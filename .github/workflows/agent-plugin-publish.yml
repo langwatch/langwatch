@@ -6,9 +6,11 @@
 # publish must correspond to a release rather than to a merge. release-please
 # cuts `agent-plugin@vX.Y.Z`; this reacts to it.
 #
-# The public repo is a MIRROR of the built directory. It gets the manifests, the
-# hooks, the skills and the built hook script, and none of the monorepo scaffolding
-# (package.json, build script, tests, release shim).
+# The public repo is a MIRROR of the committed directory. There is no build:
+# the plugin's hooks run one committed launcher script, which runs the
+# installed `langwatch` CLI. It gets the manifests, the hooks, the launcher,
+# the skills, the README, the LICENSE and the changelog, and none of the
+# monorepo scaffolding (package.json, tests, release shim).
 name: agent-plugin-publish
 
 on:
@@ -72,29 +74,24 @@ jobs:
           path: _agent-plugin-publish
           token: ${{ secrets.AGENT_PLUGIN_PUBLISH_TOKEN }}
 
-      # `langwatch...` is the SDK the hook is bundled from, plus its workspace
-      # dependencies. The plugin package's own devDependencies are test tooling
-      # and this job runs no tests, so they are deliberately not installed.
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "langwatch..."
-
-      - name: Build the plugin
-        run: pnpm --filter @langwatch/agent-plugin run build
-
-      - name: Verify the hook bundle is present
+      # The launcher is what every hook runs, and hooks.json names it by path,
+      # so a publish without it (or with one node cannot parse) ships a plugin
+      # whose hooks do nothing. `node --check` parses without running; the
+      # runner's node is what the checkout already provides.
+      - name: Verify the launcher is present and parses
         run: |
           set -euo pipefail
-          script=plugins/langwatch/scripts/session-context.mjs
-          if [ ! -s "$script" ]; then
-            echo "::error::$script is missing or empty. Publishing would ship a plugin whose hooks do nothing."
+          launcher=plugins/langwatch/scripts/launch.mjs
+          if [ ! -s "$launcher" ]; then
+            echo "::error::$launcher is missing or empty. Publishing would ship a plugin whose hooks do nothing."
             exit 1
           fi
+          node --check "$launcher"
 
-      # What crosses over: the two manifests, the marketplace, hooks/, skills/,
-      # the built scripts/session-context.mjs, the README, the LICENSE and the
-      # changelog. What stays behind is the monorepo scaffolding that would only
-      # confuse somebody reading the published package.
+      # What crosses over: the two manifests, the marketplace, hooks/, scripts/,
+      # skills/, the README, the LICENSE and the changelog. What stays behind is
+      # the monorepo scaffolding that would only confuse somebody reading the
+      # published package.
       #
       # `.git/` is excluded explicitly because `--delete` would otherwise remove
       # the destination checkout's own history, which is what the guard in the
@@ -108,9 +105,7 @@ jobs:
             --exclude '__tests__/' \
             --exclude 'package.json' \
             --exclude 'tsconfig.json' \
-            --exclude 'build.mjs' \
             --exclude 'vitest.config.ts' \
-            --exclude '.gitignore' \
             --exclude '.release-please-shim' \
             plugins/langwatch/ _agent-plugin-publish/
 

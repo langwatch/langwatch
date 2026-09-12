@@ -5,7 +5,7 @@
 #   sdks/typescript/src/cli/utils/governance/codex-live-session.ts      (which codex session is live on this machine)
 #   sdks/typescript/src/cli/utils/governance/codex-agents-md.ts         (the guidance block in ~/.codex/AGENTS.md)
 #   sdks/typescript/src/cli/utils/governance/session-guidance.ts        (the one guidance text every channel carries)
-#   sdks/typescript/src/cli/plugin/session-guidance-entry.ts            (the plugin hook that injects the guidance)
+#   plugins/langwatch/scripts/launch.mjs                                (the plugin hook that runs the guidance command)
 #   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts   (the raw-hooks guidance entry)
 #   sdks/typescript/src/cli/utils/governance/telemetry-targets.ts       (logout removal)
 #
@@ -278,9 +278,9 @@ Rule: The agent is told when to declare
     When the guidance is removed
     Then the file is gone
 
-  @unit
+  @integration
   Scenario: The plugin's guidance hook emits the guidance as session context
-    When the plugin's session guidance entry runs
+    When the plugin's launcher runs the session guidance hook against the installed CLI
     Then stdout is one JSON object whose additionalContext carries the guidance
     And the exit code is zero
 

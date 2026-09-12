@@ -1,12 +1,11 @@
 /**
  * The plugin's manifests, read as the two ecosystems read them.
  *
- * These files are hand-authored JSON that nothing in the build validates, and
- * each of the two clients that consumes them fails in a way nobody sees: an
- * Agent Plugins client REJECTS a plugin whose manifest violates the closed
- * schema, and Claude Code simply loads a plugin whose hooks point at a file
- * that is not there. So the contract is asserted here rather than discovered in
- * somebody's session.
+ * These files are hand-authored JSON that nothing validates, and each of the
+ * two clients that consumes them fails quietly: an Agent Plugins client
+ * REJECTS a plugin whose manifest violates the closed schema, and Claude Code
+ * simply loads a plugin whose hooks point at a file that is not there. So the
+ * contract is asserted here rather than discovered in somebody's session.
  *
  * The Agent Plugins allowlist below is copied from
  * https://agent-plugins.org/schemas/1.0.0/plugin.schema.json (§5.2 of the
@@ -18,7 +17,7 @@
  * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -130,8 +129,8 @@ describe("the plugin manifests", () => {
 
 describe("the plugin hook configuration", () => {
   describe("given Claude Code loading the plugin", () => {
-    /** @scenario "The hooks run the bundled script at the start and the end of a session" */
-    it("declares the two session events, each running the bundled script under a timeout", () => {
+    /** @scenario "The hooks run the launcher at the start and the end of a session" */
+    it("declares the two session events, each running the committed launcher under a timeout", () => {
       const events = hooks.hooks as Record<
         string,
         Array<{
@@ -141,51 +140,40 @@ describe("the plugin hook configuration", () => {
 
       expect(Object.keys(events).sort()).toEqual(["SessionStart", "Stop"]);
 
-      for (const groups of Object.values(events)) {
-        expect(groups).toHaveLength(1);
-        const entries = groups[0]?.hooks ?? [];
-        const entry = entries[0]!;
-        expect(entry.type).toBe("command");
-        // The plugin root is quoted so a path with spaces survives the shell,
-        // and the argument names the agent the record is filed under.
-        expect(entry.command).toContain(
-          '"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.mjs" claude-code',
-        );
-        expect(entry.command.startsWith("node ")).toBe(true);
-        expect(typeof entry.timeout).toBe("number");
-        expect(entry.timeout).toBeGreaterThan(0);
-        expect(entry.timeout).toBeLessThanOrEqual(60);
-      }
-    });
-
-    /** @scenario "The plugin's guidance hook emits the guidance as session context" */
-    it("runs the guidance script on SessionStart only, beside the context hook", () => {
-      const events = hooks.hooks as Record<
-        string,
-        Array<{
-          hooks: Array<{ type: string; command: string; timeout?: number }>;
-        }>
-      >;
-
       const commandsOf = (event: string): string[] =>
         (events[event] ?? []).flatMap((group) =>
           group.hooks.map((hook) => hook.command),
         );
 
-      const guidance = commandsOf("SessionStart").filter((command) =>
-        command.includes("session-guidance.mjs"),
-      );
-      expect(guidance).toHaveLength(1);
-      expect(guidance[0]).toContain(
-        '"${CLAUDE_PLUGIN_ROOT}/scripts/session-guidance.mjs"',
-      );
-      // Guidance is context for the session's start; the Stop hook stays a
-      // single-purpose context reporter.
-      expect(
-        commandsOf("Stop").some((command) =>
-          command.includes("session-guidance.mjs"),
-        ),
-      ).toBe(false);
+      for (const groups of Object.values(events)) {
+        expect(groups).toHaveLength(1);
+        for (const entry of groups[0]?.hooks ?? []) {
+          expect(entry.type).toBe("command");
+          // The plugin root is quoted so a path with spaces survives the
+          // shell, the argument names the hook event the launcher maps to a
+          // CLI command, and `|| true` keeps a shell-level failure from ever
+          // reaching the session.
+          expect(entry.command).toMatch(
+            /^node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/launch\.mjs" session-(context|guidance) \|\| true$/,
+          );
+          expect(existsSync(join(pluginRoot, "scripts", "launch.mjs"))).toBe(true);
+          expect(typeof entry.timeout).toBe("number");
+          expect(entry.timeout).toBeGreaterThan(0);
+          expect(entry.timeout).toBeLessThanOrEqual(60);
+        }
+      }
+
+      // Both events report context; guidance is context for the session's
+      // start, so the Stop hook stays a single-purpose context reporter.
+      expect(commandsOf("SessionStart").map(hookOf)).toEqual([
+        "session-context",
+        "session-guidance",
+      ]);
+      expect(commandsOf("Stop").map(hookOf)).toEqual(["session-context"]);
     });
   });
 });
+
+/** The hook event name a hooks.json command hands the launcher. */
+const hookOf = (command: string): string =>
+  /launch\.mjs" (\S+)/.exec(command)?.[1] ?? "";
