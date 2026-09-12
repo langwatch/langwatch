@@ -1,13 +1,12 @@
 apiVersion: v2
 name: langwatch-langyagent
 description: >-
-  Langy agent pod. Runs the worker manager (Go, services/langyagent) that
-  spawns one isolated worker subprocess per conversation, with per-request
-  credential injection. Internal-only service consumed by the LangWatch control
-  plane.
+  Langy agent pod. Runs the worker manager (Go, services/langyagent) that spawns
+  one isolated worker subprocess per conversation, with per-request credential
+  injection. Internal-only service consumed by the LangWatch control plane.
 type: application
-version: 3.17.0
-appVersion: 3.17.0
+version: 3.18.0
+appVersion: 3.18.0
 keywords:
   - langwatch
   - langy
