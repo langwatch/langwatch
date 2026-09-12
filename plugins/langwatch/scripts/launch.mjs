@@ -19,7 +19,15 @@
 // sdks/typescript/src/cli/__tests__/plugin-launcher-contract.unit.test.ts.
 // Importing anything from the SDK here would bring a build step back.
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
@@ -58,11 +66,25 @@ function recordedCli() {
   return null;
 }
 
+// A PATH lookup means a file that can be run, not a name that happens to be
+// there: a directory called `langwatch`, or a file without the execute bit,
+// would be picked and then fail to spawn while the real CLI sat further down
+// PATH.
+function runnable(candidate) {
+  try {
+    if (!statSync(candidate).isFile()) return false;
+    accessSync(candidate, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function cliOnPath() {
   const names = process.platform === "win32" ? ["langwatch.cmd", "langwatch"] : ["langwatch"];
   for (const dir of (process.env.PATH ?? "").split(delimiter).filter(Boolean)) {
     for (const name of names) {
-      if (existsSync(join(dir, name))) return [join(dir, name)];
+      if (runnable(join(dir, name))) return [join(dir, name)];
     }
   }
   return null;

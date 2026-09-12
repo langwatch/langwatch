@@ -198,6 +198,34 @@ describe("the launcher's resolution order", () => {
     });
   });
 
+  describe("given a PATH entry whose langwatch cannot be run", () => {
+    /** @scenario "The launcher skips a PATH entry whose langwatch cannot be run" */
+    it("skips a directory named langwatch and runs the real one further down PATH", async () => {
+      const decoy = join(scratch, "decoy-dir");
+      mkdirSync(join(decoy, "langwatch"), { recursive: true });
+      const bin = fakePathCli();
+
+      const run = await runLauncher({ hook: "session-context", path: [decoy, bin] });
+
+      expect(run.exitCode).toBe(0);
+      expect(readProbe()).toEqual({ via: "path", argv: "ingest hook claude-code" });
+    });
+
+    it("skips a langwatch with no execute bit and runs the real one further down PATH", async () => {
+      const decoy = join(scratch, "decoy-file");
+      mkdirSync(decoy, { recursive: true });
+      const unrunnable = join(decoy, "langwatch");
+      writeFileSync(unrunnable, "#!/bin/sh\nexit 1\n");
+      chmodSync(unrunnable, 0o644);
+      const bin = fakePathCli();
+
+      const run = await runLauncher({ hook: "session-context", path: [decoy, bin] });
+
+      expect(run.exitCode).toBe(0);
+      expect(readProbe()).toEqual({ via: "path", argv: "ingest hook claude-code" });
+    });
+  });
+
   describe("given the guidance hook", () => {
     /** @scenario "The launcher maps the guidance hook to the guidance command" */
     it("runs the CLI's guidance command and forwards its stdout", async () => {

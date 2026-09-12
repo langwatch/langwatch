@@ -108,6 +108,13 @@ Rule: The hooks run the installed CLI through a committed launcher
     Then it runs the langwatch on PATH
 
   @unit
+  Scenario: The launcher skips a PATH entry whose langwatch cannot be run
+    Given a PATH entry holding a langwatch that is a directory or has no execute bit
+    And a real langwatch further down PATH
+    When the launcher runs the session context hook
+    Then it runs the langwatch further down PATH
+
+  @unit
   Scenario: The launcher maps the guidance hook to the guidance command
     Given a langwatch on PATH
     When the launcher runs the session guidance hook
