@@ -62,6 +62,7 @@ let collector: Server;
 let collectorUrl: string;
 let received: CapturedRequest[] = [];
 let scratch: string;
+let gitBin: string;
 
 /** Where the CLI config and the fingerprint state live for one case. */
 let home: string;
@@ -149,10 +150,11 @@ const cliOnPath = (): string => {
 /**
  * Run the launcher exactly as the plugin's `hooks.json` does, minus the shell:
  * one `node` process, the hook event as its only argument, the payload on
- * stdin. `PATH` carries git (the CLI shells out to it) plus whatever the case
- * added, and never node's own directory: a global npm install puts
- * `langwatch` right beside node, which is the one thing the no-CLI case must
- * not find by accident. The dist is always run by absolute path.
+ * stdin. `PATH` carries a scratch directory holding a single `git` shim (the
+ * CLI shells out to git) plus whatever the case added, and nothing else. Both
+ * the real git directory and node's own would defeat the no-CLI case on a
+ * machine that installed `langwatch` beside either of them. The dist is always
+ * run by absolute path.
  */
 const runHook = ({
   hook,
@@ -169,7 +171,7 @@ const runHook = ({
     const child = spawn(process.execPath, [launcher, hook], {
       cwd: scratch,
       env: {
-        PATH: [...path, dirname(gitPath)].join(":"),
+        PATH: [...path, gitBin].join(":"),
         HOME: home,
         // The daemon would serve the guidance command from a process whose
         // stdout is not this hook's; the CLI denies it anyway, and this keeps
@@ -233,6 +235,12 @@ beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "langwatch-plugin-"));
   home = join(scratch, "home");
   mkdirSync(home, { recursive: true });
+
+  gitBin = join(scratch, "git-bin");
+  mkdirSync(gitBin, { recursive: true });
+  const gitShim = join(gitBin, "git");
+  writeFileSync(gitShim, `#!/bin/sh\nexec "${gitPath}" "$@"\n`);
+  chmodSync(gitShim, 0o755);
 });
 
 afterEach(() => {

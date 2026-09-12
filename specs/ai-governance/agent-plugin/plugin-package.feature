@@ -31,8 +31,10 @@
 # The plugin carries no hook logic. Its hooks run one committed launcher, and
 # the launcher runs the installed `langwatch` CLI: `ingest hook claude-code`
 # for session context, `ingest guidance claude-code` for the guidance. The
-# plugin does nothing without a CLI login, its skill calls the CLI, and
-# `langwatch claude` is what installs it, so the CLI is already a requirement.
+# session context the plugin reports needs a CLI login, its skill calls the CLI,
+# and `langwatch claude` is what installs it, so the CLI is already a
+# requirement. Guidance is the part that still runs without a login, and a
+# machine with no CLI at all gets one installation message per session.
 # Running it is what makes a hook fix reach plugin users with the next CLI
 # release instead of waiting for someone to cut a plugin release.
 #
