@@ -249,6 +249,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       judgeModel: null,
       kind: "test_suite",
       scope: null,
+      fields: input.fields ?? [],
+      evaluators: input.evaluators ?? [],
       archivedAt: null,
       createdAt: new Date(0),
       updatedAt: new Date(0),

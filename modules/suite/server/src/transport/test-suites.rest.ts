@@ -11,15 +11,17 @@ import {
   projectRestFacts,
 } from "@langwatch/api/rest";
 import { runActorFromRequest, type ScenarioTestSuite } from "@langwatch/scenario-contract";
-import { MAX_PLAN_NAME_LENGTH, SuiteApi, SuiteNotFoundError } from "@langwatch/suite-contract";
+import { SuiteApi, SuiteNotFoundError } from "@langwatch/suite-contract";
 import { z } from "zod";
 
 import {
   queryBoolean,
   runPlanRunResultSchema,
   suiteSurfaceFact,
+  testSuiteCreateInputSchema,
   testSuiteDetailWireSchema,
   testSuiteRunInputSchema,
+  testSuiteUpdateInputSchema,
   testSuiteWireSchema,
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
@@ -30,15 +32,6 @@ const listQuerySchema = z.object({
   includeArchived: queryBoolean.describe(
     "Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no.",
   ),
-});
-
-const nameInputSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1)
-    .max(MAX_PLAN_NAME_LENGTH)
-    .describe("The test suite name, as it reads in the platform."),
 });
 
 const archiveResultSchema = z.object({
@@ -64,6 +57,8 @@ function suiteWire(params: {
     slug: suite.slug,
     scenarioIds: suite.scenarioIds,
     scenarioCount: suite.scenarioIds.length,
+    fields: suite.fields,
+    evaluators: suite.evaluators,
     archivedAt: suite.archivedAt?.toISOString() ?? null,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),
@@ -124,18 +119,24 @@ async function readTestSuiteDetail(params: {
   };
 }
 
-/** Renames the suite this id names, refusing a run plan id as a miss. */
-async function renameTestSuite(params: {
+/**
+ * Edits the suite this id names, refusing a run plan id as a miss. Send only
+ * what changes: the slug is kept, so links and run history stay where they
+ * are.
+ */
+async function updateTestSuite(params: {
   app: SuiteApi;
-  input: z.infer<typeof idParamsSchema> & z.infer<typeof nameInputSchema>;
+  input: z.infer<typeof idParamsSchema> & z.infer<typeof testSuiteUpdateInputSchema>;
   projectId: string;
   projectSlug: string;
 }): Promise<z.infer<typeof testSuiteWireSchema>> {
   await readTestSuite({ app: params.app, id: params.input.id, projectId: params.projectId });
-  const suite = await params.app.renameTestSuite({
+  const suite = await params.app.updateTestSuite({
     testSuiteId: params.input.id,
     projectId: params.projectId,
-    name: params.input.name,
+    ...(params.input.name !== undefined && { name: params.input.name }),
+    ...(params.input.fields !== undefined && { fields: params.input.fields }),
+    ...(params.input.evaluators !== undefined && { evaluators: params.input.evaluators }),
   });
 
   return suiteWire({ app: params.app, projectSlug: params.projectSlug, suite });
@@ -230,21 +231,26 @@ export function createTestSuitesRest() {
     )
 
     .post("/", "createTestSuite")
-    .withInput(nameInputSchema)
+    .withInput(testSuiteCreateInputSchema)
     .withPermission("scenarios:create")
     .withOutput(testSuiteWireSchema)
     .withStatus(201)
     .withDocs({
       tags: ["Test Suites"],
       description:
-        "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run.",
+        "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start.",
     })
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       suiteWire({
         app,
         projectSlug: project.projectSlug,
-        suite: await app.createTestSuite({ projectId: scope.id, name: input.name }),
+        suite: await app.createTestSuite({
+          projectId: scope.id,
+          name: input.name,
+          ...(input.fields !== undefined && { fields: input.fields }),
+          ...(input.evaluators !== undefined && { evaluators: input.evaluators }),
+        }),
       }),
     )
 
@@ -269,20 +275,20 @@ export function createTestSuitesRest() {
       }),
     )
 
-    .patch("/:id", "renameTestSuite")
+    .patch("/:id", "updateTestSuite")
     .withParams(idParamsSchema)
-    .withInput(nameInputSchema)
+    .withInput(testSuiteUpdateInputSchema)
     .withPermission("scenarios:update")
     .withOutput(testSuiteWireSchema)
     .withDocs({
       tags: ["Test Suites"],
       description:
-        "Rename a test suite. The slug is kept, so links and run history stay where they are.",
+        "Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.",
       responses: notFound,
     })
     .withMiddleware(projectRestFacts)
     .handle(({ app, input, scope }, project) =>
-      renameTestSuite({
+      updateTestSuite({
         app,
         input,
         projectId: scope.id,

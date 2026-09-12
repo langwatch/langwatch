@@ -48,6 +48,54 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
     });
   });
 
+  describe("when a test suite declares fields and evaluators", () => {
+    /** @scenario "A test suite declares fields and reads them back" */
+    it("reads back the fields and evaluators it was created and updated with", async () => {
+      const repository = backend.repository();
+      const fields = [{ identifier: "golden_sql", type: "text" as const }];
+      const evaluators = [
+        {
+          id: "att_1",
+          evaluatorId: "eval_1",
+          required: true,
+          mappings: {
+            expected_output: {
+              type: "source" as const,
+              sourceId: "scenario" as const,
+              path: ["fields", "golden_sql"],
+            },
+          },
+        },
+      ];
+      const created = await repository.createTestSuite({
+        id: `suite_${randomUUID()}`,
+        projectId: PROJECT_ID,
+        name: `Case lookups ${randomUUID().slice(0, 8)}`,
+        fields,
+        evaluators,
+      });
+
+      expect(created.fields).toEqual(fields);
+      expect(created.evaluators).toEqual(evaluators);
+
+      const updatedFields = [
+        { identifier: "golden_sql", type: "text" as const },
+        { identifier: "table_schema", type: "text" as const },
+      ];
+      const updated = await repository.updateTestSuite({
+        testSuiteId: created.id,
+        projectId: PROJECT_ID,
+        fields: updatedFields,
+      });
+
+      expect(updated.fields).toEqual(updatedFields);
+      expect(updated.evaluators).toEqual(evaluators);
+      await expect(
+        repository.tryFindTestSuite({ testSuiteId: created.id, projectId: PROJECT_ID }),
+      ).resolves.toMatchObject({ fields: updatedFields, evaluators });
+    });
+  });
+
   describe("when a test suite files scenarios", () => {
     it("lists only the ones this project owns", async () => {
       const repository = backend.repository();

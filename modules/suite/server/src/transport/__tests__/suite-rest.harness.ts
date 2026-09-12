@@ -19,9 +19,11 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import {
   scenarioTestSuiteSchema,
   ScenarioTestSuiteNotFoundError,
+  type EvaluatorAttachment,
   type ScenarioApi,
   type ScenarioRunConfig,
   type ScenarioTestSuite,
+  type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
 import {
   suiteSchema,
@@ -171,7 +173,14 @@ export class SuiteWorld {
     return row;
   }
 
-  addTestSuite(overrides: { name?: string; scenarioIds?: string[] } = {}): ScenarioTestSuite {
+  addTestSuite(
+    overrides: {
+      name?: string;
+      scenarioIds?: string[];
+      fields?: SuiteFieldDefinition[];
+      evaluators?: EvaluatorAttachment[];
+    } = {},
+  ): ScenarioTestSuite {
     const id = this.nextId("suite");
     const name = overrides.name ?? "Refunds";
     const testSuite = scenarioTestSuiteSchema.parse({
@@ -191,6 +200,8 @@ export class SuiteWorld {
       judgeModel: null,
       kind: "test_suite",
       scope: null,
+      fields: overrides.fields ?? [],
+      evaluators: overrides.evaluators ?? [],
       archivedAt: null,
       createdAt: NOW,
       updatedAt: NOW,
@@ -273,7 +284,12 @@ function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
         (one) =>
           one.projectId === input.projectId && (input.includeArchived || one.archivedAt === null),
       ),
-    createTestSuite: async (input) => world.addTestSuite({ name: input.name }),
+    createTestSuite: async (input) =>
+      world.addTestSuite({
+        name: input.name,
+        ...(input.fields !== undefined && { fields: input.fields }),
+        ...(input.evaluators !== undefined && { evaluators: input.evaluators }),
+      }),
     renameTestSuite: async (input) => {
       const found = world.testSuites.get(input.testSuiteId);
       if (!found) throw new ScenarioTestSuiteNotFoundError(input.testSuiteId);
@@ -288,6 +304,8 @@ function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
       const updated = scenarioTestSuiteSchema.parse({
         ...found,
         ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.fields === undefined ? {} : { fields: input.fields }),
+        ...(input.evaluators === undefined ? {} : { evaluators: input.evaluators }),
         updatedAt: NOW,
       });
       world.testSuites.set(updated.id, updated);

@@ -12,6 +12,7 @@ import type {
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
+  ScenarioTestSuiteUpdateInput,
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
@@ -284,6 +285,15 @@ export class SuiteApp implements SuiteApi {
   /** Renames a test suite. */
   renameTestSuite(input: ScenarioTestSuiteIdInput & { name: string }): Promise<ScenarioTestSuite> {
     return this.#dependencies.scenarios.renameTestSuite(input);
+  }
+
+  /**
+   * Edits what a test suite declares: its name, the fields it declares, the
+   * evaluators attached to it. Send only what changes; the slug is kept, as
+   * on a rename.
+   */
+  updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
+    return this.#dependencies.scenarios.updateTestSuite(input);
   }
 
   // -- runs ------------------------------------------------------------------

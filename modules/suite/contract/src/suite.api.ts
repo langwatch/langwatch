@@ -3,6 +3,7 @@ import type {
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
+  ScenarioTestSuiteUpdateInput,
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
@@ -55,6 +56,11 @@ export interface SuiteApi {
   archive(input: SuiteIdInput): Promise<Suite>;
   archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite>;
   renameTestSuite(input: ScenarioTestSuiteIdInput & { name: string }): Promise<ScenarioTestSuite>;
+  /**
+   * Edits what a test suite declares: its name, the fields it declares, the
+   * evaluators attached to it. Send only what changes.
+   */
+  updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult>;
   runAll(input: Omit<SuiteRunAllInput, "organizationId">): Promise<SuiteRunAllResult>;
   runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult>;

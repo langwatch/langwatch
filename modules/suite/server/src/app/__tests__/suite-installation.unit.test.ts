@@ -17,8 +17,41 @@ import { describe, expect, it } from "vitest";
 import { suiteServer } from "../../suite.server.ts";
 import { RecordingSuiteExecution } from "./suite.fixture.ts";
 
+/**
+ * The one member `SuiteApp` declares it reads (`suite.app.ts`,
+ * `reads("clickhouse")`). Installing on the memory tier never reaches a store,
+ * so the boot needs the member to EXIST and nothing more — a stub that refuses
+ * on use proves that without opening a client, and turns a reach into a named
+ * failure rather than a silent one.
+ */
+function membersWithoutStores() {
+  return {
+    order: ["clickhouse"] as const,
+    read(name: string): unknown {
+      if (name !== "clickhouse") {
+        throw new Error(`This process opened no clients, so it cannot read the "${name}" member.`);
+      }
+
+      // Boot builds every claimed member eagerly, so this has to BE something.
+      // It refuses on first use instead, which keeps "the memory tier reached
+      // ClickHouse" a named failure rather than a silent query.
+      return new Proxy(
+        {},
+        {
+          get(_target, property) {
+            throw new Error(
+              `The memory tier must not reach ClickHouse (read "${String(property)}").`,
+            );
+          },
+        },
+      );
+    },
+    async close() {},
+  };
+}
+
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
+  return createApp({ role, config: {}, members: membersWithoutStores() as never })
     .withProvided(
       ScenarioApi,
       createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),

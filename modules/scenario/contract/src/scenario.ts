@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
+import { parseSuiteFieldDefinitions, suiteFieldDefinitionsSchema } from "./suite-fields.ts";
 
 export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
 export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;
@@ -54,6 +56,11 @@ export const scenarioTestSuiteSchema = z
     judgeModel: z.string().nullable(),
     kind: z.literal("test_suite"),
     scope: jsonValueSchema.nullable(),
+    fields: z.preprocess((raw) => parseSuiteFieldDefinitions(raw), suiteFieldDefinitionsSchema),
+    evaluators: z.preprocess(
+      (raw) => parseEvaluatorAttachments(raw),
+      evaluatorAttachmentsSchema,
+    ),
     archivedAt: z.date().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -62,7 +69,12 @@ export const scenarioTestSuiteSchema = z
 export type ScenarioTestSuite = z.infer<typeof scenarioTestSuiteSchema>;
 
 export const scenarioTestSuiteCreateInputSchema = z
-  .object({ projectId: z.string().min(1), name: z.string().trim().min(1) })
+  .object({
+    projectId: z.string().min(1),
+    name: z.string().trim().min(1),
+    fields: suiteFieldDefinitionsSchema.optional(),
+    evaluators: evaluatorAttachmentsSchema.optional(),
+  })
   .strict();
 export type ScenarioTestSuiteCreateInput = z.infer<typeof scenarioTestSuiteCreateInputSchema>;
 
@@ -85,6 +97,8 @@ export const scenarioTestSuiteUpdateInputSchema = scenarioTestSuiteIdInputSchema
     labels: z.array(z.string()).optional(),
     simulatorModel: z.string().nullable().optional(),
     judgeModel: z.string().nullable().optional(),
+    fields: suiteFieldDefinitionsSchema.optional(),
+    evaluators: evaluatorAttachmentsSchema.optional(),
   })
   .strict();
 export type ScenarioTestSuiteUpdateInput = z.infer<typeof scenarioTestSuiteUpdateInputSchema>;

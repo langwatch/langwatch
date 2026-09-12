@@ -434,6 +434,8 @@ export class PrismaScenarioRepository extends ScenarioRepository {
             targets: [],
             repeatCount: 1,
             labels: [],
+            fields: (input.fields ?? []) as unknown as Prisma.InputJsonValue,
+            evaluators: (input.evaluators ?? []) as unknown as Prisma.InputJsonValue,
           },
         });
         return mapTestSuite(row);
@@ -487,7 +489,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   }
 
   async updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
-    const { testSuiteId, projectId, targets, ...data } = input;
+    const { testSuiteId, projectId, targets, fields, evaluators, ...data } = input;
     const found = await this.database.simulationSuite.findFirst({
       where: { id: testSuiteId, projectId, kind: "test_suite", archivedAt: null },
       select: { id: true },
@@ -499,6 +501,10 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       data: {
         ...data,
         ...(targets === void 0 ? {} : { targets: targets as Prisma.InputJsonValue }),
+        ...(fields === void 0 ? {} : { fields: fields as unknown as Prisma.InputJsonValue }),
+        ...(evaluators === void 0
+          ? {}
+          : { evaluators: evaluators as unknown as Prisma.InputJsonValue }),
       },
     });
     return mapTestSuite(row);
