@@ -89,6 +89,7 @@ import {
   reserveLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
+import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
@@ -483,6 +484,7 @@ export function initializeDefaultApp(options?: {
     new ProjectService(
       projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+      ModelProviderService.create(prisma),
     ),
     "ProjectService",
   );

@@ -238,6 +238,15 @@ export const projectRouter = createTRPCRouter({
 
       return { firstMessage: project?.firstMessage ?? false };
     }),
+  getResolvedDefaultModel: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .permission("project:view")
+    .query(async ({ input }) => {
+      const resolvedModel = await getApp().projects.resolveDefaultModel(
+        input.projectId,
+      );
+      return { resolvedDefaultModel: resolvedModel };
+    }),
   regenerateApiKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("project:manage")
