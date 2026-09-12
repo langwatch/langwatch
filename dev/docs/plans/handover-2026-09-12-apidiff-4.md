@@ -325,7 +325,21 @@ coupling lesson at smaller scale: a type-import pass converted
 `IngestionKeyRepository` to `import type` and left its `extends` in place,
 manufacturing a 57th ERASED site that had not existed. **The fix for one class
 can create another if you apply half of a coupled edit.** The detector caught
-it; a person would not have.
+it; a person would not have — and the reason is worth stating, because it is
+the argument for these detectors existing at all.
+
+Neither half of that edit reads as a defect. Converting a value import of an
+interface to `import type` is correct in isolation; the `extends` five lines
+below was correct before the edit. A reviewer reading the diff passes it. The
+only signal was **57 where there had been 56**, and that signal existed solely
+because something had counted before. A detector's value is not that it finds
+things — it is that it establishes a baseline, and a baseline is what turns an
+invisible half-edit into a visible number.
+
+That generalises past tonight. It is the same reason this session's 63/3/1
+per-application split was better evidence than the totals: a number you can
+compare against a prior number says things a number on its own cannot. Every
+wall in this document was a measurement that had no baseline to disagree with.
 
 **The visualdiff session's tree changes are uncommitted** — the 110-specifier
 pass, the exports repoint, the type-import pass, the 35 renames, the two
