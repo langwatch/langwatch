@@ -10,13 +10,8 @@ import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { finishedStatusOf } from "../projections/simulation-run-state.projection.ts";
-// DANGLING: `RecordEvaluationsCommandData` / `recordEvaluationsCommandDataSchema`
-// were never ported off main's ../schemas/commands (see
-// platform/app/src/server/event-sourcing/pipelines/simulation-processing/schemas/commands.ts
-// at MERGE_HEAD). No package exports them under the new layout. Do not invent
-// a replacement here - see handoff merge-scenario-dangling-imports.
-import type { RecordEvaluationsCommandData } from "../schemas/commands";
-import { recordEvaluationsCommandDataSchema } from "../schemas/commands";
+import type { RecordEvaluationsCommandData } from "@langwatch/scenario-contract";
+import { recordEvaluationsCommandDataSchema } from "@langwatch/scenario-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,

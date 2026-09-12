@@ -11,6 +11,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import {
   ComputeRunMetricsCommand,
   FinishRunCommand,
+  RecordEvaluationsCommand,
   NullSimulationRepository,
   RedisCancellationPublisherAdapter,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
@@ -31,6 +32,7 @@ import type {
   SimulationDeleteRun,
   SimulationRecordAgentInstance,
   SimulationFinishRun,
+  RecordEvaluationsCommandData,
   SimulationMessageSnapshot,
   SimulationProcessingEvent,
   SimulationQueueRun,
@@ -119,6 +121,19 @@ export function createWorkerScenarioProcessing(
   if (!options.executionPool) options.absence?.withoutExecutionPool();
   const simulations = SimulationService.create(new NullSimulationRepository(), execution);
 
+  const loadSimulationPriorEvents = ({
+    tenantId,
+    scenarioRunId,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+  }) =>
+    options.eventStore.getEvents(
+      scenarioRunId,
+      { tenantId: createTenantId(tenantId) },
+      "simulation_run",
+    ) as Promise<SimulationProcessingEvent[]>;
+
   const definition = () =>
     SimulationProcessingPipelineAdapter.create({
       simulationRunStore: cachedRunStore(options),
@@ -127,12 +142,10 @@ export function createWorkerScenarioProcessing(
         resolveClient: options.resolveClickHouseClient as never,
       }),
       finishRunCommand: new FinishRunCommand({
-        loadPriorEvents: ({ tenantId, scenarioRunId }) =>
-          options.eventStore.getEvents(
-            scenarioRunId,
-            { tenantId: createTenantId(tenantId) },
-            "simulation_run",
-          ) as Promise<SimulationProcessingEvent[]>,
+        loadPriorEvents: loadSimulationPriorEvents,
+      }),
+      recordEvaluationsCommand: new RecordEvaluationsCommand({
+        loadPriorEvents: loadSimulationPriorEvents,
       }),
       computeRunMetricsCommand: new ComputeRunMetricsCommand({
         traceSummaryStore: options.traceSummaryStore,
@@ -271,6 +284,9 @@ class WorkerSimulationExecutionAdapter extends SimulationExecutionRepository {
   }
   finishRun(input: SimulationFinishRun): Promise<void> {
     return this.dispatch("finishRun", input);
+  }
+  recordEvaluations(input: RecordEvaluationsCommandData): Promise<void> {
+    return this.dispatch("recordEvaluations", input);
   }
   cancelRun(input: SimulationCancelRun): Promise<void> {
     return this.dispatch("cancelRun", input);

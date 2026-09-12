@@ -18,6 +18,7 @@ import {
 } from "../../processes/simulation-run-execution.process.ts";
 import { ComputeRunMetricsCommand } from "../../eventing/compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "../../eventing/finish-run.commands.ts";
+import { RecordEvaluationsCommand } from "../../eventing/recordEvaluations.command.ts";
 import { NullSimulationRepository } from "../simulation.repository.ts";
 import { SimulationService as SimulationServiceClass } from "../../services/simulation.service.ts";
 import { SimulationProcessingPipelineAdapter } from "../../eventing/simulation-processing.pipeline.ts";
@@ -119,6 +120,9 @@ class ProducerOnlySimulationExecution extends SimulationExecutionRepository {
   finishRun(): Promise<never> {
     return this.refuse("finish a simulation run");
   }
+  recordEvaluations(): Promise<never> {
+    return this.refuse("record a simulation run's evaluator results");
+  }
   cancelRun(): Promise<never> {
     return this.refuse("cancel a simulation run");
   }
@@ -157,6 +161,9 @@ function buildSimulationProcessingProducerPipeline(input: { processName: string 
       "simulation run metrics",
     ),
     finishRunCommand: new FinishRunCommand({
+      loadPriorEvents: () => Promise.reject(producerOnly(processName, "read a run's prior events")),
+    }),
+    recordEvaluationsCommand: new RecordEvaluationsCommand({
       loadPriorEvents: () => Promise.reject(producerOnly(processName, "read a run's prior events")),
     }),
     computeRunMetricsCommand: new ComputeRunMetricsCommand({

@@ -19,6 +19,7 @@ import type {
   SimulationStartRun,
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
+  RecordEvaluationsCommandData,
 } from "./simulation.commands.ts";
 
 export type SimulationProjectDateRangeInput = {
@@ -160,6 +161,7 @@ export abstract class SimulationService {
   abstract textMessageStart(input: SimulationTextMessageStart): Promise<void>;
   abstract textMessageEnd(input: SimulationTextMessageEnd): Promise<void>;
   abstract finishRun(input: SimulationFinishRun): Promise<void>;
+  abstract recordEvaluations(input: RecordEvaluationsCommandData): Promise<void>;
   abstract cancelRun(input: SimulationCancelRun): Promise<void>;
   abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
   abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;

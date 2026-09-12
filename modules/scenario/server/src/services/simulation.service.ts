@@ -8,6 +8,7 @@ import {
   simulationRecordAgentInstanceSchema,
   simulationExportRunSchema,
   simulationFinishRunSchema,
+  recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
   simulationQueueRunSchema,
   simulationAllSuitesRunDataSchema,
@@ -42,6 +43,7 @@ import type {
   SimulationProjectDateRangeInput,
   SimulationProjectIdsInput,
   SimulationFinishRun,
+  RecordEvaluationsCommandData,
   SimulationMessageSnapshot,
   SimulationQueueRun,
   SimulationRunData,
@@ -210,6 +212,10 @@ export class SimulationService extends SimulationServiceContract {
 
   finishRun(input: SimulationFinishRun): Promise<void> {
     return this.execution.finishRun(simulationFinishRunSchema.parse(input));
+  }
+
+  recordEvaluations(input: RecordEvaluationsCommandData): Promise<void> {
+    return this.execution.recordEvaluations(recordEvaluationsCommandDataSchema.parse(input));
   }
 
   cancelRun(input: SimulationCancelRun): Promise<void> {

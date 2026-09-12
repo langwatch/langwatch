@@ -9,6 +9,7 @@ import {
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
 import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
+import { RecordEvaluationsCommand } from "./recordEvaluations.command.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import {
   SimulationRunMetricsMapProjection,
@@ -41,6 +42,7 @@ export interface SimulationProcessingPipelineDeps {
    */
   simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
   finishRunCommand: FinishRunCommand;
+  recordEvaluationsCommand: RecordEvaluationsCommand;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
   scenarioRunExecution: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
   simulations: SimulationService;
@@ -82,6 +84,11 @@ export class SimulationProcessingPipelineAdapter {
       .withCommand("textMessageStart", commands.textMessageStart)
       .withCommand("textMessageEnd", commands.textMessageEnd)
       .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
+      .withCommandInstance(
+        "recordEvaluations",
+        RecordEvaluationsCommand,
+        deps.recordEvaluationsCommand,
+      )
       .withCommand("cancelRun", commands.cancelRun)
       .withCommand("deleteRun", commands.deleteRun)
       .withCommand("recordAgentInstance", commands.recordAgentInstance)

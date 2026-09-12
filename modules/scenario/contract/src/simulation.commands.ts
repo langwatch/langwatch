@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { simulationMessageSchema } from "./simulation.ts";
+import { scenarioEvaluationResultSchema } from "./schemas/event-schemas.ts";
 
 const simulationRunIdentitySchema = z.object({
   tenantId: z.string(),
@@ -129,3 +130,19 @@ export const deleteRunCommandDataSchema = simulationDeleteRunSchema;
 export type DeleteRunCommandData = SimulationDeleteRun;
 export const archiveSetCommandDataSchema = simulationArchiveSetSchema;
 export type ArchiveSetCommandData = SimulationArchiveSet;
+
+/**
+ * Records the evaluator results of a finished run. The verdict after the
+ * gate, the identity and the verdict the run held before are all read from
+ * the run's prior events by RecordEvaluationsCommand, so the caller sends
+ * only the results.
+ */
+export const recordEvaluationsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  evaluations: z.array(scenarioEvaluationResultSchema),
+  occurredAt: z.number(),
+});
+export type RecordEvaluationsCommandData = z.infer<
+  typeof recordEvaluationsCommandDataSchema
+>;

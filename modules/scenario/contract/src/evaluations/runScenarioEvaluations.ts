@@ -22,7 +22,7 @@ import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.gen
 import type { DataForEvaluation } from "~/server/evaluations/runEvaluation";
 import { CODE_EVALUATOR_CHECK_PREFIX } from "~/server/evaluators/codeEvaluator";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
-import type { RecordEvaluationsCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
+import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
 import { evaluatorInputSpecsOf } from "~/server/suites/suite-evaluators";
 import type { Span, Trace } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
