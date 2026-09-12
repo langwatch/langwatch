@@ -77,6 +77,10 @@ export function createAgentRest(
   return defineRestRouter(AgentApi)
     .withNamespace("agents")
     .withVersion(MANAGEMENT_API_VERSION)
+    // `/api/v1/agents` is this family's whole contract: the bare `/api/agents`
+    // belongs to the deprecated legacy family, which answers a reduced field
+    // set there.
+    .withAddressing("v1-only")
 
   .get("/", "listAgents")
   .withQuery(agentRestQuerySchema)

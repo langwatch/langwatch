@@ -8,6 +8,6 @@ import { RedisPresenceRepositories } from "./redis/redis.presence.repositories.t
  * `memory` and serves the sessions its own instance can see.
  */
 export const presenceRepositories = defineRepositories({
-  redis: RedisPresenceRepositories,
+  live: RedisPresenceRepositories,
   memory: MemoryPresenceRepositories,
 });

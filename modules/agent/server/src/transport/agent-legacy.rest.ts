@@ -57,6 +57,10 @@ export const agentLegacyRest: Readonly<{
 }> = defineRestRouter(AgentApi)
   .withNamespace("agents")
   .withVersion(MANAGEMENT_API_VERSION)
+  // The bare path was never aliased: `/api/v1/agents` is the SUCCESSOR family,
+  // not this one's twin, so claiming the twin would publish two declarations at
+  // one address.
+  .withAddressing("dated", { v1Twin: false })
   .withDeprecated({ successor: AGENTS_ALIAS_SUCCESSOR, notice: `superseded by ${AGENTS_ALIAS_SUCCESSOR}` })
 
   .get("/", "listLegacyAgents")
