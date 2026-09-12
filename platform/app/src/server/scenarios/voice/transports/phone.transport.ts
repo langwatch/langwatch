@@ -26,10 +26,12 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
+import { getLangWatchTracer } from "langwatch";
 import {
   raceAgainstUpgradeRefusal,
   requestNonceRegistration,
 } from "../voice-nonce-handoff";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice-public-url-env";
 import {
   createVoiceSocketReceiver,
   type VoiceSocketReceiver,
@@ -40,6 +42,14 @@ import type {
 } from "../voice-transport.registry";
 
 const logger = createLogger("langwatch:scenarios:voice:phone");
+
+/**
+ * Traces the outbound-adapter build so a public-URL failure lands on the run's
+ * OWN trace as a recorded exception + ERROR span, not just a Twilio 120s
+ * timeout with nothing attached. `withActiveSpan` records the throw and marks
+ * the span ERROR automatically, the same pattern the code-agent adapter uses.
+ */
+const tracer = getLangWatchTracer("langwatch.scenarios.voice.phone");
 
 /**
  * Shown when a phone target's project has no Twilio credentials. Surfaced by
@@ -202,6 +212,46 @@ export class VoicePublicBaseUrlInvalidError extends Error {
         "as an invalid stream URL and the call fails with error 11100.",
     );
     this.name = "VoicePublicBaseUrlInvalidError";
+  }
+}
+
+/**
+ * Thrown when a phone run is about to dial but there is no public media URL the
+ * WORKER's own listener answers: `VOICE_PUBLIC_BASE_URL` is unset (the worker
+ * minted no quick tunnel — most often because the `cloudflared` binary is
+ * missing, so the mint failed with ENOENT at worker boot) and the only value
+ * left is the app's own `BASE_HOST`, which runs no voice media listener.
+ *
+ * Dialling `BASE_HOST` is the exact production failure this guards: Twilio
+ * opens the media stream against `app.langwatch.ai`, the handshake never
+ * completes, and the call dies with Twilio error 31920 after a 120-second
+ * timeout with no trace attached. Failing HERE — at adapter-build time, on the
+ * run's own trace — turns that silent timeout into an immediate, actionable
+ * run error naming the remedy.
+ *
+ * A plain {@link Error}, not a {@link HandledError}: the remedy is an OPERATOR
+ * action (set the env var, ship the binary), not one the customer can take, so
+ * per ADR-045 it degrades to a generic "unknown" plus a trace id at the API
+ * boundary rather than promising the caller an action they do not have —
+ * matching {@link VoicePublicBaseUrlInvalidError} directly above.
+ */
+export class VoicePublicBaseUrlMissingError extends Error {
+  constructor(source: PublicBaseUrlSource | "none", reason?: string) {
+    // When the worker recorded WHY it minted no tunnel (its cloudflared tunnel
+    // boot failed), name that real cause — otherwise the run error is a generic
+    // "no public media URL" that hides a "spawn cloudflared ENOENT" behind it.
+    const reasonSuffix = reason
+      ? ` The worker's public URL tunnel failed to open: ${reason}`
+      : "";
+    super(
+      `No public media URL for the outbound phone call (VOICE_PUBLIC_BASE_URL ` +
+        `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
+        `media listener, so Twilio would dial a URL nothing answers and the ` +
+        `call would fail with error 31920 after a 120s timeout. Set ` +
+        `VOICE_PUBLIC_BASE_URL, or ensure cloudflared is installed so the ` +
+        `worker can mint a tunnel at boot.${reasonSuffix}`,
+    );
+    this.name = "VoicePublicBaseUrlMissingError";
   }
 }
 
@@ -422,6 +472,137 @@ function withOutboundDial(
   return adapter;
 }
 
+/** The resolved (defaults applied) dependencies the adapter build reads. */
+interface ResolvedPhoneDeps {
+  twilioAgentFactory: TwilioAgentFactory;
+  processEnv: NodeJS.ProcessEnv | undefined;
+  registerNonce: NonceRegistrar;
+  mintNonce: () => string;
+  raceUpgradeRefusal: <T>(promise: Promise<T>) => Promise<T>;
+  socketReceiver: VoiceSocketReceiver;
+}
+
+/**
+ * Build one outbound SDK adapter for a phone call, wrapped in a span so a
+ * missing public media URL is recorded as an ERROR span + exception on the
+ * run's OWN trace, instead of only ever surfacing as Twilio's 120s
+ * media-stream timeout (error 31920) with nothing attached. `withActiveSpan`
+ * records the throw and marks the span ERROR automatically.
+ *
+ * Extracted from {@link createPhoneTransport} so that factory stays a thin
+ * dependency-wiring shell and this build is its own unit.
+ */
+function buildPhoneAgentAdapter(
+  args: {
+    agentId: string;
+    credential: VoiceTransportCredential;
+    maxCallSeconds: number;
+  },
+  deps: ResolvedPhoneDeps,
+): AgentAdapter {
+  const { agentId, credential, maxCallSeconds } = args;
+  return tracer.withActiveSpan(
+    "phone.transport.build_outbound_adapter",
+    { attributes: { "scenario.agent.id": agentId } },
+    (span): AgentAdapter => {
+      const twilio = twilioCredentialOf(credential);
+      // The SDK caps an a-leg call at 300s and throws above it; a project
+      // whose VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
+      const maxCallDurationSeconds = Math.min(
+        maxCallSeconds,
+        TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
+      );
+      const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
+      // A phone call MUST route Twilio's media stream to a URL the WORKER's own
+      // listener answers. That is only ever VOICE_PUBLIC_BASE_URL (an explicit
+      // config, or the worker's minted quick tunnel). BASE_HOST is the app's
+      // origin, which runs no voice media listener, so dialling it hands Twilio
+      // a dead URL — the exact prod 31920 failure. Refuse to build the adapter
+      // rather than dial into a 120s timeout.
+      if (!resolvedBaseUrl || resolvedBaseUrl.source === "BASE_HOST") {
+        const source = resolvedBaseUrl?.source ?? "none";
+        // The worker threads WHY its tunnel mint failed through this env var
+        // (set at boot, forwarded by child-environment.ts), read from the same
+        // env the base URL was resolved from so a test's injected env is honored.
+        const reason = (deps.processEnv ?? process.env)[
+          VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV
+        ]?.trim();
+        logger.error(
+          { agentId, streamBaseUrlSource: source, reason },
+          "no voice public base URL for outbound call; refusing to dial",
+        );
+        throw new VoicePublicBaseUrlMissingError(
+          source,
+          reason && reason.length > 0 ? reason : undefined,
+        );
+      }
+      // Record only the URL origin in telemetry and logs — never the full
+      // resolved URL, which may carry credentials or query parameters (CWE-532
+      // sensitive-data exposure). The functional value handed to Twilio below
+      // stays complete.
+      const streamBaseUrlOrigin = new URL(resolvedBaseUrl.value).origin;
+      span.setAttribute("voice.twilio.stream_base_url", streamBaseUrlOrigin);
+      span.setAttribute(
+        "voice.twilio.stream_base_url_source",
+        resolvedBaseUrl.source,
+      );
+      // Log which base URL and env var this run's Twilio media stream is routed
+      // to, so a later failure (e.g. error 11100) can be traced back to what
+      // URL Twilio actually received.
+      logger.info(
+        {
+          agentId,
+          streamBaseUrl: streamBaseUrlOrigin,
+          streamBaseUrlSource: resolvedBaseUrl.source,
+        },
+        "resolved Twilio media-stream base URL for outbound call",
+      );
+      const adapter = deps.twilioAgentFactory({
+        accountSid: twilio.accountSid,
+        authToken: twilio.authToken,
+        phoneNumber: twilio.fromNumber,
+        publicBaseUrl: resolvedBaseUrl.value,
+        // Always OS-assigned: the parent worker owns the public media port and
+        // hands the child an already-upgraded socket over IPC (below), so the
+        // child's own SDK server never needs a reachable port. Binding a fixed
+        // port here would race the parent for the same listener.
+        httpPort: 0,
+        // Only the dialled target is allowlisted, so the SDK's deny-by-default
+        // a-leg guard passes for exactly this number and nothing else. There is
+        // no user-facing allowlist; this guard is internal to the SDK.
+        allowedCallees: [agentId],
+        role: AgentRole.AGENT,
+      });
+      // The other half of the nonce-registration handshake: once Twilio dials
+      // back, the PARENT worker's listener accepts the upgrade (it owns the
+      // public port) and hands the raw socket to this child over IPC
+      // (`handOffVoiceSocket`/`voice-ws-listener.ts`). Without this wiring the
+      // child would register the nonce and dial correctly, but the arriving
+      // socket would have nowhere to go and the call would still never connect.
+      // One scenario child handles exactly one call, so the receiver lives for
+      // the process's lifetime — no unsubscribe needed.
+      deps.socketReceiver.onVoiceSocket(({ message, socket, head }) => {
+        adapter.receiveExternalMediaSocket?.({
+          req: {
+            method: message.method,
+            url: message.url,
+            headers: message.headers,
+          },
+          socket,
+          head,
+        });
+      });
+      return withOutboundDial(adapter, {
+        to: agentId,
+        maxCallDurationSeconds,
+        registerNonce: deps.registerNonce,
+        mintNonce: deps.mintNonce,
+        raceUpgradeRefusal: deps.raceUpgradeRefusal,
+      }) as unknown as AgentAdapter;
+    },
+  );
+}
+
 /**
  * Build the phone transport runner from its dependencies. `phoneTransport` is
  * the production instance; tests build their own with a fake adapter factory.
@@ -464,72 +645,15 @@ export function createPhoneTransport(
       await (adapter as { disconnect?: () => Promise<void> }).disconnect?.();
     },
 
-    createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {
-      const twilio = twilioCredentialOf(credential);
-      // The SDK caps an a-leg call at 300s and throws above it; a project whose
-      // VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
-      const maxCallDurationSeconds = Math.min(
-        maxCallSeconds,
-        TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
-      );
-      const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
-      // Log which base URL and env var this run's Twilio media stream is
-      // routed to. There is no span available at this point to stamp
-      // `voice.twilio.stream_base_url` on directly, so a failed call (error
-      // 11100, zero duration) can still be traced back to what URL Twilio
-      // actually received via this log line.
-      if (resolvedBaseUrl) {
-        logger.info(
-          {
-            agentId,
-            streamBaseUrl: resolvedBaseUrl.value,
-            streamBaseUrlSource: resolvedBaseUrl.source,
-          },
-          "resolved Twilio media-stream base URL for outbound call",
-        );
-      }
-      const adapter = twilioAgentFactory({
-        accountSid: twilio.accountSid,
-        authToken: twilio.authToken,
-        phoneNumber: twilio.fromNumber,
-        publicBaseUrl: resolvedBaseUrl?.value,
-        // Always OS-assigned: the parent worker owns the public media port
-        // and hands the child an already-upgraded socket over IPC (below), so
-        // the child's own SDK server never needs a reachable port. Binding a
-        // fixed port here would race the parent for the same listener.
-        httpPort: 0,
-        // Only the dialled target is allowlisted, so the SDK's deny-by-default
-        // a-leg guard passes for exactly this number and nothing else. There is
-        // no user-facing allowlist; this guard is internal to the SDK.
-        allowedCallees: [agentId],
-        role: AgentRole.AGENT,
-      });
-      // The other half of the nonce-registration handshake: once Twilio dials
-      // back, the PARENT worker's listener accepts the upgrade (it owns the
-      // public port) and hands the raw socket to this child over IPC
-      // (`handOffVoiceSocket`/`voice-ws-listener.ts`). Without this wiring the
-      // child would register the nonce and dial correctly, but the arriving
-      // socket would have nowhere to go and the call would still never
-      // connect. One scenario child handles exactly one call, so the receiver
-      // lives for the process's lifetime — no unsubscribe needed.
-      socketReceiver.onVoiceSocket(({ message, socket, head }) => {
-        adapter.receiveExternalMediaSocket?.({
-          req: {
-            method: message.method,
-            url: message.url,
-            headers: message.headers,
-          },
-          socket,
-          head,
-        });
-      });
-      return withOutboundDial(adapter, {
-        to: agentId,
-        maxCallDurationSeconds,
+    createAgentAdapter(params): AgentAdapter {
+      return buildPhoneAgentAdapter(params, {
+        twilioAgentFactory,
+        processEnv: deps.processEnv,
         registerNonce,
         mintNonce,
         raceUpgradeRefusal,
-      }) as unknown as AgentAdapter;
+        socketReceiver,
+      });
     },
   };
 }

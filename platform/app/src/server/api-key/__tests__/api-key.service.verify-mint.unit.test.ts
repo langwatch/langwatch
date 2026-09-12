@@ -20,13 +20,16 @@ describe("API key verification", () => {
   function serviceWith({
     apiKey,
     mintLegacyGrant,
+    parent = { revokedAt: null, expiresAt: null },
   }: {
     apiKey: ApiKeyWithBindings | null;
     mintLegacyGrant: (args: { apiKey: ApiKeyWithBindings }) => void;
+    parent?: { revokedAt: Date | null; expiresAt: Date | null } | null;
   }) {
     const repo = {
       findByLookupId: vi.fn().mockResolvedValue(apiKey),
       upgradeHash: vi.fn().mockResolvedValue(undefined),
+      findLivenessById: vi.fn().mockResolvedValue(parent),
     };
     return new ApiKeyService({
       prisma: {} as never,
@@ -73,6 +76,72 @@ describe("API key verification", () => {
       await expect(service.verify({ token: "sk-lw-x_y" })).resolves.toBeNull();
 
       expect(mintLegacyGrant).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The cascade is one caller's work; the credential must not depend on it
+   * having run. These pin the rule at the only place that authenticates.
+   */
+  describe("given a key minted under a CLI login key", () => {
+    function childKey(): ApiKeyWithBindings {
+      return { ...serviceKey(), parentApiKeyId: "ak_login" };
+    }
+
+    /** @scenario "A key whose session is gone does not authenticate" */
+    it("refuses it once that login key is revoked, however the revoke happened", async () => {
+      const service = serviceWith({
+        apiKey: childKey(),
+        mintLegacyGrant: vi.fn(),
+        parent: { revokedAt: new Date(), expiresAt: null },
+      });
+
+      await expect(service.verify({ token: "ik-lw-x_y" })).resolves.toBeNull();
+    });
+
+    /** @scenario "A key whose session is gone does not authenticate" */
+    it("refuses it once that login key's session window has passed", async () => {
+      const service = serviceWith({
+        apiKey: childKey(),
+        mintLegacyGrant: vi.fn(),
+        parent: { revokedAt: null, expiresAt: new Date(Date.now() - 1_000) },
+      });
+
+      await expect(service.verify({ token: "ik-lw-x_y" })).resolves.toBeNull();
+    });
+
+    it("refuses it when the login key row is gone entirely", async () => {
+      const service = serviceWith({
+        apiKey: childKey(),
+        mintLegacyGrant: vi.fn(),
+        parent: null,
+      });
+
+      await expect(service.verify({ token: "ik-lw-x_y" })).resolves.toBeNull();
+    });
+
+    it("accepts it while that login key is live", async () => {
+      const apiKey = childKey();
+      const service = serviceWith({
+        apiKey,
+        mintLegacyGrant: vi.fn(),
+        parent: { revokedAt: null, expiresAt: new Date(Date.now() + 60_000) },
+      });
+
+      await expect(service.verify({ token: "ik-lw-x_y" })).resolves.toBe(
+        apiKey,
+      );
+    });
+  });
+
+  describe("given a key with no login key behind it", () => {
+    it("does not go looking for a parent at all", async () => {
+      const apiKey = serviceKey();
+      const service = serviceWith({ apiKey, mintLegacyGrant: vi.fn() });
+
+      await expect(service.verify({ token: "sk-lw-x_y" })).resolves.toBe(
+        apiKey,
+      );
     });
   });
 });

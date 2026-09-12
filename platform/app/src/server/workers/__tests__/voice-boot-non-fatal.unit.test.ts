@@ -9,6 +9,7 @@
  * processing. Pins the non-fatal guard directly at the two boot steps.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "~/server/scenarios/voice/voice-public-url-env";
 
 vi.mock("~/server/scenarios/voice/voice-public-url-tunnel", () => ({
   openVoicePublicUrlTunnel: vi.fn(async () => {
@@ -29,6 +30,7 @@ vi.mock("~/server/scenarios/voice/voice-nonce-registry", () => ({
 describe("voice boot non-fatal guards", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    delete process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV];
   });
 
   /** @scenario "A worker's own voice boot failure does not take the worker down" */
@@ -44,6 +46,21 @@ describe("voice boot non-fatal guards", () => {
 
     expect(result).toBeUndefined();
     expect(shutdownHandles).toHaveLength(0);
+  });
+
+  /** @scenario "A failed voice tunnel boot records its reason for the phone run error" */
+  it("bootVoicePublicUrlTunnel records the failure reason in the child env var", async () => {
+    const { bootVoicePublicUrlTunnel } = await import("../startWorkers");
+
+    await bootVoicePublicUrlTunnel([], {
+      voiceWsPort: 3300,
+      voicePublicBaseUrl: undefined,
+      voiceTunnelEnabled: true,
+    });
+
+    expect(process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]).toBe(
+      "cloudflared failed to start",
+    );
   });
 
   /** @scenario "A worker's own voice boot failure does not take the worker down" */

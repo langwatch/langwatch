@@ -21,6 +21,7 @@ import {
   NLP_FETCH_MAX_TIMEOUT_ENV,
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
 } from "../../nlpgo/timeouts";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice/voice-public-url-env";
 import {
   encodeScenarioLogContext,
   SCENARIO_LOG_CONTEXT_ENV,
@@ -176,6 +177,12 @@ export function buildChildEnvironment({
     ...(jobData.target.type === "voice"
       ? {
           VOICE_PUBLIC_BASE_URL: process.env.VOICE_PUBLIC_BASE_URL,
+          // Why the worker has no public URL (its cloudflared tunnel mint
+          // failed), forwarded so the child's phone-run error can name the real
+          // cause instead of a generic "no public media URL". Filtered out when
+          // unset by `buildChildProcessEnv`.
+          [VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]:
+            process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV],
           BASE_HOST: env.BASE_HOST,
         }
       : {}),
