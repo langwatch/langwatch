@@ -2254,10 +2254,15 @@ model TriggerSent {
   updatedAt       DateTime     @default(now()) @updatedAt
 
   @@unique([triggerId, traceId])
-  @@index([triggerId])
-  @@index([projectId])
+  // Every read of fire history asks for the newest rows of one trigger or of
+  // one project. Both composites end in createdAt so the planner walks
+  // straight to the newest entry instead of sorting the whole key range —
+  // one trigger holds 65% of the table in production, so an index that
+  // cannot order within the trigger is a sequential scan. Single-column
+  // triggerId and projectId indexes are prefixes of these and were dropped.
+  @@index([projectId, triggerId, createdAt])
+  @@index([projectId, createdAt])
   @@index([customGraphId])
-  @@index([resolvedAt])
 }
 
 // ADR-031: recipient unsubscribe / suppression list for trigger emails. A row

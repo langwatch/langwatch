@@ -1,0 +1,52 @@
+-- Fire history is read one way: the newest rows for one trigger, or the
+-- newest rows for one project. The health probe (`/api/health/triggers`)
+-- asks "when did this trigger last fire" with
+-- `WHERE "triggerId" = $1 AND "projectId" = $2 ORDER BY "createdAt" DESC LIMIT 1`.
+--
+-- Every index on "TriggerSent" led with a column that could find the rows
+-- but not order them: single-column triggerId, single-column projectId. One
+-- trigger holds 65% of the table in production, so for it "find the rows"
+-- is "find the table", and the planner correctly gave up on both indexes
+-- and sequentially scanned every row to sort out the newest one. Measured
+-- on production: 710 ms per probe on a warm cache, a mean of 1.1 s and a
+-- worst case of 171 s across six months of calls, eighth most expensive
+-- query in the database by total time - for an endpoint that returns one
+-- row and is polled by an external monitor.
+--
+-- A composite ending in createdAt lets the planner walk to the newest
+-- entry directly: an Index Scan Backward that reads a handful of pages no
+-- matter how many rows the trigger has. Measured on a local Postgres 16
+-- over a 2.1M-row reproduction of the production distribution (one
+-- project/trigger pair holding 1.385M rows, the rest spread over 229
+-- pairs): the probe went from a 68 ms parallel sequential scan to a
+-- 0.013 ms index scan. The build took 3.0 s and 97 MB there; expect
+-- roughly ten seconds against production.
+--
+-- This is the first of five one-statement migrations
+-- (20260907120000-20260907120004): two builds, then three drops of the
+-- indexes they replace. They are split because `CONCURRENTLY` needs a
+-- statement that is the only one in its file, and they run in this order
+-- so a replacement exists before the index it replaces goes.
+--
+-- LOCKING NOTE: `CONCURRENTLY` builds in the background - reads and writes
+-- (the automations firing) keep going the whole time. A plain `CREATE
+-- INDEX` would block writes for the build, and a plain `DROP INDEX` later
+-- would wait for every in-flight read on the table while queueing every
+-- new read and write behind it: with probe queries that have run for 171 s
+-- on this table, that is an unbounded stall. Verified against this
+-- repository's Prisma 7.9.1 that `migrate deploy` applies one-statement
+-- `CONCURRENTLY` migrations; the older note in
+-- 20260831120000_grant_role_key_live_index predates that.
+--
+-- IF THE BUILD FAILS (timeout, connection drop, cancelled deploy): Postgres
+-- leaves an INVALID index of this name behind, and Prisma records the
+-- migration as failed. Deliberately no `IF NOT EXISTS`: it would skip over
+-- the invalid index and report success while the probe keeps scanning.
+-- Recover with, in order:
+--   DROP INDEX CONCURRENTLY "TriggerSent_projectId_triggerId_createdAt_idx";
+--   prisma migrate resolve --rolled-back 20260907120000_trigger_sent_latest_fire_index
+--   prisma migrate deploy
+CREATE INDEX CONCURRENTLY "TriggerSent_projectId_triggerId_createdAt_idx" ON "TriggerSent"("projectId", "triggerId", "createdAt");
+
+-- Down step. To roll back, uncomment and run manually.
+-- DROP INDEX CONCURRENTLY "TriggerSent_projectId_triggerId_createdAt_idx";
