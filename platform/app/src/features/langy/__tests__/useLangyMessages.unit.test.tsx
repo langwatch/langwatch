@@ -11,7 +11,10 @@
  */
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useLangyMessages } from "../data/useLangyMessages";
+import {
+  langyMessagesPollInterval,
+  useLangyMessages,
+} from "../data/useLangyMessages";
 
 const previousConversation = {
   messages: [{ id: "msg_1", role: "assistant", parts: [] }],
@@ -49,9 +52,18 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../stores/langyStore", () => ({
-  useLangyStore: { getState: () => ({ confirmConversation: vi.fn() }) },
-}));
+vi.mock("../stores/langyStore", () => {
+  const state = {
+    confirmConversation: vi.fn(),
+    unconfirmedConversations: {} as Record<string, true>,
+  };
+  // The real store is callable-with-selector AND carries getState; the hook
+  // uses both (a subscription for the unconfirmed flag, getState in effects).
+  const useLangyStore = (selector: (s: typeof state) => unknown) =>
+    selector(state);
+  useLangyStore.getState = () => state;
+  return { useLangyStore };
+});
 
 describe("useLangyMessages", () => {
   describe("when no conversation is open", () => {
@@ -77,6 +89,40 @@ describe("useLangyMessages", () => {
       expect(result.current.messages).toHaveLength(1);
       expect(result.current.isTurnInFlight).toBe(true);
       expect(result.current.isError).toBe(true);
+    });
+  });
+});
+
+describe("langyMessagesPollInterval", () => {
+  describe("while the fold says a turn is in flight", () => {
+    it("re-checks on the in-flight cadence", () => {
+      expect(langyMessagesPollInterval({ isTurnInFlight: true })).toBe(3_000);
+    });
+  });
+
+  describe("while a freshly minted conversation has produced no data", () => {
+    // The projection row is written by an asynchronous fold, so the first
+    // read of a new conversation routinely 404s; the query's retry policy
+    // rightly never retries a 404, and without this poll NOTHING re-asks —
+    // the panel sat on "conversation not found" until the answer streamed in.
+    it("polls on a short interval — the 404 is 'not yet', never settled", () => {
+      expect(langyMessagesPollInterval(undefined, true)).toBe(1_000);
+    });
+
+    it("stops the moment data lands and the turn is settled", () => {
+      expect(langyMessagesPollInterval({ isTurnInFlight: false }, true)).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("when the conversation is confirmed and nothing is in flight", () => {
+    it("does not poll at all", () => {
+      expect(langyMessagesPollInterval(undefined, false)).toBe(false);
+      expect(langyMessagesPollInterval({ isTurnInFlight: false }, false)).toBe(
+        false,
+      );
+      expect(langyMessagesPollInterval({ isTurnInFlight: false })).toBe(false);
     });
   });
 });
