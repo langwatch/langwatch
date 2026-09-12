@@ -724,8 +724,20 @@ export async function listIngestionKeys(
   }));
 }
 
-/** Why the platform revoked a key, as the server records it. */
-export type IngestionKeyRevocationCause = "user" | "rotation" | "cap";
+/**
+ * Why a key was revoked, as the server records it: `user` for a person's
+ * revoke, `session` when the login key it was parented to was revoked,
+ * `expired` when that session ran out, `offboarded` when the person's
+ * membership of the organization ended, `rotation` when a rotate from the
+ * personal tile replaced it, `cap` from an older server's per-tool cap.
+ */
+export type IngestionKeyRevocationCause =
+  | "user"
+  | "rotation"
+  | "session"
+  | "expired"
+  | "offboarded"
+  | "cap";
 
 export interface IngestionKeyDescription {
   /** `unknown` is also what a key of another user reads as. */
@@ -738,9 +750,10 @@ export interface IngestionKeyDescription {
 /**
  * What became of one of the caller's own personal ingestion keys. The hook's
  * self-heal asks this before it re-mints a key the collector rejected: a key
- * a person revoked from the API-keys page is left dead, one the cap retired or
- * a rotation replaced is re-minted. A server from before this route answers
- * 404, which reads as `unknown`, so an older platform heals as it always did.
+ * a person revoked from the API-keys page is left dead, one retired with its
+ * session or replaced by a rotation is re-minted. A server from before this
+ * route answers 404, which reads as `unknown`, so an older platform heals as
+ * it always did.
  */
 export async function describeIngestionKey(
   cfg: GovernanceConfig,

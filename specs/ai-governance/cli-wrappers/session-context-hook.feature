@@ -274,8 +274,8 @@ Rule: The hook never disturbs the session
 Rule: A revoked ingest key heals itself
 
   # A personal ingest key can die under a running agent: revoked on the
-  # API-keys page, rotated by an older server, evicted by the per-tool cap.
-  # The agent's own exporter answers that 401 with silence, and so did the
+  # API-keys page, or retired with the session that minted it after a
+  # re-login on this device. The agent's own exporter answers that 401 with silence, and so did the
   # hook, so a machine could export into a void for weeks. The hook is the one
   # process that learns the key is dead on every session, so it repairs it:
   # re-mint through the CLI's own resolver, rewrite the wiring, retry the
@@ -417,12 +417,23 @@ Rule: A revoked ingest key heals itself
     When the hook runs
     Then no new key is minted
 
+  # A key retired with its session is the platform's own doing: this device
+  # signed in again and the old session's keys went with it, or another
+  # session that shared this key was logged out. The device holds a live
+  # session, so it mints a replacement under it.
+
   @unit
-  Scenario: A key the cap retired is re-minted
-    Given a signed-in CLI whose cached key the platform says the cap retired
-    And a collector that answers 401
+  Scenario: A key retired with its session is re-minted under the device's current session
+    Given a platform that says the cached key was retired with its session
     When the hook runs
-    Then a new key is minted
+    Then a new key is minted and wired
+
+  @unit
+  Scenario: A key whose session expired is re-minted when the device signed in again
+    Given a platform that says the cached key expired with its session
+    And the device holds a live session
+    When the hook runs
+    Then a new key is minted and wired
 
   # A device whose own session the platform refuses can neither check its key
   # nor mint a replacement. Saying nothing leaves the session exporting into

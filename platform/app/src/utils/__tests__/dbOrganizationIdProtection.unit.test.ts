@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
+import {
+  applySessionCeiling,
+  reapExpiredCliLoginKeys,
+} from "~/server/api-key/cli-login-key-reaper";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
 import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
@@ -657,6 +661,158 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
           args: { where: { name: "Langy session" } },
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  /**
+   * The sweep over elapsed CLI login keys is cross-tenant for the same
+   * structural reason: it runs on a timer with no request context. It is a
+   * READ (the revokes that follow name each row's organization), admitted on
+   * exactly the predicate the real reaper writes.
+   */
+  describe("when the expired CLI login key reaper runs its real hourly sweep", () => {
+    function guardedReadPrisma(rows: unknown[]) {
+      const calls: unknown[] = [];
+      const client = {
+        apiKey: {
+          findMany: async (args: unknown) => {
+            calls.push(args);
+            return guardOrganizationId(
+              { model: "ApiKey", action: "findMany", args },
+              async () => rows,
+            );
+          },
+        },
+      };
+      return { client, calls };
+    }
+
+    async function captureLoginKeySweepWhere(): Promise<
+      Record<string, unknown>
+    > {
+      const { client, calls } = guardedReadPrisma([]);
+      await reapExpiredCliLoginKeys({
+        prisma: client as unknown as PrismaClient,
+        now: new Date("2026-09-07T12:00:00Z"),
+        loginKeys: { revokeSessionKey: vi.fn() },
+      });
+      return (calls[0] as { where: Record<string, unknown> }).where;
+    }
+
+    it("passes the guard and hands the elapsed keys to the tenant-scoped revoke", async () => {
+      const { client } = guardedReadPrisma([
+        { id: "ak_1", userId: "user_1", organizationId: "org_1" },
+      ]);
+      const revokeSessionKey = vi
+        .fn()
+        .mockResolvedValue({ loginKeyRevoked: true, ingestKeysRevoked: 0 });
+
+      await expect(
+        reapExpiredCliLoginKeys({
+          prisma: client as unknown as PrismaClient,
+          now: new Date("2026-09-07T12:00:00Z"),
+          loginKeys: { revokeSessionKey },
+        }),
+      ).resolves.toBe(1);
+
+      expect(revokeSessionKey).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_1" }),
+      );
+    });
+
+    it("THROWS when the sweep's shape is replayed as an updateMany or deleteMany", async () => {
+      const where = await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: { where, data: { revokedAt: new Date() } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+      await expect(
+        runGuard({ model: "ApiKey", action: "deleteMany", args: { where } }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    it("THROWS when the read drops the elapsed-expiry bound: that is every live session in every organization", async () => {
+      const { expiresAt: _elapsed, ...withoutExpiryBound } =
+        await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: withoutExpiryBound },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...withoutExpiryBound, expiresAt: { not: null } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    it("THROWS when the read widens the name to a contains match or another prefix", async () => {
+      const where = await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...where, name: { contains: "CLI login" } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...where, name: { startsWith: "Ingestion key" } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    it("THROWS when the read carries any clause beyond the sweep's three", async () => {
+      const where = await captureLoginKeySweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { ...where, userId: { not: null } } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+
+    /**
+     * An admin lowering the organization's session ceiling runs the same
+     * sweep bounded to that organization, so the read carries a fourth
+     * clause. It passes on the ordinary organizationId bound rather than the
+     * cross-tenant hatch, which is what keeps that hatch at exactly the three
+     * clauses above.
+     */
+    it("passes the guard on both reads when a ceiling change scopes them to one organization", async () => {
+      const { client, calls } = guardedReadPrisma([]);
+
+      // A positive ceiling is what makes the first read happen at all: the
+      // live-key read that re-derives expiries, and then the expiry sweep.
+      await expect(
+        applySessionCeiling({
+          prisma: client as unknown as PrismaClient,
+          organizationId: "org_1",
+          maxSessionDurationDays: 7,
+          now: new Date("2026-09-07T12:00:00Z"),
+          loginKeys: { revokeSessionKey: vi.fn() },
+        }),
+      ).resolves.toBe(0);
+
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({
+        where: { organizationId: "org_1", expiresAt: { not: null } },
+      });
+      expect(calls[1]).toMatchObject({ where: { organizationId: "org_1" } });
     });
   });
 

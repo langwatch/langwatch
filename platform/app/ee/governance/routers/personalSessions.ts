@@ -6,8 +6,9 @@
  * Three procedures:
  *   - list: list every active CLI session for the authenticated user
  *     (one card per device — hostname, platform, last-seen, expires)
- *   - revoke: invalidate a single session by sessionStartedAtMs
- *   - revokeAll: invalidate every session for the user (e.g. "log out
+ *   - revoke: invalidate a single session by sessionStartedAtMs, its login
+ *     key and the ingest keys under it
+ *   - revokeAll: the same for every session of the user (e.g. "log out
  *     everywhere" affordance)
  *
  * RBAC: every authenticated user can list + revoke THEIR OWN sessions
@@ -18,7 +19,6 @@
  */
 
 import { CliSessionInventoryService } from "@ee/governance/services/cliSessionInventory.service";
-import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -28,7 +28,7 @@ export const personalSessionsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .query(async ({ ctx }) => {
-      const service = CliSessionInventoryService.create();
+      const service = CliSessionInventoryService.create({ prisma: ctx.prisma });
       const sessions = await service.listForUser({
         userId: ctx.session.user.id,
       });
@@ -40,6 +40,7 @@ export const personalSessionsRouter = createTRPCRouter({
         platform: s.platform,
         lastSeenMs: s.lastSeenMs,
         expiresAtMs: s.expiresAtMs,
+        cliApiKeyId: s.cliApiKeyId,
       }));
     }),
 
@@ -52,24 +53,30 @@ export const personalSessionsRouter = createTRPCRouter({
     )
     .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
-      const service = CliSessionInventoryService.create();
+      const service = CliSessionInventoryService.create({ prisma: ctx.prisma });
       const result = await service.revokeSession({
         userId: ctx.session.user.id,
         sessionStartedAtMs: input.sessionStartedAtMs,
       });
-      return { ok: true, revokedTokens: result.revokedTokens };
+      return {
+        ok: true,
+        revokedTokens: result.revokedTokens,
+        revokedKeys: result.revokedKeys,
+      };
     }),
 
   revokeAll: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .mutation(async ({ ctx }) => {
-      // Reuse the user-wide revoke from Phase 1B.5 — that path also
-      // clears the per-user token index in one shot.
-      const revocation = CliTokenRevocationService.create();
-      const result = await revocation.revokeForUser({
+      const service = CliSessionInventoryService.create({ prisma: ctx.prisma });
+      const result = await service.revokeAllSessions({
         userId: ctx.session.user.id,
       });
-      return { ok: true, revokedTokens: result.revokedCount };
+      return {
+        ok: true,
+        revokedTokens: result.revokedTokens,
+        revokedKeys: result.revokedKeys,
+      };
     }),
 });
