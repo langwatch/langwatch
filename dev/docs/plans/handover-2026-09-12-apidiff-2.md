@@ -1,5 +1,13 @@
 # Drive: get `apidiff` to report no behavioural difference against `origin/main`
 
+> **SUPERSEDED — read `handover-2026-09-12-apidiff-3.md` instead.**
+> Gate 1 is now OPEN (`pnpm --filter langwatch build` exits 0, commit
+> `dbc7f57afe`), so every "what to do next" section below is stale. This file
+> is still the record of HOW the diagnosis was reached — the four classes of
+> missing surface, the b383462d96 root cause, and the measurements behind them
+> — and it is worth reading for that. It is no longer the entry point.
+
+
 Written 2026-09-12, second apidiff session. **This supersedes
 `handover-2026-09-12-apidiff.md`, whose step 2 is wrong and would delete
 published API surface if followed.** That file is still the reference for the
