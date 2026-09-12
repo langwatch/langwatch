@@ -14,10 +14,21 @@ export const PULLED_USAGE_AGGREGATE_TYPE = "pulled_usage" as const;
 
 export const PULLED_USAGE_EVENT_TYPES = {
   OBSERVED: "lw.obs.pulled_usage.observed",
+  /**
+   * Withdraws what one restatement key holds in the cell it currently sits in.
+   *
+   * Emitted when a provider reissues a charge under a dimension the
+   * restatement key deliberately excludes -- the currency, the agent, the
+   * spender it named. Those land in a DIFFERENT rollup cell, so without this
+   * the first version is left behind holding its money with nothing to say it
+   * was superseded, and a total across the day carries the one bill twice.
+   */
+  RETRACTED: "lw.obs.pulled_usage.retracted",
 } as const;
 
 export const PULLED_USAGE_PROCESSING_EVENT_TYPES = [
   PULLED_USAGE_EVENT_TYPES.OBSERVED,
+  PULLED_USAGE_EVENT_TYPES.RETRACTED,
 ] as const;
 
 export type PulledUsageProcessingEventType =
@@ -25,10 +36,20 @@ export type PulledUsageProcessingEventType =
 
 export const PULLED_USAGE_COMMAND_TYPES = {
   RECORD: "lw.obs.pulled_usage.record",
+  /**
+   * Withdraws the version of a charge that a later pull superseded.
+   *
+   * Separate from RECORD rather than a flag on it because the two carry
+   * different addresses: RECORD names the cell the charge is landing in, and
+   * this names the cell it is leaving. One command that meant both would have
+   * to guess which of its dimensions were the address.
+   */
+  RETRACT: "lw.obs.pulled_usage.retract",
 } as const;
 
 export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = [
   PULLED_USAGE_COMMAND_TYPES.RECORD,
+  PULLED_USAGE_COMMAND_TYPES.RETRACT,
 ] as const;
 
 export type PulledUsageProcessingCommandType =
@@ -37,6 +58,7 @@ export type PulledUsageProcessingCommandType =
 /** Event schema versions using calendar versioning (YYYY-MM-DD). */
 export const PULLED_USAGE_EVENT_VERSIONS = {
   OBSERVED: "2026-08-06",
+  RETRACTED: "2026-09-09",
 } as const;
 
 /**

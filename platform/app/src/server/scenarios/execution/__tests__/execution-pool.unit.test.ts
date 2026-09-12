@@ -165,6 +165,54 @@ describe("ScenarioExecutionPool", () => {
     });
   });
 
+  describe("given a slow prefetch that has not yet registered a child", () => {
+    // #27: admission must count the job as soon as it is admitted (before its
+    // child ever registers), or a second submit sees the still-empty
+    // `_running` map and starts past `_concurrency`.
+    it("does not admit a second job at concurrency 1 until the first deregisters", async () => {
+      let releaseFirstPrefetch: (() => void) | undefined;
+      let resolveRun1Registered: (() => void) | undefined;
+      const run1Registered = new Promise<void>((resolve) => {
+        resolveRun1Registered = resolve;
+      });
+      let resolveRun2Started: (() => void) | undefined;
+      const run2Started = new Promise<void>((resolve) => {
+        resolveRun2Started = resolve;
+      });
+      const slowPool = new ScenarioExecutionPool({ concurrency: 1 });
+      const slowSpawned: ExecutionJobData[] = [];
+      slowPool.setSpawnFunction(async (jobData) => {
+        slowSpawned.push(jobData);
+        if (jobData.scenarioRunId === "run-2") resolveRun2Started?.();
+        if (jobData.scenarioRunId === "run-1") {
+          await new Promise<void>((resolve) => {
+            releaseFirstPrefetch = resolve;
+          });
+        }
+        slowPool.registerChild(jobData.scenarioRunId, makeFakeChild());
+        if (jobData.scenarioRunId === "run-1") resolveRun1Registered?.();
+      });
+
+      slowPool.submit(makeJob("run-1"));
+      slowPool.submit(makeJob("run-2")); // must stay pending, not start
+
+      expect(slowSpawned.map((j) => j.scenarioRunId)).toEqual(["run-1"]);
+      expect(slowPool.pendingCount).toBe(1);
+
+      // run-1's prefetch finishes and its child registers.
+      releaseFirstPrefetch?.();
+      await run1Registered;
+      slowPool.deregisterChild("run-1");
+      await run2Started;
+
+      expect(slowSpawned.map((j) => j.scenarioRunId)).toEqual([
+        "run-1",
+        "run-2",
+      ]);
+      expect(slowPool.pendingCount).toBe(0);
+    });
+  });
+
   describe("inFlightJobs", () => {
     describe("when jobs are running and buffered", () => {
       it("returns both running and pending job data", () => {

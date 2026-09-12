@@ -59,6 +59,10 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
+  // Voice agents: register an ElevenLabs agent, talk to it, call it from a
+  // run, and run scenarios with a simulated caller. Off by default.
+  // See useVoiceAgentsEnabled and specs/features/agents/voice-agents-v1.feature.
+  "release_voice_agents_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
   // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are
@@ -66,11 +70,13 @@ export const FRONTEND_FEATURE_FLAGS = [
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
-  // The Costs and Billed placeholder pages + their governance nav items.
-  // Composed ON TOP of `release_ui_ai_governance_enabled` (never instead
-  // of it): the section flag off still hides everything. Off by default —
-  // the pages are empty shells shipped ahead of the spend views. See
-  // specs/ai-gateway/governance/governance-home-routing.feature.
+  // Costs and the Platform preview pages + their governance nav items. Composed ON
+  // TOP of `release_ui_ai_governance_enabled` (never instead of it): the
+  // section flag off still hides everything. Off by default. Costs renders
+  // the real cost lanes (ADR-128); the unfinished Billed address stays
+  // unavailable even when enabled. See
+  // specs/ai-gateway/governance/governance-home-routing.feature and
+  // specs/governance/governance-cost-screen.feature.
   "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",

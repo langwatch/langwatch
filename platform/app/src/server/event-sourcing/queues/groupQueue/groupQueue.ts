@@ -90,7 +90,6 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
-  gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
@@ -99,6 +98,7 @@ import {
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
+  recordDroppedJob,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import {
@@ -2471,7 +2471,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
 
-    gqJobsDroppedTotal.inc({
+    recordDroppedJob({
       queue_name: this.queueName,
       pipeline_name: pipelineName ?? "unknown",
       job_type: jobType ?? "unknown",

@@ -22,6 +22,7 @@ import { FG_MUTED, ROW_HOVER_BG } from "../shared/design";
 import { EvaluatorPill, readingOfEvaluation } from "../shared/EvaluatorPill";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { callerLabel, runCallerKind } from "./caller-display";
 import { evaluationsOf, isAwaitingEvaluations } from "./evaluation-summaries";
 import type { RunResultsTableProps } from "./RunResultsTable";
 
@@ -41,6 +42,8 @@ export type RunResultRowProps = Pick<
   hasStoppable: boolean;
   /** True when the table draws an Evaluators column. */
   hasEvaluators: boolean;
+  /** True when the table draws a Caller column (AC24). */
+  hasCaller: boolean;
 };
 
 /** The row menu: reach the conversation, run the case again, or edit it. */
@@ -191,11 +194,22 @@ function RowMetrics({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   );
 }
 
+function RowCaller({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+  const kind = runCallerKind(scenarioRun);
+  if (!kind) return null;
+  return (
+    <Text fontSize="12px" color={FG_MUTED}>
+      {callerLabel(kind)}
+    </Text>
+  );
+}
+
 export function RunResultRow({
   scenarioRun,
   templateColumns,
   hasStoppable,
   hasEvaluators,
+  hasCaller,
   resolveTargetName,
   iterationMap,
   onScenarioRunClick,
@@ -251,6 +265,12 @@ export function RunResultRow({
       {hasEvaluators ? (
         <Box minWidth={0}>
           <RowEvaluators scenarioRun={scenarioRun} />
+        </Box>
+      ) : null}
+
+      {hasCaller ? (
+        <Box paddingTop="1px" minWidth={0}>
+          <RowCaller scenarioRun={scenarioRun} />
         </Box>
       ) : null}
 

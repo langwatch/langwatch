@@ -33,9 +33,10 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
+Anomaly rules are not in the table: they have no REST surface and no authoring page, see [Anomaly rules](/ai-governance/anomaly-rules).
+
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
-| Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
 | Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/platform/audit-log) |
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |

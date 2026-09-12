@@ -76,6 +76,11 @@ export const TIME_PARTITIONED_TABLES = {
   gateway_spend: ["OccurredAt"],
   gateway_budget_scope_totals: ["PeriodStart"],
   governance_kpis: ["HourBucket"],
+  // The daily cost rollup: month-partitioned on `Day`, and exempt from tenant
+  // retention in favour of a fixed 13-month TTL, so the cold end of this table
+  // is always thirteen months deep. Every read has to range on `Day` — asking
+  // it for a tenant alone reads all of them.
+  governance_cost_rollup_1d: ["Day"],
   automation_audit: ["OccurredAt"],
   langy_analytics_events: ["OccurredAt"],
   langy_messages: ["CreatedAt"],

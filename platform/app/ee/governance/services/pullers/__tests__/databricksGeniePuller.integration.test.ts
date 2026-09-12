@@ -107,7 +107,19 @@ async function pullThroughTheRealPipeline(params: {
   try {
     const pipeline = eventSourcing.register(
       createPulledUsageProcessingPipeline({
-        ledger: { budgetCHRepository: chRepo },
+        // This file drives the WRITE half only: it asserts what the puller
+        // lands in the ledger. The withdrawal deps are stubbed, and the stub
+        // throws rather than no-ops so that a future change which does reach
+        // them fails here instead of silently swallowing a retraction.
+        ledger: {
+          budgetCHRepository: chRepo,
+          sendRetractPulledUsage: async () => {
+            throw new Error(
+              "unreachable: this suite drives the ledger writer only",
+            );
+          },
+          retractionEnabled: async () => false,
+        },
       }),
     );
     const commands = mapCommands(pipeline.commands);
@@ -854,15 +866,17 @@ describe("given a Genie workspace the credential can fully read", () => {
       expect(row.ActorEmail).toBe("priya.nair@acme.test");
     });
 
-    /** @scenario "A question costs nothing when no warehouse is named" */
-    it("records the questions with no cost attached", async () => {
+    /** @scenario "A question carries no amount when no warehouse is named" */
+    it("lands no money row for the questions: no amount, not zero", async () => {
       const totals = await pulledTotalsFor({
         tenantId: seeded.govProjectId,
         scopeIds: [seeded.teamId, seeded.organizationId],
       });
-      expect(totals.items).toBe(4);
+      // The four questions sit in the audit trail (asserted above). With no
+      // warehouse named there is no bill behind them, so nothing reaches the
+      // money ledger: a zero row here would be a measurement nobody made.
+      expect(totals.items).toBe(0);
       expect(totals.spentNanoUsd).toBe(0);
-      expect(totals.spentUsd).toBe("0");
     });
 
     it("anchors the watermark to when the sweep began, not to the newest message", () => {

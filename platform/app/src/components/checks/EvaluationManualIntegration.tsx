@@ -20,6 +20,116 @@ import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 
+// Sample values for the fields a Go example can send, in the order the request
+// body renders them.
+const GO_SAMPLE_FIELD_VALUES: Record<string, string> = {
+  input: `"user input"`,
+  output: `"generated response"`,
+  contexts: `[]string{"retrieved snippet 1", "retrieved snippet 2"}`,
+  expected_output: `"gold answer"`,
+  conversation: `[]map[string]any{{"input": "hi", "output": "hello"}}`,
+};
+
+function buildGoDataBlock(fields: string[]): string {
+  const entries = Object.entries(GO_SAMPLE_FIELD_VALUES)
+    .filter(([field]) => fields.includes(field))
+    .map(([field, value]) => `\t\t\t"${field}": ${value},`);
+
+  if (entries.length === 0) {
+    return `map[string]any{}`;
+  }
+
+  return `map[string]any{\n${entries.join("\n")}\n\t\t}`;
+}
+
+function buildGoResponseHandling(isGuardrail: boolean): string {
+  if (!isGuardrail) {
+    return `\tout, _ := io.ReadAll(resp.Body)
+\tfmt.Println(string(out))`;
+  }
+
+  return `\tvar guardrail struct {
+\t\tPassed bool \`json:"passed"\`
+\t}
+\tif err := json.NewDecoder(resp.Body).Decode(&guardrail); err != nil {
+\t\tpanic(err)
+\t}
+\tif !guardrail.Passed {
+\t\t// handle the guardrail here
+\t\tfmt.Println("I'm sorry, I can't do that.")
+\t\treturn
+\t}
+\t// ... continue with your LLM call`;
+}
+
+// The Go tracing SDK has no "run evaluator by slug" helper, so the Go example
+// posts the same request the curl tab sends, authenticated with
+// `Authorization: Bearer <LANGWATCH_API_KEY>` (never the legacy X-Auth-Token
+// header).
+export function buildGoEvaluationSnippet({
+  name,
+  checkSlug,
+  fields,
+  isGuardrail,
+  settingsJson,
+}: {
+  name: string;
+  checkSlug: string | undefined;
+  fields: string[];
+  isGuardrail: boolean;
+  settingsJson: string | null;
+}): string {
+  // Interpolated, not raw: evaluator settings can carry free text, and a
+  // single backtick in it would terminate a Go raw literal and leave the
+  // snippet unparseable. JSON's escapes are all valid Go ones, so quoting
+  // the settings as a JSON string yields a valid Go interpreted literal.
+  const settingsEntry =
+    settingsJson === null
+      ? ""
+      : `\n\t\t"settings": json.RawMessage(${JSON.stringify(settingsJson)}),`;
+  const asGuardrailEntry = isGuardrail ? `\n\t\t"as_guardrail": true,` : "";
+  const ioImport = isGuardrail ? "" : `\n\t"io"`;
+
+  return `package main
+
+import (
+\t"bytes"
+\t"context"
+\t"encoding/json"
+\t"fmt"${ioImport}
+\t"net/http"
+\t"os"
+)
+
+// Uses LANGWATCH_API_KEY environment variable
+
+func main() {
+\tctx := context.Background()
+
+\tbody, _ := json.Marshal(map[string]any{
+\t\t"name": "${name}",
+\t\t"data": ${buildGoDataBlock(fields)},${asGuardrailEntry}${settingsEntry}
+\t})
+
+\treq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+\t\t"${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate",
+\t\tbytes.NewReader(body))
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY"))
+\treq.Header.Set("Content-Type", "application/json")
+
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\tdefer resp.Body.Close()
+
+${buildGoResponseHandling(isGuardrail)}
+}`;
+}
+
 export function EvaluationManualIntegration({
   slug,
   evaluatorDefinition,
@@ -270,6 +380,49 @@ ${
     );
   };
 
+  const GoInstructions = () => (
+    <VStack align="start" width="full" gap={3}>
+      <Text fontSize="14px">
+        First, set up your traces and spans capturing as explained in the{" "}
+        <Link
+          href="https://github.com/langwatch/langwatch/tree/main/sdks/go"
+          isExternal
+        >
+          Go SDK documentation
+        </Link>
+        .
+      </Text>
+      {(!isOutputMandatory || !isGuardrail) && (
+        <>
+          <Text fontSize="14px">
+            {isGuardrail
+              ? isOutputMandatory
+                ? "Then, after calling your LLM, check for the guardrail:"
+                : "Then, either before or after calling your LLM, check for the guardrail:"
+              : "Then, pass in the message data to get the result of the evaluator:"}
+          </Text>
+          <Box className="markdown" width="full">
+            <RenderCode
+              code={buildGoEvaluationSnippet({
+                name,
+                checkSlug,
+                fields: [
+                  ...evaluatorDefinition.requiredFields,
+                  ...evaluatorDefinition.optionalFields,
+                ],
+                isGuardrail,
+                settingsJson: storeSettingsOnCode
+                  ? JSON.stringify(settings ?? {})
+                  : null,
+              })}
+              language="go"
+            />
+          </Box>
+        </>
+      )}
+    </VStack>
+  );
+
   const settingsParamsCurl = storeSettingsOnCode
     ? `,\n  "settings": ${JSON.stringify(settings ?? {}, null, 2)
         .split("\n")
@@ -331,6 +484,7 @@ ${
           <Tabs.Trigger value="python">Python</Tabs.Trigger>
           <Tabs.Trigger value="python-async">Python (Async)</Tabs.Trigger>
           <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
+          <Tabs.Trigger value="go">Go</Tabs.Trigger>
           <Tabs.Trigger value="curl">Curl</Tabs.Trigger>
         </Tabs.List>
 
@@ -342,6 +496,9 @@ ${
         </Tabs.Content>
         <Tabs.Content value="typescript" padding={0}>
           <TypeScriptInstructions />
+        </Tabs.Content>
+        <Tabs.Content value="go" padding={0}>
+          <GoInstructions />
         </Tabs.Content>
         <Tabs.Content value="curl" padding={0}>
           <VStack align="start" width="full" gap={3}>

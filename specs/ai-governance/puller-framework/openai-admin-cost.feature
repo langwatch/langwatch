@@ -148,8 +148,31 @@ Feature: OpenAI Admin cost puller
     Scenario: Spend is attributed to the person the provider named
       Given a day whose spend the provider attributes to a person
       When the puller records it
-      Then the record names that person by the email the provider gave
+      Then the record names that person by the identifier the provider gave
       And the record carries the provider's own id for that person
+      # The identifier is the provider's opaque one, not an email address. The
+      # report does send an address beside it, and reading that instead is the
+      # thing being refused: the id is stable and an address on a money row is
+      # heavier to erase. Turning the id into a name is the identity engine's
+      # job, and it needs the record to name somebody at all to have anything
+      # to work from.
+
+    @unit
+    Scenario: Spend the provider attributes to nobody names nobody
+      Given a day whose spend the provider attributes to no person
+      When the puller records it
+      Then the record names nobody
+      # An invented placeholder would put a person on the People screen who
+      # does not exist, and give the tenant's procurement somebody to blame.
+
+    @unit
+    Scenario: Naming the person does not re-key the day
+      Given a day whose spend the provider attributes to a person
+      When the puller records it
+      Then the day is identified by its coordinates alone
+      # The person is already one of those coordinates. Adding them a second
+      # time as a separate term would give every day already recorded a new
+      # identity, and the same spend would be counted twice.
 
     @integration
     Scenario: The credential the spend was billed to is recorded
@@ -178,11 +201,66 @@ Feature: OpenAI Admin cost puller
 
     @integration
     Scenario: A failed read leaves the source where it was
-      Given a run whose request to the provider fails
+      Given a run whose first request to the provider fails
       When the run ends
       Then the source's position is unchanged
       And the failure is reported
       And the next run reads that window again
+      # Only when nothing was read. There is no progress to weigh against the
+      # retry, the whole window is still owed, and the wait the provider named
+      # is the most valuable thing the run has. A failure that arrives once
+      # pages HAVE been read is answered the other way round, below.
+
+    @unit
+    Scenario: A page that cannot be read part-way through a window keeps the ones already read
+      Given a run that has already read earlier pages of a window
+      When a later page cannot be read
+      Then the spend from the pages already read is kept
+      And the source resumes at the page that could not be read
+      And the window is reported as not fully collected
+      # Holding the position still instead cost the run every page it had
+      # already read, so the next run asked for the first page again and was
+      # stopped at the same one. A window needing more than one page could
+      # never be got past, on any number of retries.
+
+    @unit
+    Scenario: A refusal part-way through a window still counts against the source
+      Given a run that kept the pages it read before a later one was refused
+      When the run ends
+      Then the run counts as a failure for the source's health
+      And the spend and position it kept are still kept
+
+    @unit
+    Scenario: A source refused part-way through every run reads as failing
+      Given a source refused part-way through each of its last three runs
+      When an admin looks at it
+      Then its pulls are shown as failing
+      # Every one of those runs ends as a completion, because that is how the
+      # pages it did read survive. Reading a completion as proof the source
+      # works lets one collecting a fraction of its spend every hour say
+      # nothing at all about it.
+
+    @unit
+    Scenario: A refused key fails the run rather than banking part of a window
+      Given a run whose key the provider refuses part-way through a window
+      When the run ends
+      Then the run fails
+      And the refusal names what an admin can fix
+      # A refused key answers the same way on every page, so there is no window
+      # to resume and nothing to gain by keeping part of one. Banking here would
+      # record a completion and leave the source looking healthy while it
+      # collected nothing.
+
+    @unit
+    Scenario: A request the provider rejects outright is not banked part-way
+      Given a run that has already read earlier pages of a window
+      When the provider rejects a later page as a bad request
+      Then the source's position is unchanged
+      And the failure is reported
+      # A rejected request is an answer about the request itself, earning the
+      # same answer on every page and every retry. Resuming at it would leave
+      # the position on a page nothing will ever read past, so this is weighed
+      # like a refused key rather than like a provider having a bad minute.
 
     @integration
     Scenario: Every page of a window is read
@@ -198,7 +276,9 @@ Feature: OpenAI Admin cost puller
       And the source starts the new question from the beginning
       # The provider binds a page token to the exact question that produced it
       # and refuses it under any other, so a replayed token fails the run rather
-      # than returning the wrong page.
+      # than returning the wrong page. That binding is verified against the live
+      # API but the provider publishes no promise about it, so it can change
+      # without notice and without this scenario going red.
 
     @integration
     Scenario: Widening the backfill start makes the source read the older days

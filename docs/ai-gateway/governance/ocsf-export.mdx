@@ -63,7 +63,9 @@ The HTTP response wraps the procedure result under `result.data.json`. The resul
 }
 ```
 
-`rawOcsfJson` is the full OCSF 1.1 event as a JSON string. The other fields are the columns your SIEM filters on. `actionName` is the tool the trace invoked, or `trace.recorded` for a trace with no tool call. `anomalyAlertId` is empty when no anomaly rule matched. An organization with no ingestion source yet returns `{ "events": [], "nextCursor": null, "nextCursorCompound": null }`.
+`rawOcsfJson` is the full OCSF 1.1 event as a JSON string. The other fields are the columns your SIEM filters on. `actionName` is the tool the trace invoked, or `trace.recorded` for a trace with no tool call. An organization with no ingestion source yet returns `{ "events": [], "nextCursor": null, "nextCursorCompound": null }`.
+
+`anomalyAlertId` is returned on every record and is **always empty**. No attribute sets it, so no exported record is ever linked to an anomaly alert, and `severityId` is always 1 (Informational). Anomaly alerts are not exported as OCSF rows at all. They are delivered by webhook, described in [Anomaly rules](/ai-governance/anomaly-rules).
 
 ## Pagination
 
@@ -95,4 +97,4 @@ curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
 
 <Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. It is not scoped to `complianceExport:view`, and it expires on the session's own schedule rather than the job's. Keep it out of shell history, out of the process argument list, and out of any script committed to a repository, and rotate the session when the job host changes.</Warning>
 
-**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for what sets `anomalyAlertId`, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
+**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, which is by webhook rather than through this export, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.

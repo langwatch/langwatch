@@ -235,12 +235,16 @@ const routes: RouteObject[] = [
         ),
       },
       {
-        path: "/governance/anomaly-rules",
-        ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
-      },
-      {
+        // Anomaly rules moved into the inventory as a tab; the retired
+        // /governance/anomaly-rules address redirects via legacyRedirectRoutes.
         path: "/governance/people",
         ...page(() => import("./pages/governance/people")),
+      },
+      {
+        // The agents detected across the organization, as one list. `?view`
+        // picks the layout and `?add=1` asks for the register drawer.
+        path: "/governance/agents",
+        ...page(() => import("./pages/governance/agents")),
       },
       {
         // Behind release_ui_governance_billed_cost_enabled (the pages
@@ -251,6 +255,21 @@ const routes: RouteObject[] = [
       {
         path: "/governance/billed",
         ...page(() => import("./pages/governance/billed")),
+      },
+      {
+        // The Platform placeholders, behind the same flag as costs/billed
+        // (each page carries its own guard; see
+        // specs/governance/governance-platform-placeholders.feature).
+        path: "/governance/insights",
+        ...page(() => import("./pages/governance/insights")),
+      },
+      {
+        path: "/governance/analytics",
+        ...page(() => import("./pages/governance/analytics")),
+      },
+      {
+        path: "/governance/signals",
+        ...page(() => import("./pages/governance/signals")),
       },
       {
         // The people page has been cost centers and then departments; old
@@ -282,11 +301,8 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/teams/[id]")),
       },
       {
-        // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/governance/users",
-        ...page(() => import("./pages/governance/users")),
-      },
-      {
+        // The bare users listing folded into the People page (?tab=people);
+        // /governance/users redirects there via legacyRedirectRoutes.
         // Per-user detail - single-row scoped view keyed off the
         // URL-encoded actor id (email / sub claim).
         path: "/governance/users/:id",

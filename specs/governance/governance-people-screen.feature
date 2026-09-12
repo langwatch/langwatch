@@ -1,0 +1,155 @@
+@governance @identity
+Feature: The People screen shows who the providers named
+  Departments already live on this screen. This adds the people themselves:
+  everyone a provider has named, whether they hold a LangWatch account or
+  not, with the match engine's verdicts beside them and its button in front
+  of them. The engine keeps no standing appointment
+  (governance-identity-match-engine.feature) — this screen asks for the proof
+  pass on demand, and the feed that discovers people triggers the rest.
+  Decision: ADR-128 sections 11 and 12.
+
+  Background:
+    Given an organization with discovered people
+
+  # ── Reading ───────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: The list shows what a provider said and what the engine decided
+    When a governance viewer opens the People screen
+    Then each discovered person shows their identifier, provider, and kind
+    And when they were first and last seen
+    And whether they are linked to an account, and by what proof
+
+  @integration
+  Scenario: A linked person shows their member's department
+    Given a discovered person linked to a member assigned to a department
+    When the list is read
+    Then that person's row carries the department name
+    # The department lives on the membership, not on the discovered person.
+    # The row shows it through the link; an unlinked person shows none.
+
+  @integration
+  Scenario: An unlinked person shows the department their directory named
+    Given a discovered person the directory filed under a department
+    And no link to any account
+    When the list is read
+    Then that person's row carries the directory's department
+    # The case the linked-member department cannot cover, and the common one:
+    # on a tenant where nobody is linked yet, the directory is the only thing
+    # that knows where anybody works.
+
+  @unit
+  Scenario: The directory's department wins over the linked member's
+    Given a linked person whose directory names one department
+    And whose linked member is assigned to another
+    When the row picks a department to show
+    Then the directory's is shown
+    # It is a fact about the identity being read. The member's department is
+    # a fact about an account we decided is the same human — one hop further
+    # away, and the hop the reader cannot see.
+
+  @unit
+  Scenario: Departments the providers see are counted from the directory only
+    Given discovered people carrying directory departments
+    And a linked person whose department comes only from their member
+    When the observed departments are grouped
+    Then only the directory's departments are counted
+    # The discovered half of the Departments tab reports what the connected
+    # directories say. Counting our own assignments into it would be reporting
+    # our answers back to us.
+
+  @integration
+  Scenario: An erased person shows a stand-in, never the identifier
+    Given a person who has been erased
+    When the list is read
+    Then their row is marked erased
+    And shows the pseudonym their identifier was replaced with
+    # The row survives erasure so spend stays attributable to someone; what
+    # it must never do is show who that someone was.
+
+  @integration
+  Scenario: Reading the list requires the governance view grant
+    When someone without governance view asks for the list
+    Then the request is refused
+
+  # ── Running the engine ────────────────────────────────────────────────────
+
+  @integration
+  Scenario: The match button runs the proof pass
+    When a governance manager presses the match button
+    Then proven identities are linked
+    And the answer says how many were linked and how many remain unproven
+    # Proof only, and the absence is the design: the suggestion pass scores
+    # names, which the engine's import-graph gate keeps off every request
+    # path (ADR-128 section 12). The button gives fresh proof links on
+    # demand; guesses arrive with the feed, below.
+
+  @unit
+  Scenario: Suggestions are recomputed when the feed discovers people
+    When a pull delivers rows that discover at least one person
+    Then the suggestion pass runs on the worker, after the delivery's own writes
+    # The trigger the engine spec promised: a call site on the feed, composed
+    # by the root on the worker role. A pull that discovers nobody is not a
+    # trigger — an empty feed re-scoring an unchanged queue is the nightly
+    # timer this design replaced.
+
+  @integration
+  Scenario: Running the engine requires the governance manage grant
+    When someone with only governance view asks to run the engine
+    Then the request is refused
+    # The viewer grant reads; linking writes identity rows.
+
+  # ── Suggestions ───────────────────────────────────────────────────────────
+  # What confirming does — the link it opens, the refusals for people since
+  # linked or erased — is the engine spec's contract. This screen only has
+  # to reach it.
+
+  @integration
+  Scenario: A suggestion shows both halves and a confirm action
+    Given a stored suggestion
+    When a governance manager reads the screen
+    Then the suggestion shows the provider-named person and the account
+    And confirming it links them and removes the suggestion from the screen
+
+  @integration
+  Scenario: Confirming requires the governance manage grant
+    When someone with only governance view tries to confirm a suggestion
+    Then the request is refused
+
+  # ── One table on the screen ───────────────────────────────────────────────
+  # The screen used to render the people the providers named as a list of its
+  # own, below the spend ranking. They are one population read two ways, so
+  # they are now one table (people-tabs.feature). Merging two lists is where a
+  # screen can quietly decide that two identifiers are the same human, which is
+  # the match engine's decision and not a table's — these scenarios are the
+  # invariants that survive the merge.
+
+  @integration
+  Scenario: The same identifier at two providers stays two rows
+    Given two providers that both named the same address
+    When the merged table renders
+    Then there are two rows, one per provider
+    And neither row shows the other's provider
+    # The data keeps them apart (governance-people-discovery.feature) and so
+    # must the screen. Collapsing them by string equality would be the table
+    # asserting a match nothing proved.
+
+  @integration
+  Scenario: Spend claimed by two providers is shown once, on neither of them
+    Given a spend row for an address
+    And two discovered people carrying that same address
+    When the merged table renders
+    Then the spend appears once, on a row of its own
+    And neither provider's row claims it
+    # One measurement, two claimants, no way to choose: showing it twice would
+    # double the organization's spend on screen, and choosing one would be the
+    # same unproven match by another route.
+
+  @integration
+  Scenario: An erased person's row names nobody it should not
+    Given a person who has been erased
+    When the merged table renders
+    Then their row shows the pseudonym
+    And it shows no identifier, no provider identity and no department
+    # Erasure already blanks the stored fields; the row is built so that a
+    # value surviving somewhere upstream still cannot reach the screen.

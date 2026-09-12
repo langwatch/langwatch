@@ -1,0 +1,78 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * Identifiers for the daily governance cost rollup (ADR-128 wave 1).
+ *
+ * The fold is registered on the pulled-usage pipeline alone; the metered lane
+ * is read straight off the gateway ledger and never reaches it. The name,
+ * version and table still live here rather than under that pipeline's own
+ * `schemas/`, because the comparator and the cost screen read them too.
+ */
+
+export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";
+
+/**
+ * Schema-snapshot version of the fold (calendar date). The projected row
+ * stamps it; the store's read-back only trusts rows carrying the current
+ * stamp, so a row written by an older shape reads as a miss rather than
+ * decoding column defaults into wrong state.
+ */
+export const GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST = "2026-08-28";
+
+export const GOVERNANCE_COST_ROLLUP_TABLE = "governance_cost_rollup_1d";
+
+/**
+ * Where each restatement key currently sits (challenge settlement 9).
+ *
+ * One row per (tenant, restatement key), carrying the cell the key was first
+ * filed under. The puller reads it before writing an observation: a key that
+ * turns up under a different cell is a REISSUE of the charge already recorded
+ * there, and the old cell has to be retracted or the day carries the one bill
+ * twice.
+ *
+ * It is written by the rollup store in the same write as the cell and derived
+ * from the same event, so a rebuild from history reproduces it. Held only in
+ * memory it would be lost by every restart; looked for by scanning the day it
+ * would mean reading every row of that day on every correction.
+ */
+export const GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE =
+  "governance_cost_rollup_restatement_index";
+
+/**
+ * Which lane the money came from.
+ *
+ * The trace lane is RESERVED and excluded from wave 1: ADR-128 keeps trace
+ * cost a separate system (per-request Float64 in `trace_summaries`), and no
+ * pipeline carrying trace cost registers this fold, so no row can ever carry a
+ * trace cost source.
+ */
+export const GOVERNANCE_COST_SOURCE = {
+  GATEWAY: "gateway",
+  PULLED: "pulled",
+} as const;
+export type GovernanceCostSource =
+  (typeof GOVERNANCE_COST_SOURCE)[keyof typeof GOVERNANCE_COST_SOURCE];
+
+/**
+ * The currency both wave-1 producers state their figures in. It is a KEY
+ * column so that the first non-USD producer is a new row rather than a new
+ * sort key — changing a sort key means rebuilding the table.
+ */
+export const GOVERNANCE_COST_CURRENCY_USD = "USD";
+
+/**
+ * How long after a pull last touched a day that day may still move (ADR-128
+ * §15).
+ *
+ * MEASURED FOR ANTHROPIC ONLY, which is why this reads as a default rather
+ * than a fact: Anthropic restates cost for up to 30 days. Azure's and
+ * Databricks' windows have not been probed, so every source runs on this
+ * number until somebody measures one — at which point a per-source override
+ * is worth building; a hook for it sat here unused and was removed (#7923).
+ *
+ * No provider tells us a day is final. FOCUS's `ChargeClass="Correction"`
+ * describes only periods that have already closed, so nothing on the wire
+ * says "settled" and the flag has to be derived from how long ago we last
+ * looked.
+ */
+export const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;

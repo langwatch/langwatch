@@ -6,6 +6,8 @@ import type {
   SerializedReason,
 } from "@langwatch/handled-error";
 
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
+
 import type { AppErrorCode } from "./codes";
 import {
   type HandledErrorShape,
@@ -1850,6 +1852,11 @@ const presentations = {
     describe: () =>
       "It may have been archived or removed. Reload, then pick a test suite again.",
   },
+  scenario_not_found: {
+    title: "That scenario isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a scenario again.",
+  },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
     describe: (error) => {
@@ -2098,6 +2105,23 @@ const presentations = {
     describe: () =>
       "It is already verified, or it was removed. Refresh the page to see its current state.",
   },
+  // ADR-128 §12. Both are races rather than mistakes: a review queue is read
+  // by people, and the world moves between reading it and clicking.
+  identity_match_suggestion_not_found: {
+    title: "That match suggestion is no longer there",
+    describe: () =>
+      "Somebody may have confirmed it already, or it stopped being suggested. Reload to see the current list.",
+  },
+  identity_already_linked: {
+    title: "This person is already linked to an account",
+    describe: () =>
+      "Someone linked them while this list was open. Reload to see who they are linked to.",
+  },
+  identity_erased: {
+    title: "This person has been erased",
+    describe: () =>
+      "Their details were removed at their request, so they can no longer be linked to an account. Reload to see the current list.",
+  },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
     describe: () =>
@@ -2289,6 +2313,22 @@ const presentations = {
     describe: () =>
       "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
+  agent_listing_unavailable: {
+    // fault: platform, and the copy is written to match. Nothing reached a
+    // provider here — the ask could not be recorded at all — so there is no
+    // outcome landing later, no half-finished sync, and nothing already on
+    // the page is affected.
+    //
+    // It deliberately does not say "try again". Both causes are settings of
+    // the install rather than moments: this deployment does not run the
+    // pipeline that carries listings, or the organization has no governance
+    // project for the request to be tenanted to. Pressing the button a second
+    // time changes neither, and copy that implied otherwise would send an
+    // admin round a loop that cannot end.
+    title: "Agent sync isn't switched on for this organization",
+    describe: () =>
+      "Your providers weren't asked, so no agent list is on the way. Ask your administrator to switch it on, or contact support — trying again won't help until they do.",
+  },
 
   // ---- datasets ----
   dataset_name_taken: {
@@ -2312,6 +2352,15 @@ const presentations = {
     title: "This dataset's columns have changed",
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
+  },
+  dataset_too_large_to_search: {
+    // A limit, not a breakage: the search would have had to read more of the
+    // dataset than one search reads. Saying so beats returning the matches
+    // found before giving up, which reads as a complete answer and is not one.
+    // Paging still works, so the copy points at the way through.
+    title: "This dataset is too large to search",
+    describe: () =>
+      "Page through the rows, or split the dataset into smaller ones.",
   },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
@@ -3204,6 +3253,45 @@ const presentations = {
   gateway_budget_not_found: {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  voice_agents_disabled: {
+    // voiceAgents.message has zero imports of its own, so pulling it in here
+    // never drags server-only Prisma code into this client-bundled registry.
+    title: VOICE_AGENTS_DISABLED_MESSAGE,
+    describe: () => "Ask an admin to turn the feature on for this project.",
+  },
+  voice_key_missing: {
+    title: "No key configured for this voice provider",
+    describe: () => "Add a provider key for this project, then try again.",
+  },
+  voice_mint_failed: {
+    title: "Could not start the call",
+    describe: () => "The voice provider refused the request. Try again.",
+  },
+  voice_name_required: {
+    title: "A name is required to save the agent",
+    describe: () => "",
+  },
+  voice_phone_transport_unavailable: {
+    title: "Phone targets have no browser call",
+    describe: () =>
+      "A phone target has no browser call. Run a scenario against the phone number instead.",
+  },
+  voice_recording_unavailable: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_recording_key_missing: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_conversation_mismatch: {
+    title: "This conversation does not belong to the minted session",
+    describe: () => "",
+  },
+  voice_session_invalid: {
+    title: "The session is invalid or has expired",
+    describe: () => "Start the call again.",
   },
   gateway_budget_cycle_anchor_invalid: {
     // Names the window back, because the fix is to change one of the two:

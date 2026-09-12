@@ -43,8 +43,19 @@ export interface PulledUsageQuantities {
  */
 interface ProviderReportedPrice {
   basis: typeof PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED;
-  /** The provider's amount in USD as a decimal string. */
+  /**
+   * The provider's amount as a decimal string, in ITS OWN currency. Named for
+   * the sources that predate currencies, all of which reported dollars.
+   */
   costUsd: string;
+  /** ISO 4217 code for the amount above. Defaults to dollars. */
+  currencyCode?: string;
+  /**
+   * The biller's own conversion of that amount into dollars, as a decimal
+   * string, when it published one. Undefined when it did not — we never fill
+   * this in from a rate of our own.
+   */
+  costUsdBiller?: string;
   costStatus: PulledUsageCostStatus;
   // No `quantities`. This path never reads them — the provider already priced
   // the item — and requiring them made every caller hand over data the
@@ -66,12 +77,20 @@ interface ComputedPrice {
 export type PulledUsagePriceInput = ProviderReportedPrice | ComputedPrice;
 
 export interface PulledUsagePrice {
-  costNanoUsd: number;
+  /** The amount in the provider's own minor units. See the event schema. */
+  costNanoMinor: number;
+  /** ISO 4217 code for `costNanoMinor`. */
+  currencyCode: string;
+  /** The biller's own dollar figure, or null when it published none. */
+  costNanoUsd: number | null;
   /** Which price table produced a computed cost; null when we produced none. */
   rateVersion: string | null;
   costBasis: PulledUsageCostBasis;
   costStatus: PulledUsageCostStatus;
 }
+
+/** The currency every source reported before currencies were carried. */
+const DEFAULT_CURRENCY_CODE = "USD";
 
 /**
  * The provider's decimal string as the integer nano-USD the ledger stores.
@@ -91,7 +110,7 @@ export interface PulledUsagePrice {
  * publishing a quietly rounded one is the failure this whole path exists to
  * prevent.
  */
-function providerCostToNanoUsd(costUsd: string): number {
+function providerCostToNanoMinor(costUsd: string): number {
   const exact = usdToNanoUsd(costUsd);
   if (
     exact > BigInt(Number.MAX_SAFE_INTEGER) ||
@@ -109,7 +128,15 @@ export function pricePulledUsage(
 ): PulledUsagePrice {
   if (input.basis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
     return {
-      costNanoUsd: providerCostToNanoUsd(input.costUsd),
+      costNanoMinor: providerCostToNanoMinor(input.costUsd),
+      currencyCode: input.currencyCode ?? DEFAULT_CURRENCY_CODE,
+      // Scaled by the same pure function, because it is the same kind of
+      // figure — a decimal string of money — and only its denomination
+      // differs. Absent stays absent: there is no rate here to fill it with.
+      costNanoUsd:
+        input.costUsdBiller === undefined
+          ? null
+          : providerCostToNanoMinor(input.costUsdBiller),
       rateVersion: null,
       costBasis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
       costStatus: input.costStatus,
@@ -132,7 +159,13 @@ export function pricePulledUsage(
   });
 
   return {
-    costNanoUsd,
+    costNanoMinor: costNanoUsd,
+    // We priced it, off a table that is denominated in dollars. There is no
+    // other currency this path can produce.
+    currencyCode: DEFAULT_CURRENCY_CODE,
+    // The amount above already IS the dollar figure; a copy here would be a
+    // second number to keep in step for no reader's benefit.
+    costNanoUsd: null,
     rateVersion,
     costBasis: PULLED_USAGE_COST_BASIS.COMPUTED,
     // Not a branch. A number we derived is never the invoice, so this path

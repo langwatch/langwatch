@@ -11,7 +11,7 @@ describe("buildSecurityHeaders", () => {
     });
 
     expect(headers["Permissions-Policy"]).toBe(
-      "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+      "geolocation=(), microphone=(self), camera=(), payment=(), usb=()",
     );
     expect(headers["Content-Security-Policy"]).toBeDefined();
     expect(headers["Strict-Transport-Security"]).toBe(
@@ -26,10 +26,58 @@ describe("buildSecurityHeaders", () => {
     });
 
     expect(headers["Permissions-Policy"]).toBe(
-      "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+      "geolocation=(), microphone=(self), camera=(), payment=(), usb=()",
     );
     expect(headers["Content-Security-Policy"]).toBeUndefined();
     expect(headers["Strict-Transport-Security"]).toBeUndefined();
+  });
+
+  describe("given a development response", () => {
+    describe("when the CSP is built", () => {
+      /** @scenario Development responses report the production CSP without enforcing it */
+      it("reports the production policy instead of enforcing it", () => {
+        const dev = buildSecurityHeaders({ dev: true, environment: {} });
+        const prod = buildSecurityHeaders({ dev: false, environment: {} });
+
+        expect(dev["Content-Security-Policy"]).toBeUndefined();
+        expect(dev["Content-Security-Policy-Report-Only"]).toBe(
+          prod["Content-Security-Policy"]?.replace(
+            "upgrade-insecure-requests; ",
+            "",
+          ),
+        );
+      });
+    });
+  });
+
+  describe("given the voice agents panel (#7947)", () => {
+    describe("when building production headers", () => {
+      /** @scenario The app's own headers allow the ElevenLabs audio worklets */
+      it("admits blob: script modules so AudioWorklet.addModule can load them", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
+
+        expect(csp).toMatch(/script-src [^;]*\bblob:/);
+      });
+
+      /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
+      it("allows the microphone for the app's own origin", () => {
+        const headers = buildSecurityHeaders({ dev: false, environment: {} });
+
+        expect(headers["Permissions-Policy"]).toContain("microphone=(self)");
+      });
+
+      /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
+      it("admits the ElevenLabs API into connect-src", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
+
+        expect(csp).toMatch(/connect-src [^;]*wss:\/\/api\.elevenlabs\.io/);
+        expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.elevenlabs\.io/);
+      });
+    });
   });
 
   describe("given a content-hashed asset CDN (ADR-086)", () => {

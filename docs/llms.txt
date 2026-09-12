@@ -60,6 +60,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Optimization Algorithms](https://langwatch.ai/docs/improve-your-agent/algorithms.md): What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
 
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
+- [Voice Agents in the App](https://langwatch.ai/docs/agent-testing/voice-agents-in-app.md): Test an ElevenLabs Conversational AI agent from the LangWatch app: talk to it, call it from a run, or run scenarios with a simulated caller.
 - [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 
 ## Observability
@@ -231,7 +232,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Go
 
 - [Go Integration Guide](https://langwatch.ai/docs/integration/go/guide.md): Use the LangWatch Go SDK to trace LLM calls, measure performance, and support observability-driven AI agent testing.
-- [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including core functions, OpenAI instrumentation, and span types.
+- [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including the exporter, tracer, span helpers, provider instrumentations, data capture and the REST client.
 
 - [Metadata and Labels](https://langwatch.ai/docs/integration/metadata-and-labels.md): Add custom metadata, user IDs, conversation threads, and labels to your traces for filtering, analytics, and debugging.
 
@@ -330,6 +331,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Instructor AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/instructor.md): Instrument Instructor AI with LangWatch to track structured outputs, detect errors, and enhance AI agent testing workflows.
 - [SmolAgents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/smolagents.md): Add SmolAgents tracing with LangWatch to analyze behaviors, detect errors, and improve AI agent testing accuracy.
 - [Google Agent Development Kit (ADK) Instrumentation](https://langwatch.ai/docs/integration/python/integrations/google-ai.md): Integrate Google ADK agents into LangWatch to trace actions, tools, and interactions for structured AI agent evaluations.
+- [Firebase Genkit Integration](https://langwatch.ai/docs/integration/go/integrations/genkit.md): Export Firebase Genkit Go traces to LangWatch to observe flows, models, and tools for AI agent evaluation.
 - [Other OpenTelemetry Instrumentors](https://langwatch.ai/docs/integration/python/integrations/other.md): Use any OpenTelemetry-compatible instrumentor with LangWatch to standardize tracing and centralize AI agent testing observability.
 
 ## Model Providers
@@ -357,11 +359,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Google Cloud
 
 - [Google Vertex AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/vertex-ai.md): The LangWatch Python SDK instruments Google Vertex AI API calls through OpenInference.
-- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
+- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 
 ### Amazon Web Services
 
 - [AWS Bedrock Instrumentation](https://langwatch.ai/docs/integration/python/integrations/aws-bedrock.md): Instrument AWS Bedrock calls using OpenInference and LangWatch to capture metrics and behaviors for AI agent testing workflows.
+- [Amazon Bedrock Integration](https://langwatch.ai/docs/integration/go/integrations/amazon-bedrock.md): Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
 
 - [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for LLM observability, cost tracking, and agent evaluation insights.
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
@@ -506,9 +509,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+- [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, the agents they run, and a personal home page for each developer.
 - [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
-- [From zero to first detected anomaly (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
+- [From zero to your first governed request (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough to publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
 
 ## Personal Portal
@@ -525,7 +528,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Dashboards
 
-- [/governance dashboard](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /governance/*. Available only after the org's setup-state OR-of-flags trips.
+- [The /governance overview](https://langwatch.ai/docs/ai-governance/governance-dashboard.md): What the /governance page shows today, where each governance number actually lives, and the setup-state signal behind the section.
 - [People](https://langwatch.ai/docs/ai-governance/people.md): Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
 
 ## Privacy
@@ -546,7 +549,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Detection
 
-- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
+- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): What the anomaly detector evaluates, what a rule is made of, how a fired alert reaches you, and why rules cannot be created in the app today.
 
 ## Compliance & Architecture
 
@@ -708,6 +711,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Register the GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App the organization connects, covering registration, permissions, the GITHUB_LANGY env vars, GitHub Enterprise Server, restricted networks, install, verify, and disconnect.
 - [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
 - [Langy Networking and Egress](https://langwatch.ai/docs/self-hosting/langy/networking-and-egress.md): The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
+- [Langy Health Check](https://langwatch.ai/docs/self-hosting/langy/health-check.md): An endpoint an uptime monitor can poll that sends Langy a real greeting and reports whether it answered.
 
 # API Reference
 

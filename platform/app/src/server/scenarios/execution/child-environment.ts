@@ -21,6 +21,7 @@ import {
   NLP_FETCH_MAX_TIMEOUT_ENV,
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
 } from "../../nlpgo/timeouts";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice/voice-public-url-env";
 import {
   encodeScenarioLogContext,
   SCENARIO_LOG_CONTEXT_ENV,
@@ -125,10 +126,18 @@ export function buildChildEnvironment({
   jobData,
   labels,
   telemetry,
+  callerEnv,
 }: {
   jobData: ExecutionJobData;
   labels: string[];
   telemetry: ChildEnvInputs["telemetry"];
+  /**
+   * The caller's OpenAI / ElevenLabs keys, for a VOICE target only — the SDK
+   * builds its TTS and transcription clients from the child's env. The caller
+   * passes it only for a voice run; it is never set for any other target, so a
+   * caller credential can never leak into an unrelated child. Never logged.
+   */
+  callerEnv?: Record<string, string>;
 }): NodeJS.ProcessEnv {
   // TLS for the runner's own fetch stack (EventReporter → platform, and the
   // model API call). Forwards haven's trusted local CA when present; only in
@@ -152,5 +161,30 @@ export function buildChildEnvironment({
       setId: jobData.setId,
     }),
     ...tlsEnv,
+    // Voice-only, and only the two keys the prefetcher resolved. Narrowed
+    // here (not just at the call site) so a caller credential can never reach
+    // an unrelated child even if a future caller forgets to gate it (#26).
+    ...(jobData.target.type === "voice" ? (callerEnv ?? {}) : {}),
+    // Voice-only. The phone transport reads these from the child's own env
+    // (`resolvePublicBaseUrl` in `phone.transport.ts`) once it is running in
+    // the pool child, and this allowlist is the only gate between the
+    // operator's process env and that child. `VOICE_WS_PORT` is deliberately
+    // NOT forwarded: the child's SDK media server always binds an
+    // OS-assigned port (the parent worker owns the public media port and
+    // hands off an already-upgraded socket over IPC), and forwarding the
+    // parent's own port here would let it collide with the parent's own
+    // listener.
+    ...(jobData.target.type === "voice"
+      ? {
+          VOICE_PUBLIC_BASE_URL: process.env.VOICE_PUBLIC_BASE_URL,
+          // Why the worker has no public URL (its cloudflared tunnel mint
+          // failed), forwarded so the child's phone-run error can name the real
+          // cause instead of a generic "no public media URL". Filtered out when
+          // unset by `buildChildProcessEnv`.
+          [VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]:
+            process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV],
+          BASE_HOST: env.BASE_HOST,
+        }
+      : {}),
   });
 }

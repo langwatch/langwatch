@@ -85,16 +85,31 @@ Feature: AI Tools Portal - Admin catalog editor at /governance/inventory?tab=cat
     And the Anthropic row renders dimmed (opacity 0.5) because `enabled=false`
     And the Anthropic row's enable/disable button reads "Enable" (not "Disable")
 
-  Scenario: each row has drag handle, scope badge, edit, and disable buttons
+  Scenario: each card has drag handle, scope badge, and an actions menu
     Given the catalog has at least one entry per section
-    When user "carol@acme.com" hovers over a row
-    Then the row exposes:
+    When user "carol@acme.com" looks at a card
+    Then the card exposes:
       | element           | function                                          |
       | grip-vertical    | drag handle (cursor: grab)                        |
       | display name     | non-interactive label                             |
+      | tile icon        | the same icon the /me portal renders for the tile |
+      | type badge       | "Coding assistant", "Model provider" or "Internal tool" |
       | scope badge      | "Org-wide" or "Team: <name>"                      |
-      | Edit button      | opens edit drawer pre-populated with entry config |
-      | Disable/Enable   | toggles `enabled` field via tRPC mutation         |
+      | actions menu     | Edit / Disable-Enable / Delete                    |
+
+  @bdd @admin-catalog @cards @integration
+  Scenario: the catalog renders cards with only the fields a tile has
+    Given the catalog has a coding assistant "Claude Code" allowing the
+      gateway path but not direct ingestion, a model provider "Anthropic",
+      and an internal tool "Wiki" linking to "https://wiki.example.test"
+    When user "carol@acme.com" loads "/governance/inventory?tab=catalog"
+    Then each section lays its tiles out as a grid of cards, one to three
+      across depending on the viewport
+    And the "Claude Code" card carries its type badge, its scope chip and
+      the line "CLI paths: gateway only"
+    And the "Wiki" card carries its link
+    And no card shows a seat count, a licence, or a cost — nothing the tile
+      does not actually store
 
   Scenario: + Add tile opens drawer with section's type pre-selected
     Given the editor is loaded

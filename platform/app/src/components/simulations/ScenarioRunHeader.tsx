@@ -13,12 +13,15 @@ interface ScenarioRunHeaderProps {
   status?: ScenarioRunStatus;
   name?: string | null;
   copyableIds: CopyableId[];
+  /** "Simulated" or "You" for a voice run; absent hides the caller line (AC24). */
+  caller?: "Simulated" | "You" | null;
 }
 
 export function ScenarioRunHeader({
   status,
   name,
   copyableIds,
+  caller,
 }: ScenarioRunHeaderProps) {
   return (
     <Box p={5} borderBottom="1px" borderColor="border" w="100%">
@@ -31,6 +34,11 @@ export function ScenarioRunHeader({
                 {name}
               </Text>
             </HStack>
+            {caller ? (
+              <Text fontSize="xs" color="fg.muted" mb={1}>
+                Caller: {caller}
+              </Text>
+            ) : null}
             <VStack align="start" gap={0} ml={0}>
               {copyableIds.map((id) => (
                 <HStack key={id.label} gap={1}>

@@ -1,15 +1,20 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
+import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
+import { GovernanceGatewaySpendClickHouseRepository } from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
 
 type ClickHouseClientLike = ClickHouseClient;
 
@@ -31,7 +36,8 @@ import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpe
  * right for a unit test and useless for one that asserts on rows.
  *
  * Wires the ClickHouse-backed slots a route or worker test reaches today:
- * `clickhouse`, `gateway`, `governance` and `billableEvents`. The rest keep
+ * `clickhouse`, `gateway`, `governance` (including ADR-128's cost rollup) and
+ * `billableEvents`. The rest keep
  * their `createTestApp` defaults - a throwing analytics resolver, a null
  * filter repository, an empty cross-tenant stored-object lookup, no orphan
  * reconciliation. A test whose route reaches one of those adds it here rather
@@ -103,6 +109,19 @@ export function installClickHouseTestApp({
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),
       activityMonitor: new ActivityMonitorClickHouseRepository(required),
+      costRollup: new GovernanceCostRollupClickHouseRepository(required),
+      gatewaySpend: new GovernanceGatewaySpendClickHouseRepository(required),
+      // Real: the metered lane scopes the ledger read by the organization's
+      // project ids, which a route test seeds in the same Postgres.
+      projects: new PrismaProjectRepository(prisma),
+      // The erasure needs Postgres repositories and the ops replay service,
+      // neither of which this ClickHouse-only harness composes. A suite that
+      // drives an erasure builds it directly.
+      identityErasure: undefined,
+      // The matcher, unlike the erasure, needs only Postgres — which this
+      // harness already has behind `createTestApp` — so it is the real service
+      // rather than a hole a route test would trip into.
+      identityMatch: new IdentityMatchService({ prisma }),
     },
     billableEvents: new BillableEventsClickHouseRepository(
       required,

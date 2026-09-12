@@ -1,0 +1,567 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * @vitest-environment node
+ *
+ * The cost rollup's drift watchdog, against real ClickHouse: it re-derives one
+ * day straight from `event_log` and holds it against the summary.
+ *
+ * The assertion is the METRIC and the log, and the absence of a repair. Wave 1
+ * surfaces signals and sends nothing — a comparator that quietly rewrote the
+ * row it disagreed with would erase the evidence of why the two diverged.
+ *
+ * Spec: specs/governance/governance-cost-rollup.feature
+ * Decision: ADR-128.
+ */
+import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  PULLED_USAGE_EVENT_TYPES,
+  PULLED_USAGE_EVENT_VERSIONS,
+} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
+import { nanoid } from "nanoid";
+import { register } from "prom-client";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+
+import {
+  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+  GOVERNANCE_COST_SOURCE,
+} from "../../projections/governanceCostRollup.constants";
+import {
+  GovernanceCostRollupFoldProjection,
+  type GovernanceCostRollupState,
+  governanceCostRollupKey,
+} from "../../projections/governanceCostRollup.foldProjection";
+import { projectGovernanceCostRollupStateToRow } from "../../projections/governanceCostRollup.store";
+import {
+  COST_SOURCE_EVENT_TYPES,
+  CostRollupComparatorService,
+} from "../costRollupComparator.service";
+import { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
+
+const DAY = "2026-08-01";
+const DAY_MS = Date.parse(`${DAY}T09:30:00.000Z`);
+
+let ch: ClickHouseClient;
+let repo: GovernanceCostRollupClickHouseRepository;
+let comparator: CostRollupComparatorService;
+let tenantId: string;
+
+/**
+ * Writes the day's summary at whatever figure the test wants it to claim, by
+ * folding one dollar-billed observation through the real projection.
+ */
+async function writeSummary(amountNanoUsd: number): Promise<void> {
+  const projection = new GovernanceCostRollupFoldProjection({
+    store: { store: async () => undefined, get: async () => null },
+  });
+  const state: GovernanceCostRollupState = projection.apply(projection.init(), {
+    id: `evt-${nanoid()}`,
+    type: "lw.obs.pulled_usage.observed",
+    tenantId,
+    aggregateId: "seed",
+    occurredAt: DAY_MS,
+    data: observedData({
+      costNanoMinor: amountNanoUsd,
+      currencyCode: "USD",
+      observedAtMs: DAY_MS,
+      restatementKey: "seed",
+    }),
+  } as never);
+  await repo.upsert(
+    projectGovernanceCostRollupStateToRow({
+      state,
+      tenantId,
+      version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      appliedEventIds: [],
+    }),
+  );
+}
+
+/**
+ * One pulled observation's payload, as the puller worker writes it.
+ *
+ * `occurredAtMs` is the provider's business time, which is what the fold
+ * buckets the item by; the envelope time the comparator selects by is set
+ * separately in `appendPulled`, and the two only agree because every test
+ * here passes the same instant to both.
+ */
+function observedData({
+  costNanoMinor,
+  currencyCode,
+  observedAtMs,
+  occurredAtMs = DAY_MS,
+  restatementKey = "bucket-hash",
+}: {
+  costNanoMinor: number;
+  currencyCode: string;
+  observedAtMs: number;
+  occurredAtMs?: number;
+  restatementKey?: string;
+}) {
+  return {
+    itemKey: `usage_report:${DAY}:1d`,
+    restatementKey,
+    source: "anthropic_admin",
+    ingestionSourceId: "src_1",
+    organizationId: "org_acme",
+    teamId: "team_platform",
+    projectId: tenantId,
+    model: "anthropic/claude-sonnet-5",
+    tokensInput: 1_000,
+    tokensOutput: 200,
+    tokensCacheRead: 0,
+    tokensCacheWrite: 0,
+    costNanoMinor,
+    currencyCode,
+    costNanoUsd: null,
+    rawActorId: "",
+    rateVersion: "registry@2026-08-01",
+    costBasis: "computed",
+    costStatus: "estimate",
+    occurredAtMs,
+    observedAtMs,
+  };
+}
+
+/**
+ * Puts one dollar-billed observation on the durable log, dated to the day
+ * its business time falls in: the puller sets the envelope's `occurredAt` to
+ * the item's own `occurredAtMs` (pullerWorker.ts), and the store writes that
+ * envelope field to `EventOccurredAt` verbatim. Seeding the two apart would
+ * be testing a system we do not have.
+ */
+async function appendObserved({
+  costNanoMinor,
+  occurredAtMs = DAY_MS,
+  restatementKey = `bucket-${nanoid(6)}`,
+}: {
+  costNanoMinor: number;
+  occurredAtMs?: number;
+  restatementKey?: string;
+}): Promise<void> {
+  await appendPulled({
+    type: "lw.obs.pulled_usage.observed",
+    data: observedData({
+      costNanoMinor,
+      currencyCode: "USD",
+      observedAtMs: occurredAtMs,
+      occurredAtMs,
+      restatementKey,
+    }),
+    occurredAt: occurredAtMs,
+  });
+}
+
+/**
+ * The payload that withdraws what one restatement key holds.
+ *
+ * `lw.obs.pulled_usage.retracted` (settlement 9), whose shape is
+ * `PulledUsageRetractedEventSchema`. Nothing emits one in production yet: the
+ * detector that would compare an incoming key against the restatement index
+ * is the piece still to be written.
+ *
+ * `costNanoMinor` is spelled out because the cell an event addresses is
+ * derived through `readPulledUsageMoney`, which falls back to dollars when it
+ * is absent - a retraction omitting it would address the wrong cell.
+ */
+function retractedData({
+  currencyCode,
+  observedAtMs,
+  restatementKey = "bucket-hash",
+}: {
+  currencyCode: string;
+  observedAtMs: number;
+  restatementKey?: string;
+}) {
+  return {
+    restatementKey,
+    source: "anthropic_admin",
+    ingestionSourceId: "src_1",
+    organizationId: "org_acme",
+    model: "anthropic/claude-sonnet-5",
+    costNanoMinor: 0,
+    currencyCode,
+    costNanoUsd: null,
+    rawActorId: "",
+    occurredAtMs: DAY_MS,
+    observedAtMs,
+  };
+}
+
+/**
+ * Puts one pulled-usage event on the durable log.
+ *
+ * `occurredAt` is the ENVELOPE time, which is the column the comparator
+ * selects its day by - deliberately a separate argument from the payload's own
+ * `occurredAtMs`, because a retraction dated to its arrival rather than to the
+ * day it corrects is exactly the defect these scenarios are about.
+ */
+async function appendPulled({
+  type,
+  data,
+  occurredAt,
+}: {
+  type: string;
+  data: Record<string, unknown>;
+  occurredAt: number;
+}): Promise<void> {
+  await ch.insert({
+    table: "event_log",
+    values: [
+      {
+        TenantId: tenantId,
+        IdempotencyKey: `idem-${nanoid()}`,
+        AggregateType: "pulled_usage",
+        AggregateId: String(data.restatementKey),
+        EventId: `evt-${nanoid()}`,
+        EventType: type,
+        // Each pulled event carries its OWN declared version. Hardcoding the
+        // observed one put a retraction on the log under a version that never
+        // described its shape.
+        EventVersion:
+          type === PULLED_USAGE_EVENT_TYPES.RETRACTED
+            ? PULLED_USAGE_EVENT_VERSIONS.RETRACTED
+            : PULLED_USAGE_EVENT_VERSIONS.OBSERVED,
+        EventTimestamp: Date.now(),
+        EventPayload: JSON.stringify(data),
+        EventOccurredAt: occurredAt,
+      },
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+}
+
+/**
+ * Writes the pulled lane's summary by folding the given events through the
+ * REAL projection, one state per cell - the same path the store takes.
+ *
+ * Hand-writing the row instead would let this pass while the fold ignored the
+ * retraction entirely, which is the thing under test.
+ */
+async function writePulledSummary(
+  events: Array<{ type: string; data: Record<string, unknown> }>,
+): Promise<void> {
+  const projection = new GovernanceCostRollupFoldProjection({
+    store: { store: async () => undefined, get: async () => null },
+  });
+  const cells = new Map<string, GovernanceCostRollupState>();
+  for (const event of events) {
+    const envelope = {
+      id: `evt-${nanoid()}`,
+      tenantId,
+      aggregateId: String(event.data.restatementKey),
+      occurredAt: DAY_MS,
+      ...event,
+    };
+    const key = governanceCostRollupKey(envelope as never);
+    cells.set(
+      key,
+      projection.apply(cells.get(key) ?? projection.init(), envelope as never),
+    );
+  }
+  for (const state of cells.values()) {
+    await repo.upsert(
+      projectGovernanceCostRollupStateToRow({
+        state,
+        tenantId,
+        version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+        appliedEventIds: [],
+      }),
+    );
+  }
+}
+
+async function mismatchCount(): Promise<number> {
+  const metric = register.getSingleMetric(
+    "langwatch_governance_cost_rollup_mismatch_total",
+  );
+  const values = (await metric!.get()).values;
+  return values
+    .filter(
+      (value) => value.labels.cost_source === GOVERNANCE_COST_SOURCE.PULLED,
+    )
+    .reduce((sum, value) => sum + value.value, 0);
+}
+
+describe("COST_SOURCE_EVENT_TYPES", () => {
+  // The comparator checks the billed lane alone. The metered lane is read
+  // straight off its own per-request ledger and never reaches a rollup row,
+  // so a gateway entry here would re-derive cells the summary is never
+  // written with and report drift that is entirely its own.
+  it("covers the billed lane and no gateway event", () => {
+    expect(Object.keys(COST_SOURCE_EVENT_TYPES)).toEqual([
+      GOVERNANCE_COST_SOURCE.PULLED,
+    ]);
+    const gatewayTypes = Object.values(COST_SOURCE_EVENT_TYPES)
+      .flat()
+      .filter((type) => type.startsWith("lw.gateway."));
+    expect(gatewayTypes).toEqual([]);
+  });
+});
+
+describe("CostRollupComparatorService", () => {
+  beforeAll(() => {
+    const client = getTestClickHouseClient();
+    if (!client) throw new Error("Test ClickHouse is not available");
+    ch = client;
+    repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
+    comparator = new CostRollupComparatorService(repo);
+  });
+
+  beforeEach(() => {
+    tenantId = `proj-comparator-${nanoid(8)}`;
+  });
+
+  afterAll(async () => {
+    await ch?.close();
+  });
+
+  describe("given a summary row that no longer matches the sum of its events", () => {
+    /** @scenario "The comparator counts a summary that drifted from its events" */
+    it("counts the mismatch on the drift metric and names both figures in the log", async () => {
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+      await appendObserved({ costNanoMinor: 7_340_000_000 });
+      // The summary claims a figure the events do not add up to.
+      await writeSummary(9_999_000_000);
+
+      const before = await mismatchCount();
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      expect(await mismatchCount()).toBe(before + 1);
+      expect(comparison.mismatches).toHaveLength(1);
+      // Both figures are carried out of the comparison, which is what the log
+      // line renders: a counter alone cannot tell an operator which way the
+      // drift went or by how much.
+      expect(comparison.mismatches[0]!.summarizedNanoMinor).toBe(9_999_000_000);
+      expect(comparison.mismatches[0]!.derivedNanoMinor).toBe(12_340_000_000);
+    });
+
+    it("leaves the drifted row exactly as it found it", async () => {
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+      await writeSummary(9_999_000_000);
+
+      await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      expect(cells[0]!.AmountNanoUsd).toBe(9_999_000_000);
+    });
+  });
+
+  describe("given a summary that agrees with its events", () => {
+    // The counter has to be quiet on the healthy path, or the alerting it
+    // exists for is noise from the first day.
+    it("counts nothing", async () => {
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+      await appendObserved({ costNanoMinor: 7_340_000_000 });
+      await writeSummary(12_340_000_000);
+
+      const before = await mismatchCount();
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      expect(comparison.mismatches).toEqual([]);
+      expect(await mismatchCount()).toBe(before);
+    });
+  });
+
+  describe("given two events either side of midnight", () => {
+    /**
+     * The comparator selects its events by `event_log.EventOccurredAt` while
+     * the fold buckets them by the payload's own `occurredAtMs`. That is only
+     * safe while the two carry the same value, and today they do: the puller
+     * sets the envelope's `occurredAt` to the item's business time
+     * (pullerWorker.ts) and the store writes the envelope field to the column
+     * unchanged (eventStoreUtils.ts:71), with the append clock going to
+     * `EventTimestamp` instead.
+     *
+     * So this is a pin, not a repair. A producer that ever set the envelope to
+     * wall-clock time would put an event in one query's day and the other's
+     * neighbour, and the comparator would report drift that is entirely its
+     * own. That regression fails here.
+     */
+    it("assigns each to the day its own business time falls in", async () => {
+      const lastMs = Date.parse(`${DAY}T23:59:59.999Z`);
+      const firstMsNextDay = Date.parse("2026-08-02T00:00:00.000Z");
+      await appendObserved({
+        costNanoMinor: 5_000_000_000,
+        occurredAtMs: lastMs,
+      });
+      await appendObserved({
+        costNanoMinor: 7_340_000_000,
+        occurredAtMs: firstMsNextDay,
+      });
+
+      // The summary for DAY claims only the event whose business day is DAY.
+      await writeSummary(5_000_000_000);
+
+      const sameDay = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+      // The 00:00:00.000 event next door was not pulled into this day.
+      expect(sameDay.mismatches).toEqual([]);
+
+      // ...and it was not dropped on the floor either: it turns up on its own
+      // day, where no summary explains it.
+      const nextDay = await comparator.compareDay({
+        tenantId,
+        day: "2026-08-02",
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+      expect(nextDay.mismatches).toHaveLength(1);
+      expect(nextDay.mismatches[0]!.derivedNanoMinor).toBe(7_340_000_000);
+    });
+  });
+
+  describe("given a summary cell no event on the log explains", () => {
+    // Money on a screen that nothing accounts for is the more alarming
+    // direction, and the one a naive comparator iterating only over derived
+    // cells would be blind to.
+    it("counts it too", async () => {
+      await writeSummary(9_999_000_000);
+
+      const before = await mismatchCount();
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      expect(comparison.mismatches).toHaveLength(1);
+      expect(comparison.mismatches[0]!.derivedNanoMinor).toBe(null);
+      expect(await mismatchCount()).toBe(before + 1);
+    });
+  });
+
+  describe("when the comparator runs", () => {
+    it("measures how far the summary is behind the log", async () => {
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      // Nothing summarized, one event at 09:30 on the sampled day: the summary
+      // is behind by the whole elapsed part of the window.
+      expect(comparison.lagMs).toBe(
+        DAY_MS - Date.parse(`${DAY}T00:00:00.000Z`),
+      );
+    });
+  });
+
+  describe("given a day summarized from a bill issued in one currency", () => {
+    const BILLED = 10_000_000_000;
+    const FIRST_PULL = Date.parse("2026-08-02T04:00:00.000Z");
+    const CORRECTION_SEEN = Date.parse("2026-08-05T04:00:00.000Z");
+    /** The day the correction ARRIVED, three days after the day it corrects. */
+    const ARRIVAL_DAY_MS = Date.parse("2026-08-04T11:00:00.000Z");
+
+    /** @scenario "A retraction is dated to the day it corrects" */
+    it("lets the day's own check see the retraction, so the day reads as agreeing", async () => {
+      const bill = observedData({
+        costNanoMinor: BILLED,
+        currencyCode: "EUR",
+        observedAtMs: FIRST_PULL,
+      });
+      const retraction = retractedData({
+        currencyCode: "EUR",
+        observedAtMs: CORRECTION_SEEN,
+      });
+      await appendPulled({
+        type: "lw.obs.pulled_usage.observed",
+        data: bill,
+        occurredAt: DAY_MS,
+      });
+      await appendPulled({
+        type: "lw.obs.pulled_usage.retracted",
+        data: retraction,
+        // Dated to the day it corrects, not to the day it arrived.
+        occurredAt: DAY_MS,
+      });
+      await writePulledSummary([
+        { type: "lw.obs.pulled_usage.observed", data: bill },
+        { type: "lw.obs.pulled_usage.retracted", data: retraction },
+      ]);
+
+      // The check re-derives a day from the events falling inside that day, so
+      // the retraction has to be one of the event types it asks for AND has to
+      // fall inside the window.
+      const seen = await repo.findCostEventsForDay({
+        tenantId,
+        day: DAY,
+        eventTypes: COST_SOURCE_EVENT_TYPES[GOVERNANCE_COST_SOURCE.PULLED],
+      });
+      expect(seen.map((event) => event.type)).toContain(
+        "lw.obs.pulled_usage.retracted",
+      );
+
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+      expect(comparison.mismatches).toEqual([]);
+    });
+
+    // Deliberately unbound, and the arm above carries the binding: both cover
+    // the one scenario "A retraction is dated to the day it corrects", and
+    // this is its negative half. Without it an implementation that dated the
+    // retraction either way passes the bound arm, so the scenario would be
+    // green while enforcing nothing.
+    it("reports the day as drifting when the retraction is dated to its own arrival", async () => {
+      // The far side of the rule. Dated to the day the correction arrived, the
+      // retraction is never read by the check for the day it corrects, and
+      // that day is reported as drifting for as long as it is kept - so an
+      // implementation that dated it either way would pass the arm above.
+      const bill = observedData({
+        costNanoMinor: BILLED,
+        currencyCode: "EUR",
+        observedAtMs: FIRST_PULL,
+      });
+      const retraction = retractedData({
+        currencyCode: "EUR",
+        observedAtMs: CORRECTION_SEEN,
+      });
+      await appendPulled({
+        type: "lw.obs.pulled_usage.observed",
+        data: bill,
+        occurredAt: DAY_MS,
+      });
+      await appendPulled({
+        type: "lw.obs.pulled_usage.retracted",
+        data: retraction,
+        occurredAt: ARRIVAL_DAY_MS,
+      });
+      await writePulledSummary([
+        { type: "lw.obs.pulled_usage.observed", data: bill },
+        { type: "lw.obs.pulled_usage.retracted", data: retraction },
+      ]);
+
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+      expect(comparison.mismatches).toHaveLength(1);
+      expect(comparison.mismatches[0]!.summarizedNanoMinor).toBe(0);
+      expect(comparison.mismatches[0]!.derivedNanoMinor).toBe(BILLED);
+    });
+  });
+});

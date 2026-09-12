@@ -9,6 +9,10 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  formatRelativeTime,
+  formatUsd,
+} from "~/components/governance/PeopleTable";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
@@ -18,27 +22,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
-
-const fmtUsd = (n: number | string) => {
-  const v = typeof n === "string" ? Number(n) : n;
-  return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");
-};
-
-const fmtRelative = (date: Date | string | null): string => {
-  if (!date) return "—";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "—";
-  const diffMs = Date.now() - d.getTime();
-  if (diffMs < 0) return "just now";
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const days = Math.floor(hr / 24);
-  return `${days}d ago`;
-};
 
 function GovernanceUserDetailPage() {
   const router = useRouter();
@@ -77,8 +60,8 @@ function GovernanceUserDetailPage() {
               ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/governance/users" color="blue.600">
-              All users
+            <Link href="/governance/people" color="blue.600">
+              People
             </Link>
           </Text>
           <HStack gap={2}>
@@ -86,7 +69,14 @@ function GovernanceUserDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
+              // The filled state is a palette hue keyed off the name. The empty
+              // state was `fg.muted`, a text token, which painted the swatch at
+              // reading contrast — a near-black dot louder than the heading
+              // beside it. A swatch with no name behind it is a surface, so it
+              // takes a surface token.
+              backgroundColor={
+                actor ? getHexColorForString(actor) : "bg.emphasized"
+              }
             />
             <Heading size="md">
               {user?.actor ?? actor ?? "User not found"}
@@ -120,16 +110,19 @@ function GovernanceUserDetailPage() {
         ) : (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
-              <Stat label="Spend (30 d)" value={fmtUsd(user.spendUsd)} />
+              <Stat
+                label="Spend, last 30 days"
+                value={formatUsd(user.spendUsd)}
+              />
               <Stat
                 label="Requests"
                 value={numeral(user.requests).format("0,0")}
               />
               <Stat
                 label="Last active"
-                value={fmtRelative(user.lastActivityIso)}
+                value={formatRelativeTime(user.lastActivityIso)}
               />
-              <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
+              <Stat label="Most used" value={user.mostUsedTarget ?? "—"} />
             </SimpleGrid>
 
             <Box
@@ -142,8 +135,8 @@ function GovernanceUserDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend trend and per-model breakdown for this user will
-                land here in a follow-up.
+                Per-day spend trend and per-model breakdown for this user are
+                not available yet.
               </Text>
               {personalProject && (
                 <>

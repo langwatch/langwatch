@@ -24,6 +24,10 @@ import {
   type AgentHttpEditorDrawerProps,
 } from "./AgentHttpEditorDrawer";
 import {
+  AgentVoiceEditorDrawer,
+  type AgentVoiceEditorDrawerProps,
+} from "./AgentVoiceEditorDrawer";
+import {
   WorkflowSelectorDrawer,
   type WorkflowSelectorDrawerProps,
 } from "./WorkflowSelectorDrawer";
@@ -42,6 +46,14 @@ export function AgentHttpEditorDrawerFromUrl(
   const { drawerOpen } = useDrawer();
   const open = props.open ?? drawerOpen("agentHttpEditor");
   return <AgentHttpEditorDrawer {...props} open={open} />;
+}
+
+export function AgentVoiceEditorDrawerFromUrl(
+  props: Omit<AgentVoiceEditorDrawerProps, "open"> & { open?: boolean },
+) {
+  const { drawerOpen } = useDrawer();
+  const open = props.open ?? drawerOpen("agentVoiceEditor");
+  return <AgentVoiceEditorDrawer {...props} open={open} />;
 }
 
 export function WorkflowSelectorDrawerFromUrl(

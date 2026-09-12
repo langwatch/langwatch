@@ -53,16 +53,34 @@ import {
   type TypedAgent,
 } from "../../agents/agent.repository";
 import {
+  parseVoiceAgentConfig,
+  voiceAgentExternalId,
+} from "../../agents/voice/voice-agent.config";
+import {
   getProjectModelProviders,
+  prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
+import {
+  findElevenLabsProviderForProject,
+  getElevenLabsApiCredential,
+} from "../../gateway/elevenLabsCredential.service";
+import {
+  findTwilioProviderForProject,
+  getTwilioCredential,
+} from "../../gateway/twilioCredential.service";
 import {
   PromptService,
   type VersionedPrompt,
 } from "../../prompt-config/prompt.service";
 import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
+import {
+  type CallerVoiceConfig,
+  parseCallerVoiceConfig,
+} from "../voice/caller-voice.config";
+import { voiceCallMaxSeconds } from "../voice/voice-limits";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,
@@ -76,6 +94,7 @@ import {
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
+  type VoiceAgentData,
   type WorkflowAgentData,
 } from "./types";
 
@@ -100,6 +119,8 @@ export interface ScenarioFetcher {
     /** Turn config (ADR-015); null = SDK default. */
     maxTurns?: number | null;
     minTurns?: number | null;
+    /** The scenario's caller-voice JSON, for a voice target. Parsed tolerantly. */
+    callerVoice?: unknown;
   } | null>;
 }
 
@@ -344,6 +365,7 @@ const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
   workflow: "Workflow agent",
   connected: "Connected agent",
   http: "HTTP agent",
+  voice: "Voice agent",
 };
 
 /**
@@ -725,6 +747,12 @@ export async function prefetchScenarioData({
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
       ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
+      // The simulated caller's voice, carried to the child for a voice target
+      // only. The child builds the voice user simulator from it and records the
+      // effective values on the run (AC20).
+      ...(target.type === "voice"
+        ? { callerVoice: scenarioResult.callerVoice }
+        : {}),
     },
     telemetry: {
       endpoint: env.LANGWATCH_ENDPOINT,
@@ -753,6 +781,7 @@ async function fetchScenario({
   parameters: RunParameterValues;
   simulatorModel: string | null;
   judgeModel: string | null;
+  callerVoice: CallerVoiceConfig;
 } | null> {
   const scenario = await fetcher.getById({ projectId, id: scenarioId });
   if (!scenario) return null;
@@ -800,6 +829,7 @@ async function fetchScenario({
     parameters,
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
+    callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
   };
 }
 
@@ -872,6 +902,13 @@ async function fetchAgentData(
       workflowVersionFetcher: deps.workflowVersionFetcher,
       modelParamsProvider: deps.modelParamsProvider,
       projectSecretsFetcher: deps.projectSecretsFetcher,
+    });
+  }
+  if (target.type === "voice") {
+    return fetchVoiceAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
     });
   }
   return fetchHttpAgentData({
@@ -991,6 +1028,100 @@ async function fetchConnectedAgentData({
       config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
       MAX_CALL_TIMEOUT_MS,
     ),
+  };
+}
+
+/**
+ * The transport credential a voice run carries to the child, resolved from the
+ * project's model-provider row for the target's transport. The agent stores no
+ * secret; ElevenLabs reads its API key and host, phone reads the Twilio account
+ * SID, auth token and from-number. `null` when the project has no provider row
+ * for the transport, which the child surfaces as the transport's named
+ * missing-key failure (there is no operator env for either credential).
+ */
+export async function resolveVoiceTarget({
+  projectId,
+  config,
+}: {
+  projectId: string;
+  config: ReturnType<typeof parseVoiceAgentConfig>;
+}): Promise<VoiceAgentData["voiceTarget"]> {
+  switch (config.transport) {
+    case "elevenlabs_convai": {
+      const provider = await findElevenLabsProviderForProject({ projectId });
+      const credential = provider
+        ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "elevenlabs_convai",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "elevenlabs", ...credential } : null,
+      };
+    }
+    case "phone": {
+      const provider = await findTwilioProviderForProject({ projectId });
+      const credential = provider
+        ? await getTwilioCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "phone",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "twilio", ...credential } : null,
+      };
+    }
+  }
+}
+
+/**
+ * The child reaches a voice agent with the project's provider credential, so
+ * the job carries the transport, the agent id on it (the ElevenLabs agent id,
+ * or the phone number for a phone target), and the credential resolved from the
+ * provider row. The agent stores no secret; the key comes from the ElevenLabs
+ * or Twilio model provider, and is `null` when the project has none, which the
+ * child surfaces as a named failure.
+ */
+async function fetchVoiceAgentData({
+  projectId,
+  agentId,
+  fetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+}): Promise<VoiceAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "voice") return null;
+
+  const config = parseVoiceAgentConfig(agent.config);
+  const voiceTarget = await resolveVoiceTarget({ projectId, config });
+
+  // The SDK builds its own OpenAI client from the child's process env for the
+  // caller's TTS and for the transcription the judge uses. The platform's
+  // guardrail is that credentials come from the project's model provider rows
+  // only, so resolve it the same way the model params are: `prepareEnvKeys`
+  // maps the OpenAI provider's customKeys / env fallbacks onto
+  // `OPENAI_API_KEY`. Nothing else from the operator env reaches the child.
+  // (No ElevenLabs key travels here: the target transport's adapter takes its
+  // key as an explicit option, never from env, and `CALLER_VOICES` offers no
+  // `elevenlabs/...` voice today, so no code path in the child reads
+  // `ELEVENLABS_API_KEY`.)
+  const providers = await getProjectModelProviders(projectId);
+  const openaiProvider = providers.openai;
+  const callerEnv: Record<string, string> = {};
+  const openaiApiKey = openaiProvider?.enabled
+    ? prepareEnvKeys(openaiProvider).OPENAI_API_KEY
+    : undefined;
+  if (openaiApiKey) callerEnv.OPENAI_API_KEY = openaiApiKey;
+
+  return {
+    type: "voice",
+    agentId: agent.id,
+    voiceTarget,
+    callerEnv,
+    // The whole-call budget the child enforces and the transport clamps a turn
+    // to. Read here (not in the child) so a run records the limit it started
+    // under even if the env changes mid-flight.
+    maxCallSeconds: voiceCallMaxSeconds(),
   };
 }
 

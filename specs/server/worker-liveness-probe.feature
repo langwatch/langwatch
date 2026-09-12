@@ -122,6 +122,26 @@ Feature: Worker liveness probe endpoint
       Then the response status is 503
       # A stalled loop fails the scrape, never the probe.
 
+  Rule: Liveness boots before any stage that can block for minutes
+
+    # The voice public URL tunnel (cloudflared quick tunnel) can take up to
+    # CLOUDFLARED_INSTALL_TIMEOUT_MS_DEFAULT + TUNNEL_READY_TIMEOUT_MS_DEFAULT
+    # to mint on a cold binary download or slow trycloudflare DNS — minutes,
+    # far past the kubelet's liveness budget (prod: ~90s). Before this rule,
+    # the tunnel boot ran before the boot plan and /healthz didn't answer
+    # until the plan's LAST stage, so a slow tunnel crash-looped every new
+    # worker pod during a rollout. The liveness thread now boots first and
+    # depends on nothing any other stage sets up, so a slow tunnel no longer
+    # risks the probe.
+
+    @unit
+    Scenario: The liveness server boots before every other stage, including the voice tunnel
+      Given the worker boot plan is resolved
+      Then the metrics stage is first in the plan
+      # startWorkers boots exactly this "metrics" stage, before it resolves
+      # the voice public URL tunnel, so /healthz is answering the kubelet
+      # for the entire duration of a slow tunnel mint.
+
   Rule: The chart probes the liveness endpoint, not the metrics endpoint
 
     @e2e @unimplemented

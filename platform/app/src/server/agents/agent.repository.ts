@@ -15,10 +15,15 @@ import {
 } from "~/optimization_studio/types/dsl";
 import { connectedAgentVisibleWhere } from "./connected-agent-visibility";
 import { AgentRegisterOnlyError } from "./errors";
+import {
+  type VoiceAgentConfig,
+  voiceAgentConfigSchema,
+} from "./voice/voice-agent.config";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http,
- * plus "connected": an agent registered from code by the SDK (ADR-128).
+ * plus "connected": an agent registered from code by the SDK (ADR-128), and
+ * "voice": a voice agent reached through a transport (ADR: voice agents v1).
  */
 export const agentTypeSchema = z.enum([
   "signature",
@@ -26,6 +31,7 @@ export const agentTypeSchema = z.enum([
   "workflow",
   "http",
   "connected",
+  "voice",
 ]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
@@ -37,7 +43,8 @@ export type AgentComponentConfig =
   | CodeComponentConfig
   | CustomComponentConfig
   | HttpComponentConfig
-  | ConnectedComponentConfig;
+  | ConnectedComponentConfig
+  | VoiceAgentConfig;
 
 /**
  * Get the appropriate config schema based on agent type
@@ -54,6 +61,8 @@ export const getConfigSchemaForType = (type: AgentType) => {
       return httpComponentSchema;
     case "connected":
       return connectedComponentSchema;
+    case "voice":
+      return voiceAgentConfigSchema;
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown agent type: ${_exhaustive}`);
@@ -112,6 +121,13 @@ export type CreateAgentInput = {
   copiedFromAgentId?: string;
   /** The identity of a connected agent (ADR-128); unset for every other type. */
   identity?: ConnectedAgentIdentity;
+  /** The natural key a non-connected agent dedups on, sharing the same
+   *  `(projectId, identityKey)` unique constraint as a connected agent's
+   *  {@link ConnectedAgentIdentity.identityKey}. Voice agents set it so a first
+   *  hang-up before the row is saved cannot create a second row on a retry
+   *  (#8020). Distinct from `identity`, which also carries the connected-only
+   *  environment/scope/lastSeenAt fields; unset for a connected agent. */
+  identityKey?: string;
 };
 
 /**
@@ -329,6 +345,12 @@ export class AgentRepository {
           identityKey: input.identity.identityKey,
           lastSeenAt: new Date(),
         }),
+        // A non-connected agent's natural key, without the connected-only
+        // environment/scope/lastSeenAt fields. Mutually exclusive with
+        // `identity` in practice, so this never overrides that block's key.
+        ...(input.identityKey && !input.identity
+          ? { identityKey: input.identityKey }
+          : {}),
       },
     });
 
@@ -336,8 +358,9 @@ export class AgentRepository {
   }
 
   /**
-   * Finds a connected agent by its identity key, whatever its state, so a
-   * process that registers the same identity writes the row it already has.
+   * Finds an agent by its natural key (identity key), whatever its state, so
+   * a process that registers the same identity writes the row it already
+   * has. Used by both connected agents and voice agents.
    */
   async findByIdentityKey(input: {
     projectId: string;

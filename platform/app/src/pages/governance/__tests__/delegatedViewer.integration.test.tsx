@@ -31,6 +31,8 @@ const harness = vi.hoisted(() => ({
   permissions: [] as string[],
   /** Every procedure path whose `useQuery` was NOT disabled. */
   requested: [] as string[],
+  /** Per-procedure answers, keyed by dotted path; undefined otherwise. */
+  data: {} as Record<string, unknown>,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
@@ -74,8 +76,34 @@ vi.mock("~/components/governance/QuarantineFillAlert", () => ({
   QuarantineFillAlert: () => null,
 }));
 
+// The lit ground behind the overview's hero runs a WebGL shader, and jsdom has
+// no canvas to give it. Left real it throws from a timer after the test that
+// mounted it has already passed.
+vi.mock("@paper-design/shaders-react", () => ({
+  MeshGradient: () => null,
+}));
+
 vi.mock("~/components/me/InstallCliCard", () => ({
   InstallCliCard: () => null,
+}));
+
+// The overview's hero mounts the inline command palette and the greeting;
+// neither is what this test is about, and both reach providers it does not
+// stand up (specs/ai-governance/dashboard/governance-overview-hero.feature).
+vi.mock("~/features/command-bar/CommandPalette", () => ({
+  CommandPalette: ({ placeholder }: { placeholder: string }) => (
+    <input placeholder={placeholder} />
+  ),
+}));
+vi.mock("~/features/command-bar/CommandBarContext", () => ({
+  useCommandBar: () => ({ registerInlinePalette: () => () => undefined }),
+}));
+vi.mock("~/features/langy/stores/langyStore", () => ({
+  useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
+    selector({ askLangy: vi.fn() }),
+}));
+vi.mock("~/components/home/WelcomeHeader", () => ({
+  WelcomeHeader: () => <h1>Good morning</h1>,
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
@@ -88,8 +116,8 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 vi.mock("~/utils/api", () => {
-  const queryResult = () => ({
-    data: undefined,
+  const queryResult = (path: string) => ({
+    data: harness.data[path],
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -113,7 +141,7 @@ vi.mock("~/utils/api", () => {
             return (_input: unknown, options?: { enabled?: boolean }) => {
               if (options?.enabled !== false)
                 harness.requested.push(path.join("."));
-              return queryResult();
+              return queryResult(path.join("."));
             };
           }
           if (property === "useMutation") return mutationResult;
@@ -131,6 +159,7 @@ import AnomalyRulesPage from "@ee/governance/dashboard/pages/anomaly-rules";
 import IngestionSourceDetailPage from "@ee/governance/dashboard/pages/ingestion-source-detail";
 import InventoryPage from "@ee/governance/dashboard/pages/inventory";
 
+import AgentsPage from "../agents";
 import GovernanceOverviewPage from "../index";
 import PeoplePage from "../people";
 import TeamsListPage from "../teams";
@@ -145,8 +174,12 @@ const GOVERNANCE_PAGES: Array<[string, React.ComponentType]> = [
   // the Catalog tab (the old tool-catalog page) — one entry covers both.
   ["/governance/inventory", InventoryPage],
   ["/governance/inventory/:id", IngestionSourceDetailPage],
+  // Anomaly rules and the users listing no longer have their own routes
+  // (they redirect to a tab), but the page modules still mount for anyone
+  // who reaches them, so they stay covered.
   ["/governance/anomaly-rules", AnomalyRulesPage],
   ["/governance/people", PeoplePage],
+  ["/governance/agents", AgentsPage],
   ["/governance/teams", TeamsListPage],
   ["/governance/teams/:id", TeamDetailPage],
   ["/governance/users", UsersListPage],
@@ -203,8 +236,13 @@ function renderPage({
 }
 
 beforeEach(() => {
+  // The section keeps ONE sample choice for the whole sitting, in session
+  // storage, so a test that presses the toggle would otherwise hand its
+  // answer to the next one.
+  window.sessionStorage.clear();
   harness.permissions = [...DELEGATED_VIEWER];
   harness.requested = [];
+  harness.data = {};
 });
 
 afterEach(() => cleanup());
@@ -217,51 +255,89 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.queryByText("Access Restricted")).not.toBeInTheDocument();
     });
 
-    /** @scenario "The overview names the grant a refused panel needs" */
-    it("names activityMonitor:view on the overview and still renders the rest", () => {
+    /** @scenario "The overview holds nothing a delegated viewer is refused" */
+    /** @scenario "Top-level /governance renders the dashboard" */
+    it("names no missing grant on the overview and renders its heading and hero", () => {
       renderPage({ Page: GovernanceOverviewPage });
 
-      expect(screen.getByText(/activityMonitor:view/)).toBeInTheDocument();
-      // The page did not collapse into the notice: its own heading and the
-      // panels that need no activity-monitor grant are still there.
+      // Nothing on the overview asks for a grant any more, so there is no
+      // notice to read - and no panel missing behind one either.
+      expect(
+        screen.queryByText(/activityMonitor:view/),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Ask an organization admin to grant you/),
+      ).not.toBeInTheDocument();
       expect(
         screen.getByRole("heading", { name: "AI Governance" }),
       ).toBeInTheDocument();
-      expect(screen.getByText("CLI session policy")).toBeInTheDocument();
+      expect(screen.getByText("Good morning")).toBeInTheDocument();
+      expect(screen.getByText("Insights")).toBeInTheDocument();
+      // The one control the hero gates: this viewer holds no
+      // `ingestionSources:manage`, and the inventory would drop the add link
+      // it leads to, so the pill is not drawn at all.
+      expect(screen.queryByText("Add source")).not.toBeInTheDocument();
     });
 
-    /** @scenario "A panel query is not sent when the viewer cannot read it" */
-    it("sends no activity-monitor query", () => {
+    /** @scenario "The overview holds nothing a delegated viewer is refused" */
+    it("sends no panel query at all", () => {
       renderPage({ Page: GovernanceOverviewPage });
 
-      expect(
-        harness.requested.filter((path) => path.startsWith("activityMonitor.")),
-      ).toEqual([]);
-      // The grants it DOES hold are still read, so the page is not simply
-      // querying nothing.
-      expect(harness.requested).toContain("sessionPolicy.get");
+      // The overview reads nothing of its own now, so the whole recorded
+      // list is empty rather than only the activity-monitor slice of it.
+      // (That the recorder itself works is exercised by the sibling tests
+      // below, which assert a page DID issue its read.)
+      expect(harness.requested).toEqual([]);
     });
 
     /** @scenario "Departments offers no controls a viewer cannot use" */
     it("offers no department controls without governance:manage", () => {
-      renderPage({ Page: PeoplePage });
+      // Departments live on the People page's second tab.
+      renderPage({
+        Page: PeoplePage,
+        initialEntry: "/governance/people?tab=departments",
+      });
 
-      expect(screen.queryByText("Create a department")).not.toBeInTheDocument();
+      // Creating a department is now a header action opening a drawer, so the
+      // control a viewer must not see is the button, not a text box.
       expect(
-        screen.queryByRole("button", { name: "Actions" }),
+        screen.queryByRole("button", { name: /Add department/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Actions for/ }),
       ).not.toBeInTheDocument();
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
 
+    // The pane's grant has changed with the pane, twice, and it is now back
+    // where it started. It was the tile editor on `aiTools:manage`; it became
+    // the catalog built from the source list, which made `ingestionSources:view`
+    // the honest answer; it is now the registered-tools catalog reading
+    // `aiTools.adminList`, and it does not touch the source list at all. So
+    // `aiTools:manage` is the grant again — naming the source grant here would
+    // name one that has nothing to do with why this viewer cannot see the
+    // catalog, and granting it would not unblock them.
+    //
+    // The gate matters more than which grant it names: with no gate the pane
+    // falls through to its "no tools registered yet" empty state and tells
+    // this viewer their organization runs no AI at all.
     /** @scenario "The inventory Catalog pane names its own grant" */
-    it("names aiTools:manage on the inventory Catalog pane and renders no editor", () => {
+    it("names aiTools:manage on the inventory Catalog pane and claims no empty estate", () => {
       renderPage({
         Page: InventoryPage,
         initialEntry: "/governance/inventory?tab=catalog",
       });
 
       expect(screen.getByText(/aiTools:manage/)).toBeInTheDocument();
-      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
+      // The headline the pane WOULD draw if the gate came off, so this half
+      // still fails if it does — the string is live at ToolCatalogTab.tsx:137
+      // and inventoryUiRules asserts a granted reader really sees it.
+      expect(screen.queryByText(/No tools registered yet/)).toBeNull();
+      // The "Tool Tiles" absence that used to sit here has moved to
+      // inventoryTabShell, which owns what mounts on this page. It is a
+      // mounting guard, not a permission one, and it said nothing about this
+      // viewer's grants; keeping a third copy of it here only made it look
+      // like three tests agreed about something none of them could observe.
     });
   });
 
@@ -283,7 +359,12 @@ describe("governance pages for a delegated viewer", () => {
     /** @scenario "The sources tab offers no controls a viewer cannot use" */
     it("offers no source authoring controls", () => {
       harness.permissions = [...DELEGATED_VIEWER, "ingestionSources:view"];
-      renderPage({ Page: InventoryPage });
+      // Addressed rather than defaulted: the inventory opens on Catalog now,
+      // and the write notice under test lives on the Sources pane.
+      renderPage({
+        Page: InventoryPage,
+        initialEntry: "/governance/inventory?tab=sources",
+      });
 
       expect(
         screen.queryByRole("button", { name: /Add source/ }),
@@ -297,37 +378,42 @@ describe("governance pages for a delegated viewer", () => {
     // The admin path is what every existing customer sees, and the panels
     // were re-grouped to make the delegated path work. This is what says the
     // regrouping did not take anything away from the admin.
-    /** @scenario "An org admin still sees every panel on the overview" */
-    it("renders every panel and names no missing grant", () => {
+    /** @scenario "An org admin meets the same overview a delegated viewer does" */
+    it("meets the same hero and sections, with no panel and no read", () => {
       harness.permissions = ORGANIZATION_ADMIN;
       renderPage({ Page: GovernanceOverviewPage });
 
-      expect(screen.getByText("Top teams by spend")).toBeInTheDocument();
-      expect(screen.getByText("Top users by spend")).toBeInTheDocument();
-      expect(screen.getByText("Spend by department")).toBeInTheDocument();
-      expect(screen.getByText("Recent anomalies")).toBeInTheDocument();
-      expect(screen.getByText("Ingestion sources")).toBeInTheDocument();
-      expect(screen.getByText("CLI session policy")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+      expect(screen.getByText("Good morning")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Add department" }),
+      ).toBeVisible();
+      expect(screen.getByText("Insights")).toBeInTheDocument();
+      expect(screen.getByText("Recent activity")).toBeInTheDocument();
+      // The admin can add a source, so the admin is the one offered the pill.
+      expect(screen.getByText("Add source")).toBeInTheDocument();
       expect(
         screen.queryByText(/Ask an organization admin to grant you/),
       ).not.toBeInTheDocument();
 
-      // Every panel's read is actually issued for an admin.
-      expect(harness.requested).toContain("activityMonitor.summary");
-      expect(harness.requested).toContain("ingestionSources.list");
-      expect(harness.requested).toContain("routingPolicy.list");
-      expect(harness.requested).toContain("anomalyRules.list");
-      expect(harness.requested).toContain("aiTools.adminList");
-      expect(harness.requested).toContain("sessionPolicy.get");
+      // The panels moved to the pages that own them, so the admin's overview
+      // reads exactly as much as the delegated viewer's: nothing.
+      expect(screen.queryByText("Recent anomalies")).not.toBeInTheDocument();
+      expect(screen.queryByText("Ingestion sources")).not.toBeInTheDocument();
+      expect(screen.queryByText("CLI session policy")).not.toBeInTheDocument();
+      expect(harness.requested).toEqual([]);
     });
 
     /** @scenario "An org admin still sees the department write controls" */
     it("offers the department write controls", () => {
       harness.permissions = ORGANIZATION_ADMIN;
-      renderPage({ Page: PeoplePage });
+      renderPage({
+        Page: PeoplePage,
+        initialEntry: "/governance/people?tab=departments",
+      });
 
-      expect(screen.getByText("Create a department")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Add department/ }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByText(/Ask an organization admin to grant you/),
       ).not.toBeInTheDocument();

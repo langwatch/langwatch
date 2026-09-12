@@ -104,6 +104,19 @@ Feature: Product switcher navigation
     Given I am on a Gateway page in the product-switcher mode
     Then the top bar shows no project chip and no personal badge
 
+  @unit
+  Scenario: A sticky personal workspace does not follow me onto an org-wide page
+    Given the workspace I last worked in was my own personal one
+    When I open a Gateway or a Governance page
+    Then the page keeps the organization scope its address asks for
+    And it does not render as my personal surface
+    # The scope carried between pages is the workspace I was last in, not
+    # something the address said. Gateway and Governance are organization-wide
+    # by definition, so letting that sticky workspace decide put a Personal
+    # badge, the personal sidebar and a lit-up Me in the switcher on a page
+    # that is about the whole organization. Settings was already exempt for
+    # the same reason.
+
   @integration
   Scenario: The sidebar ignores the page's auto-hide request in the new modes
     Given a page that collapses the sidebar in the current chrome
