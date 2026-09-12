@@ -18,6 +18,7 @@ import {
   type SimulationDeleteRun,
   type SimulationFinishRun,
   type SimulationMessageSnapshot,
+  type RecordEvaluationsCommandData,
   type SimulationQueueRun,
   type SimulationStartRun,
   type SimulationTextMessageEnd,
@@ -30,7 +31,7 @@ import {
 import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
- * The eight simulation writes, dispatched onto this process's own producer-only registration.
+ * The nine simulation writes, dispatched onto this process's own producer-only registration.
  * Only `finishRun` is ever called by stalled-runs-backfill; the rest refuse by name — this task
  * submits and cancels nothing, and streams no messages.
  */
@@ -74,6 +75,9 @@ class TasksSimulationExecution extends SimulationExecutionRepository {
   }
   recordAgentInstance(_input: SimulationRecordAgentInstance): Promise<void> {
     return this.refuse("recordAgentInstance");
+  }
+  recordEvaluations(_input: RecordEvaluationsCommandData): Promise<void> {
+    return this.refuse("recordEvaluations");
   }
 }
 

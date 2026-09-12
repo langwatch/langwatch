@@ -12,10 +12,8 @@ import {
   NullBillingErrorReporter,
   type BillingErrorReporter,
 } from "./billing-error-reporter.service.ts";
-import {
-  MemoryUsageLimitEmailChannel,
-  type UsageLimitEmailChannel,
-} from "../channels/usage-limit-email.channel.ts";
+import type { UsageLimitEmailChannel } from "../channels/usage-limit-email.channel.ts";
+import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import {
   type HubspotFormBody,
   billingThresholdFailureText,
@@ -118,7 +116,7 @@ export class NotificationService {
         }));
     this.fetchFn = options?.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
-    this.usageLimitEmail = options.usageLimitEmail ?? MemoryUsageLimitEmailChannel.create();
+    this.usageLimitEmail = options.usageLimitEmail ?? usageLimitEmailChannels.memory.create();
   }
 
   /**

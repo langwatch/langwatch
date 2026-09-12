@@ -104,7 +104,7 @@ function newbornSweep({
 }
 
 /** The identity command senders this process produces, or none at all. */
-class TasksIdentityEventing extends IdentityEventing {
+class TasksIdentityEventing implements IdentityEventing {
   static create({
     eventing,
   }: {
@@ -119,9 +119,7 @@ class TasksIdentityEventing extends IdentityEventing {
     return new TasksIdentityEventing(registered.commands as Record<string, unknown>);
   }
 
-  private constructor(private readonly commands: Record<string, unknown> | null) {
-    super();
-  }
+  private constructor(private readonly commands: Record<string, unknown> | null) {}
 
   tryPipelineCommand(input: {
     pipeline: string;

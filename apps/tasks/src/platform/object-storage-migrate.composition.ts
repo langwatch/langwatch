@@ -21,10 +21,8 @@ import type { TasksHost } from "./tasks-host.composition.ts";
  * This process has no per-project ClickHouse routing — a single `CLICKHOUSE_URL` answers every
  * project, the same simplification `ClickHouseMigrateTask` and `LwqlProvisionTask` make.
  */
-class TasksStoredObjectsClickHouse extends StoredObjectsClickHouse {
-  constructor(private readonly client: () => unknown) {
-    super();
-  }
+class TasksStoredObjectsClickHouse implements StoredObjectsClickHouse {
+  constructor(private readonly client: () => unknown) {}
 
   async resolveClient(_projectId: string): Promise<StoredObjectsClickHouseClient> {
     return this.client() as StoredObjectsClickHouseClient;
