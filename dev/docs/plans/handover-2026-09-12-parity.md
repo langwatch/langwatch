@@ -97,18 +97,91 @@ The authority is the generator, which needs no database:
 It is currently blocked by the parse errors above; it also needs
 `pnpm --filter @langwatch/mcp-server build` first (done).
 
+## What has landed (this session)
+
+    1d758e09e0  governance puller parses; oxlint-baseline.json valid again
+    70960d916f  scenario module parses, loads, admits voice runs under main's cap
+    85f6595385  topic barrel points at where its interfaces went
+    1afba5a3ba  pulled usage carries the provider's own currency again
+    aaecc74349  interfaces imported as values become type imports (176 files)
+
+Measured: scenario-server went from every file crashing at import to 1014
+passing / 22 failing. governance openai-admin-puller 38/41 -> 41/41.
+
+## The method that is actually finding parity gaps
+
+Not apidiff, which has still never probed an operation. The branch's own test
+suite. The merge kept tests (additive, they merge cleanly) and dropped
+implementations (they conflict and get resolved one way), so **a test asserting
+a field production code never mentions marks a lost feature.** That is how the
+multi-currency money model was found. Run a package's suite and read the
+failures by cause:
+
+    pnpm --filter <pkg> test:unit 2>&1 | grep -E "ReferenceError|does not provide an export|is not a function|Cannot find module" | sort | uniq -c | sort -rn
+
+**Caveat, learned the hard way:** a test file that cannot LOAD reports zero
+tests, not failures, and binds nothing. `pulledUsageCurrency.unit.test.ts` and
+`signedPulledMoney.unit.test.ts` are verbatim main ports importing an `@ee/...`
+alias this branch lacks. Before citing a test as evidence, confirm it runs.
+
+## Known remaining gaps, with evidence
+
+- **governance server: 158 failures / 44 files**, all one class - symbols the
+  merge dropped. By count: `createRestApiService` (22), `isDataverseEnvironmentOrigin`
+  (15), `adapter.fetchAzureCostPages` (8), `createAppRestSecurity` (5),
+  `resolveSourceNonBillable` (3), and missing modules `~/utils/ssrfProtection`,
+  `src/services/pullerWorker`, `src/repositories/prisma/ingestionCredentials`.
+- **scenario: 22 failures / 18 files**, six of them voice (`execution-pool-voice-cap`,
+  `execution-pool-voice-filter`, `resolveVoiceTarget`, `voice-agent.adapter`,
+  `voiceTargetSchema`, plus a ClickHouse filter expecting `ScenarioSetId != 'voice-calls'`).
+  Main's voice-agent feature is substantially absent here. Causes: `beforeEach`
+  and `makePrisma` not imported, `buildChildEnvironment` and
+  `createRecordEvaluationsHandler` not exported.
+- **`execution-pool-voice-cap.unit.test.ts` is mis-ported** - it imports its pool
+  from `./execution-pool.unit.test.ts`, which exports nothing, and uses main's
+  OLD constructor API. The behaviour IS implemented and was verified by driving
+  the real service through all five scenarios. Fix the test to
+  `ScenarioExecutionPoolService.create({...})` + `pool.connect({...})`.
+- **The voice gate is not wired into the worker.** `apps/worker/src/app/worker-production.composition.ts:919`
+  needs `voiceGate: new VoiceConcurrencyGate({ max: voiceRunsMaxConcurrent() })`,
+  and `modules/scenario/server/src/index.ts` must export the gate. Coordinator-owned.
+- **`pnpm lint` fails with 15,303 errors.** It was failing before too, with every
+  file throwing a plugin crash; the baseline fix turned spurious crashes into
+  real violations. Top rules: comment-block-size (6953), fallible-result-naming
+  (1980), logical-statement-spacing (1374), package-boundaries (637).
+- **pulled-usage-record: 9 failures** are ADR-128 `governanceProjectId` / ADR-129
+  `rawActorId`, a DIFFERENT dropped feature from the currency one.
+
 ## Exact next action
 
-1. Collect the two active lanes (see `.claude/coordinator/LANES.md`), verify each
-   package's own checks yourself, commit by explicit pathspec **together with**
-   the oxlint-baseline fix.
-2. Re-run `./node_modules/.bin/oxlint modules enterprise apps packages` and
-   confirm zero parse errors.
-3. Run the OpenAPI generator and redo the path comparison against main's
-   document. THAT is the functional-parity number; the 183/16 above is not.
-4. Re-run `.bin/apidiff/apidiff run -no-haven -main-ref origin/main -json
-   -report <file>`.
-5. visualdiff only after the CA is trusted.
+1. **Finish the boot chain.** The objective is still the single highest-leverage
+   command in the repo:
+   `pnpm --filter @langwatch/platform-api task openapi-generate /tmp/out.json`
+   It now clears topic, automation, coding-agent and data-privacy, and fails on
+   CROSS-PACKAGE imports the sweep did not touch - first
+   `@langwatch/dataset-contract` / `DatasetNormalizePayload`.
+
+   The fault class, and why nothing catches it: an interface imported in VALUE
+   position typechecks fine (the type system is satisfied) but at run time node
+   asks the real module for an export that erasure removed, and you get
+   `SyntaxError: does not provide an export named X`. `pnpm typecheck` will
+   never find these. The sweep fixed every RELATIVE one inside module server
+   packages; extend the same rule to `@langwatch/*` workspace imports by
+   resolving each package's `src` and testing whether the symbol is declared
+   `export interface` / `export type` there. `langwatch(type-only-value-import)`
+   tracks the class: it went 495 -> 297, and the remaining 297 are the work.
+2. When that command exits 0, **refreeze the document**: diff the generated file
+   against `apps/api/src/features/discovery/openapi-document.json` and commit
+   the new one deliberately. That is a person's decision, never a lane's.
+3. The refreeze unblocks a chain: SDK client types stop missing
+   `fields`/`evaluators` -> `sdks/typescript` builds -> `packages/observability`
+   resolves the `langwatch` types -> every `pnpm typecheck:one` stops failing
+   upstream -> apidiff can boot.
+4. THEN redo the path comparison against main's document. The 183/16 figure in
+   the section above is measured against the FROZEN artifact and is not an
+   answer.
+5. `.bin/apidiff/apidiff run -no-haven -main-ref origin/main -json -report <f>`.
+6. visualdiff only after the CA is trusted (see the section above).
 
 ## Lane mortality
 
