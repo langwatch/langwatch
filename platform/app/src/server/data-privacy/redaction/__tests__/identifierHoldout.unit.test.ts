@@ -74,7 +74,7 @@ describe("given the identifier hold-out rules", () => {
      * analysis path cannot borrow it. Pinning that here means a future merge of
      * the two rules fails loudly instead of quietly re-opening the leak.
      */
-    it("should call a written name identifier-shaped, which is why the analysis path cannot borrow the rule", () => {
+    it("calls a written name identifier-shaped, which is why the analysis path cannot borrow the rule", () => {
       expect(isIdentifierShapedValue("Elise-Marin-Van-Toren")).toBe(true);
       expect(isIdentifierShapedValue("AnneMarieJohansson")).toBe(true);
       expect(isIdentifierShapedValue("maria.schmidt.1972")).toBe(true);
