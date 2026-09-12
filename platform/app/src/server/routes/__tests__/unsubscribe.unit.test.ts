@@ -1,3 +1,4 @@
+import type * as ObservabilityModule from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -6,7 +7,8 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof ObservabilityModule>()),
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

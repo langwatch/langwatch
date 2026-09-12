@@ -60,8 +60,8 @@ import {
   toComparisonVerdict,
 } from "./comparison";
 import { printSummary } from "./printSummary";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -231,7 +231,7 @@ export class Experiment {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey: this.apiKey }),
+          ...buildRequestHeaders({ apiKey: this.apiKey }),
         },
         body: JSON.stringify({
           experiment_name: this.name,
@@ -677,7 +677,7 @@ export class Experiment {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey: this.apiKey }),
+          ...buildRequestHeaders({ apiKey: this.apiKey }),
         },
         body: JSON.stringify({
           trace_id: traceId ?? null,
@@ -1387,7 +1387,7 @@ export class Experiment {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
+        ...buildRequestHeaders({ apiKey: this.apiKey }),
       },
       body: JSON.stringify(body),
     })

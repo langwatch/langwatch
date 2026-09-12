@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * RFC 8628 device-code OAuth client for the `langwatch login --device`
  * flow. Targets the control plane's `/api/auth/cli/*` endpoints —
@@ -330,6 +331,7 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
   return f(url, {
     method: "POST",
     headers: {
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
       "Content-Type": "application/json",
       Accept: "application/json",
       // Origin enforcement on the server requires this for non-browser

@@ -1,15 +1,11 @@
 import openApiCreateClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "../generated/openapi/api-client";
-import { version } from "../../../package.json";
-import {
-  LANGWATCH_SDK_LANGUAGE,
-  LANGWATCH_SDK_NAME_OBSERVABILITY,
-  LANGWATCH_SDK_RUNTIME,
-  LANGWATCH_SDK_VERSION,
-} from "../constants";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
-import { buildAuthHeaders } from "./auth";
+import {
+  scopedApiKey,
+  scopedProjectId,
+} from "@/internal/credentialContext";
+import { buildRequestHeaders } from "./request-headers";
 import { handledErrorFrom } from "./errors";
 import { langwatchFetch } from "../http/langwatchFetch";
 
@@ -92,13 +88,8 @@ export const createLangWatchApiClient = (
     baseUrl: resolveEndpoint(endpoint),
     fetch: langwatchFetch,
     headers: {
-      ...buildAuthHeaders({ apiKey, projectId }),
+      ...buildRequestHeaders({ apiKey, projectId }),
       "content-type": "application/json",
-      "user-agent": `langwatch-sdk-node/${version}`,
-      "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
-      "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
-      "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-      "x-langwatch-sdk-platform": LANGWATCH_SDK_RUNTIME(),
     },
   });
 

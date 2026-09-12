@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
@@ -236,6 +237,7 @@ export class WebhooksApiService {
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: {
+        ...buildSdkIdentityHeaders(),
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
         ...(init?.headers ?? {}),

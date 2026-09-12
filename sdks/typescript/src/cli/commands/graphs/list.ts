@@ -5,7 +5,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -31,7 +31,7 @@ export const listGraphsCommand = async (options: {
     const qs = params.toString() ? `?${params}` : "";
 
     const response = await langwatchFetch(`${endpoint}/api/graphs${qs}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {

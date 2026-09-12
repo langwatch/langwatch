@@ -23,6 +23,7 @@
  */
 
 import { Readable } from "node:stream";
+import type * as ObservabilityModule from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -87,7 +88,8 @@ vi.mock("~/server/rateLimit", () => ({
 }));
 
 // Suppress logger noise
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof ObservabilityModule>()),
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),

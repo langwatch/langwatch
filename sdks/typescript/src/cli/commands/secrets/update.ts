@@ -4,7 +4,7 @@ import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -34,7 +34,7 @@ export const updateSecretCommand = async (
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
       body: JSON.stringify({ value: options.value }),
     });

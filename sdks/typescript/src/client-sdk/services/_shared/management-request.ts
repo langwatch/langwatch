@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * The raw-fetch request path the management API services share.
  *
@@ -111,6 +112,7 @@ export const createManagementRequest = ({
       {
         ...(method ? { method } : {}),
         headers: {
+          ...buildSdkIdentityHeaders(),
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },

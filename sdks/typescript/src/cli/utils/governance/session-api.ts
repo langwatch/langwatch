@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * Session-authenticated calls that trade the device session for project
  * credentials:
@@ -133,6 +134,7 @@ async function sessionRequest(
     f(normalizeEndpoint(cfg.control_plane_url) + path, {
       method,
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         Authorization: `Bearer ${cfg.access_token}`,
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),

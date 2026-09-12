@@ -3,7 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -26,7 +26,7 @@ export const deleteTriggerCommand = async (
   try {
     const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {

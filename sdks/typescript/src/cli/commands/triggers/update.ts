@@ -4,7 +4,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -52,7 +52,7 @@ export const updateTriggerCommand = async (
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
       body: JSON.stringify(body),
     });
