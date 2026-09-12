@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  CancellationPublisher as CancellationPublisherPort,
-  CancellationSubscriber as CancellationSubscriberPort,
+  type CancellationPublisher as CancellationPublisherPort,
+  type CancellationSubscriber as CancellationSubscriberPort,
   type CancellationMessage,
 } from "../../app/scenario.app.ts";
 

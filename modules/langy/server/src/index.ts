@@ -175,7 +175,7 @@ export { LangyAnalyticsEventSink } from "./repositories/langy-analytics-event.re
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyEffectMembers } from "./app/langy.members.ts";
 export type { LangyTitleGenerator } from "./app/langy.members.ts";
-export { LangyTitleModel } from "./app/langy.members.ts";
+export type { LangyTitleModelResolver } from "./app/langy.members.ts";
 export {
   LANGY_TITLE_FEATURE_KEY,
   LangyTitleGeneratorService,
