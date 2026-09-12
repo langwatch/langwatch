@@ -42,6 +42,7 @@ import {
   demoProviderEnvLines,
   getCliApiKey,
   openaiKey,
+  toolOutputText,
 } from "./local-control-fixture";
 import {
   getSessionCookie,
@@ -69,6 +70,10 @@ export const GUIDED_LINES = {
   pullRequestMerge: "You can merge it already.",
   noRemoteStart:
     "No pull request was opened, since the folder has no remote or gh is not signed in: branch",
+  // The third way step 2 can end: the push worked and the pull request command
+  // failed twice. The line names the branch and then the one line the command
+  // printed, so only its middle is fixed.
+  pushedOpenFailed: "is pushed; opening the pull request failed with:",
   branchLineStart: "I left branch",
   branchLineEnd: "checked out: the agent you started runs on it.",
   chatAboutThis:
@@ -159,23 +164,90 @@ export function diffAddsLangwatchToManifest(diff: string): boolean {
     .some((section) => /^\+.*langwatch/m.test(section));
 }
 
+/** The SDK's connect call, in each language the demo repositories use. */
+const SDK_CONNECT_CALLS = [/\bconnect_agent\s*\(/, /\bconnectAgent\s*\(/];
+
+/**
+ * Does this diff add the SDK's connect call?
+ *
+ * The connect-agent skill's HTTP fallback is for an agent that cannot import
+ * the SDK, and a run took that shape with the SDK installed: it left a route
+ * answering on `/langwatch/connect`. A route registers nothing, so the process
+ * starts cleanly and no agent ever reports online. Only the SDK's own call
+ * opens the connection.
+ */
+export function diffAddsSdkConnect(diff: string): boolean {
+  return diff
+    .split("\n")
+    .filter((line) => line.startsWith("+"))
+    .some((line) => SDK_CONNECT_CALLS.some((call) => call.test(line)));
+}
+
+/** What one guided run stored, message by message. */
+type StoredMessages = ReadonlyArray<{ parts: Array<Record<string, unknown>> }>;
+
+/** Every stored tool call that ran a command, in the order they ran. */
+function commandCalls(
+  messages: StoredMessages,
+): Array<Record<string, unknown>> {
+  return messages.flatMap((message) =>
+    message.parts.filter(
+      (part) =>
+        typeof part.type === "string" &&
+        part.type.startsWith("tool-") &&
+        typeof (part.input as { command?: unknown } | undefined)?.command ===
+          "string",
+    ),
+  );
+}
+
+/** The command one stored call ran. */
+function commandOf(part: Record<string, unknown>): string {
+  return String((part.input as { command: string }).command);
+}
+
+/**
+ * Did a push print a new branch on a remote?
+ *
+ * The no-remote line is for a folder with no remote, or a `gh` that is not
+ * signed in. A run said it right after a push that printed `* [new branch]`,
+ * where the pull request had failed on a body file Langy never wrote, so the
+ * sentence named a cause nothing had shown.
+ */
+export function pushPrintedNewRemoteBranch(messages: StoredMessages): boolean {
+  return commandCalls(messages).some(
+    (part) =>
+      /\bgit push\b/.test(commandOf(part)) &&
+      /\[new branch\]/.test(toolOutputText(part)),
+  );
+}
+
 /**
  * Layer 2: every branch, commit and pull request the said lines name is a
  * thing a command made, and the branch carries the install. A run once pasted
  * the no-remote sentence into the brace of the pull request line and named a
  * branch no command had created; another wrote the import without ever
- * installing the package, so the agent died at import.
+ * installing the package, so the agent died at import; a third wrote a route
+ * where the SDK's connect call belongs and said the no-remote line after a
+ * push that had just created the branch on the remote.
+ *
+ * Step 2 ends on one of three lines: the pull request line with the address
+ * the command printed, the no-remote line, or the failed-open line, which says
+ * the branch is pushed and carries the line the command printed.
  */
 export function expectSaidLinesMatchRepo({
   lines,
   repo,
+  messages,
 }: {
   lines: readonly string[];
   repo: {
     branches: () => string[];
+    remoteBranches: () => string[];
     log: () => string[];
     diffAgainstMain: (branch: string) => string;
   };
+  messages: StoredMessages;
 }): void {
   const branch = branchNamedInSaidLines(lines);
   expect(branch, "the branch line names a branch").not.toBeNull();
@@ -191,23 +263,52 @@ export function expectSaidLinesMatchRepo({
     diffAddsLangwatchToManifest(repo.diffAgainstMain(branch!)),
     "the branch adds langwatch to the manifest",
   ).toBe(true);
+  expect(
+    diffAddsSdkConnect(repo.diffAgainstMain(branch!)),
+    "the branch adds the SDK's connect call, not a route of its own",
+  ).toBe(true);
   const pullRequest = lines.find((line) =>
     line.includes(GUIDED_LINES.pullRequestOpened),
   );
   const noRemote = lines.find((line) =>
     line.includes(GUIDED_LINES.noRemoteStart),
   );
+  const openFailed = lines.find((line) =>
+    line.includes(GUIDED_LINES.pushedOpenFailed),
+  );
   expect(
-    Boolean(pullRequest) !== Boolean(noRemote),
-    "either the pull request line or the no-remote line, never both or neither",
-  ).toBe(true);
+    [pullRequest, noRemote, openFailed].filter(Boolean).length,
+    "one of the pull request line, the no-remote line and the failed-open line, never two and never none",
+  ).toBe(1);
   if (pullRequest) {
     expect(pullRequest, "the pull request line carries an address").toMatch(
       /https?:\/\/\S+/,
     );
     expect(pullRequest.toLowerCase()).not.toContain("no pull request");
   }
-  if (noRemote) expect(noRemote).toContain(branch);
+  if (noRemote) {
+    expect(noRemote).toContain(branch);
+    expect(
+      pushPrintedNewRemoteBranch(messages),
+      "the no-remote line was said, so no push printed a new branch on a remote",
+    ).toBe(false);
+  }
+  if (openFailed) {
+    expect(openFailed).toContain(branch);
+    // The line says the branch is pushed, so the remote has to carry it.
+    expect(
+      repo.remoteBranches(),
+      "the failed-open line says the branch is pushed",
+    ).toContain(branch);
+    expect(
+      openFailed.split(GUIDED_LINES.pushedOpenFailed)[1]?.trim(),
+      "the failed-open line carries the line the command printed",
+    ).toBeTruthy();
+    expect(
+      openFailed,
+      "the failed-open line carries no pull request address",
+    ).not.toMatch(/https?:\/\/\S+/);
+  }
 }
 
 /**
@@ -215,19 +316,9 @@ export function expectSaidLinesMatchRepo({
  * --wait-online call that answered online, before the first run.
  */
 export function expectAgentOnlineBeforeFirstRun(
-  messages: ReadonlyArray<{ parts: Array<Record<string, unknown>> }>,
+  messages: StoredMessages,
 ): void {
-  const calls = messages.flatMap((message) =>
-    message.parts.filter(
-      (part) =>
-        typeof part.type === "string" &&
-        part.type.startsWith("tool-") &&
-        typeof (part.input as { command?: unknown } | undefined)?.command ===
-          "string",
-    ),
-  );
-  const commandOf = (part: Record<string, unknown>) =>
-    String((part.input as { command: string }).command);
+  const calls = commandCalls(messages);
   const waitIndex = calls.findIndex((part) =>
     /langwatch agent list --wait-online/.test(commandOf(part)),
   );

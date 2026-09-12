@@ -137,6 +137,9 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
                   "Every line Langy says about its branch, commit or pull request names a thing a command made: the branch line names the branch it checked out, and the pull request line carries the address the command printed or is replaced by the no-remote line. A line naming a branch, a commit or a pull request that no command made fails this criterion.",
                   "Before the first scenario runs, Langy starts the agent and confirms it is online with one langwatch agent list --wait-online call; no scenario or suite runs against an agent that did not report online.",
                   "Langy installs the langwatch package through the project's own package manager (uv add, pip install, npm install or pnpm add) before it starts the agent, so the agent process finds the module at import. An agent started before the install, or a start that dies on a missing langwatch module with no install and restart after it, fails this criterion.",
+                  "The connect adapter Langy writes is the SDK's own connect call, the connect_agent decorator in Python or connectAgent in TypeScript, in the file that starts the service. A route of Langy's own answering on a path such as /langwatch/connect registers nothing with the platform, so writing one while the SDK is installed fails this criterion.",
+                  "Langy says the no-remote line only when the commands showed that cause. A push that printed a new branch on a remote means the folder has one, so a pull request that fails after it is reported with the failed-open line, which names the branch and the line the command printed, and the no-remote line is wrong there. The three lines are alternatives: exactly one of them is said.",
+                  "Langy never prints an environment file to the terminal: no command that shows the values in a .env file. Reading the key names alone, such as sed 's/=.*//' .env, is fine, and so is writing the file through the env tool.",
                   `When the developer picks "${GUIDED_OPTIONS.chatAboutThis}", Langy says, word for word, "${GUIDED_LINES.chatAboutThis}" and ends its turn there, creating nothing.`,
                   "After the developer describes the scenario, Langy writes it as described, opens it, runs it against the connected agent, and does not argue the developer out of it.",
                   "When the run fails, Langy explains in plain words what the judge saw and why the agent did not meet the criteria (the code was refused as expired), without blaming the developer and without hiding the failure.",
@@ -296,7 +299,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
         );
         const said = storedSaidLines(stored);
         console.log("[layer2] said:", said.join(" | "));
-        expectSaidLinesMatchRepo({ lines: said, repo });
+        expectSaidLinesMatchRepo({ lines: said, repo, messages: stored });
         expectAgentOnlineBeforeFirstRun(stored);
 
         if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
