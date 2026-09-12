@@ -178,15 +178,17 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 12;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with NO pending handoff before we conclude the id
- * is simply unknown.
+ * How many attempts may pass with NO evidence that waiting can help before we
+ * conclude the id is simply unknown.
  *
- * It cannot be zero, which is the second half of the same bug: the handoff row
- * is written by the very dispatch we are waiting on, so a read that arrives
- * before IT lands found no evidence, took the fast path, and returned "not
- * found" without ever retrying. A couple of beats of grace is the difference
- * between "no create is in flight" and "the create is a few milliseconds
- * younger than this read".
+ * It cannot be zero: the evidence — the aggregate's events, or the legacy
+ * pending-handoff row — is written by the very dispatch we are waiting on
+ * (commands are queued, so even the event append trails the accept). A read
+ * that arrives before it lands finds nothing, and a couple of beats of grace
+ * is the difference between "no create is in flight" and "the create is a
+ * few milliseconds younger than this read". It is also the SAME exit for
+ * absent, foreign and archived ids alike, so an id nobody may see never
+ * answers on a different clock than an id that does not exist.
  */
 const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
 
@@ -376,6 +378,38 @@ function isLangyWaitEventType(type: string): boolean {
 }
 
 /**
+ * Whether this caller will see the conversation's projection row once the
+ * fold lands it, decided from the raw event log by the fold's own rules: a
+ * birth event (started or forked) names the owner first-writer-wins, the
+ * latest metadata word decides shared, and an archive is terminal — the
+ * vocabulary has no unarchive, so one archive event means the visible row is
+ * never coming back and waiting cannot help.
+ *
+ * Only meaningful for a NON-EMPTY log; an empty one says nothing about
+ * whether the conversation exists (the caller owns that distinction).
+ */
+function eventLogSaysVisible(
+  events: readonly LangyConversationProcessingEvent[],
+  userId: string,
+): boolean {
+  let owner: string | null = null;
+  let isShared = false;
+  for (const event of events) {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED
+    ) {
+      owner ??= event.data.userId;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED) {
+      isShared = event.data.isShared ?? isShared;
+    } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED) {
+      return false;
+    }
+  }
+  return owner === userId || isShared;
+}
+
+/**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
  */
@@ -391,16 +425,25 @@ export class LangyConversationService {
   /**
    * The visibility read, tolerant of the DISPATCH window.
    *
-   * A conversation whose create was just accepted has a pending handoff —
-   * written synchronously at dispatch — before its projection row lands, so
-   * "missing row + pending handoff" means NOT YET, never "never". In that
-   * window this retries briefly instead of reporting the very lie the
-   * `getById` doc below spends three paragraphs on: the panel used to render
+   * A conversation's projection row is written by an asynchronous fold, so
+   * every read of a brand-new conversation can run before the row lands. In
+   * that window this retries instead of reporting the very lie the `getById`
+   * doc below spends three paragraphs on: the panel used to render
    * "conversation not found" moments before the same conversation's turn was
-   * accepted. A miss with NO handoff stays an immediate not-found — an
-   * unknown id must not grow a probe-friendly delay, and the retried read
-   * still enforces visibility, so the handoff's existence never widens
-   * access.
+   * accepted.
+   *
+   * Whether a miss is worth waiting out is decided from the canonical event
+   * log (`dispatchInFlightEvidence`): a caller the log says will see the row
+   * once it lands waits out the FULL budget; every other miss — absent,
+   * foreign and archived alike — gives up at the same short grace, so timing
+   * never becomes an existence oracle across users. The grace exists because
+   * commands are queued: the event append itself can trail the accept by a
+   * beat, so "nothing on the log yet" early on means "too soon to tell", not
+   * "no such conversation" — which is also why the evidence is re-asked
+   * every beat until it says wait, rather than trusted once up front.
+   *
+   * Evidence only ever EXTENDS the wait: the answer always comes from the
+   * retried `findVisibleById`, which enforces visibility on every beat.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -411,6 +454,7 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }) {
+    let waitOutFullBudget = false;
     for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
       const row = await this.repository.findVisibleById({
         id,
@@ -419,13 +463,14 @@ export class LangyConversationService {
       });
       if (row) return row;
 
-      // Re-asked every beat, not once up front: the handoff row lands on the
-      // same dispatch we are waiting for, so "no handoff yet" early on means
-      // "too soon to tell", not "no such conversation".
-      const handoff = await this.repository
-        .findPendingHandoff({ projectId, conversationId: id })
-        .catch(() => null);
-      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+      // Short-circuits once the log has said wait: evidence is not re-read
+      // every beat after, only the projection is.
+      waitOutFullBudget =
+        waitOutFullBudget ||
+        (await this.dispatchInFlightEvidence({ id, projectId, userId }));
+      if (!waitOutFullBudget && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
+        return null;
+      }
 
       if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
       await new Promise((resolve) =>
@@ -433,6 +478,58 @@ export class LangyConversationService {
       );
     }
     return null;
+  }
+
+  /**
+   * Whether a projection miss is worth waiting out — the answer to "will
+   * this caller's `findVisibleById` succeed once the fold catches up?".
+   *
+   * The preferred source is the canonical event log, the very record the
+   * projection is folded FROM: owned-or-shared and not archived means the
+   * visible row WILL land (`eventLogSaysVisible`), anything else means
+   * waiting cannot help. An EMPTY log is "no evidence", not "no
+   * conversation" — the caller re-asks each beat of its grace window because
+   * the append itself may be a few milliseconds younger than this read.
+   *
+   * Without a reader (event sourcing disabled), or when the log read fails,
+   * the legacy heuristic stands in: a pending handoff on the projection row
+   * proves a dispatch is in flight. It says nothing about visibility — but
+   * evidence here only extends the wait, and the retried projection read is
+   * what enforces visibility, so the fallback never widens access.
+   */
+  private async dispatchInFlightEvidence({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<boolean> {
+    if (this.events) {
+      try {
+        const events = await this.events.getEventsOccurredSince(
+          id,
+          { tenantId: createTenantId(projectId) },
+          "langy_conversation",
+          0,
+        );
+        return events.length > 0 && eventLogSaysVisible(events, userId);
+      } catch (error) {
+        conversationServiceLogger.warn(
+          {
+            projectId,
+            conversationId: id,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Event-log evidence read failed during the dispatch window — falling back to the pending-handoff heuristic",
+        );
+      }
+    }
+    const handoff = await this.repository
+      .findPendingHandoff({ projectId, conversationId: id })
+      .catch(() => null);
+    return handoff !== null;
   }
 
   /**
@@ -1148,6 +1245,18 @@ export class LangyConversationService {
    * secret could forge a result into any tenant's conversation, and a benign
    * projectId/conversationId mix-up in the multiplexing manager would write
    * one tenant's output into another's with nothing to catch it.
+   *
+   * Decided projection-first (one indexed Postgres read, and a hit is
+   * definitive), then from the EVENT LOG on a miss: the turn projection is an
+   * asynchronous fold, and the durable result path is exactly the caller
+   * racing it — an agent can finish a short turn and post its final before
+   * the fold has landed the turn row. The acceptance event is the record the
+   * projection is derived from, so it answers "was this turn really accepted
+   * here?" without waiting, and a finished answer is never discarded because
+   * the projection lags. A reader failure PROPAGATES rather than answering
+   * "no": the route turns false into a 404 the posting manager treats as
+   * terminal, and a dropped final is the one outcome this check exists to
+   * prevent — a 5xx, by contrast, is retried.
    */
   async turnExists({
     projectId,
@@ -1158,7 +1267,24 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
   }): Promise<boolean> {
-    return this.repository.turnExists({ projectId, conversationId, turnId });
+    const projected = await this.repository.turnExists({
+      projectId,
+      conversationId,
+      turnId,
+    });
+    if (projected) return true;
+    if (!this.events) return false;
+    const events = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+    return events.some(
+      (event) =>
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED &&
+        event.data.turnId === turnId,
+    );
   }
 
   async ingestAgentTurnResult({

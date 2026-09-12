@@ -340,14 +340,17 @@ interface LangyState extends TurnPhaseState {
   adoptConversation: (id: string) => void;
   /**
    * Conversations THIS tab created whose read-side projection has not yet
-   * been seen. The create command is accepted before the projection lands, so
-   * a not-found from the history read is "not yet", never an error, until a
-   * durable confirmation arrives — a successful read, or a freshness signal
-   * naming the conversation. Session-scoped on purpose: never persisted (a
-   * refreshed tab reads before it writes, so the window doesn't exist there).
+   * been read back. The create command is accepted before the projection
+   * lands, so a not-found from the history read is "not yet", never an
+   * error, until the projection itself answers — a successful history read.
+   * Nothing weaker counts: a freshness signal's cursor proves the EVENT LOG
+   * knows the conversation, and the log is ahead of the projection by
+   * definition, so confirming on it reopened the very window this exists to
+   * cover. Session-scoped on purpose: never persisted (a refreshed tab reads
+   * before it writes, so the window doesn't exist there).
    */
   unconfirmedConversations: Record<string, true>;
-  /** A durable read or signal proved the conversation's projection exists. */
+  /** A successful history read proved the projection is readable. */
   confirmConversation: (id: string) => void;
   /** Start a fresh, empty conversation. */
   startNewConversation: () => void;
