@@ -28,6 +28,8 @@ const VERBATIM_LINES = {
     "I opened a pull request with the tracing change: {link}. You can merge it already.",
   "the no-remote line":
     "No pull request was opened, since the folder has no remote or gh is not signed in: branch {branch} holds the commit.",
+  "the failed-open line":
+    "The branch {branch} is pushed; opening the pull request failed with: {error}.",
   "the branch line":
     "I left branch {branch} checked out: the agent you started runs on it.",
   "the chat-about-this line":
@@ -138,7 +140,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The step 2 lines are said before the card, and the answer is the go" */
     it("says the step 2 lines with the say tool right before the question call and goes straight to the checklist after the answer", () => {
       const lines = rendered.indexOf(
-        "These three lines of step 2, the framework line, the pull request line or the no-remote line, and the branch line, are said with the `say` tool, one call each, in that order, in this same step, right after the pull request command answered and right before the question of step 3: never after the answer, and never in the reply text.",
+        "These three lines of step 2, the framework line, the pull request line, the no-remote line or the failed-open line, and the branch line, are said with the `say` tool, one call each, in that order, in this same step, right after the pull request command answered and right before the question of step 3: never after the answer, and never in the reply text.",
       );
       const ask = rendered.indexOf("With the three step 2 lines said, ask with the `question` tool");
       const go = rendered.indexOf(
@@ -561,6 +563,61 @@ describe("the guided-onboarding skill", () => {
       );
       expect(section).toContain(
         "The repair happens once and never touches the env file or reads the key: a second failed wait, or a cause outside those edits, stops there as this section says",
+      );
+    });
+
+    /** @scenario "The adapter is the SDK connect call" */
+    it("writes the adapter as the SDK connect call and never as a route", () => {
+      expect(rendered).toContain(
+        "On this path the SDK is always installed, item 3 of the checklist, so the adapter is the SDK connect call: the `@langwatch.connect_agent` decorator in Python, `connectAgent` in TypeScript.",
+      );
+      expect(rendered).toContain(
+        "The HTTP fallback at the bottom of `connect-agent` is never used here: a route on a path, `@app.post(\"/langwatch/connect\")` or the like, registers nothing with the SDK",
+      );
+      expect(rendered).toContain("A route is not an adapter.");
+    });
+
+    /** @scenario "A clean log with no online row means the adapter did not register" */
+    it("repairs a wait that fails on a clean start by rewriting the adapter as the SDK call", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      const cleanLog = section.indexOf(
+        "A log that shows a clean start, the server up and no exception, with the row never online means the adapter did not register with the SDK, which is your own work of this step too: the repair is to rewrite the adapter as the SDK connect call of item 3, start the agent again and run the wait once more.",
+      );
+      const once = section.indexOf("The repair happens once and never touches the env file or reads the key");
+      expect(cleanLog).toBeGreaterThan(-1);
+      expect(once).toBeGreaterThan(cleanLog);
+    });
+
+    /** @scenario "The pull request body is written before it is read, and the no-remote line waits for its reason" */
+    it("writes the body file before the command that reads it, and says the no-remote line only for the reason the output named", () => {
+      const body = rendered.indexOf(
+        "The body goes in a file: write `.langwatch/pr-body.md` with `local_write` first, and only then the command that reads it with `--body-file`",
+      );
+      const branch = rendered.indexOf("Then run `git branch --show-current`: its output is the name the lines below carry.");
+      expect(body).toBeGreaterThan(-1);
+      expect(branch).toBeGreaterThan(body);
+      expect(rendered).toContain(
+        "That line is said only when the push or `gh` answered that there is no remote or that `gh` is not signed in: a reason the output did not name is never said.",
+      );
+      expect(rendered).toContain(
+        "Any other `gh` error, a missing body file, a wrong base, gets one fix of its cause and one retry of the command; when it still fails, this line, verbatim, takes the place of both, with the second brace filled with the one line the command printed, and the step is done:",
+      );
+      const noRemote = rendered.indexOf(VERBATIM_LINES["the no-remote line"]);
+      const failedOpen = rendered.indexOf(VERBATIM_LINES["the failed-open line"]);
+      const branchLine = rendered.indexOf(VERBATIM_LINES["the branch line"]);
+      expect(failedOpen).toBeGreaterThan(noRemote);
+      expect(branchLine).toBeGreaterThan(failedOpen);
+      expect(VERBATIM_LINES["the failed-open line"].match(/\{[a-z]+\}/g)).toEqual(["{branch}", "{error}"]);
+    });
+
+    /** @scenario "An env file is never printed" */
+    it("never prints an env file, and reads its names alone when they matter", () => {
+      expect(rendered).toContain(
+        "An env file is never printed, with `cat` or any other command: the terminal that runs it is shared, and a key printed there is a key shown.",
+      );
+      expect(rendered).toContain(
+        "read them alone with a command that prints keys and no values, such as `sed 's/=.*//' .env`.",
       );
     });
 

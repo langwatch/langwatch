@@ -508,7 +508,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: The step 2 lines name only what the commands made
       When the compiled guided-onboarding skill is read
-      Then the pull request line is said only with the address the command printed, and the fixed no-remote line takes its place otherwise
+      Then the pull request line is said only with the address the command printed, and the fixed no-remote line takes its place when the output says there is no remote or gh is not signed in
       And the branch line names the branch that git branch --show-current printed after the commit
       And no brace is ever filled with a fallback, and no branch, commit or pull request a command did not make is ever named
       And the three lines are said right after the pull request command answered, before the question
@@ -531,6 +531,33 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then the agent list --wait-online command runs with the shell timeout set to 150 seconds
       And the line Langy reads when the agent never comes online is the CLI's own, naming the agent, the wait and the credentials
+
+    # A run wrote a route on a path, the HTTP fallback of connect-agent, with
+    # the SDK installed and importable: the process started cleanly and the
+    # agent never came online, since a route registers nothing.
+    @unit
+    Scenario: The adapter is the SDK connect call
+      When the compiled guided-onboarding skill is read
+      Then the adapter is the SDK connect call, the decorator in Python and connectAgent in TypeScript, since the package is always installed on this path
+      And the HTTP fallback of connect-agent is never used here: a route on a path is not an adapter
+
+    # A run pushed the branch, then gh failed on a body file that was never
+    # written, and Langy said the no-remote line for a reason it had not checked.
+    @unit
+    Scenario: The pull request body is written before it is read, and the no-remote line waits for its reason
+      When the compiled guided-onboarding skill is read
+      Then the body file is written with local_write before the command that reads it
+      And the no-remote line is said only when the push or gh answered that there is no remote or gh is not signed in
+      And any other gh error gets one fix of its cause and one retry, and when it still fails the fixed failed-open line names the branch and the one line the command printed
+      And no reason the output did not name is ever said
+
+    # A run printed the env file to the shared terminal, and the provider key
+    # appeared in full on the film.
+    @unit
+    Scenario: An env file is never printed
+      When the compiled guided-onboarding skill is read
+      Then an env file is never printed, with cat or any other command
+      And when the names it holds matter they are read alone, with a command that prints keys and no values
 
     # A film said "All ready!" between the first run and the suite. The line
     # closes the path, so it waits for the suite run and its open run.
@@ -669,6 +696,14 @@ Feature: Langy guides the first setup after sign-up
       Then a log naming a cause in Langy's own work of the step, a missing module, an import or syntax error in a file it edited or a name the adapter got wrong, is fixed, the agent is started again and the wait runs once more
       And a second failed wait, or a cause outside those edits, stops the path with the log's line as the reason
       And the repair never touches the env file and never reads the key
+
+    # The repair did not cover the route case: the log showed a clean start
+    # and the row never came online, so nothing in the log named a cause.
+    @unit
+    Scenario: A clean log with no online row means the adapter did not register
+      When the compiled guided-onboarding skill is read
+      Then a wait that fails on a process whose log shows a clean start means the adapter did not register with the SDK
+      And the repair is to rewrite the adapter as the SDK connect call, start the agent again and wait once more, within the same one round
 
     @unit
     Scenario: LangWatch initialises after the project's environment is loaded
