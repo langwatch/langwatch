@@ -366,6 +366,10 @@ const RECORD_ID_PREFIXES = new Set([
   "acct",
   "cus",
   "sub",
+  // Stored objects: edge media extraction rewrites span media to
+  // `/api/files/{projectId}/so_<id>` references, and that id is a record id
+  // like any other minted here (#8077).
+  "so",
 ]);
 
 /**
@@ -696,9 +700,27 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") &&
-      isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => {
+      if (isNonCredentialPrefix(groups[1] ?? "")) return false;
+      const body = groups[2] ?? "";
+      // The body class crosses `/`, so a URL path can be swallowed as one
+      // token: `/api/files/local-dev-project/so_<id>` matches with prefix
+      // `local` and a body that runs across the slash, and eating it turns a
+      // media reference into a 404 (#8077). A span whose LAST path segment
+      // names itself a record id is a reference to that record, not a
+      // credential, whatever the earlier segments look like. The guard stays
+      // narrow on purpose: a real key containing `/` keeps its protection
+      // unless its terminal segment carries an allowlisted record prefix,
+      // which key material has no reason to do.
+      const lastSlash = body.lastIndexOf("/");
+      if (lastSlash !== -1) {
+        const tailPrefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(
+          body.slice(lastSlash + 1),
+        )?.[1];
+        if (tailPrefix && isNonCredentialPrefix(tailPrefix)) return false;
+      }
+      return isKeyShapedBody(body);
+    },
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {

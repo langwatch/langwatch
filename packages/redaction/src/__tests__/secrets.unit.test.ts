@@ -1200,3 +1200,55 @@ describe("detectSecretsInText", () => {
     });
   });
 });
+
+describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
+  const STORED_OBJECT_ID = "so_000000000002Ckax9GYtOrWQlpTOa";
+
+  describe("given an /api/files reference whose project id has no allowlisted prefix", () => {
+    it("keeps the URL intact instead of eating the path as one token", () => {
+      const url = `/api/files/local-dev-project/${STORED_OBJECT_ID}`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps it intact inside span content too", () => {
+      const content = `{"type":"audio","url":"/api/files/local-dev-project/${STORED_OBJECT_ID}"}`;
+
+      const { text } = redactSecretsInText({ text: content });
+
+      expect(text).toBe(content);
+    });
+  });
+
+  describe("given the production and legacy URL shapes", () => {
+    it("keeps a project_-prefixed reference intact", () => {
+      const url = `/api/files/project_awkQTIH4hwMYdL8KsHbo1/${STORED_OBJECT_ID}`;
+
+      const { text } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+    });
+
+    it("keeps a legacy id-only reference intact", () => {
+      const url = `/api/files/${STORED_OBJECT_ID}`;
+
+      const { text } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+    });
+  });
+
+  describe("given a shaped key that carries a slash but no record-id tail", () => {
+    it("still redacts it, so the guard costs no recall", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/Yb3Ke6Ng1Jd5Hf0Cu here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+});
