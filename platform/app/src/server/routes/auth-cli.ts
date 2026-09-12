@@ -48,6 +48,7 @@ import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platf
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -74,6 +75,10 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import {
+  publishDeviceCodeSettled,
+  waitForDeviceCodeSettled,
+} from "./_lib/device-approval-signal";
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -158,6 +163,13 @@ const REFRESH_TOKEN_TTL_SECONDS = positiveIntFromEnv(
 );
 /** Min seconds between successive /exchange polls per device_code. */
 const POLL_RATE_LIMIT_SECONDS = 4;
+/**
+ * How long one /exchange holds the exclusive redemption claim on an approved
+ * device code. Long enough to cover the Prisma reads, the personal-workspace
+ * ensure and the login-key mint the redemption does; short enough that an
+ * unexpected throw before the release frees the code well inside its TTL.
+ */
+const EXCHANGE_CLAIM_SECONDS = 30;
 
 const DEVICE_CODE_PREFIX = "lwcli:device:"; // Redis key prefix for device-code records
 const REFRESH_TOKEN_PREFIX = "lwcli:refresh:"; // Redis key prefix for refresh-token records
@@ -363,6 +375,16 @@ async function validateAccessToken(
 
 function pollRateKey(deviceCode: string): string {
   return `${POLL_RATE_PREFIX}${deviceCode}`;
+}
+
+/**
+ * Redemption claim for an approved device code. A settled code skips the
+ * poll-rate window, so this claim is what serialises concurrent /exchange
+ * calls on the approved branch: one request redeems the code, the rest get
+ * the same slow_down the window would have given them.
+ */
+function deviceExchangeClaimKey(deviceCode: string): string {
+  return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
 }
 
 function getRedis() {
@@ -659,29 +681,37 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
 
   const { device_code } = parsed.data;
 
+  const raw = await redis.get(deviceCodeKey(device_code));
+  const settledEarly =
+    raw !== null && (JSON.parse(raw) as DeviceCodeRecord).status !== "pending";
+
   // Per-device polling rate-limit. RFC 8628 says clients respect the
   // server-issued interval but defensive servers must enforce it too.
   // We use SET NX EX — first call writes the key with TTL, subsequent
-  // calls within window see existing key and get rejected.
-  const setResult = await redis.set(
-    pollRateKey(device_code),
-    "1",
-    "EX",
-    POLL_RATE_LIMIT_SECONDS,
-    "NX",
-  );
-  if (setResult !== "OK") {
-    return c.json(
-      {
-        error: "slow_down",
-        error_description:
-          "Polling too fast. Increase your interval before retrying.",
-      },
-      429,
+  // calls within window see existing key and get rejected. A code that has
+  // already been approved or denied skips the window: that poll is the one
+  // `/device-approval` just told the CLI to make, and answering it with
+  // slow_down would put back the wait the stream exists to remove.
+  if (!settledEarly) {
+    const setResult = await redis.set(
+      pollRateKey(device_code),
+      "1",
+      "EX",
+      POLL_RATE_LIMIT_SECONDS,
+      "NX",
     );
+    if (setResult !== "OK") {
+      return c.json(
+        {
+          error: "slow_down",
+          error_description:
+            "Polling too fast. Increase your interval before retrying.",
+        },
+        429,
+      );
+    }
   }
 
-  const raw = await redis.get(deviceCodeKey(device_code));
   if (!raw) {
     // Either the device_code never existed or it expired and Redis evicted it.
     // RFC 8628 recommends `expired_token` here.
@@ -749,6 +779,35 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // Exclusive redemption. Everything below hands out a credential the
+    // device code is only supposed to buy once: the project-key branch
+    // returns the project apiKey, the device-session branch mints an ApiKey
+    // and a token pair, and the mint revokes the previous login key for the
+    // same device label. Two concurrent exchanges both reaching that would
+    // hand out two sets and let the second revoke the first's key, so the
+    // approved branch is entered by one request at a time. The loser gets
+    // the same slow_down a too-fast poll gets, which the CLI already
+    // retries, and the winner deletes the device code on every path that
+    // consumes it.
+    const claimKey = deviceExchangeClaimKey(device_code);
+    const claimed = await redis.set(
+      claimKey,
+      "1",
+      "EX",
+      EXCHANGE_CLAIM_SECONDS,
+      "NX",
+    );
+    if (claimed !== "OK") {
+      return c.json(
+        {
+          error: "slow_down",
+          error_description:
+            "Polling too fast. Increase your interval before retrying.",
+        },
+        429,
+      );
+    }
+
     // Look up user + org details for the response payload. We only fetch
     // the fields the CLI actually needs to print on success.
     const user = await prisma.user.findUnique({
@@ -763,6 +822,9 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       logger.error(
         `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
       );
+      // Nothing was consumed, so the code stays redeemable for whatever
+      // retry the CLI makes next.
+      await redis.del(claimKey);
       return c.json(
         {
           error: "server_error",
@@ -814,6 +876,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         logger.warn(
           `[auth-cli] approved project_api_key device_code ${device_code} missing project payload — returning pending`,
         );
+        await redis.del(claimKey);
         return c.json(
           {
             error: "authorization_pending",
@@ -947,6 +1010,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
             410,
           );
         }
+        await redis.del(claimKey);
         throw err;
       }
       cliApiKey = minted.token;
@@ -1067,6 +1131,134 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     { error: "server_error", error_description: "Unknown device code state" },
     500,
   );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/device-approval
+// ---------------------------------------------------------------------------
+
+/** How often the stream writes a comment so proxies keep it open. */
+const APPROVAL_KEEPALIVE_MS = 15_000;
+
+/**
+ * How many approval streams one pod holds open at once. Minting a device code
+ * takes no credential, so without a ceiling anyone could park a connection, a
+ * pair of timers and a Redis subscription per code they mint. Past the ceiling
+ * the route refuses, and a CLI that gets nothing polls the way it always did.
+ */
+const MAX_OPEN_APPROVAL_STREAMS = 512;
+let openApprovalStreams = 0;
+
+/** The device code's status once it has settled, or null while it is pending. */
+async function readDeviceCodeStatus({
+  redis,
+  deviceCode,
+}: {
+  redis: ReturnType<typeof getRedis>;
+  deviceCode: string;
+}): Promise<string | null> {
+  const raw = await redis.get(deviceCodeKey(deviceCode));
+  if (!raw) return "expired";
+  const status = (JSON.parse(raw) as DeviceCodeRecord).status;
+  return status === "pending" ? null : status;
+}
+
+/**
+ * Tell the CLI the moment its device code settles, so `langwatch login` does
+ * not sit on the spinner until its next scheduled poll.
+ *
+ * The device_code is the credential, exactly as it is on `/exchange`, and the
+ * stream carries no session material: the CLI still has to POST `/exchange` to
+ * get its tokens. That keeps this route a latency fix rather than a second way
+ * to authenticate.
+ *
+ * The stream is an accelerator, never the contract. It ends on the first
+ * settle, on the device code's own deadline, or when the client disconnects,
+ * and a CLI that never reaches it just polls at the interval it was given.
+ */
+secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
+  const redis = getRedis();
+  const deviceCode = c.req.query("device_code");
+  if (!deviceCode) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "device_code is required",
+      },
+      400,
+    );
+  }
+
+  const raw = await redis.get(deviceCodeKey(deviceCode));
+  const record = raw ? (JSON.parse(raw) as DeviceCodeRecord) : null;
+  const deadline = record?.expires_at ?? Date.now();
+  const wouldWait = record?.status === "pending" && Date.now() <= deadline;
+
+  if (wouldWait && openApprovalStreams >= MAX_OPEN_APPROVAL_STREAMS) {
+    return c.json(
+      {
+        error: "temporarily_unavailable",
+        error_description:
+          "Too many approval streams are open. Poll /exchange at the interval you were given.",
+      },
+      503,
+    );
+  }
+
+  return streamSSE(c, async (stream) => {
+    // An already-settled code (or one Redis no longer holds) needs no wait:
+    // the CLI's next poll is the one that matters and it can make it now.
+    if (record?.status !== "pending" || Date.now() > deadline) {
+      await stream.writeSSE({
+        data: JSON.stringify({ status: record?.status ?? "expired" }),
+      });
+      return;
+    }
+
+    openApprovalStreams++;
+    const controller = new AbortController();
+    const closeOnDeadline = setTimeout(
+      () => controller.abort(),
+      Math.max(1000, deadline - Date.now()),
+    );
+    stream.onAbort(() => controller.abort());
+
+    const keepalive = setInterval(() => {
+      void stream.writeSSE({ data: "", event: "ping" }).catch(() => {
+        controller.abort();
+      });
+    }, APPROVAL_KEEPALIVE_MS);
+
+    try {
+      const watch = waitForDeviceCodeSettled({
+        redis,
+        deviceCode,
+        signal: controller.signal,
+      });
+      await watch.subscribed;
+
+      // Redis pub/sub keeps nothing for a late subscriber, so a code settled
+      // between the read above and that subscribe published to no one. Read it
+      // once more now that the channel is live: from here on, either the
+      // record already says so or the publication reaches us.
+      const status =
+        (await readDeviceCodeStatus({ redis, deviceCode })) ??
+        (await watch.settled);
+      if (status) {
+        await stream.writeSSE({ data: JSON.stringify({ status }) });
+      }
+    } catch (error) {
+      logger.debug(
+        { error },
+        "[auth-cli] device-approval stream ended early; the CLI's own poll still settles the login",
+      );
+    } finally {
+      clearInterval(keepalive);
+      clearTimeout(closeOnDeadline);
+      controller.abort();
+      openApprovalStreams--;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -3121,6 +3313,7 @@ export async function approveDeviceCode({
     "EX",
     remainingSeconds,
   );
+  await publishDeviceCodeSettled({ redis, deviceCode, status: "approved" });
   return { approved: true };
 }
 
@@ -3141,4 +3334,5 @@ export async function denyDeviceCode(deviceCode: string): Promise<void> {
     "EX",
     Math.ceil(remainingMs / 1000),
   );
+  await publishDeviceCodeSettled({ redis, deviceCode, status: "denied" });
 }
