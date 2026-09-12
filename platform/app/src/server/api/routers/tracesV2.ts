@@ -44,6 +44,7 @@ import type {
   SpanSummaryRow,
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { resolveConversationId } from "~/server/app-layer/traces/resolve-conversation-id";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
@@ -193,10 +194,7 @@ export function mapTraceSummaryToHeader(
       summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",
     origin: summary.attributes["langwatch.origin"] ?? "application",
-    conversationId:
-      summary.attributes["gen_ai.conversation.id"] ??
-      summary.attributes["langgraph.thread_id"] ??
-      null,
+    conversationId: resolveConversationId(summary.attributes) || null,
     userId: summary.attributes["langwatch.user_id"] ?? null,
     durationMs: summary.totalDurationMs,
     spanCount: summary.spanCount,
