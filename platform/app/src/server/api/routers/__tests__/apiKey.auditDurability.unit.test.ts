@@ -2,7 +2,8 @@
  * @vitest-environment node
  *
  * Pins both halves of the bargain #8097 struck on the personal-API-key
- * router: the audit write is awaited, AND its failure is caught.
+ * router: the audit write is awaited, AND its failure is caught — caught
+ * loudly, which is why the catch's log line is asserted rather than assumed.
  *
  * `create`, `update` and `revoke` dispatched their audit write with a bare
  * `void auditLog(...)`, so the row was still in flight — and could be lost
@@ -51,13 +52,25 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
+/**
+ * One stable logger, not a fresh object per `createLogger` call, because the
+ * rejection cases assert on it. A swallowed audit failure that logs nothing is
+ * the third way this bargain can break: `.catch(() => {})` keeps the caller's
+ * key and passes every "still returns the token" case, while the lost row it
+ * was meant to guarantee becomes invisible in production. On a credential
+ * event that is the failure nobody finds out about, so it is pinned here too.
+ */
+const { logger } = vi.hoisted(() => ({
+  logger: {
     debug: vi.fn(),
     warn: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
-  }),
+  },
+}));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => logger,
 }));
 
 /**
@@ -174,7 +187,7 @@ describe("apiKey router — the audit row is durable before the caller is told",
     caller = buildCaller();
   });
 
-  describe("create", () => {
+  describe("when creating a key", () => {
     it("does not answer with the token while the audit write is still open", async () => {
       audit.holdAction = "apiKey.create";
 
@@ -216,10 +229,14 @@ describe("apiKey router — the audit row is durable before the caller is told",
 
       expect(result?.token).toBe("sk-lw-test-token");
       expect(result?.apiKey.id).toBe(API_KEY_ID);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ apiKeyId: API_KEY_ID }),
+        "could not write the apiKey.create audit row",
+      );
     });
   });
 
-  describe("update", () => {
+  describe("when updating a key", () => {
     it("does not answer while the audit write is still open", async () => {
       audit.holdAction = "apiKey.update";
 
@@ -252,10 +269,14 @@ describe("apiKey router — the audit row is durable before the caller is told",
           name: "Renamed Key",
         }),
       ).toMatchObject({ id: API_KEY_ID, name: "Renamed Key" });
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ apiKeyId: API_KEY_ID }),
+        "could not write the apiKey.update audit row",
+      );
     });
   });
 
-  describe("revoke", () => {
+  describe("when revoking a key", () => {
     it("does not answer while the audit write is still open", async () => {
       audit.holdAction = "apiKey.revoke";
 
@@ -281,6 +302,10 @@ describe("apiKey router — the audit row is durable before the caller is told",
         await caller.revoke({ organizationId: ORG_ID, apiKeyId: API_KEY_ID }),
       ).toEqual({ success: true });
       expect(service.revoke).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ apiKeyId: API_KEY_ID }),
+        "could not write the apiKey.revoke audit row",
+      );
     });
   });
 });

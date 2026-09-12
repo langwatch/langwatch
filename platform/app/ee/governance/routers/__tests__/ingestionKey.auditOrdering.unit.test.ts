@@ -163,7 +163,7 @@ describe("ingestionKey router — the audit row is durable before the caller is 
     caller = buildCaller();
   });
 
-  describe("install", () => {
+  describe("when installing a key", () => {
     it("does not answer with the token while the audit write is still open", async () => {
       held.match = (entry) => entry.action === "ingestionKey.mint";
 
@@ -178,7 +178,7 @@ describe("ingestionKey router — the audit row is durable before the caller is 
     });
   });
 
-  describe("rotate", () => {
+  describe("when rotating a key", () => {
     it("does not answer with the replacement token while the audit write is still open", async () => {
       held.match = (entry) =>
         entry.action === "ingestionKey.rotate" &&
