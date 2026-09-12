@@ -332,12 +332,21 @@ packageExtensions:
 
 # Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
 # the rest came from platform/app/.
+#
+# cloudflared's postinstall downloads the actual `cloudflared` binary into its
+# own bin/ (`node lib/cloudflared.js bin install latest`). pnpm 10 runs a
+# dependency's build/postinstall ONLY when it is allowlisted here, so without
+# this entry the binary is never fetched, the voice worker's quick-tunnel mint
+# spawns a non-existent path (ENOENT), no VOICE_PUBLIC_BASE_URL is set, and
+# phone calls dial a URL nothing answers (Twilio error 31920). See
+# specs/features/agents/voice-phone.feature.
 onlyBuiltDependencies:
   - "@prisma/client"
   - "@prisma/engines"
   - "@scarf/scarf"
   - bcrypt
   - bufferutil
+  - cloudflared
   - core-js
   - cpu-features
   - esbuild
