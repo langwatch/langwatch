@@ -19,6 +19,8 @@ export interface StagedLangevalsPayload {
 }
 
 
+export const STAGED_PAYLOAD_HEADER = "X-Payload-S3-URL";
+
 export interface LangevalsPayloadStaging {
   stage(input: {
     projectId: string;
