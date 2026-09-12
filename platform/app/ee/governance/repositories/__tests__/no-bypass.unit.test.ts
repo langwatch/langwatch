@@ -27,7 +27,11 @@ const repoRoot = path.resolve(__dirname, "../../../..");
  * platform-default seeder + dogfood scripts are also allowed because:
  *   - Tests need to set up + assert DB state directly to verify behavior
  *     end-to-end (no value in routing through the repos when the test
- *     IS the regression for the repo + service contract).
+ *     IS the regression for the repo + service contract). Router tests
+ *     are here for the weaker reason that a gated table is sometimes just
+ *     a fixture row their subject needs to exist — the audit-durability
+ *     tests seed a platform template so a key has something to mint
+ *     against, and never assert on the template at all.
  *   - The platform seeder predates the repository extraction and lives
  *     adjacent to the service; it owns the platform-row catalog upsert
  *     and routing it through a repo would just shuffle the call site.
@@ -36,6 +40,7 @@ const repoRoot = path.resolve(__dirname, "../../../..");
  */
 const ALLOWED_FILE_PATTERNS = [
   "ee/governance/repositories/",
+  "ee/governance/routers/__tests__/",
   "ee/governance/services/__tests__/",
   "ee/governance/services/platformIngestionTemplates.seeds.ts",
   "scripts/dogfood/",
