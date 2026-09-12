@@ -24,6 +24,16 @@ export const LANGY_SESSION_API_KEY_NAME = "Langy session";
 export const AGENT_SANDBOX_API_KEY_NAME = "Agent sandbox run";
 
 /**
+ * Name prefix of the key a `langwatch login` device session carries. The
+ * device label follows it, so re-login from the same device finds the key it
+ * replaces by (prefix, label), and the hourly sweep over elapsed login keys
+ * finds its rows by the prefix alone. NOT a hidden name: a customer can name
+ * a key this way, so it is not in `HIDDEN_SYSTEM_KEY_NAMES` and the sweep's
+ * cross-tenant read is bounded by the elapsed expiry, not by the name.
+ */
+export const CLI_LOGIN_KEY_NAME_PREFIX = "CLI login - ";
+
+/**
  * Keys with these names are system-managed and short-lived; they are excluded
  * from both the per-user and the admin (org-wide) API-keys listings so the UI
  * shows only keys a human created and manages. They remain fully functional for

@@ -267,10 +267,11 @@ async function runHook({
   });
 
   // A 401 means the key this device exports with is dead: revoked on the
-  // platform, rotated by an older server, evicted by the cap. The agent's own
+  // platform, or retired with the session that minted it. The agent's own
   // exporter fails the same way and says nothing, so this is the one place
-  // the device finds out. Re-mint, rewrite the wiring, retry, and tell the
-  // user to restart the agent: the running process still holds the old key.
+  // the device finds out. Re-mint under the current session, rewrite the
+  // wiring, retry, and tell the user to restart the agent: the running
+  // process still holds the old key.
   let liveTarget = target;
   if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
     const outcome = await healRevokedKey({

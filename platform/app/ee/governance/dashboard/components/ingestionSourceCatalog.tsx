@@ -222,7 +222,11 @@ export const SOURCE_TYPE_OPTIONS = [
   },
   {
     value: "anthropic_admin",
-    label: "Anthropic Admin API (usage & cost)",
+    // Named after the product. Which report a source pulls is a question the
+    // composer asks two fields later, where the admin can actually answer it;
+    // the old "(usage & cost)" put the answer in a menu that offered no
+    // choice between them.
+    label: "Anthropic Admin API",
     mode: "pull",
     blurb:
       "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",
@@ -406,9 +410,17 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
 export function SourceTypeIconGlyph({
   sourceType,
   size = "16px",
+  testId,
 }: {
   sourceType: SourceType;
   size?: string | number;
+  /**
+   * Named by the caller rather than fixed here: this renders on the menu, the
+   * composer, the list rows and the edit title, and one id shared by all of
+   * them would make `getByTestId` ambiguous the first time two appear on one
+   * screen. Callers that nothing queries pass nothing.
+   */
+  testId?: string;
 }) {
   const icon = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.icon;
   if (!icon) return null;
@@ -417,6 +429,7 @@ export function SourceTypeIconGlyph({
       icon={icon}
       monochrome={MONOCHROME_SOURCE_ICONS.has(sourceType)}
       size={size}
+      testId={testId}
     />
   );
 }

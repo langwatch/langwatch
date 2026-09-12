@@ -1,10 +1,12 @@
 import { Worker } from "node:worker_threads";
 import { createLogger } from "@langwatch/observability";
+import { SpanStatusCode } from "@opentelemetry/api";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
 import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "~/server/scenarios/voice/voice-public-url-env";
 
 const logger = createLogger("langwatch:workers");
 
@@ -188,24 +190,75 @@ export async function bootVoicePublicUrlTunnel(
   ) {
     return voiceEnv.voicePublicBaseUrl;
   }
-  try {
-    const { openVoicePublicUrlTunnel } = await import(
-      "~/server/scenarios/voice/voice-public-url-tunnel"
-    );
-    const tunnel = await openVoicePublicUrlTunnel({
-      port: voiceEnv.voiceWsPort,
-    });
-    process.env.VOICE_PUBLIC_BASE_URL = tunnel.url;
-    shutdownHandles.push(() => tunnel.close());
-    logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
-    return tunnel.url;
-  } catch (error) {
-    logger.error(
-      { error },
-      "voice public URL tunnel failed to open; voice runs on this worker will fail until it restarts",
-    );
-    return undefined;
-  }
+  // Trace the tunnel-mint boot so a failure lands as a recorded exception on a
+  // span, and thread the specific reason into the child's env — the eventual
+  // phone-run error then names the real cause (e.g. "spawn cloudflared ENOENT")
+  // instead of a generic "no public media URL". Lazy import to keep this file's
+  // env-load ordering intact (see startWorkers' doc comment).
+  const { getLangWatchTracer } = await import("langwatch");
+  const tracer = getLangWatchTracer("langwatch.workers.voice");
+  return tracer.withActiveSpan(
+    "voice.public_url_tunnel.boot",
+    { attributes: { "voice.ws_port": voiceEnv.voiceWsPort } },
+    async (span): Promise<string | undefined> => {
+      try {
+        const { openVoicePublicUrlTunnel } = await import(
+          "~/server/scenarios/voice/voice-public-url-tunnel"
+        );
+        const tunnel = await openVoicePublicUrlTunnel({
+          port: voiceEnv.voiceWsPort,
+        });
+        process.env.VOICE_PUBLIC_BASE_URL = tunnel.url;
+        // A prior failed boot may have left a stale reason; clear it now that a
+        // tunnel is live so a later run reads no misleading cause.
+        delete process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV];
+        shutdownHandles.push(() => tunnel.close());
+        logger.info({ url: tunnel.url }, "voice public URL tunnel ready");
+        return tunnel.url;
+      } catch (error) {
+        // Non-fatal: voice boots on EVERY worker now, so one Cloudflare/binary
+        // hiccup must not down the whole fleet's job processing. Record the
+        // cause on the span and stash it for the child so the phone-run error
+        // can name it — then continue with no public URL (voice runs on this
+        // process fail individually).
+        const reason = error instanceof Error ? error.message : String(error);
+        span.recordException(
+          error instanceof Error ? error : new Error(reason),
+        );
+        span.setStatus({ code: SpanStatusCode.ERROR, message: reason });
+        process.env[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV] = reason;
+        logger.error(
+          { error },
+          "voice public URL tunnel failed to open; voice runs on this worker will fail until it restarts",
+        );
+        return undefined;
+      }
+    },
+  );
+}
+
+// Reads the voice worker env and resolves its public base URL (opening a
+// tunnel if needed), in that order: the tunnel/listener boot need the env's
+// port and tunnel settings, and the URL must be resolved (and
+// process.env.VOICE_PUBLIC_BASE_URL set) before the scenario-processor stage
+// can spawn its first child. Split out of `startWorkers` only to keep that
+// function under the line-count lint budget; see bootVoicePublicUrlTunnel's
+// own doc comment for why this can block for minutes and why that's now safe
+// for the kubelet probe (metrics boots before this runs).
+async function resolveVoiceEnv(shutdownHandles: ShutdownHandles): Promise<{
+  voiceWsPort: number;
+  voicePublicBaseUrl: string | undefined;
+  voiceTunnelEnabled: boolean;
+}> {
+  const { readVoiceWorkerEnv } = await import(
+    "~/server/scenarios/voice/voice-worker-env"
+  );
+  const rawVoiceEnv = readVoiceWorkerEnv();
+  const resolvedPublicBaseUrl = await bootVoicePublicUrlTunnel(
+    shutdownHandles,
+    rawVoiceEnv,
+  );
+  return { ...rawVoiceEnv, voicePublicBaseUrl: resolvedPublicBaseUrl };
 }
 
 // The Twilio media listener: its own HTTP+WS server on VOICE_WS_PORT, booted
@@ -611,30 +664,27 @@ export async function startWorkers(
   await assertRedisReady();
   await verifyDatabaseReady();
 
-  // Read the voice worker env FIRST: the tunnel/listener boot below need its
-  // port and tunnel settings. Never throws (see voice-worker-env.ts).
-  const { readVoiceWorkerEnv } = await import(
-    "~/server/scenarios/voice/voice-worker-env"
-  );
-  const rawVoiceEnv = readVoiceWorkerEnv();
-
-  // Resolve the public base URL BEFORE the boot plan runs: a quick tunnel
-  // (when needed) must be open and process.env.VOICE_PUBLIC_BASE_URL set
-  // before the scenario-processor stage can spawn its first child.
-  const resolvedPublicBaseUrl = await bootVoicePublicUrlTunnel(
-    shutdownHandles,
-    rawVoiceEnv,
-  );
-  const voiceEnv = {
-    ...rawVoiceEnv,
-    voicePublicBaseUrl: resolvedPublicBaseUrl,
-  };
-
   const { resolveWorkerBootPlan } = await import("./worker-boot-plan");
   const plan = resolveWorkerBootPlan({ shouldStartMetricsServer });
   logger.info({ plan }, "worker boot plan");
 
+  const remainingPlan = plan.filter((stage) => stage !== "metrics");
+
   try {
+    // Boot metrics (the liveness thread that answers the kubelet's /healthz)
+    // BEFORE the voice tunnel below: a cold cloudflared binary download or
+    // slow trycloudflare DNS can take minutes, far past the kubelet's
+    // liveness budget, and a pod whose /healthz isn't listening yet gets
+    // killed and restarted mid-mint — crash-looping the whole rollout. The
+    // liveness thread depends on nothing the tunnel or any other stage sets
+    // up, so running it first is free. Run only the "metrics" stage here and
+    // filter it out of the loop below so it isn't booted twice.
+    if (plan.includes("metrics")) {
+      await bootMetricsServer(shutdownHandles);
+    }
+
+    const voiceEnv = await resolveVoiceEnv(shutdownHandles);
+
     // Ingestion pulls self-drive through durable process wakes and the
     // transactional process outbox; there is no separate queue worker to boot.
     // Topic clustering self-drives (ADR-051): the process wake worker and
@@ -649,7 +699,7 @@ export async function startWorkers(
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful
     // closeables stop them (see presets.ts).
-    for (const stage of plan) {
+    for (const stage of remainingPlan) {
       switch (stage) {
         case "storage-stats":
           await bootStorageStatsCollection(shutdownHandles);
@@ -675,9 +725,12 @@ export async function startWorkers(
         case "voice-ws-listener":
           await bootVoiceListener(shutdownHandles, voiceEnv);
           break;
-        case "metrics":
-          await bootMetricsServer(shutdownHandles);
-          break;
+        // "metrics" is deliberately absent: TypeScript's inferred type
+        // predicate on the `remainingPlan` filter above already narrows
+        // "metrics" out of `stage`'s type here, so a case for it is
+        // unreachable (and TS errors on it as such). It's already booted,
+        // before the voice tunnel — see the metrics-first comment near the
+        // top of this function.
       }
     }
   } catch (error) {

@@ -32,10 +32,11 @@ import { IngestionSourceService } from "@ee/governance/services/activity-monitor
 import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
-  IngestionKeyService,
-  PersonalSourceTypeNotAllowedError,
-  PersonalWorkspaceMissingError,
-} from "@ee/governance/services/ingestionKey.service";
+  IngestionKeySessionRevokedError,
+  IngestionKeySourceNotAllowedError,
+  IngestionKeyWorkspaceMissingError,
+} from "@ee/governance/services/ingestionKey.errors";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
   NoEligibleProvidersError,
@@ -57,10 +58,15 @@ import {
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
-  CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
   type CliKeySelection,
+  type CliLoginKeyRevocationCause,
   CliLoginKeyService,
+  loginKeyExpiresAt,
 } from "~/server/api-key/cli-login-key.service";
+import {
+  deviceLabelForSession,
+  sanitizeDeviceLabel,
+} from "~/server/api-key/device-label";
 import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
@@ -757,7 +763,12 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     });
     const organization = await prisma.organization.findUnique({
       where: { id: record.organization_id },
-      select: { id: true, name: true, slug: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        maxSessionDurationDays: true,
+      },
     });
     if (!user || !organization) {
       logger.error(
@@ -902,17 +913,14 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           permissions: string[];
         }
       | undefined;
+    // The session starts now: the same instant stamps the token records
+    // and anchors the login key's expiry, so the ceiling the org sets is
+    // measured from one clock.
+    const now = Date.now();
     if (record.key_selection) {
-      // Same normalization the other label paths use, and the user-chosen
-      // label wins over the machine hostname. The value names the key AND
-      // matches the previous login key for replacement, so an unnormalized
-      // value would leave the old key alive on a hostname or formatting
-      // change and let credentials accumulate.
-      const deviceLabel =
-        sanitizeDeviceLabel(
-          parsed.data.client_info?.device_label ??
-            parsed.data.client_info?.hostname,
-        ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
+      // The same label the ingest keys minted under this session carry, so
+      // the devices tab can put them beside it.
+      const deviceLabel = deviceLabelForSession(parsed.data.client_info);
       let minted: Awaited<
         ReturnType<CliLoginKeyService["mintForDeviceSession"]>
       >;
@@ -922,6 +930,9 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           organizationId: organization.id,
           deviceLabel,
           selection: record.key_selection,
+          sessionStartedAtMs: now,
+          maxSessionDurationDays: organization.maxSessionDurationDays ?? 0,
+          refreshWindowMs: REFRESH_TOKEN_TTL_SECONDS * 1000,
         });
       } catch (err) {
         // A ceiling refusal is permanent: the selection was approved minutes
@@ -963,7 +974,6 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // tokens against an authoritative store.
     const accessToken = generateAccessToken();
     const refreshToken = generateRefreshToken();
-    const now = Date.now();
     // Phase 8 — stamp client device info so the devices inventory can show
     // "Bob's MacBook Pro" entries. session_started_at is preserved
     // through future /refresh rotations so the dashboard can show
@@ -1106,6 +1116,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const record = JSON.parse(raw) as RefreshTokenRecord;
   if (Date.now() > record.expires_at) {
     await redis.del(refreshTokenKey(refresh_token));
+    await retireExpiredSessionKey(record);
     return c.json(
       {
         error: "invalid_grant",
@@ -1115,43 +1126,34 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     );
   }
 
-  // Phase 8 — enforce admin-configured max session duration. The
-  // session-start anchor is `client_info.session_started_at` (set at
-  // /exchange and preserved across rotations); fall back to
-  // record.issued_at for sessions started before client_info was
-  // captured. When maxSessionDurationDays > 0 and the session is
-  // older, reject the refresh — the user must re-run `langwatch login`.
   const sessionAnchorMs =
     record.client_info?.session_started_at ?? record.issued_at;
-  const org = await prisma.organization.findUnique({
-    where: { id: record.organization_id },
-    select: { maxSessionDurationDays: true },
+  const ceiling = await CliLoginKeyService.create(prisma).sessionCeiling({
+    organizationId: record.organization_id,
+    sessionAnchorMs,
   });
-  const maxDurationDays = org?.maxSessionDurationDays ?? 0;
-  if (maxDurationDays > 0) {
-    const sessionAgeMs = Date.now() - sessionAnchorMs;
-    const maxDurationMs = maxDurationDays * 24 * 60 * 60 * 1000;
-    if (sessionAgeMs > maxDurationMs) {
-      // Reject + invalidate the old refresh token to prevent further
-      // rotation attempts. The CLI gets 401 → wipes local state.
-      await redis.del(refreshTokenKey(refresh_token));
-      logger.info(
-        {
-          userId: record.user_id,
-          organizationId: record.organization_id,
-          sessionAgeDays: Math.round(sessionAgeMs / 86_400_000),
-          maxDurationDays,
-        },
-        "rejecting refresh: session exceeded org max-duration policy",
-      );
-      return c.json(
-        {
-          error: "invalid_grant",
-          error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
-        },
-        401,
-      );
-    }
+  const { maxDurationDays } = ceiling;
+  if (ceiling.exceeded) {
+    // Reject + invalidate the old refresh token to prevent further
+    // rotation attempts. The CLI gets 401 → wipes local state.
+    await redis.del(refreshTokenKey(refresh_token));
+    await retireExpiredSessionKey(record);
+    logger.info(
+      {
+        userId: record.user_id,
+        organizationId: record.organization_id,
+        sessionAgeDays: Math.round(ceiling.sessionAgeMs / 86_400_000),
+        maxDurationDays,
+      },
+      "rejecting refresh: session exceeded org max-duration policy",
+    );
+    return c.json(
+      {
+        error: "invalid_grant",
+        error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
+      },
+      401,
+    );
   }
 
   // Rotation mints a new credential pair, so it re-derives membership the way
@@ -1170,6 +1172,10 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   });
   if (!activeMembership) {
     await redis.del(refreshTokenKey(refresh_token));
+    // Not `expired`: this session had time left and lost its person instead.
+    // The cause reaches the ingest keys under it, and the CLI reads it as a
+    // sign-out no mint on this machine can repair.
+    await retireExpiredSessionKey(record, "offboarded");
     logger.info(
       { userId: record.user_id, organizationId: record.organization_id },
       "rejecting refresh: caller is not an active member of the organization",
@@ -1244,6 +1250,32 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
+  // The login key's expiry slides with the refresh window, held under the
+  // organization's ceiling from the session start, so the hourly sweep only
+  // retires sessions the CLI has stopped refreshing. Best effort: a key
+  // whose expiry did not move is retired one refresh window early, not a
+  // refresh the CLI is refused.
+  if (record.cli_api_key_id) {
+    try {
+      await CliLoginKeyService.create(prisma).extendExpiry({
+        apiKeyId: record.cli_api_key_id,
+        userId: record.user_id,
+        organizationId: record.organization_id,
+        expiresAt: loginKeyExpiresAt({
+          nowMs: now,
+          sessionStartedAtMs: sessionAnchorMs,
+          maxSessionDurationDays: maxDurationDays,
+          refreshWindowMs: REFRESH_TOKEN_TTL_SECONDS * 1000,
+        }),
+      });
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId: record.cli_api_key_id, userId: record.user_id },
+        "[auth-cli] could not extend the CLI login key's expiry on refresh",
+      );
+    }
+  }
+
   return c.json(
     {
       access_token: newAccessToken,
@@ -1255,6 +1287,32 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     200,
   );
 });
+
+/**
+ * A refused refresh is the end of the session, so the login key it minted
+ * goes with it and the ingest keys under that key with it. Best effort and
+ * idempotent, like the token delete beside it: the refusal is answered
+ * either way, and a key left behind is retired by the hourly sweep.
+ */
+async function retireExpiredSessionKey(
+  record: RefreshTokenRecord,
+  cause: CliLoginKeyRevocationCause = "expired",
+): Promise<void> {
+  if (!record.cli_api_key_id) return;
+  try {
+    await CliLoginKeyService.create(prisma).revokeSessionKey({
+      apiKeyId: record.cli_api_key_id,
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      cause,
+    });
+  } catch (err) {
+    logger.warn(
+      { err, apiKeyId: record.cli_api_key_id, userId: record.user_id },
+      "[auth-cli] could not revoke the CLI login key of a refused refresh",
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/budget/status
@@ -1526,22 +1584,6 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
 const issueVirtualKeySchema = z.object({
   device_label: z.string().optional(),
 });
-
-/**
- * Reduce a free-form device label to the charset a VK name carries. Returns
- * null when nothing usable survives, so the caller falls back to a random
- * suffix rather than naming every machine the same.
- */
-function sanitizeDeviceLabel(raw: string | undefined): string | null {
-  if (!raw) return null;
-  const cleaned = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .slice(0, 24)
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return cleaned.length > 0 ? cleaned : null;
-}
 
 secured.access(CLI_POLICY).post("/virtual-key", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
@@ -2389,9 +2431,25 @@ secured
 
 /**
  * The personal-project branch of the ingestion-key mint: the caller's own
- * workspace, one key per device. Create-only, because the caller is a
+ * workspace, one key per session. Create-only, because the caller is a
  * device session and the other devices under this login are still exporting
- * with theirs; the service's cap is what keeps the list bounded.
+ * with theirs. The key is parented to this session's login key, which is
+ * what retires it later: logout, the devices tab, a re-login from this
+ * device, or the session running out.
+ *
+ * A session whose record names no login key mints an unparented key: the row
+ * this route wrote before login keys existed, in the "Other keys" group, with
+ * no cascade behind it. Those are sessions approved before 2026-08-22, when
+ * `cli_api_key_id` began to be written; the refresh window is 90 days, so
+ * some are still alive and still minting. Refusing them would tell a person
+ * whose CLI works to sign in again for a reason they cannot see. The window
+ * closes as those sessions age out, so this branch is temporary by
+ * construction: every session opened since carries a login key and is
+ * parented.
+ *
+ * A session that names a login key which is revoked is still refused as
+ * signed out. That one is a real sign-out, and the repair is `langwatch
+ * login`.
  */
 async function mintPersonalIngestionKey(
   c: Context,
@@ -2406,17 +2464,15 @@ async function mintPersonalIngestionKey(
   },
 ): Promise<Response> {
   try {
-    const result = await service.issueForPersonalProject({
+    const result = await service.mint({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       sourceType,
-      // Snapshot which device minted the key so the API-keys settings page
-      // can attribute it. Falls back to the hostname when the CLI sent no
-      // explicit label; null for CLIs that predate device metadata.
-      createdByDeviceLabel:
-        tokenRecord.client_info?.device_label ??
-        tokenRecord.client_info?.hostname ??
-        null,
+      fromCliSession: true,
+      parentApiKeyId: tokenRecord.cli_api_key_id ?? null,
+      // The same label the session's login key carries, so the devices tab
+      // can put the key beside its session.
+      createdByDeviceLabel: deviceLabelForSession(tokenRecord.client_info),
     });
     return c.json(
       {
@@ -2427,12 +2483,13 @@ async function mintPersonalIngestionKey(
       201,
     );
   } catch (err) {
-    // A source type no wrapped tool stamps and a missing workspace are the
-    // two failures the caller can act on, so they are the only ones that
-    // report as such. Everything else is a server fault: it gets logged and a
-    // fixed message, the way the project branch does, rather than a prompt
-    // the user cannot act on and an internal error string on the wire.
-    if (err instanceof PersonalSourceTypeNotAllowedError) {
+    // A source type no wrapped tool stamps, a missing workspace and a
+    // signed-out session are the failures the caller can act on, so they
+    // are the only ones that report as such. Everything else is a server
+    // fault: it gets logged and a fixed message, the way the project branch
+    // does, rather than a prompt the user cannot act on and an internal
+    // error string on the wire.
+    if (IngestionKeySourceNotAllowedError.is(err)) {
       return c.json(
         {
           error: "invalid_request",
@@ -2441,7 +2498,7 @@ async function mintPersonalIngestionKey(
         400,
       );
     }
-    if (err instanceof PersonalWorkspaceMissingError) {
+    if (IngestionKeyWorkspaceMissingError.is(err)) {
       return c.json(
         {
           error: "precondition_failed",
@@ -2450,6 +2507,9 @@ async function mintPersonalIngestionKey(
         },
         412,
       );
+    }
+    if (IngestionKeySessionRevokedError.is(err)) {
+      return signedOut(c);
     }
     logger.error(
       { err, userId: tokenRecord.user_id, sourceType },
@@ -2463,6 +2523,21 @@ async function mintPersonalIngestionKey(
       500,
     );
   }
+}
+
+/**
+ * The answer for a session whose login key is gone: the same 401 the CLI
+ * already reads as "sign in again", so the device's own repair path fires.
+ */
+function signedOut(c: Context): Response {
+  return c.json(
+    {
+      error: "unauthorized",
+      error_description:
+        "This device session is signed out. Run `langwatch login` to start a new session.",
+    },
+    401,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2498,7 +2573,7 @@ secured
       );
     }
     const service = IngestionKeyService.create(prisma);
-    const keys = await service.listForPersonalProject({
+    const keys = await service.list({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
     });
@@ -2525,7 +2600,9 @@ secured
 // `langwatch instrument` again.
 //
 // Response: { lookup_id, status: "live" | "revoked" | "unknown",
-//             source_type?, revocation_cause?: "user" | "rotation" | "cap" | null }
+//             source_type?,
+//             revocation_cause?: "user" | "rotation" | "session" | "expired"
+//                                | "offboarded" | "cap" | null }
 //
 // `unknown` is a 200, not a 404, so a CLI can tell "no such key of yours"
 // from "a server too old to have this route".
@@ -2557,7 +2634,7 @@ secured
       );
     }
     const service = IngestionKeyService.create(prisma);
-    const key = await service.describePersonalKey({
+    const key = await service.describe({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       lookupId,
@@ -3008,10 +3085,11 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
 });
 
 /**
- * Revokes the CLI ApiKeys named by a logout's token records. Best-effort and
- * idempotent, like the token deletes beside it: logout stays a 200 whatever
- * state the key is in, and a failed revoke is logged rather than surfaced —
- * the key still dies with the owner's next re-login from the same device.
+ * Revokes the CLI ApiKeys named by a logout's token records, and with each
+ * login key the ingest keys parented to it. Best-effort and idempotent, like
+ * the token deletes beside it: logout stays a 200 whatever state the key is
+ * in, and a failed revoke is logged rather than surfaced: the key still dies
+ * with the owner's next re-login from the same device, or in the sweep.
  */
 async function revokeCliKeysFromTokenRecords(
   raws: Array<string | null>,
@@ -3029,10 +3107,11 @@ async function revokeCliKeysFromTokenRecords(
     if (!apiKeyId || seen.has(apiKeyId)) continue;
     seen.add(apiKeyId);
     try {
-      await CliLoginKeyService.create(prisma).revokeForLogout({
+      await CliLoginKeyService.create(prisma).revokeSessionKey({
         apiKeyId,
         userId: record.user_id,
         organizationId: record.organization_id,
+        cause: "user",
       });
     } catch (err) {
       logger.warn(

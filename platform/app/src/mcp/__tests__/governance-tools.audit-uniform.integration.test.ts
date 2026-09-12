@@ -17,6 +17,7 @@
  *       (@audit-uniform)
  */
 
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
@@ -37,6 +38,7 @@ const ADMIN_ID = `usr-mcp-${suffix}`;
 const PROJECT_ID = `prj-mcp-${suffix}`;
 const TEAM_ID = `team-mcp-${suffix}`;
 const PLATFORM_TEMPLATE_ID = `tmpl-platform-mcp-${suffix}`;
+const COWORK_TEMPLATE_ID = `tmpl-cowork-mcp-${suffix}`;
 const API_KEY = `sk-lw-mcp-test-${suffix}`;
 
 interface CapturedTool {
@@ -148,6 +150,27 @@ describe("governance MCP tools — audit-uniform contract", () => {
         enabled: true,
       },
     });
+    // A source no CLI wrapper covers, which is the only kind the MCP mint
+    // takes: a wrapped tool's key is minted by the CLI on its own machine.
+    await prisma.ingestionTemplate.create({
+      data: {
+        id: COWORK_TEMPLATE_ID,
+        organizationId: null,
+        slug: `platform_cowork_mcp_${suffix}`,
+        sourceType: "claude_cowork",
+        displayName: "Platform Cowork",
+        iconAsset: "preset:claude_code",
+        ottlRules: "",
+        platformPublished: true,
+        enabled: true,
+      },
+    });
+    // The mint lands in the caller's personal workspace, which is a team +
+    // project this service allocates rather than the fixture above.
+    await new PersonalWorkspaceService(prisma).ensure({
+      userId: ADMIN_ID,
+      organizationId: ORG_ID,
+    });
   });
 
   describe("when an MCP tool authors a new template", () => {
@@ -174,6 +197,44 @@ describe("governance MCP tools — audit-uniform contract", () => {
       });
       expect(audit).not.toBeNull();
       expect(audit?.metadata).toMatchObject({ surface: "mcp" });
+    });
+  });
+
+  describe("when an MCP tool mints and then revokes an ingestion key", () => {
+    it("stamps metadata.surface=mcp on both rows, the revoke before it answers", async () => {
+      const mock = mockMcpServer();
+      registerGovernanceMcpTools(mock as any, {
+        prisma,
+        apiKey: API_KEY,
+        callerUserId: ADMIN_ID,
+      });
+
+      const minted = await call(mock, "governance_ingestion_keys_mint", {
+        source_type: "claude_cowork",
+        template_id: COWORK_TEMPLATE_ID,
+      });
+      expect(minted).not.toMatch(/^FORBIDDEN|^AUTH_REQUIRED/);
+      const apiKeyId = (JSON.parse(minted) as { apiKeyId: string }).apiKeyId;
+
+      const mintAudit = await prisma.auditLog.findFirst({
+        where: { organizationId: ORG_ID, action: "ingestionKey.mint" },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(mintAudit?.metadata).toMatchObject({ surface: "mcp" });
+      expect(mintAudit?.args).toMatchObject({ apiKeyId });
+
+      const revoked = await call(mock, "governance_ingestion_keys_revoke", {
+        api_key_id: apiKeyId,
+      });
+      expect(revoked).toBe(`revoked ${apiKeyId}`);
+
+      // The tool awaits this row, so it is already there when it answers.
+      const revokeAudit = await prisma.auditLog.findFirst({
+        where: { organizationId: ORG_ID, action: "ingestionKey.revoke" },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(revokeAudit?.metadata).toMatchObject({ surface: "mcp" });
+      expect(revokeAudit?.args).toMatchObject({ apiKeyId });
     });
   });
 

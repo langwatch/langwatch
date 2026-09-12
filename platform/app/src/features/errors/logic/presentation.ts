@@ -2274,6 +2274,40 @@ const presentations = {
     describe: () =>
       "It may have been archived. Reload to see the current list.",
   },
+  ingestion_key_not_found: {
+    title: "Ingestion key not found",
+    describe: () =>
+      "That key is not one of yours, or it was already removed. Refresh the list and try again.",
+  },
+  ingestion_key_revoke_incomplete: {
+    title: "Some keys could not be revoked",
+    describe: (error) => {
+      const survivors = error.meta.survivors;
+      const named =
+        Array.isArray(survivors) && survivors.length > 0
+          ? ` Still live: ${survivors.map((label) => String(label)).join(", ")}.`
+          : "";
+      return `No new key was minted because the previous keys for this source could not all be revoked.${named} Try again; keys already revoked stay revoked.`;
+    },
+  },
+  ingestion_key_session_revoked: {
+    title: "This device is signed out",
+    describe: () =>
+      "The CLI session on this machine was signed out, so it cannot mint an ingestion key. Run `langwatch login --device` and try again.",
+  },
+  ingestion_key_source_not_allowed: {
+    title: "This source is set up from the CLI",
+    describe: (error) => {
+      const sourceType = error.meta.sourceType;
+      const tool = typeof sourceType === "string" ? sourceType : "this tool";
+      return `A key for ${tool} is minted on the machine that runs it. Run \`langwatch instrument\` there, or connect a source a template names.`;
+    },
+  },
+  ingestion_key_workspace_missing: {
+    title: "Finish setting up your workspace",
+    describe: () =>
+      "Your personal workspace is not ready yet. Sign in again and retry the connection.",
+  },
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () =>

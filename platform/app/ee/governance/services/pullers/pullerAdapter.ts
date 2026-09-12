@@ -210,6 +210,23 @@ export interface PullResult {
    */
   completeness?: "complete" | "truncated";
   /**
+   * Set when this run's `errorCount` includes a page it could not read AT ALL.
+   *
+   * The contract above has two shapes for a nonzero `errorCount`, and this is
+   * the third thing that can happen: an adapter that could not read a page but
+   * HAD already read earlier ones may bank them — return the advanced cursor,
+   * the events it has, and this flag — rather than throw the lot away. The
+   * events are written and the position is persisted, exactly like skipped
+   * input, but the source must NOT read as working: without this flag a source
+   * refused part-way through every run holds a failure count of zero forever
+   * and never turns red. Say so here and the fold counts the failure while
+   * keeping the progress.
+   *
+   * Only for a page nobody could read. Input an adapter deliberately steps
+   * over belongs in `errorCount` alone.
+   */
+  unreadPage?: true;
+  /**
    * The instant this run is known to have read up to, ISO 8601.
    *
    * Distinct from the instant the run finished, and that distinction is the

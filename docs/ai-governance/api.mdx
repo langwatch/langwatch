@@ -41,7 +41,7 @@ Anomaly rules are not in the table: they have no REST surface and no authoring p
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
 | Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates) |
+| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate` / `revoke`) | [Ingestion templates](/ai-governance/ingestion-templates) |
 | Members | `/api/governance/members` | [Members and Teams](/platform/members-and-teams) |
 | Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
 | Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
@@ -71,19 +71,24 @@ A few resource-shape notes that generalise across the namespace:
 - **Resource-specific verbs**: `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain, admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
 - **Error mapping**: `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType`, validation. All map to a common `errorSchema` with `{ type, code, message }`.
 
-The second resource to ship is `ingestion-keys` (Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
+The second resource to ship is `ingestion-keys`. An ingestion key is just an `ApiKey` (prefix `ik-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate` / `revoke`):
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
-| `mint` | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once) | `aiTools:manage` |
-| `list` | tRPC `ingestionKey.list` | `{ data: IngestionKeyDto[] }` (project-scoped; only the `sk-lw-` prefix is visible, never the full token) | `aiTools:manage` |
-| `install` | tRPC `ingestionKey.install` | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once) | `aiTools:manage` |
-| `rotate` | tRPC `ingestionKey.rotate` | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `aiTools:manage` |
+| `mint` | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "ik-lw-…", prefix, endpoint }` (token returned exactly once) | device session |
+| `list` | tRPC `ingestionKey.list` | one row per live key: `apiKeyId`, `sourceType`, `deviceLabel`, `parentApiKeyId`, `createdAtMs`, `lastUsedAtMs` (never the token) | `organization:view` |
+| `install` | tRPC `ingestionKey.install` | `{ token: "ik-lw-…", prefix, apiKeyId }` (token returned exactly once) | `organization:view` |
+| `rotate` | tRPC `ingestionKey.rotate` | the same plus `revokedCount` and `revokedDeviceLabels` (every previous key for the source is refused immediately) | `organization:view` |
+| `revoke` | tRPC `ingestionKey.revoke` (`{ apiKeyId }`) | `{ success: true }`; idempotent, another person's key answers `ingestion_key_not_found` | `organization:view` |
 
-Two consequences:
+Three consequences:
 
-- **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `sk-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
+- **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `ik-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
+- **A personal CLI key follows its session**: a personal key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it. A mint from a revoked session answers 401.
+- **Each side records its own cause**: the login key carries why it died (`user` for a logout or a devices-tab revoke, `rotation` for a re-login, `expired` for a session that ran out, `offboarded` for a membership that ended). The keys under it carry the same cause, except `user`, which reaches them as `session`. A re-login therefore leaves `rotation` on the keys, which is what tells the CLI it may re-mint under the session that replaced theirs.
+- **A project CLI key does not**: a key minted into a named team project carries no parent and outlives the session that asked for it.
+- **Only the CLI mints for a tool it wraps**: `install` and the MCP mint accept only source types a published template names, and a wrapped tool answers `ingestion_key_source_not_allowed`.
 
 The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
@@ -127,7 +132,7 @@ SELECT * FROM "AuditLog"
 
 All four rows have **identical** payload shapes apart from the `metadata.surface` field, same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
 
-The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of the Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
+The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate`, `revoke` on ingestion keys) all carry surface attribution. Minting an ingestion key emits an `ingestionKey.mint` audit row, rotating a source emits `ingestionKey.rotate` with the count of keys it revoked, and revoking one emits `ingestionKey.revoke`.
 
 ## Verifying the contract
 
@@ -135,13 +140,15 @@ The wire shape, request bodies, response envelopes, status-code mapping, and sur
 
 **Ingestion-templates wire shape**: `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
 
-**Ingestion-key wire shape**: `platform/app/src/app/api/governance/__tests__/governance-ingestion-keys.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the ingestion-key flows. Specifically locks:
+**Ingestion-key wire shape**: `platform/app/src/server/routes/__tests__/auth-cli-ingestion-key-personal.integration.test.ts` and `auth-cli-ingestion-key-project.integration.test.ts`, against real Postgres and the real Hono pipeline. Specifically lock:
 
-- the mint route returns a one-time `sk-lw-…` token and thereafter exposes only the prefix
-- `install` and `rotate` audit rows both stamp `metadata.surface === "hono"` end-to-end (cross-validates the B-3 surface threading at `fc6d54100`)
-- `rotate` emits `gateway.ingestion_key.minted` and revoking a key emits `gateway.ingestion_key.revoked` at the wire level, previously unit-only
+- the mint route answers 201 with an `ik-lw-…` token, its prefix and the OTLP endpoint, and a second mint for the same source returns a different token rather than replacing the first
+- a mint from a CLI session stores that session's login key as `parentApiKeyId` and the session's device label, and a mint from a session whose login key was revoked answers 401
+- the describe route reports a key's status and its `revocation_cause`, which is what the CLI reads before it re-mints
 
-The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:manage` caller) is the canonical reference for any downstream lane (CLI, MCP) that needs an ingestion-key test path.
+Surface attribution is not asserted there. `metadata.surface` on the ingestion-key audit rows is locked by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` and `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`.
+
+The `organization:view` caller plus a project-scoped ingest-only RoleBinding is the setup pattern any downstream lane (CLI, MCP) needs for an ingestion-key test path. The cascade itself is locked by `auth-cli-logout.integration.test.ts` and `auth-cli-refresh-expiry.integration.test.ts`, and the service rules by `platform/app/ee/governance/services/__tests__/ingestionKey.lifecycle.unit.test.ts`.
 
 **No-bypass invariant (CI-enforced)**: `platform/app/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
 
@@ -153,12 +160,15 @@ The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:man
 
 That locks the `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags. The only value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test, this pins the umbrella spec's `@audit-uniform` invariant for v1.
 
+`cli` itself is a hint from an already-authenticated caller rather than a claim the route can verify, since the CLI presents the same credentials any other HTTP client does. Read it as "which client said it did this", never as a permission.
+
 To run locally:
 
 ```bash
 cd platform/app
 pnpm test:integration governance-rest-api.integration.test.ts
-pnpm test:integration governance-ingestion-keys.integration.test.ts
+pnpm test:integration auth-cli-ingestion-key-personal.integration.test.ts
+pnpm test:integration auth-cli-ingestion-key-project.integration.test.ts
 pnpm test:integration governance-tools.audit-uniform.integration.test.ts
 pnpm test:integration auditSurface.crossSurface.integration.test.ts
 pnpm test:unit no-bypass.unit.test.ts
