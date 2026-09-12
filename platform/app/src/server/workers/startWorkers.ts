@@ -237,6 +237,30 @@ export async function bootVoicePublicUrlTunnel(
   );
 }
 
+// Reads the voice worker env and resolves its public base URL (opening a
+// tunnel if needed), in that order: the tunnel/listener boot need the env's
+// port and tunnel settings, and the URL must be resolved (and
+// process.env.VOICE_PUBLIC_BASE_URL set) before the scenario-processor stage
+// can spawn its first child. Split out of `startWorkers` only to keep that
+// function under the line-count lint budget; see bootVoicePublicUrlTunnel's
+// own doc comment for why this can block for minutes and why that's now safe
+// for the kubelet probe (metrics boots before this runs).
+async function resolveVoiceEnv(shutdownHandles: ShutdownHandles): Promise<{
+  voiceWsPort: number;
+  voicePublicBaseUrl: string | undefined;
+  voiceTunnelEnabled: boolean;
+}> {
+  const { readVoiceWorkerEnv } = await import(
+    "~/server/scenarios/voice/voice-worker-env"
+  );
+  const rawVoiceEnv = readVoiceWorkerEnv();
+  const resolvedPublicBaseUrl = await bootVoicePublicUrlTunnel(
+    shutdownHandles,
+    rawVoiceEnv,
+  );
+  return { ...rawVoiceEnv, voicePublicBaseUrl: resolvedPublicBaseUrl };
+}
+
 // The Twilio media listener: its own HTTP+WS server on VOICE_WS_PORT, booted
 // on every worker. It authenticates the per-call nonce and hands the raw
 // upgrade socket to the scenario child that owns the call.
@@ -640,30 +664,27 @@ export async function startWorkers(
   await assertRedisReady();
   await verifyDatabaseReady();
 
-  // Read the voice worker env FIRST: the tunnel/listener boot below need its
-  // port and tunnel settings. Never throws (see voice-worker-env.ts).
-  const { readVoiceWorkerEnv } = await import(
-    "~/server/scenarios/voice/voice-worker-env"
-  );
-  const rawVoiceEnv = readVoiceWorkerEnv();
-
-  // Resolve the public base URL BEFORE the boot plan runs: a quick tunnel
-  // (when needed) must be open and process.env.VOICE_PUBLIC_BASE_URL set
-  // before the scenario-processor stage can spawn its first child.
-  const resolvedPublicBaseUrl = await bootVoicePublicUrlTunnel(
-    shutdownHandles,
-    rawVoiceEnv,
-  );
-  const voiceEnv = {
-    ...rawVoiceEnv,
-    voicePublicBaseUrl: resolvedPublicBaseUrl,
-  };
-
   const { resolveWorkerBootPlan } = await import("./worker-boot-plan");
   const plan = resolveWorkerBootPlan({ shouldStartMetricsServer });
   logger.info({ plan }, "worker boot plan");
 
+  const remainingPlan = plan.filter((stage) => stage !== "metrics");
+
   try {
+    // Boot metrics (the liveness thread that answers the kubelet's /healthz)
+    // BEFORE the voice tunnel below: a cold cloudflared binary download or
+    // slow trycloudflare DNS can take minutes, far past the kubelet's
+    // liveness budget, and a pod whose /healthz isn't listening yet gets
+    // killed and restarted mid-mint — crash-looping the whole rollout. The
+    // liveness thread depends on nothing the tunnel or any other stage sets
+    // up, so running it first is free. Run only the "metrics" stage here and
+    // filter it out of the loop below so it isn't booted twice.
+    if (plan.includes("metrics")) {
+      await bootMetricsServer(shutdownHandles);
+    }
+
+    const voiceEnv = await resolveVoiceEnv(shutdownHandles);
+
     // Ingestion pulls self-drive through durable process wakes and the
     // transactional process outbox; there is no separate queue worker to boot.
     // Topic clustering self-drives (ADR-051): the process wake worker and
@@ -678,7 +699,7 @@ export async function startWorkers(
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful
     // closeables stop them (see presets.ts).
-    for (const stage of plan) {
+    for (const stage of remainingPlan) {
       switch (stage) {
         case "storage-stats":
           await bootStorageStatsCollection(shutdownHandles);
@@ -705,7 +726,8 @@ export async function startWorkers(
           await bootVoiceListener(shutdownHandles, voiceEnv);
           break;
         case "metrics":
-          await bootMetricsServer(shutdownHandles);
+          // Already booted above, before the voice tunnel — see the
+          // metrics-first comment near the top of this function.
           break;
       }
     }
