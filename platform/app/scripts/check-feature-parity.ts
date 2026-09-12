@@ -313,8 +313,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
-  "specs/ai-gateway/governance/siem-export.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
@@ -688,6 +686,12 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/ingestion-templates-catalog.feature",
   "specs/ai-gateway/governance/my-usage-dashboard.feature",
+  // Reason: #7960 tagged and bound the four scenarios the devices tab now
+  // answers, and retired its LEGACY_INERT entry. The eight untagged ones
+  // describe the org-wide max-session-duration policy and the admin sessions
+  // widget, neither of which is built, and the bulk revoke of every
+  // credential class at once, which is.
+  "specs/ai-gateway/governance/sessions-and-devices.feature",
   // Reason: #8041 tagged and bound two scenarios (opaque id placement on
   // export, and the drop of an opaque email beside a user id) and retired
   // its LEGACY_INERT entry. The eleven untagged scenarios describe the wider
@@ -703,6 +707,12 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-governance/cli-onboarding/login-unified.feature",
   "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
   "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
+  // Reason: #7960 tagged and bound the scenario for logout retiring the
+  // ingest keys its session minted, and retired the file's LEGACY_INERT
+  // entry. The twenty-one untagged ones describe the rest of what logout
+  // unwires locally, settings.json, the plugin, the codex blocks and the
+  // shell rc, which that change did not touch.
+  "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/personal-portal/admin-catalog-editor.feature",
   "specs/ai-governance/personal-portal/tool-catalog-rbac.feature",
@@ -1919,8 +1929,37 @@ interface ParityAnalysis {
   listErrors: string[];
 }
 
+/**
+ * `LEGACY_INERT` says a file yields NO enforced scenario. `LEGACY_UNBOUND` and
+ * `LEGACY_PARTIAL` both say it yields some. A file on the inert list and on
+ * either of the other two is therefore always a mistake, and it is one two
+ * branches can make without conflicting: one tags a scenario in the file and
+ * moves it to `LEGACY_PARTIAL`, the other leaves it untagged and adds it to
+ * `LEGACY_INERT`, and main gets both. The stale-entry check then fails on the
+ * copy that no longer describes the file, which is what this catches first.
+ *
+ * `LEGACY_UNBOUND` and `LEGACY_PARTIAL` are not exclusive of each other: a
+ * file can have enforced scenarios that are unbound and untagged ones beside
+ * them, and it needs both entries to be tolerated.
+ */
+function validateNoCrossListEntries(): string[] {
+  const inert = new Set(LEGACY_INERT);
+  return [
+    { name: "LEGACY_UNBOUND", entries: LEGACY_UNBOUND },
+    { name: "LEGACY_PARTIAL", entries: LEGACY_PARTIAL },
+  ].flatMap(({ name, entries }) =>
+    entries
+      .filter((entry) => inert.has(entry))
+      .map(
+        (entry) =>
+          `${entry} is listed in LEGACY_INERT and ${name} — the first says the file enforces nothing, the second says it enforces something, keep the one that matches the file and delete the other`,
+      ),
+  );
+}
+
 function validateAllExemptionLists(allFeatures: string[]): string[] {
   return [
+    ...validateNoCrossListEntries(),
     ...validateExemptionList({
       name: "LEGACY_UNBOUND",
       entries: LEGACY_UNBOUND,
