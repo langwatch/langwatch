@@ -1,7 +1,7 @@
 import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import "~/features/auth-front-door/authFrontDoor.css";
+import "~/features/auth/auth.css";
 import { FullLogo } from "../icons/FullLogo";
 
 /**
@@ -55,7 +55,7 @@ export function AuthCard({
       marginY={{ base: 6, md: "8vh" }}
     >
       <Card.Root
-        className="lw-front-door-card"
+        className="lw-auth-card"
         width="full"
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}

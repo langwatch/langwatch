@@ -33,6 +33,7 @@ export const IDENTITY_SECRET_HEAL_MIGRATION_NAME =
  * and the parity check.
  */
 export class IdentitySecretHealMigration implements SystemMigration {
+  readonly startupSettlement = "recurring" as const;
   readonly name = IDENTITY_SECRET_HEAL_MIGRATION_NAME;
   readonly title = "Sign-in credential repair";
   readonly description =

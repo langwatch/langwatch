@@ -7,12 +7,14 @@ import {
 /**
  * Sign-up's address confirmation (D13, ADR-117 §6).
  *
- * The front door verifies the address BEFORE any sign-in method is chosen, so
- * this is the first thing sign-up does and the only thing it does until the
- * emailed link comes back. Nothing is created for the address in between: the
- * only state a request leaves behind is a single-use token with an hour on it,
- * which is what makes an abandoned sign-up cost nothing and an expired one
- * recoverable by asking again.
+ * The address is confirmed BEFORE anybody gets in. The account is created by
+ * the credential step — it has to be, because a passkey cannot be enrolled
+ * against an account that does not exist yet — but no session is opened for
+ * it, and the link is what opens the first one. So an account whose address
+ * was never confirmed is an account nobody ever signed into.
+ *
+ * The state a request leaves behind is a single-use token with an hour on it,
+ * which is what makes an expired sign-up recoverable by asking again.
  *
  * A token may carry a PENDING CREDENTIAL: the password somebody typed into the
  * log-in form for an address nobody holds. That is the same journey arriving
@@ -36,10 +38,41 @@ export interface SignUpVerificationTokenStore {
   /**
    * Spends a token: returns the identifier it was issued for and makes it
    * unusable, or answers null for a token that never existed, was already
-   * spent, or has expired. One answer for all three on purpose — see
-   * `completeVerification`.
+   * spent, or has expired.
+   *
+   * `keepSpentUntil` says what "unusable" leaves behind. A date keeps the row
+   * as a spent MARKER until then, which is what lets `findSpent` recognise
+   * somebody opening their own link a second time; null removes it outright,
+   * for a token whose second use must look like nothing at all.
+   *
+   * Either way the token can never be spent twice — that is the whole point of
+   * the method, and the marker is not a claimable token.
    */
-  claim(input: { token: string; now: Date }): Promise<{
+  claim(input: {
+    token: string;
+    now: Date;
+    keepSpentUntil: Date | null;
+  }): Promise<{
+    identifier: string;
+  } | null>;
+  claimExpected(input: {
+    token: string;
+    identifier: string;
+    now: Date;
+  }): Promise<boolean>;
+  hasExpected(input: {
+    token: string;
+    identifier: string;
+    now: Date;
+  }): Promise<boolean>;
+  /**
+   * The identifier a token was spent for, while its marker is still live.
+   *
+   * Null once the grace window closes, and null for a token this store never
+   * issued — so the only thing this can tell anybody is what they themselves
+   * did with a link they held.
+   */
+  findSpent(input: { token: string; now: Date }): Promise<{
     identifier: string;
   } | null>;
 }
@@ -51,33 +84,29 @@ export interface SignUpVerificationMailer {
   }): Promise<void>;
 }
 
-/** Whether an address already has an account (epic Q12: sign-up may say so). */
-export interface SignUpAccountDirectory {
-  hasAccountFor(input: { email: string }): Promise<boolean>;
-}
+/**
+ * What an address already is to us. Three states rather than a boolean,
+ * because sign-up now treats the middle one differently from both ends: an
+ * account whose address is still unconfirmed is somebody mid-sign-up, and the
+ * one thing they may need is the link again.
+ */
+export type SignUpAddressState =
+  /** No account. A sign-up may proceed. */
+  | "unknown"
+  /** An account exists and its address has not been confirmed yet. */
+  | "awaiting_confirmation"
+  /** An account exists and its address is confirmed. The wrong door. */
+  | "confirmed";
 
-/** Creates the account a confirmed pending credential earned. */
-export interface SignUpAccountFactory {
-  createCredentialAccount(input: {
-    email: string;
-    passwordHash: string;
-  }): Promise<void>;
-  /**
-   * The link came back, so the address is proven.
-   *
-   * This is the whole job of a link now. Confirmation used to be implicit —
-   * the account did not exist until a link created it, so "has an account"
-   * and "proved the address" were one fact. Sign-up creates the account up
-   * front, so the two have come apart and the second has to be written down.
-   */
-  markAddressConfirmed(input: { email: string }): Promise<void>;
+/** What an address already is (epic Q12: sign-up may say so out loud). */
+export interface SignUpAccountDirectory {
+  stateFor(input: { email: string }): Promise<SignUpAddressState>;
 }
 
 export interface SignUpVerificationDeps {
   tokens: SignUpVerificationTokenStore;
   mailer: SignUpVerificationMailer;
   directory: SignUpAccountDirectory;
-  accounts: SignUpAccountFactory;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
   now?: () => Date;
@@ -93,6 +122,45 @@ const SIGN_UP_TOKEN_NAMESPACE = "identity-signup-verification:";
 
 /** One hour, matching the reset link's lifetime and the email's promise. */
 export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * The namespace for a PROOF that an address was confirmed while it had no
+ * account yet.
+ *
+ * A link minted from the log-in door (an address nobody holds, typed into a
+ * password field) confirms an address that has nothing behind it. The account
+ * is created a screen later, by `user.register`, and without this that account
+ * would be born unconfirmed and immediately mailed a second link — asking
+ * somebody to prove, twice, an address they just proved.
+ *
+ * The proof is a server-minted single-use token rather than a flag the browser
+ * sets, because "this address is already confirmed" is exactly the claim a
+ * caller must not be able to make about an address they do not hold.
+ */
+const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
+
+/**
+ * How long a spent confirmation link keeps telling the truth about itself.
+ *
+ * A link that has been opened once is still sitting in an inbox, and it will
+ * be opened again — a refresh, a restored tab, a second click, a phone after a
+ * laptop. Spending it used to REMOVE its row, which left the next opening
+ * indistinguishable from a token nobody ever issued, so the screen called a
+ * link that had just worked expired and offered to send another. People
+ * pressed that button until they gave up.
+ *
+ * So the row survives as a marker, and a second opening gets the same answer
+ * as the first: the address is confirmed. A day is the window because that is
+ * roughly how long a confirmation email stays near the top of an inbox; past
+ * it, "expired" is finally the honest word.
+ */
+export const SPENT_LINK_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Half an hour: long enough to choose a password on the very next screen,
+ * short enough that a proof left lying in a closed tab is worthless.
+ */
+export const CONFIRMED_ADDRESS_TTL_MS = 30 * 60 * 1000;
 
 /**
  * What a sign-up token stands for: an address, and — only on links minted
@@ -112,6 +180,26 @@ interface PendingSignUp {
   passwordHash: string | null;
 }
 
+type CompletedVerification = {
+  email: string;
+  accountCreated: boolean;
+  accountExists: boolean;
+  addressProof: string | null;
+  readonly freshClaim: boolean;
+};
+
+function completedVerification(
+  value: Omit<CompletedVerification, "freshClaim">,
+  freshClaim: boolean,
+): CompletedVerification {
+  const result: CompletedVerification = { ...value, freshClaim };
+  Object.defineProperty(result, "freshClaim", {
+    value: freshClaim,
+    enumerable: false,
+  });
+  return result;
+}
+
 export class SignUpVerificationService {
   private readonly deps: SignUpVerificationDeps;
 
@@ -120,14 +208,27 @@ export class SignUpVerificationService {
   }
 
   /**
-   * Whether the address already holds an account — the one question sign-up
-   * is allowed to answer out loud (epic Q12), because refusing to say it is
-   * what strands somebody on an account they half-created.
+   * What the address already is — the one question sign-up is allowed to
+   * answer out loud (epic Q12), because refusing to say it is what strands
+   * somebody on an account they half-created.
    */
-  async addressIsRegistered({ email }: { email: string }): Promise<boolean> {
-    return this.deps.directory.hasAccountFor({
+  async addressState({
+    email,
+  }: {
+    email: string;
+  }): Promise<SignUpAddressState> {
+    return this.deps.directory.stateFor({
       email: normalizeIdentifierValue(email),
     });
+  }
+
+  /**
+   * Whether the address already holds an account, confirmed or not. The
+   * question `completeVerification` asks, where the difference does not
+   * matter: a link confirms an account that exists either way.
+   */
+  async addressIsRegistered({ email }: { email: string }): Promise<boolean> {
+    return (await this.addressState({ email })) !== "unknown";
   }
 
   /**
@@ -153,15 +254,32 @@ export class SignUpVerificationService {
    * holding the link — the way on is to ask for a new one — and distinguishing
    * them would turn this into a probe for which links were ever issued.
    */
-  async completeVerification({ token }: { token: string }): Promise<{
-    email: string;
-    accountCreated: boolean;
-    accountExists: boolean;
-  }> {
-    const claimed = await this.deps.tokens.claim({ token, now: this.now() });
+  async completeVerification({
+    token,
+  }: {
+    token: string;
+  }): Promise<CompletedVerification> {
+    /**
+     * Only where the confirmed address has NO account yet: the single-use
+     * proof `user.register` spends to mark the account it is about to create
+     * as already confirmed, so nobody is asked to prove the same address
+     * twice. Null in every other case, where there is an account to mark and
+     * it has just been marked.
+     */
+    const now = this.now();
+    const claimed = await this.deps.tokens.claim({
+      token,
+      now,
+      keepSpentUntil: new Date(now.getTime() + SPENT_LINK_GRACE_MS),
+    });
     const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
 
     if (!pending) {
+      // Not necessarily a dead link: far more often it is this link, opened a
+      // second time by the person it was sent to. That deserves the answer it
+      // gave the first time rather than a refusal — see `reopenSpentLink`.
+      const reopened = await this.reopenSpentLink({ token });
+      if (reopened) return reopened;
       throw new IdentityVerificationExpiredError();
     }
 
@@ -169,34 +287,122 @@ export class SignUpVerificationService {
       email: pending.email,
     });
 
-    // The ordinary case now: sign-up made the account and this link is the
-    // address catching up with it. Confirming is the whole job.
+    // A verification link proves an address. It never adopts or confirms an
+    // account that was created before the proof arrived, because that account
+    // may already contain credentials chosen by somebody else.
     if (alreadyRegistered) {
-      await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-      return {
-        email: pending.email,
-        accountCreated: false,
-        accountExists: true,
-      };
+      throw new IdentityVerificationExpiredError();
     }
 
     // No account, and no credential to make one from: the link came from the
     // log-in door, where a password is asked for once and never kept. The
-    // screen takes it from here.
-    if (!pending.passwordHash) {
-      return {
+    // screen takes it from here — and carries the proof, so the account it
+    // creates is born confirmed instead of being mailed a second link for the
+    // address this one just proved.
+    // Old links may contain a password hash. It is untrusted enrollment state:
+    // holding the mailbox link proves the address, not that the holder chose
+    // the credential embedded in a token minted before this flow changed.
+    return completedVerification(
+      {
         email: pending.email,
         accountCreated: false,
         accountExists: false,
-      };
-    }
+        addressProof: await this.issueAddressProof({ email: pending.email }),
+      },
+      true,
+    );
+  }
 
-    await this.deps.accounts.createCredentialAccount({
-      email: pending.email,
-      passwordHash: pending.passwordHash,
+  /**
+   * Spends a proof minted by `completeVerification`, and answers whether it
+   * was genuinely one for this address.
+   *
+   * Both halves matter. Claiming makes it single-use, so a proof cannot mint
+   * a second confirmed account; comparing the address makes it non-
+   * transferable, so a proof for one address cannot confirm another. A proof
+   * that is missing, expired, spent or for somebody else all answer false, and
+   * the caller's job is then simply to send a link the ordinary way.
+   */
+  async claimAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    // Removed outright rather than marked, unlike a confirmation link. A link
+    // is opened by a person who may open it again; a proof is spent once by
+    // the screen that was handed it, and a second use is not somebody
+    // repeating themselves — so it leaves nothing behind to recognise.
+    return await this.deps.tokens.claimExpected({
+      token,
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
     });
-    await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-    return { email: pending.email, accountCreated: true, accountExists: true };
+  }
+
+  async validateAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    return await this.deps.tokens.hasExpected({
+      token,
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
+  }
+
+  /**
+   * The same link, opened again while its marker is still live.
+   *
+   * The answer is the answer the first opening gave, because the question has
+   * not changed: this address is confirmed. Nothing is created — the account
+   * already exists by now, or it does not and the screen still has a password
+   * to collect — and nothing is confirmed twice.
+   *
+   * It says nothing to anybody who did not hold a real link. A token this
+   * store never issued, and one whose grace has run out, both answer null and
+   * fall through to the refusal, so this cannot be asked which links exist.
+   */
+  private async reopenSpentLink({
+    token,
+  }: {
+    token: string;
+  }): Promise<CompletedVerification | null> {
+    const spent = await this.deps.tokens.findSpent({ token, now: this.now() });
+    const pending = spent ? readPendingSignUp(spent.identifier) : null;
+    if (!pending) return null;
+
+    const state = await this.deps.directory.stateFor({ email: pending.email });
+
+    // A spent link is status only. Reopening it cannot mint fresh enrollment
+    // authority or finish an account that appeared after the original proof.
+    return completedVerification(
+      {
+        email: pending.email,
+        accountCreated: false,
+        accountExists: state !== "unknown",
+        addressProof: null,
+      },
+      false,
+    );
+  }
+
+  private async issueAddressProof({
+    email,
+  }: {
+    email: string;
+  }): Promise<string> {
+    const token = this.mintToken();
+    await this.deps.tokens.issue({
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${email}`,
+      token,
+      expires: new Date(this.now().getTime() + CONFIRMED_ADDRESS_TTL_MS),
+    });
+    return token;
   }
 
   private async issueLink({

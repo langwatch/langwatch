@@ -67,7 +67,7 @@ import {
   probeOrganizationPermission,
   probeProjectPermission,
 } from "~/server/app-layer/permissions/imperative";
-import { getServerAuthSession } from "~/server/auth";
+import { getServerAuthSession, type Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
@@ -99,11 +99,11 @@ const cliActivityMonitorAuth = handlerManagedAuth({
   permissions: ["activityMonitor:view"],
   credential: "session",
 });
-// `/approve` mints a credential usable outside the UI, so it requires a
-// write-capable project permission — a view-only member cannot extract one.
+// `/approve` mints a credential usable outside the UI, so it requires project
+// administration — a member who can update the project cannot extract one.
 const cliApproveAuth = handlerManagedAuth({
   reason: CLI_REASON,
-  permissions: ["project:update"],
+  permissions: ["project:manage"],
   credential: "session",
 });
 
@@ -382,17 +382,17 @@ function getRedis() {
  * customer report, was a coding agent silently auto-selecting someone's
  * personal project), and because the key is the shared write credential
  * usable outside the UI's RBAC constraints, team membership alone is not
- * enough: the caller needs a write-capable project permission. A view-only
- * member cannot extract it.
+ * enough: the caller needs project administration. Ownership of a personal
+ * project does not replace that canonical permission.
  *
  * Returns the refusal response to send, or null when the handout is allowed.
  */
 async function refuseProjectKeyHandout(
   c: Context,
   project: { id: string; isPersonal: boolean; ownerUserId: string | null },
-  userId: string,
+  session: Session,
 ): Promise<Response | null> {
-  if (project.isPersonal && project.ownerUserId !== userId) {
+  if (project.isPersonal && project.ownerUserId !== session.user.id) {
     return c.json(
       {
         error: "personal_project_not_allowed",
@@ -402,24 +402,40 @@ async function refuseProjectKeyHandout(
       400,
     );
   }
-  const canWriteProject = await probeProjectPermission(
-    {
-      session: { user: { id: userId } },
-    } as Parameters<typeof probeProjectPermission>[0],
+  const canManageProject = await probeProjectPermission(
+    { session },
     project.id,
-    "project:update",
+    "project:manage",
   );
-  if (!canWriteProject) {
+  if (!canManageProject) {
     return c.json(
       {
         error: "forbidden",
         error_description:
-          "You need write access to this project to retrieve its API key.",
+          "You need admin access to this project to retrieve its API key.",
       },
       403,
     );
   }
   return null;
+}
+
+/**
+ * Adapt an identity proven by the browser or device-token boundary to the
+ * session-shaped input used by the canonical permission facade.
+ * Raw API-key principals never reach this adapter.
+ */
+function permissionSessionForAuthenticatedIdentity({
+  userId,
+  expiresAt,
+}: {
+  userId: string;
+  expiresAt: number;
+}): Session {
+  return {
+    user: { id: userId },
+    expires: new Date(expiresAt).toISOString(),
+  };
 }
 
 /**
@@ -823,6 +839,67 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           428,
         );
       }
+      const currentProject = await prisma.project.findFirst({
+        where: {
+          id: record.project_api_key.project_id,
+          archivedAt: null,
+          team: { organizationId: organization.id },
+        },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          isPersonal: true,
+          ownerUserId: true,
+        },
+      });
+      const permissionSession = permissionSessionForAuthenticatedIdentity({
+        userId: user.id,
+        expiresAt: record.expires_at,
+      });
+      const canManageProject = currentProject
+        ? await probeProjectPermission(
+            { session: permissionSession },
+            currentProject.id,
+            "project:manage",
+          )
+        : false;
+      const isAllowedPersonalProject =
+        !currentProject?.isPersonal || currentProject.ownerUserId === user.id;
+      if (!currentProject || !canManageProject || !isAllowedPersonalProject) {
+        await redis.del(deviceCodeKey(device_code));
+        await redis.del(userCodeKey(record.user_code));
+        await redis.del(pollRateKey(device_code));
+        return c.json(
+          {
+            error: "access_denied",
+            error_description:
+              "You no longer have admin access to the selected project",
+          },
+          410,
+        );
+      }
+
+      const currentProjectKey = await prisma.project.findFirst({
+        where: {
+          id: currentProject.id,
+          archivedAt: null,
+          team: { organizationId: organization.id },
+        },
+        select: { apiKey: true },
+      });
+      if (!currentProjectKey) {
+        await redis.del(deviceCodeKey(device_code));
+        await redis.del(userCodeKey(record.user_code));
+        await redis.del(pollRateKey(device_code));
+        return c.json(
+          {
+            error: "access_denied",
+            error_description: "The selected project is no longer available",
+          },
+          410,
+        );
+      }
       // Single-use device_code: delete after successful exchange. Per-key
       // dels — Redis cluster CROSSSLOT-rejects multi-key ops on differing
       // hash slots.
@@ -831,11 +908,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       return c.json(
         {
           kind: "api_key" as const,
-          api_key: record.project_api_key.api_key,
+          api_key: currentProjectKey.apiKey,
           project: {
-            id: record.project_api_key.project_id,
-            slug: record.project_api_key.project_slug,
-            name: record.project_api_key.project_name,
+            id: currentProject.id,
+            slug: currentProject.slug,
+            name: currentProject.name,
           },
           user: { id: user.id, email: user.email, name: user.name },
           organization: {
@@ -873,12 +950,24 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         displayName: user.name,
         displayEmail: user.email,
       });
-      personalProject = {
-        id: workspace.project.id,
-        slug: workspace.project.slug,
-        name: workspace.project.name,
-        api_key: workspace.project.apiKey,
-      };
+      const canManagePersonalProject = await probeProjectPermission(
+        {
+          session: permissionSessionForAuthenticatedIdentity({
+            userId: user.id,
+            expiresAt: record.expires_at,
+          }),
+        },
+        workspace.project.id,
+        "project:manage",
+      );
+      if (canManagePersonalProject) {
+        personalProject = {
+          id: workspace.project.id,
+          slug: workspace.project.slug,
+          name: workspace.project.name,
+          api_key: workspace.project.apiKey,
+        };
+      }
     } catch (err) {
       logger.error(
         { err, userId: user.id, organizationId: organization.id },
@@ -1479,13 +1568,25 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
       displayName: user?.name,
       displayEmail: user?.email,
     });
+    const canManagePersonalProject = await probeProjectPermission(
+      {
+        session: permissionSessionForAuthenticatedIdentity({
+          userId: tokenRecord.user_id,
+          expiresAt: tokenRecord.expires_at,
+        }),
+      },
+      workspace.project.id,
+      "project:manage",
+    );
     return c.json(
       {
         project: {
           id: workspace.project.id,
           slug: workspace.project.slug,
           name: workspace.project.name,
-          api_key: workspace.project.apiKey,
+          ...(canManagePersonalProject
+            ? { api_key: workspace.project.apiKey }
+            : {}),
         },
       },
       200,
@@ -1703,7 +1804,7 @@ async function issuePersonalVirtualKey({
 // Non-interactive project login: `langwatch login --project <slug>` in a
 // headless context (agent VM, CI without a key). The device session proves
 // the user; the same RBAC gate as the browser approve flow applies
-// (`project:update`, because Project.apiKey is the shared write credential),
+// (`project:manage`, because Project.apiKey grants full project access),
 // and nothing new is minted, the project's existing key is returned. The
 // caller's OWN personal project is allowed, exactly like the authorize page's
 // explicit personal pick; anyone else's personal project is refused.
@@ -1749,7 +1850,6 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
       id: true,
       slug: true,
       name: true,
-      apiKey: true,
       isPersonal: true,
       ownerUserId: true,
     },
@@ -1766,12 +1866,32 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
   const refusal = await refuseProjectKeyHandout(
     c,
     project,
-    tokenRecord.user_id,
+    permissionSessionForAuthenticatedIdentity({
+      userId: tokenRecord.user_id,
+      expiresAt: tokenRecord.expires_at,
+    }),
   );
   if (refusal) return refusal;
+  const projectWithKey = await prisma.project.findFirst({
+    where: {
+      id: project.id,
+      archivedAt: null,
+      team: { organizationId: tokenRecord.organization_id },
+    },
+    select: { apiKey: true },
+  });
+  if (!projectWithKey) {
+    return c.json(
+      {
+        error: "not_found",
+        error_description: "Project is no longer available",
+      },
+      404,
+    );
+  }
   return c.json(
     {
-      api_key: project.apiKey,
+      api_key: projectWithKey.apiKey,
       project: { id: project.id, slug: project.slug, name: project.name },
     },
     200,
@@ -2761,7 +2881,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     }
     // Resolve the picked project: it must live in the chosen org and not be
     // archived. Authorization is NOT decided by this lookup. The
-    // `probeProjectPermission(..., "project:update")` check below is the source
+    // `probeProjectPermission(..., "project:manage")` check below is the source
     // of truth, and it re-derives the org from the project id and inspects
     // project-, team- and org-scoped role bindings plus the org role. So an
     // org-level admin (or an org/team-scoped role-binding admin) who sees the
@@ -2782,7 +2902,6 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
         id: true,
         slug: true,
         name: true,
-        apiKey: true,
         isPersonal: true,
         ownerUserId: true,
       },
@@ -2801,8 +2920,26 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     // The browser picker lists personal as a clearly-labelled entry the user
     // must deliberately choose, so an explicit self-pick is honoured here;
     // everything else the shared handout rule refuses.
-    const refusal = await refuseProjectKeyHandout(c, project, session.user.id);
+    const refusal = await refuseProjectKeyHandout(c, project, session);
     if (refusal) return refusal;
+    const projectWithKey = await prisma.project.findFirst({
+      where: {
+        id: project.id,
+        archivedAt: null,
+        team: { organizationId: organization_id },
+      },
+      select: { apiKey: true },
+    });
+    if (!projectWithKey) {
+      return c.json(
+        {
+          error: "forbidden",
+          error_description:
+            "Project not found or unavailable in this organization",
+        },
+        403,
+      );
+    }
 
     await approveDeviceCode({
       deviceCode: record.device_code,
@@ -2812,7 +2949,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
         project_id: project.id,
         project_slug: project.slug,
         project_name: project.name,
-        api_key: project.apiKey,
+        api_key: projectWithKey.apiKey,
       },
     });
 

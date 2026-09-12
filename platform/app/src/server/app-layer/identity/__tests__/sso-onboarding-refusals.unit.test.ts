@@ -16,6 +16,7 @@ import {
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
+  SsoConnectionIssuerNotPublicError,
   SsoConnectionOperatorActRequiredError,
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
@@ -41,6 +42,7 @@ const REFUSALS = [
   new SsoConnectionOperatorActRequiredError("detail"),
   new SsoConnectionStringEditRetiredError("detail"),
   new SsoSamlNotSelfServeError("detail"),
+  new SsoConnectionIssuerNotPublicError("detail"),
 ];
 
 const shapeOf = (error: (typeof REFUSALS)[number]) => ({

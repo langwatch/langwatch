@@ -9,7 +9,10 @@
  *
  * Corresponds to specs/identity/identifier-model.feature.
  */
-import { IdentityVerificationInvalidError } from "@langwatch/identity";
+import {
+  IdentityDetachStrandsUserError,
+  IdentityVerificationInvalidError,
+} from "@langwatch/identity";
 import type { TRPCError } from "@trpc/server";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,8 +20,9 @@ import type * as IdentityRuntime from "~/server/app-layer/identity/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityRouter } from "../identity";
 
-const { mockComplete } = vi.hoisted(() => ({
+const { mockComplete, mockRemoveIdentifier } = vi.hoisted(() => ({
   mockComplete: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  mockRemoveIdentifier: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
 /**
@@ -54,16 +58,19 @@ vi.mock(
     }),
     identityEmail: () => ({ resolveEmail: async () => null }),
     identityService: () => ({}),
+    signInLinkEvidence: () => ({
+      refusalForLink: async () => null,
+    }),
     identityGuards: () => ({}),
     identityProjectionStore: () => ({}),
+    twoStepAccount: () => ({}),
     identityBridgeCeremonies: () => ({
       beforeAccountCreate: async () => undefined,
       beforeAccountDelete: async () => undefined,
     }),
     identityBackfill: () => ({}),
     identifierBackfillMigration: () => ({}),
-    identityBirth: () => ({}),
-    identityNewbornReconciliation: () => ({}),
+    identityAddressLockReaper: () => ({}),
     identitySecretCarry: () => ({}),
     identitySecretHealMigration: () => ({}),
     isLatched: async () => false,
@@ -89,10 +96,43 @@ vi.mock(
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
     resolveSignInMethodPolicy: async () => ({}),
+    priorSession: () => ({}),
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
+    decideLocalSignUp: async () => ({}),
+    localSignUpDecision: async () => ({}),
+    signUpIdentifier: () => ({}),
     signUpVerification: () => ({}),
     ssoConnections: () => ({}),
+    // Core identity additions. Stubbed rather than omitted because the annotation
+    // above is exhaustive on purpose: a new runtime export has to be looked
+    // at here, and this suite reaches none of them.
+    BACKUP_CODE_COUNT: 0,
+    accountIdentifiers: () => ({ removeIdentifier: mockRemoveIdentifier }),
+    mfaCeremonies: () => ({}),
+    mfaEnrollments: () => ({}),
+    organizationMfa: () => ({}),
+    sessionCallbackEvidence: () => ({}),
+    sessionClaims: () => ({}),
+    sessionInventory: () => ({}),
+    signUpHealth: () => ({}),
+    // ADR-129 slice 21a: better-auth's own composition-root reads, now
+    // exhaustive on this Record too. Nothing in this suite reaches either.
+    secondaryStorage: () => ({ configured: false, connection: () => null }),
+    betterAuthInstance: () => ({ provide: () => undefined }),
+    // ADR-129 slice 21b: the three satellite roots folded into the runtime.
+    identityLookup: () => ({}),
+    linkProposals: () => ({}),
+    twoStepVerification: () => ({}),
+    PASSWORD_HASH_ROUNDS: 10,
+    sessionRevocation: () => ({}),
+    signUpConfirmationEndpoint: () => ({}),
+    passwordResetSessionBridge: () => ({}),
+    passkeySignUp: () => ({}),
+    lastWayIn: () => ({}),
+    lastWayInGuard: () => ({}),
+    credentialAccounts: () => ({}),
+    sessionMinter: () => ({}),
   }),
 );
 
@@ -181,6 +221,31 @@ describe("identity.completeVerification", () => {
       await expect(caller.completeVerification(input)).rejects.toMatchObject({
         message: "identity_verification_invalid",
       });
+    });
+  });
+});
+
+describe("identity.removeIdentifier", () => {
+  beforeEach(() => {
+    mockRemoveIdentifier.mockReset();
+    mockRemoveIdentifier.mockRejectedValue(
+      new IdentityDetachStrandsUserError("the remaining way in is required"),
+    );
+  });
+
+  /** @scenario "The detach route refuses the last way in whatever the screen drew" */
+  it("asks the guard-backed service again and preserves its refusal", async () => {
+    const caller = callerFor({
+      user: { id: "user_sam", email: "sam@acme.com" },
+    });
+
+    await expect(
+      caller.removeIdentifier({ identifierId: "idf_last" }),
+    ).rejects.toMatchObject({ message: "identity_detach_strands_user" });
+
+    expect(mockRemoveIdentifier).toHaveBeenCalledWith({
+      userId: "user_sam",
+      identifierId: "idf_last",
     });
   });
 });

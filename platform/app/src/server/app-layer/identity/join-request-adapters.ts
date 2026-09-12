@@ -445,13 +445,15 @@ export class JoinRequestLifecycleDispatcher
   }): Promise<void> {
     // Read the requester BEFORE the command: the fold that follows it is the
     // only thing that changes here, and reading first keeps the "who do we
-    // tell" question independent of when the projection catches up.
-    const request = await this.prisma.joinRequest.findUnique({
+    // tell" question independent of when the projection catches up. The state
+    // read alongside it is the BEFORE half of the one transition this wake is
+    // allowed to announce.
+    const before = await this.prisma.joinRequest.findUnique({
       where: { id: joinRequestId },
       select: { userId: true, state: true },
     });
 
-    const facts = await joinRequests().expireJoin({
+    await joinRequests().expireJoin({
       tenantId: organizationId,
       organizationId,
       joinRequestId,
@@ -461,15 +463,52 @@ export class JoinRequestLifecycleDispatcher
       scheduledFor: occurredAtMs,
     });
 
-    // Only if something actually expired. A wake that fired early, or one for
-    // a request an admin answered in the meantime, states nothing — and
-    // telling somebody their request lapsed when it did not would be worse
-    // than telling them nothing.
-    if (facts.length === 0 || !request) return;
-    await this.notifier.requestExpired({
-      joinRequestId,
-      organizationId,
-      requesterUserId: request.userId,
+    // What gets announced is what was RECORDED, never what this thread
+    // decided (ADR-135).
+    //
+    // `expireJoin` used to be read for its return value, which is the facts
+    // the guard produced ON THIS THREAD. The same guard runs again on the
+    // queue, against state that may have moved in between, and the queue's run
+    // is the one whose events are stored. An administrator approving inside
+    // the expiry window is exactly that divergence: the calling path reads
+    // PENDING and states an expiry, the approval folds first, the queue's
+    // re-run reads APPROVED and states nothing. Gating the email on the
+    // returned facts sent that person a notice that their request had lapsed,
+    // moments after it was in fact granted — which this function's own comment
+    // already called worse than telling them nothing.
+    //
+    // So the projection is what is read, and only the PENDING -> EXPIRED
+    // transition is announced. Requiring the transition rather than merely the
+    // end state is what keeps a replayed wake silent about a request that
+    // expired an hour ago and was already announced then.
+    if (before?.state !== "PENDING") return;
+
+    const recorded = await this.prisma.joinRequest.findUnique({
+      where: { id: joinRequestId },
+      select: { state: true },
     });
+    if (recorded?.state === "EXPIRED") {
+      await this.notifier.requestExpired({
+        joinRequestId,
+        organizationId,
+        requesterUserId: before.userId,
+      });
+      return;
+    }
+
+    // Still PENDING here means the fold has not landed — the ledger's
+    // read-your-writes window was already spent inside `expireJoin`, so this
+    // is the projection genuinely lagging rather than a wake that fired early.
+    // Nothing is sent, because a notice we cannot substantiate is the failure
+    // this whole change exists to remove; but an expiry nobody is ever told
+    // about is its own quiet defect, so it is said out loud here rather than
+    // returning in silence. Any other state is the ordinary case of somebody
+    // having answered the request first, and is not worth a line.
+    if (recorded?.state === "PENDING") {
+      logger.warn(
+        { joinRequestId, organizationId },
+        "expiry wake could not confirm the request expired before telling the requester; the command is queued and the fold will converge, but this notice will not be sent",
+      );
+    }
   }
 }

@@ -8,7 +8,7 @@
 plan `../identity-platform/delivery-plan.md`, deliverable
 `D07-passkeys.md`. Specs: `specs/identity/passkeys.feature`.
 
-**Builds on:** ADR-117 (the front door, whose credential step now creates
+**Builds on:** ADR-117 (the auth screens, whose credential step now creates
 passkey-only accounts), ADR-101 (the identifier model, whose detach guards this
 complements).
 

@@ -1,6 +1,13 @@
 import type { SsoPlatformOperatorRepository } from "@langwatch/identity-server";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { isAdmin } from "../../../../ee/admin/isAdmin";
+
+/**
+ * The one fact the operator list needs about a person: the address on their
+ * `User` head. `PrismaIdentityUsersRepository` already answers it.
+ */
+export interface PlatformOperatorAddressPort {
+  findEmail(args: { userId: string }): Promise<string | null>;
+}
 
 /**
  * Who counts as a LangWatch platform operator, for the guards that refuse an
@@ -22,15 +29,11 @@ import { isAdmin } from "../../../../ee/admin/isAdmin";
 export class AdminEmailPlatformOperators
   implements SsoPlatformOperatorRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly users: PlatformOperatorAddressPort) {}
 
   async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: actorId },
-      select: { email: true },
-    });
-    if (!user) return false;
-    return isAdmin({ email: user.email });
+    const email = await this.users.findEmail({ userId: actorId });
+    return isAdmin({ email });
   }
 }
 

@@ -21,7 +21,11 @@ wireDefaultTestApp();
 describe("project.regenerateApiKey integration", () => {
   const testNamespace = `regen-api-key-${nanoid(8)}`;
   let projectId: string;
+  let siblingProjectId: string;
+  let foreignProjectId: string;
   let caller: ReturnType<typeof appRouter.createCaller>;
+  let memberCaller: ReturnType<typeof appRouter.createCaller>;
+  let projectAdminCaller: ReturnType<typeof appRouter.createCaller>;
   // A caller for a user who can view but NOT manage the project, used to prove
   // rotation is gated on `project:manage`.
   let viewerCaller: ReturnType<typeof appRouter.createCaller>;
@@ -54,6 +58,50 @@ describe("project.regenerateApiKey integration", () => {
       },
     });
     projectId = project.id;
+
+    const siblingTeam = await prisma.team.create({
+      data: {
+        name: "Sibling Team",
+        slug: `--test-team-${testNamespace}-sibling`,
+        organizationId: organization.id,
+      },
+    });
+    const siblingProject = await prisma.project.create({
+      data: {
+        name: "Sibling Project",
+        slug: `--test-project-${testNamespace}-sibling`,
+        apiKey: `sk-lw-test-${nanoid()}`,
+        teamId: siblingTeam.id,
+        language: "en",
+        framework: "test",
+      },
+    });
+    siblingProjectId = siblingProject.id;
+
+    const foreignOrganization = await prisma.organization.create({
+      data: {
+        name: "Foreign Organization",
+        slug: `--test-org-${testNamespace}-foreign`,
+      },
+    });
+    const foreignTeam = await prisma.team.create({
+      data: {
+        name: "Foreign Team",
+        slug: `--test-team-${testNamespace}-foreign`,
+        organizationId: foreignOrganization.id,
+      },
+    });
+    const foreignProject = await prisma.project.create({
+      data: {
+        name: "Foreign Project",
+        slug: `--test-project-${testNamespace}-foreign`,
+        apiKey: `sk-lw-foreign-${nanoid()}`,
+        teamId: foreignTeam.id,
+        language: "en",
+        framework: "test",
+      },
+    });
+    foreignProjectId = foreignProject.id;
 
     const user = await prisma.user.create({
       data: {
@@ -117,6 +165,54 @@ describe("project.regenerateApiKey integration", () => {
       },
     });
     viewerCaller = appRouter.createCaller(viewerCtx);
+
+    const member = await prisma.user.create({
+      data: {
+        name: "Member User",
+        email: `member-${testNamespace}@example.com`,
+      },
+    });
+    await prisma.organizationUser.create({
+      data: {
+        userId: member.id,
+        organizationId: organization.id,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    await prisma.teamUser.create({
+      data: { userId: member.id, teamId: team.id, role: TeamUserRole.MEMBER },
+    });
+    memberCaller = appRouter.createCaller(
+      createInnerTRPCContext({
+        session: { user: { id: member.id }, expires: "1" },
+      }),
+    );
+
+    const projectAdmin = await prisma.user.create({
+      data: {
+        name: "Project Admin User",
+        email: `project-admin-${testNamespace}@example.com`,
+      },
+    });
+    await prisma.organizationUser.create({
+      data: {
+        userId: projectAdmin.id,
+        organizationId: organization.id,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    await prisma.teamUser.create({
+      data: {
+        userId: projectAdmin.id,
+        teamId: team.id,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+    projectAdminCaller = appRouter.createCaller(
+      createInnerTRPCContext({
+        session: { user: { id: projectAdmin.id }, expires: "1" },
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -128,12 +224,14 @@ describe("project.regenerateApiKey integration", () => {
       .catch(() => {});
     await prisma.teamUser
       .deleteMany({
-        where: { team: { slug: `--test-team-${testNamespace}` } },
+        where: {
+          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
+        },
       })
       .catch(() => {});
     await prisma.team
       .deleteMany({
-        where: { slug: `--test-team-${testNamespace}` },
+        where: { slug: { startsWith: `--test-team-${testNamespace}` } },
       })
       .catch(() => {});
     await prisma.organizationUser
@@ -143,7 +241,7 @@ describe("project.regenerateApiKey integration", () => {
       .catch(() => {});
     await prisma.organization
       .deleteMany({
-        where: { slug: `--test-org-${testNamespace}` },
+        where: { slug: { startsWith: `--test-org-${testNamespace}` } },
       })
       .catch(() => {});
     await prisma.user
@@ -156,6 +254,59 @@ describe("project.regenerateApiKey integration", () => {
         where: { email: `viewer-${testNamespace}@example.com` },
       })
       .catch(() => {});
+    await prisma.user
+      .deleteMany({
+        where: {
+          email: {
+            in: [
+              `member-${testNamespace}@example.com`,
+              `project-admin-${testNamespace}@example.com`,
+            ],
+          },
+        },
+      })
+      .catch(() => {});
+  });
+
+  describe("given a project base key", () => {
+    /** @scenario A signed-in project admin reads the base key */
+    it("returns it to a signed-in project admin", async () => {
+      const stored = await prisma.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { apiKey: true },
+      });
+      await expect(
+        caller.project.getProjectAPIKey({ projectId }),
+      ).resolves.toEqual({ apiKey: stored.apiKey });
+    });
+
+    /** @scenario A project member cannot read the base key */
+    it("refuses a signed-in member who can update but not manage", async () => {
+      await expect(
+        memberCaller.project.getProjectAPIKey({ projectId }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    /** @scenario Permission is checked against the requested project */
+    it("grants an admin only the concrete project they administer", async () => {
+      await expect(
+        projectAdminCaller.project.getProjectAPIKey({ projectId }),
+      ).resolves.toMatchObject({ apiKey: expect.stringMatching(/^sk-lw-/) });
+      await expect(
+        projectAdminCaller.project.getProjectAPIKey({
+          projectId: siblingProjectId,
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    /** @scenario "A project in another organization is not disclosed" */
+    it("answers a foreign project like an absent one and never returns its key", async () => {
+      const attempt = caller.project.getProjectAPIKey({
+        projectId: foreignProjectId,
+      });
+
+      await expect(attempt).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
   });
 
   describe("given an existing project", () => {
@@ -210,6 +361,7 @@ describe("project.regenerateApiKey integration", () => {
 
   describe("given rotation invalidates the previous base key", () => {
     /** @scenario "Rotation invalidates the previous base key" */
+    /** @scenario "The base key keeps working until it is explicitly rotated" */
     it("makes the old base key stop authenticating and the new one authenticate scoped to the project", async () => {
       const before = await prisma.project.findUnique({
         where: { id: projectId },

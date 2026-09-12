@@ -26,13 +26,16 @@ describe("the identifier backfill migration", () => {
 
   describe("when the runner reads its declaration", () => {
     /** @scenario "Finalizing a user's backfill opens their write gate" */
-    it("registers under the name the write gate reads, dark and operator-free", () => {
+    it("registers under the name the write gate reads, operator-free, and runs itself when self-hosted", () => {
       const migration = new IdentityIdentifierBackfillMigration({
         migrateUser: vi.fn(),
       });
       expect(migration.name).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
       expect(migration.requiresOperatorConfirmation).toBe(false);
-      expect(migration.runsAutomaticallyOnSelfHosted).toBe(false);
+      // A self-hosted installation includes every organization in any
+      // migration it runs at all, so this is what gives a self-hosted user an
+      // identity history — and the front door now needs one to find them.
+      expect(migration.runsAutomaticallyOnSelfHosted).toBe(true);
       // Still paced by enrollment on cloud: the identity rollout has not
       // finished, so deploying it must keep changing nothing until an
       // operator enrolls an organization.

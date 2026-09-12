@@ -86,6 +86,7 @@ describe("the connection teardown grace", () => {
 
   describe("given a connection that already reached TORN_DOWN", () => {
     /** @scenario "Teardown completes only after its grace period" */
+    /** @scenario Tenant retention never enrolls durable security projections */
     it("disarms the wake so nothing fires afterwards", () => {
       const armed = onTeardownRequested(
         CONNECTION_TEARDOWN_INITIAL_STATE,

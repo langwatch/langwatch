@@ -14,6 +14,7 @@ import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/s
 import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { LocalDoorBreakGlassBinding } from "../../break-glass-binding";
 import { AdminEmailPlatformOperators } from "../../platform-operators";
+import { PrismaIdentityUsersRepository } from "../identity-users.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "../legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "../legacy-sso-organization.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "../sso-connection-projection.prisma.repository";
@@ -133,7 +134,9 @@ function grandfather() {
         // The real binding, over the same prisma the rest of this suite uses:
         // an integration test that stubbed the operator check would stop
         // proving the guard it is here to exercise.
-        platformOperators: new AdminEmailPlatformOperators(prisma),
+        platformOperators: new AdminEmailPlatformOperators(
+          new PrismaIdentityUsersRepository(prisma),
+        ),
       }),
       ledger,
     ),
@@ -261,7 +264,9 @@ describe("the sso connection grandfather migration against Postgres", () => {
             // The real binding, over the same prisma the rest of this suite uses:
             // an integration test that stubbed the operator check would stop
             // proving the guard it is here to exercise.
-            platformOperators: new AdminEmailPlatformOperators(prisma),
+            platformOperators: new AdminEmailPlatformOperators(
+              new PrismaIdentityUsersRepository(prisma),
+            ),
           }),
           ledger,
         ),

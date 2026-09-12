@@ -357,7 +357,7 @@ export function ApiKeysSection({
   // A fake row with a single PROJECT-scoped binding is synthesised so the same
   // filterProvidersByScope logic can decide.
   const showProjectKey: boolean = useMemo(() => {
-    if (!projectApiKey || !project?.id) return false;
+    if (!canManageProject || !projectApiKey || !project?.id) return false;
     // Synthesize a single-binding row so the project-service-key row reuses the
     // same inclusive cascade predicate (`filterProvidersByScope`) as the table.
     // Intent: keep the cascade rules in ONE place — not a hack to bypass typing.
@@ -371,7 +371,14 @@ export function ApiKeysSection({
         currentProjectId: project?.id,
       }).length > 0
     );
-  }, [projectApiKey, project?.id, scopeFilter, hierarchy, team?.id]);
+  }, [
+    canManageProject,
+    projectApiKey,
+    project?.id,
+    scopeFilter,
+    hierarchy,
+    team?.id,
+  ]);
 
   const getStatus = (key: ApiKeyRow) => {
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";

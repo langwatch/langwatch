@@ -1,6 +1,5 @@
 import {
   emptyIdentityHeads,
-  IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
   IdentityEmailInUseError,
   IdentityVerificationInvalidError,
   type VerifyIdentifierCommandData,
@@ -46,19 +45,52 @@ export class InMemoryVerificationStore implements IdentityVerificationRepository
   }
 }
 
+/**
+ * The heads double models a PROJECTION, not a constant.
+ *
+ * Completion now reads the identifier back after dispatching the write and
+ * answers from its recorded state (ADR-135), so a double that returns one
+ * fixed state cannot exercise the thing under test: every outcome — verified,
+ * dead-ended by a uniqueness race, or not yet folded — is a different state
+ * found by the SAME read. `fold` is therefore what the write does to the
+ * projection, and it is the knob each test turns.
+ */
 function harness(options?: {
   identifierState?: "ATTACHED" | "VERIFIED";
   identifierProvider?: "email" | "google";
   now?: () => number;
   latched?: boolean;
-  /** The guard's emission: a dead end is how a uniqueness race resolves on a
-   *  side that reached the command before the lock could refuse it. */
-  emits?: () => unknown[];
+  /**
+   * What the dispatched write lands in the projection by the time the
+   * read-your-writes wait inside it returns.
+   *
+   * `"VERIFIED"` is the golden path. `"DEAD_END"` is how a uniqueness race
+   * resolves on the side that reached the command before the lock could refuse
+   * it. `"unfolded"` leaves the state alone, which is the queue having accepted
+   * the command without the fold having landed — the case that must claim
+   * neither outcome.
+   */
+  fold?: "VERIFIED" | "DEAD_END" | "unfolded";
 }) {
   const store = new InMemoryVerificationStore();
+  // The one row the ceremony reads, as it stands right now.
+  const projection = {
+    state: options?.identifierState ?? ("ATTACHED" as const),
+  } as { state: "ATTACHED" | "VERIFIED" | "DEAD_END" };
+  /**
+   * The fold landing. Defaults to whatever this harness was built for; pass a
+   * state to land a different one, which is how the not-yet-folded test shows
+   * the same link completing once the projection finally catches up.
+   */
+  const landFold = (as?: "VERIFIED" | "DEAD_END") => {
+    const fold = as ?? options?.fold ?? "VERIFIED";
+    if (fold !== "unfolded") projection.state = fold;
+  };
   const verifyIdentifier = vi.fn(
-    async (_data: VerifyIdentifierCommandData): Promise<unknown[]> =>
-      options?.emits?.() ?? [],
+    async (_data: VerifyIdentifierCommandData): Promise<unknown[]> => {
+      landFold();
+      return [];
+    },
   );
   const service = new VerificationCeremonyService(
     store,
@@ -68,12 +100,13 @@ function harness(options?: {
           ? fact({
               identifierId,
               provider: options?.identifierProvider ?? "email",
-              state: options?.identifierState ?? "ATTACHED",
+              state: projection.state,
             })
           : null,
       // The ceremony reads exactly one head; the rest of the port is
       // present so the double is the contract, not a slice of it.
       findUserHashKey: async () => null,
+      hasFolded: async () => true,
       findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
       findActiveIdentifierByValue: async () => null,
       findIdentifierIdForAccount: async () => null,
@@ -84,12 +117,13 @@ function harness(options?: {
       ...(options?.now ? { now: options.now } : {}),
     },
   );
-  return { store, service, verifyIdentifier };
+  return { store, service, verifyIdentifier, projection, landFold };
 }
 
 describe("the email verification ceremony", () => {
   describe("when completion presents the token and the matching PKCE verifier", () => {
     /** @scenario "Email verification completes only with the ceremony's proof" */
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("verifies via a verify_identifier command carrying the verificationId", async () => {
       const { service, verifyIdentifier } = harness();
       const codeVerifier = "the-initiating-context-secret";
@@ -116,6 +150,7 @@ describe("the email verification ceremony", () => {
       });
     });
 
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("refuses the emailed token alone when the verifier does not match", async () => {
       const { service, verifyIdentifier } = harness();
       const minted = await service.mintEmailVerification({
@@ -149,7 +184,7 @@ describe("the email verification ceremony", () => {
      */
     /** @scenario "A guard refusal reaches the customer as named copy" */
     it("keeps the handled code and leaves the verification proof unconsumed", async () => {
-      const { store, service, verifyIdentifier } = harness();
+      const { store, service, verifyIdentifier, landFold } = harness();
       verifyIdentifier.mockRejectedValue(
         new IdentityEmailInUseError(
           "verify_identifier: a user outside the identity population already holds this address",
@@ -178,29 +213,26 @@ describe("the email verification ceremony", () => {
       );
 
       // The proof outlived the refusal, so the very same link completes once
-      // the collision is gone.
-      verifyIdentifier.mockResolvedValue([]);
+      // the collision is gone. The write has to LAND for that — completion
+      // answers from the recorded state now, so a stub that resolves without
+      // moving the projection would be a write nobody made.
+      verifyIdentifier.mockImplementation(async () => {
+        landFold();
+        return [];
+      });
       await expect(complete()).resolves.toBeUndefined();
       expect(store.records.has(WORK)).toBe(false);
     });
   });
 
-  describe("when the emission dead-ends on a uniqueness race", () => {
+  describe("when the write dead-ends on a uniqueness race", () => {
     /** @scenario "A verification that loses a uniqueness race reports the collision" */
     it("reports the collision instead of a completed verification, and keeps the proof", async () => {
-      const { service, store } = harness({
-        emits: () => [
-          {
-            type: IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
-            data: {
-              identifierId: WORK,
-              reason: "uniqueness_race_lost",
-              actor: { type: "user", id: USER },
-            },
-            occurredAt: 1,
-          },
-        ],
-      });
+      // The projection is what is read, so the race is expressed as the state
+      // the fold actually landed — not as an event the calling thread decided.
+      // `uniqueness_race_lost` is the only reason anything is dead-ended, which
+      // is what makes DEAD_END conclusive on its own.
+      const { service, store } = harness({ fold: "DEAD_END" });
       const codeVerifier = "the-initiating-context-secret";
       const minted = await service.mintEmailVerification({
         userId: USER,
@@ -221,6 +253,57 @@ describe("the email verification ceremony", () => {
       // The identifier dead-ended, so the token can verify nothing — and a
       // ceremony that rejected the proof must not have charged for it.
       expect(store.records.get(WORK)).toBeDefined();
+    });
+  });
+
+  describe("when the write is accepted but its fold has not landed", () => {
+    /**
+     * The third answer, and the reason completion reads the projection at all
+     * (ADR-135). Before this the ceremony reported from the facts the guard
+     * produced on the calling thread, which has only two answers and is
+     * therefore always willing to give one. Reading what was RECORDED admits a
+     * state where neither outcome is known yet, and the only honest move there
+     * is to claim neither: saying "verified" hands somebody an address that
+     * may still go to a stranger, and saying "in use" accuses a stranger who
+     * does not exist.
+     */
+    /** @scenario "A verification whose outcome is not yet recorded claims neither" */
+    it("claims neither outcome, keeps the proof, and lets the same link finish later", async () => {
+      const { service, store, landFold } = harness({ fold: "unfolded" });
+      const codeVerifier = "the-initiating-context-secret";
+      const minted = await service.mintEmailVerification({
+        userId: USER,
+        identifierId: WORK,
+        codeChallenge: s256Challenge(codeVerifier),
+      });
+      const complete = () =>
+        service.completeEmailVerification({
+          userId: USER,
+          identifierId: WORK,
+          verificationId: minted.verificationId,
+          token: minted.token,
+          codeVerifier,
+        });
+
+      await expect(complete()).rejects.toMatchObject({
+        code: "identity_verification_not_settled",
+      });
+      // Neither of the other two answers was given: not a completion, and not
+      // the collision that would have named somebody else.
+      await expect(complete()).rejects.not.toMatchObject({
+        code: "identity_email_in_use",
+      });
+
+      // The proof is intact, which is what makes "open the same link again"
+      // real remediation rather than copy.
+      expect(store.records.get(WORK)?.verificationId).toBe(
+        minted.verificationId,
+      );
+
+      // And it is: once the fold lands, the very same link completes.
+      landFold("VERIFIED");
+      await expect(complete()).resolves.toBeUndefined();
+      expect(store.records.has(WORK)).toBe(false);
     });
   });
 

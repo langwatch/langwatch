@@ -1,7 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../data-retention/retentionPolicy.schema";
+import { classifyEventLogRowRetention } from "../../data-retention/event-log-retention-policy";
+import {
+  INDEFINITE_RETENTION_DAYS,
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+} from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { Event } from "../domain/types";
 import { AbstractEventStore } from "./abstractEventStore";
@@ -83,21 +87,42 @@ export class EventStoreClickHouse<
     // no-op: removed verbose per-store logging
   }
 
-  // event_log carries the trace category retention. Resolved once per batch
-  // from the tenant policy and stamped on every record. Retention is
-  // default-on: a tenant with no override resolves to the platform default, so
-  // we always stamp a concrete value rather than leaving the column to its
-  // migration default. When no resolver is wired (e.g. tests) we leave the
-  // field off and the repo's fallback stamps the platform default.
+  // Security control-plane history never expires; ClickHouse uses zero as its
+  // indefinite-retention sentinel. Other rows follow their workload category,
+  // resolving tenant policy once per batch or using the platform default.
   protected override async enrichRecordsForStorage(
     records: EventRecord[],
     context: EventStoreReadContext<EventType>,
   ): Promise<EventRecord[]> {
-    if (!this.retentionPolicyResolver || records.length === 0) return records;
+    if (records.length === 0) return records;
+
+    const classifiedRecords = records.map((record) => ({
+      record,
+      retentionClass: classifyEventLogRowRetention(record),
+    }));
+    const hasFiniteEvents = classifiedRecords.some(
+      ({ retentionClass }) => retentionClass !== "indefinite",
+    );
+
+    if (!this.retentionPolicyResolver || !hasFiniteEvents) {
+      return classifiedRecords.map(({ record, retentionClass }) =>
+        retentionClass === "indefinite"
+          ? { ...record, _retention_days: INDEFINITE_RETENTION_DAYS }
+          : record,
+      );
+    }
+
     const policy = await this.retentionPolicyResolver.resolve(
       String(context.tenantId),
     );
-    const retentionDays = policy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    return records.map((r) => ({ ...r, _retention_days: retentionDays }));
+    return classifiedRecords.map(({ record, retentionClass }) =>
+      retentionClass === "indefinite"
+        ? { ...record, _retention_days: INDEFINITE_RETENTION_DAYS }
+        : {
+            ...record,
+            _retention_days:
+              policy?.[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+          },
+    );
   }
 }

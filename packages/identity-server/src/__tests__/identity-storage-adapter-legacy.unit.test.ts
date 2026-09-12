@@ -194,4 +194,158 @@ describe("better-auth over the identity storage adapter", () => {
       expect(sorted).toHaveLength(1);
     });
   });
+
+  /**
+   * The legacy engine here follows the current Prisma account shape, including
+   * the issuer column added for better-auth 1.7's account key. These tests pin
+   * both halves: synthetic issuers may be translated when they merely repeat
+   * the provider, while real connection issuers are persisted and matched.
+   */
+  describe("given the legacy engine is bound to the Prisma account schema", () => {
+    let identity: IdentityStack;
+
+    beforeEach(() => {
+      identity = identityStack({ inert: true, schemaBoundLegacy: true });
+    });
+
+    /** @scenario "Legacy account writes persist synthetic and real issuers" */
+    it("persists the issuer chosen for provider and connection accounts", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "github",
+        issuer: "local:oauth:github",
+        accountId: "sub-github-1",
+      });
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "connection-acme",
+        issuer: "https://login.acme.example",
+        accountId: "subject-olga",
+      });
+
+      expect(identity.db.account).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            providerId: "github",
+            accountId: "sub-github-1",
+            issuer: "local:oauth:github",
+          }),
+          expect.objectContaining({
+            providerId: "connection-acme",
+            accountId: "subject-olga",
+            issuer: "https://login.acme.example",
+          }),
+        ]),
+      );
+    });
+
+    /** @scenario "A connection is found by its own issuer, not refused for it" */
+    it("finds a connection account by the real issuer it was linked under", async () => {
+      // The case nothing covered, and the reason it mattered: the OAuth
+      // callback looks an account up by `(issuer, accountId)`, and a
+      // connection's issuer is its own URL rather than a synthetic one. When
+      // the read answered "no rows" for an issuer it could not decode, every
+      // returning connection sign-in failed to find its own row and
+      // better-auth tried to create it again into the account uniqueness
+      // constraint.
+      const cookie = await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "connection-acme",
+        issuer: "https://login.acme.example",
+        accountId: "subject-olga",
+      });
+
+      const found = await context.adapter.findOne<{
+        userId: string;
+        issuer: string;
+      }>({
+        model: "account",
+        where: [
+          { field: "issuer", value: "https://login.acme.example" },
+          { field: "accountId", value: "subject-olga" },
+        ],
+      });
+      expect(found).toMatchObject({
+        userId,
+        issuer: "https://login.acme.example",
+      });
+
+      // And the row kept the issuer it was linked under, rather than being
+      // handed back a synthetic one 1.7's own comparison would reject.
+      const listed = await identity.auth.api.listUserAccounts({
+        headers: new Headers({ cookie }),
+      });
+      expect(listed.map((row) => row.providerId).sort()).toEqual([
+        "connection-acme",
+        "credential",
+      ]);
+    });
+
+    /** @scenario "An issuer-keyed account read on the legacy branch drops the synthetic issuer" */
+    it("serves the issuer-keyed credential read /two-factor/enable sends", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      // The exact shape 1.7's enableTwoFactor issues: the user, the
+      // provider, the synthetic issuer and the subject, all at once.
+      const row = await context.adapter.findOne({
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "providerId", value: "credential" },
+          { field: "issuer", value: "local:credential" },
+          { field: "accountId", value: userId },
+        ],
+      });
+
+      expect(row).not.toBeNull();
+    });
+
+    /** @scenario "A provider is never matched under another issuer" */
+    it("answers no rows for an issuer that contradicts the provider beside it", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      const contradicted = await context.adapter.findOne({
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "providerId", value: "credential" },
+          { field: "issuer", value: "https://accounts.google.com" },
+        ],
+      });
+      expect(contradicted).toBeNull();
+
+      // A real issuer standing alone IS answerable now — it matches the
+      // column — and the answer here is still empty, because the only row
+      // seeded carries the synthetic credential issuer. That is narrowing,
+      // not widening: nothing resolves one identity provider's subject onto
+      // another's.
+      const unanswerable = await context.adapter.findMany({
+        model: "account",
+        where: [{ field: "issuer", value: "https://accounts.google.com" }],
+      });
+      expect(unanswerable).toEqual([]);
+
+      // While the synthetic form alone is decodable, and answers.
+      const decoded = await context.adapter.findMany({
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "issuer", value: "local:credential" },
+        ],
+      });
+      expect(decoded).toHaveLength(1);
+    });
+  });
 });

@@ -53,9 +53,9 @@ Feature: Running system migrations across organizations
   # ═══ Converging ═══════════════════════════════════════════════════════
   # One pass is never enough on its own: a pass cannot observe its own
   # events, so an organization it adopts reads as held and only a LATER pass
-  # finalizes it. Starting the app therefore drives passes rather than one
-  # pass — nobody should have to restart the app, or click "run a pass",
-  # until the counts settle.
+  # finalizes it. Startup therefore runs a blocking preflight of passes rather
+  # than one background pass — nobody should receive traffic, have to restart
+  # the app, or click "run a pass" before the counts settle.
   #
   # It stops on NO PROGRESS, never on "everything is terminal": a held
   # organization is re-proved on every pass and may legitimately never reach
@@ -66,20 +66,46 @@ Feature: Running system migrations across organizations
     When the app starts
     Then passes run one after another while each one advances an organization
     And the first pass that advances nothing ends the run
+    And runtime processes start only after that run completes
 
   @unit
-  Scenario: A held tenant that never advances does not loop forever
-    Given an organization held with a disagreement nothing resolves
+  Scenario: Preflight projection work cannot consume application traffic
+    Given the preflight emits events while an existing worker is still running
+    When those events and application events are queued concurrently
+    Then the preflight uses the canonical queue and its aggregate locks
+    And it dispatches only groups registered by that preflight
+    And pending, delayed, blocked, or failed work in those groups prevents startup
+    And worker-scoped durable subscribers run for the preflight events
+    And schedulers, process-manager consumers, and general workers do not start
+
+  @unit
+  Scenario: A recurring reconciliation does not loop forever
+    Given a migration declares its held outcome to be recurring reconciliation
     When the app starts
     Then it is re-proved once and the run ends
     And being re-proved into the same state does not count as progress
 
   @unit
-  Scenario: Shutting down stops the loop between passes
+  Scenario: A finite held migration prevents startup
+    Given a finite migration remains held after its pass, with nothing advancing
+    When the app starts
+    Then the preflight fails
+    And runtime processes do not start
+
+  @unit
+  Scenario: One tenant's parked migration does not stop the fleet starting
+    Given one tenant's migration parks on an error
+    When the app starts
+    Then the preflight still completes and runtime processes start
+    And that tenant stays on its legacy path, served as it was before
+    And the park is reported as an error against its tenant and migration
+
+  @unit
+  Scenario: Cancelling startup stops the loop between passes
     Given a run waiting between two passes
-    When the app shuts down
+    When startup is cancelled
     Then no further pass starts
-    And the shutdown does not wait out the interval
+    And runtime processes do not start
 
   # `lease.acquire` fails safe to false on contention AND on any Redis error,
   # and a tenant that cannot be claimed does no work — so a pass shut out of
@@ -88,24 +114,38 @@ Feature: Running system migrations across organizations
   # pod actually holding the claims is then evicted, nothing drives the rest.
   @unit
   Scenario: A pass shut out by another process is not convergence
-    Given every organization claimed by another process
+    Given any organization is claimed by another process
     When the pass advances nothing
     Then the run continues rather than stopping
     But an installation with no organizations at all is converged
 
   @unit
-  Scenario: A loop that never converges stops at its cap and says so
+  Scenario: A loop that never converges prevents startup
     Given passes that report progress every time
     When the maximum number of passes is reached
-    Then the run stops
+    Then the preflight fails
     And it says how many passes it gave up after
+    And runtime processes do not start
 
   @unit
-  Scenario: A failed pass ends the loop rather than retrying it
+  Scenario: A failed pass prevents startup
     Given a pass that fails outright
     When the run reaches it
-    Then the run stops rather than retrying immediately
-    And the failure is recorded for the next start to retry
+    Then the preflight fails rather than retrying immediately
+    And runtime processes do not start
+    And the next start retries the pass
+
+  # PR1 keeps the staff-configured Auth0 route as the compatibility path. Its
+  # stored domain is not proof that the customer controls that domain, so D04
+  # stays outside the shared registry until PR2 can register the proof-aware
+  # migration. The registry is shared by prestart, ordinary, targeted and
+  # enrollment paths, which keeps the unproved migration out of all four.
+  @unit
+  Scenario: PR1 does not run the unproved SSO grandfather migration
+    Given an organization has a staff-configured legacy SSO domain
+    When any system migration entry point reads the PR1 registry
+    Then the D04 connection grandfather migration is not declared or run
+    And the legacy SSO route remains unchanged
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has

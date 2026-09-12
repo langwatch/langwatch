@@ -1,8 +1,12 @@
 import type { IdentityUsersRepository } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type {
+  LegacySignInAccount,
+  LegacySignInAccountDirectory,
+} from "../signin-account-lookup";
 
 /**
- * The two `User` columns identity touches.
+ * The `User` columns identity touches.
  *
  * The `userHashKey` write is guarded (ADR-101 §4): only a user without a key
  * takes one, so a key minted concurrently — by the ceremony at user
@@ -13,7 +17,9 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * Identifier/Account exemption, so these queries carry no `projectId` — the
  * model has none, and a user is not scoped to a project.
  */
-export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
+export class PrismaIdentityUsersRepository
+  implements IdentityUsersRepository, LegacySignInAccountDirectory
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async storeUserHashKeyIfMissing({
@@ -60,5 +66,127 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
       select: { id: true },
     });
     return user?.id ?? null;
+  }
+
+  /**
+   * The legacy method answer for an unlatched sign-in. Password presence is
+   * evaluated inside Prisma, so no credential hash crosses this boundary.
+   * Provider ids cross verbatim so the router can retain each configured
+   * Auth0/Okta method the user actually holds, including alongside a passkey.
+   */
+  async findLegacySignInAccount({
+    normalizedValue,
+  }: {
+    normalizedValue: string;
+  }): Promise<LegacySignInAccount | null> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedValue, mode: "insensitive" },
+      },
+      select: {
+        id: true,
+        accounts: {
+          where: {
+            OR: [
+              { provider: { not: "credential" } },
+              { provider: "credential", password: { not: "" } },
+            ],
+          },
+          select: { provider: true },
+        },
+        accountCredentials: {
+          where: {
+            OR: [
+              { provider: { not: "credential" } },
+              { provider: "credential", password: { not: "" } },
+            ],
+          },
+          select: { provider: true },
+        },
+        passkeys: { select: { id: true }, take: 1 },
+      },
+    });
+    if (!user) {
+      return null;
+    }
+    const providers = [
+      ...user.accounts.map((account) => account.provider),
+      ...user.accountCredentials.map((account) => account.provider),
+    ];
+
+    return {
+      userId: user.id,
+      methods: {
+        hasPassword: providers.includes("credential"),
+        hasPasskey: user.passkeys.length > 0,
+        providerIds: [
+          ...new Set(providers.filter((provider) => provider !== "credential")),
+        ],
+        connectionIds: [],
+      },
+    };
+  }
+
+  /**
+   * Who holds an address, and everything they could sign into it with.
+   *
+   * The wider read behind the passkey sign-up guard, which has to tell an
+   * account apart from the residue of a ceremony that never finished. Both
+   * credential tables are selected, because a user whose backfill has
+   * finalized keeps theirs in `AccountCredential` rather than `Account`; one
+   * passkey and one membership are enough, because the question is only
+   * whether any exists.
+   *
+   * Case-insensitive for the same reason `findUserIdByEmail` is: rows written
+   * before addresses were stored lowercased may carry capitals, and a
+   * case-twin beside one is two Users answering for one person.
+   */
+  async findAddressHolder({ email }: { email: string }): Promise<{
+    id: string;
+    accounts: { provider: string; password: string | null }[];
+    accountCredentials: { provider: string; password: string | null }[];
+    passkeys: { id: string }[];
+    orgMemberships: { organizationId: string }[];
+  } | null> {
+    return await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: {
+        id: true,
+        accounts: { select: { provider: true, password: true } },
+        accountCredentials: { select: { provider: true, password: true } },
+        passkeys: { select: { id: true }, take: 1 },
+        orgMemberships: { select: { organizationId: true }, take: 1 },
+      },
+    });
+  }
+
+  async clearSignUpConfirmationPending({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { signupConfirmationPending: false },
+    });
+  }
+
+  /**
+   * Marks the address confirmed on whoever holds it.
+   *
+   * Case-insensitive for the same reason `findUserIdByEmail` is: rows written
+   * before sign-up lowercased addresses may carry capitals, and an exact
+   * match would quietly confirm nothing.
+   *
+   * `updateMany` rather than `update` because the predicate is not the unique
+   * key: a case-twin pair is exactly what the insensitive match exists to
+   * catch, and confirming both is the honest answer where a `update` would
+   * throw on the second.
+   */
+  async updateAddressConfirmed({ email }: { email: string }): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: { email: { equals: email, mode: "insensitive" } },
+      data: { emailVerified: true, signupConfirmationPending: false },
+    });
   }
 }

@@ -20,6 +20,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 
 import { auditLog } from "@ee/audit-log/auditLog";
 
+import { _resetMemoryRateLimitStore } from "../../rateLimit";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const mockAuditLog = vi.mocked(auditLog);
@@ -73,6 +74,10 @@ function recordedArgs(): unknown {
 describe("audit middlewares", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The refusal budget is per caller and lives in process memory without
+    // Redis, so one case's spending would otherwise be the next one's
+    // starting point - and every case here signs in as the same person.
+    _resetMemoryRateLimitStore();
   });
 
   describe("given a run started with parameter values", () => {
@@ -107,6 +112,23 @@ describe("audit middlewares", () => {
           "tok-live-1",
         );
       });
+    });
+  });
+
+  describe("given one caller provoking the same refusal over and over", () => {
+    /** @scenario "One caller cannot fill the audit trail with refusals" */
+    it("keeps a bounded number of their refusals and refuses every one the same", async () => {
+      const attempts = 260;
+      for (let i = 0; i < attempts; i++) {
+        await expect(
+          caller().scenarios.run({ projectId: "proj-1" }),
+        ).rejects.toThrow();
+      }
+
+      // Every call was refused; only a bounded number reached the trail, so a
+      // session is not a licence to grow the table.
+      expect(mockAuditLog.mock.calls.length).toBeGreaterThan(0);
+      expect(mockAuditLog.mock.calls.length).toBeLessThan(attempts);
     });
   });
 });

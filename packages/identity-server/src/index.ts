@@ -37,11 +37,10 @@
 export {
   computeIdentifierHash,
   deriveIdentifierId,
-  deriveNewbornUserId,
 } from "./crypto/identifier-identity";
 export { s256Challenge } from "./crypto/pkce";
 export { mintUserHashKey } from "./crypto/user-hash-key";
-export { IdentityGuards } from "./guards";
+export { detachStrandsUser, IdentityGuards } from "./guards";
 export {
   type BackfillAccountRow,
   type BackfillUserRow,
@@ -84,9 +83,27 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export { LinkProposalGuards } from "./link-proposal-guards";
+export type {
+  LinkProposalDecision,
+  LinkProposalReadsRepository,
+  LinkProposalRecord,
+} from "./link-proposal.repository";
+export {
+  type LinkProposalDirectoryPort,
+  LinkProposalService,
+  type LinkProposalServiceDeps,
+} from "./link-proposal.service";
 export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
 export { MfaGuards } from "./mfa-guards";
 export {
+  mfaCeremonyCommandId,
+  newMfaEnrollmentId,
+} from "./mfa-id";
+export type { MfaLedger } from "./mfa-ledger";
+export { MfaService } from "./mfa.service";
+export {
+  type SignInAccountLookupPort,
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
   type SignInMethodPolicyPort,
@@ -111,6 +128,7 @@ export {
   type CallbackAuditRecord,
   type CallbackLinkOutcome,
   type CallbackUserMatch,
+  linkRefusalFor,
   type SignInCallbackAudit,
   type SignInCallbackDirectoryPort,
   SignInCallbackLinkingService,

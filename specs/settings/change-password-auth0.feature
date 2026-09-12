@@ -1,37 +1,39 @@
-Feature: Change password from /settings/authentication
+Feature: Change password from /settings/security
   As a LangWatch user (whether the tenant uses Auth0 or BetterAuth credentials)
   I want a single, clear way to change my password without leaving the settings page
   So that the action is intentional, the page stays uncluttered, and toast feedback confirms success
 
-  # The Change Password entry point lives where it makes sense for each mode:
-  #   * Auth0 mode:  next to the database (Email/Password) identity in the
-  #                  Linked Sign-in Methods list. Hidden for social-only users.
-  #   * Email mode:  a dedicated "Change Password" section (since email-mode
-  #                  doesn't render a Linked Sign-in Methods list).
+  # The password is always its own section on /settings/security, never a row
+  # inside the linked sign-in methods list — a password is something I choose
+  # and change, a linked account is something I connect and disconnect. The
+  # section only offers a change where there is a password to change:
+  #   * Auth0 mode: only when my account holds a database (Email/Password)
+  #                 identity. Hidden for social-only users.
+  #   * Email mode: always — the password is mine to manage directly.
   # In both modes, clicking the entry point opens the same dialog. The dialog
   # always asks for the current password — required for both modes — to defend
   # against a stolen session being used to lock the real owner out.
 
   Background:
     Given I am signed in
-    And I am on /settings/authentication
+    And I am on /settings/security
 
   @integration
   Scenario: Auth0 user with a database identity sees the Change Password link in their linked sign-in row
-    Given the tenant runs on NEXTAUTH_PROVIDER="auth0"
-    And my Auth0 identity is "Email/Password (via auth0)"
-    Then I see "Change Password" next to that identity
+    Given my deployment authenticates through Auth0
+    And I hold an Email/Password identity there
+    Then I see "Change Password" in the password section
     And I do not see any password input until I click it
 
   @integration
   Scenario: Auth0 social-only user (Google via Auth0) does not see Change Password
-    Given the tenant runs on NEXTAUTH_PROVIDER="auth0"
-    And my only Auth0 identity is "Google (via auth0)"
+    Given my deployment authenticates through Auth0
+    And I signed up with Google and hold no Email/Password identity
     Then I do not see a Change Password entry point
 
   @integration
   Scenario: Email/credential user sees a dedicated Change Password section with just a button
-    Given the tenant runs on NEXTAUTH_PROVIDER="email"
+    Given my deployment authenticates with an email and password directly, not through Auth0
     Then I see a Change Password section
     And the section shows a "Change Password" button but no inline form
 
@@ -82,21 +84,20 @@ Feature: Change password from /settings/authentication
 
   @integration
   Scenario: Auth0 backend verifies the current password via Resource Owner Password Grant before updating
-    Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are set
-    And the Management M2M application has the "Password" grant type enabled
+    Given my deployment's Auth0 management application is set up to verify passwords
+    And that application is allowed to check a password directly
     When the server processes a change-password submission for an Auth0 user
-    Then it calls Auth0 /oauth/token with grant_type=password using the M2M credentials
-    And on a 200 it requests a Management API token via client_credentials
-    And it calls Auth0 Management API PATCH /api/v2/users/{id} with the new password
-    And the connection field is "Username-Password-Authentication"
+    Then it verifies the current password against Auth0 before accepting the change
+    And only once that succeeds does it request elevated access to update the record
+    And it updates the password on the Auth0 database connection the user signed up with
 
   @integration
   Scenario: Auth0 backend returns 401 UNAUTHORIZED when the current password is wrong
-    Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are set
+    Given my deployment's Auth0 management application is set up to verify passwords
     When the server submits the wrong current password to Auth0
-    Then Auth0 responds with error=invalid_grant
-    And the server does NOT call the Management API
-    And the tRPC mutation throws UNAUTHORIZED with message "Current password is incorrect"
+    Then Auth0 rejects the current password
+    And the server does NOT go on to update the record
+    And the change is refused as unauthorized with the message "Current password is incorrect"
 
   # The two `@unimplemented` scenarios below describe behaviour that is
   # implemented in the source but has no asserting test:
@@ -113,10 +114,10 @@ Feature: Change password from /settings/authentication
   #     integration test exercises the limiter today.
   @integration @unimplemented
   Scenario: Auth0 backend falls back to AUTH0_CLIENT_ID/SECRET when the M2M vars are absent
-    Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are not set
-    And AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET are set
+    Given my deployment has not set up a dedicated management application for password checks
+    And its regular Auth0 application credentials are configured instead
     When the server processes a successful change-password submission for an Auth0 user
-    Then it uses AUTH0_CLIENT_ID/SECRET for the client_credentials grant
+    Then it uses those regular application credentials to request elevated access
 
   @integration @unimplemented
   Scenario: Rate limit applies to both modes
@@ -144,14 +145,13 @@ Feature: Change password from /settings/authentication
   # The email-mode end-to-end flow (router-level test that wires
   # together password verification + Prisma update + session revoke)
   # has no integration test today. The pieces are tested individually:
-  #   * `revokeOtherSessionsForUser` — `revokeSessions.test.ts`
   #   * BetterAuth credential update — covered by `auth.test.ts` paths
   # but no test exercises the `user.changePassword` mutation in email
   # mode end-to-end. Leaving `@unimplemented` until the router test
   # exists.
   @regression @integration @unimplemented
   Scenario: Email-provider mode continues to verify the current password and revoke other sessions
-    Given the tenant runs on NEXTAUTH_PROVIDER="email"
+    Given my deployment authenticates with an email and password directly, not through Auth0
     When I submit the dialog with a correct current password and a valid new password
     Then the server updates the BetterAuth credential password in the database
     And the server revokes other sessions for the user

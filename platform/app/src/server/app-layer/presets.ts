@@ -254,6 +254,7 @@ import {
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
 import { AdminEmailPlatformOperators } from "./identity/platform-operators";
+import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
@@ -356,7 +357,6 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -419,6 +419,14 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * One-shot system-migration role. It processes only migration event work on
+ * an isolated queue without starting shared consumers, schedulers, or workers.
+ */
+export function initializeMigrationApp(): App {
+  return initializeDefaultApp({ processRole: "migration" });
 }
 
 /**
@@ -871,6 +879,9 @@ export function initializeDefaultApp(options?: {
   // The address lock is shared: the guards claim through it and the fold
   // releases through it, so the two must be the same instance (ADR-116 §6).
   const identityReservations = new PrismaIdentityReservationRepository(prisma);
+  // One instance, two roles: the `User` reads identity runs on, and the one
+  // address the platform-operator list asks about an actor.
+  const identityUsers = new PrismaIdentityUsersRepository(prisma);
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
@@ -961,8 +972,12 @@ export function initializeDefaultApp(options?: {
       identityReservations,
     ),
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
-    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityUsers,
     identityReservations,
+    // The proposal log, not a table: reads the identity events back through
+    // the App's own event store, resolved lazily for the same reason the
+    // ledger writer resolves it lazily — this composes before an App exists.
+    identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
     ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
@@ -971,7 +986,7 @@ export function initializeDefaultApp(options?: {
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
-    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would
@@ -1227,17 +1242,6 @@ export function initializeDefaultApp(options?: {
       })
     : undefined;
   scheduler?.start();
-
-  // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - passes run until the fleet stops moving and then stop,
-  // so held and parked organizations converge here rather than on the
-  // restart cadence with nobody running anything.
-  // Redis is handed in rather than read back off the App: this composes the
-  // App, so `tryGetApp()` is still null here, and a null handle would make
-  // the lease unacquirable and every pass a silent no-op.
-  const systemMigrations = roleRunsWorkers(config.processRole)
-    ? startSystemMigrations({ redis })
-    : undefined;
 
   // ADR-128: the cost rollup's comparator, on the same calendar scheduler the
   // reports use. The fire is a tiny trigger — the lane read back out of
@@ -1895,14 +1899,6 @@ export function initializeDefaultApp(options?: {
     gracefulCloseables.push({
       name: "scheduler",
       close: () => scheduler.stop(),
-    });
-  }
-  if (systemMigrations) {
-    // Aborts the pass between tenants; a truncated pass is harmless because
-    // every migration is idempotent and the next boot resumes the sweep.
-    gracefulCloseables.push({
-      name: "system-migrations",
-      close: () => systemMigrations.stop(),
     });
   }
   gracefulCloseables.push({

@@ -75,6 +75,7 @@ describe("attachIdentifier guard", () => {
       expect(facts[0]?.data).toMatchObject({ identifierHash: null });
     });
 
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("attaches email-provider identifiers ATTACHED, awaiting the ceremony", async () => {
       const facts = await new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations()).attachIdentifier(
         attachData({
@@ -221,6 +222,7 @@ describe("attachIdentifier guard", () => {
 
   describe("when the heads already carry the identifier", () => {
     /** @scenario "A fact the heads already carry is not stated again" */
+    /** @scenario "Adding an address already on the account changes nothing" */
     it("states nothing, whatever the command id", async () => {
       const heads = new InMemoryHeads();
       const guards = new IdentityGuards(heads, users, new InMemoryReservations());
@@ -245,6 +247,44 @@ describe("attachIdentifier guard", () => {
       expect((another[0]!.data as { identifierId: string }).identifierId).not.toBe(
         (first[0]!.data as { identifierId: string }).identifierId,
       );
+    });
+  });
+
+  describe("when a newborn's heads hold the ledger's provisional row", () => {
+    /** @scenario "A newborn's provisional head does not silence its own attach" */
+    it("states the attach anyway, because nothing has folded for this user", async () => {
+      const heads = new InMemoryHeads();
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      const first = await guards.attachIdentifier(attachData());
+      // The ledger's provisional write: the row is there, the cursor is not.
+      heads.fold(USER, first);
+      heads.newborns.add(USER);
+
+      const rerun = await guards.attachIdentifier(attachData());
+
+      expect(rerun).toHaveLength(1);
+      expect((rerun[0]!.data as { identifierId: string }).identifierId).toBe(
+        (first[0]!.data as { identifierId: string }).identifierId,
+      );
+    });
+
+    /** @scenario "A provisional head with no event is restated by the next pass" */
+    it("keeps stating it for a later pass under another command id, until a fold lands", async () => {
+      const heads = new InMemoryHeads();
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      heads.fold(USER, await guards.attachIdentifier(attachData()));
+      heads.newborns.add(USER);
+
+      const nextPass = await guards.attachIdentifier(
+        attachData({ commandId: "backfill:acc_1" }),
+      );
+      expect(nextPass).toHaveLength(1);
+
+      heads.newborns.delete(USER);
+      const afterFold = await guards.attachIdentifier(
+        attachData({ commandId: "backfill:acc_1" }),
+      );
+      expect(afterFold).toEqual([]);
     });
   });
 });
@@ -341,6 +381,7 @@ describe("verifyIdentifier guard", () => {
   });
 
   describe("when the value is unheld", () => {
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("verifies the ATTACHED identifier with the ceremony's proof trail", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
@@ -781,6 +822,36 @@ describe("detachIdentifier strands guard", () => {
           data: { identifierId: "idf_passkey_a", actor: ACTOR },
         },
       ]);
+    });
+
+    /** @scenario "Removing an address that is not the last way in" */
+    it("allows one verified email to be removed when another remains", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_email_old",
+            provider: "email",
+            value: "sam.old@acme.com",
+          }),
+          fact({
+            identifierId: "idf_email_keep",
+            provider: "email",
+            value: "sam.keep@acme.com",
+          }),
+        ),
+      );
+
+      expect(await detach(heads, "idf_email_old")).toEqual([
+        {
+          type: IDENTIFIER_DETACHED_EVENT_TYPE,
+          data: { identifierId: "idf_email_old", actor: ACTOR },
+        },
+      ]);
+      expect(heads.heads.get(USER)?.identifiers.idf_email_keep?.state).toBe(
+        "VERIFIED",
+      );
     });
 
     it("does not refuse an unverified identifier, which strands nobody", async () => {

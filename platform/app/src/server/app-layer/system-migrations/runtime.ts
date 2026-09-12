@@ -1,8 +1,8 @@
 /**
  * The system-migrations composition root: the ONE place the generic runner
  * (@langwatch/system-migrations) meets Prisma, Redis, the authz collector
- * and the registered migrations. Worker boot calls `runSystemMigrationPass`
- * (via ./boot); the ops router reads the same composed state repository.
+ * and the registered migrations. The startup preflight calls
+ * `runSystemMigrationPass` via ./boot; the ops router reads the same state.
  *
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
@@ -25,9 +25,8 @@ import {
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
 import {
-  connectionGrandfatherMigration,
   identifierBackfillMigration,
-  identityNewbornReconciliation,
+  identityAddressLockReaper,
   identitySecretHealMigration,
 } from "../identity/runtime";
 import {
@@ -133,10 +132,6 @@ export function registeredMigrations(): SystemMigration[] {
       ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
-    // D04 (ADR-117 §5): the organization's legacy SSO strings become
-    // connection history, proved by routing. Dark — the connection projection
-    // decides nothing until `SSOCONN_ROUTING` is flipped.
-    connectionGrandfatherMigration(),
   ];
 }
 
@@ -348,6 +343,7 @@ function mergeSummaries(
     tenantsSeen: a.tenantsSeen + b.tenantsSeen,
     finalized: a.finalized + b.finalized,
     held: a.held + b.held,
+    finiteHeld: (a.finiteHeld ?? 0) + (b.finiteHeld ?? 0),
     parked: a.parked + b.parked,
     skipped: a.skipped + b.skipped,
     alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
@@ -442,7 +438,7 @@ export async function runSystemMigrationTargetedPass({
 /**
  * One full pass over every cohort organization, then over every cohort user.
  * Composed per call so the lease token, the Redis handle and the enrollment
- * read are all fresh - the ops "run a pass now" action and the worker boot
+ * read are all fresh - the ops "run a pass now" action and startup preflight
  * share this exact entry point. Self-hosted runs only the migrations whose
  * `runsAutomaticallyOnSelfHosted` declaration has been released: the others
  * are not driven for any tenant - never attempted, parked or reported -
@@ -453,7 +449,7 @@ export async function runSystemMigrationPass(args?: {
   /**
    * The process's Redis handle. Pass it when the App is still being composed
    * - `tryGetApp()` answers null until then, and a null handle makes the
-   * lease unacquirable, which would silently turn every boot pass into a
+   * lease unacquirable, which would silently turn every preflight pass into a
    * no-op. Callers that run after startup (the ops action) can omit it.
    */
   redis?: Redis | Cluster | null;
@@ -482,7 +478,7 @@ export async function runSystemMigrationPass(args?: {
     userMigrations.length === 0 ? null : await userMigrationPassCohort();
   const organizationSummary = await runner.runPass({ signal: args?.signal });
   if (userCohort === null) {
-    await sweepAbandonedNewborns();
+    await reapOrphanedAddressLocks();
     return organizationSummary;
   }
   const userRunner = new SystemMigrationRunnerService({
@@ -496,32 +492,34 @@ export async function runSystemMigrationPass(args?: {
     organizationSummary,
     await userRunner.runPass({ signal: args?.signal }),
   );
-  await sweepAbandonedNewborns();
+  await reapOrphanedAddressLocks();
   return summary;
 }
 
 /**
- * The born-finalized entrance's reconciliation sweep (ADR-116 §3), on the
- * same cadence as the passes and never terminal — a required companion to the
- * entrance rather than optional hygiene.
+ * The address lock's reap (ADR-116 §6), on the same cadence as the passes and
+ * never terminal — a required companion to the lock rather than optional
+ * hygiene. A ceremony that claimed an address and then failed leaves a lock
+ * no live identifier backs, and without this nobody could take that address
+ * again.
  *
  * A LEG of the pass rather than a registered `SystemMigration`, because what
  * it hunts has no tenant a runner could visit. The runner drives the tenants
  * a source enumerates, and the user tenant source enumerates `User` rows; an
- * abandoned entrance is precisely a claim with no user row behind it, so a
+ * orphaned lock is precisely a claim no live identifier backs, so a
  * per-tenant migration would never reach one.
  *
- * Its failure is never the pass's: the sweep removes rows the pass did not
- * write, and a pass that reported nothing because a sweep threw would hide
- * the migration outcome an operator asked for.
+ * Its failure is never the pass's: the reap removes rows the pass did not
+ * write, and a pass that reported nothing because a reap threw would hide the
+ * migration outcome an operator asked for.
  */
-async function sweepAbandonedNewborns(): Promise<void> {
+async function reapOrphanedAddressLocks(): Promise<void> {
   try {
-    await identityNewbornReconciliation().runPass();
+    await identityAddressLockReaper().runPass();
   } catch (error) {
     logger.warn(
       { error },
-      "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+      "the address-lock reap failed; the locks stay and the next pass retries",
     );
   }
 }

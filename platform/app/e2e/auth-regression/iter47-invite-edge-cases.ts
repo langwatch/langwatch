@@ -295,7 +295,7 @@ async function main() {
     const ctxD = await browser.newContext();
     const pageD = await ctxD.newPage();
     const trpcRes = await pageD.request.post(
-      `${BASE_URL}/api/trpc/organization.acceptInvite?batch=1`,
+      `${BASE_URL}/api/trpc/invite.acceptInvite?batch=1`,
       {
         headers: { "Content-Type": "application/json", Origin: BASE_URL },
         data: {
