@@ -50,6 +50,13 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  ExperimentV3RestSession,
+  ExperimentV3RunLoop,
+  ExperimentWorkbenchObserver,
+  ExperimentWorkbenchPermissions,
+} from "#app/experiment-workbench.members";
 import { on } from "node:events";
 import type { ExperimentService } from "../services/experiment.service.ts";
 import type { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
@@ -151,6 +158,16 @@ export interface ExperimentAppDependencies {
   modelCosts: ExperimentModelCosts;
   /** The slug this deployment derives from a name. */
   slugify(value: string): string;
+  /**
+   * Whether the person behind a browser workbench door holds one permission on
+   * one project. Separate from `permissions` above, which answers about an
+   * actor id the declared check already resolved.
+   */
+  workbenchPermissions: ExperimentWorkbenchPermissions;
+  /** The workbench run loop this deployment composed, or the holes where it did not. */
+  runLoop: ExperimentV3RunLoop;
+  /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
+  workbenchObserver: ExperimentWorkbenchObserver;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -605,6 +622,52 @@ export class ExperimentApp implements ExperimentApi {
     if (authorIds.length === 0) return Promise.resolve([]);
 
     return this.#dependencies.people.namesOf(authorIds);
+  }
+
+  // ── The workbench's own doors ────────────────────────
+
+  /**
+   * Whether the signed-in person behind a browser workbench door holds one
+   * permission on one project.
+   */
+  probeProjectPermission(
+    session: ExperimentV3RestSession,
+    projectId: string,
+    permission: AuthzPermission,
+  ): Promise<boolean> {
+    return this.#dependencies.workbenchPermissions.permitted({ session, projectId, permission });
+  }
+
+  /**
+   * The application the workbench's four setup doors answer from. They hold it
+   * whole rather than calling through the module's reference, because a
+   * reference publishes operations and several of those doors read the
+   * service behind one.
+   */
+  experiments(): ExperimentApp {
+    return this;
+  }
+
+  /** The run loop the workbench's run doors drive. */
+  run(): ExperimentV3RunLoop {
+    return this.#dependencies.runLoop;
+  }
+
+  /** Records that a person ran an experiment. Best-effort. */
+  recordExperimentRan(
+    input: Readonly<{
+      userId: string;
+      projectId: string;
+      experimentId: string | undefined;
+      isFullRun: boolean;
+    }>,
+  ): void {
+    this.#dependencies.workbenchObserver.recordExperimentRan(input);
+  }
+
+  /** Where an unnamed workbench failure is reported. Best-effort. */
+  reportError(error: unknown, context: Readonly<Record<string, unknown>>): void {
+    this.#dependencies.workbenchObserver.reportError(error, context);
   }
 
   /**

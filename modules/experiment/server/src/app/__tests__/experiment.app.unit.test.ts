@@ -5,7 +5,9 @@
 import type { WorkflowService } from "@langwatch/workflow-server";
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
 import { readFile } from "node:fs/promises";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -15,6 +17,9 @@ import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 import { ExperimentApp, type ExperimentAppDependencies } from "../experiment.app.ts";
+import type { ExperimentV3RunLoop } from "../experiment-workbench.members.ts";
+import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
+import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -140,11 +145,29 @@ function harness({
     getTenantEmitter: vi.fn(),
     cleanupTenantEmitter: vi.fn(),
   };
+  const workbenchPermissions = { permitted: vi.fn(async () => true) };
+  const workbenchObserver = { recordExperimentRan: vi.fn(), reportError: vi.fn() };
+  const runLoop: ExperimentV3RunLoop = {
+    ports: null,
+    progress: null,
+    services: {
+      datasets: createApiFixture<DatasetApi>(),
+      prompts: createApiFixture<PromptApi>(),
+      agents: createApiFixture<AgentApi>(),
+      workflows: createApiFixture<ExperimentWorkflowDsl>(),
+    },
+    workflows: workflowService,
+    defaultConcurrency: 10,
+    startRun: vi.fn(async () => ({ runId: "run-1", runUrl: "https://app/run-1", total: 1 })),
+  };
 
   return {
     experiments: experimentService,
     workflows: workflowService,
     monitors,
+    workbenchPermissions,
+    workbenchObserver,
+    runLoop,
     app: ExperimentApp.create({
       dependencies: {},
       members: {
@@ -159,6 +182,9 @@ function harness({
         people,
         modelCosts,
         slugify: (value: string) => value,
+        workbenchPermissions,
+        runLoop,
+        workbenchObserver,
       },
       config: undefined,
       resources: new ResourceScope(),
@@ -421,6 +447,74 @@ describe("ExperimentApp", () => {
     it("does not import getClickHouseClientForTenant", async () => {
       const src = await readFile(new URL("../experiment.app.ts", import.meta.url), "utf8");
       expect(src).not.toMatch(/getClickHouseClientForTenant/);
+    });
+  });
+});
+
+describe("given the workbench's own doors", () => {
+  describe("when the family asks the App for what it declares", () => {
+    it("answers every required member of the workbench REST family", () => {
+      const { app } = harness();
+      // The compiler is the assertion: the family's three required members are
+      // `probeProjectPermission`, `experiments()` and `run()`, and a missing
+      // one fails here rather than at the first request.
+      const answered: ExperimentV3RestApi = app;
+
+      expect(typeof answered.probeProjectPermission).toBe("function");
+      expect(typeof answered.experiments).toBe("function");
+      expect(typeof answered.run).toBe("function");
+    });
+
+    it("answers the setup doors with the application itself", () => {
+      const { app } = harness();
+
+      expect(app.experiments()).toBe(app);
+    });
+
+    it("hands the run doors the loop this deployment composed", () => {
+      const { app, runLoop } = harness();
+
+      expect(app.run()).toBe(runLoop);
+    });
+  });
+
+  describe("when a browser door asks whether the person may run", () => {
+    it("asks the workbench permission member about that project", async () => {
+      const { app, workbenchPermissions } = harness();
+
+      await expect(
+        app.probeProjectPermission({ user: { id: "user-1" } }, "project-1", "evaluations:manage"),
+      ).resolves.toBe(true);
+      expect(workbenchPermissions.permitted).toHaveBeenCalledWith({
+        session: { user: { id: "user-1" } },
+        projectId: "project-1",
+        permission: "evaluations:manage",
+      });
+    });
+  });
+
+  describe("when a run ends", () => {
+    it("records the run and reports a failure through the observer", () => {
+      const { app, workbenchObserver } = harness();
+      const failure = new Error("nope");
+
+      app.recordExperimentRan({
+        userId: "user-1",
+        projectId: "project-1",
+        experimentId: "experiment-1",
+        isFullRun: true,
+      });
+      app.reportError(failure, { projectId: "project-1" });
+
+      expect(workbenchObserver.recordExperimentRan).toHaveBeenCalledWith({
+        userId: "user-1",
+        projectId: "project-1",
+        experimentId: "experiment-1",
+        isFullRun: true,
+      });
+      expect(workbenchObserver.reportError).toHaveBeenCalledWith(failure, {
+        projectId: "project-1",
+      });
     });
   });
 });

@@ -99,14 +99,14 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
     const person = await permittedPerson({ app, userId: caller.userId, projectId });
     if (person instanceof Response) return person;
 
-    const { ports: runPorts, progress } = runLoopOf(app.run);
+    const { ports: runPorts, progress } = runLoopOf(app.run());
 
     const dataResult = await ExperimentExecutionDataService.loadExecutionData(
       projectId,
       input.dataset,
       input.targets,
       input.evaluators,
-      app.run.services,
+      app.run().services,
       { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
     );
 
@@ -219,7 +219,7 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
     const person = await permittedPerson({ app, userId: caller.userId, projectId });
     if (person instanceof Response) return person;
 
-    const { ports: runPorts, progress } = runLoopOf(app.run);
+    const { ports: runPorts, progress } = runLoopOf(app.run());
 
     // The runId is attacker-controlled: verify it is owned by the authenticated project before
     // signaling an abort, or a caller could abort another tenant's run by guessing its id.
@@ -279,10 +279,10 @@ function executeEventStream(options: {
           loadedPrompts: options.loadedPrompts,
           loadedAgents: options.loadedAgents,
           ports: options.runPorts,
-          workflows: app.run.workflows,
+          workflows: app.run().workflows,
           loadedEvaluators: options.loadedEvaluators,
           loadedWorkflows: options.loadedWorkflows,
-          defaultConcurrency: app.run.defaultConcurrency,
+          defaultConcurrency: app.run().defaultConcurrency,
           concurrency: input.concurrency,
           seedTargetOutputs: input.seedTargetOutputs,
           carriedOverCells: input.carriedOverCells,

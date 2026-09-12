@@ -176,10 +176,14 @@ export {
   type ExperimentV3RestApi,
   type ExperimentV3AliasApi,
   experimentWorkbenchCredential,
-  type ExperimentV3RestSession,
-  type ExperimentV3RunLoop,
-  type ExperimentV3StartRunInput,
 } from "./transport/experiment-v3.rest.ts";
+export type {
+  ExperimentV3RestSession,
+  ExperimentV3RunLoop,
+  ExperimentV3StartRunInput,
+  ExperimentWorkbenchObserver,
+  ExperimentWorkbenchPermissions,
+} from "./app/experiment-workbench.members.ts";
 export {
   experimentWorkbenchRunRest,
   experimentWorkbenchCaller,

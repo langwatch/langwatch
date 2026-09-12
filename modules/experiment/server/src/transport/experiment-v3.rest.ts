@@ -33,46 +33,18 @@ import {
 import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
+import type {
+  ExperimentV3RestSession,
+  ExperimentV3RunLoop,
+} from "#app/experiment-workbench.members";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
-import type { StartPollingRunInput } from "../services/experiment-polling-run.service.ts";
 import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
-import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
-
-/** The signed-in person the two workbench-run doors read. */
-export type ExperimentV3RestSession = Readonly<{ user: Readonly<{ id: string }> }>;
-
-/**
- * One polling run, as this transport asks for it: the run, and nothing about
- * the process it runs on.
- */
-export type ExperimentV3StartRunInput = Omit<
-  StartPollingRunInput,
-  "ports" | "workflows" | "progress" | "baseUrl" | "defaultConcurrency"
-> &
-  Readonly<{ defaultConcurrency?: number }>;
-
-/**
- * The run loop this process composed, or the holes where it did not.
- */
-export type ExperimentV3RunLoop = Readonly<{
-  ports: ExperimentRunCollaborators | null;
-  progress: ExperimentRunProgressRepository | null;
-  services: ExecutionDataServices;
-  // `WorkflowService` is server-private to the workflow module; this transport
-  // only forwards it into the orchestrator, so it is typed loosely rather than
-  // naming that module's server package from here.
-  workflows: unknown;
-  defaultConcurrency: number;
-  startRun(
-    input: ExperimentV3StartRunInput,
-  ): Promise<{ runId: string; runUrl: string; total: number }>;
-}>;
 
 /**
  * Everything the workbench's ten doors reach that `ExperimentApi` does not
@@ -90,8 +62,13 @@ export interface ExperimentV3RestApi {
   ): Promise<boolean>;
   /** The application the workbench's four setup doors answer from. */
   experiments(): ExperimentApp;
-  /** The run loop, as this process composed it. */
-  run: ExperimentV3RunLoop;
+  /**
+   * The run loop, as this process composed it. A call rather than a field
+   * because a module's API answers through a reference that exposes
+   * operations only (`LocalFeatureApi`), and a field-valued collaborator read
+   * off one throws.
+   */
+  run(): ExperimentV3RunLoop;
   /**
    * Records that a person ran an experiment, where this process has somewhere to
    * record it.
@@ -293,7 +270,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
       const prepared = await ExperimentSavedStateExecutionService.prepareSavedStateExecution({
         experiments: experiments.experimentService,
-        services: app.run.services,
+        services: app.run().services,
         projectId: scope.id,
         slug,
         runInputs: {
@@ -335,7 +312,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       );
 
       if (isSSE) {
-        const { ports: runPorts } = runLoopOf(app.run);
+        const { ports: runPorts } = runLoopOf(app.run());
         return {
           status: 200,
           headers: {
@@ -362,7 +339,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
         };
       }
 
-      const { runId, runUrl, total } = await app.run.startRun({
+      const { runId, runUrl, total } = await app.run().startRun({
         projectId: scope.id,
         projectSlug: project.projectSlug,
         experimentId: experiment.id,
@@ -464,7 +441,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, scope }) => {
     const { runId } = input;
 
-    const { progress } = runLoopOf(app.run);
+    const { progress } = runLoopOf(app.run());
 
     const runState = await progress.findRunState(runId);
 
@@ -564,7 +541,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, scope }) => {
     const { runId } = input;
 
-    const { progress } = runLoopOf(app.run);
+    const { progress } = runLoopOf(app.run());
     const experiments = app.experiments();
 
     const runState = await progress.findRunState(runId);
@@ -853,10 +830,10 @@ function runEventStream(options: {
           loadedPrompts: options.loadedPrompts as Map<string, VersionedPrompt>,
           loadedAgents: options.loadedAgents as Map<string, TypedAgent>,
           ports: options.runPorts,
-          workflows: app.run.workflows,
+          workflows: app.run().workflows,
           loadedEvaluators: options.loadedEvaluators,
           loadedWorkflows: options.loadedWorkflows,
-          defaultConcurrency: app.run.defaultConcurrency,
+          defaultConcurrency: app.run().defaultConcurrency,
           ...(options.carriedOverCells.length > 0
             ? { carriedOverCells: options.carriedOverCells }
             : {}),
