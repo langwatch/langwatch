@@ -194,7 +194,24 @@ why this is lane work rather than a sweep.
     DONE in 17d0a92311: both GOVERNANCE_* constants - they needed a REPOINT to
         @langwatch/enterprise-governance-contract, not a restore
 
-    STILL OPEN (12), generator stops at the first of these - LangyTitleModel:
+    ALSO DONE: LangyTitleModel (a rename to LangyTitleModelResolver, 8e9a05f43a)
+        and the aliased-import blind spot in scenario's cancellation repository.
+
+    **The list below is NOT the whole remaining set.** It was built by scanning
+    only `app/*.members.ts` and `app/*.app.ts`, and the generator has since
+    surfaced a symbol outside it (`createRecordEvaluationsHandler`). Treat the
+    generator's own error as the authority and this list as a head start.
+
+    A THIRD kind has now appeared, and it is the expensive one. Not a repoint
+    and not a one-line restore: a FUNCTION that was dropped whole.
+    `createRecordEvaluationsHandler` is missing from
+    `modules/scenario/server/src/intents/simulation-run-execution.intent.ts`,
+    which still has the other three handlers. Its original:
+        0bcf01edb3:platform/app/src/server/event-sourcing/pipelines/simulation-processing/process-manager/simulationRunExecutionIntentHandlers.ts:164
+    Porting it means adapting monolith imports to the module's vocabulary. It is
+    also one of scenario's 22 test failures, so it pays twice.
+
+    STILL OPEN from the original scan (11):
     AutomationDispatchError, AutomationGraphNotifier, AutomationHeartbeat,
     AutomationLogger, AutomationSlackBotTokenDecryptor,
     AutomationNotificationDelivery
