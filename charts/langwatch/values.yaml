@@ -1073,6 +1073,153 @@ workers:
 
 
 # =============================================================================
+# Voice Worker Configuration (opt-in)
+# =============================================================================
+# A dedicated single-replica worker that terminates inbound Media Streams calls.
+# Off by default, the default install renders no voice resources at all.
+#
+# Media Streams connects INBOUND to this worker: without a
+# publicly-reachable voice.publicBaseUrl, there are no phone targets, no
+# matter how the rest of this block is set. Terminate TLS at your own edge
+# (ingress or a cloud load balancer) and point voice.publicBaseUrl at that
+# public origin.
+#
+# Env contract (langwatch/langwatch#8014): the worker reads VOICE_WS_PORT and
+# VOICE_PUBLIC_BASE_URL below. Replicas are fixed at 1, not a value, the Media
+# Streams WebSocket routes an in-flight call by nonce inside one process, so a
+# second replica would split a call's frames across two processes with no
+# shared state. Call-provider credentials (account SID, auth token, from-number)
+# are per-project data configured inside LangWatch, not chart values.
+## @section Voice worker (opt-in)
+voice:
+  # See workers.otel: named separately so voice worker telemetry is distinguishable.
+  ## @extra voice.otel OpenTelemetry identity for the voice worker.
+  ## @param voice.otel.serviceName [string, default: langwatch-voice] Service name reported in traces and logs.
+  otel:
+    serviceName: langwatch-voice
+
+  ## @param voice.enabled [default: true] Deploy the voice worker Deployment, Service (and Ingress if voice.ingress.enabled) once a public https:// origin can be resolved (see voice.publicBaseUrl below). On by default; set false to opt the whole feature out even when a public URL is available.
+  enabled: true
+
+  # Public https:// origin the call provider dials back to; the worker
+  # derives wss://<host>/twilio/<nonce> from it.
+  #
+  # Left empty (the default), the chart resolves it FROM app.http.publicUrl
+  # instead, so a cluster that already has a public https:// URL for the app
+  # gets phone simulations for free, with zero extra values set. If
+  # app.http.publicUrl is not an https:// origin either (e.g. it is still the
+  # chart default, http://localhost:5560), no public address can be resolved
+  # and the voice Deployment/Service/Ingress simply do not render — NOTES.txt
+  # explains why and names both settings that fix it. Set this value
+  # explicitly only when voice needs a DIFFERENT public host than the app
+  # (its own subdomain, its own edge). An explicit value here always wins
+  # over app.http.publicUrl, including a bad one: the chart still refuses to
+  # render rather than silently ignore it.
+  ## @param voice.publicBaseUrl [string] Public https:// origin the call provider connects to (e.g. https://voice.example.com). Empty resolves to app.http.publicUrl when that is an https:// origin. Must be an https origin only: scheme, hostname, optional port, no path or query; a value that does not match this is rejected, not trimmed.
+  publicBaseUrl: ""
+
+  # TCP port of the Media Streams WebSocket listener inside the pod.
+  ## @param voice.wsPort [default: 3300] Container port of the Media Streams WebSocket listener.
+  wsPort: 3300
+
+  # Resource requirements for the voice worker pod.
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
+  ## @extra voice.resources Resource requests and limits for the voice worker.
+  ## @param voice.resources.requests.cpu [string, default: 100m] Requested CPU.
+  ## @param voice.resources.requests.memory [string, default: 512Mi] Requested memory.
+  ## @param voice.resources.limits.cpu [string, default: 500m] CPU limit.
+  ## @param voice.resources.limits.memory [string, default: 1Gi] Memory limit.
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { cpu: 500m, memory: 1Gi }
+
+  # Node selector
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
+  ## @param voice.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  # Tolerations
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
+  ## @param voice.tolerations [array] Tolerations overrides.
+  tolerations: []
+  # Affinity
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
+  ## @param voice.affinity [object] Affinity overrides.
+  affinity: {}
+  # Topology spread constraints
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  ## @param voice.topologySpreadConstraints [array] Topology spread constraints overrides.
+  topologySpreadConstraints: []
+  # PriorityClass for the voice worker pod, overriding global.scheduling.priorityClassName.
+  # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param voice.priorityClassName [string] PriorityClass for the voice worker pod (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+
+  # Shutdown budget. shutdownDrainSeconds is how long the voice worker may
+  # wait for in-flight jobs to finish their ClickHouse writes; it must match
+  # the app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this
+  # value.
+  #
+  # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must
+  # cover the drain plus 5s for App.close, 15s for process teardown and 10s
+  # of kubelet slack, so at least shutdownDrainSeconds + 30. Because it is
+  # set here, raising shutdownDrainSeconds alone always fails the render:
+  # raise both together. The chart refuses rather than installing a release
+  # the kubelet kills mid-drain. Both must be whole numbers of seconds
+  # greater than zero: a quoted or fractional value is rejected, because
+  # Helm's `int` would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param voice.shutdownDrainSeconds [default: 25] Seconds the voice worker may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param voice.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
+
+  ## @param voice.extraEnvs [array] Additional environment variables for the voice worker container.
+  extraEnvs: []
+
+  # Pod-level configurations, mirroring workers.pod.
+  ## @extra voice.pod Pod-level metadata.
+  ## @param voice.pod.annotations [object] Additional pod annotations for the voice worker.
+  pod:
+    annotations: {}
+  # Deployment-level configurations, mirroring workers.deployment.
+  ## @extra voice.deployment Deployment-level metadata.
+  ## @param voice.deployment.annotations [object] Additional Deployment annotations for the voice worker.
+  deployment:
+    annotations: {}
+
+  # Service exposing the Twilio Media Streams WebSocket port in-cluster.
+  ## @extra voice.service Service configuration for the voice worker.
+  ## @param voice.service.type [default: ClusterIP] Service type.
+  ## @param voice.service.port [default: 3300] Service port (target is voice.wsPort).
+  service:
+    type: ClusterIP
+    port: 3300
+
+  # Ingress fronting the WebSocket port, on by default alongside voice.enabled
+  # (it still only renders once a public https:// origin resolves, same as
+  # the Deployment/Service). TLS termination is left to your edge, same as
+  # the main ingress.
+  ## @extra voice.ingress Ingress configuration for the voice worker.
+  ## @param voice.ingress.enabled [default: true] Create an Ingress for the voice worker once a public https:// origin resolves. On by default.
+  ## @param voice.ingress.className [string] IngressClassName for the voice Ingress.
+  ## @param voice.ingress.annotations [object] Additional annotations (e.g. controller-specific WebSocket upgrade/timeout settings). Defaults to nginx's proxy-read/send-timeout at 3600s (the stock 60s value would cut off any call longer than a minute) — nginx-specific; a non-nginx controller needs its own equivalents set here instead. Set to {} (or override each key) to replace the defaults entirely.
+  ## @param voice.ingress.host [string] Hostname the voice Ingress routes, matching voice.publicBaseUrl (or its app.http.publicUrl fallback). Empty defaults to that resolved URL's hostname; set explicitly only to override it, and it must then agree with the resolved URL or the render is refused.
+  ## @param voice.ingress.tls [array] TLS configuration, same shape as ingress.tls ([{secretName, hosts}]).
+  ingress:
+    enabled: true
+    className: ""
+    # nginx-specific: extends the default 60s proxy timeout so a Media
+    # Streams WebSocket survives calls up to an hour. A different ingress
+    # controller needs its own WebSocket/timeout annotations here instead —
+    # override this whole map to swap them in.
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    host: ""
+    tls: []
+
+
+# =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
 # Configuration for the NLP service (nlpgo).

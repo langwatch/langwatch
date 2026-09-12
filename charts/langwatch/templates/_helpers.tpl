@@ -2087,3 +2087,33 @@ azure.workload.identity/use: "true"
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Resolves the voice worker's public https:// origin so an operator does not
+have to set a fourth value just to turn phone simulations on.
+
+Priority:
+  1. voice.publicBaseUrl, if set — an explicit value always wins, even a bad
+     one. Validation of the RESOLVED value (the strict https-origin regex)
+     still runs at every call site, so a bad explicit value still fails the
+     render; this helper only decides WHICH value gets validated.
+  2. app.http.publicUrl, if it is an https:// origin — the chart already
+     knows the app's public URL, and voice shares the same edge in the
+     common case.
+  3. "" — cannot be resolved. Callers must treat this as "render nothing",
+     not as a failure: a default install's app.http.publicUrl is
+     http://localhost:5560, and a stock `helm template` must not fail.
+*/}}
+{{- define "langwatch.voice.publicBaseUrl" -}}
+{{- $explicit := .Values.voice.publicBaseUrl | default "" -}}
+{{- if $explicit -}}
+{{- $explicit -}}
+{{- else -}}
+{{- $appPublicUrl := ((.Values.app).http).publicUrl | default "" -}}
+{{- if hasPrefix "https://" $appPublicUrl -}}
+{{- $appPublicUrl -}}
+{{- else -}}
+{{- "" -}}
+{{- end -}}
+{{- end -}}
+{{- end }}

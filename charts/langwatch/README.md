@@ -698,6 +698,81 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `workers.extraInitContainers`             | Additional init containers.                                                                                                                                                                                             | `[]`                |
 | `workers.extraVolumeMounts`               | Additional volume mounts for workers container.                                                                                                                                                                         | `[]`                |
 
+### Voice worker
+
+On by default (`voice.enabled: true`), with **zero extra configuration**
+required on a cluster that already has a public `https://` URL for the app.
+It still needs a public `https://` origin to work, so with none resolvable it
+degrades quietly: no voice Deployment, Service or Ingress render, and
+`helm install`/`upgrade` NOTES explain why.
+
+The public origin is resolved in priority order:
+
+1. `voice.publicBaseUrl`, if set — an explicit value always wins, even a bad
+   one (the chart still refuses to render rather than silently ignore it).
+2. `app.http.publicUrl`, if that is already an `https://` origin — the
+   common case, and why most installs need nothing set here at all.
+3. Unresolved — voice renders nothing, no failure.
+
+Set `voice.publicBaseUrl` explicitly only when voice needs a **different**
+public host than the app (its own subdomain, its own edge).
+
+Turning it on deploys a **single-replica** worker Deployment (same app image)
+that terminates inbound Media Streams calls, plus a Service and (also on by
+default) an Ingress for its WebSocket port. Replicas are fixed at 1: the
+WebSocket routes an in-flight call by nonce inside one process, so a second
+replica would split a call's frames across two processes with no shared state.
+
+**Media Streams connects INBOUND to you.** Without a resolved public
+`https://` origin, there are no phone targets, no matter what else is
+configured. Terminate TLS at your own edge (the `voice.ingress` block, or an
+external load balancer pointed at the `voice.service`); the worker derives
+`wss://<host>/twilio/<nonce>` from the resolved origin.
+
+`voice.ingress.host` defaults to that resolved origin's hostname, so it needs
+no separate setting either; set it explicitly only to override, and it must
+then agree with the resolved origin or the render is refused, since Twilio
+dials the resolved origin and a mismatched Ingress would never see the
+WebSocket upgrade.
+
+`voice.ingress.annotations` defaults to nginx's `proxy-read-timeout` and
+`proxy-send-timeout` at `3600` seconds — nginx's stock 60-second timeout would
+cut off any call longer than a minute. These are **nginx-specific**; a
+different ingress controller needs its own equivalent WebSocket/timeout
+annotations set under this same key (which fully replaces the default map).
+
+Call-provider credentials (account SID, auth token, from-number) are
+configured per project inside LangWatch, not as chart values.
+
+The chart refuses to render only when `voice.publicBaseUrl` (or, once
+resolved from it, `voice.ingress.host`) is explicitly set to something
+invalid — never for the merely-unresolved case.
+
+| Name                          | Description                                                                                                              | Value              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `voice.otel.serviceName`       | Service name reported in traces and logs.                                                                                  | `langwatch-voice`    |
+| `voice.enabled`                | Deploy the voice worker Deployment, Service (and Ingress if `voice.ingress.enabled`) once a public `https://` origin resolves. On by default. | `true`   |
+| `voice.publicBaseUrl`          | Public `https://` origin the call provider connects to (e.g. `https://voice.example.com`). Empty resolves to `app.http.publicUrl` when that is an `https://` origin. | `""` |
+| `voice.wsPort`                 | Container port of the Media Streams WebSocket listener.                                                                    | `3300`               |
+| `voice.resources`              | Resource requests and limits for the voice worker.                                                                         |                      |
+| `voice.nodeSelector`           | Node selector overrides.                                                                                                   | `{}`                 |
+| `voice.tolerations`            | Tolerations overrides.                                                                                                     | `[]`                 |
+| `voice.affinity`               | Affinity overrides.                                                                                                        | `{}`                 |
+| `voice.topologySpreadConstraints` | Topology spread constraints overrides.                                                                                  | `[]`                 |
+| `voice.priorityClassName`      | PriorityClass for the voice worker pod (overrides `global.scheduling.priorityClassName`).                                  | `""`                 |
+| `voice.shutdownDrainSeconds`   | Seconds the voice worker may spend draining in-flight jobs on shutdown.                                                    | `25`                 |
+| `voice.terminationGracePeriodSeconds` | Seconds before SIGKILL. Must be at least `shutdownDrainSeconds` + 30.                                               | `55`                 |
+| `voice.extraEnvs`              | Additional environment variables for the voice worker container.                                                           | `[]`                 |
+| `voice.pod.annotations`        | Additional pod annotations for the voice worker.                                                                           | `{}`                 |
+| `voice.deployment.annotations` | Additional Deployment annotations for the voice worker.                                                                    | `{}`                 |
+| `voice.service.type`           | Service type.                                                                                                              | `ClusterIP`          |
+| `voice.service.port`           | Service port (target is `voice.wsPort`).                                                                                   | `3300`               |
+| `voice.ingress.enabled`        | Create an Ingress for the voice worker once a public `https://` origin resolves. On by default.                           | `true`               |
+| `voice.ingress.className`      | IngressClassName for the voice Ingress.                                                                                    | `""`                 |
+| `voice.ingress.annotations`    | Additional annotations (e.g. controller-specific WebSocket upgrade/timeout settings). Defaults to nginx's 3600s proxy-read/send timeouts; replace the whole map for another controller. | `{nginx proxy-read/send-timeout: "3600"}` |
+| `voice.ingress.host`           | Hostname the voice Ingress routes. Empty defaults to the resolved public origin's hostname; an explicit value must agree with it.  | `""`                 |
+| `voice.ingress.tls`            | TLS configuration, same shape as `ingress.tls` (`[{secretName, hosts}]`).                                                  | `[]`                 |
+
 ### NLP service
 
 | Name                                            | Description                                                                                                                                                                                                             | Value           |

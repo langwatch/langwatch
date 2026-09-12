@@ -1,0 +1,25 @@
+{{/* Gated the same way as templates/voice/deployment.yaml: a Service with
+     nothing behind it is just as useless, and rendering it while the
+     Deployment stays silent would be a confusing half-install. */}}
+{{- if and .Values.voice.enabled (include "langwatch.voice.publicBaseUrl" .) }}
+# Service exposing the voice worker's Twilio Media Streams WebSocket port.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-voice
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-voice
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: voice
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.voice.service.type }}
+  ports:
+    - port: {{ .Values.voice.service.port }}
+      targetPort: voice-ws
+      protocol: TCP
+      name: voice-ws
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-voice
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
