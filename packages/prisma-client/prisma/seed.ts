@@ -67,7 +67,7 @@ import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
 import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import {
   LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
