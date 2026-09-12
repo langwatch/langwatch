@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.0](https://github.com/langwatch/langwatch/compare/skills@v1.4.0...skills@v1.5.0) (2026-09-12)
+
+
+### Features
+
+* **analytics:** sandboxed custom chart widgets over LWQL ([#7870](https://github.com/langwatch/langwatch/issues/7870)) ([279b657](https://github.com/langwatch/langwatch/commit/279b6572ce15d9c0d6f791ed7e95afb469be2765))
+
+
+### Bug Fixes
+
+* **skills:** skill tests drive Claude Code through the Scenario SDK adapter, which leaves no orphan process ([#7911](https://github.com/langwatch/langwatch/issues/7911)) ([a3aba37](https://github.com/langwatch/langwatch/commit/a3aba3766466ad2b487f04ca89e15b79cf82c1b1))
+
+
+### Documentation
+
+* **agent-testing:** a development agent in a container registers a new row per hostname ([#7981](https://github.com/langwatch/langwatch/issues/7981)) ([edcbebd](https://github.com/langwatch/langwatch/commit/edcbebd572fba9e24ac7571e17583e80d95e6aa2))
+
 ## [1.4.0](https://github.com/langwatch/langwatch/compare/skills@v1.3.0...skills@v1.4.0) (2026-09-06)
 
 
