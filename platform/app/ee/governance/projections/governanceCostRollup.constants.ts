@@ -3,9 +3,10 @@
 /**
  * Identifiers for the daily governance cost rollup (ADR-128 wave 1).
  *
- * The fold is registered on TWO pipelines — gateway spend and pulled usage —
- * so its name, version and table live here rather than under either pipeline's
- * own `schemas/`.
+ * The fold is registered on the pulled-usage pipeline alone; the metered lane
+ * is read straight off the gateway ledger and never reaches it. The name,
+ * version and table still live here rather than under that pipeline's own
+ * `schemas/`, because the comparator and the cost screen read them too.
  */
 
 export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";

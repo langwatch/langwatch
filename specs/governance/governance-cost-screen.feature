@@ -454,8 +454,119 @@ Feature: One cost screen, three honest lanes
     # must assert the two fixture values differ before asserting placement.
     # "Never summed into one figure" is a universal negative no test can
     # prove; ADR-128 assigns it to the code-review gate in wave 1.
-    # "Matches its own source" end to end is a datastore-lane concern
-    # covered by the rollup spec, not this component test.
+    # "Matches its own source" end to end is a datastore-lane concern:
+    # the billed lane's is covered by the rollup spec, the metered lane's
+    # by the ledger scenarios in the section directly below.
+
+  # =========================================================================
+  # THE METERED LANE READS THE GATEWAY'S OWN LEDGER.
+  #
+  # The metered lane used to read the same daily rollup the billed lane
+  # reads. A fold wrote the gateway's cells there under the tenant of the
+  # project whose traffic it was, while the screen read them under the
+  # hidden governance project's tenant, so for real traffic the lane was
+  # always empty and only fixtures ever filled it. Two writers on one table
+  # is what made that possible, so the fold is gone rather than repaired:
+  # the lane reads the gateway's per-request ledger directly, the rows the
+  # fold already wrote stay where they are and no read counts them, and
+  # every read of the rollup asks for pulled rows only. The nightly check
+  # that compared the rollup against its sources checks the billed lane
+  # alone now, and what happens to the gateway half's leftover scheduled
+  # rows is specified beside the comparator in governance-cost-rollup.feature.
+  #
+  # A request is the unit. The ledger keeps one row per gateway request,
+  # partitioned by the month it started in, and the same request can sit
+  # in two months when its outcome landed before its admission and the
+  # admission moved the start time. A sum that trusts the table to have
+  # merged those rows counts that request twice. The day a request belongs
+  # to is the day it STARTED, in UTC: a streamed answer running across
+  # midnight is one request, on the day the caller asked.
+  #
+  # A failed request that consumed tokens is still priced, so it counts.
+  # The lane groups by model and by virtual key only: the ledger sits
+  # outside erasure, so a person's identifier read from it would outlive
+  # a deletion the rest of the product honoured.
+  #
+  # Requests with no dollar amount are counted beside the total rather
+  # than blanking it, unlike the billed lane's rule further down. There a
+  # cell with no amount hides an unknown share of a bill; here the count
+  # beside the figure names exactly what is left out — marked, not
+  # withheld, the same choice the provider breakdown makes for a euro
+  # bill. The ledger cannot tell a request nobody priced from a free one,
+  # so both are "no dollar amount", and a request that settled with its
+  # cost never confirmed is counted among them rather than left out.
+  # =========================================================================
+
+  @integration
+  Scenario: The metered lane counts gateway spend from every project of the organization
+    Given gateway requests recorded under two projects of the viewer's organization
+    And gateway requests recorded under a project of another organization
+    When a permitted viewer opens the cost screen
+    Then the metered lane total is the sum of both of the organization's projects
+    And the other organization's requests contribute nothing
+
+  @integration
+  Scenario: A failed request that consumed tokens still counts as metered spend
+    Given a confirmed gateway request and a failed one priced for the tokens it consumed
+    When the metered lane is read
+    Then both requests' amounts are in the metered total
+
+  @integration
+  Scenario: A request written into two months is counted once
+    Given a gateway request whose outcome was recorded before its admission
+    And the admission moved its start time into the previous month
+    When the metered lane is read
+    Then that request's amount is in the total exactly once
+
+  @integration
+  Scenario: A stream crossing midnight belongs to the day it started
+    Given a gateway request admitted ten minutes before midnight UTC whose answer finished after it
+    When the metered day series is read
+    Then the whole amount is on the day the request started
+    And nothing is on the day it finished
+
+  @integration
+  Scenario: Metered spend is grouped by model and by virtual key, never by person
+    Given gateway requests from two virtual keys against two models
+    When the metered breakdowns are read
+    Then each model's requests total under that model
+    And each key's requests total under that key
+    And the metered read offers model and virtual key as its only groupings
+
+  @integration
+  Scenario: Requests with no dollar amount are counted beside the metered total, not inside it
+    Given priced gateway requests, requests that consumed tokens but carry no dollar amount, and a request whose cost was never confirmed
+    When a permitted viewer opens the cost screen
+    Then the metered lane shows the total of the priced requests
+    And beside it says how many requests carry no dollar amount
+
+  @integration
+  Scenario: A window of only requests with no dollar amount still shows the metered lane
+    Given a window whose every gateway request carries no dollar amount
+    And nothing billed and no seats reported
+    When a permitted viewer opens the cost screen
+    Then the metered lane is shown with no dollar figure
+    And beside it says how many requests carry no dollar amount
+    And the screen does not say nothing was recorded
+
+  @integration
+  Scenario: A failed gateway ledger read never renders the metered lane as zero
+    # The ledger read failing while the rollup read succeeds still rejects
+    # the whole summary, per the rule at the top of the service.
+    Given the gateway ledger read fails despite gateway spend existing
+    When a permitted viewer opens the cost screen
+    Then the cost screen shows its error state
+    And no lane displays a zero amount
+
+  @integration
+  Scenario: Gateway rows left in the rollup are counted nowhere
+    Given gateway rows the retired fold wrote into the rollup
+    And pulled rows for the same days
+    When the billed total, the provider, model and spender breakdowns and the day series are read
+    Then every figure counts the pulled rows only
+
+  # The nightly rollup check and its leftover gateway rows are specified in
+  # governance-cost-rollup.feature, beside the comparator.
 
   # =========================================================================
   # A LANE CARD ANSWERS ONE QUESTION AND RAISES ANOTHER. The money cards
@@ -693,8 +804,10 @@ Feature: One cost screen, three honest lanes
     # screen says how much was left out. A lane we cannot total is a lane
     # with no total, and the screen would rather say nothing than
     # understate what an organization spent. The per-currency lines shown
-    # beside it follow the same rule, one currency at a time.
-    Given one lane has spend we hold no dollar figure for
+    # beside it follow the same rule, one currency at a time. The billed
+    # lane only: the metered lane marks instead of withholding, see the
+    # ledger section above.
+    Given the billed lane has spend we hold no dollar figure for
     And that same lane also has spend stated in US dollars
     When the cost screen reads that window
     Then that lane holds no dollar total
@@ -1159,10 +1272,10 @@ Feature: One cost screen, three honest lanes
     # one person read as two. A spender discovery has not seen is shown as
     # the id itself, which is all anybody knows.
     #
-    # The breakdown reads the PULLED lane only. The gateway lane writes actor
-    # ids into the same table under a different provider vocabulary; letting
-    # them in would both mislabel and cross-sum the lanes the screen keeps
-    # apart.
+    # The breakdown reads the PULLED lane only. The gateway lane used to
+    # write actor ids into the same table under a different provider
+    # vocabulary; those rows were never deleted, so letting them in would
+    # both mislabel and cross-sum the lanes the screen keeps apart.
 
     @unit
     Scenario: Pulled spend is grouped by who spent it
@@ -1172,10 +1285,11 @@ Feature: One cost screen, three honest lanes
 
     @unit
     Scenario: Gateway rows never enter the spender breakdown
-      # The rollup holds both lanes. An unfiltered read would satisfy every
-      # other scenario here while quietly summing gateway money into a
-      # spender's pulled total — the cross-lane sum this screen exists to
-      # refuse.
+      # The rollup holds the pulled lane plus the gateway rows an earlier
+      # fold left behind, which nobody counts. An unfiltered read would
+      # satisfy every other scenario here while quietly summing that
+      # leftover gateway money into a spender's pulled total — the
+      # cross-lane sum this screen exists to refuse.
       Given pulled cost and gateway cost recorded for the same day
       When the spender breakdown is read
       Then only the pulled rows are counted
@@ -1335,9 +1449,10 @@ Feature: One cost screen, three honest lanes
     # figures a reader may need apart.
     #
     # The breakdown reads the PULLED lane only, for the reason the spender
-    # breakdown does: the gateway lane writes a different provider vocabulary
-    # into the same table, and an unfiltered read would cross-sum the two
-    # lanes this screen keeps apart.
+    # breakdown does: the gateway lane used to write a different provider
+    # vocabulary into the same table, its leftover rows are still there,
+    # and an unfiltered read would cross-sum the two lanes this screen
+    # keeps apart.
 
     @unit
     Scenario: Pulled spend is grouped by the model the provider named

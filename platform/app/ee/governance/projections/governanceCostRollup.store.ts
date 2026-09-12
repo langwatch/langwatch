@@ -81,25 +81,18 @@ export function projectGovernanceCostRollupStateToRow({
   };
 }
 
-/** Row → state, the inverse. */
+/**
+ * Row → state, the inverse.
+ *
+ * The row's total columns are not read back: every figure the fold states is
+ * derived from the item map, and the totals were written FROM that map, so
+ * the map alone reproduces them. Reading the totals as a second source would
+ * hand the fold two figures that can disagree, and nothing here could say
+ * which one the provider actually reported.
+ */
 export function governanceCostRollupStateFromRow(
   row: GovernanceCostRollupRow,
 ): GovernanceCostRollupState {
-  const pulledItems = decodePulledItems(row.PulledItemsJson);
-  const pulledAmount = Object.values(pulledItems).reduce(
-    (sum, item) => sum + item.amountNanoMinor,
-    0,
-  );
-  const pulledTokens = Object.values(pulledItems).reduce(
-    (acc, item) => ({
-      input: acc.input + item.tokensInput,
-      output: acc.output + item.tokensOutput,
-      cacheRead: acc.cacheRead + item.tokensCacheRead,
-      cacheWrite: acc.cacheWrite + item.tokensCacheWrite,
-    }),
-    { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  );
-  const pulledCount = Object.keys(pulledItems).length;
   return {
     day: row.Day,
     costSource: row.CostSource as GovernanceCostSource,
@@ -112,17 +105,7 @@ export function governanceCostRollupStateFromRow(
     organizationId: row.OrganizationId,
     exactOrEstimate:
       row.ExactOrEstimate as GovernanceCostRollupState["exactOrEstimate"],
-    // The gateway lane's share is what the row's totals hold beyond the pulled
-    // items it also carries. The two lanes never share a row (CostSource is in
-    // the key), so exactly one of these is non-zero on any real row; the
-    // subtraction is what makes the round-trip exact either way.
-    gatewayAmountNanoMinor: row.AmountNanoMinor - pulledAmount,
-    gatewayTokensInput: row.TokensInput - pulledTokens.input,
-    gatewayTokensOutput: row.TokensOutput - pulledTokens.output,
-    gatewayTokensCacheRead: row.TokensCacheRead - pulledTokens.cacheRead,
-    gatewayTokensCacheWrite: row.TokensCacheWrite - pulledTokens.cacheWrite,
-    gatewayRequestCount: row.RequestCount - pulledCount,
-    pulledItems,
+    pulledItems: decodePulledItems(row.PulledItemsJson),
     revisionCount: row.RevisionCount,
     previousAmountNanoUsd: row.PreviousAmountNanoUsd,
     revisedAt: row.RevisedAt === null ? null : fromUnixSeconds(row.RevisedAt),

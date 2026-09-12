@@ -600,6 +600,103 @@ describe("the governance cost screen", () => {
     });
   });
 
+  describe("given the metered lane counts requests with no dollar amount", () => {
+    /** @scenario "Requests with no dollar amount are counted beside the metered total, not inside it" */
+    it("shows the priced total and, beside it, how many requests carry no dollar amount", () => {
+      harness.query = {
+        data: summaryFixture({
+          gateway: {
+            amountUsd: 67.89,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
+            ],
+            requestsWithoutAmount: 4,
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const gateway = screen.getByTestId("cost-lane-gateway");
+      // The total still stands — the metered lane marks, it does not withhold.
+      expect(within(gateway).getByText("$67.89")).toBeInTheDocument();
+      // And the count is on the face of the card, not hidden behind the (i):
+      // a reader needs it in front of them.
+      expect(
+        within(gateway).getByTestId("cost-lane-gateway-note"),
+      ).toHaveTextContent("4 requests with no dollar amount");
+    });
+
+    it("says nothing when every metered request carries a dollar amount", () => {
+      harness.query = {
+        data: summaryFixture({
+          gateway: {
+            amountUsd: 67.89,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
+            ],
+            requestsWithoutAmount: 0,
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      expect(
+        within(screen.getByTestId("cost-lane-gateway")).queryByTestId(
+          "cost-lane-gateway-note",
+        ),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a metered window of only requests with no dollar amount", () => {
+    /** @scenario "A window of only requests with no dollar amount still shows the metered lane" */
+    it("shows the metered lane with its count and does not say nothing was recorded", () => {
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
+          },
+          gateway: {
+            // Every request in the window settled or priced at zero: no money
+            // to total, no cell marked unpriced, and three requests counted.
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
+            requestsWithoutAmount: 3,
+          },
+          seats: { status: "awaiting_data" },
+          series: [],
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      // The count IS the lane's report. Reading it as "nothing recorded"
+      // hides three real requests behind the empty-organization alert.
+      expect(
+        screen.queryByTestId("cost-lanes-unavailable"),
+      ).not.toBeInTheDocument();
+      const gateway = screen.getByTestId("cost-lane-gateway");
+      expect(within(gateway).queryByText(/\$\d/)).not.toBeInTheDocument();
+      expect(
+        within(gateway).getByTestId("cost-lane-gateway-note"),
+      ).toHaveTextContent("3 requests with no dollar amount");
+    });
+  });
+
   describe("given a window billed in two currencies", () => {
     /** @scenario "A window billed in two currencies shows one total per currency" */
     it("shows one total per currency, combines neither, and applies no rate", () => {

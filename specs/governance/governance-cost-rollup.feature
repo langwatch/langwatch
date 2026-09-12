@@ -135,6 +135,27 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     Then the drift metric counts the mismatch
     And the mismatch details are in the log
 
+  # The comparator checks the billed lane alone. It once checked the
+  # gateway lane too, and the scheduled rows it created for that half are
+  # still in the database; they are marked inactive at start and a start
+  # never recreates them. A row that fires anyway, racing that boot step,
+  # settles as delivered so the scheduler does not retry the slot.
+
+  @integration
+  Scenario: The nightly rollup check covers the billed lane alone
+    Given a scheduled check of the metered lane left over from before
+    When the app starts
+    Then that scheduled check is marked inactive
+    And a later start leaves it inactive
+    And the billed lane's check stays active
+
+  @integration
+  Scenario: A leftover metered check that fires anyway settles quietly
+    Given a scheduled check of the metered lane that fires after all
+    When it runs
+    Then it completes without an error
+    And that slot is not retried
+
   @unit
   Scenario: The summary's lag behind the event log is measured
     Given events newer than the latest summarized moment

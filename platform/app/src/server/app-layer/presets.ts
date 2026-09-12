@@ -14,13 +14,12 @@ import { resolveSourceNonBillable } from "@ee/governance/services/costAttributio
 import {
   COST_ROLLUP_COMPARATOR_TARGET_TYPE,
   CostRollupComparatorService,
+  costRollupComparatorFireHandler,
 } from "@ee/governance/services/costRollupComparator.service";
-import {
-  costSourceFromTargetId,
-  reconcileCostRollupComparatorSchedules,
-} from "@ee/governance/services/costRollupComparatorSchedule";
+import { reconcileCostRollupComparatorSchedules } from "@ee/governance/services/costRollupComparatorSchedule";
 import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
 import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
+import { GovernanceGatewaySpendClickHouseRepository } from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceRollupErasureClickHouseRepository } from "@ee/governance/services/governanceRollupErasure.clickhouse.repository";
@@ -477,9 +476,12 @@ export function initializeDefaultApp(options?: {
   });
 
   const broadcast = new BroadcastService(redis);
+  // One instance, shared with the governance cost screen's metered-lane scope
+  // below, so both read projects through the same repository.
+  const projectRepository = new PrismaProjectRepository(prisma);
   const projects = traced(
     new ProjectService(
-      new PrismaProjectRepository(prisma),
+      projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
     ),
     "ProjectService",
@@ -1053,7 +1055,8 @@ export function initializeDefaultApp(options?: {
     : undefined;
 
   // ADR-128's daily cost rollup. One instance for the whole App: the fold
-  // writes through it on BOTH pipelines (gateway spend and pulled usage), the
+  // writes through it on the pulled-usage pipeline (the metered lane reads
+  // the gateway ledger directly and never reaches this table), the
   // comparator reads through it, and `app.governance.costRollup` hands out the
   // same reference — so the watchdog can never be reading a different table
   // from the one the product shows.
@@ -1062,6 +1065,13 @@ export function initializeDefaultApp(options?: {
     : undefined;
   const governanceCostRollupStore = governanceCostRollupRepository
     ? new GovernanceCostRollupStore(governanceCostRollupRepository)
+    : undefined;
+
+  // ADR-128's metered lane reads the gateway's own per-request ledger rather
+  // than the rollup, scoped to every project of the organization. One instance
+  // for the whole App, resolving its ClickHouse the same way the rollup does.
+  const governanceGatewaySpendRepository = clickhouseEnabled
+    ? new GovernanceGatewaySpendClickHouseRepository(resolveClickHouseClient)
     : undefined;
 
   // ADR-128 §9 step 5. The fold substitutes a pseudonym for an erased
@@ -1247,27 +1257,10 @@ export function initializeDefaultApp(options?: {
     );
     schedulerRegistry.register({
       targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
-      handler: async (fire) => {
-        const costSource = costSourceFromTargetId(fire.targetId);
-        if (!costSource) {
-          // A row naming a lane we do not have. Comparing the wrong lane would
-          // report drift between two things never meant to match, so say so
-          // and do nothing.
-          comparatorLogger.warn(
-            { targetId: fire.targetId, tenantId: fire.projectId },
-            "Cost rollup comparator fired for an unknown cost source; skipping",
-          );
-          return;
-        }
-        const sampled = new Date(fire.slot.getTime() - 86_400_000)
-          .toISOString()
-          .slice(0, 10);
-        await comparator.compareDay({
-          tenantId: fire.projectId,
-          day: sampled,
-          costSource,
-        });
-      },
+      handler: costRollupComparatorFireHandler({
+        comparator,
+        logger: comparatorLogger,
+      }),
     });
 
     // Registering the handler is only half of it: without calendar entries
@@ -2064,6 +2057,8 @@ export function initializeDefaultApp(options?: {
       personalUsage: personalUsageRepository,
       activityMonitor: activityMonitorRepository,
       costRollup: governanceCostRollupRepository,
+      gatewaySpend: governanceGatewaySpendRepository,
+      projects: projectRepository,
       identityErasure: governanceIdentityErasure,
       identityMatch: governanceIdentityMatch,
     },
@@ -2218,11 +2213,9 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     } as unknown as PromptTagRepository),
     "OrganizationService",
   );
+  const nullProjectRepository = new NullProjectRepository();
   const nullProjects = traced(
-    new ProjectService(
-      new NullProjectRepository(),
-      new NullLwqlKeyMapRepository(),
-    ),
+    new ProjectService(nullProjectRepository, new NullLwqlKeyMapRepository()),
     "ProjectService",
   );
 
@@ -2437,6 +2430,8 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       personalUsage: undefined,
       activityMonitor: undefined,
       costRollup: undefined,
+      gatewaySpend: undefined,
+      projects: nullProjectRepository,
       identityErasure: undefined,
       // Real rather than a double: it is Postgres-only, and a test that drives
       // the review surface wants the actual evidence rules, not a stub that

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import type { SchedulerHandler } from "~/server/app-layer/scheduler/scheduler.types";
 import {
   incrementGovernanceCostRollupMismatch,
   setGovernanceCostRollupLagSeconds,
@@ -19,6 +20,10 @@ import {
   governanceCostRollupKey,
   governanceCostRollupTotals,
 } from "../projections/governanceCostRollup.foldProjection";
+import {
+  type ComparedCostSource,
+  costSourceFromTargetId,
+} from "./costRollupComparatorSchedule";
 import type {
   GovernanceCostRollupClickHouseRepository,
   GovernanceCostRollupRow,
@@ -31,15 +36,19 @@ const logger = createLogger("langwatch:governance:cost-rollup:comparator");
 export const COST_ROLLUP_COMPARATOR_TARGET_TYPE =
   "governanceCostRollupComparator" as const;
 
-/** Which events each lane is derived from. */
+/**
+ * Which events each compared lane is derived from.
+ *
+ * Keyed by `ComparedCostSource` rather than by every lane the table knows:
+ * the compiler then refuses a lane that gets an entry but no events, and a
+ * lane with events but no entry, so the schedule and the check cannot drift
+ * apart. The metered lane is absent on purpose — the summary is never written
+ * with its cells, so there is nothing to hold its events against.
+ */
 export const COST_SOURCE_EVENT_TYPES: Record<
-  GovernanceCostSource,
+  ComparedCostSource,
   readonly string[]
 > = {
-  [GOVERNANCE_COST_SOURCE.GATEWAY]: [
-    "lw.gateway.spend.confirmed",
-    "lw.gateway.spend.failed",
-  ],
   // The retraction is here for the same reason the observation is: the check
   // re-derives a day by folding the events that fall inside it, and a fold
   // that never sees the retraction re-derives the amount the retraction
@@ -71,7 +80,7 @@ export interface CostRollupCellMismatch {
 
 export interface CostRollupComparison {
   day: string;
-  costSource: GovernanceCostSource;
+  costSource: ComparedCostSource;
   mismatches: CostRollupCellMismatch[];
   lagMs: number;
 }
@@ -101,7 +110,7 @@ export class CostRollupComparatorService {
   }: {
     tenantId: string;
     day: string;
-    costSource: GovernanceCostSource;
+    costSource: ComparedCostSource;
   }): Promise<CostRollupComparison> {
     const eventTypes = COST_SOURCE_EVENT_TYPES[costSource];
 
@@ -223,4 +232,62 @@ function governanceCostRollupKeyOfRow(row: GovernanceCostRollupRow): string {
     currencyCode: row.CurrencyCode,
     rawActorId: row.RawActorId,
   });
+}
+
+/** The slice of the comparator the scheduled fire needs. */
+export interface CostRollupComparatorDayComparer {
+  compareDay(params: {
+    tenantId: string;
+    day: string;
+    costSource: ComparedCostSource;
+  }): Promise<unknown>;
+}
+
+interface CostRollupComparatorFireLogger {
+  warn(context: Record<string, unknown>, message: string): void;
+}
+
+/**
+ * The handler the scheduler runs when a comparator calendar entry comes due.
+ *
+ * The fire is a tiny trigger — the lane is read back out of `targetId`, the
+ * day derived from the slot — so everything is re-derived at fire time rather
+ * than acted on from a payload minted when the schedule was written. It
+ * samples YESTERDAY, not today: a day still being written to is expected to
+ * disagree with its own summary, and a watchdog that fires on that is a
+ * watchdog nobody reads.
+ *
+ * A fire naming a lane we no longer compare (a leftover metered entry from
+ * before that lane read the ledger directly) is logged and settled as
+ * delivered — the handler resolves, so the scheduler advances the slot rather
+ * than retrying a comparison that has nothing to compare against.
+ */
+export function costRollupComparatorFireHandler({
+  comparator,
+  logger,
+}: {
+  comparator: CostRollupComparatorDayComparer;
+  logger: CostRollupComparatorFireLogger;
+}): SchedulerHandler {
+  return async (fire) => {
+    const costSource = costSourceFromTargetId(fire.targetId);
+    if (!costSource) {
+      // A row naming a lane we do not have. Comparing the wrong lane would
+      // report drift between two things never meant to match, so say so
+      // and do nothing.
+      logger.warn(
+        { targetId: fire.targetId, tenantId: fire.projectId },
+        "Cost rollup comparator fired for an unknown cost source; skipping",
+      );
+      return;
+    }
+    const sampled = new Date(fire.slot.getTime() - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    await comparator.compareDay({
+      tenantId: fire.projectId,
+      day: sampled,
+      costSource,
+    });
+  };
 }

@@ -17,6 +17,7 @@ import type { BillableEventsClickHouseRepository } from "../../../ee/billing/ser
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
 import type { ActivityMonitorClickHouseRepository } from "../../../ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import type { GovernanceCostRollupClickHouseRepository } from "../../../ee/governance/services/governanceCostRollup.clickhouse.repository";
+import type { GovernanceGatewaySpendClickHouseRepository } from "../../../ee/governance/services/governanceGatewaySpend.clickhouse.repository";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -72,6 +73,7 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
+import type { ProjectRepository } from "./projects/repositories/project.repository";
 import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
@@ -298,6 +300,14 @@ export interface AppDependencies {
     /** ADR-128's daily cost rollup — the fold's write side and the read both
      *  the screen and the drift comparator go through. */
     costRollup: GovernanceCostRollupClickHouseRepository | undefined;
+    /** ADR-128's metered lane: the gateway's per-request billing ledger
+     *  (`gateway_spend`), read scoped to every project of the organization.
+     *  Undefined on a deployment without ClickHouse. */
+    gatewaySpend: GovernanceGatewaySpendClickHouseRepository | undefined;
+    /** The metered lane's tenant scope: every project of the organization,
+     *  archived ones included, since `gateway_spend.TenantId` is the traffic's
+     *  own project id. The same instance the ProjectService reads through. */
+    projects: ProjectRepository;
     /** ADR-128 §9: erasing a discovered person from the governance data —
      *  the suppression list, the account links, the person row and the
      *  money rows. Undefined on a deployment without ClickHouse, which has

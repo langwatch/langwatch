@@ -52,11 +52,36 @@ export const COST_ROLLUP_COMPARATOR_CRON = "23 4 * * *";
  */
 export const COST_ROLLUP_COMPARATOR_TIMEZONE = "UTC";
 
-/** The lanes that get their own entry. Both, for every tenant. */
-const COMPARED_COST_SOURCES: readonly GovernanceCostSource[] = [
+/**
+ * The lanes that get their own entry: the pulled lane, for every tenant.
+ *
+ * The metered lane is not compared. The cost screen reads it straight off the
+ * per-request ledger, and the rollup fold no longer writes gateway cells, so
+ * a gateway comparison would re-derive cells the summary is never written
+ * with and always find nothing on both sides — a check that could not fail.
+ *
+ * Exported as a tuple so the comparator's event-type map can be typed by it:
+ * the compiler then proves the map covers exactly the lanes that get an
+ * entry, no more and no fewer.
+ */
+export const COMPARED_COST_SOURCES = [GOVERNANCE_COST_SOURCE.PULLED] as const;
+export type ComparedCostSource = (typeof COMPARED_COST_SOURCES)[number];
+
+/**
+ * The lanes older builds scheduled and this one no longer compares. An
+ * ACTIVE entry for one of these is switched off at boot and never recreated;
+ * an inactive one is left exactly as it is, retired rather than deleted so an
+ * operator can still see what the older build had scheduled.
+ */
+const RETIRED_COST_SOURCES: readonly GovernanceCostSource[] = [
   GOVERNANCE_COST_SOURCE.GATEWAY,
-  GOVERNANCE_COST_SOURCE.PULLED,
 ];
+
+function isRetiredTargetId(targetId: string): boolean {
+  return RETIRED_COST_SOURCES.some((costSource) =>
+    targetId.endsWith(`:${costSource}`),
+  );
+}
 
 /**
  * The scheduler's target identity for one tenant's lane.
@@ -90,7 +115,7 @@ export function costRollupComparatorTargetId({
  */
 export function costSourceFromTargetId(
   targetId: string,
-): GovernanceCostSource | null {
+): ComparedCostSource | null {
   return (
     COMPARED_COST_SOURCES.find((costSource) =>
       targetId.endsWith(`:${costSource}`),
@@ -136,13 +161,20 @@ async function findEntriesForTenant({
 }
 
 /**
- * One tenant's missing entries, created.
+ * One tenant's missing entries created, and its retired ones switched off.
  *
  * Create-if-missing, like the report reconciler: an entry that already exists
  * is left exactly as it is, INCLUDING an inactive one, because an operator who
  * paused a noisy comparator must not have it switched back on by the next
  * deploy. Safe on every pod — `upsertForTarget` is race-hardened on the
  * unique.
+ *
+ * Retire-if-active for the lanes this build no longer compares: the row
+ * stays, marked inactive, and is never recreated because it is not among the
+ * compared lanes. Only an ACTIVE one is written to, so a second boot is a
+ * no-op rather than a re-deactivation. A retired row that fires before this
+ * reaches it lands in the handler as a lane it does not have, which the
+ * handler settles with a warning rather than a retry.
  *
  * A failure is logged and counted rather than thrown, so one bad tenant cannot
  * stop the rest of the fleet from being scheduled.
@@ -157,7 +189,7 @@ async function ensureEntriesForTenant({
   targetType: string;
   tenantId: string;
   logger: { warn: (context: unknown, message: string) => void };
-}): Promise<{ created: number; failed: number }> {
+}): Promise<{ created: number; deactivated: number; failed: number }> {
   const existing = await findEntriesForTenant({
     scheduledJobs,
     targetType,
@@ -165,7 +197,7 @@ async function ensureEntriesForTenant({
     logger,
   });
   // One unreadable tenant, counted and stepped over.
-  if (existing === null) return { created: 0, failed: 1 };
+  if (existing === null) return { created: 0, deactivated: 0, failed: 1 };
   const existingTargetIds = new Set(existing.map((job) => job.targetId));
 
   const missing = COMPARED_COST_SOURCES.filter(
@@ -175,8 +207,20 @@ async function ensureEntriesForTenant({
       ),
   );
 
+  const retired = await switchOffEntries({
+    scheduledJobs,
+    targetType,
+    tenantId,
+    logger,
+    jobs: existing.filter(
+      (row) => row.active && isRetiredTargetId(row.targetId),
+    ),
+    failureMessage:
+      "Retiring the cost rollup comparator entry for a lane no longer compared failed; the next boot retries it",
+  });
+
   let created = 0;
-  let failed = 0;
+  let failed = retired.failed;
   for (const costSource of missing) {
     try {
       await scheduledJobs.upsertForTarget({
@@ -206,7 +250,58 @@ async function ensureEntriesForTenant({
       );
     }
   }
-  return { created, failed };
+  return { created, deactivated: retired.deactivated, failed };
+}
+
+/**
+ * The given entries, switched off one by one.
+ *
+ * The caller decides WHICH rows — an archived tenant's live ones, a live
+ * tenant's retired lane — and this only does the writes, so the two paths
+ * cannot drift on how a switch-off is counted or how its failure is reported.
+ *
+ * Failures are logged and counted, never thrown, for the same reason as the
+ * creation path: a tenant whose rows will not switch off must not cost the
+ * tenants behind it their schedule.
+ */
+async function switchOffEntries({
+  scheduledJobs,
+  targetType,
+  tenantId,
+  logger,
+  jobs,
+  failureMessage,
+}: {
+  scheduledJobs: ScheduledJobRepository;
+  targetType: string;
+  tenantId: string;
+  logger: { warn: (context: unknown, message: string) => void };
+  jobs: ScheduledJobRecord[];
+  failureMessage: string;
+}): Promise<{ deactivated: number; failed: number }> {
+  let deactivated = 0;
+  let failed = 0;
+  for (const job of jobs) {
+    try {
+      await scheduledJobs.deactivateForTarget({
+        projectId: tenantId,
+        targetType,
+        targetId: job.targetId,
+      });
+      deactivated += 1;
+    } catch (error) {
+      failed += 1;
+      logger.warn(
+        {
+          tenantId,
+          targetId: job.targetId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        failureMessage,
+      );
+    }
+  }
+  return { deactivated, failed };
 }
 
 /**
@@ -214,10 +309,6 @@ async function ensureEntriesForTenant({
  *
  * Only what is actually there and still active, so the count reports work done
  * rather than no-op writes against tenants that never had an entry.
- *
- * Failures are logged and counted, never thrown, for the same reason as the
- * creation path: an archived tenant whose rows will not switch off must not
- * cost the live tenants behind it their schedule.
  */
 async function deactivateEntriesForTenant({
   scheduledJobs,
@@ -238,35 +329,26 @@ async function deactivateEntriesForTenant({
   });
   if (existing === null) return { deactivated: 0, failed: 1 };
 
-  let deactivated = 0;
-  let failed = 0;
-  for (const job of existing.filter((row) => row.active)) {
-    try {
-      await scheduledJobs.deactivateForTarget({
-        projectId: tenantId,
-        targetType,
-        targetId: job.targetId,
-      });
-      deactivated += 1;
-    } catch (error) {
-      failed += 1;
-      logger.warn(
-        {
-          tenantId,
-          targetId: job.targetId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Switching off the cost rollup comparator for this archived tenant failed; the next boot retries it",
-      );
-    }
-  }
-  return { deactivated, failed };
+  return switchOffEntries({
+    scheduledJobs,
+    targetType,
+    tenantId,
+    logger,
+    jobs: existing.filter((row) => row.active),
+    failureMessage:
+      "Switching off the cost rollup comparator for this archived tenant failed; the next boot retries it",
+  });
 }
 
 /**
- * Give every governance project its comparator entries, and take them away
- * from projects that have been archived — a comparator firing daily at a dead
+ * Give every governance project its comparator entries, retire the entries
+ * for lanes this build no longer compares, and take everything away from
+ * projects that have been archived — a comparator firing daily at a dead
  * tenant is pure noise on the mismatch counter.
+ *
+ * `deactivated` counts both kinds of switch-off: the retired lane on a live
+ * tenant and every entry on an archived one. Either way it is an entry that
+ * was firing and now is not, which is what the boot log line reports.
  */
 export async function reconcileCostRollupComparatorSchedules({
   prisma,
@@ -305,6 +387,7 @@ export async function reconcileCostRollupComparatorSchedules({
       logger,
     });
     created += result.created;
+    deactivated += result.deactivated;
     failed += result.failed;
   }
 
