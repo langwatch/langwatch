@@ -17,6 +17,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 )
 
 // ServiceRow is one service of a stack, as the detail panel shows it.
@@ -442,19 +444,22 @@ func (m model) selected() (item, bool) {
 
 // --- view --------------------------------------------------------------------
 
+// The hub's styles, drawn from haven's one palette (adapters/havenui). The
+// local names stay because the rendering below reads better for them; what
+// they must NOT be again is a second definition of the same colours.
 var (
-	accent       = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
-	styleTitle   = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	styleDim     = lipgloss.NewStyle().Faint(true)
-	styleSel     = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleLive    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleStale   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	styleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
+	accent       = havenui.Accent
+	styleTitle   = havenui.Title
+	styleDim     = havenui.Muted
+	styleSel     = havenui.Selected
+	styleLive    = havenui.Good
+	styleStale   = havenui.Aging
+	styleWarn    = havenui.Warn
 	styleSection = lipgloss.NewStyle().Bold(true).Faint(true)
-	styleBarOn   = lipgloss.NewStyle().Foreground(accent)
+	styleBarOn   = lipgloss.NewStyle().Foreground(havenui.Accent)
 	// styleBarOther colors the non-dev slice of the RAM bar: a muted violet so
 	// it reads as "occupied, not ours" next to the accent's "ours".
-	styleBarOther = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#7c3aed", Dark: "#a78bfa"})
+	styleBarOther = lipgloss.NewStyle().Foreground(havenui.Other)
 )
 
 const hubWidth = 72

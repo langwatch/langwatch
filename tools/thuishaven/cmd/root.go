@@ -31,6 +31,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/otellgtm"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/portlessproxy"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/postgresbrew"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/prereqs"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procmetrics"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/redisbrew"
@@ -232,7 +233,8 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
 		Container: rt, Janitor: dockerjanitor.New(rt), Jobs: jobscratch.New(),
 		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
-		Claude:  claudesettings.New(), Codex: codexsettings.New(), Log: logger,
+		Claude:  claudesettings.New(), Codex: codexsettings.New(),
+		Prereqs: prereqs.New(), Log: logger,
 	})
 	return deps{
 		orch: orch,

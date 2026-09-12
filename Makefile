@@ -24,7 +24,7 @@ help:
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""
 	@echo "  Local dev by hostname (thuishaven):"
-	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
+	@echo "    make haven install                  go install the haven binary, then check this machine has what haven needs"
 	@echo "    make haven up                       start this worktree's stack (bootstraps itself)"
 	@echo "    make haven status                   every stack + shared-server health, one shot"
 	@echo "    make haven <cmd>                    any haven subcommand (see 'haven help')"

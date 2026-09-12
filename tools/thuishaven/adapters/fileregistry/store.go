@@ -201,6 +201,88 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return atomicfile.Write(path, data, perm)
 }
 
+// prereqSkipsPath is the machine-wide record of which prerequisites `haven
+// install` was told never to ask about again. It lives beside the registry
+// rather than in a worktree: what is installed on the machine is the same
+// answer from every checkout, and so is the developer's decision about it.
+func (s *Store) prereqSkipsPath() string { return filepath.Join(s.home, "install-skips.json") }
+
+// prereqSkipsFile is the on-disk shape: what `haven install` was told about
+// this machine. A list for the skips rather than a map, so the file reads as
+// the sentence it is ("never ask me about these") and a hand edit is obvious.
+type prereqSkipsFile struct {
+	Skipped []string `json:"skipped"`
+	// ContainerPosture is colima, docker or none — the one answer every
+	// container-shaped decision downstream is derived from. Empty means the
+	// developer has never chosen, which is what makes haven look instead.
+	ContainerPosture string `json:"containerPosture,omitempty"`
+}
+
+// readPrereqFile loads the whole record. Absent, unreadable or corrupt all
+// read as empty: a preference nobody has expressed yet is not a failure, and
+// a truncated file must not be able to block the install command entirely.
+func (s *Store) readPrereqFile() prereqSkipsFile {
+	var f prereqSkipsFile
+	b, err := os.ReadFile(s.prereqSkipsPath())
+	if err != nil {
+		return prereqSkipsFile{}
+	}
+	if json.Unmarshal(b, &f) != nil {
+		return prereqSkipsFile{}
+	}
+	return f
+}
+
+// writePrereqFile replaces the record, sorted so it does not churn between
+// runs that record the same thing in a different order.
+func (s *Store) writePrereqFile(f prereqSkipsFile) error {
+	if err := os.MkdirAll(s.home, 0o755); err != nil {
+		return err
+	}
+	if f.Skipped == nil {
+		f.Skipped = []string{}
+	}
+	sort.Strings(f.Skipped)
+	b, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(s.prereqSkipsPath(), append(b, '\n'), 0o644)
+}
+
+// ReadContainerPosture is the machine's stated container posture, "" when
+// never chosen.
+func (s *Store) ReadContainerPosture() string { return s.readPrereqFile().ContainerPosture }
+
+// WriteContainerPosture records it, leaving the skips in the same file alone.
+func (s *Store) WriteContainerPosture(posture string) error {
+	f := s.readPrereqFile()
+	f.ContainerPosture = posture
+	return s.writePrereqFile(f)
+}
+
+// ReadPrereqSkips loads the never-ask-again set.
+func (s *Store) ReadPrereqSkips() map[string]bool {
+	skips := map[string]bool{}
+	for _, key := range s.readPrereqFile().Skipped {
+		skips[key] = true
+	}
+	return skips
+}
+
+// WritePrereqSkips replaces the set, leaving the posture in the same file
+// alone.
+func (s *Store) WritePrereqSkips(skips map[string]bool) error {
+	f := s.readPrereqFile()
+	f.Skipped = []string{}
+	for key, on := range skips {
+		if on {
+			f.Skipped = append(f.Skipped, key)
+		}
+	}
+	return s.writePrereqFile(f)
+}
+
 // hmrGatePath is the marker the Vite HMR-gate plugin reads. The plugin resolves
 // it against its own working directory, which is the Vite lane's — apps/ui —
 // so the marker is written there, not at the workspace root.

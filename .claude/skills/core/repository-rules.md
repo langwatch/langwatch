@@ -138,8 +138,12 @@ fatter turns**, not a warmer cache.
   on every subsequent turn, at full price, forever.
 - A framework signature is `tslsp-cli hover --symbol X`, not a read of the
   framework's source.
-- Prefix shell commands with `rtk` where a filter exists (`rtk git`, `rtk pnpm`,
-  `rtk grep`); it is a passthrough when there is none, so it is always safe.
+- `rtk` shrinks the output of the commands you run most (`rtk git`, `rtk pnpm`,
+  `rtk grep`) and passes through the ones it has no filter for. It is optional
+  here and not on every machine, so check `command -v rtk` once and prefix from
+  then on; unprefixed is correct when it is absent, and `rtk` on a machine
+  without it is `command not found` and a wasted turn. `haven install` offers
+  to install it.
 
 **Do not let one tool call outlive the prompt cache.** The cache TTL depends on
 who you are: a main session gets an hour, a **subagent gets five minutes**. A

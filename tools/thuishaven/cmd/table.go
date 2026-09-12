@@ -461,6 +461,22 @@ var baseTable = []commandSpec{
 		run: runHeavy,
 	},
 	{
+		// install is about the MACHINE, setup about the CHECKOUT. Two commands
+		// rather than one because they answer to different people: everything
+		// here is something a developer installs once per laptop, and
+		// everything in setup is per worktree and gitignored.
+		name:    "install",
+		summary: "check this machine for what haven needs and offer to install it (portless, node, brew formulae, a runtime)",
+		args:    "[prerequisite…]",
+		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--list", summary: "report what is installed and what is missing; change nothing"},
+			{long: "--yes", summary: "install what haven needs without asking (leaves the optional ones alone)"},
+			{long: "--reset-skips", summary: "forget every never-ask-again, so the next run offers them all"},
+		},
+		run: runInstall,
+	},
+	{
 		name:    "setup",
 		summary: "install optional integrations into this checkout (interactive; nothing is assumed)",
 		args:    "[feature…]",

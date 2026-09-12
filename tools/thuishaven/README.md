@@ -56,8 +56,12 @@ Shared, machine-wide (one daemon serves all worktrees):
 There is none. The first `haven up` bootstraps the machine itself: installs
 portless if missing, trusts its CA, starts the proxy — every step idempotent.
 `make haven install` (optional) go-installs the binary so plain `haven ...`
-works everywhere. Hostname routing is opt-in — `pnpm dev` uses the plain
-`PORT` scheme:
+works everywhere, and then runs `haven install`, which checks the machine for
+everything else haven drives — node, pnpm, go, the brew formulae behind the
+shared Postgres and Redis, a container runtime — and offers to install what is
+missing. Nothing is installed without being ticked, and anything declined with
+"never" is remembered for the machine (`haven install --reset-skips` undoes
+that). Hostname routing is opt-in — `pnpm dev` uses the plain `PORT` scheme:
 
 ```bash
 haven up                 # registers hostnames, starts + supervises the stack
@@ -143,6 +147,18 @@ haven slot       run any command under the machine-wide check slot:
                  HAVEN_PRIORITY=high states a run matters, honoured once per
                  agent id every ten minutes
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
+haven install    check this MACHINE for what haven drives but does not own —
+                 portless, node, pnpm, go, the brew formulae behind the shared
+                 Postgres and Redis, a container runtime, the ClickHouse
+                 client, rtk — and offer to install what is missing. A terminal gets a
+                 picker (space ticks, `n` is never-ask-again, ←/→ picks between
+                 colima and Docker Desktop); a pipe or an agent gets the report
+                 and the commands. --yes installs what haven needs without
+                 asking, --list only reports, --reset-skips forgets every
+                 never-ask-again. Naming one installs exactly that:
+                 `haven install clickhouse-client`, `haven install runtime=docker-desktop`
+haven setup      install optional integrations into this CHECKOUT (the agent
+                 gate hooks) — see "Optional agent hooks" below
 haven upgrade    reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference
 ```
