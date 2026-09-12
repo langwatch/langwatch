@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { WebhookApi, WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
+import { WebhookApi, type WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";

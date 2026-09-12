@@ -5,7 +5,7 @@ import {
   type AuthzGrantsCommandDispatcher,
 } from "@langwatch/authz-server";
 import {
-  DataRetentionPlanResolver,
+  type DataRetentionPlanResolver,
   type DataRetentionInfrastructure,
   type DataRetentionPlan,
 } from "@langwatch/data-retention-server";

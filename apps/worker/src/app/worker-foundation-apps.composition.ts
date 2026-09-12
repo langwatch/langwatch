@@ -1,7 +1,7 @@
 import { mintStoredObjectUri, ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import {
   PrometheusStoredObjectsTelemetryAdapter,
-  StoredObjectsClickHouse,
+  type StoredObjectsClickHouse,
   StoredObjectsService,
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";

@@ -1,6 +1,6 @@
 import { Deferred } from "@langwatch/eventing";
 import {
-  TraceProcessingInstaller,
+  type TraceProcessingInstaller,
   type TraceProcessingCommands,
 } from "@langwatch/trace-server";
 import {

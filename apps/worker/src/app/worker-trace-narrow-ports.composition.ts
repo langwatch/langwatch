@@ -6,10 +6,10 @@ import type {
 } from "@langwatch/project-contract";
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import {
-  TraceEvaluationMonitor,
-  TraceModelCostCatalog,
-  TraceProductAnalytics,
-  TraceProjectMetadata,
+  type TraceEvaluationMonitor,
+  type TraceModelCostCatalog,
+  type TraceProductAnalytics,
+  type TraceProjectMetadata,
 } from "@langwatch/trace-server";
 
 /**

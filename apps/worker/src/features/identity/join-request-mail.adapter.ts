@@ -1,4 +1,4 @@
-import { JoinRequestMail } from "@langwatch/identity-server";
+import { type JoinRequestMail } from "@langwatch/identity-server";
 import type { MailRender } from "@langwatch/mail";
 import type { EmailDelivery } from "@langwatch/notification-server";
 

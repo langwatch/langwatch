@@ -3,7 +3,7 @@ import {
   type DataPrivacyResolution,
 } from "@langwatch/data-privacy-server";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceSpanContentDrop, type TraceSpanContentDropResult } from "@langwatch/trace-server";
+import { type TraceSpanContentDrop, type TraceSpanContentDropResult } from "@langwatch/trace-server";
 
 /**
  * The content this process would refuse to store for a project that asked for

@@ -9,7 +9,7 @@ import type {
 import { TopicClusteringModels } from "@langwatch/topic-contract";
 import {
   OtelTopicClusteringMetricsAdapter,
-  TopicClusteringLangevals,
+  type TopicClusteringLangevals,
   type TopicClusteringClickHouseResolver,
   type TopicClusteringExecutionDependencies,
   type TopicClusteringLangevalsKind,

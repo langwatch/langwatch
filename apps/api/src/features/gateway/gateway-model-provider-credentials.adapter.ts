@@ -1,4 +1,4 @@
-import { GatewayModelProviderCredentials } from "@langwatch/gateway-server";
+import { type GatewayModelProviderCredentials } from "@langwatch/gateway-server";
 import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import type { SecretEncryption } from "@langwatch/secret-server";
 

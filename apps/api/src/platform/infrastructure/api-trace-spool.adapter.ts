@@ -1,7 +1,7 @@
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
-import { TraceSpoolStorage, type TraceSpoolObjectStore } from "@langwatch/trace-server";
+import { type TraceSpoolStorage, type TraceSpoolObjectStore } from "@langwatch/trace-server";
 
 export type ApiTraceSpoolStorageOptions = {
   runtime: StoredObjectStorageRuntimeAdapter;

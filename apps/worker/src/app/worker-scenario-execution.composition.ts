@@ -44,15 +44,15 @@ import {
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
 import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
-import { suiteServer, SuiteExecution } from "@langwatch/suite-server";
+import { suiteServer, type SuiteExecution } from "@langwatch/suite-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
-  NlpPayloadStaging,
+  type NlpPayloadStaging,
   StudioEventPreparerService,
-  WorkflowId,
-  WorkflowLlmParameters,
+  type WorkflowId,
+  type WorkflowLlmParameters,
   WorkflowNlpExecutionService,
   WorkflowProjectEnvironmentService,
   WorkflowService,

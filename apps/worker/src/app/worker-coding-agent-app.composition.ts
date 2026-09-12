@@ -1,7 +1,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  CodingAgentCallerScopeDirectory,
-  CodingAgentScopePermissions,
+  type CodingAgentCallerScopeDirectory,
+  type CodingAgentScopePermissions,
   codingAgentServer,
   type CodingAgentBillingPolicy,
   type CodingAgentClickHouse,

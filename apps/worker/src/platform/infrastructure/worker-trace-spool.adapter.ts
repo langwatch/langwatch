@@ -6,8 +6,8 @@ import {
 } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import {
-  TraceSpoolLegacyObject,
-  TraceSpoolStorage,
+  type TraceSpoolLegacyObject,
+  type TraceSpoolStorage,
   type TraceSpoolObjectStore,
 } from "@langwatch/trace-server";
 

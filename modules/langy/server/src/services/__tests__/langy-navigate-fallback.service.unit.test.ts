@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { LangyNavigateProject } from "../../app/langy.members.ts";
-import { LangyNavigateResource } from "../../app/langy.members.ts";
+import type { LangyNavigateResourceLocator } from "../../app/langy.members.ts";
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
 import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service.ts";
 
@@ -16,7 +16,7 @@ class FakeProjects implements LangyNavigateProject {
   }
 }
 
-class FakeResources implements LangyNavigateResource {
+class FakeResources implements LangyNavigateResourceLocator {
   readonly lookups: Array<{ kind: LangyNavigateResourceKind; resourceId: string }> = [];
 
   constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {
@@ -34,7 +34,7 @@ class FakeResources implements LangyNavigateResource {
 
 const service = (
   slugs: Record<string, string> = { "project-1": "acme" },
-  resources?: LangyNavigateResource,
+  resources?: LangyNavigateResourceLocator,
 ) =>
   LangyNavigateFallbackService.create({
     projects: new FakeProjects(slugs),

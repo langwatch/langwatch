@@ -1,12 +1,12 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import {
-  AutomationClock,
+  type AutomationClock,
   AutomationDispatchError,
   AutomationEmailCapService,
   type AutomationEmailCapRepository,
-  AutomationGraphActivity,
+  type AutomationGraphActivity,
   AutomationLogger,
-  AutomationProjectIdentityPort,
+  type AutomationProjectIdentityPort,
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
   type AutomationSecretCrypto,

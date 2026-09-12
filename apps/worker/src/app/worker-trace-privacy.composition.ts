@@ -8,7 +8,7 @@ import {
 import type { TenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan, PIIRedactionLevel } from "@langwatch/trace-contract";
-import { TraceSpanPiiRedaction } from "@langwatch/trace-server";
+import { type TraceSpanPiiRedaction } from "@langwatch/trace-server";
 import { WorkerPiiAnalysisAdapter } from "../platform/infrastructure/worker-pii-analysis.adapter.ts";
 import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.ts";
 

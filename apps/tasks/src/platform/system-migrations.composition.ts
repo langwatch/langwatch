@@ -5,7 +5,7 @@ import {
 } from "@langwatch/authz-server";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
 import {
-  IdentityEventing,
+  type IdentityEventing,
   IdentityProducerPipelinesAdapter,
   PostgresIdentityNewbornSweepAdapter,
   PostgresIdentityUserMigrationsAdapter,

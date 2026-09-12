@@ -8,7 +8,7 @@ import {
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
-  EvaluationRetentionFloor,
+  type EvaluationRetentionFloor,
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
 import {

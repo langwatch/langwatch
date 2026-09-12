@@ -17,7 +17,7 @@ export type { LangyInfrastructure } from "./app/langy.app.ts";
 export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";
 export { type LangyNavigateProject } from "./app/langy.members.ts";
-export { LangyNavigateResource } from "./app/langy.members.ts";
+export type { LangyNavigateResourceLocator } from "./app/langy.members.ts";
 export {
   LANGY_NAVIGATE_RESOURCE_KINDS,
   type LangyNavigateResourceKind,

@@ -4,7 +4,7 @@ import type { QueueSendOptions } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   OtelTraceEvaluationLoopMetricsAdapter,
-  TraceEvaluationDispatch,
+  type TraceEvaluationDispatch,
   createEvaluationTriggerSubscriber,
   type TraceEvaluationLoopMetrics,
   type TraceEvaluationMonitor,

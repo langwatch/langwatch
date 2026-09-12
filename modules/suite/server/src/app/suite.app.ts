@@ -15,7 +15,7 @@ import type {
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
-import { SuiteApi, SuiteNotFoundError, SuiteRunParameters, SuiteRunResult, SuiteScopeNotAllowedError, SuiteTarget, type CreateSuiteCommand, type StartSuiteRunCommandData, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
+import { SuiteApi, SuiteNotFoundError, type SuiteRunParameters, type SuiteRunResult, SuiteScopeNotAllowedError, type SuiteTarget, type CreateSuiteCommand, type StartSuiteRunCommandData, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";

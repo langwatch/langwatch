@@ -4,7 +4,7 @@
  * or failing resolves to null rather than tearing down the relay stream.
  */
 import type { LangyNavigateProject } from "../app/langy.members.ts";
-import type { LangyNavigateResource } from "../app/langy.members.ts";
+import type { LangyNavigateResourceLocator } from "../app/langy.members.ts";
 import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules.ts";
 import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules.ts";
 
@@ -15,7 +15,7 @@ export class LangyNavigateFallbackService {
   private constructor(
     private readonly projects: LangyNavigateProject,
     private readonly platformUrl: LangyNavigatePlatformUrl,
-    private readonly resources: LangyNavigateResource | undefined,
+    private readonly resources: LangyNavigateResourceLocator | undefined,
   ) {}
 
   static create(deps: {
@@ -25,7 +25,7 @@ export class LangyNavigateFallbackService {
      * Absent where a process composed none of the eight features a resource id
      * names; only page names resolve then.
      */
-    resources?: LangyNavigateResource;
+    resources?: LangyNavigateResourceLocator;
   }): LangyNavigateFallbackService {
     return new LangyNavigateFallbackService(deps.projects, deps.platformUrl, deps.resources);
   }

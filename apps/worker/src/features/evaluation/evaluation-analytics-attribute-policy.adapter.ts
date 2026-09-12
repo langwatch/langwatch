@@ -1,4 +1,4 @@
-import { EvaluationAnalyticsAttributePolicy } from "@langwatch/evaluation-server";
+import { type EvaluationAnalyticsAttributePolicy } from "@langwatch/evaluation-server";
 import { trimAttributesForAnalytics } from "@langwatch/trace-server";
 
 /**

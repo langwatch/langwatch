@@ -1,5 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
-import { TraceProductAnalytics, type TraceProductEvent } from "@langwatch/trace-server";
+import { type TraceProductAnalytics, type TraceProductEvent } from "@langwatch/trace-server";
 import { PostHog } from "posthog-node";
 import type { WorkerProductAnalyticsConfig } from "../config/worker.config.ts";
 

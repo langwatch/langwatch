@@ -9,7 +9,7 @@ import {
 } from "@langwatch/analytics-server";
 import { TRACE_EXPANSIONS, type DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
-  AutomationClock,
+  type AutomationClock,
   AutomationDatasetMapper,
   AutomationPersistActionService,
   AutomationPersistCapService,

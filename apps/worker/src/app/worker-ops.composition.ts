@@ -7,14 +7,14 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
 import {
-  AnomalyHardTierAlert,
+  type AnomalyHardTierAlert,
   OpsWorkerAdapter,
   OtelStorageStatsMetricsAdapter,
   StorageStatsCollectionService,
   UsageStatsClickHouseClient,
   UsageStatsClickHouseClientResolver,
-  UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
+  type UsageStatsErrorReporter,
+  type UsageStatsTelemetryClient,
   type OpsWorker,
   type StorageStatsInstance,
   type UsageStatsWorkerDatabase,

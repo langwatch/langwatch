@@ -78,7 +78,7 @@ import type { OpsExplainClients } from "#repositories/observe/ops-explain.reposi
 import type { OpsEventingIntrospection } from "./ops.app.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { timingSafeEqual } from "node:crypto";
-import { Instant, nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 import {
   buildExplainQuery,
   redactQueryForAudit,

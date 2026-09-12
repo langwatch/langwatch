@@ -1,5 +1,5 @@
 import {
-  EvaluationModelEnv,
+  type EvaluationModelEnv,
   type EvaluationAzureSafetyCredentials,
 } from "@langwatch/evaluation-server";
 import { isAzureEvaluatorType, EvaluatorConfigError } from "@langwatch/evaluation-contract";

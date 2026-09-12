@@ -1,15 +1,15 @@
 import { AZURE_SAFETY_PROVIDER_KEY } from "@langwatch/evaluation-contract";
 import {
-  EvaluationAzureSafetyCredentials,
-  EvaluationInputsOffload,
-  EvaluationMonitorLookup,
+  type EvaluationAzureSafetyCredentials,
+  type EvaluationInputsOffload,
+  type EvaluationMonitorLookup,
   type EvaluationInputsOffloadService,
-  EvaluationSettingsRecovery,
-  EvaluationSpanDigest,
-  EvaluationTraceEvidence,
-  EvaluationTraceRead,
+  type EvaluationSettingsRecovery,
+  type EvaluationSpanDigest,
+  type EvaluationTraceEvidence,
+  type EvaluationTraceRead,
   type EvaluationTraceProtections,
-  EvaluationWorkflowExecutor,
+  type EvaluationWorkflowExecutor,
   HttpLangevalsEvaluatorAdapter,
   OtelEvaluationExecutionMetricsAdapter,
   EvaluationCostService,
@@ -22,8 +22,8 @@ import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/com
 import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import {
   monitorServer,
-  MonitorEvaluator,
-  MonitorPerformance,
+  type MonitorEvaluator,
+  type MonitorPerformance,
   type MonitorReplicationReader,
 } from "@langwatch/monitor-server";
 import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";

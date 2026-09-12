@@ -7,7 +7,7 @@ import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/eg
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import {
   GatewayElevenLabsCredentialService,
-  GatewayModelProviderCredentials,
+  type GatewayModelProviderCredentials,
   GatewayRealtimeSessionReconciliationService,
   GatewayRealtimeSessionService,
   ModelCatalogGatewaySpendRatingAdapter,

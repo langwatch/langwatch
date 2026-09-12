@@ -22,7 +22,7 @@ import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
 import {
-  LangyUiActionCatalog,
+  type LangyUiActionCatalog,
   type LangyUiActionDefinition,
 } from "#app/langy.members";
 import {

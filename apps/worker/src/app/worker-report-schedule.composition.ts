@@ -1,7 +1,7 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "@langwatch/automation-contract";
 import {
-  AutomationClock,
+  type AutomationClock,
   PostgresAutomationGraphDeliveryAdapter,
   PrismaCustomGraphRepository,
   PrismaTriggerFireHistoryRepository,
@@ -25,7 +25,7 @@ import {
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
-  EvaluationRetentionFloor,
+  type EvaluationRetentionFloor,
 } from "@langwatch/evaluation-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";

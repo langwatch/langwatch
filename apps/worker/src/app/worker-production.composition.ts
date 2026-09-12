@@ -162,8 +162,8 @@ import type { WorkerFeatureInstaller } from "../features/worker-feature.installe
 import { WorkerApplication } from "./worker.application.ts";
 import type { DatasetContentDatabase } from "@langwatch/dataset-server/composition/dataset-content";
 import {
-  AutomationGraphActivity,
-  AutomationTriggerMatchRecorder,
+  type AutomationGraphActivity,
+  type AutomationTriggerMatchRecorder,
   PrismaAutomationTraceTriggerCatalogueRepository,
   type AutomationGraphActivityDatabase,
   type AutomationTraceTriggerCatalogueDatabase,

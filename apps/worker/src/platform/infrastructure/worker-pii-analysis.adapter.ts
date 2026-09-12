@@ -34,7 +34,7 @@
 import type { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos.js";
 import type { BatchEvaluationResult } from "@langwatch/evaluator-contract";
-import { type PiiAnalysisMetrics, PiiAnalysis } from "@langwatch/data-privacy-server";
+import { type PiiAnalysisMetrics, type PiiAnalysis } from "@langwatch/data-privacy-server";
 import { normalizePresidioMarkers, PRESIDIO_STRICT_ENTITIES } from "@langwatch/redaction";
 import {
   compilePiiExceptPatterns,

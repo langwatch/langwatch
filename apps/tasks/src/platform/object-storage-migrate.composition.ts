@@ -7,7 +7,7 @@ import {
   ObjectStorageMigrateTask,
   ObjectStorageMigrationInventory,
   parseMigrationTaskConfig,
-  StoredObjectsClickHouse,
+  type StoredObjectsClickHouse,
   type MigrationDataset,
   type MigrationPageRequest,
   type MigrationProject,

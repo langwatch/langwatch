@@ -1,6 +1,6 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import {
-  GatewaySpendConfirmation,
+  type GatewaySpendConfirmation,
   type ConfirmSpendCommandData,
 } from "@langwatch/gateway-server";
 import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feature.installer.ts";

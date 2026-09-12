@@ -1,7 +1,7 @@
 import type { TenantBroadcast } from "@langwatch/notification-server";
 import type { Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { TraceTenantBroadcast } from "@langwatch/trace-server";
+import { type TraceTenantBroadcast } from "@langwatch/trace-server";
 import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
 
 /**

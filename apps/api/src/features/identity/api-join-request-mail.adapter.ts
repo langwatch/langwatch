@@ -1,4 +1,4 @@
-import { JoinRequestMail } from "@langwatch/identity-server";
+import { type JoinRequestMail } from "@langwatch/identity-server";
 import type { ApiPersonMail } from "../../app/api-person-mail.port.ts";
 
 /**
