@@ -23,7 +23,7 @@
  */
 
 import { z } from "zod";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { evaluatorAttachmentsSchema } from "./evaluator-attachments.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 

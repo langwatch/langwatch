@@ -23,11 +23,46 @@
  */
 
 import { z } from "zod";
-import type {
-  AvailableSource,
-  NestedField,
-} from "~/components/variables/VariableMappingInput";
+import type { ComponentType, Field } from "@langwatch/workflow-contract";
 import type { SuiteFieldDefinition } from "./suite-fields";
+
+/**
+ * What the variable mapping picker offers, declared here rather than imported
+ * from the component that draws it. A contract that reaches into a web package
+ * for a shape inverts the dependency: the picker renders what this module
+ * describes, not the other way round. The underlying unions still come from
+ * the workflow contract, so the two cannot drift on what a field type is.
+ *
+ * `modules/prompt/web/src/ui/sections/variables/variable-mapping-input.tsx`
+ * declares the same two shapes for its props today. They are structurally
+ * identical; pointing that component at these is a separate change, owned by
+ * whoever owns that seam.
+ */
+
+/** Source types aligned with DSL ComponentType + dataset. */
+export type MappingSourceType = ComponentType | "dataset";
+
+/** Field type — uses the DSL Field type, so the picker and this agree. */
+export type MappingFieldType = Field["type"];
+
+/** A field selectable in the mapping dropdown, nested via `children`. */
+export type NestedField = {
+  /** Field name, used as a path segment. */
+  name: string;
+  /** Display label; defaults to the name when absent. */
+  label?: string;
+  type: MappingFieldType;
+  /** Children known at definition time. */
+  children?: NestedField[];
+};
+
+/** One source the picker lists, with the fields it offers. */
+export type AvailableSource = {
+  id: string;
+  name: string;
+  type: MappingSourceType;
+  fields: NestedField[];
+};
 
 /** The sources an evaluator input can read from. */
 export const SCENARIO_MAPPING_SOURCE_IDS = [
