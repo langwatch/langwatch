@@ -15,7 +15,21 @@
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import {
+  eitherOrProviders,
+  inputFor,
+  isMarkedRequired,
+  keyedRow,
+  makePrimeQueries,
+  modelProviderDrawerMocks,
+  resetModelProviderDrawerMocks,
+  SELF_HOSTED_URL,
+  Wrapper,
+} from "./modelProviderDrawerHarness";
+import { EditModelProviderForm } from "../ModelProviderForm";
 
 const {
   mockMutateAsync,
@@ -23,98 +37,7 @@ const {
   mockListAllForOrganizationForFrontendQuery,
   mockListAllForProjectForFrontendQuery,
   mockValidateApiKey,
-} = vi.hoisted(() => ({
-  mockMutateAsync: vi.fn().mockResolvedValue({}),
-  mockGetAllForProjectForFrontendQuery: vi.fn(),
-  mockListAllForOrganizationForFrontendQuery: vi.fn(),
-  mockListAllForProjectForFrontendQuery: vi.fn(),
-  mockValidateApiKey: vi.fn().mockResolvedValue(true),
-}));
-
-vi.mock("../../../utils/api", () => ({
-  api: {
-    modelProvider: {
-      getAllForProjectForFrontend: {
-        useQuery: mockGetAllForProjectForFrontendQuery,
-      },
-      listAllForOrganizationForFrontend: {
-        useQuery: mockListAllForOrganizationForFrontendQuery,
-      },
-      listAllForProjectForFrontend: {
-        useQuery: mockListAllForProjectForFrontendQuery,
-      },
-      update: { useMutation: () => ({ mutateAsync: mockMutateAsync }) },
-      setRoleAssignmentForScope: {
-        useMutation: () => ({
-          mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
-        }),
-      },
-      isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
-    },
-    useUtils: () => ({
-      organization: { getAll: { invalidate: vi.fn() } },
-      modelProvider: {
-        getAllForProject: { invalidate: vi.fn() },
-        getAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForOrganizationForFrontend: { invalidate: vi.fn() },
-        getResolvedDefault: { invalidate: vi.fn() },
-        getDefaultModelsForProject: { invalidate: vi.fn() },
-      },
-    }),
-  },
-}));
-
-vi.mock("../../../hooks/useDrawer", () => ({
-  useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
-}));
-
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", name: "Web App", slug: "web-app" },
-    team: { id: "team-1", name: "Platform" },
-    organization: {
-      id: "org-1",
-      name: "Acme",
-      teams: [
-        {
-          id: "team-1",
-          name: "Platform",
-          projects: [{ id: "proj-1", name: "Web App" }],
-        },
-      ],
-    },
-    hasPermission: () => true,
-  }),
-}));
-
-vi.mock("../../../hooks/useModelProviderApiKeyValidation", () => ({
-  useModelProviderApiKeyValidation: () => ({
-    validate: mockValidateApiKey,
-    validateWithCustomUrl: vi.fn().mockResolvedValue(true),
-    isValidating: false,
-    validationError: undefined,
-    clearError: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
-}));
-
-vi.mock("../../ui/toaster", () => ({ toaster: { create: vi.fn() } }));
-
-import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
-import { EditModelProviderForm } from "../ModelProviderForm";
-import {
-  eitherOrProviders,
-  inputFor,
-  isMarkedRequired,
-  keyedRow,
-  makePrimeQueries,
-  SELF_HOSTED_URL,
-  Wrapper,
-} from "./modelProviderDrawerHarness";
+} = modelProviderDrawerMocks;
 
 const primeQueries = makePrimeQueries({
   collapsedQuery: mockGetAllForProjectForFrontendQuery,
@@ -137,9 +60,7 @@ const renderDrawer = (
   );
 
 const resetMocks = () => {
-  vi.clearAllMocks();
-  mockMutateAsync.mockResolvedValue({});
-  mockValidateApiKey.mockResolvedValue(true);
+  resetModelProviderDrawerMocks();
 };
 
 describe("Feature: edits beside a saved credential leave that credential intact", () => {
