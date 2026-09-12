@@ -158,7 +158,7 @@ make down                    # stop all services
 pnpm typecheck                              # apps/api, apps/worker, apps/ui
 pnpm typecheck:one @langwatch/trace-server  # one package, seconds not minutes
 pnpm typecheck:all                          # every package. What CI runs
-pnpm lint                                   # oxlint + architecture-lint
+pnpm lint                                   # oxlint + architecture-enforcer
 pnpm format                                 # oxfmt
 pnpm --filter @langwatch/platform-api test  # one package's suite
 ```

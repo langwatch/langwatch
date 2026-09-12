@@ -260,7 +260,7 @@ From the repo root:
 pnpm typecheck        # apps/api, apps/worker, apps/ui — one project each, tests included
 pnpm typecheck:one @langwatch/eventing   # or a directory: pnpm typecheck:one packages/eventing
 pnpm typecheck:all    # every workspace package. What CI runs; minutes, not seconds
-pnpm lint             # oxlint + architecture-lint, the only JavaScript/TypeScript linters
+pnpm lint             # oxlint + architecture-enforcer, the only JavaScript/TypeScript linters
 pnpm format           # oxfmt, the only formatter
 pnpm test             # every workspace package's own suite
 ```
@@ -366,7 +366,16 @@ sdks/typescript/     # TypeScript SDK
 sdks/go/             # Go SDK
 mcp/typescript/      # MCP server
 specs/               # BDD feature specs
+.bin/<name>/<name>   # Every locally built binary, ignored (see below)
 ```
+
+Nothing this repository builds locally lands anywhere but `.bin/<name>/<name>`:
+`make haven` writes `.bin/haven/haven`, `make service-watch svc=X` writes
+`.bin/X/X`, and the two bun-compiled CLIs default to `.bin/langy-worker/` and
+`.bin/langwatch/`. The directory is ignored wholesale by git and by Docker, so
+a stray build can never be committed the way a 9.8 MB `apidiff` once was.
+Release pipelines and image builds are unaffected — each passes its own
+explicit `--outfile`.
 
 ## Key References
 
@@ -444,7 +453,7 @@ specs/               # BDD feature specs
 | Adding a security `override` to a single project's `package.json`                                           | pnpm honours `overrides` only at the workspace root, so put it in the root `pnpm-workspace.yaml`. A `pnpm` block in a member package.json is silently ignored — it looks active and does nothing. This is why the pins used to drift when the repo had six install roots                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Referring to "the app" as one package                                                                       | There is no one app package. The product is `@langwatch/ui` (`apps/ui`), `@langwatch/platform-api` (`apps/api`) and `@langwatch/worker` (`apps/worker`). `langwatch` is the published TypeScript SDK, in `sdks/typescript/`, and `@langwatch/server` is the `npx` CLI in `apps/server/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `cd` into an application before every command                                                               | The repo root proxies the common ones, so `pnpm dev`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/platform-api <script>` reaches any of them                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Importing a component into server code to reuse a constant it happens to export                             | No _value_-import chain from server code may reach a browser-only package (React, Chakra, Ark, Emotion, react-router, lucide-react, browser OTel). One such import pulled 2,020 modules / 212 MB RSS into every backend process. **Enforced:** `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` walks the real value-import graph transitively from the API and worker entrypoints, every `*.composition.ts` they wire, and every `modules/*/server` + `packages/*/src/server` source — and it refuses a module out of `apps/ui` or a `*-web` package too, not only the toolkits one imports. `@langwatch/mail` is the one exception, since react-email renders its templates server-side. **Convention on top:** don't value-import a `**/ui/**` file from a `server` package at all, even a framework-free one — it invites exactly that chain later. Move the shared value into a framework-free module both sides import (`import type` is always fine — types are erased) |
+| Importing a component into server code to reuse a constant it happens to export                             | No _value_-import chain from server code may reach a browser-only package (React, Chakra, Ark, Emotion, react-router, lucide-react, browser OTel). One such import pulled 2,020 modules / 212 MB RSS into every backend process. **Enforced:** `packages/architecture-enforcer/tests/frontend-boundary.unit.test.ts` walks the real value-import graph transitively from the API and worker entrypoints, every `*.composition.ts` they wire, and every `modules/*/server` + `packages/*/src/server` source — and it refuses a module out of `apps/ui` or a `*-web` package too, not only the toolkits one imports. `@langwatch/mail` is the one exception, since react-email renders its templates server-side. **Convention on top:** don't value-import a `**/ui/**` file from a `server` package at all, even a framework-free one — it invites exactly that chain later. Move the shared value into a framework-free module both sides import (`import type` is always fine — types are erased) |
 
 ## TypeScript
 

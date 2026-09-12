@@ -68,7 +68,7 @@ old `database: object` + `as PrismaClient` seam.
    - `pnpm --filter @langwatch/<pkg> typecheck` → 0
    - `pnpm --filter @langwatch/<pkg> test` → green
    - **sabotage a member and watch the right test fail**
-   - `pnpm --filter @langwatch/architecture-lint lint` → still 821, nothing traded
+   - `pnpm --filter @langwatch/architecture-enforcer lint` → still 821, nothing traded
 5. **Format only the files you touched.** `oxfmt` on a directory reformats
    everything not already oxfmt-clean; that has produced 45-file phantom diffs
    twice.

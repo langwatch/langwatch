@@ -18,7 +18,7 @@ ui/sections/        composed presentation fed by behavior; screens and layouts l
 ```
 
 Allowed imports (`UI_LAYER_DEPENDENCIES` in
-`packages/architecture-lint/src/frontend-ui-boundaries.ts`):
+`packages/architecture-enforcer/src/frontend-ui-boundaries.ts`):
 
 | from        | may import                                  |
 | ----------- | -------------------------------------------- |

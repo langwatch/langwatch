@@ -39,7 +39,7 @@ than relying on the lane to recognise one, and say who owns them.
   apps/api/src/app-rest/api-rest.doors.ts              coordinator
   apps/api/src/app/api-production.composition.ts       coordinator
   apps/ui/src/features/catalogue.json                  coordinator
-  packages/architecture-lint/src/*-baseline.json       coordinator
+  packages/architecture-enforcer/src/*-baseline.json       coordinator
 
 The lane writes the exact lines it needs into its handoff, section 10, and
 carries on with whatever else it can do.>

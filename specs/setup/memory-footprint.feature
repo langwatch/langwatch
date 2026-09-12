@@ -70,7 +70,7 @@ Feature: Reduced server memory footprint
 
   # The guard walks from the API and worker entrypoints, every composition
   # module they wire, and every server package's sources. It lives in
-  # packages/architecture-lint/tests/frontend-boundary.unit.test.ts — the
+  # packages/architecture-enforcer/tests/frontend-boundary.unit.test.ts — the
   # platform application that used to host it is gone, and the boundary it
   # describes outlived it.
   @unit

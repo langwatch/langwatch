@@ -68,7 +68,7 @@ describe("given a stored secret", () => {
 ## 4. Run it and read the verdict, not the tick
 
 ```bash
-pnpm --filter @langwatch/architecture-lint check:feature-parity
+pnpm --filter @langwatch/architecture-enforcer check:feature-parity
 ```
 
 Read the banner:
@@ -86,7 +86,7 @@ machine-readable report.
 
 `LEGACY_UNBOUND` (files with enforced-but-unbound scenarios) and `LEGACY_INERT` (files
 with no enforced scenario at all) live in
-`packages/architecture-lint/src/check-feature-parity.ts`. They exist to hold migration
+`packages/architecture-enforcer/src/check-feature-parity.ts`. They exist to hold migration
 debt and **may only shrink**. Never add a file to either to get a run green: tag the
 scenarios and bind them. Removing a file from a list, once its scenarios are bound, is
 part of the change.

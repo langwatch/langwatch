@@ -114,7 +114,7 @@ The cost of the decision is a second place the wire contract is written: the map
 
 ## Consequences
 
-`AppRouter` gains a ceiling it cannot quietly exceed. `packages/architecture-lint/tests/app-router-type-seam.unit.test.ts` walks the real import graph from `app-trpc.types.ts` — following type-only imports, because the compiler does — and fails if the reachable workspace source count passes 3,850 (3,746 today), or if any feature that has a `*.composition.types.ts` sibling is reached through its composition again. `specs/setup/app-router-type-seam.feature` carries both scenarios.
+`AppRouter` gains a ceiling it cannot quietly exceed. `packages/architecture-enforcer/tests/app-router-type-seam.unit.test.ts` walks the real import graph from `app-trpc.types.ts` — following type-only imports, because the compiler does — and fails if the reachable workspace source count passes 3,850 (3,746 today), or if any feature that has a `*.composition.types.ts` sibling is reached through its composition again. `specs/setup/app-router-type-seam.feature` carries both scenarios.
 
 Both of the consumers that used to pay are gone (stage 1b), so no browser package names `AppRouter` any more. A third scenario on the same spec — "The browser program compiles no API application source" — walks every module `apps/ui/src` loads, following type-only imports as well as value ones, and fails with the list of `apps/api/src` files a change pulled back in. It was confirmed to bite: a scratch module in `apps/ui/src` importing `AppRouter` fails it with 118 files named.
 

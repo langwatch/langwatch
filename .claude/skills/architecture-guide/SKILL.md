@@ -1,6 +1,6 @@
 ---
 name: architecture-guide
-description: "The reference for the LangWatch repository layout: what apps/ui, apps/api, apps/worker and apps/tasks are, what a module is (contract/server/web), the server shape the annotation module set (one installer, one app, private services, repository interfaces with Prisma and memory backends, flat REST and tRPC declarations), the web layer order (model, behavior, ui/elements, ui/blocks, ui/sections, flat entry files), how config, composition roots, UI install and specs work, and which architecture-lint rule enforces each. Read this whenever you touch anything under modules, enterprise/modules, apps/api/src/app, apps/api/src/features, apps/worker/src/app or apps/ui/src/features, or when a user asks where something should live, why a lint rule fired, what an app/service/repository is here, or how a module is wired. The task skills `module` (build or change one: new, extend, including REST endpoints and tRPC procedures, convert, wire, move, web-surface) and `module-review` (audit one, or for over-abstraction) build on it, alongside `spec-bind` (bind a scenario to a test) and `lint-rule` (add or change a house lint rule)."
+description: "The reference for the LangWatch repository layout: what apps/ui, apps/api, apps/worker and apps/tasks are, what a module is (contract/server/web), the server shape the annotation module set (one installer, one app, private services, repository interfaces with Prisma and memory backends, flat REST and tRPC declarations), the web layer order (model, behavior, ui/elements, ui/blocks, ui/sections, flat entry files), how config, composition roots, UI install and specs work, and which architecture-enforcer rule enforces each. Read this whenever you touch anything under modules, enterprise/modules, apps/api/src/app, apps/api/src/features, apps/worker/src/app or apps/ui/src/features, or when a user asks where something should live, why a lint rule fired, what an app/service/repository is here, or how a module is wired. The task skills `module` (build or change one: new, extend, including REST endpoints and tRPC procedures, convert, wire, move, web-surface) and `module-review` (audit one, or for over-abstraction) build on it, alongside `spec-bind` (bind a scenario to a test) and `lint-rule` (add or change a house lint rule)."
 user-invocable: true
 argument-hint: "[layer: contract | server | web | config | composition | install | testing | gates]"
 ---
@@ -32,7 +32,7 @@ web packages install through `apps/ui/src/features/catalogue.json` like any othe
 
 **The reference module is `annotation`** (`modules/annotation`, ADR-001 in its
 `adrs/`, shared decision ADR-133). Every other module is being converted to its shape;
-`packages/architecture-lint/src/feature-shape-baseline.json` is the list of what each
+`packages/architecture-enforcer/src/feature-shape-baseline.json` is the list of what each
 module still carries from the older shape, and it may only shrink. Copy annotation, not
 the module next to it. Pointed at any other module, the `module` skill's references
 produce this same shape: `references/convert.md` closes a module's entries kind by kind;
@@ -188,18 +188,18 @@ and `feature-shape` are baseline keys and keep their names.
 - `dev/docs/adr/133-composition-spec.md` (the installer, the app factory, transports,
   repositories, the six requirements) and
   `modules/annotation/adrs/001-annotation-service-boundary.md` (the reference)
-- `packages/architecture-lint/adrs/002-versioned-strict-feature-layout.md` (the grammar),
-  `packages/architecture-lint/adrs/001-feature-package-boundaries.md`,
-  `packages/architecture-lint/adrs/004-frontend-feature-boundaries.md`
-- `packages/lint-core/grammar/feature-layout-policy.mjs` (`SERVER_PATTERNS`,
+- `packages/architecture-enforcer/adrs/002-versioned-strict-feature-layout.md` (the grammar),
+  `packages/architecture-enforcer/adrs/001-feature-package-boundaries.md`,
+  `packages/architecture-enforcer/adrs/004-frontend-feature-boundaries.md`
+- `packages/oxlint-rules/grammar/feature-layout-policy.mjs` (`SERVER_PATTERNS`,
   `CANONICAL_ARTIFACTS`, `SERVER_ARCHITECTURAL_QUALIFIERS`, `RULES_PATTERN`,
-  `PURE_VALUE_CONSTRUCTORS`), consumed by `packages/architecture-lint/oxlint-plugin.mjs`
-  and `packages/architecture-lint/src/feature-layout.ts`
-- `packages/architecture-lint/src/feature-shape.ts` (the legacy-shape inventory),
+  `PURE_VALUE_CONSTRUCTORS`), consumed by `packages/architecture-enforcer/oxlint-plugin.mjs`
+  and `packages/architecture-enforcer/src/feature-layout.ts`
+- `packages/architecture-enforcer/src/feature-shape.ts` (the legacy-shape inventory),
   `feature-app-contract.ts`, `feature-app-factory.ts`, `feature-setup-infrastructure.ts`
   (the app and API shape), `frontend-ui-boundaries.ts` (`UI_LAYER_DEPENDENCIES`),
   `port-modules.ts` (`typed-prisma-seam` is an oxlint rule with no baseline of its own)
-- `packages/architecture-lint/oxlint-plugin.mjs` and `.oxlintrc.architecture.json`
+- `packages/architecture-enforcer/oxlint-plugin.mjs` and `packages/architecture-enforcer/oxlint.architecture.jsonc`
   (`prisma-containment`, `typed-prisma-seam`, `feature-source-layout`, `-filename`,
   `-subject`, `fallible-result-naming`, `layer-class`, and the rest; rendered in
   `dev/docs/lint-rules.md`)

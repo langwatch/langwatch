@@ -199,7 +199,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - name: Setup pnpm

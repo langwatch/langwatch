@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/oxlint-rules.tsbuildinfo",
+    "lib": ["es2022"],
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    // The package is plain ESM `.mjs` on purpose: oxlint loads the plugin
+    // graph directly, so a build step would put a stale artefact between an
+    // edit and the linter. The JSDoc types document the shapes; `checkJs`
+    // stays off, exactly as `@langwatch/architecture-enforcer` has it.
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["src/**/*.mjs", "grammar/**/*.mjs", "tests/**/*.mjs"]
+}

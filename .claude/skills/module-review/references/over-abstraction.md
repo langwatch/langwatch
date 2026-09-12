@@ -36,6 +36,6 @@ Keep list: a port with two or more implementations, an open set with one file pe
 where a new member touches nothing else, `app/<f>.app.ts` (the one facade both transports
 call, which the layout requires), a hot path already inside its quality ceiling where the
 only complaint is method length, and anything the mechanical half already accepts
-(`packages/architecture-lint/src/overengineering-policy.mjs`,
-`packages/architecture-lint/src/oxlint-baseline.json`), and defer to their output rather than
+(`packages/architecture-enforcer/src/overengineering-policy.mjs`,
+`packages/architecture-enforcer/src/oxlint-baseline.json`), and defer to their output rather than
 re-litigating it.

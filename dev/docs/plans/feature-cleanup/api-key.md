@@ -8,7 +8,7 @@ shaped after [`dataset.md`](./dataset.md).
 **5,066 lines across 32 non-test source files** (server 24 / 4,102; contract 8 / 964),
 plus 2,887 lines of tests. No `web` sub-package — the feature's UI and two server
 modules still sit in `platform/app`, baselined as legacy fragments
-(`packages/architecture-lint/src/legacy-feature-fragment-baseline.json:18-31`).
+(`packages/architecture-enforcer/src/legacy-feature-fragment-baseline.json:18-31`).
 
 **36 real operations, declared 98 times** across the contract, the facade, the app
 and the sub-services.

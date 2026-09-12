@@ -18,7 +18,7 @@ and [`overengineering.md`](../../best_practices/overengineering.md); shape follo
 
 There is **no `web/` package**. `feature.json` is `{"layoutVersion": 0}` and the
 feature's eight UI files are still in `platform/app`, recorded as legacy fragments
-(`packages/architecture-lint/src/legacy-feature-fragment-baseline.json:320-329`).
+(`packages/architecture-enforcer/src/legacy-feature-fragment-baseline.json:320-329`).
 Out of scope here.
 
 ```
@@ -90,7 +90,7 @@ The feature appears in **none** of `overengineering-baseline.json`,
 delegations.** Only `translate` (`:298-315`) holds behaviour.
 
 `layer-class` misses it. The policy counts _same-name_ forwards at a 0.6 ratio
-(`packages/architecture-lint/src/overengineering.ts:33-34`), and only 12 of the
+(`packages/architecture-enforcer/src/overengineering.ts:33-34`), and only 12 of the
 28 keep their name:
 
 ```ts
@@ -228,7 +228,7 @@ even explains why, and is right to.
 306 lines, **10 exported abstract classes, 35 abstract signatures**. Exactly one
 is named `*Port` — `ModelTranslationPort:294`. That single name is what carries
 the file past `strict-port-module`
-(`packages/architecture-lint/src/port-modules.ts:70-89`: the rule requires _at
+(`packages/architecture-enforcer/src/port-modules.ts:70-89`: the rule requires _at
 least one_ `Port`-named export and that every `Port`-named export be an abstract
 class). The other nine boundaries dodge the convention by not using the word.
 

@@ -424,7 +424,7 @@ Check that first for any other module before asking for `.withAudit` on tRPC.
 
 `modules/catalogue.json` carries a `tier` per entry (`"core"` by default,
 `"enterprise"` for an `enterprise/modules` entry) alongside the pre-existing
-`classification` field architecture-lint already reads for the same
+`classification` field architecture-enforcer already reads for the same
 core/enterprise split; the two currently agree on every entry and have not
 yet been folded into one. `dev/scripts/generate-modules.mjs`
 (`pnpm generate:modules`, run by `start:prepare:files`) reads the catalogue
@@ -516,7 +516,7 @@ A module has four kinds of collaborator, and each has one home:
 | member | a raw technical client the process supplies from `ProcessMembers`; a module's channel wraps one with the module's own message types |
 
 The folder grammar mirrors repositories exactly and is landed in
-`packages/lint-core/grammar/feature-layout-policy.mjs`'s `SERVER_PATTERNS`:
+`packages/oxlint-rules/grammar/feature-layout-policy.mjs`'s `SERVER_PATTERNS`:
 
 ```
 channels/<subject>.channel.ts                     the interface, in the module's own message types
@@ -529,7 +529,7 @@ channels/<f>-channels.registry.ts                 defineChannels({ live, memory 
 a broker, a vendor or a mailbox, and the twin is what a test asserts against.
 
 **Nothing uses this yet.** `defineChannels` exists only inside
-`packages/architecture-lint`'s own feature-shape policy - the rule that will
+`packages/architecture-enforcer`'s own feature-shape policy - the rule that will
 enforce this grammar once a module has a `channels/` folder to check - and no
 module in `modules/` or `enterprise/modules/` has one. This is a decided shape
 with the lint primitive ready and zero adopters, not a landed pattern with

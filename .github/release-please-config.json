@@ -319,8 +319,7 @@
         "skills",
         "plugins/langwatch",
         ".github",
-        ".cursor",
-        "assets"
+        ".cursor"
       ],
       "changelog-sections": [
         {

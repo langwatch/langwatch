@@ -168,7 +168,7 @@ the mechanism that took `feature_shape_rows` from 392 to **0** on this branch.
 
 **C.** The repository has already run this play once and won it: the
 feature-shape baseline went 392 → 0 and the drive is finished. The same shape
-applies, the tooling exists (`packages/architecture-lint/src/*-baseline.json`),
+applies, the tooling exists (`packages/architecture-enforcer/src/*-baseline.json`),
 and the counter is one line in `shape-counters.sh`.
 
 What C needs that does not exist yet:

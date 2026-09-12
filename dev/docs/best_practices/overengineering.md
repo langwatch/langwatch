@@ -72,15 +72,15 @@ nobody made — it is what happens when the migration path becomes the design.
 | ----------------------------------------------------------------- | ---------------------------- | --------------------------------------------------- |
 | A named function that returns its own argument                    | `no-identity-function-ts`    | `dev/lint/ast-grep/rules/`                          |
 | A method forwarding to the same name on a collaborator            | `no-same-name-delegation-ts` | `dev/lint/ast-grep/rules/`                          |
-| A class that forwards most of its methods to **one** collaborator | `layer-class`                | `packages/architecture-lint/src/overengineering.ts` |
+| A class that forwards most of its methods to **one** collaborator | `layer-class`                | `packages/architecture-enforcer/src/overengineering.ts` |
 | A type alias nesting conditional types past 3                     | `conditional-type-depth`     | same                                                |
 | Overloads differing only by a boolean literal                     | `overload-by-literal`        | same                                                |
 | A comment block over 60 lines                                     | `comment-block-size`         | `src/comment-blocks.ts`                             |
 | A service module over its size ceiling                            | `service-ceilings`           | `src/service-ceilings.ts`                            |
 
 The ast-grep rules run from `make lint-rules` and are proved against fixtures
-by `make lint-rules-test`. The architecture-lint policies run from
-`pnpm --filter @langwatch/architecture-lint lint`.
+by `make lint-rules-test`. The architecture-enforcer policies run from
+`pnpm --filter @langwatch/architecture-enforcer lint`.
 
 None of them is a verdict. `layer-class` exempts `app/<feature>.app.ts` and
 routed repositories because both are supposed to delegate; the others fire on a

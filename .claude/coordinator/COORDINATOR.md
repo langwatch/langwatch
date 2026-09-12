@@ -152,7 +152,7 @@ apps/api/src/app-trpc/app-trpc.features.ts
 apps/api/src/app-trpc/app-trpc.namespaces.ts
 apps/worker/src/app/worker-tenancy*.composition.ts
 apps/ui/src/features/catalogue.json
-packages/architecture-lint/src/*-baseline.json
+packages/architecture-enforcer/src/*-baseline.json
 ```
 
 Keep this list current - it is the copy the manifests point at. A file joins it

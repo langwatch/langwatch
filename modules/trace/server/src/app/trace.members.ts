@@ -50,7 +50,7 @@ export interface TraceInfrastructure {  traceEdgeMediaTelemetry: TraceEdgeMediaT
  *
  * This is a port and not an import for a reason the linter enforces: a feature
  * server cannot depend on another feature's server package (`cross-feature` in
- * `architecture-lint`), and `ExecuteEvaluationCommand` lives in
+ * `architecture-enforcer`), and `ExecuteEvaluationCommand` lives in
  * `@langwatch/evaluation-server`. The composition root holds both and wires
  * them together, which is also what lets a process dispatch evaluations
  * without building the evaluator engine behind them.

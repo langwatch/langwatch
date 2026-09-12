@@ -18,7 +18,7 @@
 #   make haven install       # go install the binary + check the machine's prerequisites
 #   make haven up            # start this worktree's stack
 #   make haven status        # every stack + shared-server health, one shot
-#   make haven               # build ./bin/haven (no subcommand)
+#   make haven               # build .bin/haven/haven (no subcommand)
 
 .PHONY: haven observability observability-connect observability-logs \
         observability-status observability-down
@@ -45,7 +45,7 @@ ifeq (haven,$(firstword $(MAKECMDGOALS)))
   endif
 endif
 
-# `make haven`         -> build ./bin/haven
+# `make haven`         -> build .bin/haven/haven
 # `make haven install` -> go install, fix PATH, then check the machine
 # `make haven <sub>`   -> run the haven CLI with <sub> (up, down, status, logs, …)
 #
@@ -66,7 +66,7 @@ endif
 # already done.
 haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
-	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
+	@mkdir -p .bin/haven && go build -o .bin/haven/haven $(HAVEN_PKG) && echo "built .bin/haven/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
 	@go install $(HAVEN_PKG)
 	@go run $(HAVEN_PKG) install || true

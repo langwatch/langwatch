@@ -23,15 +23,21 @@ var LeanCheckoutWorkflows = []string{
 	".github/workflows/readme-links.yml",
 }
 
-// RequiredExclusions are the repository's marketing media: 172 MB of .gif and
-// .mp4 against 93 MB for apps/ and packages/, the thing CI builds. Naming a
-// sparse-checkout makes actions/checkout fetch with --filter=blob:none, so
+// RequiredExclusions are the repository's marketing media: the .gif and .mp4
+// weight that dwarfs apps/ and packages/, the thing CI actually builds. Naming
+// a sparse-checkout makes actions/checkout fetch with --filter=blob:none, so
 // these blobs never cross the wire — a depth-1 clone drops from 180 MB to
 // 42 MB of .git.
 //
-// Root-anchored on purpose: a bare "assets" would also drop
-// services/langyagent/internal/assets, which the evaluator tests read.
-var RequiredExclusions = []string{"!/docs/media/", "!/docs/images/", "!/assets/"}
+// A third entry, "!/assets/", retired when the root assets/ directory did: its
+// 36 MB of preview video was unreferenced and deleted, and the 530 KB that
+// remained moved under .github/. Media must not go back there — every change
+// gate checks .github out whole (see gateOnlyPattern), so nothing under it can
+// be excluded from a checkout that still needs the workflow files.
+//
+// Root-anchored on purpose: a bare "docs" would also drop sdks/python/docs and
+// the .mdx tree CI reads.
+var RequiredExclusions = []string{"!/docs/media/", "!/docs/images/"}
 
 // wholeDocsExclusion is what this guard exists to prevent a return to.
 // error-remediation.unit.test.ts resolves the repo's docs/ and asserts every
@@ -149,8 +155,11 @@ func excludesTheMedia(where string, patterns []string) []string {
 	return problems
 }
 
-// anchorsItsExclusions keeps `!/assets/` from also dropping
-// services/langyagent/internal/assets, which the evaluator tests read.
+// anchorsItsExclusions keeps `!/docs/images/` from also dropping a nested
+// directory of the same name — sdks/python/docs, or the images/ any package
+// may hold. The rule outlived the exclusion that motivated it: a bare
+// `!assets` would have dropped services/langyagent/internal/assets, which the
+// evaluator tests read.
 func anchorsItsExclusions(where string, patterns []string) []string {
 	var problems []string
 	for _, pattern := range patterns {

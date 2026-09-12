@@ -20,7 +20,7 @@ with product ownership and singular feature names defined by
 The physical move of SSO also preserves the licensing boundary fixed by
 [ADR-027](./027-license-gated-sso.md), while repository-wide lint and format
 cutover is owned by
-[architecture-lint ADR-003](../../../packages/architecture-lint/adrs/003-unified-oxc-toolchain.md).
+[architecture-enforcer ADR-003](../../../packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md).
 
 ## Context
 
@@ -165,7 +165,7 @@ The unstructured `platform/app/ee` tree is removed as part of the application
 extraction. Enterprise code gains one deliberate ownership and composition
 root, while product behaviour moves feature by feature into the strict layout
 already defined by ADR-101 and the
-[feature-package boundary](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md):
+[feature-package boundary](../../../packages/architecture-enforcer/adrs/001-feature-package-boundaries.md):
 
 ```text
 enterprise/

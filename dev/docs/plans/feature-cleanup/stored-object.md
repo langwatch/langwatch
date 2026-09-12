@@ -15,7 +15,7 @@ built and none of them is reached by a production door. What production
 actually runs is the _legacy_ implementation, 17 more files and **3,882 lines**
 still in `platform/app/src/server/stored-objects/`, baselined as
 `legacy-implementation` at
-`packages/architecture-lint/src/legacy-feature-fragment-baseline.json:622-638`.
+`packages/architecture-enforcer/src/legacy-feature-fragment-baseline.json:622-638`.
 
 There is no single stack; there are four, and only three of them are live.
 
@@ -143,7 +143,7 @@ them: `authorizeFileRead` (`:207`), `authorizeFilePurpose` (`:247`) and
 `handleFileRead` (`:299`, 124 lines). That is R2's "a class whose constructor
 was never written", verbatim.
 
-It also breaks the layout grammar twice over. `packages/architecture-lint/adrs/002-versioned-strict-feature-layout.md:118`:
+It also breaks the layout grammar twice over. `packages/architecture-enforcer/adrs/002-versioned-strict-feature-layout.md:118`:
 
 > Files ending in `.service.ts`, `.store.ts`, `.projection.ts`, `.api.ts`, and
 > `.migration.ts` export the correspondingly named class.
@@ -162,7 +162,7 @@ awaited-through twice: `await app().resolveOwner({ id })` (`:363`) and
 `modules/stored-object/feature.json` declares `"layoutVersion": 0`
 and `modules/catalogue.json` lists the feature as governed. Checking
 every non-test server path against `SERVER_PATTERNS`
-(`packages/architecture-lint/src/feature-layout.ts:65-91`):
+(`packages/architecture-enforcer/src/feature-layout.ts:65-91`):
 
 | Path                                                        | Why it fails                                                             |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -490,7 +490,7 @@ gains `static create` and loses its public constructor; the three files take
   `platform/app/src/runtime/app/features/__tests__/user-avatar-read.compatibility.adapter.unit.test.ts:10`
   imports. Keep both.
 - **`services/stored-object.service.ts`** — 634 lines with a 12/24/24 profile
-  already recorded in `packages/architecture-lint/src/service-quality-baseline.json:92-99`.
+  already recorded in `packages/architecture-enforcer/src/service-quality-baseline.json:92-99`.
   It holds one lifecycle, its methods are short, its private helpers are
   private, and it takes a store rather than a client. R1 is satisfied
   throughout the package. Do not split it; the only complaint is length.

@@ -42,7 +42,7 @@ cannot resolve; making that resolve means changing what the package declares as
 a dependency, which is a decision about the published artifact and not a build
 detail. These two move when a `.d.ts` bundler that speaks the TS 7 API exists.
 
-**A third package stays on `typescript@6`: `packages/architecture-lint`.** It is
+**A third package stays on `typescript@6`: `packages/architecture-enforcer`.** It is
 not a publishing concern — it drives the old programmatic API directly, across
 19 rule modules and roughly 726 call sites, and reaches for `createProgram`,
 `createPrinter`, `createScanner`, `preProcessFile`, `parseJsonText`,

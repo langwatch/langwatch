@@ -46,7 +46,7 @@ details. Do not "fix" this.
   unsubscribe footer, no-reply `To`) exports a render function and gains a method on
   `MailRenderPort`. Only a whole send gets a `sendXEmail`. Getting this wrong puts
   react-email on a worker's boot graph, which
-  `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` will catch.
+  `packages/architecture-enforcer/tests/frontend-boundary.unit.test.ts` will catch.
 - **Links arrive built.** A template never assembles a URL from a base host it read
   itself. The module that owns the destination passes the link.
 

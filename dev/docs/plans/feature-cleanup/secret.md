@@ -246,7 +246,7 @@ Nothing outside the package imports the concrete one.
 ### P10 — The transport lives in two directory conventions at once (observation, not a claim about CI)
 
 `transport/api-trpc/secret.api.ts` matches the layout grammar
-(`packages/architecture-lint/src/feature-layout.ts:88-89`,
+(`packages/architecture-enforcer/src/feature-layout.ts:88-89`,
 `^transport/${NAME}/${NAME}\.api\.ts$`). `api/public-rest/secret.api.ts` matches
 none of `SERVER_PATTERNS` (`feature-layout.ts:65-92`), and the package is
 `layoutVersion: 0` (`modules/secret/feature.json`), so `lintServer`
@@ -254,7 +254,7 @@ applies to it (`feature-layout.ts:432-436`).
 
 Being honest about the disagreement rather than the verdict: a **different**
 architecture rule already treats both as transport roots —
-`packages/architecture-lint/src/api-transport-boundaries.ts:68` names
+`packages/architecture-enforcer/src/api-transport-boundaries.ts:68` names
 `src/transport` and `src/api` together — and `langy` and `stored-object` carry
 the same `api/public/` + `transport/api-trpc/` shape. So either the grammar wants
 an `api/<surface>/` entry or three packages want a move; this review does not
@@ -355,7 +355,7 @@ is bound to a test that exercises production's reserved list.
 ### The adapter (P5)
 
 The class stays — `lintPrivateServerExports`
-(`packages/architecture-lint/src/feature-layout.ts:267-269`) forbids a feature
+(`packages/architecture-enforcer/src/feature-layout.ts:267-269`) forbids a feature
 server root from exporting `repositories/**`, so this is the sanctioned seam that
 keeps `PrismaSecretRepository` private. What goes is the instance:
 

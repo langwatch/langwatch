@@ -282,7 +282,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
@@ -358,7 +357,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
@@ -435,7 +433,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
@@ -829,7 +826,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
@@ -915,12 +911,11 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api... @langwatch/ui... @langwatch/architecture-lint..."
+          install: "@langwatch/platform-api... @langwatch/ui... @langwatch/architecture-enforcer..."
 
       # The ADR-076 workspace invariants: one lockfile, one workspace
       # definition, no member carrying overrides pnpm would ignore, the app and
@@ -941,8 +936,8 @@ jobs:
 
       - name: Architecture policy tests (blocking)
         run: |
-          pnpm --filter @langwatch/architecture-lint typecheck
-          pnpm --filter @langwatch/architecture-lint test
+          pnpm --filter @langwatch/architecture-enforcer typecheck
+          pnpm --filter @langwatch/architecture-enforcer test
 
       # Debt inventories are ceilings, not a second place to hide debt. Compare
       # each one with the merge-base copy when it exists. The first reviewed
@@ -959,10 +954,10 @@ jobs:
             base_sha="$(git rev-parse HEAD^)"
           fi
           merge_base="$(git merge-base "$base_sha" HEAD)"
-          reference_directory="$RUNNER_TEMP/architecture-lint-baselines"
+          reference_directory="$RUNNER_TEMP/architecture-enforcer-baselines"
           mkdir -p "$reference_directory"
           for baseline in service-ceilings-baseline.json port-module-baseline.json comment-block-roots.json boundary-edge-baseline.json; do
-            source_path="packages/architecture-lint/src/$baseline"
+            source_path="packages/architecture-enforcer/src/$baseline"
             reference="$reference_directory/$baseline"
             if git cat-file -e "$merge_base:$source_path"; then
               git show "$merge_base:$source_path" > "$reference"
@@ -973,9 +968,9 @@ jobs:
 
       - name: Architecture debt inventories (blocking)
         run: |
-          pnpm --filter @langwatch/architecture-lint lint -- \
+          pnpm --filter @langwatch/architecture-enforcer lint -- \
             --shrinking-baseline-only \
-            --baseline-reference-dir "$RUNNER_TEMP/architecture-lint-baselines"
+            --baseline-reference-dir "$RUNNER_TEMP/architecture-enforcer-baselines"
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
@@ -985,12 +980,12 @@ jobs:
       # blocking on the lines a PR added, gated by a script that counted
       # violations per (file, rule) on both sides of the merge base and
       # failed only on an increase. See
-      # packages/architecture-lint/adrs/003-unified-oxc-toolchain.md.
+      # packages/architecture-enforcer/adrs/003-unified-oxc-toolchain.md.
       #
       # NONE OF THAT MACHINERY HAS AN EQUIVALENT HERE, AND NONE IS NEEDED.
       # It existed because that ruleset carried a warn tier with a baseline
       # in the thousands, and a rule that cannot block full-tree has to be
-      # narrowed to the diff somehow. /.oxlintrc.architecture.json has no
+      # narrowed to the diff somehow. /.oxlintrc.jsonc has no
       # warn tier: a rule is `error` for the whole tree, and where a backlog
       # exists the offending files are named in the debt register at the
       # bottom of that file. The gate is full-tree and the register is the
@@ -1007,7 +1002,7 @@ jobs:
       # job output rather than as review comments.
       #
       # `lint:oxlint` rather than `lint`, because `lint` also runs the
-      # architecture-lint CLI, and the step above already runs it with the
+      # architecture-enforcer CLI, and the step above already runs it with the
       # merge-base baselines this job needs. `lint:oxlint` is the same binary,
       # config and path set that `pnpm lint` gives a contributor.
       - name: Oxlint (blocking -- config errors included)
@@ -1046,7 +1041,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -1095,17 +1089,16 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/architecture-lint..."
+          install: "@langwatch/architecture-enforcer..."
 
-      # The parity scanner moved into @langwatch/architecture-lint with the
+      # The parity scanner moved into @langwatch/architecture-enforcer with the
       # rest of the repository-wide checks.
       - name: Check feature-file parity
-        run: pnpm --filter @langwatch/architecture-lint run check:feature-parity
+        run: pnpm --filter @langwatch/architecture-enforcer run check:feature-parity
 
       # tsc resolves a relative or deep-package specifier by its own rules,
       # which are more forgiving than node's. Every backend process runs on
@@ -1161,7 +1154,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
@@ -1197,7 +1189,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - name: Setup pnpm
@@ -1331,7 +1322,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - name: Test extract-failures.sh
@@ -1386,7 +1376,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - name: Check the npm pack filters
@@ -1405,7 +1394,6 @@ jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node

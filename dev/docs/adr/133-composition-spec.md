@@ -456,9 +456,9 @@ and configuration and contain no domain queries, no mappers and no duplicate
 services.
 
 - Guard today: `feature-source-layout` and `feature-source-subject`
-  (`packages/lint-core/src/rules/`) fix where a feature's own sources live;
+  (`packages/oxlint-rules/src/rules/`) fix where a feature's own sources live;
   `service-dependencies` stops a service importing a foreign repository;
-  `composed-exports` (`packages/architecture-lint/src/composed-exports.ts`)
+  `composed-exports` (`packages/architecture-enforcer/src/composed-exports.ts`)
   refuses an exported service no root constructs.
 - Guard proposed: `no-domain-query-in-composition` — a Prisma delegate call, a
   mapper, or a `create` of another feature's repository inside a
@@ -471,7 +471,7 @@ There is no request-time service locator, no partial service view, and no
 automatically generated throwing proxy. A deliberately disabled feature exposes
 an explicit disabled capability state.
 
-- Guard today: `global-app-access` (`packages/architecture-lint/src/global-app-access.ts`)
+- Guard today: `global-app-access` (`packages/architecture-enforcer/src/global-app-access.ts`)
   bans `getApp`; `service-dependencies` bans callback bags and `Pick`/`Omit`
   service views. Nothing validates the graph at boot: absence is discovered by
   the first request, via one of the 53 `refusing*` fallbacks.
@@ -485,10 +485,10 @@ and lifecycle hooks through its installation declaration. Runtime manifests
 derive from those declarations. `modules/catalogue.json` stays the
 ownership authority; there is no competing catalogue.
 
-- Guard today: `feature-catalogue` (`packages/architecture-lint/src/feature-catalogue.ts`)
+- Guard today: `feature-catalogue` (`packages/architecture-enforcer/src/feature-catalogue.ts`)
   and `manifests` hold the catalogue as the authority; the one-list convention
   is documented in `dev/docs/best_practices/feature-installation.md` and
-  `no-raw-hono-mount` (`packages/lint-core/src/rules/`) refuses a hand-rolled
+  `no-raw-hono-mount` (`packages/oxlint-rules/src/rules/`) refuses a hand-rolled
   route registration.
 - Guard proposed: `app-with-feature-only` — no `*.composition.ts` under `apps/**`
   outside the one app root per application; manifests derived from declarations
@@ -497,7 +497,7 @@ ownership authority; there is no competing catalogue.
 **4. Consistent roles.** As in the table above.
 
 - Guard today: `application-boundaries` and `frontend-ui-boundaries`
-  (`packages/architecture-lint/src/`) keep browser packages out of server
+  (`packages/architecture-enforcer/src/`) keep browser packages out of server
   entrypoints; `eventing-roles` fixes producer versus consumer;
   `dev/scripts/check-node-resolution.mjs` proves each process's real boot graph
   resolves under node's own resolver. `apps/api`'s producer-only Eventing is
@@ -512,7 +512,7 @@ adaptation never turns a restricted key into its owner and never bypasses a
 service-level ownership check.
 
 - Guard today: `api-transport-boundaries` and `api-context-services`
-  (`packages/lint-core/src/rules/api-context-services.rule.mjs`), the tRPC
+  (`packages/oxlint-rules/src/rules/api-context-services.rule.mjs`), the tRPC
   declared-check middleware chain, and the fail-closed backstop described in
   `feature-installation.md`. Enforcement is per transport; nothing asserts the
   two transports reach the same policy for the same operation.
@@ -603,17 +603,17 @@ violations.
 
 | Requirement | Enforced by |
 | --- | --- |
-| **One owner, no duplicate implementation.** Features own business logic; API, UI, worker and server compose surfaces. | architecture-lint (`feature-catalogue`, `composed-exports`, `legacy-feature-fragments`) |
-| **Construct once.** Concrete services have private constructors and `static create`. No construction in handlers, no global app access, no import-time registration. | oxlint (`service-classes`, `feature-module-classes`), architecture-lint (`global-app-access`) |
+| **One owner, no duplicate implementation.** Features own business logic; API, UI, worker and server compose surfaces. | architecture-enforcer (`feature-catalogue`, `composed-exports`, `legacy-feature-fragments`) |
+| **Construct once.** Concrete services have private constructors and `static create`. No construction in handlers, no global app access, no import-time registration. | oxlint (`service-classes`, `feature-module-classes`), architecture-enforcer (`global-app-access`) |
 | **Inject complete contracts.** No callback bags, service locators, `Pick`/`Omit` service views, mirrored signatures, or foreign repositories. | oxlint (`service-dependencies`) |
 | **Keep boundaries typed.** Zod validates transport, persistence and process inputs. No `any`, double assertions, suppression comments, or assertions standing in for validation. | oxlint (`typed-prisma-seam`, `no-inferable-twin` proposed), focused typechecks |
-| **Keep infrastructure private.** Generated Prisma stays inside repository adapters; roots parse the environment once and inject semantic configuration. | oxlint (`prisma-containment`, `environment-boundaries`), architecture-lint (`typed-prisma-seam`) |
+| **Keep infrastructure private.** Generated Prisma stays inside repository adapters; roots parse the environment once and inject semantic configuration. | oxlint (`prisma-containment`, `environment-boundaries`), architecture-enforcer (`typed-prisma-seam`) |
 | **Keep methods predictable.** Required operations return a value or throw a concrete domain error. Normal absence belongs to explicitly named `find*` methods returning `null` or `undefined`. `try*` and `require*` are forbidden. | oxlint (`fallible-result-naming`); legacy declarations remain migration work and are not a precedent for new code |
-| **Keep composition declarative.** No SQL, authorization decision, business mapping, transaction, or request handling inside a composition module. | architecture-lint (`no-domain-query-in-composition`, proposed) |
-| **Keep authorization consistent.** Preserve the credential principal, check the target being accessed, share policy between transports. | oxlint (`api-context-services`), architecture-lint (`api-transport-boundaries`), policy-parity test (proposed) |
-| **Keep source readable.** Lower-kebab filenames with dotted roles, small cohesive collaborators, braces, named intermediate values, short comments explaining durable constraints. | oxfmt, oxlint (`feature-source-filename`, `service-member-spacing`, `comment-block-size`), architecture-lint (`service-ceilings`, `comment-blocks`) |
-| **Keep eventing deterministic.** Projections and process managers derive synchronously; effects run behind explicit retry and idempotency boundaries. | architecture-lint (`eventing-roles`, `service-projection-boundaries`) |
-| **Preserve behaviour and coverage.** Delete displaced implementations after rewiring callers; keep equivalent behavioural coverage and existing API contracts. | architecture-lint (`check-feature-parity`, `test-quality`), focused tests |
+| **Keep composition declarative.** No SQL, authorization decision, business mapping, transaction, or request handling inside a composition module. | architecture-enforcer (`no-domain-query-in-composition`, proposed) |
+| **Keep authorization consistent.** Preserve the credential principal, check the target being accessed, share policy between transports. | oxlint (`api-context-services`), architecture-enforcer (`api-transport-boundaries`), policy-parity test (proposed) |
+| **Keep source readable.** Lower-kebab filenames with dotted roles, small cohesive collaborators, braces, named intermediate values, short comments explaining durable constraints. | oxfmt, oxlint (`feature-source-filename`, `service-member-spacing`, `comment-block-size`), architecture-enforcer (`service-ceilings`, `comment-blocks`) |
+| **Keep eventing deterministic.** Projections and process managers derive synchronously; effects run behind explicit retry and idempotency boundaries. | architecture-enforcer (`eventing-roles`, `service-projection-boundaries`) |
+| **Preserve behaviour and coverage.** Delete displaced implementations after rewiring callers; keep equivalent behavioural coverage and existing API contracts. | architecture-enforcer (`check-feature-parity`, `test-quality`), focused tests |
 
 ## Done means
 

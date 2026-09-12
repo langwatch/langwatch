@@ -17,7 +17,7 @@ background, not the recipe.
 
 ## The target shape, per baseline row
 
-Rows live in `packages/architecture-lint/src/feature-shape-baseline.json` as
+Rows live in `packages/architecture-enforcer/src/feature-shape-baseline.json` as
 `<module>|<rule>`. Each rule has one exemplar to copy exactly.
 
 | rule | what closes it | copy exactly |

@@ -6,8 +6,8 @@
 # ../server/cdn-asset-base.feature, ../setup/single-pnpm-workspace.feature and
 # ../npx-installer/05-publish.feature.
 # Enterprise package shape remains owned by
-# ../../packages/architecture-lint/specs/feature-package-boundaries.feature and
-# ../../packages/architecture-lint/specs/strict-feature-layout.feature.
+# ../../packages/architecture-enforcer/specs/feature-package-boundaries.feature and
+# ../../packages/architecture-enforcer/specs/strict-feature-layout.feature.
 # Product ownership, singular names and canonical cross-feature services remain
 # owned by singular-feature-ownership.feature.
 # License and plan behaviour remains owned by

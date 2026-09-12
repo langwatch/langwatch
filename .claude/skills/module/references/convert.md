@@ -12,7 +12,7 @@ the one you are writing.
 
 ```bash
 F=<module>; P=modules/$F
-grep -n "\"$F\"" packages/architecture-lint/src/feature-shape-baseline.json
+grep -n "\"$F\"" packages/architecture-enforcer/src/feature-shape-baseline.json
 find $P/contract/src $P/server/src $P/web/src -type f | grep -v __tests__ | grep -v node_modules | sort
 ls apps/api/src/features/$F apps/worker/src/features/$F 2>/dev/null
 grep -rn "withModule(" apps/api/src apps/worker/src apps/tasks/src | grep -v __tests__ | grep -i "$(echo $F | sed 's/-//g')"
@@ -245,7 +245,7 @@ layers under `model/`, `behavior/`, `ui/` do not move.
 - Gates per `.claude/skills/architecture-guide/references/gates.md`. Then the module's
   entries in `feature-shape-baseline.json` are stale and the root session deletes them;
   the lint reports the ones still standing. Done means
-  `grep -c "\"<f>\"" packages/architecture-lint/src/feature-shape-baseline.json` is 0.
+  `grep -c "\"<f>\"" packages/architecture-enforcer/src/feature-shape-baseline.json` is 0.
 
 ## Rules that hold throughout
 

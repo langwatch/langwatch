@@ -141,7 +141,7 @@ plan_langy_lane() {
   # about a missing build. Name the repo's copy and say when it is not there.
   local repo
   repo="$(cd "$repo_root" 2>/dev/null && pwd)"
-  LANGY_LANE_WORKER_BINARY="${repo}/services/langyworker/out/langy-worker"
+  LANGY_LANE_WORKER_BINARY="${repo}/.bin/langy-worker/langy-worker"
   if [ ! -x "$LANGY_LANE_WORKER_BINARY" ]; then
     LANGY_LANE_REASON="${LANGY_LANE_REASON}, chats need \`pnpm --filter @langwatch/langyworker build:binary\` first"
   fi

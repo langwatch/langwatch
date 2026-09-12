@@ -27,7 +27,7 @@ packages/api/src/rest/runtime.ts · index.ts                            defineRe
 ```
 
 `transport/api-rest/**` and `transport/public-rest/**` are the older spelling; a module
-that still has one is listed in `packages/architecture-lint/src/feature-shape-baseline.json`
+that still has one is listed in `packages/architecture-enforcer/src/feature-shape-baseline.json`
 (`nested-transport`). New endpoints go on the flat declaration even in such a module; if
 the module has no flat declaration yet, create `transport/<f>.rest.ts` and mount it (step
 1.3) rather than adding to the folder.

@@ -412,7 +412,7 @@ one look like an oversight rather than a decision.
 
 ### P11 — `ports/trace.port.ts` exports `TraceRepository`, not a `*Port` (R4, policy)
 
-`packages/architecture-lint/src/port-module-baseline.json:32` carries
+`packages/architecture-enforcer/src/port-module-baseline.json:32` carries
 `"modules/trace/server/src/ports/trace.port.ts"` as a standing exception
 to `strict-port-module`, because its exported abstract class is named
 `TraceRepository` (`ports/trace.port.ts:27`) and the rule requires the name to end
@@ -660,7 +660,7 @@ copy already sitting in `presentation.ts:256` starts reaching customers.
   others; that is correct and P1 is about _where the vendor's rules files sit_, never
   about collapsing the set.
 - **`ports/` — 26 files, 29 abstract classes, 56 signatures.** The fragmentation is
-  policy: `packages/architecture-lint/src/port-modules.ts` requires a `.port.ts`
+  policy: `packages/architecture-enforcer/src/port-modules.ts` requires a `.port.ts`
   module to export an abstract class named `*Port`. More to the point, **16 of these
   ports are implemented in `platform/app/src/runtime/app/`** — genuine cross-package
   inversions, exactly R4's keep criterion:

@@ -197,7 +197,7 @@ Scenario: Analytics chart shows error state when ClickHouse query fails
 
 ### Binding scenarios to tests
 
-The parity checker (`packages/architecture-lint/src/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
+The parity checker (`packages/architecture-enforcer/src/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
 
 ```ts
 /** @scenario Analytics chart shows error state when ClickHouse query fails */
@@ -253,7 +253,7 @@ noise. It is a parity check you run against a branch, not a suite that runs in
 CI, and its own behaviour is specified in `specs/tooling/visual-diff.feature`
 and bound by Go and runner unit tests. Start with
 `go run ./cmd/visualdiff run -dry-run`; the routes and flows it renders live in
-`visualdiff.yaml` at the repository root, so widening the coverage is editing
+`tools/visualdiff/visualdiff.yaml`, so widening the coverage is editing
 YAML. See `tools/visualdiff/README.md`.
 
 ## Workflow
