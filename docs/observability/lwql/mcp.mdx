@@ -1,0 +1,23 @@
+---
+title: "LWQL MCP Server"
+description: "A first-party MCP server for LangWatchQL — coming soon"
+sidebarTitle: "MCP (coming soon)"
+keywords: langwatchql, lwql, mcp, model context protocol, agent
+---
+
+<Note>
+The LWQL MCP server is **coming soon**.
+</Note>
+
+A first-party [Model Context Protocol](https://modelcontextprotocol.io) server for LWQL is in the works. It will expose the two LWQL endpoints as MCP tools, so any MCP-capable client — Claude Code, Claude Desktop, Cursor, and others — can discover your analytics schema and run queries without any custom prompt wiring:
+
+- **`lwql_schema`** — the dataset catalog your key can see, ready for the model's context
+- **`lwql_query`** — run one read-only SQL statement and get typed rows, statistics, and diagnostics back
+
+LWQL is read-only, tenant-isolated and resource-capped at the database, so an agent connected through MCP cannot write and cannot reach another tenant's rows, and every query it sends is bounded by the ceilings pinned in its settings profile as constants no caller can change — a query that exceeds them is refused, timed out, or truncated rather than left to run. Those are per-query and per-identity guarantees the database enforces, not a global availability guarantee for the cluster; and whatever your agent then does with the rows it legitimately reads is your side of the boundary.
+
+## Until then
+
+The HTTP API works with any agent today — see [Handing the reins to your agent](/observability/lwql/querying-with-agents) for a ready-made system prompt and the discover → query → repair loop. If you're using an MCP client that supports generic HTTP/fetch tools, that same prompt is enough.
+
+Want early access or have opinions on the tool surface? [Talk to us](/support).
