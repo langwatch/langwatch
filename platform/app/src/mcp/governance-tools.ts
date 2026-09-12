@@ -352,10 +352,11 @@ export function registerGovernanceMcpTools(
         ingestionTemplateId: template_id ?? null,
       });
       // The call surface lives in `metadata.surface`, the field every other
-      // governance mutation stamps and incident response queries. The mint is
-      // not held up by the audit write: a write that fails must not swallow a
-      // token this response shows exactly once.
-      void auditLog({
+      // governance mutation stamps and incident response queries. Awaited, so
+      // the row is durable before the caller is told a key exists; the `.catch`
+      // is what keeps the original guarantee — an audit write that genuinely
+      // fails must not swallow a token this response shows exactly once.
+      await auditLog({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         action: "ingestionKey.mint",

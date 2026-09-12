@@ -313,8 +313,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
-  "specs/ai-gateway/governance/siem-export.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
@@ -688,6 +686,11 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/ingestion-templates-catalog.feature",
   "specs/ai-gateway/governance/my-usage-dashboard.feature",
+  // Reason: #7960 tagged and bound the four scenarios the devices tab now
+  // answers for ingestion keys, and retired its LEGACY_INERT entry. The eight
+  // untagged scenarios describe session-duration policy and the admin
+  // bird-eye dashboard, neither of which that issue audited.
+  "specs/ai-gateway/governance/sessions-and-devices.feature",
   // Reason: #8041 tagged and bound two scenarios (opaque id placement on
   // export, and the drop of an opaque email beside a user id) and retired
   // its LEGACY_INERT entry. The eleven untagged scenarios describe the wider
@@ -703,6 +706,12 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-governance/cli-onboarding/login-unified.feature",
   "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
   "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
+  // Reason: #7960 tagged the one scenario it bound — logout retiring the
+  // ingest keys parented to the session's login key — and took the file out
+  // of LEGACY_INERT, which left its other twenty-one scenarios enforced by
+  // nothing and the check red. They describe the wider logout surface that
+  // issue did not audit.
+  "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/personal-portal/admin-catalog-editor.feature",
   "specs/ai-governance/personal-portal/tool-catalog-rbac.feature",
