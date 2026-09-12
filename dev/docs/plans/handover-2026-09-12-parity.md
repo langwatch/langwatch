@@ -171,7 +171,57 @@ alias this branch lacks. Before citing a test as evidence, confirm it runs.
    packages; extend the same rule to `@langwatch/*` workspace imports by
    resolving each package's `src` and testing whether the symbol is declared
    `export interface` / `export type` there. `langwatch(type-only-value-import)`
-   tracks the class: it went 495 -> 297, and the remaining 297 are the work.
+   tracks the class: it went 495 -> 297.
+
+   **That sweep is now DONE for every boundary** - relative, `@langwatch/*` and
+   `#*` subpath (commits aaecc74349 and 27edfffecf). What blocks the generator
+   now is a different and final class, enumerated below. The remaining 297 lint
+   findings are in files the generator does not reach; they are debt, not this
+   critical path.
+
+## The last boot-chain class: ports that folded into Infrastructure
+
+24 symbols are imported from a module's `app/*.members.ts` or `app/*.app.ts` and
+declared in neither. They are NOT renames and NOT type-import problems. Commit
+`0611c343fe` records what happened - "nine ports and the four invite ports fold
+into OrganizationInfrastructure" - so each became a FIELD on its module's
+Infrastructure interface and its importers were never updated. Each is a small
+design decision (reference the field's type, or restore the interface), which is
+why this is lane work rather than a sweep.
+
+    OrganizationCeremony, OrganizationDemoProject, OrganizationDirectory,
+    OrganizationInvitations, OrganizationInviteWithOrganization,
+    OrganizationInvitesCreated, OrganizationJoinRequests,
+    OrganizationJoinRequestState, OrganizationPlanGate, OrganizationSignals
+        modules/organization/server/src/app/organization.members.ts
+    AutomationDispatchError, AutomationGraphNotifier, AutomationHeartbeat,
+    AutomationLogger, AutomationSlackBotTokenDecryptor,
+    AutomationNotificationDelivery
+        modules/automation/server/src/app/automation.members.ts
+    AutomationProjectIdentity, AutomationWebhookStoredParams
+        modules/automation/server/src/app/automation.app.ts
+    LangyTitleModel                  modules/langy/server/src/app/langy.members.ts
+    CodingAgentTraceProcessing       modules/coding-agent/server/src/app/coding-agent.members.ts
+    ModelProviderCaller              modules/model-provider/server/src/app/model-provider.app.ts
+    TenantClickHouseClientResolver   modules/data-retention/server/src/app/data-retention.app.ts
+    GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE, GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE
+        enterprise/modules/governance/server/src/app/governance.members.ts
+
+Regenerate the list: for each `import {...} from ".../app/*.members.ts"`, check
+each name against the target's own `export` declarations. Low false-positive,
+because members files never `export *`. (A wider scan over ALL relative imports
+reports ~317 and is mostly noise - it cannot follow `export *` or barrel chains.
+Trust the narrow one.)
+
+The generator currently dies on `LangyTitleModel` and will name these one at a
+time; the list above is the whole set, so fix them in one pass.
+
+Worked example, already landed in `27edfffecf`: langy's `LangyNavigateResource`
+was `export abstract class LangyNavigateResourcePort` before `f054ab2baf`, became
+the interface `LangyNavigateResourceLocator`, and its barrel, its fallback
+service and the API adapter were never told - the adapter still said `extends` a
+thing that had become an interface, while the module's own test already said
+`implements`, which is what settled the intended shape.
 2. When that command exits 0, **refreeze the document**: diff the generated file
    against `apps/api/src/features/discovery/openapi-document.json` and commit
    the new one deliberately. That is a person's decision, never a lane's.
