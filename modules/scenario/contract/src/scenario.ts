@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
-import { parseSuiteFieldDefinitions, suiteFieldDefinitionsSchema } from "./suite-fields.ts";
+import {
+  parseScenarioFieldValues,
+  parseSuiteFieldDefinitions,
+  scenarioFieldValuesSchema,
+  suiteFieldDefinitionsSchema,
+} from "./suite-fields.ts";
 
 export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
 export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;
@@ -30,6 +35,10 @@ export const scenarioSchema = z
     judgeModel: z.string().nullable(),
     maxTurns: z.number().int().nullable(),
     minTurns: z.number().int().nullable(),
+    // The value this scenario carries for each field its test suite declares,
+    // keyed by field identifier. A field with no value has no key. See
+    // specs/scenarios/scenario-fields.feature.
+    fields: z.preprocess((raw) => parseScenarioFieldValues(raw), scenarioFieldValuesSchema),
     testSuiteId: z.string().min(1).nullable().default(null),
     version: z.number().int().positive().default(1),
     lastUpdatedById: z.string().nullable(),
@@ -126,6 +135,7 @@ const scenarioFieldsSchema = z
     minTurns: z.number().int().min(0).max(100).nullable().optional(),
     lastUpdatedById: z.string().nullable().optional(),
     testSuiteId: z.string().min(1).nullable().optional(),
+    fields: scenarioFieldValuesSchema.optional(),
   })
   .strict();
 

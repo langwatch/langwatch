@@ -96,6 +96,50 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
     });
   });
 
+  describe("when a scenario carries a value per suite field", () => {
+    /** @scenario "A scenario carries a value per suite field" */
+    it("reads back the same field values it was created with", async () => {
+      const repository = backend.repository();
+      const testSuite = await repository.createTestSuite({
+        id: `suite_${randomUUID()}`,
+        projectId: PROJECT_ID,
+        name: `Case lookups ${randomUUID().slice(0, 8)}`,
+        fields: [{ identifier: "golden_sql", type: "text" as const }],
+      });
+      const id = `scenario_${randomUUID()}`;
+
+      const created = await repository.create({
+        id,
+        projectId: PROJECT_ID,
+        name: "Look up a customer's last order",
+        situation: "An analyst asks for the customer's last order",
+        criteria: ["The agent answers with the right row"],
+        labels: [],
+        testSuiteId: testSuite.id,
+        lastUpdatedById: null,
+        actor: { userId: null, label: "api" },
+        fields: { golden_sql: "SELECT 1" },
+      });
+
+      expect(created.fields).toEqual({ golden_sql: "SELECT 1" });
+      await expect(
+        repository.tryFindById({ id, projectId: PROJECT_ID }),
+      ).resolves.toMatchObject({ fields: { golden_sql: "SELECT 1" } });
+
+      const updated = await repository.update({
+        id,
+        projectId: PROJECT_ID,
+        actor: { userId: null, label: "api" },
+        fields: { golden_sql: "SELECT 2" },
+      });
+
+      expect(updated.fields).toEqual({ golden_sql: "SELECT 2" });
+      await expect(
+        repository.tryFindById({ id, projectId: PROJECT_ID }),
+      ).resolves.toMatchObject({ fields: { golden_sql: "SELECT 2" } });
+    });
+  });
+
   describe("when a test suite files scenarios", () => {
     it("lists only the ones this project owns", async () => {
       const repository = backend.repository();

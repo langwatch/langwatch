@@ -98,6 +98,7 @@ function toScenarioResponse(scenario: Scenario) {
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
     testSuiteId: scenario.testSuiteId,
+    fields: scenario.fields,
   };
 }
 
@@ -182,6 +183,7 @@ export function createScenarioRest() {
           ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
           ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
           ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
+          ...(body.fields !== undefined && { fields: body.fields }),
         },
         { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );

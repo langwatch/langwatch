@@ -172,7 +172,7 @@ describe("the snapshot envelope", () => {
       const neverHadValues = snapshotFieldsOf(neverHadValuesRow);
       const cleared = snapshotFieldsOf(clearedRow);
 
-      expect(diffSnapshotFields(neverHadValues, cleared)).toEqual([]);
+      expect(changedSnapshotFields(neverHadValues, cleared)).toEqual([]);
     });
   });
 });

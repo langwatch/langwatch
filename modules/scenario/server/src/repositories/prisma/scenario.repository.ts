@@ -257,6 +257,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       judgeModel: version.fields.judgeModel,
       maxTurns: version.fields.maxTurns,
       minTurns: version.fields.minTurns,
+      fields: version.fields.fields ?? {},
       lastUpdatedById: input.actor.userId,
       actor: input.actor,
       expectedVersion: scenario.version,

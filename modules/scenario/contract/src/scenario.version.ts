@@ -7,6 +7,11 @@ import {
   type ScenarioUpdateInput,
 } from "./scenario.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
+import {
+  parseScenarioFieldValues,
+  scenarioFieldValuesSchema,
+  type ScenarioFieldValues,
+} from "./suite-fields.ts";
 
 export type { ScenarioActor, ScenarioAuthorLabel } from "./scenario.ts";
 
@@ -20,6 +25,7 @@ export const scenarioVersionedFields = [
   "judgeModel",
   "maxTurns",
   "minTurns",
+  "fields",
 ] as const;
 export type ScenarioVersionedField = (typeof scenarioVersionedFields)[number];
 
@@ -34,6 +40,9 @@ export const scenarioSnapshotFieldsSchema = z
     judgeModel: z.string().nullable(),
     maxTurns: z.number().int().nullable(),
     minTurns: z.number().int().nullable(),
+    // Absent on a version snapshot written before scenario fields existed,
+    // which reads the same as a scenario that carries no values.
+    fields: scenarioFieldValuesSchema.nullable().optional(),
   })
   .strict();
 export type ScenarioSnapshotFields = z.infer<typeof scenarioSnapshotFieldsSchema>;
@@ -49,7 +58,9 @@ const scenarioSnapshotEnvelopeSchema = z
   .strict();
 export type ScenarioSnapshotEnvelope = z.infer<typeof scenarioSnapshotEnvelopeSchema>;
 
-export function snapshotFieldsOf(scenario: Scenario): ScenarioSnapshotFields {
+export function snapshotFieldsOf(
+  scenario: Pick<Scenario, Exclude<ScenarioVersionedField, "fields">> & { fields?: unknown },
+): ScenarioSnapshotFields {
   return {
     name: scenario.name,
     situation: scenario.situation,
@@ -60,7 +71,18 @@ export function snapshotFieldsOf(scenario: Scenario): ScenarioSnapshotFields {
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
+    fields: fieldValuesOrNull(scenario.fields),
   };
+}
+
+/**
+ * A scenario with no field values stores either null (never given any) or an
+ * empty record (cleared); the snapshot keeps one spelling so the two never
+ * diff as a change.
+ */
+function fieldValuesOrNull(raw: unknown): ScenarioFieldValues | null {
+  const parsed = parseScenarioFieldValues(raw);
+  return Object.keys(parsed).length === 0 ? null : parsed;
 }
 
 export function changedSnapshotFields(
@@ -88,7 +110,8 @@ export function buildSnapshotEnvelope(
 }
 
 export function parseSnapshotEnvelope(snapshot: unknown): ScenarioSnapshotEnvelope {
-  return scenarioSnapshotEnvelopeSchema.parse(snapshot);
+  const envelope = scenarioSnapshotEnvelopeSchema.parse(snapshot);
+  return { ...envelope, fields: { ...envelope.fields, fields: envelope.fields.fields ?? null } };
 }
 
 export const scenarioVersionSummarySchema = z

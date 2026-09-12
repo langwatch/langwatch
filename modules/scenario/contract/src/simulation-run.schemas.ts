@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 import { scenarioLegacyErrorBodySchema } from "./scenario-rest.schemas.ts";
 
 export { scenarioLegacyErrorBodySchema };
@@ -17,6 +18,12 @@ export const scenarioRunRestResponseSchema = z.object({
       metCriteria: z.array(z.string()).optional(),
       unmetCriteria: z.array(z.string()).optional(),
       error: z.string().nullable().optional(),
+      evaluations: z
+        .array(scenarioEvaluationResultSchema)
+        .optional()
+        .describe(
+          "One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators.",
+        ),
     })
     .nullable(),
   messages: z.array(

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { runActorLabelSchema } from "./run-actor.ts";
 import { runParameterValuesSchema } from "./scenario.parameters.ts";
+import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 
 /**
  * Persisted and wire-visible state of one simulation run. `STALLED` remains readable for
@@ -54,6 +55,11 @@ export const simulationRunResultSchema = z.object({
   metCriteria: z.array(z.string()),
   unmetCriteria: z.array(z.string()),
   error: z.string().optional(),
+  /**
+   * One result per evaluator that ran on the scenario. Absent on a run with
+   * no evaluators, and on results recorded before evaluators existed.
+   */
+  evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
 export type SimulationRunResult = z.infer<typeof simulationRunResultSchema>;
 
