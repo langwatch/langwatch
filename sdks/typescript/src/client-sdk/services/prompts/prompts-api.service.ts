@@ -38,7 +38,7 @@ const syncResultSchema = z.object({
 });
 
 export type AssignTagResult = NonNullable<
-  operations["putApiPromptsByIdTagsByTag"]["responses"]["200"]["content"]["application/json"]
+  operations["assignPromptTag"]["responses"]["200"]["content"]["application/json"]
 >;
 
 export type ConfigData = NonNullable<

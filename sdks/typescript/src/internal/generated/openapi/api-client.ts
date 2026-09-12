@@ -2922,6 +2922,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/traces/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Search traces for a project */
+        post: operations["searchTraces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/traces/{traceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a single trace by ID. */
+        get: operations["getTrace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/usage": {
         parameters: {
             query?: never;
@@ -19474,7 +19508,7 @@ export interface operations {
     getPrompt: {
         parameters: {
             query?: {
-                version?: string;
+                version?: number;
                 tag?: string;
             };
             header?: never;
@@ -23523,6 +23557,244 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    searchTraces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    query?: string;
+                    /** @default {} */
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    traceIds?: string[];
+                    negateFilters?: boolean;
+                    /** @description Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded. */
+                    pageOffset?: number;
+                    pageSize?: number;
+                    groupBy?: string;
+                    sortBy?: string;
+                    sortDirection?: string;
+                    updatedAt?: number;
+                    scrollId?: string | null;
+                    startDate: number | string;
+                    endDate: number | string;
+                    /**
+                     * @description Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)
+                     * @enum {string}
+                     */
+                    format?: "digest" | "json";
+                    /** @description When true, fetches full span data for each trace. Useful for bulk export. Default false. */
+                    includeSpans?: boolean;
+                    llmMode?: boolean;
+                    /**
+                     * @description Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
+                     * @default occurred
+                     * @enum {string}
+                     */
+                    dateField?: "occurred" | "updated";
+                    /**
+                     * @description Entity root to read from. Only 'traces' is supported today; defaults to 'traces' when omitted.
+                     * @default traces
+                     * @enum {string}
+                     */
+                    from?: "traces";
+                    /** @description Flat list of dotted-path columns to project, e.g. ['trace_id','metadata.user_id','events.type','evaluations.score']. Paths group by root in the response: scalar fields stay top-level, 'metadata.*' nests under a metadata object, and 'events.*'/'annotations.*'/'evaluations.*' return as nested arrays (one row per trace). When present, the response gains a top-level 'schema' field describing the resolved columns. When omitted, the response is unchanged from the legacy shape. */
+                    select?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Matching traces with pagination */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        traces: unknown[];
+                        pagination: {
+                            totalHits: number;
+                            scrollId?: string;
+                            /** @description Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set. */
+                            skipped?: number;
+                            /** @description Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. The bound is inclusive on both sides, so a trace last written at exactly this millisecond arrives in this pull and again in the next one: pulls are at-least-once, and applying them idempotently is what keeps that from becoming a duplicate. */
+                            updatedThrough?: number;
+                        };
+                        /** @description Present only when 'select' is provided. Describes the resolved columns — the dotted path, its value type, and whether it belongs to a nested child collection — so callers can pre-allocate a typed reader. */
+                        schema?: {
+                            from: string;
+                            columns: {
+                                path: string;
+                                type: string;
+                                collection: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getTrace: {
+        parameters: {
+            query?: {
+                /** @description Output format: 'digest' (AI-readable) or 'json' (full raw data, default) */
+                format?: string;
+                /** @description Deprecated: use format=digest instead */
+                llmMode?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project. */
+                traceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trace detail with spans, evaluations, and ASCII tree */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trace not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description Ambiguous trace ID prefix — the prefix matches more than one trace */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                        candidateTraceIds: string[];
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

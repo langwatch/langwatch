@@ -19,7 +19,6 @@ export const promptResponseFactory = Factory.define<PromptResponse>(({ sequence 
   inputs: [],
   outputs: [],
   versionId: `prompt_version_${sequence}`,
-  versionCreatedAt: new Date().toISOString(),
   model: "gpt-5",
   prompt: "Hello {{name}}, how is the {{topic}} today?",
   messages: [
@@ -32,7 +31,7 @@ export const promptResponseFactory = Factory.define<PromptResponse>(({ sequence 
       content: "Tell me about {{topic}}",
     },
   ],
-  response_format: {
+  responseFormat: {
     type: "json_schema" as const,
     json_schema: {
       name: "response",
@@ -41,4 +40,5 @@ export const promptResponseFactory = Factory.define<PromptResponse>(({ sequence 
   },
   tags: [],
   parameters: {},
+  platformUrl: `https://app.langwatch.ai/test-project/prompts/prompt_${sequence}`,
 }));

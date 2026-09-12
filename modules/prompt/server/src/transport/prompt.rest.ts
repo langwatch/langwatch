@@ -287,7 +287,12 @@ const idVersionParamsSchema = z.object({ id: z.string(), versionId: z.string() }
 
 /** The two window parameters a bare slug may name instead of a shorthand. */
 const promptWindowQuerySchema = z.object({
-  version: z.string().optional(),
+  // Coerced, not `z.string()`: a version IS a non-negative integer everywhere
+  // else it is named (`versionSchema`, `prompt.ts`, `prompt.commands.ts`), and
+  // main publishes this parameter as `integer, minimum 0`. Declaring it a
+  // string published a different contract and pushed the parsing onto every
+  // caller. Query values arrive as strings, so the coercion is the parse.
+  version: z.coerce.number().int().nonnegative().optional(),
   tag: z.string().optional(),
 });
 

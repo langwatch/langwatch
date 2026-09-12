@@ -6,6 +6,7 @@ import {
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import type { ExperimentRunSummary } from "./platformTypes";
 
 export interface ExperimentRunStartResponse {
   runId: string;
@@ -47,8 +48,47 @@ export const toRunStartRequest = ({
   return Object.keys(body).length > 0 ? body : undefined;
 };
 
-export type ExperimentRunStatusResponse =
-  paths["/api/v1/experiments/runs/{runId}"]["get"]["responses"]["200"]["content"]["application/json"];
+/**
+ * `GET /api/v1/experiments/runs/{runId}` is declared `withRawResponse`
+ * (`modules/experiment/server/src/transport/experiment-v3.rest.ts:430`), so
+ * `assertSchemaAnswerFree` forbids it from publishing a response schema and no
+ * document will ever type this body. Restored from the last document that
+ * had it (`openapi-document.json` at `0a0f549cfd^`), not invented from a call
+ * site.
+ */
+export interface ExperimentRunStatusResponse {
+  runId: string;
+  status: "pending" | "running" | "completed" | "failed" | "stopped";
+  /** Cells finished so far */
+  progress: number;
+  /** Cells in the run */
+  total: number;
+  /** Unix milliseconds */
+  startedAt?: number;
+  /** Unix milliseconds; set once the run is no longer running */
+  finishedAt?: number;
+  /** Present when completed */
+  summary?: ExperimentRunSummary & {
+    /** Non-zero means some rows may be missing from the stored results */
+    chDispatchFailures?: number;
+  };
+  /** Stable failure code, present when failed. Not display copy. */
+  error?: string;
+  /** The full failure envelope, when the failure carried one */
+  domainError?: {
+    code: string;
+    kind: string;
+    message?: string;
+    meta?: Record<string, unknown>;
+    httpStatus?: number;
+    fault?: string;
+    traceId?: string;
+    tips?: string[];
+    docsUrl?: string;
+  };
+  /** Trace id for failures that carry no code, to quote in support */
+  traceId?: string;
+}
 
 /**
  * Status payload for `GET /api/evaluations/v3/runs/{runId}` (polling).
@@ -212,34 +252,74 @@ export type ExperimentCreateResponse =
   paths["/api/v1/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
 
 /**
+ * `GET /api/v1/experiments/{slug}/workbench-state`,
+ * `PUT /api/v1/experiments/{slug}/workbench-state`,
+ * `GET /api/v1/experiments/{slug}/versions` and
+ * `POST /api/v1/experiments/{slug}/versions/{version}/restore` are all
+ * declared `withRawResponse` (`experiment-v3.rest.ts:589, 625, 667, 722`), so
+ * none of their responses can come from the document. Restored from the last
+ * document that had them (`openapi-document.json` at `0a0f549cfd^`).
+ *
  * The read answers one of two documents, chosen by the `fields` query. The
  * full setup is the one carrying `state`, so that field is what splits the
  * union into the two shapes the overloads promise.
  */
-type WorkbenchStateReadResponse =
-  paths["/api/v1/experiments/{slug}/workbench-state"]["get"]["responses"]["200"]["content"]["application/json"];
-
-export type ExperimentWorkbenchStateResponse = Extract<
-  WorkbenchStateReadResponse,
-  { state: unknown }
->;
+export interface ExperimentWorkbenchStateResponse {
+  id: string;
+  slug: string;
+  name: string | null;
+  state: ExperimentWorkbenchState | null;
+  /** Send this back as expectedVersion to save safely */
+  version: number;
+  /** ISO 8601 timestamp of the last save */
+  updatedAt: string;
+}
 
 /** What `fields: "version"` answers: the staleness probe without the setup. */
-export type ExperimentWorkbenchVersionProbe = Exclude<
-  WorkbenchStateReadResponse,
-  { state: unknown }
->;
+export interface ExperimentWorkbenchVersionProbe {
+  id: string;
+  slug: string;
+  version: number;
+  updatedAt: string;
+}
 
-export type ExperimentSaveWorkbenchStateResponse =
-  paths["/api/v1/experiments/{slug}/workbench-state"]["put"]["responses"]["200"]["content"]["application/json"];
+export interface ExperimentSaveWorkbenchStateResponse {
+  /** The version the save produced */
+  version: number;
+}
 
-export type ExperimentRestoreVersionResponse =
-  paths["/api/v1/experiments/{slug}/versions/{version}/restore"]["post"]["responses"]["200"]["content"]["application/json"];
+export interface ExperimentRestoreVersionResponse {
+  /** The new version the restore wrote. History is never rewritten, so the
+   * restored version is still in the list. */
+  version: number;
+}
 
-export type ExperimentVersionsResponse =
-  paths["/api/v1/experiments/{slug}/versions"]["get"]["responses"]["200"]["content"]["application/json"];
+export interface ExperimentVersionSummary {
+  /** Restore this version by this number. Named versions run 1, 2, 3 with no
+   * gaps. The autosave row also has a number, but it changes with every
+   * save, so read it as a handle and not as a place in the history. */
+  version: number;
+  /** The setup version this row was written at. */
+  counterVersion: number;
+  /** True for the single autosave row, which every ordinary save rewrites in place */
+  autoSaved: boolean;
+  commitMessage: string | null;
+  /** Who wrote it: user, langy or api */
+  authorLabel: string;
+  /** User id, when a person wrote it */
+  authorId: string | null;
+  /** ISO 8601 timestamp of the first write */
+  createdAt: string;
+  /** ISO 8601 timestamp of the last write */
+  updatedAt: string;
+}
 
-export type ExperimentVersionSummary = ExperimentVersionsResponse["versions"][number];
+export interface ExperimentVersionsResponse {
+  /** Newest first, by `counterVersion` */
+  versions: ExperimentVersionSummary[];
+  /** Pass as `cursor` to read the next page, null on the last one */
+  nextCursor: number | null;
+}
 
 export class ExperimentsApiServiceError extends Error {
   constructor(
@@ -412,7 +492,11 @@ export class ExperimentsApiService {
         },
       },
     );
-    return unwrapApiResult({
+    // The endpoint is declared `withRawResponse`, so the document cannot
+    // describe `data`'s shape (it types as `undefined`); the response type
+    // is asserted explicitly here rather than inferred, restored from the
+    // last document that had it.
+    return unwrapApiResult<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe>({
       operation: `get workbench state for "${slug}"`,
       data,
       error,
@@ -446,7 +530,8 @@ export class ExperimentsApiService {
         },
       },
     );
-    return unwrapApiResult({
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentSaveWorkbenchStateResponse>({
       operation: `save workbench state for "${slug}"`,
       data,
       error,
@@ -479,7 +564,8 @@ export class ExperimentsApiService {
         },
       },
     );
-    return unwrapApiResult({
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentVersionsResponse>({
       operation: `list versions for experiment "${slug}"`,
       data,
       error,
@@ -503,7 +589,8 @@ export class ExperimentsApiService {
       "/api/v1/experiments/{slug}/versions/{version}/restore",
       { params: { path: { slug, version: String(version) } } },
     );
-    return unwrapApiResult({
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentRestoreVersionResponse>({
       operation: `restore version ${version} of experiment "${slug}"`,
       data,
       error,
@@ -516,7 +603,8 @@ export class ExperimentsApiService {
     const { data, error, response } = await this.apiClient.GET("/api/v1/experiments/runs/{runId}", {
       params: { path: { runId } },
     });
-    return unwrapApiResult({
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentRunStatusResponse>({
       operation: `get run status for "${runId}"`,
       data,
       error,

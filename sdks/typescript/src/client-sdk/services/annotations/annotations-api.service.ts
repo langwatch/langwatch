@@ -19,6 +19,23 @@ export type CreateAnnotationBody = NonNullable<
   paths["/api/v1/annotations/trace/{id}"]["post"]["requestBody"]
 >["content"]["application/json"];
 
+export type DeleteAnnotationResponse = { status?: string; message?: string };
+
+/**
+ * The delete endpoint's `application/json` content is `unknown` in the
+ * document (the generator no longer names it as a component schema), so the
+ * shape this service promises callers is verified at runtime rather than
+ * assumed.
+ */
+function isDeleteAnnotationResponse(value: unknown): value is DeleteAnnotationResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    (record.status === undefined || typeof record.status === "string") &&
+    (record.message === undefined || typeof record.message === "string")
+  );
+}
+
 export class AnnotationsApiError extends Error {
   constructor(
     message: string,
@@ -99,16 +116,21 @@ export class AnnotationsApiService {
     }).data;
   }
 
-  async delete(id: string): Promise<{ status?: string; message?: string }> {
+  async delete(id: string): Promise<DeleteAnnotationResponse> {
     const { data, error, response } = await this.apiClient.DELETE("/api/v1/annotations/{id}", {
       params: { path: { id } },
     });
-    return unwrapApiResult({
-      operation: `delete annotation with ID "${id}"`,
+    const operation = `delete annotation with ID "${id}"`;
+    const result = unwrapApiResult({
+      operation,
       data,
       error,
       response,
       onError: this.handleApiError.bind(this),
     });
+    if (!isDeleteAnnotationResponse(result)) {
+      this.handleApiError(operation, new Error("Delete annotation response has an unexpected shape"));
+    }
+    return result;
   }
 }

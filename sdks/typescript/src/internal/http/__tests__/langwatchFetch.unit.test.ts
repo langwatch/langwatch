@@ -621,19 +621,19 @@ describe("langwatchFetch", () => {
     /** @scenario the generated API client uses the shared transport */
     it("sends through the shared transport and replays the upgrade with its headers", async () => {
       const { fetchImpl, calls } = scripted(
-        redirect({ status: 301, location: "https://app.langwatch.ai/api/annotations" }),
+        redirect({ status: 301, location: "https://app.langwatch.ai/api/v1/annotations" }),
         new Response("[]", { status: 200, headers: { "content-type": "application/json" } }),
       );
       globalThis.fetch = fetchImpl;
       const client = createLangWatchApiClient("sk-lw-secret", "http://app.langwatch.ai");
 
-      const { data, error } = await client.GET("/api/annotations");
+      const { data, error } = await client.GET("/api/v1/annotations");
 
       expect(error).toBeUndefined();
       expect(data).toEqual([]);
       expect(calls.map((call) => urlOf(call.input))).toEqual([
-        "http://app.langwatch.ai/api/annotations",
-        "https://app.langwatch.ai/api/annotations",
+        "http://app.langwatch.ai/api/v1/annotations",
+        "https://app.langwatch.ai/api/v1/annotations",
       ]);
       const replay = calls[1]!.input as Request;
       expect(replay.headers.get("x-auth-token")).toBe("sk-lw-secret");

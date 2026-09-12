@@ -22,6 +22,11 @@ const annotation: AnnotationResponse = {
   // rather than optional.
   userId: null,
   email: "reviewer@example.com",
+  scoreOptions: {},
+  expectedOutput: null,
+  anchorKind: null,
+  anchorId: null,
+  anchorPath: null,
   createdAt: "2026-09-01T00:00:00.000Z",
   updatedAt: "2026-09-01T00:00:00.000Z",
 };

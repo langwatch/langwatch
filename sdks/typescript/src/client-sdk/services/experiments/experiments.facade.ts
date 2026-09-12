@@ -7,6 +7,10 @@ import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { Logger } from "@/logger";
 import { Experiment } from "./experiment";
 import { ExperimentsApiService, toRunStartRequest } from "./experiments-api.service";
+import type {
+  ExperimentRunStartResponse,
+  ExperimentRunStatusResponse,
+} from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
   ExperimentRunResult,
@@ -27,6 +31,17 @@ import { printSummary } from "./printSummary";
 
 const DEFAULT_POLL_INTERVAL = 2000;
 const DEFAULT_TIMEOUT = 600000; // 10 minutes
+
+/**
+ * Asserts the shape of a raw endpoint's body. `data` types as `undefined` on
+ * a `withRawResponse` operation (the document cannot describe it), so a
+ * direct `as` cast has no overlap to check against; the type comes in
+ * through this generic instead, the same trust boundary
+ * `ExperimentsApiService`'s undeclared-endpoint helpers use.
+ */
+function rawResponseData<T>(data: unknown): T {
+  return data as T;
+}
 
 type ExperimentsFacadeConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -219,7 +234,7 @@ export class ExperimentsFacade {
   /**
    * Start an experiment run
    */
-  private async startRun(slug: string): Promise<{ runId: string; total: number; runUrl?: string }> {
+  private async startRun(slug: string): Promise<ExperimentRunStartResponse> {
     let response;
     try {
       response = await this.config.langwatchApiClient.POST("/api/v1/experiments/{slug}/run", {
@@ -238,19 +253,18 @@ export class ExperimentsFacade {
       this.handleStartRunError(slug, response.error, response.response.status);
     }
 
-    return response.data as { runId: string; total: number; runUrl?: string };
+    // `/api/v1/experiments/{slug}/run` is declared `withRawResponse`
+    // (`experiment-v3.rest.ts:208`), so the typed client's `data` is
+    // `undefined` here — the document cannot describe a raw response's body.
+    // The real shape is restored from the last document that had it
+    // (`openapi-document.json` at `0a0f549cfd^`).
+    return rawResponseData<ExperimentRunStartResponse>(response.data);
   }
 
   /**
    * Get the status of a run
    */
-  private async getRunStatus(runId: string): Promise<{
-    status: string;
-    progress: number;
-    total: number;
-    summary?: ExperimentRunSummary;
-    error?: string;
-  }> {
+  private async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {
     let response;
     try {
       response = await this.config.langwatchApiClient.GET("/api/v1/experiments/runs/{runId}", {
@@ -269,13 +283,8 @@ export class ExperimentsFacade {
       this.handleRunStatusError(runId, response.error, response.response.status);
     }
 
-    return response.data as {
-      status: string;
-      progress: number;
-      total: number;
-      summary?: ExperimentRunSummary;
-      error?: string;
-    };
+    // Declared `withRawResponse`; see startRun above.
+    return rawResponseData<ExperimentRunStatusResponse>(response.data);
   }
 
   private handleStartRunError(slug: string, error: unknown, status: number): never {
