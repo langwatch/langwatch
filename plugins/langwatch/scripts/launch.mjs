@@ -92,7 +92,13 @@ async function notifyNotInstalled() {
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(marker, JSON.stringify({ notified_at: new Date().toISOString() }));
   const output = { hookEventName: "SessionStart", additionalContext: NOT_INSTALLED };
-  process.stdout.write(`${JSON.stringify({ hookSpecificOutput: output })}\n`);
+  // Claude Code reads this hook's stdout as its answer to the session, and
+  // stdout is a pipe, so the write is asynchronous. Wait for it to reach the
+  // pipe before main()'s exit can drop it: the marker above is already on
+  // disk, so a notice lost here is never said again.
+  await new Promise((resolve) =>
+    process.stdout.write(`${JSON.stringify({ hookSpecificOutput: output })}\n`, resolve),
+  );
 }
 
 async function main() {
@@ -111,6 +117,9 @@ async function main() {
   await new Promise((resolve) => child.on("error", resolve).on("close", resolve));
 }
 
+// The exit is forced rather than left to the event loop: reading stdin refs
+// that handle, and a client that never closes the pipe would otherwise keep
+// the hook alive past its answer. Everything written above is drained first.
 main()
   .catch(() => undefined)
   .finally(() => process.exit(0));
