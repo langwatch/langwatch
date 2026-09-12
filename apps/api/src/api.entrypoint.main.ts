@@ -1,4 +1,5 @@
 import process from "node:process";
+import { createLogger } from "@langwatch/observability";
 import { ApiHttpListener, type ApiListenerAddress } from "./api-http.listener.ts";
 import { ApiProcessLifecycleRoutes } from "./api-process.lifecycle.ts";
 import {
@@ -56,10 +57,15 @@ class ApiProductionComposition extends ApiRuntimeComposition {
  * Everything the API process does lives behind one composition, which is the
  * table of what the process is made of.
  *
- * A boot failure has already been written to the error stream by the time this
- * catch runs; what is left to decide here is the exit status, and it is
- * non-zero. Nothing is re-reported: a failure printed twice reads as two
- * failures.
+ * This catch reports what it caught. It used to assume the failure had already
+ * reached the error stream and stay silent, which holds only once the process
+ * has a logger — and the boot seam resolves secrets and parses config BEFORE
+ * that, so the failures most worth seeing are exactly the ones nothing had
+ * reported yet. An `InvalidRuntimeConfigError` naming the variables it rejected
+ * was being swallowed whole, leaving a process that exits 1 having printed
+ * nothing at all, under a supervisor that can only report "exit status 1".
+ * `apps/tasks` has always logged here (tasks.entrypoint.main.ts:106); this is
+ * the same line.
  */
 export async function bootApi(): Promise<void> {
   try {
@@ -68,7 +74,8 @@ export async function bootApi(): Promise<void> {
       composition: new ApiProductionComposition(),
     });
     await main.start();
-  } catch {
+  } catch (error) {
+    createLogger("langwatch:api").error({ error }, "api process failed to boot");
     process.exitCode = 1;
   }
 }

@@ -17,10 +17,31 @@ import {
   type ProcessMembers,
 } from "@langwatch/infrastructure";
 import type { MountableRestApp } from "@langwatch/api/rest";
+import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { serverModules } from "@langwatch/installed-modules/server";
 import type { BootedRuntime } from "@langwatch/runtime-composition";
 import { apiRestHosts, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
 import type { ApiConfig } from "../platform/config/api.config.ts";
+
+/**
+ * The null audit log, installed where no tier provides a real one.
+ *
+ * `modules/audit-log` publishes a contract and no core server half — the
+ * implementation is `enterprise/modules/audit-log/server` — so a core build
+ * installs nothing for the `audit-log` token. Meanwhile `agent`, `evaluator`
+ * and `ops` each declare a REQUIRED dependency on it, and boot refuses with
+ * `MissingProviderError` before the listener opens: the api process cannot
+ * start at all in the tier it ships by default.
+ *
+ * `@langwatch/audit-log-null` is what an installation without the Enterprise
+ * feature answers with, and apps/api has always declared the dependency on it
+ * in its package.json — only the line that installs it was missing. Appended
+ * conditionally so an enterprise build, where the real module IS in the list,
+ * does not end up with two providers for one token.
+ */
+const coreAuditLog = serverModules.some((module) => (module.name as string) === "audit-log")
+  ? []
+  : [auditLogNullServer];
 
 /** The api process's own rate allowance, until a deployment states one. */
 const DEFAULT_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
@@ -165,6 +186,7 @@ export function bootApiProcess(options: {
     members: options.members,
   })
     .withModules(serverModules)
+    .withModules(coreAuditLog)
     .withTransports(
       apiRestHosts({
         config: {
