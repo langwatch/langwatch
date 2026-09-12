@@ -136,6 +136,13 @@ export interface EvaluatorApi {
   syncFromSource(
     input: EvaluatorLineageScope & { actorId: string },
   ): Promise<EvaluatorSyncFromSourceResult>;
+  /**
+   * The platform's own address for one evaluator resource, built from the
+   * project's slug and the path the caller already resolved. The REST
+   * declaration is a static object with no request-scoped builder to
+   * receive, so the app composes the link itself.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
 export const EvaluatorApi = moduleApi<EvaluatorApi>("evaluator");

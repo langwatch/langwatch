@@ -59,6 +59,13 @@ export interface SuiteApi {
   runAll(input: Omit<SuiteRunAllInput, "organizationId">): Promise<SuiteRunAllResult>;
   runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult>;
   getOrganizationId(projectId: string): Promise<string>;
+  /**
+   * The platform's own address for one suite resource, built from the
+   * project's slug and the path the caller already resolved. The three suite
+   * REST declarations are static objects with no request-scoped builder to
+   * receive, so the app composes the link itself.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
 export const SuiteApi = moduleApi<SuiteApi>("suite");

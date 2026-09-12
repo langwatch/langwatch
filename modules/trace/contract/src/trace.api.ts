@@ -342,6 +342,10 @@ export interface TraceApi {
     payload: unknown;
   }): Promise<void>;
   readProject(projectId: string): Promise<unknown>;
+
+  /** The platform's own address for one trace resource, built from the
+   * project's slug and the path the caller already resolved. */
+  platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
 export const TraceApi = moduleApi<TraceApi>("trace");

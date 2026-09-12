@@ -70,23 +70,19 @@ function buildApi(run: (...args: never[]) => unknown) {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
     },
   });
-  const app = runtime.mount(
-    createSuitesAliasRest(({ projectSlug, path }) => `https://app.test/${projectSlug}${path}`)
-      .router(),
-    {
-      app: () => suites,
-      credential: "project",
-      onError: suitesAliasErrorHandler(boundaryErrorHandler),
-      facts: [
-        bindRestMiddleware(projectRestFacts, () => ({
-          projectSlug: "project-one",
-          viewerUserId: null,
-          actorId: "project-key-1",
-        })),
-        bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
-      ],
-    },
-  );
+  const app = runtime.mount(createSuitesAliasRest().router(), {
+    app: () => suites,
+    credential: "project",
+    onError: suitesAliasErrorHandler(boundaryErrorHandler),
+    facts: [
+      bindRestMiddleware(projectRestFacts, () => ({
+        projectSlug: "project-one",
+        viewerUserId: null,
+        actorId: "project-key-1",
+      })),
+      bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
+    ],
+  });
 
   return {
     fetch: (path: string, body: unknown) =>

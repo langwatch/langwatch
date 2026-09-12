@@ -4,6 +4,7 @@ import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
 import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
+import { dashboardWidgetRest } from "./transport/dashboard-widget.rest.ts";
 import { queryRest } from "./transport/query.rest.ts";
 import { savedWorkbenchChartRest } from "./transport/saved-workbench-chart.rest.ts";
 
@@ -16,6 +17,7 @@ export const analyticsServer = defineServerModule("analytics")
     analyticsLegacyRest,
     queryRest,
     savedWorkbenchChartRest,
+    dashboardWidgetRest,
     analyticsTrpcTransport,
     analyticsLwqlTrpcTransport,
   )

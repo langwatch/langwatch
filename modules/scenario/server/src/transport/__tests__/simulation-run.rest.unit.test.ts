@@ -20,11 +20,7 @@ function buildSimulationRunsFamily(
     simulations: { findBatchSummary, getRunDataForBatchRun },
   });
   const { runtime, projectFacts } = createScenarioRestTestRuntime();
-  const declaration = createSimulationRunsRest({
-    scenarioRunPlatformUrl: ({ projectSlug, scenarioRunId }) =>
-      `https://app.langwatch.test/${projectSlug}/simulations/${scenarioRunId}`,
-    findBatchSummary: (input) => world.simulations.findBatchSummary(input),
-  });
+  const declaration = createSimulationRunsRest();
   const mounted = runtime.mount(declaration.router(), {
     app: () => world.app,
     onError: simulationRunErrorHandler(scenarioRestTestErrors),

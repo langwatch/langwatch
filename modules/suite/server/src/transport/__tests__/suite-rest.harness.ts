@@ -417,9 +417,6 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
 /** Who the credential chain resolved the caller as. */
 export type RestFamilyCaller = { userId?: string | null | undefined };
 
-const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
-  `https://app.langwatch.test/${projectSlug}${path}`;
-
 /** The three families, one application, one world. */
 export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefined } = {}) {
   const caller = options.caller ?? {};
@@ -450,6 +447,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
       resolveClickHouseClient: null,
       defaultRetentionDays: 30,
       generateId: () => world.nextId("suite"),
+      publicBaseUrl: "https://app.langwatch.test",
     },
     config: void 0,
     resources: new ResourceScope(),
@@ -479,12 +477,12 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
 
   // The three families register absolute paths, so the first one's app serves
   // as the root the other two are routed into.
-  const hono = runtime.mount(createRunPlansRest(platformUrl).router(), mount(renderHandled));
-  hono.route("/", runtime.mount(createTestSuitesRest(platformUrl).router(), mount(renderHandled)));
+  const hono = runtime.mount(createRunPlansRest().router(), mount(renderHandled));
+  hono.route("/", runtime.mount(createTestSuitesRest().router(), mount(renderHandled)));
   hono.route(
     "/",
     runtime.mount(
-      createSuitesAliasRest(platformUrl).router(),
+      createSuitesAliasRest().router(),
       mount(suitesAliasErrorHandler(renderHandled)),
     ),
   );

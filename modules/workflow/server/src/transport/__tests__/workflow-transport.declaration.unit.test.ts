@@ -39,9 +39,6 @@ function permissionsOf(declaration: MountableTrpc): (AuthzPermission | object)[]
   return declared;
 }
 
-const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
-  `https://app.langwatch.test/${projectSlug}${path}`;
-
 /** Every route a family declares, as method, path, operation and permission. */
 function routesOf(declaration: { router: () => { routes: readonly unknown[] } }) {
   return declaration.router().routes.map((route) => {
@@ -123,14 +120,14 @@ describe("the workflow module's transport declarations", () => {
 
   describe("given the REST families the module declares", () => {
     it("keeps the /api/workflows management addresses", () => {
-      expect(routesOf(createWorkflowRest(platformUrl))).toEqual([
+      expect(routesOf(createWorkflowRest())).toEqual([
         ["GET", "/", "listWorkflows", "workflows:view"],
         ["GET", "/:id", "getWorkflow", "workflows:view"],
         ["PATCH", "/:id", "updateWorkflow", "workflows:update"],
         ["DELETE", "/:id", "archiveWorkflow", "workflows:manage"],
         ["POST", "/:id/evaluate", "evaluateWorkflow", "workflows:create"],
       ]);
-      expect(createWorkflowRest(platformUrl).router().namespace).toBe("workflows");
+      expect(createWorkflowRest().router().namespace).toBe("workflows");
     });
 
     it("keeps the three synchronous run addresses, literally", () => {

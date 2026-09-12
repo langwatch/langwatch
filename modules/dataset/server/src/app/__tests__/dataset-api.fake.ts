@@ -34,6 +34,7 @@ export function completeDatasetApi(overrides: Partial<DatasetApi> = {}): Dataset
     abortPendingUpload: unused,
     summariseBatchEvaluations: unused,
     listBatchEvaluations: unused,
+    platformUrl: ({ projectSlug, path }) => `https://app.example.com/${projectSlug}${path}`,
     ...overrides,
   };
 }

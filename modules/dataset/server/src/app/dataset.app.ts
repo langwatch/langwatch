@@ -27,6 +27,7 @@ import { DatasetUploadAdapter } from "../services/dataset-upload.service.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
+import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 
 /**
  * What the composing process owns and this feature may not build for itself.
@@ -49,6 +50,8 @@ export interface DatasetInfrastructure {
   datasetAzureConfigResolver: DatasetAzureConfigResolver;
   datasetNormalize: DatasetNormalize;
   datasetS3ClientResolver: DatasetS3ClientResolver;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  readonly publicBaseUrl?: string;
 }
 
 type DatasetSetup = FeatureSetup<
@@ -89,6 +92,7 @@ export class DatasetApp implements DatasetApi {
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
   #experiments: ExperimentApi;
   #permissions: AuthzApi;
+  readonly #publicBaseUrl: string | undefined;
 
   private constructor(
     repositories: DatasetRepositories,
@@ -135,6 +139,7 @@ export class DatasetApp implements DatasetApi {
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
+    this.#publicBaseUrl = members.publicBaseUrl;
   }
 
   static create({ repositories, dependencies, members }: DatasetSetup): DatasetApp {
@@ -407,6 +412,22 @@ export class DatasetApp implements DatasetApi {
       projectId: input.projectId,
       experimentId: experiment.id,
     });
+  }
+
+  // ── the platform's own links ──────────────────────────────────────────────
+
+  /**
+   * The platform's own address for one dataset resource. A deployment that
+   * serves this family but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#publicBaseUrl === undefined) {
+      throw new Error(
+        "The dataset REST family was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return datasetPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
 }
 

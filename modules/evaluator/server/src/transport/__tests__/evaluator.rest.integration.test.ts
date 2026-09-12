@@ -62,9 +62,6 @@ const renderHandled: RestErrorHandler = (error, c) => {
   return c.json({ error: "internal_server_error" }, 500);
 };
 
-const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
-  `https://app.langwatch.test/${projectSlug}${path}`;
-
 function buildApi(overrides: Record<string, unknown> = {}) {
   const stub = {
     getAllWithFields: vi.fn(async () => [enriched]),
@@ -74,6 +71,8 @@ function buildApi(overrides: Record<string, unknown> = {}) {
     createWithResolvedDefaults: vi.fn(async () => evaluator),
     update: vi.fn(async () => evaluator),
     archive: vi.fn(async () => evaluator),
+    platformUrl: ({ projectSlug, path }: { projectSlug: string; path: string }) =>
+      `https://app.langwatch.test/${projectSlug}${path}`,
     ...overrides,
   } as unknown as EvaluatorApi;
 
@@ -82,7 +81,7 @@ function buildApi(overrides: Record<string, unknown> = {}) {
       authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
   });
-  const hono = runtime.mount(createEvaluatorRest(platformUrl).router(), {
+  const hono = runtime.mount(createEvaluatorRest().router(), {
     app: () => stub,
     credential: "project",
     onError: renderHandled,

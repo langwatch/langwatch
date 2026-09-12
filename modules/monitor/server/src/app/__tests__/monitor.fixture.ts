@@ -99,6 +99,7 @@ export function createMonitorTestApp(
     performance?: MonitorPerformance;
     replication?: MonitorReplicationReader;
     generateId?: () => string;
+    publicBaseUrl?: string;
   }> = {},
 ): MonitorApp {
   return MonitorApp.create({
@@ -114,6 +115,7 @@ export function createMonitorTestApp(
       replication:
         input.replication ?? new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null }),
       generateId: input.generateId ?? (() => "monitor_test"),
+      publicBaseUrl: input.publicBaseUrl ?? "https://app.langwatch.test",
     },
     config: void 0,
     resources: new ResourceScope(),

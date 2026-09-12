@@ -10,7 +10,6 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
@@ -343,11 +342,11 @@ const PLAN_PATH = (slug: string) => `/simulations/run-plans/${slug}`;
 function withPlatformUrl(params: {
   row: SuiteResponse;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
+  app: SuiteApi;
 }): SuiteResponseWithPlatformUrl {
   return {
     ...params.row,
-    platformUrl: params.platformUrl({
+    platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
       path: PLAN_PATH(params.row.slug),
     }),
@@ -365,7 +364,6 @@ async function listSuites(params: {
   kind: "custom" | "folder";
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<SuiteResponseWithPlatformUrl[]> {
   const { app, kind, projectId } = params;
   logger.info({ projectId, kind }, "Listing suites");
@@ -375,9 +373,7 @@ async function listSuites(params: {
       ? (await app.listTestSuites({ projectId })).map(toTestSuiteResponse)
       : (await app.list({ projectId })).map(toSuiteResponse);
 
-  return listed.map((row) =>
-    withPlatformUrl({ row, projectSlug: params.projectSlug, platformUrl: params.platformUrl }),
-  );
+  return listed.map((row) => withPlatformUrl({ row, projectSlug: params.projectSlug, app }));
 }
 
 /** The row either family holds, in the one shape this alias publishes. */
@@ -396,7 +392,6 @@ async function getSuite(params: {
   id: string;
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<SuiteResponseWithPlatformUrl> {
   logger.info({ projectId: params.projectId, suiteId: params.id }, "Getting suite");
 
@@ -409,7 +404,7 @@ async function getSuite(params: {
   return withPlatformUrl({
     row: eitherResponse(found),
     projectSlug: params.projectSlug,
-    platformUrl: params.platformUrl,
+    app: params.app,
   });
 }
 
@@ -418,7 +413,6 @@ async function createSuite(params: {
   input: z.infer<typeof createSuiteInputSchema>;
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<SuiteResponseWithPlatformUrl> {
   const { app, projectId } = params;
   const { kind, scope, ...definition } = params.input;
@@ -435,7 +429,7 @@ async function createSuite(params: {
           }),
         );
 
-  return withPlatformUrl({ row, projectSlug: params.projectSlug, platformUrl: params.platformUrl });
+  return withPlatformUrl({ row, projectSlug: params.projectSlug, app });
 }
 
 /** A test suite stores no target, so an update naming any is malformed. */
@@ -453,7 +447,6 @@ async function updateSuite(params: {
   input: z.infer<typeof idParamsSchema> & z.infer<typeof updateSuiteInputSchema>;
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<SuiteResponseWithPlatformUrl> {
   const { app, projectId } = params;
   const { id, scope, ...fields } = params.input;
@@ -470,7 +463,7 @@ async function updateSuite(params: {
   return withPlatformUrl({
     row: eitherResponse(updated),
     projectSlug: params.projectSlug,
-    platformUrl: params.platformUrl,
+    app,
   });
 }
 
@@ -479,7 +472,6 @@ async function duplicateSuite(params: {
   id: string;
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<SuiteResponseWithPlatformUrl> {
   logger.info({ projectId: params.projectId, suiteId: params.id }, "Duplicating suite");
 
@@ -490,7 +482,7 @@ async function duplicateSuite(params: {
   return withPlatformUrl({
     row: toSuiteResponse(suite),
     projectSlug: params.projectSlug,
-    platformUrl: params.platformUrl,
+    app: params.app,
   });
 }
 
@@ -614,7 +606,7 @@ async function archiveSuite(params: {
  * REST for suites — the run plans a project assembles by hand, and the test
  * suites scenarios are filed into.
  */
-export function createSuitesAliasRest(platformUrl: PlatformUrlBuilder) {
+export function createSuitesAliasRest() {
   return (
     defineRestRouter(SuiteApi)
       .withNamespace("suites")
@@ -637,7 +629,6 @@ export function createSuitesAliasRest(platformUrl: PlatformUrlBuilder) {
           kind: query.kind,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          platformUrl,
         }),
       )
 
@@ -657,7 +648,6 @@ export function createSuitesAliasRest(platformUrl: PlatformUrlBuilder) {
           id: params.id,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          platformUrl,
         }),
       )
 
@@ -677,7 +667,6 @@ export function createSuitesAliasRest(platformUrl: PlatformUrlBuilder) {
           input: body,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          platformUrl,
         }),
       )
 
@@ -696,7 +685,6 @@ export function createSuitesAliasRest(platformUrl: PlatformUrlBuilder) {
           input: body,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          platformUrl,
         }),
       )
 
@@ -715,7 +703,6 @@ export function createSuitesAliasRest(platformUrl: PlatformUrlBuilder) {
           id: params.id,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          platformUrl,
         }),
       )
 

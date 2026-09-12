@@ -12,7 +12,6 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -33,7 +32,7 @@ const notFound = documentedResponses({ 404: badRequestSchema });
 
 /** Where an online evaluation opens in the platform. */
 function monitorWire(params: {
-  platformUrl: PlatformUrlBuilder;
+  app: MonitorApi;
   projectSlug: string;
   monitor: Monitor;
 }): MonitorRestResponse {
@@ -55,7 +54,7 @@ function monitorWire(params: {
     threadIdleTimeout: monitor.threadIdleTimeout,
     createdAt: monitor.createdAt.toISOString(),
     updatedAt: monitor.updatedAt.toISOString(),
-    platformUrl: params.platformUrl({
+    platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
       path: `/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
     }),
@@ -63,9 +62,7 @@ function monitorWire(params: {
 }
 
 /** The `/api/monitors` collection, item, toggle and delete endpoints. */
-export function createMonitorsRest(
-  platformUrl: PlatformUrlBuilder,
-): Readonly<{
+export function createMonitorsRest(): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<MonitorApi>;
@@ -84,7 +81,7 @@ export function createMonitorsRest(
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, scope }, project) =>
       (await app.list({ projectId: scope.id })).map((monitor) =>
-        monitorWire({ platformUrl, projectSlug: project.projectSlug, monitor }),
+        monitorWire({ app, projectSlug: project.projectSlug, monitor }),
       ),
     )
 
@@ -100,7 +97,7 @@ export function createMonitorsRest(
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       monitorWire({
-        platformUrl,
+        app,
         projectSlug: project.projectSlug,
         monitor: await app.getById({ id: input.id, projectId: scope.id }),
       }),
@@ -122,7 +119,7 @@ export function createMonitorsRest(
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       monitorWire({
-        platformUrl,
+        app,
         projectSlug: project.projectSlug,
         monitor: await app.create({
           projectId: scope.id,
@@ -157,7 +154,7 @@ export function createMonitorsRest(
       const { id, ...changes } = input;
 
       return monitorWire({
-        platformUrl,
+        app,
         projectSlug: project.projectSlug,
         monitor: await app.patch({ id, projectId: scope.id, changes }),
       });

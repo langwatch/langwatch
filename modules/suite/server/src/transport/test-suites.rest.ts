@@ -9,7 +9,6 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
 } from "@langwatch/api/rest";
 import { runActorFromRequest, type ScenarioTestSuite } from "@langwatch/scenario-contract";
 import { MAX_PLAN_NAME_LENGTH, SuiteApi, SuiteNotFoundError } from "@langwatch/suite-contract";
@@ -53,7 +52,7 @@ const notFound = documentedResponses({ 404: badRequestSchema });
 type ProjectFacts = z.output<typeof projectRestFacts.schema>;
 
 function suiteWire(params: {
-  platformUrl: PlatformUrlBuilder;
+  app: SuiteApi;
   projectSlug: string;
   suite: ScenarioTestSuite;
 }): z.infer<typeof testSuiteWireSchema> {
@@ -68,7 +67,7 @@ function suiteWire(params: {
     archivedAt: suite.archivedAt?.toISOString() ?? null,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),
-    platformUrl: params.platformUrl({
+    platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
       path: `/simulations/run-plans/${suite.slug}`,
     }),
@@ -90,7 +89,6 @@ async function readTestSuite(params: {
 /** Where the run plan a run was filed under opens in the platform. */
 async function resolvedPlanUrl(params: {
   app: SuiteApi;
-  platformUrl: PlatformUrlBuilder;
   projectId: string;
   projectSlug: string;
   planId: string;
@@ -101,7 +99,7 @@ async function resolvedPlanUrl(params: {
   });
   if (found.kind !== "suite") throw new SuiteNotFoundError("Run plan not found");
 
-  return params.platformUrl({
+  return params.app.platformUrl({
     projectSlug: params.projectSlug,
     path: `/simulations/run-plans/${found.suite.slug}`,
   });
@@ -113,7 +111,6 @@ async function readTestSuiteDetail(params: {
   id: string;
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof testSuiteDetailWireSchema>> {
   const suite = await readTestSuite(params);
   const scenarios = await params.app.resolveActiveScenarioNames({
@@ -122,7 +119,7 @@ async function readTestSuiteDetail(params: {
   });
 
   return {
-    ...suiteWire({ platformUrl: params.platformUrl, projectSlug: params.projectSlug, suite }),
+    ...suiteWire({ app: params.app, projectSlug: params.projectSlug, suite }),
     scenarios,
   };
 }
@@ -133,7 +130,6 @@ async function renameTestSuite(params: {
   input: z.infer<typeof idParamsSchema> & z.infer<typeof nameInputSchema>;
   projectId: string;
   projectSlug: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof testSuiteWireSchema>> {
   await readTestSuite({ app: params.app, id: params.input.id, projectId: params.projectId });
   const suite = await params.app.renameTestSuite({
@@ -142,7 +138,7 @@ async function renameTestSuite(params: {
     name: params.input.name,
   });
 
-  return suiteWire({ platformUrl: params.platformUrl, projectSlug: params.projectSlug, suite });
+  return suiteWire({ app: params.app, projectSlug: params.projectSlug, suite });
 }
 
 /** Archives the suite this id names, and the scenarios filed in it. */
@@ -168,7 +164,6 @@ async function runTestSuite(params: {
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   await readTestSuite({ app, id: input.id, projectId });
@@ -204,7 +199,6 @@ async function runTestSuite(params: {
     created: result.created,
     platformUrl: await resolvedPlanUrl({
       app,
-      platformUrl: params.platformUrl,
       projectId,
       projectSlug: params.project.projectSlug,
       planId: result.suiteId,
@@ -213,7 +207,7 @@ async function runTestSuite(params: {
 }
 
 /** The `/api/v1/test-suites` collection, item and run endpoints. */
-export function createTestSuitesRest(platformUrl: PlatformUrlBuilder) {
+export function createTestSuitesRest() {
   return defineRestRouter(SuiteApi)
     .withNamespace("test-suites")
     .withVersion(MANAGEMENT_API_VERSION)
@@ -231,7 +225,7 @@ export function createTestSuitesRest(platformUrl: PlatformUrlBuilder) {
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       (await app.listTestSuites({ projectId: scope.id, includeArchived: input.includeArchived })).map(
-        (suite) => suiteWire({ platformUrl, projectSlug: project.projectSlug, suite }),
+        (suite) => suiteWire({ app, projectSlug: project.projectSlug, suite }),
       ),
     )
 
@@ -248,7 +242,7 @@ export function createTestSuitesRest(platformUrl: PlatformUrlBuilder) {
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       suiteWire({
-        platformUrl,
+        app,
         projectSlug: project.projectSlug,
         suite: await app.createTestSuite({ projectId: scope.id, name: input.name }),
       }),
@@ -272,7 +266,6 @@ export function createTestSuitesRest(platformUrl: PlatformUrlBuilder) {
         id: input.id,
         projectId: scope.id,
         projectSlug: project.projectSlug,
-        platformUrl,
       }),
     )
 
@@ -294,7 +287,6 @@ export function createTestSuitesRest(platformUrl: PlatformUrlBuilder) {
         input,
         projectId: scope.id,
         projectSlug: project.projectSlug,
-        platformUrl,
       }),
     )
 
@@ -326,7 +318,7 @@ export function createTestSuitesRest(platformUrl: PlatformUrlBuilder) {
     })
     .withMiddleware(projectRestFacts, suiteSurfaceFact)
     .handle(({ app, input, scope }, project, surface) =>
-      runTestSuite({ app, input, projectId: scope.id, project, surface, platformUrl }),
+      runTestSuite({ app, input, projectId: scope.id, project, surface }),
     )
     .build();
 }

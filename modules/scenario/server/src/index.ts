@@ -10,6 +10,11 @@ export {
 } from "./eventing/compute-run-metrics.commands.ts";
 export type { ComputeRunMetricsDeps } from "./eventing/compute-run-metrics.commands.ts";
 export { FinishRunCommand, type FinishRunDeps } from "./eventing/finish-run.commands.ts";
+export {
+    RecordEvaluationsCommand,
+    type RecordEvaluationsDeps,
+    evaluationsFingerprint
+} from "./eventing/recordEvaluations.command.ts";
 export * from "./services/http-auth.service.ts";
 export * from "./services/litellm-model.service.ts";
 export { NlpFetchAdapter, type NlpFetchTimeouts } from "./services/nlp-fetch.service.ts";

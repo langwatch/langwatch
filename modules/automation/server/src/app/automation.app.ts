@@ -80,6 +80,7 @@ import {
 } from "../services/automation-rules.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
 import type { AutomationPersistCapRedis } from "../services/persist-cap.service.ts";
+import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
 
 export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
@@ -189,6 +190,8 @@ export type AutomationInfrastructure = Readonly<{
   traceFilters: AutomationTraceFilterCompiler;
   limits: AutomationCallCounter;
   audit: AutomationAuditSink;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
   // Peer APIs are resolved from setup.dependencies; members contains technical ports only.
 }>;
 
@@ -220,6 +223,7 @@ interface AutomationAppCollaborators {
   authoring: AutomationAuthoringService;
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
+  publicBaseUrl: string | undefined;
 }
 
 export class AutomationApp implements AutomationApi {
@@ -304,6 +308,7 @@ export class AutomationApp implements AutomationApi {
       monitors: setup.dependencies.monitors,
       audit: setup.members.audit,
       limits: setup.members.limits,
+      publicBaseUrl: setup.members.publicBaseUrl,
     });
   }
 
@@ -313,6 +318,7 @@ export class AutomationApp implements AutomationApi {
   #monitors: MonitorApiContract;
   #audit: AutomationAuditSink;
   #limits: AutomationCallCounter;
+  readonly #publicBaseUrl: string | undefined;
 
   private constructor(collaborators: AutomationAppCollaborators) {
     this.#automation = collaborators.automation;
@@ -321,6 +327,7 @@ export class AutomationApp implements AutomationApi {
     this.#monitors = collaborators.monitors;
     this.#audit = collaborators.audit;
     this.#limits = collaborators.limits;
+    this.#publicBaseUrl = collaborators.publicBaseUrl;
   }
 
   // -- reads -----------------------------------------------------------------
@@ -695,5 +702,21 @@ export class AutomationApp implements AutomationApi {
     });
 
     if (!limit.allowed) throw new UnsubscribeRateLimitedError();
+  }
+
+  // ── the platform's own links ──────────────────────────────────────────────
+
+  /**
+   * The platform's own address for one automation resource. A deployment that
+   * serves this family but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#publicBaseUrl === undefined) {
+      throw new Error(
+        "The triggers REST family was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return automationPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
 }

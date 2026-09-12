@@ -24,9 +24,6 @@ import { createMonitorsRest } from "../monitor.rest.ts";
 /** The project every request in these suites is authenticated for. */
 export const TEST_PROJECT = { id: "project-1", slug: "project-one" } as const;
 
-const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
-  `https://app.langwatch.test/${projectSlug}${path}`;
-
 /** A handled refusal at its own status, carrying its own code. */
 const renderHandled: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
@@ -69,7 +66,7 @@ export function mountMonitorRest(
     },
   });
 
-  const hono = runtime.mount(createMonitorsRest(platformUrl).router(), {
+  const hono = runtime.mount(createMonitorsRest().router(), {
     app: () => app,
     credential: "project",
     onError: renderHandled,

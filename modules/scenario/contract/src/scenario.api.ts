@@ -29,6 +29,7 @@ import type {
   SimulationAllSuitesRunData,
   SimulationBatchHistory,
   SimulationBatchRunData,
+  SimulationBatchSummary,
   SimulationExternalSetSummary,
   SimulationLastResultSummary,
   SimulationRunData,
@@ -291,6 +292,16 @@ export interface ScenarioApi {
     endDate?: number;
     limit?: number;
   }): Promise<RunConfigurationEntryResponse[]>;
+
+  // -- the platform's own links ----------------------------------------------
+  /** The platform's own address for one scenario resource, built from the
+   * project's slug and the path the caller already resolved. */
+  platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The pass/fail counts of one batch run, or null when the project holds none. */
+  findBatchSummary(input: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<SimulationBatchSummary | null>;
 }
 
 export const ScenarioApi = moduleApi<ScenarioApi>("scenario");

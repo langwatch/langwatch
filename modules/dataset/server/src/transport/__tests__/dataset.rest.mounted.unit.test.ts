@@ -15,7 +15,6 @@ import {
   createRestRuntime,
   projectRestFacts,
   UnauthorizedError,
-  type PlatformUrlBuilder,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
@@ -39,9 +38,6 @@ const dataset = {
   createdAt: NOW,
   updatedAt: NOW,
 };
-
-const platformUrl: PlatformUrlBuilder = ({ projectSlug, path }) =>
-  `https://app.langwatch.test/${projectSlug}${path}`;
 
 /**
  * A domain error as the application raises it: a plain `Error` whose NAME is
@@ -92,6 +88,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
     batchCreateRecords: vi.fn(async () => [{ id: "rec-1", entry: { input: "hello" } }]) as never,
     deleteRecords: vi.fn(async () => ({ count: 2 })) as never,
     archiveDataset: vi.fn(async () => ({ id: "dataset_1", archived: true as const })) as never,
+    platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
     ...overrides,
   });
 
@@ -108,7 +105,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
     },
   });
 
-  const hono = runtime.mount(createDatasetRest(platformUrl).router(), {
+  const hono = runtime.mount(createDatasetRest().router(), {
     app: () => stub,
     credential: "project",
     onError: createDatasetErrorHandler({ boundaryErrorHandler }),

@@ -4,12 +4,10 @@
  * register before the bare `:traceId`, so the literal segments are not
  * swallowed by the parameter.
  *
- * `getProtections` and `platformUrl` stay factory parameters rather than
- * `TraceApi` methods: the first asks a question of the CALLER's credential
- * (an API key's own `cost:view`, a legacy key's blanket access) that only the
- * process's authz wiring can answer, and the second needs the deployment's own
- * origin. Both are deployment shape, not module behaviour — the same reason
- * `createEvaluatorRest`/`createDatasetRest` take `platformUrl` this way.
+ * `platformUrl` now resolves through `TraceApi.platformUrl`. `getProtections`
+ * stays a factory parameter - it asks a question of the caller's credential
+ * that only the process's authz wiring can answer - so this family is not
+ * yet registered on `traceServer`; see the module handover.
  */
 import { TraceFormattingService } from "#services/support/trace-formatting.service";
 import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
@@ -23,7 +21,6 @@ import {
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   RequestValidationError,
-  type PlatformUrlBuilder,
   type RestRawResult,
 } from "@langwatch/api/rest";
 import {
@@ -84,9 +81,9 @@ async function readOneTraceOrThrow(input: {
 
 function formatTraceRow(
   trace: Trace,
-  input: { format: string; platformUrl: PlatformUrlBuilder; projectSlug: string },
+  input: { app: TraceApi; format: string; projectSlug: string },
 ): unknown {
-  const platformUrl = input.platformUrl({
+  const platformUrl = input.app.platformUrl({
     projectSlug: input.projectSlug,
     path: `/traces/${trace.trace_id}`,
   });
@@ -146,7 +143,6 @@ function coerceToEpochOrThrow(value: unknown, field: string): number {
 export type TracesRestOptions<Schema extends z.ZodObject<z.ZodRawShape>> = Readonly<{
   /** The deployment's shared analytics filter vocabulary, merged with `traceSearchBodyExtensions`. */
   searchBodySchema: Schema;
-  platformUrl: PlatformUrlBuilder;
   /** The caller's read-time redactions for one project, keyed by their credential. */
   getProtections(input: Readonly<{ projectId: string; caller: TracesRestCaller }>): Promise<unknown>;
   /** Absent where the process registered no command queue; the route is not registered at all. */
@@ -170,8 +166,7 @@ export type TracesRestOptions<Schema extends z.ZodObject<z.ZodRawShape>> = Reado
 export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
   options: TracesRestOptions<Schema>,
 ) {
-  const { searchBodySchema, platformUrl, getProtections, updateTraceMetadata, readCodingAgentTranscript } =
-    options;
+  const { searchBodySchema, getProtections, updateTraceMetadata, readCodingAgentTranscript } = options;
 
   let router = defineRestRouter(TraceApi)
     .withNamespace("traces")
@@ -266,7 +261,7 @@ export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
       const serializeTrace = projection
         ? (trace: Trace) => projection!.project(trace as unknown as ProjectableTrace)
         : (trace: Trace) =>
-            formatTraceRow(trace, { format, platformUrl, projectSlug: project.projectSlug });
+            formatTraceRow(trace, { app, format, projectSlug: project.projectSlug });
 
       const { serializedTraces, skippedCount } = serializeTraceRows(enrichedTraces, serializeTrace);
 
@@ -369,7 +364,7 @@ export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
         protections,
       });
       const evaluations = evaluationsMap[resolvedTraceId] ?? [];
-      const url = platformUrl({ projectSlug: project.projectSlug, path: `/traces/${resolvedTraceId}` });
+      const url = app.platformUrl({ projectSlug: project.projectSlug, path: `/traces/${resolvedTraceId}` });
 
       if (format === "digest") {
         return {

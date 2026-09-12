@@ -6,6 +6,7 @@ import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenla
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
+import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
@@ -19,6 +20,7 @@ export const gatewayServer = defineServerModule("gateway")
     gatewayBudgetTrpcTransport,
     gatewayCacheRuleTrpcTransport,
     gatewayGuardrailTrpcTransport,
+    gatewayPlatformRest,
     gatewayUsageTrpcTransport,
     virtualKeyTrpcTransport,
   )

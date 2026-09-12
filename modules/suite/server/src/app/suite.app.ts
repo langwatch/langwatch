@@ -20,6 +20,7 @@ import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
+import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 import type { Instant } from "@langwatch/time";
@@ -57,6 +58,8 @@ export interface SuiteAppInfrastructure {
   now?: () => Instant;
   suiteRunCommands: SuiteRunCommands;
   suiteRunId: SuiteRunId;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 }
 
 export interface SuiteAppDependencies {
@@ -110,13 +113,21 @@ export class SuiteApp implements SuiteApi {
       now: members.now,
     });
 
-    return new SuiteApp({ ...dependencies, suites });
+    return new SuiteApp({ ...dependencies, suites, publicBaseUrl: members.publicBaseUrl });
   }
 
   #dependencies: SuiteAppDependencies & { suites: SuiteService };
+  readonly #publicBaseUrl: string | undefined;
 
-  private constructor(dependencies: SuiteAppDependencies & { suites: SuiteService }) {
-    this.#dependencies = dependencies;
+  private constructor(
+    dependencies: SuiteAppDependencies & {
+      suites: SuiteService;
+      publicBaseUrl: string | undefined;
+    },
+  ) {
+    const { publicBaseUrl, ...rest } = dependencies;
+    this.#publicBaseUrl = publicBaseUrl;
+    this.#dependencies = rest;
   }
 
   // -- reads -----------------------------------------------------------------
@@ -311,6 +322,22 @@ export class SuiteApp implements SuiteApi {
     if (!organizationId) throw new OrganizationNotFoundForProjectError(projectId);
 
     return organizationId;
+  }
+
+  // -- the platform's own links ------------------------------------------
+
+  /**
+   * The platform's own address for one suite resource. A deployment that
+   * serves these families but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#publicBaseUrl === undefined) {
+      throw new Error(
+        "The suite REST families were asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return suitePlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
 }
 

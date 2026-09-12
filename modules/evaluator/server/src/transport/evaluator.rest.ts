@@ -12,7 +12,6 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -51,7 +50,7 @@ type ProjectFacts = z.output<typeof projectRestFacts.schema>;
 
 /** One evaluator as the wire publishes it, with its editor address. */
 function evaluatorWire(params: {
-  platformUrl: PlatformUrlBuilder;
+  app: EvaluatorApi;
   projectSlug: string;
   evaluator: unknown;
 }): z.infer<typeof evaluatorWireSchema> {
@@ -59,7 +58,7 @@ function evaluatorWire(params: {
 
   return {
     ...parsed,
-    platformUrl: params.platformUrl({
+    platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
       path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
     }),
@@ -91,7 +90,6 @@ async function createEvaluator(params: {
   input: z.infer<typeof createEvaluatorInputSchema>;
   project: ProjectFacts;
   projectId: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, projectId } = params;
   logger.info({ projectId, name: params.input.name }, "Creating evaluator");
@@ -105,7 +103,7 @@ async function createEvaluator(params: {
   logger.info({ projectId, evaluatorId: enriched.id }, "Successfully created evaluator");
 
   return evaluatorWire({
-    platformUrl: params.platformUrl,
+    app,
     projectSlug: params.project.projectSlug,
     evaluator: enriched,
   });
@@ -121,7 +119,6 @@ async function updateEvaluator(params: {
   input: z.infer<typeof idParamsSchema> & z.infer<typeof updateEvaluatorInputSchema>;
   project: ProjectFacts;
   projectId: string;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, input, projectId } = params;
   logger.info({ projectId, evaluatorId: input.id }, "Updating evaluator");
@@ -147,7 +144,7 @@ async function updateEvaluator(params: {
   logger.info({ projectId, evaluatorId: enriched.id }, "Successfully updated evaluator");
 
   return evaluatorWire({
-    platformUrl: params.platformUrl,
+    app,
     projectSlug: params.project.projectSlug,
     evaluator: enriched,
   });
@@ -179,7 +176,7 @@ type EvaluatorRestDeclaration = Readonly<{
 }>;
 
 /** The `/api/evaluators` collection and item endpoints. */
-export function createEvaluatorRest(platformUrl: PlatformUrlBuilder): EvaluatorRestDeclaration {
+export function createEvaluatorRest(): EvaluatorRestDeclaration {
   return (
     defineRestRouter(EvaluatorApi)
       .withNamespace("evaluators")
@@ -195,7 +192,7 @@ export function createEvaluatorRest(platformUrl: PlatformUrlBuilder): EvaluatorR
         const rows = await app.getAllWithFields({ projectId: scope.id });
 
         return rows.map((evaluator) =>
-          evaluatorWire({ platformUrl, projectSlug: project.projectSlug, evaluator }),
+          evaluatorWire({ app, projectSlug: project.projectSlug, evaluator }),
         );
       })
 
@@ -212,7 +209,7 @@ export function createEvaluatorRest(platformUrl: PlatformUrlBuilder): EvaluatorR
         logger.info({ projectId: scope.id, idOrSlug: input.idOrSlug }, "Getting evaluator");
 
         return evaluatorWire({
-          platformUrl,
+          app,
           projectSlug: project.projectSlug,
           evaluator: await readEvaluator({ app, idOrSlug: input.idOrSlug, projectId: scope.id }),
         });
@@ -227,7 +224,7 @@ export function createEvaluatorRest(platformUrl: PlatformUrlBuilder): EvaluatorR
       .withDocs({ description: "Create a new evaluator" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) =>
-        createEvaluator({ app, input, project, projectId: scope.id, platformUrl }),
+        createEvaluator({ app, input, project, projectId: scope.id }),
       )
 
       .put("/:id", "updateEvaluator")
@@ -241,7 +238,7 @@ export function createEvaluatorRest(platformUrl: PlatformUrlBuilder): EvaluatorR
       })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) =>
-        updateEvaluator({ app, input, project, projectId: scope.id, platformUrl }),
+        updateEvaluator({ app, input, project, projectId: scope.id }),
       )
 
       // Archiving deliberately stays at `:manage`.

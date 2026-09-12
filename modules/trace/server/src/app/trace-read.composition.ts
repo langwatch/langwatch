@@ -63,6 +63,8 @@ export type TraceReaderCompositionOptions = {
   share: TraceAppDependencies["share"];
   broadcast: TraceAppDependencies["broadcast"];
   commands: TraceProcessingCommands;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 };
 
 /** Constructs one Trace read graph from process storage and complete feature peers. */
@@ -177,6 +179,7 @@ export function composeTraceAppDependencies(
     share: options.share,
     broadcast: options.broadcast,
     protections,
+    publicBaseUrl: options.publicBaseUrl,
   };
 }
 

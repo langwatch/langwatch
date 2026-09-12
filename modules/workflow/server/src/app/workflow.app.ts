@@ -54,6 +54,7 @@ import type { WorkflowRowRepository } from "../repositories/workflow-row.reposit
 import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
+import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 
 /** Whether one person may act on a project other than the scoped one. */
 export interface WorkflowPermissionProbe {
@@ -268,6 +269,8 @@ export interface WorkflowInfrastructure {
   nlpPayloadStaging: NlpPayloadStaging;
   workflowAiCall: WorkflowAiCall;
   workflowCommitMessageModel: WorkflowCommitMessageModel;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 }
 
 type WorkflowSetup = FeatureSetup<
@@ -793,6 +796,22 @@ export class WorkflowApp implements WorkflowApi {
       .catch((error: unknown) => {
         this.#members.signals.failed(error, { projectId: input.projectId });
       });
+  }
+
+  // ── the platform's own links ──────────────────────────────────────────────
+
+  /**
+   * The platform's own address for one workflow resource. A deployment that
+   * serves this family but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#members.publicBaseUrl === undefined) {
+      throw new Error(
+        "The workflows REST family was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return workflowPlatformUrl({ publicBaseUrl: this.#members.publicBaseUrl, ...input });
   }
 }
 

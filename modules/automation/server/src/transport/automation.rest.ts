@@ -9,7 +9,6 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -35,7 +34,7 @@ const NOT_FOUND = { status: 404, body: { error: "Trigger not found" } } as const
 
 /** Where an automation opens in the platform. */
 function automationWire(params: {
-  platformUrl: PlatformUrlBuilder;
+  app: AutomationApi;
   projectSlug: string;
   trigger: Trigger;
 }): AutomationRestResponse {
@@ -52,7 +51,7 @@ function automationWire(params: {
     alertType: trigger.alertType,
     createdAt: trigger.createdAt.toISOString(),
     updatedAt: trigger.updatedAt.toISOString(),
-    platformUrl: params.platformUrl({
+    platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
       path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
     }),
@@ -60,7 +59,7 @@ function automationWire(params: {
 }
 
 /** The `/api/triggers` collection, item, create, edit and delete endpoints. */
-export function createAutomationRest(platformUrl: PlatformUrlBuilder): Readonly<{
+export function createAutomationRest(): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<AutomationApi>;
@@ -84,7 +83,7 @@ export function createAutomationRest(platformUrl: PlatformUrlBuilder): Readonly<
       const triggers = await app.getAllForProject({ projectId: scope.id });
 
       return triggers.map((trigger) =>
-        automationWire({ platformUrl, projectSlug: project.projectSlug, trigger }),
+        automationWire({ app, projectSlug: project.projectSlug, trigger }),
       );
     })
 
@@ -99,7 +98,7 @@ export function createAutomationRest(platformUrl: PlatformUrlBuilder): Readonly<
     })
     .withMiddleware(projectRestFacts)
     .handle(({ app, input, scope }, project) =>
-      readAutomation({ app, id: input.id, projectId: scope.id, project, platformUrl }),
+      readAutomation({ app, id: input.id, projectId: scope.id, project }),
     )
 
     // Creating asks for `triggers:create`; `:manage` still implies it, so no
@@ -132,7 +131,7 @@ export function createAutomationRest(platformUrl: PlatformUrlBuilder): Readonly<
         alertType: input.alertType ?? null,
       });
 
-      return automationWire({ platformUrl, projectSlug: project.projectSlug, trigger });
+      return automationWire({ app, projectSlug: project.projectSlug, trigger });
     })
 
     .patch("/:id", "updateTrigger")
@@ -147,7 +146,7 @@ export function createAutomationRest(platformUrl: PlatformUrlBuilder): Readonly<
     })
     .withMiddleware(projectRestFacts)
     .handle(({ app, input, scope }, project) =>
-      editAutomation({ app, input, projectId: scope.id, project, platformUrl }),
+      editAutomation({ app, input, projectId: scope.id, project }),
     )
 
     // Destruction deliberately stays at `:manage`.
@@ -175,7 +174,6 @@ async function readAutomation(args: {
   id: string;
   projectId: string;
   project: ProjectFacts;
-  platformUrl: PlatformUrlBuilder;
 }) {
   logger.info({ projectId: args.projectId, triggerId: args.id }, "Getting trigger");
 
@@ -189,7 +187,7 @@ async function readAutomation(args: {
   return {
     status: 200 as const,
     body: automationWire({
-      platformUrl: args.platformUrl,
+      app: args.app,
       projectSlug: args.project.projectSlug,
       trigger,
     }),
@@ -207,7 +205,6 @@ async function editAutomation(args: {
   input: { id: string } & z.infer<typeof automationRestUpdateInputSchema>;
   projectId: string;
   project: ProjectFacts;
-  platformUrl: PlatformUrlBuilder;
 }) {
   const { app, input, projectId } = args;
 
@@ -229,7 +226,7 @@ async function editAutomation(args: {
   return {
     status: 200 as const,
     body: automationWire({
-      platformUrl: args.platformUrl,
+      app,
       projectSlug: args.project.projectSlug,
       trigger: await app.update(updateCommandFor({ input, projectId })),
     }),

@@ -10,7 +10,6 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
 } from "@langwatch/api/rest";
 import { runActorFromRequest } from "@langwatch/scenario-contract";
 import {
@@ -51,19 +50,15 @@ const notFound = documentedResponses({ 404: badRequestSchema });
 type ProjectFacts = z.output<typeof projectRestFacts.schema>;
 
 /** Where this plan opens in the platform, for the project's own interface. */
-function planUrl(params: {
-  platformUrl: PlatformUrlBuilder;
-  projectSlug: string;
-  suite: Suite;
-}): string {
-  return params.platformUrl({
+function planUrl(params: { app: SuiteApi; projectSlug: string; suite: Suite }): string {
+  return params.app.platformUrl({
     projectSlug: params.projectSlug,
     path: `/simulations/run-plans/${params.suite.slug}`,
   });
 }
 
 function planWire(params: {
-  platformUrl: PlatformUrlBuilder;
+  app: SuiteApi;
   projectSlug: string;
   suite: Suite;
 }): z.infer<typeof runPlanWireSchema> {
@@ -111,7 +106,7 @@ async function readPlan(params: {
 function runWire(params: {
   result: SuiteRunResult & { suiteId?: string; planName?: string; created?: boolean };
   suite: Suite;
-  platformUrl: PlatformUrlBuilder;
+  app: SuiteApi;
   projectSlug: string;
 }): z.infer<typeof runPlanRunResultSchema> {
   const { result, suite } = params;
@@ -126,7 +121,7 @@ function runWire(params: {
     runPlanId: result.suiteId ?? suite.id,
     planName: result.planName ?? suite.name,
     created: result.created ?? false,
-    platformUrl: planUrl({ platformUrl: params.platformUrl, projectSlug: params.projectSlug, suite }),
+    platformUrl: planUrl({ app: params.app, projectSlug: params.projectSlug, suite }),
   };
 }
 
@@ -137,7 +132,6 @@ async function runConfiguration(params: {
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   const actor = runActorFromRequest({
@@ -158,7 +152,7 @@ async function runConfiguration(params: {
   return runWire({
     result,
     suite,
-    platformUrl: params.platformUrl,
+    app: params.app,
     projectSlug: params.project.projectSlug,
   });
 }
@@ -170,7 +164,6 @@ async function rerunStoredPlan(params: {
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
-  platformUrl: PlatformUrlBuilder;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   const suite = await readPlan({ app, id: input.id, projectId });
@@ -192,7 +185,7 @@ async function rerunStoredPlan(params: {
   return runWire({
     result,
     suite,
-    platformUrl: params.platformUrl,
+    app: params.app,
     projectSlug: params.project.projectSlug,
   });
 }
@@ -210,7 +203,7 @@ async function archivePlan(params: {
 }
 
 /** The `/api/v1/run-plans` collection and item endpoints. */
-export function createRunPlansRest(platformUrl: PlatformUrlBuilder) {
+export function createRunPlansRest() {
   return defineRestRouter(SuiteApi)
     .withNamespace("run-plans")
     .withVersion(MANAGEMENT_API_VERSION)
@@ -228,7 +221,7 @@ export function createRunPlansRest(platformUrl: PlatformUrlBuilder) {
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       (await app.list({ projectId: scope.id, includeArchived: input.includeArchived })).map(
-        (suite) => planWire({ platformUrl, projectSlug: project.projectSlug, suite }),
+        (suite) => planWire({ app, projectSlug: project.projectSlug, suite }),
       ),
     )
 
@@ -243,7 +236,7 @@ export function createRunPlansRest(platformUrl: PlatformUrlBuilder) {
     })
     .withMiddleware(projectRestFacts, suiteSurfaceFact)
     .handle(({ app, input, scope }, project, surface) =>
-      runConfiguration({ app, input, projectId: scope.id, project, surface, platformUrl }),
+      runConfiguration({ app, input, projectId: scope.id, project, surface }),
     )
 
     .get("/:id", "getRunPlan")
@@ -259,7 +252,7 @@ export function createRunPlansRest(platformUrl: PlatformUrlBuilder) {
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
       planWire({
-        platformUrl,
+        app,
         projectSlug: project.projectSlug,
         suite: await readPlan({ app, id: input.id, projectId: scope.id }),
       }),
@@ -279,7 +272,7 @@ export function createRunPlansRest(platformUrl: PlatformUrlBuilder) {
     })
     .withMiddleware(projectRestFacts, suiteSurfaceFact)
     .handle(({ app, input, scope }, project, surface) =>
-      rerunStoredPlan({ app, input, projectId: scope.id, project, surface, platformUrl }),
+      rerunStoredPlan({ app, input, projectId: scope.id, project, surface }),
     )
 
     .delete("/:id", "archiveRunPlan")

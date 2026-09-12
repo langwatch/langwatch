@@ -79,6 +79,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { traceDependencies, type TraceInfrastructure } from "./trace-composition.types.ts";
 import { composeTraceAppDependencies } from "./trace-read.composition.ts";
+import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 
 const logger = createLogger("langwatch:trace:app");
 
@@ -356,6 +357,8 @@ export interface TraceAppDependencies {
   codingAgents: CodingAgentApi;
   share: ShareApi;
   projects: ProjectApi;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 }
 
 /**
@@ -1169,5 +1172,21 @@ export class TraceApp implements TraceApi {
     framework: string | null;
   } | null> {
     return this.#dependencies.projects.tryGetById(projectId);
+  }
+
+  // -- the platform's own links ------------------------------------------
+
+  /**
+   * The platform's own address for one trace resource. A deployment that
+   * serves these families but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#dependencies.publicBaseUrl === undefined) {
+      throw new Error(
+        "The traces REST family was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return tracePlatformUrl({ publicBaseUrl: this.#dependencies.publicBaseUrl, ...input });
   }
 }

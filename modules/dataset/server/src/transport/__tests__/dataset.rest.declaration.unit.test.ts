@@ -5,7 +5,7 @@
  * renames an integrator's generated client.
  */
 
-import { BadRequestError, NotFoundError, type PlatformUrlBuilder } from "@langwatch/api/rest";
+import { BadRequestError, NotFoundError } from "@langwatch/api/rest";
 import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -13,10 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
 import { createDatasetRest } from "../dataset.rest.ts";
 
-const platformUrl: PlatformUrlBuilder = ({ projectSlug, path }) =>
-  `https://app.example.com/${projectSlug}${path}`;
-
-const declaration = createDatasetRest(platformUrl).router();
+const declaration = createDatasetRest().router();
 
 const scope: AuthzDeclaredScopeId = { tier: "project", id: "project-1" };
 const project = { projectSlug: "my-project", viewerUserId: null, actorId: "user-1" };

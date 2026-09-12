@@ -318,6 +318,13 @@ export interface WorkflowApi {
    * module's service. The deployment's cron bearer is what invokes it.
    */
   cleanupOldLambdas(): Promise<void>;
+  /**
+   * The platform's own address for one workflow resource, built from the
+   * project's slug and the path the caller already resolved. The REST
+   * declaration is a static object with no request-scoped builder to
+   * receive, so the app composes the link itself.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
 export const WorkflowApi = moduleApi<WorkflowApi>("workflow");

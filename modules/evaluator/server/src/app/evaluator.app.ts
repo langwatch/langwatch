@@ -43,6 +43,7 @@ import { UserApi } from "@langwatch/user-contract";
 
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
+import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import {
   EvaluatorCodeExecutionService,
   type EvaluatorNlpDispatcher,
@@ -113,6 +114,8 @@ export interface EvaluatorAppInfrastructure {
   fallbackModels?: Readonly<{ defaultModel: string; embeddingsModel: string }> | undefined;
   /** Mints the ephemeral studio ids a code evaluator's run is traced under. */
   generateId: () => string;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 }
 
 type EvaluatorSetup = FeatureSetup<
@@ -128,6 +131,7 @@ type EvaluatorAppParts = Readonly<{
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
+  publicBaseUrl: string | undefined;
 }>;
 
 export class EvaluatorApp implements EvaluatorApi {
@@ -161,6 +165,7 @@ export class EvaluatorApp implements EvaluatorApi {
       modelProviders: members.modelProviders,
       permissions: dependencies.permissions,
       graph: members.graph,
+      publicBaseUrl: members.publicBaseUrl,
     });
   }
 
@@ -547,6 +552,22 @@ export class EvaluatorApp implements EvaluatorApi {
       if (error instanceof ModelNotConfiguredError && !usesEmbeddingsModel(config)) return null;
       throw error;
     }
+  }
+
+  // ── the platform's own links ──────────────────────────────────────────────
+
+  /**
+   * The platform's own address for one evaluator resource. A deployment that
+   * serves this family but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#dependencies.publicBaseUrl === undefined) {
+      throw new Error(
+        "The evaluators REST family was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return evaluatorPlatformUrl({ publicBaseUrl: this.#dependencies.publicBaseUrl, ...input });
   }
 }
 

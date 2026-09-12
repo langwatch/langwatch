@@ -23,7 +23,6 @@ import {
   MANAGEMENT_API_VERSION,
   NotFoundError,
   projectRestFacts,
-  type PlatformUrlBuilder,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
@@ -70,12 +69,8 @@ function rethrowColumnRefusal(error: unknown): never {
 }
 
 /** Where a dataset lives in the platform, for the URL every answer carries. */
-function datasetUrl(
-  platformUrl: PlatformUrlBuilder,
-  projectSlug: string,
-  datasetId: string,
-): string {
-  return platformUrl({ projectSlug, path: `/datasets/${datasetId}` });
+function datasetUrl(app: DatasetApi, projectSlug: string, datasetId: string): string {
+  return app.platformUrl({ projectSlug, path: `/datasets/${datasetId}` });
 }
 
 /** The inert declaration the process mounts on its own project-key door. */
@@ -85,7 +80,7 @@ export type DatasetRestDeclaration = Readonly<{
   router: () => RestTransportDeclaration<DatasetApi>;
 }>;
 
-export function createDatasetRest(platformUrl: PlatformUrlBuilder): DatasetRestDeclaration {
+export function createDatasetRest(): DatasetRestDeclaration {
   return (
     defineRestRouter(DatasetApi)
       .withNamespace("dataset")
@@ -110,7 +105,7 @@ export function createDatasetRest(platformUrl: PlatformUrlBuilder): DatasetRestD
           ...result,
           data: result.data.map((dataset) => ({
             ...dataset,
-            platformUrl: datasetUrl(platformUrl, project.projectSlug, dataset.id),
+            platformUrl: datasetUrl(app, project.projectSlug, dataset.id),
           })),
         };
       })
@@ -139,7 +134,7 @@ export function createDatasetRest(platformUrl: PlatformUrlBuilder): DatasetRestD
           columnTypes: dataset.columnTypes,
           createdAt: dataset.createdAt,
           updatedAt: dataset.updatedAt,
-          platformUrl: datasetUrl(platformUrl, project.projectSlug, dataset.id),
+          platformUrl: datasetUrl(app, project.projectSlug, dataset.id),
         };
       })
 
@@ -206,7 +201,7 @@ export function createDatasetRest(platformUrl: PlatformUrlBuilder): DatasetRestD
           columnTypes: dataset.columnTypes,
           createdAt: dataset.createdAt,
           updatedAt: dataset.updatedAt,
-          platformUrl: datasetUrl(platformUrl, project.projectSlug, dataset.id),
+          platformUrl: datasetUrl(app, project.projectSlug, dataset.id),
           data: records,
         };
       })
@@ -239,7 +234,7 @@ export function createDatasetRest(platformUrl: PlatformUrlBuilder): DatasetRestD
           columnTypes: updated.columnTypes,
           createdAt: updated.createdAt,
           updatedAt: updated.updatedAt,
-          platformUrl: datasetUrl(platformUrl, project.projectSlug, updated.id),
+          platformUrl: datasetUrl(app, project.projectSlug, updated.id),
         };
       })
 

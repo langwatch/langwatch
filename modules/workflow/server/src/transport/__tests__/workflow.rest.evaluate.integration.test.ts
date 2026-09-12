@@ -30,9 +30,6 @@ const renderHandled: RestErrorHandler = (error, c) => {
   return c.json({ error: "internal_server_error" }, 500);
 };
 
-const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
-  `https://app.langwatch.test/${projectSlug}${path}`;
-
 const started: WorkflowEvaluationStarted = {
   runId: "run_1",
   runUrl: "https://app.langwatch.test/project-one/experiments/exp_1?runId=run_1",
@@ -55,7 +52,7 @@ function buildApi(options: {
     },
   });
 
-  const hono = runtime.mount(createWorkflowRest(platformUrl).router(), {
+  const hono = runtime.mount(createWorkflowRest().router(), {
     app: () => app,
     credential: "project",
     onError: renderHandled,

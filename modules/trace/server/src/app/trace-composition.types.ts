@@ -45,5 +45,8 @@ export type TraceInfrastructure = Readonly<{
     filterConditions: TraceLegacyFilterConditions;
     fallbackVisibilityDays: number;
     processName: string;
+    /** The deployment's public origin, for `platformUrl`. Optional: not every
+     * install serves REST. */
+    publicBaseUrl?: string;
   }>;
 }>;

@@ -1,9 +1,7 @@
 /**
  * `/api/scenarios` - the scenarios (test cases) a project defines, and their
- * version history. `platformUrl` arrives as a factory argument, resolved by
- * the process at mount time, exactly as the deployment's external origin
- * always has to be: a transport package has no access to it and must not
- * read it for itself.
+ * version history. `app.platformUrl(...)` resolves the deployment's own
+ * origin, so this family declares no factory ports of its own.
  *
  * The family answers a miss in the bare `{ error }` body it has always had
  * - `errorEnvelope: "legacy"` on the pre-conversion family - so
@@ -37,7 +35,6 @@ import {
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   resolver,
-  type PlatformUrlBuilder,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:scenarios");
@@ -118,14 +115,12 @@ const scenarioNotFoundResponse = {
 
 /**
  * REST for the scenarios (test cases) a project defines, and their version
- * history. `platformUrl` is resolved by the process at mount time.
+ * history. `platformUrl` is resolved through `ScenarioApi.platformUrl`.
  */
-export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder }) {
-  const { platformUrl } = options;
-
-  const withPlatformUrl = (scenario: Scenario, projectSlug: string) => ({
+export function createScenarioRest() {
+  const withPlatformUrl = (app: ScenarioApi, scenario: Scenario, projectSlug: string) => ({
     ...toScenarioResponse(scenario),
-    platformUrl: platformUrl({ projectSlug, path: scenarioEditorPath(scenario.id) }),
+    platformUrl: app.platformUrl({ projectSlug, path: scenarioEditorPath(scenario.id) }),
   });
 
   return defineRestRouter(ScenarioApi)
@@ -141,7 +136,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
     .handle(async ({ app, scope }, project) => {
       logger.info({ projectId: scope.id }, "Listing scenarios");
       const listed = await app.list({ projectId: scope.id });
-      return listed.map((s) => withPlatformUrl(s, project.projectSlug));
+      return listed.map((s) => withPlatformUrl(app, s, project.projectSlug));
     })
 
     /** Read one scenario by id. */
@@ -158,7 +153,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
       logger.info({ projectId: scope.id, scenarioId: input.id }, "Getting scenario");
       const scenario = await app.tryGetById({ id: input.id, projectId: scope.id });
       if (!scenario) throw new ScenarioRestNotThereError("Scenario not found");
-      return withPlatformUrl(scenario, project.projectSlug);
+      return withPlatformUrl(app, scenario, project.projectSlug);
     })
 
     // Creating asks for `scenarios:create`, not `scenarios:manage`. Nobody
@@ -190,7 +185,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
         },
         { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );
-      return withPlatformUrl(scenario, project.projectSlug);
+      return withPlatformUrl(app, scenario, project.projectSlug);
     })
 
     /**
@@ -216,7 +211,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
         { id, projectId: scope.id, ...scenarioUpdateData(body) },
         { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );
-      return withPlatformUrl(scenario, project.projectSlug);
+      return withPlatformUrl(app, scenario, project.projectSlug);
     })
 
     .patch("/:id", "patchScenario")
@@ -237,7 +232,7 @@ export function createScenarioRest(options: { platformUrl: PlatformUrlBuilder })
         { id, projectId: scope.id, ...scenarioUpdateData(body) },
         { id: project.actorId, label: scenarioAuthorLabel(surface) },
       );
-      return withPlatformUrl(scenario, project.projectSlug);
+      return withPlatformUrl(app, scenario, project.projectSlug);
     })
 
     // Archiving deliberately still asks for `:manage`. Create and update were

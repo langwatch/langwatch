@@ -8,7 +8,6 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type PlatformUrlBuilder,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
@@ -73,8 +72,10 @@ function evaluationRefusalOf(
   return null;
 }
 
-/** How a route reaches the studio address of one workflow. */
-type StudioUrl = (projectSlug: string, workflowId: string) => string;
+/** Where one workflow opens in the Studio. */
+function studioUrl(app: WorkflowApi, projectSlug: string, workflowId: string): string {
+  return app.platformUrl({ projectSlug, path: `/studio/${workflowId}` });
+}
 
 /** The row this address names, or the 404 a project that does not hold it answers. */
 async function readWorkflow(params: {
@@ -82,7 +83,6 @@ async function readWorkflow(params: {
   id: string;
   projectId: string;
   projectSlug: string;
-  studioUrl: StudioUrl;
 }): Promise<Readonly<{ status: 200; body: WorkflowRestDetail }> | typeof NOT_FOUND> {
   try {
     const workflow = await params.app.getById({ id: params.id, projectId: params.projectId });
@@ -99,7 +99,6 @@ async function writeWorkflow(params: {
   id: string;
   projectId: string;
   projectSlug: string;
-  studioUrl: StudioUrl;
   changes: WorkflowRestUpdate;
 }): Promise<Readonly<{ status: 200; body: WorkflowRestDetail }> | typeof NOT_FOUND> {
   const { app, id, projectId } = params;
@@ -169,13 +168,13 @@ function notFoundOr(error: unknown): typeof NOT_FOUND {
 }
 
 function wireOf(params: {
+  app: WorkflowApi;
   workflow: Workflow;
   projectSlug: string;
-  studioUrl: StudioUrl;
 }): WorkflowRestDetail {
   return {
     ...toWorkflowResponse(params.workflow),
-    platformUrl: params.studioUrl(params.projectSlug, params.workflow.id),
+    platformUrl: studioUrl(params.app, params.projectSlug, params.workflow.id),
   };
 }
 
@@ -186,10 +185,7 @@ export type WorkflowRestDeclaration = Readonly<{
 }>;
 
 /** The `/api/workflows` collection and item endpoints. */
-export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRestDeclaration {
-  const studioUrl = (projectSlug: string, workflowId: string) =>
-    platformUrl({ projectSlug, path: `/studio/${workflowId}` });
-
+export function createWorkflowRest(): WorkflowRestDeclaration {
   return (
     defineRestRouter(WorkflowApi)
       .withNamespace("workflows")
@@ -207,7 +203,7 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
 
         return listed.map((workflow) => ({
           ...toWorkflowResponse(workflow),
-          platformUrl: studioUrl(project.projectSlug, workflow.id),
+          platformUrl: studioUrl(app, project.projectSlug, workflow.id),
         }));
       })
 
@@ -225,7 +221,6 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
           id: input.id,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          studioUrl,
         });
       })
 
@@ -247,7 +242,6 @@ export function createWorkflowRest(platformUrl: PlatformUrlBuilder): WorkflowRes
           id,
           projectId: scope.id,
           projectSlug: project.projectSlug,
-          studioUrl,
           changes,
         });
       })

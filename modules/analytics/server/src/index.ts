@@ -9,6 +9,11 @@ export {
 } from "./transport/analytics.rest.ts";
 export { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 export {
+  type DashboardWidgetApi,
+  dashboardWidgetRest,
+  dashboardWidgetUrl,
+} from "./transport/dashboard-widget.rest.ts";
+export {
   type AnalyticsQueryApi,
   langWatchQLCallerProtections,
   queryRest,

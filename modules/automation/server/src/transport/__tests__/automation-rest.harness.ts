@@ -20,7 +20,8 @@ import { unsubscribeCallerAddress, unsubscribeRest, unsubscribeRestErrors } from
 /** The project every credentialed request in these suites is authenticated for. */
 export const TEST_PROJECT = { id: "project_1", slug: "acme" } as const;
 
-const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
+/** The default `platformUrl` a case's `Partial<AutomationApi>` did not override. */
+const defaultPlatformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
   `https://app.test/${projectSlug}${path}`;
 
 /** Renders the typed refusal the way every client reads it: by code. */
@@ -70,9 +71,11 @@ function requests(hono: MountableRestApp) {
 
 /** `/api/triggers`, over whichever slice of the application a case names. */
 export function mountAutomationRest(app: Partial<AutomationApi>) {
+  const withDefaults: AutomationApi = { platformUrl: defaultPlatformUrl, ...app } as AutomationApi;
+
   return requests(
-    runtime().mount(createAutomationRest(platformUrl).router(), {
-      app: () => app as AutomationApi,
+    runtime().mount(createAutomationRest().router(), {
+      app: () => withDefaults,
       credential: "project",
       onError: renderHandled,
       facts: projectFacts(),

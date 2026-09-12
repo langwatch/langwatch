@@ -17,9 +17,7 @@ function buildScenarioFamily() {
   const { app } = createScenarioRestTestApp();
   const { runtime, projectFacts } = createScenarioRestTestRuntime();
   const mounted = runtime.mount(
-    createScenarioRest({
-      platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-    }).router(),
+    createScenarioRest().router(),
     {
       app: () => app,
       onError: scenarioRestErrorHandler(scenarioRestTestErrors),

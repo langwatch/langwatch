@@ -2,11 +2,10 @@
  * `/api/simulation-runs` - the runs a simulation produced: the individual
  * runs, and the batch summaries that aggregate them.
  *
- * Every read but one is answered off `ScenarioApi` directly. The one
- * exception - a single batch's summary - has no `ScenarioApi` member yet
- * (the contract-service fold for `SimulationService` has not reached it), so
- * `findBatchSummary` arrives as a factory port, exactly as
- * `scenarioRunPlatformUrl` does, resolved by the process at mount time.
+ * Every read is answered off `ScenarioApi` directly: `app.platformUrl(...)`
+ * resolves the deployment's own origin, and `app.findBatchSummary(...)`
+ * answers a single batch's summary, so this family declares no factory
+ * ports of its own.
  */
 import { createLogger } from "@langwatch/observability";
 import {
@@ -38,12 +37,11 @@ const logger = createLogger("langwatch:api:simulation-runs");
 /**
  * The platform's own address for ONE simulation run.
  *
- * A run opens in the `scenarioRunDetail` drawer on the base simulations route,
- * and the same builder answers for the application's own UI, this response and
- * Langy's navigate fallback. It arrives as a port for the reason every
- * platform-URL builder does: the address is built from the deployment's
- * external origin, which a transport package has no access to and must not
- * read for itself.
+ * A run opens in the `scenarioRunDetail` drawer on the base simulations route.
+ * This family no longer takes a builder of this shape itself - it resolves
+ * `app.platformUrl(...)` directly - but the type is kept for
+ * `createScenarioRunPlatformUrlBuilder` (`apps/api`), which still builds one
+ * of this shape for the application's own UI and Langy's navigate fallback.
  */
 export type ScenarioRunPlatformUrlBuilder = (args: {
   projectSlug: string;
@@ -119,21 +117,13 @@ const notFoundResponse = {
 };
 
 /**
- * REST for the runs a simulation produced. `scenarioRunPlatformUrl` and
- * `findBatchSummary` are resolved by the process at mount time.
+ * REST for the runs a simulation produced. `platformUrl` and
+ * `findBatchSummary` are both resolved off `ScenarioApi`.
  */
-export function createSimulationRunsRest(options: {
-  scenarioRunPlatformUrl: ScenarioRunPlatformUrlBuilder;
-  findBatchSummary: (input: {
-    projectId: string;
-    batchRunId: string;
-  }) => Promise<BatchSummary | null>;
-}) {
-  const { scenarioRunPlatformUrl, findBatchSummary } = options;
-
-  const withPlatformUrl = (run: ScenarioRunData, projectSlug: string) => ({
+export function createSimulationRunsRest() {
+  const withPlatformUrl = (app: ScenarioApi, run: ScenarioRunData, projectSlug: string) => ({
     ...toRunResponse(run),
-    platformUrl: scenarioRunPlatformUrl({ projectSlug, scenarioRunId: run.scenarioRunId }),
+    platformUrl: app.platformUrl({ projectSlug, path: `/simulations/${run.scenarioRunId}` }),
   });
 
   return defineRestRouter(ScenarioApi)
@@ -164,7 +154,7 @@ export function createSimulationRunsRest(options: {
         }
 
         const runs = "runs" in result ? result.runs : [];
-        return { runs: runs.map((r) => withPlatformUrl(r, project.projectSlug)), hasMore: false };
+        return { runs: runs.map((r) => withPlatformUrl(app, r, project.projectSlug)), hasMore: false };
       }
 
       if (scenarioSetId) {
@@ -176,7 +166,7 @@ export function createSimulationRunsRest(options: {
         });
 
         return {
-          runs: result.runs.map((r) => withPlatformUrl(r, project.projectSlug)),
+          runs: result.runs.map((r) => withPlatformUrl(app, r, project.projectSlug)),
           hasMore: result.nextCursor !== null,
           nextCursor: result.nextCursor ?? undefined,
         };
@@ -187,7 +177,7 @@ export function createSimulationRunsRest(options: {
       if (!result.changed) return { runs: [], hasMore: false };
 
       return {
-        runs: result.runs.map((r) => withPlatformUrl(r, project.projectSlug)),
+        runs: result.runs.map((r) => withPlatformUrl(app, r, project.projectSlug)),
         hasMore: result.hasMore,
         nextCursor: result.nextCursor,
       };
@@ -212,7 +202,7 @@ export function createSimulationRunsRest(options: {
       });
       if (!run) throw new SimulationRunNotThereError("Simulation run not found");
 
-      return withPlatformUrl(run, project.projectSlug);
+      return withPlatformUrl(app, run, project.projectSlug);
     })
 
     .get("/batches/list", "listSimulationRunBatches")
@@ -249,11 +239,11 @@ export function createSimulationRunsRest(options: {
       description: "Get the summary of a single batch run, including its completion flag",
       responses: notFoundResponse,
     })
-    .handle(async ({ input, scope }) => {
+    .handle(async ({ app, input, scope }) => {
       const projectId = scope.id;
       logger.info({ projectId, batchRunId: input.batchRunId }, "Getting batch summary");
 
-      const batch = await findBatchSummary({ projectId, batchRunId: input.batchRunId });
+      const batch = await app.findBatchSummary({ projectId, batchRunId: input.batchRunId });
       if (!batch) throw new SimulationRunNotThereError("Batch run not found");
 
       return toBatchSummaryResponse(batch);

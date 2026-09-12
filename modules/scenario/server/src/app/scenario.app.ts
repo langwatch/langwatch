@@ -53,6 +53,7 @@ import {
   type SimulationLastResultSummary,
   type SimulationLastUpdatedInput,
   type SimulationProjectDateRangeInput,
+  type SimulationBatchSummary,
   type QueueSimulationRunInput,
   type SimulationRunData,
   type SimulationScenarioRunInput,
@@ -79,6 +80,7 @@ import type { ScenarioId, ScenarioTestSuiteId } from "./scenario.app.ts";
 import type { ScenarioClock } from "./scenario.app.ts";
 import type { ScenarioSecretCipher } from "./scenario.app.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
 import type { Logger } from "@langwatch/observability";
 import {
   SilentScenarioActivity,
@@ -148,6 +150,8 @@ export interface ScenarioAppInfrastructure {
   scenarioHttp: ScenarioHttp;
   scenarioProcessorServiceMetrics: ScenarioProcessorServiceMetrics;
   scenarioTabStore: ScenarioTabStore;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 }
 
 /** The one peer API this feature reads directly. */
@@ -185,13 +189,19 @@ export class ScenarioApp implements ScenarioApi {
       resultAtoms: setup.members.resultAtoms,
       runConfigurations: setup.members.runConfigurations,
       activity: setup.members.activity ?? new SilentScenarioActivity(),
+      publicBaseUrl: setup.members.publicBaseUrl,
     });
   }
 
   #dependencies: ScenarioAppDependencies;
+  readonly #publicBaseUrl: string | undefined;
 
-  private constructor(dependencies: ScenarioAppDependencies) {
-    this.#dependencies = dependencies;
+  private constructor(
+    dependencies: ScenarioAppDependencies & { publicBaseUrl: string | undefined },
+  ) {
+    const { publicBaseUrl, ...rest } = dependencies;
+    this.#publicBaseUrl = publicBaseUrl;
+    this.#dependencies = rest;
   }
 
   testAgentTurn(input: TestAgentTurnInput) {
@@ -662,6 +672,30 @@ export class ScenarioApp implements ScenarioApi {
     limit?: number;
   }): Promise<RunConfigurationEntry[]> {
     return this.#dependencies.runConfigurations.getEntries(input);
+  }
+
+  // -- the platform's own links ------------------------------------------
+
+  /**
+   * The platform's own address for one scenario resource. A deployment that
+   * serves these families but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#publicBaseUrl === undefined) {
+      throw new Error(
+        "The scenario REST families were asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return scenarioPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
+  }
+
+  /** The pass/fail counts of one batch run, or null when the project holds none. */
+  findBatchSummary(input: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<SimulationBatchSummary | null> {
+    return this.#dependencies.simulations.findBatchSummary(input);
   }
 }
 

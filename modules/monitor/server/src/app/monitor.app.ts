@@ -45,6 +45,7 @@ import { nowInstant } from "@langwatch/time";
 import { ZodError } from "zod";
 
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
+import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
 
@@ -84,6 +85,8 @@ export interface MonitorAppInfrastructure {
   replication: MonitorReplicationReader;
   /** Mints the id a new monitor row is written under. */
   generateId: () => string;
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
 }
 
 type MonitorSetup = FeatureSetup<
@@ -103,6 +106,7 @@ export class MonitorApp implements MonitorApi {
   #performance: MonitorPerformance;
   #replication: MonitorReplicationReader;
   #evaluators: MonitorEvaluator;
+  readonly #publicBaseUrl: string | undefined;
 
   private constructor(
     repositories: MonitorRepositories,
@@ -119,6 +123,7 @@ export class MonitorApp implements MonitorApi {
     this.#performance = members.performance;
     this.#replication = members.replication;
     this.#evaluators = members.evaluators;
+    this.#publicBaseUrl = members.publicBaseUrl;
   }
 
   static create({ repositories, dependencies, members }: MonitorSetup): MonitorApp {
@@ -384,6 +389,22 @@ export class MonitorApp implements MonitorApi {
         })
         .catch(() => undefined);
     }
+  }
+
+  // ── the platform's own links ──────────────────────────────────────────────
+
+  /**
+   * The platform's own address for one monitor resource. A deployment that
+   * serves this family but named no public origin refuses by name.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string {
+    if (this.#publicBaseUrl === undefined) {
+      throw new Error(
+        "The monitors REST family was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
+
+    return monitorPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
 }
 

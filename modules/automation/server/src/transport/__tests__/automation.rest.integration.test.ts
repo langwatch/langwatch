@@ -62,7 +62,7 @@ function mount(options: { live?: Trigger | null } = {}) {
 
 describe("the /api/triggers declaration", () => {
   it("answers at the five addresses and operations its callers hold", () => {
-    const routes = createAutomationRest(() => "https://app.test")
+    const routes = createAutomationRest()
       .router()
       .routes.map((route) => `${route.method.toUpperCase()} ${route.path} ${route.operation}`);
 
@@ -77,7 +77,7 @@ describe("the /api/triggers declaration", () => {
 
   it("keeps each route's permission where it has always been", () => {
     const permissions = Object.fromEntries(
-      createAutomationRest(() => "https://app.test")
+      createAutomationRest()
         .router()
         .routes.map((route) => [route.operation, route.permission]),
     );
