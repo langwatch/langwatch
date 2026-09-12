@@ -51432,6 +51432,28 @@
                           }
                         ]
                       },
+                      "fields": {
+                        "description": "The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields.",
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 65536
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            }
+                          ]
+                        }
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -51626,6 +51648,28 @@
                         }
                       ]
                     },
+                    "fields": {
+                      "description": "The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields.",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 65536
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -51806,6 +51850,28 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "fields": {
+                    "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field.",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 65536
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -51990,6 +52056,28 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "fields": {
+                      "description": "The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields.",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 65536
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
                     },
                     "platformUrl": {
                       "type": "string",
@@ -52213,6 +52301,28 @@
                         }
                       ]
                     },
+                    "fields": {
+                      "description": "The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields.",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 65536
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -52420,6 +52530,28 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "fields": {
+                    "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 65536
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -52599,6 +52731,28 @@
                         }
                       ]
                     },
+                    "fields": {
+                      "description": "The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields.",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 65536
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -52806,6 +52960,28 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "fields": {
+                    "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 65536
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -53448,6 +53624,76 @@
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "evaluations": {
+                                    "description": "One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators.",
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "evaluatorId": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "passed",
+                                            "failed",
+                                            "scored",
+                                            "skipped",
+                                            "error"
+                                          ]
+                                        },
+                                        "required": {
+                                          "type": "boolean"
+                                        },
+                                        "passed": {
+                                          "type": "boolean"
+                                        },
+                                        "score": {
+                                          "type": "number"
+                                        },
+                                        "label": {
+                                          "type": "string"
+                                        },
+                                        "details": {
+                                          "type": "string"
+                                        },
+                                        "cost": {
+                                          "type": "object",
+                                          "properties": {
+                                            "currency": {
+                                              "type": "string"
+                                            },
+                                            "amount": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "currency",
+                                            "amount"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "type": "object",
+                                          "propertyNames": {
+                                            "type": "string"
+                                          },
+                                          "additionalProperties": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "evaluatorId",
+                                        "name",
+                                        "status",
+                                        "required"
+                                      ]
+                                    }
                                   }
                                 }
                               },
@@ -53687,6 +53933,76 @@
                                   "type": "null"
                                 }
                               ]
+                            },
+                            "evaluations": {
+                              "description": "One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators.",
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "evaluatorId": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "passed",
+                                      "failed",
+                                      "scored",
+                                      "skipped",
+                                      "error"
+                                    ]
+                                  },
+                                  "required": {
+                                    "type": "boolean"
+                                  },
+                                  "passed": {
+                                    "type": "boolean"
+                                  },
+                                  "score": {
+                                    "type": "number"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "details": {
+                                    "type": "string"
+                                  },
+                                  "cost": {
+                                    "type": "object",
+                                    "properties": {
+                                      "currency": {
+                                        "type": "string"
+                                      },
+                                      "amount": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "currency",
+                                      "amount"
+                                    ]
+                                  },
+                                  "inputs": {
+                                    "type": "object",
+                                    "propertyNames": {
+                                      "type": "string"
+                                    },
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "evaluatorId",
+                                  "name",
+                                  "status",
+                                  "required"
+                                ]
+                              }
                             }
                           }
                         },

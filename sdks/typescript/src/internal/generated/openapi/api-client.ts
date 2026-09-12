@@ -20588,6 +20588,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -20632,6 +20636,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -20668,6 +20676,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20718,6 +20730,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20773,6 +20789,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -20809,6 +20829,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -20900,6 +20924,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -20936,6 +20964,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -21114,6 +21146,25 @@ export interface operations {
                                 metCriteria?: string[];
                                 unmetCriteria?: string[];
                                 error?: string | null;
+                                /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                                evaluations?: {
+                                    evaluatorId: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                    required: boolean;
+                                    passed?: boolean;
+                                    score?: number;
+                                    label?: string;
+                                    details?: string;
+                                    cost?: {
+                                        currency: string;
+                                        amount: number;
+                                    };
+                                    inputs?: {
+                                        [key: string]: string;
+                                    };
+                                }[];
                             } | null;
                             messages: {
                                 role: string;
@@ -21167,6 +21218,25 @@ export interface operations {
                             metCriteria?: string[];
                             unmetCriteria?: string[];
                             error?: string | null;
+                            /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                            evaluations?: {
+                                evaluatorId: string;
+                                name: string;
+                                /** @enum {string} */
+                                status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                required: boolean;
+                                passed?: boolean;
+                                score?: number;
+                                label?: string;
+                                details?: string;
+                                cost?: {
+                                    currency: string;
+                                    amount: number;
+                                };
+                                inputs?: {
+                                    [key: string]: string;
+                                };
+                            }[];
                         } | null;
                         messages: {
                             role: string;
