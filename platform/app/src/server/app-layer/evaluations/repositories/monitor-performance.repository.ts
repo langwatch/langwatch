@@ -8,6 +8,12 @@ export interface MonitorPerformanceBucket {
   scoreCount: number;
   passSum: number;
   passCount: number;
+  /**
+   * How many results carried each label that day. Empty for evaluators that
+   * score or pass rather than classify; the only reading a category
+   * evaluator produces, since it leaves score and pass empty.
+   */
+  labelCounts: Record<string, number>;
 }
 
 export interface FindMonitorPerformanceParams {
