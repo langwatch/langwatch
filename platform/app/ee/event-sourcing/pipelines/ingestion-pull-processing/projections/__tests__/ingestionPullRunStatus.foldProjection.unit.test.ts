@@ -518,6 +518,96 @@ describe("IngestionPullRunStatusFoldProjection", () => {
       });
     });
 
+    /**
+     * A completion that kept its progress AND could not read a page at all.
+     *
+     * The adapter banks the pages it already read rather than throwing them
+     * away, so the run ends as a completion -- but a page nobody could read is
+     * the same failure it would have been had it arrived first, and the source
+     * has to show it.
+     */
+    const bankUnreadPage = ({
+      state,
+      scheduledFor,
+      occurredAt,
+    }: {
+      state: IngestionPullRunStatusData;
+      scheduledFor: number;
+      occurredAt: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.run_completed",
+          {
+            sourceId: "source-1",
+            runId: String(scheduledFor),
+            scheduledFor,
+            nextCursor: `cursor-${scheduledFor}`,
+            eventCount: 3,
+            errorCount: 1,
+            completeness: "truncated",
+            unreadPage: true,
+          },
+          occurredAt,
+        ),
+      );
+
+    describe("when a completed run could not read one of its pages", () => {
+      /** @scenario "A refusal part-way through a window still counts against the source" */
+      it("counts the run as a failure while keeping its progress", () => {
+        const banked = bankUnreadPage({
+          state: configured,
+          scheduledFor: 1_000,
+          occurredAt: 1_100,
+        });
+
+        expect(banked.ConsecutiveErrors).toBe(1);
+        expect(banked.LastSuccessAt).toBeNull();
+        // The progress is the whole reason the run completed rather than
+        // failed, so counting the failure must not cost the advance.
+        expect(banked.Cursor).toBe("cursor-1000");
+      });
+    });
+
+    describe("when every run in a row banks progress over an unread page", () => {
+      /** @scenario "A source refused part-way through every run reads as failing" */
+      it("reads as unhealthy after three of them", () => {
+        let state = configured;
+        for (const scheduledFor of [1_000, 2_000, 3_000]) {
+          state = bankUnreadPage({
+            state,
+            scheduledFor,
+            occurredAt: scheduledFor + 100,
+          });
+        }
+
+        expect(state.ConsecutiveErrors).toBe(3);
+        expect(
+          deriveSourceHealth({ consecutiveFailures: state.ConsecutiveErrors }),
+        ).toBe("unhealthy");
+      });
+    });
+
+    describe("when a clean run follows one that banked an unread page", () => {
+      it("clears the count the banked run raised", () => {
+        const banked = bankUnreadPage({
+          state: configured,
+          scheduledFor: 1_000,
+          occurredAt: 1_100,
+        });
+
+        const recovered = succeed({
+          state: banked,
+          scheduledFor: 2_000,
+          occurredAt: 2_100,
+        });
+
+        expect(recovered.ConsecutiveErrors).toBe(0);
+        expect(recovered.LastSuccessAt).toBe(2_100);
+      });
+    });
+
     describe("when a completion predates runs reporting an error count", () => {
       it("folds as the clean run it was", () => {
         // succeed() writes the pre-change event shape -- no errorCount key at
