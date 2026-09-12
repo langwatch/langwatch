@@ -18,9 +18,9 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.44",
-    "@ai-sdk/google": "^2.0.78",
-    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/anthropic": "^4.0.49",
+    "@ai-sdk/google": "^4.0.63",
+    "@ai-sdk/openai": "^4.0.58",
     "@langwatch/scenario": "^1.6.0",
     "@types/mdast": "^4.0.4",
     "@types/node": "^26.2.0",
