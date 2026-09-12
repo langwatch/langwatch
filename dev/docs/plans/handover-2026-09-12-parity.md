@@ -104,6 +104,8 @@ It is currently blocked by the parse errors above; it also needs
     85f6595385  topic barrel points at where its interfaces went
     1afba5a3ba  pulled usage carries the provider's own currency again
     aaecc74349  interfaces imported as values become type imports (176 files)
+    27edfffecf  the same rule across package and subpath boundaries (50 files)
+    c233060756  this handover
 
 Measured: scenario-server went from every file crashing at import to 1014
 passing / 22 failing. governance openai-admin-puller 38/41 -> 41/41.
