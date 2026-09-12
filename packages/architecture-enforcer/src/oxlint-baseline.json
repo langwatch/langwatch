@@ -9051,7 +9051,63 @@
       "measured": "2026-09-11"
     },
     {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsPage.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsPageControls.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsSummaryStrip.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsSyncControl.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
       "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/arrivalAndEventTimeLabels.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costBreakdowns.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costDepartmentFilter.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costProviderDayRead.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costRefresh.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costRefusedRead.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costSampleFill.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costSampleMode.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costScreen.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costTimeControls.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/governanceOverviewHero.integration.test.tsx",
       "measured": "2026-09-11"
     },
     {
@@ -9059,7 +9115,27 @@
       "measured": "2026-09-11"
     },
     {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/peopleDepartments.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/peopleTabs.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/platformPlaceholders.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
       "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/sourceComposerAdvanced.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/teamDetailHonesty.integration.test.tsx",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/userDetailHonesty.integration.test.tsx",
       "measured": "2026-09-11"
     },
     {
@@ -9324,82 +9400,6 @@
     },
     {
       "key": "legacy-monolith-path|modules/api-key/web/src/ui/sections/token-created-dialog.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsPage.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsPageControls.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsSummaryStrip.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/agentsSyncControl.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costBreakdowns.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costDepartmentFilter.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costProviderDayRead.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costRefresh.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costRefusedRead.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costSampleFill.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costSampleMode.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costScreen.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costTimeControls.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/governanceOverviewHero.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/peopleDepartments.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/peopleTabs.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/platformPlaceholders.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/teamDetailHonesty.integration.test.tsx",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/userDetailHonesty.integration.test.tsx",
       "measured": "2026-09-11"
     },
     {

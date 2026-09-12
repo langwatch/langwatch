@@ -297,7 +297,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
      */
     const stoppedShort = (): PullResult => ({
       events,
-      cursor: encodeCursor({
+      cursor: OpenAiAdminPullerAdapter.encodeCursor({
         startingAt: resumeStart(),
         page,
         query,
@@ -934,6 +934,18 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     };
   }
 
+  /** The later of two ISO instants, tolerating nulls and unparseable input. */
+  private static laterOf(a: string | null, b: string | null): string | null {
+    if (a === null) return b;
+    if (b === null) return a;
+    const aMs = toEpochMs(a);
+    const bMs = toEpochMs(b);
+    if (Number.isNaN(aMs)) return b;
+    if (Number.isNaN(bMs)) return a;
+    return bMs > aMs ? b : a;
+  }
+}
+
 /**
  * The run continued without per-key attribution, and said so.
  *
@@ -956,16 +968,4 @@ function runNotices(hasLostKeyAttribution: boolean): { notices?: string[] } {
   return hasLostKeyAttribution
     ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] }
     : {};
-}
-
-  /** The later of two ISO instants, tolerating nulls and unparseable input. */
-  private static laterOf(a: string | null, b: string | null): string | null {
-    if (a === null) return b;
-    if (b === null) return a;
-    const aMs = toEpochMs(a);
-    const bMs = toEpochMs(b);
-    if (Number.isNaN(aMs)) return b;
-    if (Number.isNaN(bMs)) return a;
-    return bMs > aMs ? b : a;
-  }
 }
