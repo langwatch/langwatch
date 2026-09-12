@@ -311,7 +311,7 @@ export function PromptMessagesField({
       if (!alreadyExists) {
         inputsFieldArray.append({
           identifier: variable.identifier,
-          type: variable.type as "str" | "float" | "bool" | "image",
+          type: variable.type as "str" | "float" | "bool" | "image" | "file",
         });
       }
     },

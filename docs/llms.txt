@@ -122,7 +122,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Datasets: programmatic access from the SDKs, CLI and MCP server](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
 - [Automations: build a dataset from your traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Create an automation that adds every new trace matching a filter to a dataset, mapped to the columns you choose.
 - [Threads in datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add whole conversations to a dataset, one row per thread, with every trace of the thread in one column.
-- [Images in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): Store image URLs in a dataset column of type image (URL), see them as thumbnails in the grid, and pass them to a vision model in an experiment.
+- [Images and files in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): Upload a picture or a document into a dataset cell, or enter a URL, and send it to a prompt or an agent in an experiment.
 
 ### Annotations
 
@@ -735,6 +735,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Overview](https://langwatch.ai/docs/api-reference/datasets/overview.md): Manage datasets for evaluations, experiments, and fine-tuning. Create, update, upload, and manage records programmatically.
 - [List all non-archived datasets for the project](https://langwatch.ai/docs/api-reference/datasets/list-dataset.md)
 - [Create a new dataset](https://langwatch.ai/docs/api-reference/datasets/create-dataset.md)
+- [Create Attachments](https://langwatch.ai/docs/api-reference/datasets/create-attachments.md)
 - [Start a direct browser→S3 dataset upload](https://langwatch.ai/docs/api-reference/datasets/create-direct-upload.md)
 - [Evaluate a dataset](https://langwatch.ai/docs/api-reference/datasets/evaluate-a-dataset.md)
 - [Create a new dataset from an uploaded file](https://langwatch.ai/docs/api-reference/datasets/create-upload.md)

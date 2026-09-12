@@ -13,6 +13,7 @@ import {
   Layers,
   List,
   MessageSquare,
+  Paperclip,
   PenLine,
   ToggleLeft,
   Type,
@@ -25,6 +26,7 @@ export type ColumnType =
   | "json"
   | "chat_messages"
   | "image"
+  | "file"
   | "date"
   | "list"
   | "rag_contexts"
@@ -64,6 +66,8 @@ export const ColumnTypeIcon = ({ type, size = 12 }: ColumnTypeIconProps) => {
       );
     case "image":
       return <ImageIcon {...iconProps} color="var(--chakra-colors-gray-400)" />;
+    case "file":
+      return <Paperclip {...iconProps} color="var(--chakra-colors-gray-400)" />;
     case "date":
       return (
         <Calendar {...iconProps} color="var(--chakra-colors-yellow-600)" />

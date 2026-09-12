@@ -15,6 +15,7 @@ type FieldType string
 const (
 	FieldTypeStr                FieldType = "str"
 	FieldTypeImage              FieldType = "image"
+	FieldTypeFile               FieldType = "file"
 	FieldTypeFloat              FieldType = "float"
 	FieldTypeInt                FieldType = "int"
 	FieldTypeBool               FieldType = "bool"
