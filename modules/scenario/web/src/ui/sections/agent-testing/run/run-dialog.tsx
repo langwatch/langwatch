@@ -215,8 +215,16 @@ function RunDialogContent({
               isBusy={controller.isBusy}
               onNameListOpenChange={setIsNameListOpen}
             />
-          </>
-        )}
+          </OpenListContext.Provider>
+        </Dialog.Body>
+        <RunDialogFooter
+          controller={controller}
+          isRunBlocked={isRunBlocked({ form, controller })}
+          blockedReason={runBlockedReason({ subject, form, controller })}
+          caseCount={form.caseCount}
+          targetCount={form.runTargets.length}
+          onClose={onClose}
+        />
       </Dialog.Content>
     </Dialog.Root>
   );

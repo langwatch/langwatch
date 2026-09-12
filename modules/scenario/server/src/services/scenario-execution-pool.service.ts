@@ -8,7 +8,8 @@ import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
 import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
 import type { ScenarioExecutionRunner } from "../app/scenario.app.ts";
-import { ScenarioExecutionPool } from "../app/scenario.app.ts";
+import type { ScenarioExecutionPool } from "../app/scenario.app.ts";
+import type { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -29,14 +30,30 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
+  /**
+   * Per-project cap for voice runs: a voice job is admitted only while its project is under it,
+   * otherwise it waits in `_pending` like any full-pool job. Absent = no voice cap, so a pool built
+   * without one behaves exactly as it did before the cap existed.
+   */
+  private readonly _voiceGate: VoiceConcurrencyGate | null;
   private runner: ScenarioExecutionRunner | undefined = void 0;
 
-  static create(options: { concurrency: number }): ScenarioExecutionPoolService {
+  static create(options: {
+    concurrency: number;
+    voiceGate?: VoiceConcurrencyGate;
+  }): ScenarioExecutionPoolService {
     return new ScenarioExecutionPoolService(options);
   }
 
-  private constructor({ concurrency }: { concurrency: number }) {
+  private constructor({
+    concurrency,
+    voiceGate,
+  }: {
+    concurrency: number;
+    voiceGate?: VoiceConcurrencyGate;
+  }) {
     this._concurrency = concurrency;
+    this._voiceGate = voiceGate ?? null;
   }
 
   connect(runner: ScenarioExecutionRunner): void {
@@ -118,8 +135,31 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
    * Triggers dequeue of next pending job if any.
    */
   deregisterChild(scenarioRunId: string): void {
+    // Release the voice slot BEFORE the dequeue, so a queued voice run for the same project can
+    // take the freed slot in the very next dequeue pass.
+    const finished = this._active.get(scenarioRunId);
+    if (finished) {
+      this.releaseVoiceSlot(finished.job);
+    }
     this._active.delete(scenarioRunId);
     this.dequeueNext();
+  }
+
+  /**
+   * Whether a job may start now: a global slot is free and, for a voice job, the project is under
+   * its cap. Admission counts against `_active`, which a job enters at `startJob` — before its
+   * child registers — so a submit in that window cannot admit past `_concurrency`.
+   */
+  private canStart(jobData: ExecutionJobData): boolean {
+    if (this._active.size >= this._concurrency) {
+      return false;
+    }
+
+    if (this._voiceGate && jobData.target.type === "voice") {
+      return this._voiceGate.canAcquire(jobData.projectId);
+    }
+
+    return true;
   }
 
   /**
@@ -150,7 +190,7 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
       return;
     }
 
-    if (this._active.size < this._concurrency) {
+    if (this.canStart(jobData)) {
       this.startJob(jobData);
     } else {
       logger.info(
@@ -158,6 +198,7 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
           scenarioRunId: jobData.scenarioRunId,
           pendingCount: this._pending.length + 1,
           activeCount: this._active.size,
+          targetType: jobData.target.type,
         },
         "Execution pool full or voice cap reached, buffering job",
       );
@@ -187,6 +228,13 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
     const runner = this.requireRunner(jobData.scenarioRunId);
     this._active.set(jobData.scenarioRunId, { job: jobData });
 
+    // Reserve the project's voice slot at the same moment, so the cap is exact across the spawn
+    // window. Released in deregisterChild, or in settleUnregisteredJob when the executor never got
+    // as far as a child.
+    if (this._voiceGate && jobData.target.type === "voice") {
+      this._voiceGate.acquire(jobData.projectId);
+    }
+
     logger.info(
       {
         scenarioRunId: jobData.scenarioRunId,
@@ -197,36 +245,86 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
     );
 
     // Fire and forget — the spawn function handles the full lifecycle
-    void runner.execute(jobData).catch((error) => {
-      logger.error(
-        {
-          scenarioRunId: jobData.scenarioRunId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Scenario execution failed unexpectedly",
+    void runner.execute(jobData).then(
+      () => this.settleUnregisteredJob(jobData.scenarioRunId),
+      (error: unknown) => {
+        logger.error(
+          {
+            scenarioRunId: jobData.scenarioRunId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Scenario execution failed unexpectedly",
+        );
+        // Ensure we deregister even on unexpected errors
+        this.settleUnregisteredJob(jobData.scenarioRunId);
+      },
+    );
+  }
+
+  /**
+   * Release a job's slot when the executor settled without ever calling `deregisterChild` — an
+   * early return before the child registers (prefetch failure, cancellation) would otherwise leak a
+   * voice slot forever. Idempotent: a normal exit already dropped the `_active` entry.
+   */
+  private settleUnregisteredJob(scenarioRunId: string): void {
+    const execution = this._active.get(scenarioRunId);
+    if (!execution) {
+      return;
+    }
+
+    this.releaseVoiceSlot(execution.job);
+    this._active.delete(scenarioRunId);
+    this.dequeueNext();
+  }
+
+  /** Release a voice job's reserved slot; a no-op for text jobs or no gate. */
+  private releaseVoiceSlot(jobData: ExecutionJobData): void {
+    if (this._voiceGate && jobData.target.type === "voice") {
+      this._voiceGate.release(jobData.projectId);
+    }
+  }
+
+  /**
+   * Remove and settle the first cancelled job in the pending queue, wherever it sits. Returns true
+   * when one was found (so the caller re-checks capacity), false when no cancelled job remains.
+   */
+  private skipNextCancelledPending(): boolean {
+    const cancelledIdx = this._pending.findIndex((job) => this._cancelled.has(job.scenarioRunId));
+    if (cancelledIdx === -1) {
+      return false;
+    }
+
+    const cancelled = this._pending.splice(cancelledIdx, 1)[0];
+    if (cancelled) {
+      logger.info(
+        { scenarioRunId: cancelled.scenarioRunId },
+        "Skipping cancelled pending job, dispatching finished(CANCELLED)",
       );
-      // Ensure we deregister even on unexpected errors
-      this._active.delete(jobData.scenarioRunId);
-      this.dequeueNext();
-    });
+      this.requireRunner(cancelled.scenarioRunId).skipCancelled(cancelled);
+    }
+
+    return true;
   }
 
   private dequeueNext(): void {
     while (this._pending.length > 0 && this._active.size < this._concurrency) {
-      const next = this._pending.shift()!;
-
-      // Skip cancelled jobs in the pending queue
-      if (this._cancelled.has(next.scenarioRunId)) {
-        logger.info(
-          { scenarioRunId: next.scenarioRunId },
-          "Skipping cancelled pending job, dispatching finished(CANCELLED)",
-        );
-        this.requireRunner(next.scenarioRunId).skipCancelled(next);
+      if (this.skipNextCancelledPending()) {
         continue;
       }
 
+      // Start the first job that may start now. A voice job blocked by its project's cap is left in
+      // place so a runnable job behind it is not starved; the blocked job starts on a later dequeue
+      // once a slot frees.
+      const startIdx = this._pending.findIndex((job) => this.canStart(job));
+      if (startIdx === -1) {
+        return; // Nothing admissible right now.
+      }
+
       const next = this._pending.splice(startIdx, 1)[0];
-      if (!next) return;
+      if (!next) {
+        return;
+      }
+
       logger.debug(
         {
           scenarioRunId: next.scenarioRunId,
@@ -236,7 +334,9 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
       );
       this.startJob(next);
 
-      return; // One at a time — next dequeue happens when this job completes
+      // One real start per dequeue: `_active` only rises once the job is recorded here, so starting
+      // more would over-admit the global cap. The next completion drives the next dequeue.
+      return;
     }
   }
 }

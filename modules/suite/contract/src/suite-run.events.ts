@@ -93,7 +93,7 @@ export type SuiteRunItemRegradedEventData = z.infer<
   typeof suiteRunItemRegradedEventDataSchema
 >;
 
-export const SuiteRunItemRegradedEventSchema = EventSchema.extend({
+export const SuiteRunItemRegradedEventSchema = suiteRunEventSchema.extend({
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_REGRADED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_REGRADED),
   data: suiteRunItemRegradedEventDataSchema,

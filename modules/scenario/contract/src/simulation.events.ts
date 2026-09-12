@@ -322,7 +322,7 @@ export type SimulationRunCutAtLimitRecordedEventData = z.infer<
   typeof simulationRunCutAtLimitRecordedEventDataSchema
 >;
 
-export const SimulationRunCutAtLimitRecordedEventSchema = EventSchema.extend({
+export const SimulationRunCutAtLimitRecordedEventSchema = simulationEventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.CUT_AT_LIMIT_RECORDED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.CUT_AT_LIMIT_RECORDED),
   data: simulationRunCutAtLimitRecordedEventDataSchema,

@@ -5,6 +5,7 @@ import {
   simulationRunCancelRequestedEventDataSchema,
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
+  simulationRunQueuedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
