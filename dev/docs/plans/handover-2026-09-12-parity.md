@@ -189,11 +189,12 @@ Infrastructure interface and its importers were never updated. Each is a small
 design decision (reference the field's type, or restore the interface), which is
 why this is lane work rather than a sweep.
 
-    OrganizationCeremony, OrganizationDemoProject, OrganizationDirectory,
-    OrganizationInvitations, OrganizationInviteWithOrganization,
-    OrganizationInvitesCreated, OrganizationJoinRequests,
-    OrganizationJoinRequestState, OrganizationPlanGate, OrganizationSignals
-        modules/organization/server/src/app/organization.members.ts
+    DONE in 17d0a92311: all ten organization symbols, restored verbatim from
+        `git show '0611c343fe^:modules/organization/server/src/app/organization.infrastructure.ts'`
+    DONE in 17d0a92311: both GOVERNANCE_* constants - they needed a REPOINT to
+        @langwatch/enterprise-governance-contract, not a restore
+
+    STILL OPEN (12), generator stops at the first of these - LangyTitleModel:
     AutomationDispatchError, AutomationGraphNotifier, AutomationHeartbeat,
     AutomationLogger, AutomationSlackBotTokenDecryptor,
     AutomationNotificationDelivery
@@ -204,8 +205,6 @@ why this is lane work rather than a sweep.
     CodingAgentTraceProcessing       modules/coding-agent/server/src/app/coding-agent.members.ts
     ModelProviderCaller              modules/model-provider/server/src/app/model-provider.app.ts
     TenantClickHouseClientResolver   modules/data-retention/server/src/app/data-retention.app.ts
-    GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE, GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE
-        enterprise/modules/governance/server/src/app/governance.members.ts
 
 Regenerate the list: for each `import {...} from ".../app/*.members.ts"`, check
 each name against the target's own `export` declarations. Low false-positive,
