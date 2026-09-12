@@ -269,6 +269,14 @@
     "./use-copy-to-clipboard": {
       "types": "./dist/use-copy-to-clipboard.d.ts",
       "default": "./src/use-copy-to-clipboard.ts"
+    },
+    "./ask-chip": {
+      "types": "./dist/components/ask-chip.d.ts",
+      "default": "./src/components/ask-chip.tsx"
+    },
+    "./hero-lead-pill": {
+      "types": "./dist/components/hero-lead-pill.d.ts",
+      "default": "./src/components/hero-lead-pill.tsx"
     }
   },
   "scripts": {

@@ -1,4 +1,10 @@
-import { isPathUnder, isSettingsShellRoute, type ProductId, productFromPathname } from "./products.ts";
+import {
+  isOrganizationScopedProduct,
+  isPathUnder,
+  isSettingsShellRoute,
+  type ProductId,
+  productFromPathname,
+} from "./products.ts";
 
 export interface ShellRoute {
   /**
@@ -40,17 +46,35 @@ export function resolveShellRoute({
   isOnOwnPersonalProject: boolean;
 }): ShellRoute {
   const isSettingsRoute = isSettingsShellRoute(pathname);
+  // The product the ADDRESS names, before any sticky scope is applied.
+  const addressedProductId = productFromPathname(pathname);
+  /**
+   * Products the registry marks organization-wide (Gateway, Governance) are
+   * read across the whole organization, so a personal scope can never be the
+   * one they are read in.
+   *
+   * This matters because `isOnOwnPersonalProject` is a fact about the sticky
+   * ambient team, not about the address: a reader whose last project was their
+   * own workspace carries it into every later page. Without this exclusion
+   * they arrived at /gateway and got the Me shell — the Personal badge in the
+   * top bar, the personal sidebar, and "Me" lit in the product switcher while
+   * the address said Gateway. Settings was already excluded for exactly this
+   * reason and on exactly this line.
+   */
+  const isOrgScopedProduct = isOrganizationScopedProduct(addressedProductId);
   const isPersonalScopeRoute =
     !isSettingsRoute &&
-    (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
+    !isOrgScopedProduct &&
+    (isPersonalScope ||
+      isPathUnder({ pathname, base: "/me" }) ||
+      isOnOwnPersonalProject);
   const activeProductId = isSettingsRoute
     ? null
-    : ((isPersonalScopeRoute ? "me" : productFromPathname(pathname)) ?? "llm-ops");
+    : ((isPersonalScopeRoute ? "me" : addressedProductId) ?? "llm-ops");
   const isOrgScopeRoute =
     isOrgScope ||
     isSettingsRoute ||
-    activeProductId === "gateway" ||
-    activeProductId === "governance";
+    isOrganizationScopedProduct(activeProductId);
 
   return {
     isSettingsRoute,

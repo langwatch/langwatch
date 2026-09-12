@@ -1,14 +1,14 @@
 ---
 title: "Overview"
-description: "Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation)."
+description: "Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (bound to organization, team or project scopes, for automation)."
 ---
 
 ## Intro
 
 The API Keys API lets you create, list, and revoke API keys for your organization. Two key types are supported:
 
-- **Personal keys** — tied to a user, inherit the user's RBAC permissions
-- **Service keys** — no user association, scoped to specific projects with ADMIN access. Ideal for CI/CD, scaffolding tools, and service-to-service integrations
+- **Personal keys**: tied to a user, inherit the user's RBAC permissions
+- **Service keys**: no user association, bound to the organization, one or more teams, or one or more projects, with a role on each. Use them for CI/CD, scaffolding tools, and service-to-service integrations
 
 ## Authentication
 
@@ -26,15 +26,15 @@ Service keys are the exception, because they belong to nobody. A member credenti
 
 | Method   | Path                 | Description                                |
 | -------- | -------------------- | ------------------------------------------ |
-| `GET`    | `/api/v1/api-keys`      | List API keys                              |
-| `POST`   | `/api/v1/api-keys`      | Create a new API key                       |
-| `GET`    | `/api/v1/api-keys/{id}` | Read one key and the access it carries     |
-| `PATCH`  | `/api/v1/api-keys/{id}` | Update a key's name, description or access |
-| `DELETE` | `/api/v1/api-keys/{id}` | Revoke an API key                          |
+| `GET`    | `/api/api-keys`      | List API keys                              |
+| `POST`   | `/api/api-keys`      | Create a new API key                       |
+| `GET`    | `/api/api-keys/{id}` | Read one key and the access it carries     |
+| `PATCH`  | `/api/api-keys/{id}` | Update a key's name, description or access |
+| `DELETE` | `/api/api-keys/{id}` | Revoke an API key                          |
 
 ## Reading a key back
 
-`GET /api/v1/api-keys/{id}` and `PATCH /api/v1/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
+`GET /api/api-keys/{id}` and `PATCH /api/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
 
 A personal key belonging to somebody else is readable only with organization administrator membership plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists. Service keys are the exception described above: a member credential with `organization:view` reads one by id.
 
@@ -43,7 +43,7 @@ A personal key belonging to somebody else is readable only with organization adm
 `PATCH` is partial at the field level: send `name` alone and only the name changes. `bindings`, when you send them, replace the key's bindings outright, so what you send is what the key has afterward.
 
 ```bash
-curl -X PATCH https://app.langwatch.ai/api/v1/api-keys/<api_key_id> \
+curl -X PATCH https://app.langwatch.ai/api/api-keys/<api_key_id> \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -83,9 +83,11 @@ Created without a user association (`userId: null`). Scoped to specific projects
 ```
 
 <Info>
-  Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects
-  when possible.
+  Service keys with neither `projectIds` nor `bindings` get org-wide ADMIN access. Always scope to
+  specific projects when possible.
 </Info>
+
+`projectIds` is shorthand rather than a separate mechanism: each id becomes one ADMIN binding on that project, added to any `bindings` you sent rather than replacing them. Reach for `bindings` directly when you want a role other than ADMIN, or a team or organization scope. Service keys only, and a personal key that sends it is refused.
 
 Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.
 
@@ -93,7 +95,7 @@ Because a service key has no person capping it, and a key minted for somebody el
 
 Three fields decide how far a key reaches:
 
-- `bindings`, the roles the key holds and where, in the same `role` / `scopeType` / `scopeId` shape [role bindings](/api-reference/role-bindings/overview) use.
+- `bindings`, the roles the key holds and where, in the same `role` / `scopeType` / `scopeId` shape [role bindings](/api-reference/role-bindings/overview) use. `scopeType` is `ORGANIZATION`, `TEAM` or `PROJECT`.
 - `permissionMode`, one of `all`, `readonly` or `restricted`. `all` and `readonly` take their meaning from the bindings alone.
 - `permissions`, a list of `resource:action` keys. Only for `restricted` mode, where it is the exact set the key's `CUSTOM` bindings grant.
 

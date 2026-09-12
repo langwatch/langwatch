@@ -4,10 +4,12 @@ import { isSuiteSetId } from "@langwatch/suite-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import type {
   SimulationProcessingEvent,
+  SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
   SimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
 import {
+  isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,
   isSimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
@@ -32,6 +34,22 @@ export interface SuiteRunSyncSubscriberDeps {
     durationMs?: number;
     reasoning?: string;
     error?: string;
+    occurredAt: number;
+  }) => Promise<void>;
+  /**
+   * Moves a completed item's counts when its verdict changed after the fact.
+   * `idempotencyKey` names the evaluated event that changed it.
+   */
+  regradeSuiteRunItem: (data: {
+    tenantId: string;
+    batchRunId: string;
+    scenarioRunId: string;
+    scenarioId: string;
+    previousStatus: string;
+    previousVerdict?: string;
+    status: string;
+    verdict?: string;
+    idempotencyKey: string;
     occurredAt: number;
   }) => Promise<void>;
 }
@@ -117,8 +135,62 @@ export function createSuiteRunSyncSubscriber(
     );
   };
 
+  /**
+   * A run whose verdict moved after it completed: the evaluators failed it, or
+   * cleared it. Only a change moves the counts.
+   */
+  const handleEvaluated = async (event: SimulationRunEvaluatedEvent): Promise<void> => {
+    const tenantId = String(event.tenantId);
+    const { data } = event;
+
+    if (!data.scenarioSetId || !isSuiteSetId(data.scenarioSetId)) {
+      return;
+    }
+
+    if (!data.batchRunId || !data.scenarioId || !data.status || !data.previousStatus) {
+      logger.debug(
+        { tenantId, scenarioRunId: data.scenarioRunId },
+        "Skipped suiteRunSync for RunEvaluated without ECST identity fields",
+      );
+      return;
+    }
+
+    // Evaluations that report beside the verdict change nothing on the suite run.
+    if (data.status === data.previousStatus && data.verdict === data.previousVerdict) {
+      return;
+    }
+
+    await deps.regradeSuiteRunItem({
+      tenantId,
+      batchRunId: data.batchRunId,
+      scenarioRunId: data.scenarioRunId,
+      scenarioId: data.scenarioId,
+      previousStatus: data.previousStatus,
+      previousVerdict: data.previousVerdict,
+      status: data.status,
+      verdict: data.verdict,
+      idempotencyKey: event.id,
+      occurredAt: event.occurredAt,
+    });
+
+    logger.debug(
+      {
+        tenantId,
+        batchRunId: data.batchRunId,
+        scenarioRunId: data.scenarioRunId,
+        status: data.status,
+        previousStatus: data.previousStatus,
+      },
+      "Dispatched regradeSuiteRunItem",
+    );
+  };
+
   return {
-    events: [SIMULATION_RUN_EVENT_TYPES.STARTED, SIMULATION_RUN_EVENT_TYPES.FINISHED],
+    events: [
+      SIMULATION_RUN_EVENT_TYPES.STARTED,
+      SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+    ],
 
     async handler(event: SimulationProcessingEvent): Promise<void> {
       if (isSimulationRunStartedEvent(event)) {
@@ -128,6 +200,11 @@ export function createSuiteRunSyncSubscriber(
 
       if (isSimulationRunFinishedEvent(event)) {
         await handleFinished(event);
+        return;
+      }
+
+      if (isSimulationRunEvaluatedEvent(event)) {
+        await handleEvaluated(event);
       }
     },
   };

@@ -101,7 +101,7 @@ vi.mock("@langwatch/annotation-web/annotations", async (importOriginal) => ({
   annotationApi: {
     useUtils: () => ({
       annotation: {
-        getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
+        getQueueWalkStep: { invalidate: mocks.invalidateQueues },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -313,6 +313,38 @@ describe("given a reviewer walking their annotation queue", () => {
 
       expect(screen.getByText("Annotation queue unavailable")).toBeInTheDocument();
       expect(screen.queryByText("All tasks complete")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the reviewer has stepped on and the new item is still being read", () => {
+    /** @scenario "Nothing acts on the item I have just stepped off" */
+    it("holds every action that would otherwise act on the item left behind", () => {
+      // The URL already names the item asked for, while the step in hand is
+      // still the one being left. Acting now finishes, or annotates, the item
+      // the reviewer has stepped away from.
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+
+      expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Edit trace/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+    });
+
+    /** @scenario "Nothing acts on the item I have just stepped off" */
+    it("holds the conversation, whose own controls would write to the item left behind", () => {
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+
+      // Annotating, ticking a turn into the session and opening a turn all
+      // belong to the conversation rather than the bar, and annotating writes.
+      // The hold therefore sits on the subtree that hosts them, which is what
+      // the reviewer sees dim while the item they asked for is read.
+      const thread = screen.getByTestId("conversation-view").closest("[aria-busy]");
+
+      expect(thread).toHaveAttribute("aria-busy", "true");
+      expect(thread).toHaveStyle({ pointerEvents: "none" });
     });
   });
 

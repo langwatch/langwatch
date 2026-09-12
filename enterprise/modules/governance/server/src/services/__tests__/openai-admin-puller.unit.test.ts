@@ -12,10 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import type { PulledUsageRateInput } from "../../app/governance.members.ts";
-import {
-  GovernanceHttpClient,
-  type GovernanceHttpResponse,
-} from "../../app/governance.members.ts";
+import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.members.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
@@ -68,7 +65,11 @@ const SOURCE = {
   sourceType: OPENAI_ADMIN_ADAPTER_ID,
   organizationId: "org_acme",
   teamId: "team_platform",
+  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
+/** The org's hidden governance project — where the row is stored (ADR-128). */
+const GOV_PROJECT_ID = "proj_governance_acme";
+
 const OBSERVED_AT = Temporal.Instant.from("2026-08-26T09:00:00.000Z");
 
 /** 2026-08-01T00:00:00Z, the shape the API reports a bucket start in. */
@@ -123,6 +124,22 @@ const KEY_GROUPING_REFUSAL = errorResponse({
 /**
  * `amount.value` is a JSON number in DOLLARS. The sibling adapter's provider
  * reports cents; a decimal shift here would report a hundred times this.
+ *
+ * The field list is the endpoint's entire key set, checked against the saved
+ * raw responses rather than against what this adapter happens to read — a
+ * fixture trimmed to the fields under test cannot show that the ones left over
+ * are tolerated, and this schema passes them through into `raw_payload`.
+ *
+ * The report DOES send a `user_email` beside the opaque `user-…` id — every
+ * one of the 2,720 captured rows carries both — so the fixture carries one
+ * too: the adapter deliberately reads the id and never the address, and a
+ * fixture that omitted the address could not tell that choice apart from there
+ * being nothing to read. Both fields ride along because the request groups by
+ * the user dimension; the address is an attribute of that grouping, not a
+ * dimension you can group by. Note the user grouping is wire-verified rather
+ * than contract-guaranteed — OpenAI's published schema omits `user_id` from
+ * the cost `group_by` enum the live API accepts, so it could change without a
+ * deprecation and without anything here going red.
  */
 function costRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -130,9 +147,13 @@ function costRow(overrides: Record<string, unknown> = {}) {
     amount: { value: 0.0025945, currency: "usd" },
     line_item: "gpt-5, input",
     project_id: "proj_a",
+    project_name: "Default project",
     organization_id: "org_acme",
+    organization_name: "ACME",
+    quantity: 5189,
+    quantity_unit: "tokens",
     user_id: "user-1",
-    user_email: "someone@example.com",
+    user_email: "person@acme.test",
     api_key_id: "key_a",
     ...overrides,
   };
@@ -165,6 +186,41 @@ describe("given an OpenAI Admin cost source", () => {
     fetchMock.mockReset();
     for (const level of Object.values(logged)) level.mockReset();
   });
+  it("preserves a provider rate-limit wait for the durable retry", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("private upstream payload", {
+        status: 429,
+        headers: { "retry-after": "120" },
+      }),
+    );
+    await expect(makePuller().runOnce(RUN_OPTIONS, CONFIG)).rejects.toMatchObject({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryAfterMs: 120_000,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reports the rate-limit wait when draining the body fails", async () => {
+    // Same guard as the Anthropic puller's: a rejected cancel() must not
+    // escape in place of the DispatchError, or the provider's Retry-After
+    // never reaches the scheduler. A real Response resolves cancel(), so the
+    // rejection is planted here.
+    const response = new Response("private upstream payload", {
+      status: 429,
+      headers: { "retry-after": "120" },
+    });
+    Object.defineProperty(response, "body", {
+      value: {
+        cancel: () => Promise.reject(new Error("stream already errored")),
+      },
+    });
+    fetchMock.mockResolvedValue(response);
+
+    await expect(makePuller().runOnce(RUN_OPTIONS, CONFIG)).rejects.toMatchObject({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryAfterMs: 120_000,
+    });
+  });
 
   describe("when the provider reports a day's spend", () => {
     /** @scenario "A day's spend is recorded as the dollars the provider reported" */
@@ -192,11 +248,12 @@ describe("given an OpenAI Admin cost source", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
       // 0.0000001234 USD × 1e9 = 123.4 → 123 nanoUsd (truncated).
-      expect(record?.costNanoUsd).toBe(123);
+      expect(record?.costNanoMinor).toBe(123);
     });
 
     /** @scenario "Spend is called an estimate, not the invoice" */
@@ -207,6 +264,7 @@ describe("given an OpenAI Admin cost source", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -215,14 +273,53 @@ describe("given an OpenAI Admin cost source", () => {
     });
 
     /** @scenario "Spend is attributed to the person the provider named" */
-    it("names the person by email and carries the provider's raw id", async () => {
+    it("names the person by the opaque id on the row, not by the address sent beside it", async () => {
       fetchMock.mockResolvedValue(jsonResponse(page()));
 
       const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
       const event = result.events[0]!;
 
-      expect(event.actor).toBe("someone@example.com");
+      // Not "": a blank actor is what person discovery skips, so a blank here
+      // is the whole provider discovering nobody.
+      expect(event.actor).toBe("user-1");
       expect(event.extra?.actorUserId).toBe("user-1");
+      // The row the adapter read did carry an address — this is the half that
+      // makes the two lines above a choice rather than the only thing on offer.
+      // The address is dropped before the row is stored, so it is absent from
+      // the retained payload and from anywhere else on the event.
+      expect(JSON.parse(event.raw_payload as string)).not.toHaveProperty("user_email");
+      expect(JSON.stringify(event)).not.toContain("person@acme.test");
+      expect(event.actor).not.toContain("@");
+      expect(event.extra?.actorUserId).not.toContain("@");
+    });
+
+    /** @scenario "Spend the provider attributes to nobody names nobody" */
+    it("leaves the person blank when the row carries no user", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(page({ results: [costRow({ user_id: null })] })));
+
+      const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      // Blank rather than a placeholder: a row the provider attributes to
+      // nobody must not invent somebody for the People screen.
+      expect(result.events[0]?.actor).toBe("");
+    });
+
+    /** @scenario "Naming the person does not re-key the day" */
+    it("keeps the identity of a day built from its coordinates alone", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(page()));
+
+      const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
+      const event = result.events[0]!;
+
+      // Pinned to the digit. The person is already a coordinate here (`user-1`
+      // rides the path as the userId dimension), so filling the actor in adds
+      // nothing to the identity. If a later change appends the actor to this
+      // string, every day already stored re-keys and its spend is counted a
+      // second time — which is what this literal exists to catch.
+      expect(event.source_event_id).toBe(
+        `cost:${BUCKET_START_ISO}:cost:1d:proj_a:gpt-5%2C%20input:user-1:key_a`,
+      );
+      expect(event.source_event_id).not.toContain("user-1:user-1");
     });
 
     /** @scenario "The credential the spend was billed to is recorded" */
@@ -322,16 +419,18 @@ describe("given an OpenAI Admin cost source", () => {
       const before = buildPulledUsageRecord({
         event: first.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const after = buildPulledUsageRecord({
         event: second.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT.add({ milliseconds: 60_000 }),
       });
 
       expect(after?.restatementKey).toBe(before?.restatementKey);
-      expect(after?.costNanoUsd).not.toBe(before?.costNanoUsd);
+      expect(after?.costNanoMinor).not.toBe(before?.costNanoMinor);
     });
 
     /** @scenario "Re-reading an unchanged day records nothing new" */
@@ -822,6 +921,66 @@ describe("given an OpenAI Admin cost source", () => {
 
       expect(result.errorCount).toBe(1);
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a provider that refuses to break a period down per key", () => {
+  describe("when the read falls back to asking for the period undivided", () => {
+    /**
+     * The fallback is correct and the money survives it. What was missing was
+     * any trace that it happened, so a provider quietly widening what it
+     * refuses would cost every customer their attribution in silence.
+     *
+     * The notice rides on the run's own result rather than on a log line: a
+     * log is not something a reader of the source can be shown. The carrier
+     * (`notices`) and its code are this binding's choice — nothing in the
+     * settlements names them — so change both together if the implementer
+     * prefers others.
+     */
+    /** @scenario "A read that loses per-person attribution says so before carrying on" */
+    it("records that it continued without per-key attribution, and still records the money", async () => {
+      fetchMock.mockResolvedValueOnce(KEY_GROUPING_REFUSAL).mockResolvedValueOnce(
+        jsonResponse(
+          page({
+            results: [costRow({ api_key_id: null, line_item: null })],
+          }),
+        ),
+      );
+
+      const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      // Not yet implemented: PullResult.notices. Field not yet on the port
+      // (held by PR #8043 work), so it is read off a widened view here.
+      const reported = result as typeof result & { notices?: string[] };
+      expect(reported.notices ?? []).toContain("per_key_attribution_unavailable");
+
+      // And the money for the period is still recorded — the notice is a
+      // trace beside the events, never instead of them.
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+      // The minor-units field, not the dollar-denominated one. That second
+      // field only ever holds the biller's own SEPARATE conversion, and
+      // OpenAI publishes none, so it is null on every provider-reported row.
+      expect(record?.costNanoMinor).toBeGreaterThan(0);
+    });
+
+    /**
+     * The arm from the far side: a run the provider never refused must not
+     * claim it lost attribution, or the notice means nothing.
+     */
+    /** @scenario "A read that loses per-person attribution says so before carrying on" */
+    it("says nothing of the sort on a run the provider answered whole", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(page()));
+
+      const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      const reported = result as typeof result & { notices?: string[] };
+      expect(reported.notices ?? []).not.toContain("per_key_attribution_unavailable");
     });
   });
 });

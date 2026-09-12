@@ -22,6 +22,10 @@
       "langwatch-declaration-source": "./src/ui/blocks/tech-stack.tsx",
       "types": "./dist/ui/blocks/tech-stack.d.ts",
       "default": "./src/ui/blocks/tech-stack.tsx"
+    },
+    "./surfaces/hero-ask-field": {
+      "types": "./dist/ui/sections/home/components/HeroAskField.d.ts",
+      "default": "./src/ui/sections/home/components/HeroAskField.tsx"
     }
   },
   "scripts": {

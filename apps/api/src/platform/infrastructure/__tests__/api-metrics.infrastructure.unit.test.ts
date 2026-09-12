@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiMetricsAbsenceReport,
   ApiMetricsInfrastructure,
-} from "../api-metrics.infrastructure.ts";
+} from "../api-metrics.members.ts";
 
 class RecordedAbsence extends ApiMetricsAbsenceReport {
   calls = 0;

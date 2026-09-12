@@ -5,6 +5,7 @@
  */
 
 import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { isHumanCallerRun } from "../results/caller-display.ts";
 import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
 import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer.tsx";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer.tsx";
@@ -118,6 +119,11 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
     status: scenarioState.status,
   });
 
+  // A voice "Call it myself" run's caller is a real person, so their turns read
+  // as "You", not the LLM "User Simulator" (#8020). Same metadata field the
+  // results-table caller badge reads (caller-display.ts).
+  const isHumanCaller = isHumanCallerRun(scenarioState.metadata);
+
   if (!detail.hasConversation) {
     return (
       <ConversationBox>
@@ -135,6 +141,7 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
           variant="drawer"
           projectId={project?.id ?? ""}
           typingRole={typingRole}
+          isHumanCaller={isHumanCaller}
         />
       </ConversationExpandContext.Provider>
     </ConversationBox>
@@ -224,6 +231,7 @@ function ResultsSection({ detail, isFirst }: { detail: RunDetail; isFirst: boole
           declaredCriteria={detail.scenarioData?.criteria ?? []}
           reasoning={scenarioState.results?.reasoning}
           error={scenarioState.results?.error}
+          evaluations={scenarioState.results?.evaluations ?? []}
         />
       )}
     </Box>

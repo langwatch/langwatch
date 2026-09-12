@@ -499,6 +499,18 @@ pool's internal task type, confirmed at the same location) — `CLAUDE.md`'s sho
 implementing this should nest it under `poolOptions.vmForks`, matching the pattern the repo
 already uses correctly for the integration lane's `poolOptions`-adjacent settings.
 
+> **Correction, 2026-09-11.** The paragraph above is wrong on the nesting, and
+> following it reintroduces a deprecation warning. vitest 4's pool rework removed
+> `test.poolOptions` wholesale and moved every option it held to the top level;
+> vitest 5 keeps no compatibility shim, it only warns and ignores the block. The
+> per-worker memory limit **is** a literal top-level `vmMemoryLimit`
+> (`string | number`), `poolOptions.forks.isolate` is the top-level `isolate`,
+> `maxForks`/`maxThreads` are `maxWorkers`, and `singleFork`/`singleThread` are
+> `maxWorkers: 1`. `minForks`/`minThreads` and `useAtomics` have no replacement.
+> The pool *names* and worker classes this section verified are unaffected - it is
+> only the nesting that changed.
+> https://v4.vitest.dev/guide/migration#pool-rework
+
 ### 3.3 What's actually configured today — confirms and sharpens Part 1, rule 8
 
 Re-verified with a narrower, more precise grep than Part 1 used:

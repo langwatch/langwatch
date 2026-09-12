@@ -37,13 +37,13 @@ The composer collects:
 | Polling cadence (seconds) | no       | `payloadConfig.pollEverySec`           | (future puller) |
 | Parser DSL                | no       | `payloadConfig.parserDsl`              | (future parser) |
 
-The one-time-reveal modal exposes the same `lw_is_<secret>` and webhook URL as the [Workato](/ai-gateway/governance/ingestion-sources/workato) source type.
+The one-time-reveal modal exposes the same `lw_is_<secret>` and webhook URL as the [Workato](/ai-governance/ingestion-sources/workato) source type.
 
 The S3 + role ARN fields are **persisted but not yet used**: they reflect the configuration the puller will need when it ships. Setting them today doesn't cause any AWS calls.
 
 ## Event shape we accept today
 
-In callback mode, identical to the Workato envelope-only shape, see [Workato → Event shape](/ai-gateway/governance/ingestion-sources/workato#event-shape-we-accept-today).
+In callback mode, identical to the Workato envelope-only shape, see [Workato → Event shape](/ai-governance/ingestion-sources/workato#event-shape-we-accept-today).
 
 ## What is still envelope-only, follow-up work
 

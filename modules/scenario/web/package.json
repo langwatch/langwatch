@@ -39,6 +39,22 @@
       "langwatch-declaration-source": "./src/drawers.ts",
       "types": "./dist/drawers.d.ts",
       "default": "./src/drawers.ts"
+    },
+    "./surfaces/parameter-line-field": {
+      "types": "./dist/ui/sections/agent-testing/run/parameter-line-field.d.ts",
+      "default": "./src/ui/sections/agent-testing/run/parameter-line-field.tsx"
+    },
+    "./surfaces/dialog-fields": {
+      "types": "./dist/ui/elements/agent-testing/shared/dialog-fields.d.ts",
+      "default": "./src/ui/elements/agent-testing/shared/dialog-fields.tsx"
+    },
+    "./surfaces/parameter-line": {
+      "types": "./dist/model/agent-testing/run/parameter-line.d.ts",
+      "default": "./src/model/agent-testing/run/parameter-line.ts"
+    },
+    "./surfaces/parameter-suggestions": {
+      "types": "./dist/ui/sections/agent-testing/run/parameter-suggestions.d.ts",
+      "default": "./src/ui/sections/agent-testing/run/parameter-suggestions.ts"
     }
   },
   "scripts": {

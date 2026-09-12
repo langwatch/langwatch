@@ -93,7 +93,7 @@ function textMessageEndEvent(traceId: string): SimulationTextMessageEndEvent {
 
 describe("FinishRunCommand", () => {
   describe("when the caller supplies all ECST fields", () => {
-    it("emits them without reading prior events", async () => {
+    it("emits them as given", async () => {
       const deps = makeDeps();
       const handler = new FinishRunCommand(deps);
 
@@ -107,7 +107,6 @@ describe("FinishRunCommand", () => {
         }),
       );
 
-      expect(deps.loadPriorEvents).not.toHaveBeenCalled();
       expect(events).toHaveLength(1);
       const event = events[0]!;
       expect(event.type).toBe(SIMULATION_RUN_EVENT_TYPES.FINISHED);

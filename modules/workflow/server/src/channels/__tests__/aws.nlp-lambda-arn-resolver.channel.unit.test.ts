@@ -11,7 +11,7 @@ import {
   type LambdaClient,
 } from "@aws-sdk/client-lambda";
 import { describe, expect, it } from "vitest";
-import { AwsNlpLambdaArnResolverAdapter } from "../aws.nlp-lambda-arn-resolver.channel.ts";
+import { AwsNlpLambdaArnResolverAdapter } from "../../adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
 import type { StudioLambdaConfig } from "../../rules/nlp-lambda-config.rules.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";

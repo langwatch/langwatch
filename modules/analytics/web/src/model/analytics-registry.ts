@@ -353,9 +353,14 @@ export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap((
   ),
 ) as [FlattenAnalyticsGroupsEnum, ...FlattenAnalyticsGroupsEnum[]];
 
-export const getMetric = (groupMetric: FlattenAnalyticsMetricsEnum): AnalyticsMetric => {
+export const getMetric = (
+  groupMetric: FlattenAnalyticsMetricsEnum,
+): AnalyticsMetric | undefined => {
   const [group, metric_] = groupMetric.split(".") as [AnalyticsMetricsGroupsEnum, string];
-  return (analyticsMetrics[group] as any)[metric_];
+  // Optional chaining on the group lookup: an unknown group (not just an
+  // unknown metric within a known group) returns undefined here rather than
+  // throwing a raw TypeError at the caller.
+  return (analyticsMetrics[group] as any)?.[metric_];
 };
 
 export const getGroup = (groupMetric: FlattenAnalyticsGroupsEnum): AnalyticsGroup => {

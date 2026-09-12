@@ -6,6 +6,7 @@ import type {
 } from "@/client-sdk/services/_shared/management-types";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface RoleBinding {
   id: string;
@@ -115,7 +116,7 @@ export class ApiKeysApiService {
   }
 
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
     });

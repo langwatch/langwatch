@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { WorkflowAgentMappingAdapter } from "../workflow-agent-mapping.service.ts";
+import { WorkflowAgentMappingAdapter } from "../../adapters/workflow-agent-mapping.adapter.ts";
 
 /** The adapter under test, over the fake rows one case supplies. */
 const recompute = (input: {

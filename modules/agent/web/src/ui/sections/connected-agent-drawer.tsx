@@ -103,6 +103,7 @@ function AgentBody({
         agentId={agent.id}
         projectId={projectId}
         offline={agent.status === "offline"}
+        parameters={agent.parameters}
       />
     </VStack>
   );

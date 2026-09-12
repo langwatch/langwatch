@@ -50,6 +50,7 @@ import {
 } from "./undeclared-parameters.ts";
 import { useCompareRows } from "./use-compare-rows.ts";
 import { useRunConfigurationHistory } from "./use-run-configuration-history.ts";
+import { useRunEvaluators } from "./useRunEvaluators.ts";
 import { useRunHistorySeed } from "./use-run-history-seed.ts";
 import { buildTargetLabels, scopeLabelOf, useRunName } from "./use-run-name.ts";
 import { type RunPlanFields, useRunPlanFields } from "./use-run-plan-fields.ts";
@@ -786,18 +787,23 @@ function buildCustomizeRunChips({
   hasParameterDefinitions,
   hasAgents,
   hasPublishedPrompts,
+  showEvaluatorsSection,
   onAddParameters,
   onCompareAgents,
   onRunAgainstPrompt,
+  onAddEvaluators,
 }: {
   fields: RunDialogFields;
   planFields: RunPlanFields;
   hasParameterDefinitions: boolean;
   hasAgents: boolean;
   hasPublishedPrompts: boolean;
+  /** True while the evaluators block stands, which is when no chip offers it. */
+  showEvaluatorsSection: boolean;
   onAddParameters: () => void;
   onCompareAgents: () => void;
   onRunAgainstPrompt: () => void;
+  onAddEvaluators: () => void;
 }): CustomizeChip[] {
   const chips: CustomizeChip[] = [];
   // A comparison holds its parameters on its rows, so the block has no chip.
@@ -841,6 +847,13 @@ function buildCustomizeRunChips({
       key: "repeat",
       label: "Run multiple times",
       onAdd: () => planFields.setShowRepeat(true),
+    });
+  }
+  if (!showEvaluatorsSection) {
+    chips.push({
+      key: "evaluators",
+      label: "Add evaluators",
+      onAdd: onAddEvaluators,
     });
   }
   return chips;
@@ -1014,17 +1027,6 @@ function useDerivedRunDialogState({
     runTargets,
   });
 
-  const chips = buildCustomizeRunChips({
-    fields,
-    planFields,
-    hasParameterDefinitions: parameters.parameterDefinitions.length > 0,
-    hasAgents: choices.scenarioAgents.length > 0,
-    hasPublishedPrompts: choices.publishedPrompts.length > 0,
-    onAddParameters: parameters.showParameters,
-    onCompareAgents: comparing.enterCompare,
-    onRunAgainstPrompt: targeting.selectPrompts,
-  });
-
   const scopedIds = scopedScenarioIds({
     subject,
     scope: planFields.scope,
@@ -1032,8 +1034,34 @@ function useDerivedRunDialogState({
     allScenarios: choices.allScenarios ?? [],
   });
 
+  const evaluators = useRunEvaluators({
+    scope: planFields.scope,
+    scopedScenarioIds: scopedIds,
+    scopeScenarios: choices.scopeScenarios,
+    testSuites: choices.testSuites,
+    extras: planFields.evaluators,
+    setExtras: planFields.setEvaluators,
+    showExtras: planFields.showEvaluators,
+    setShowExtras: planFields.setShowEvaluators,
+    isOpen: !!subject,
+  });
+
+  const chips = buildCustomizeRunChips({
+    fields,
+    planFields,
+    hasParameterDefinitions: parameters.parameterDefinitions.length > 0,
+    hasAgents: choices.scenarioAgents.length > 0,
+    hasPublishedPrompts: choices.publishedPrompts.length > 0,
+    showEvaluatorsSection: evaluators.showEvaluatorsSection,
+    onAddParameters: parameters.showParameters,
+    onCompareAgents: comparing.enterCompare,
+    onRunAgainstPrompt: targeting.selectPrompts,
+    onAddEvaluators: evaluators.showEvaluatorsBlock,
+  });
+
   return {
     ...naming.name,
+    ...evaluators,
     applyConfiguration: naming.applyConfiguration,
     /** The scope the run goes out with, folded the way the server folds it. */
     runScope: naming.runScope,

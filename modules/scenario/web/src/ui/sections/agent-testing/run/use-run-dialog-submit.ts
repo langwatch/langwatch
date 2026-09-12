@@ -1,16 +1,17 @@
 import { useCallback } from "react";
-import type { SuiteTarget } from "@langwatch/suite-contract";
-import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { showErrorToast, describeError } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import type { SuiteTarget } from "@langwatch/suite-contract";
+import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
-import type { RunDialogSubject, RunStartedInfo, RunTarget } from "./run-dialog-types.ts";
-import { useBatchRun } from "./use-run-dialog-batch.ts";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { ParameterFieldError } from "./parameter-suggestions.ts";
 import type { RunScope } from "./run-configuration.ts";
+import type { RunDialogSubject, RunStartedInfo, RunTarget } from "./run-dialog-types.ts";
+import { useBatchRun } from "./use-run-dialog-batch.ts";
 
 /** The overrides a queued run carries, when the dialog collected any. */
 type RunParameters = ReturnType<typeof toLineRunParameters>;
@@ -83,6 +84,8 @@ export type RunDialogSubmitInput = {
   storableRunParameters: RunParameters;
   /** The keys of the secret rows, which is all the suite may remember of them. */
   storableSecretNames: string[] | undefined;
+  /** The plan's own evaluators, beside the ones the suites in scope attach. */
+  evaluators: EvaluatorAttachment[];
   onRunStarted: (info: RunStartedInfo) => void;
   onClose: () => void;
   setInlineError: (error: unknown) => void;

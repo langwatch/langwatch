@@ -1,40 +1,129 @@
 /**
  * @vitest-environment jsdom
+ *
+ * Which body a card draws, and which header controls it offers.
+ *
+ * The routing is decided by one field — `kind` — and both directions of getting
+ * it wrong are silent. A workbench row sent to `CustomGraph` hands a builder
+ * renderer a saved SQL statement in place of the series payload it expects; a
+ * builder row sent to the widget asks the saved-chart procedures for a row they
+ * will not find. Neither shows up as a type error, because `graph` is `unknown`
+ * on the way through.
+ *
+ * The alert bell is the same shape of mistake with a longer fuse. The alert path
+ * reads a builder payload's `series` to name what it thresholds, and a saved
+ * statement has no series to read — so a bell offered on a workbench card
+ * authors an alert the threshold dispatcher can never evaluate. It is excluded
+ * on purpose, and this pins that it stays excluded.
+ *
+ * Both children are mocked to markers: the claim is *which* component receives
+ * the row, and mounting the real Vega and tRPC stacks to prove it would test the
+ * harness instead.
+ *
+ * A dashboard widget (`dashboard_srcdoc`) is the same shape of claim once
+ * more: its sandboxed frame reads `{ code, queries }`, not a builder payload
+ * or a saved statement, and its author code has no `series` either — the
+ * alert bell has to stay excluded here for the identical reason it stays
+ * excluded for a workbench row.
+ *
  * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
 
-import { StubAnalyticsHost, AnalyticsTestHarness } from "../../../testing.tsx";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 
-vi.mock("../custom-graph.tsx", () => ({
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: vi.fn() }),
+}));
+
+vi.mock("~/utils/compat/next-router", () => {
+  const router = { query: {}, asPath: "/", push: vi.fn(), replace: vi.fn() };
+  return { useRouter: () => router, default: router };
+});
+
+vi.mock("~/components/analytics/CustomGraph", () => ({
   CustomGraph: () => <div data-testid="builder-graph" />,
 }));
 
-vi.mock("../langwatch-ql-dashboard-widget.tsx", () => ({
-  LangWatchQLDashboardWidget: ({
-    chartId,
-    granularitySeconds,
-  }: {
-    chartId: string;
-    granularitySeconds?: number;
-  }) => (
+vi.mock(
+  "~/features/analytics-query/components/LangWatchQLDashboardWidget",
+  () => ({
+    LangWatchQLDashboardWidget: ({
+      chartId,
+      granularitySeconds,
+    }: {
+      chartId: string;
+      granularitySeconds?: number;
+    }) => (
+      <div
+        data-testid="workbench-widget"
+        data-chart-id={chartId}
+        data-granularity={granularitySeconds ?? "unset"}
+      />
+    ),
+  }),
+);
+
+// The card and its menu read tRPC hooks at render (rename/save, "Add to
+// dashboard"), and the dashboard's period comes from the page's selector.
+// None of these scenarios exercise them, so both are stubbed rather than
+// provided — the claim here is which body a card draws.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useUtils: () => ({
+      dashboardWidgets: { list: { invalidate: vi.fn() } },
+      graphs: { getAll: { invalidate: vi.fn() } },
+    }),
+    dashboards: {
+      getOrCreateFirst: { useQuery: () => ({ data: undefined }) },
+    },
+    dashboardWidgets: {
+      assignDashboard: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      update: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+  },
+}));
+
+vi.mock("~/components/PeriodSelector", () => ({
+  usePeriodSelector: () => ({
+    period: { startDate: new Date(0), endDate: new Date(1) },
+  }),
+}));
+
+vi.mock(
+  "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor",
+  () => ({
+    DashboardWidgetInPlaceEditor: () => null,
+  }),
+);
+
+vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", () => ({
+  DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
     <div
-      data-testid="workbench-widget"
-      data-chart-id={chartId}
-      data-granularity={granularitySeconds ?? "unset"}
+      data-testid="dashboard-widget"
+      data-id={id}
+      data-graph={JSON.stringify(graph)}
     />
   ),
 }));
 
-import { WORKBENCH_SQL_CHART_KIND } from "../../../model/chart-kinds.ts";
+import {
+  DASHBOARD_SRCDOC_CHART_KIND,
+  WORKBENCH_SQL_CHART_KIND,
+} from "~/server/analytics/chartKinds";
 
 import { DraggableGraphCard } from "../draggable-graph-card.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <AnalyticsTestHarness host={new StubAnalyticsHost()}>{children}</AnalyticsTestHarness>
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
 const BUILDER_PAYLOAD = {
@@ -69,7 +158,6 @@ function renderCard({
       projectSlug="proj"
       projectId="project_1"
       onDelete={vi.fn()}
-      onSizeChange={vi.fn()}
       isDeleting={false}
     />,
     { wrapper: Wrapper },
@@ -90,15 +178,12 @@ describe("a dashboard grid card", () => {
       expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
     });
 
-    /**
-     * THE ALERT BELL IS GONE, and this scenario says so rather than pretending. `platform/app`
-     * asserted the bell was offered on a builder card; the two call sites behind it opened the
-     * automations drawer, whose registry entry was deleted when that family moved.
-     */
-    it("offers no way to author an alert", () => {
+    it("offers the alert bell", () => {
       renderCard({ kind: "builder" });
 
-      expect(screen.queryByRole("button", { name: /alert/i })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Add alert/ }),
+      ).toBeInTheDocument();
     });
 
     it("draws the builder renderer for a row carrying no kind at all", () => {
@@ -123,7 +208,9 @@ describe("a dashboard grid card", () => {
     it("offers no alert bell", () => {
       renderCard({ kind: WORKBENCH_SQL_CHART_KIND });
 
-      expect(screen.queryByRole("button", { name: /Add alert/ })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Add alert/ }),
+      ).not.toBeInTheDocument();
     });
 
     it("passes the stored step through to the widget", () => {
@@ -132,7 +219,10 @@ describe("a dashboard grid card", () => {
         granularitySeconds: 3600,
       });
 
-      expect(screen.getByTestId("workbench-widget")).toHaveAttribute("data-granularity", "3600");
+      expect(screen.getByTestId("workbench-widget")).toHaveAttribute(
+        "data-granularity",
+        "3600",
+      );
     });
 
     it("passes no step when the row carries none, leaving the widget its default", () => {
@@ -143,7 +233,81 @@ describe("a dashboard grid card", () => {
         granularitySeconds: null,
       });
 
-      expect(screen.getByTestId("workbench-widget")).toHaveAttribute("data-granularity", "unset");
+      expect(screen.getByTestId("workbench-widget")).toHaveAttribute(
+        "data-granularity",
+        "unset",
+      );
+    });
+  });
+
+  describe("given a dashboard widget", () => {
+    const DASHBOARD_WIDGET_PAYLOAD = {
+      version: 1,
+      code: "export default function Widget() { return null; }",
+      queries: [{ name: "main", sql: "SELECT 1" }],
+    };
+
+    /** @scenario "A dashboard widget card draws the sandboxed widget, not the builder" */
+    it("draws the sandboxed dashboard widget frame rather than the builder renderer", () => {
+      render(
+        <DraggableGraphCard
+          graph={{
+            id: "graph_1",
+            name: "Error rate",
+            graph: DASHBOARD_WIDGET_PAYLOAD,
+            filters: {},
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+            kind: DASHBOARD_SRCDOC_CHART_KIND,
+            trigger: null,
+          }}
+          projectSlug="proj"
+          projectId="project_1"
+          onDelete={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const widget = screen.getByTestId("dashboard-widget");
+      expect(widget).toBeInTheDocument();
+      expect(widget).toHaveAttribute("data-id", "graph_1");
+      expect(JSON.parse(widget.getAttribute("data-graph") ?? "null")).toEqual(
+        DASHBOARD_WIDGET_PAYLOAD,
+      );
+      expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A dashboard widget card is not offered an alert it cannot evaluate" */
+    it("offers no alert bell", () => {
+      render(
+        <DraggableGraphCard
+          graph={{
+            id: "graph_1",
+            name: "Error rate",
+            graph: DASHBOARD_WIDGET_PAYLOAD,
+            filters: {},
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+            kind: DASHBOARD_SRCDOC_CHART_KIND,
+            trigger: null,
+          }}
+          projectSlug="proj"
+          projectId="project_1"
+          onDelete={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /Add alert/ }),
+      ).not.toBeInTheDocument();
     });
   });
 });

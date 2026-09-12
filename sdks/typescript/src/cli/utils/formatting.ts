@@ -8,6 +8,20 @@ export const stripAnsi = (str: string): string => {
   return str.replace(/\u001b\[[0-9;]*m/g, "");
 };
 
+/**
+ * Neutralises terminal control sequences in server-supplied text before it
+ * is printed. A widget/dashboard name is user data echoed to the terminal, so
+ * an embedded escape, carriage return or other C0/C1 control character could
+ * rewrite the line, hide output, or worse (CWE-150). Tabs and newlines collapse
+ * to a single space so the value stays on one line; every remaining control
+ * byte becomes the Unicode replacement character.
+ */
+export const sanitizeTerminalText = (value: string): string =>
+  value
+    .replace(/[\t\n\r]+/g, " ")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "\uFFFD");
+
 export type ColumnColorMap = Record<string, (value: string) => string>;
 
 /**

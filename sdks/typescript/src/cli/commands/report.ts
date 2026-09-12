@@ -1,16 +1,17 @@
 import { readFileSync, statSync } from "node:fs";
 import chalk from "chalk";
-import { createCommandEvents } from "../telemetry/events";
-import type { CommandResult } from "../utils/output";
-import { getEndpoint } from "../utils/endpoint";
+import { createCommandEvents } from "../telemetry/events.ts";
+import type { CommandResult } from "../utils/output.ts";
+import { getEndpoint } from "../utils/endpoint.ts";
 import {
   collectSensitiveEnvValues,
   REDACTION_AUDIT_URL,
   redactReportText,
   redactSessionJsonl,
   truncateJsonlToByteBudget,
-} from "../../internal/generated/redaction/sessionReport";
-import { normalizeEndpoint } from "../../internal/endpoint";
+} from "../../internal/generated/redaction/sessionReport.ts";
+import { normalizeEndpoint } from "../../internal/endpoint.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 declare const __CLI_VERSION__: string;
 
@@ -183,7 +184,7 @@ export const reportCommand = async (
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/v1/bug-reports`, {
+    response = await langwatchFetch(`${endpoint}/api/v1/bug-reports`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

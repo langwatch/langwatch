@@ -46,3 +46,8 @@ export * from "./scenario-event.schemas.ts";
 export * from "./scenario-generate.schemas.ts";
 export * from "./scenario-rest.schemas.ts";
 export * from "./simulation-run.schemas.ts";
+export * from "./evaluator-attachments.ts";
+export * from "./suite-fields.ts";
+export * from "./scenario-field-values.ts";
+export * from "./scenario-evaluation-gate.ts";
+export * from "./voice/caller-voice.config.ts";

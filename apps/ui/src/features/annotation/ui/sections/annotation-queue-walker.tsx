@@ -28,8 +28,7 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import type { Trace } from "@langwatch/trace-contract";
 import { QueueTraceHost } from "./queue-trace-host.tsx";
 
-type AssignedQueueItem =
-  RouterOutputs["annotation"]["getOptimizedAnnotationQueues"]["assignedQueueItems"][number];
+type AssignedQueueItem = NonNullable<RouterOutputs["annotation"]["getQueueWalkStep"]["item"]>;
 
 /** How long the queue bar waits after a route change before it reads settled. */
 export const ROUTE_SETTLE_MS = 100;
@@ -233,7 +232,7 @@ function useQueueWalkerData() {
 
   const refetchQueueItems = useCallback(async () => {
     await Promise.all([
-      queryClient.annotation.getOptimizedAnnotationQueues.invalidate(),
+      queryClient.annotation.getQueueWalkStep.invalidate(),
       queryClient.annotation.getPendingItemsCount.invalidate(),
       queryClient.annotation.getAssignedItemsCount.invalidate(),
       queryClient.annotation.getQueueItemsCounts.invalidate(),
@@ -484,6 +483,9 @@ function QueueWalker() {
   const removeQueueItems = deleteQueueItems.mutate;
 
   const removeCurrentItemFromQueue = useCallback(() => {
+    // The card offering this button is still drawn from the item left behind,
+    // so acting on it would take away what the reviewer has stepped off.
+    if (stepIsStale) return;
     if (!projectId || !currentQueueItemId) return;
 
     removeQueueItems(
@@ -629,7 +631,39 @@ const QueueWalkerContent = ({
             />
           ) : (
             <CodeBlock.AdapterProvider value={shikiAdapter}>
-              <Box flex="1" minHeight={0} display="flex" flexDirection="column">
+              {/*
+                While the step in hand is the item the reviewer has left, the
+                controls inside the thread — annotate, suggest, the per-turn
+                dataset tick, Edit trace, opening a turn — would act on that
+                item rather than the one asked for, and annotating writes. The
+                hold sits on the subtree rather than on each control: the
+                controls belong to ConversationView, which the trace drawer
+                renders too, so gating them one at a time leaves whatever is
+                added there next ungated.
+
+                Held the way the table holds a subtree over stale rows
+                (TraceTableLayout): dimmed, pointer-inert, and announced as
+                busy. Scrolling goes with it, as it does there. `inert` is what
+                covers the keyboard, which pointer-events does not; React 19
+                reads it as a boolean, so the empty string other call sites
+                pass is read as false.
+              */}
+              <Box
+                flex="1"
+                minHeight={0}
+                display="flex"
+                flexDirection="column"
+                opacity={stepIsStale ? 0.6 : 1}
+                transition="opacity 150ms ease-out"
+                pointerEvents={stepIsStale ? "none" : "auto"}
+                // Driven by staleness alone, never by navigation: the two
+                // states look alike from the bar, and only this one means the
+                // thread on screen belongs to another item.
+                aria-busy={stepIsStale ? true : undefined}
+                {...({ inert: stepIsStale || undefined } as {
+                  inert?: boolean;
+                })}
+              >
                 <IsolatedErrorBoundary
                   scope="Couldn't render this conversation"
                   resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
@@ -662,9 +696,16 @@ const QueueWalkerContent = ({
             zIndex={10}
           >
             <AnnotationQueuePicker
-              key={queueItemsKey}
-              queueItems={pendingQueueItems}
+              // A fresh bar per item: the one it was on has been left behind,
+              // and with it the beat it was waiting out before releasing its
+              // controls. Without this the reviewer arrives at the next item
+              // with the bar still held from the step that brought them here.
+              key={currentQueueItem.id}
               currentQueueItem={currentQueueItem}
+              position={position}
+              total={total}
+              previousItemId={previousItemId}
+              nextItemId={nextItemId}
               isTraceAvailable={!!currentQueueItem.trace}
               isFinishing={isFinishing}
               sessionCount={sessionCount}
@@ -751,12 +792,19 @@ const UnavailableTraceCard = ({
   canRemove,
   canSkip,
   isRemoving,
+  isStale,
   onRemove,
   onSkip,
 }: {
   canRemove: boolean;
   canSkip: boolean;
   isRemoving: boolean;
+  /**
+   * Whether the item this card was drawn from is the one the reviewer has
+   * left. The bar holds its own buttons by disabling them; this card is a
+   * separate surface, so it is told and holds its own.
+   */
+  isStale: boolean;
   onRemove: () => void;
   onSkip: () => void;
 }) => (
@@ -770,11 +818,11 @@ const UnavailableTraceCard = ({
     </Text>
     <HStack gap={3}>
       {canRemove && (
-        <Button variant="outline" disabled={isRemoving} onClick={onRemove}>
+        <Button variant="outline" disabled={isRemoving || isStale} onClick={onRemove}>
           Remove from queue
         </Button>
       )}
-      <Button colorPalette="blue" disabled={!canSkip} onClick={onSkip}>
+      <Button colorPalette="blue" disabled={!canSkip || isStale} onClick={onSkip}>
         Skip
       </Button>
     </HStack>
@@ -782,18 +830,31 @@ const UnavailableTraceCard = ({
 );
 
 const AnnotationQueuePicker = ({
-  queueItems,
   currentQueueItem,
+  position,
+  total,
+  previousItemId,
+  nextItemId,
   isTraceAvailable,
   isFinishing,
+  stepIsStale,
   sessionCount,
   handoffWanted,
   onHandoffWantedChange,
   onFinishItem,
   onFinishQueue,
 }: {
-  queueItems: AssignedQueueItem[];
   currentQueueItem: AssignedQueueItem;
+  /**
+   * Where this item sits in the queue and how many are waiting. A rank and a
+   * count rather than the queue itself: the bar never listed it, it only ever
+   * said which one of how many this is.
+   */
+  position: number;
+  total: number;
+  /** The items either side, as ids: all the walk needs to step. */
+  previousItemId: string | null;
+  nextItemId: string | null;
   /**
    * Whether the item's trace resolved. When it did not, the bar keeps its
    * navigation and drops everything that acts on the trace: there is nothing to
@@ -802,6 +863,16 @@ const AnnotationQueuePicker = ({
   isTraceAvailable: boolean;
   /** Whether an item is being recorded as done right now. */
   isFinishing: boolean;
+  /**
+   * Whether the item above is the one the reviewer has left, with the one they
+   * asked for still being read.
+   *
+   * Everything that acts on the item waits for this to clear. Releasing on a
+   * timer instead let the bar act on the item behind: pressing the primary
+   * action finished the item the reviewer had already stepped away from, and
+   * "Edit trace" opened the trace they had left.
+   */
+  stepIsStale: boolean;
   /** How many traces the sitting counts right now. */
   sessionCount: number;
   handoffWanted: boolean;
@@ -848,13 +919,10 @@ const AnnotationQueuePicker = ({
     releaseNavigatingWhenSettled();
   };
 
-  const previousItem = queueItems[currentQueueItemIndex - 1];
-  const nextItem = queueItems[currentQueueItemIndex + 1];
-
   // One way forward: the primary action finishes this item and moves on, and
   // on the last item it ends the walk instead.
   const finishAndMoveOn = () => {
-    if (!nextItem) {
+    if (!nextItemId) {
       onFinishQueue();
 
       return;
@@ -886,7 +954,7 @@ const AnnotationQueuePicker = ({
       width="full"
       position="relative"
     >
-      {isNavigating && (
+      {(isNavigating || stepIsStale) && (
         <Box
           position="absolute"
           top={0}
@@ -905,15 +973,15 @@ const AnnotationQueuePicker = ({
       <HStack gap={4} width="full">
         <Button
           variant="outline"
-          disabled={!previousItem || isNavigating}
+          disabled={!previousItemId || isNavigating || stepIsStale}
           onClick={() => {
-            if (previousItem) void navigateToQueue(previousItem.id);
+            if (previousItemId) void navigateToQueue(previousItemId);
           }}
         >
           <ChevronLeft /> Previous
         </Button>
         <Text whiteSpace="nowrap">
-          {currentQueueItemIndex + 1} of {queueItems.length}
+          {position} of {total}
         </Text>
         <Spacer />
         {isTraceAvailable ? (

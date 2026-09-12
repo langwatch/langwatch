@@ -112,6 +112,7 @@
     "react": "catalog:",
     "react-error-boundary": "catalog:",
     "react-feather": "catalog:",
+    "react-grid-layout": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
     "recharts": "catalog:",

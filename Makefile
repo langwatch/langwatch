@@ -406,7 +406,12 @@ worktree:
 # produces goes to a scratch file, and the check prints what a person would
 # have to look at before replacing the artifact by hand.
 #
-# To regenerate the CLIENTS from the document as it stands, run the two
+# All THREE clients are generated and committed. Go is named explicitly because
+# it was once missing from this target and drifted eight spec commits behind
+# while TypeScript and Python stayed current. GOWORK=off because sdks/go/client
+# is its own module and is deliberately absent from the repo-root go.work.
+#
+# To regenerate the CLIENTS from the document as it stands, run the three
 # commands the output names.
 sync-all-openapi:
 	@pnpm --filter @langwatch/platform-api task openapi-check
@@ -414,6 +419,7 @@ sync-all-openapi:
 	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
 	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"
 	@echo "    cd sdks/python && make generate/api-client"
+	@echo "    cd sdks/go/client && GOWORK=off go generate ./..."
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

@@ -33,6 +33,7 @@ import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { GovernanceToast, GovernanceToaster } from "./behavior/governance-feedback.ts";
 import {
+  type GovernanceActor,
   GovernanceHostPort,
   GovernanceHostProvider,
   type GovernanceDeployment,
@@ -66,6 +67,8 @@ export const FAKE_ORGANIZATION: GovernanceOrganization = {
 };
 
 export type FakeGovernanceHostOptions = {
+  /** The reader the screens greet. Absent means anonymous. */
+  currentUser?: GovernanceActor | null;
   /** The grants the viewer holds, read through the authz hierarchy rule. */
   permissions?: readonly string[];
   /**
@@ -163,6 +166,15 @@ export class FakeGovernanceHost extends GovernanceHostPort {
     if (configured === void 0) return FAKE_ORGANIZATION;
     return configured ?? void 0;
   }
+
+  /** Anonymous unless a test names a reader; the greeting is the only caller. */
+
+  currentUser(): GovernanceActor | null {
+
+    return this.state.options.currentUser ?? null;
+
+  }
+
 
   hasPermission(permission: string): boolean {
     return permissionSatisfiedBy({ granted: this.granted, requested: permission });

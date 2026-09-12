@@ -188,10 +188,15 @@ export async function runUnifiedLoginFlow(
         if (refresh.mintedAny) saveConfig(cfg);
         if (refresh.labels.length > 0) {
           console.log();
-          console.log(chalk.gray("  Updated telemetry wiring to point at this login:"));
+          console.log(
+            chalk.gray("  Updated telemetry wiring to point at this login:"),
+          );
           for (const label of refresh.labels) {
             console.log(chalk.gray(`  • ${label}`));
           }
+        }
+        for (const warning of refresh.warnings ?? []) {
+          console.warn(chalk.yellow(`  ${warning}`));
         }
       } catch {
         // Wiring refresh is best-effort; the session itself is already saved.

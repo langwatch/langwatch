@@ -22,15 +22,16 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@ag-ui/core": "~0.0.57",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/user-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
-    "@ag-ui/core": "~0.0.57",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "catalog:",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/scenario": "catalog:",
+    "@langwatch/user-contract": "workspace:*",
     "liquidjs": "catalog:",
     "zod": "catalog:"
   },

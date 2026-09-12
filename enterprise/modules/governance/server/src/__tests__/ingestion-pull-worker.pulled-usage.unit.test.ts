@@ -10,9 +10,20 @@
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createWorkerService } from "./support/puller-test-ports.ts";
+import { azureCostEvents } from "../services/azureCostManagement.ts";
+// NOT YET PORTED. Main's governance cost-rollup fold projection still lives only
+// at platform/app/ee/governance/projections/governanceCostRollup.foldProjection.ts
+// (961 lines, ADR-128 — see E8 in the handoff). Imported from the path it will
+// occupy so the failure names the missing module instead of surfacing as a bare
+// `ReferenceError` in the two test bodies below that use it.
+import {
+  GovernanceCostRollupFoldProjection,
+  governanceCostRollupTotals,
+} from "../projections/governance-cost-rollup.fold-projection.ts";
 
-const { findUnique, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
+const { findUnique, update, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
   findUnique: vi.fn(),
+  update: vi.fn(),
   insertEvent: vi.fn(),
   runOnce: vi.fn(),
   isEnabled: vi.fn(),
@@ -103,6 +114,7 @@ const auditOnlyEvent = {
 
 beforeEach(() => {
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
+  update.mockReset().mockResolvedValue(undefined);
   insertEvent.mockReset().mockResolvedValue(undefined);
   runOnce.mockReset();
   // The ADR-088 gate, on for every case except the one that asserts it.
@@ -110,6 +122,98 @@ beforeEach(() => {
 });
 
 describe("the pull effect's pulled-usage emit seam", () => {
+  /** @scenario "A replacement Azure source restates the original bill" */
+  it("keeps non-bill usage attached to the replacement source", async () => {
+    findUnique.mockResolvedValue({
+      ...SOURCE_ROW,
+      id: "src_replacement",
+      sourceType: "copilot_studio_dataverse",
+      parserConfig: {
+        adapter: "test_adapter",
+        _azureBillSourceId: "src_original",
+      },
+    });
+    runOnce.mockResolvedValue({
+      events: [usageEvent({}, "conversation:123")],
+      cursor: null,
+      errorCount: 0,
+    });
+    const recordPulledUsage = vi.fn().mockResolvedValue(undefined);
+    await runIngestionPull({
+      sourceId: "src_replacement",
+      cursor: null,
+      pulledUsage: { recordPulledUsage },
+    });
+    expect(recordPulledUsage.mock.calls[0]![0].ingestionSourceId).toBe("src_replacement");
+    expect(insertEvent.mock.calls[0]![0].sourceId).toBe("src_replacement");
+  });
+
+  /** @scenario "A replacement Azure source restates the original bill" */
+  it("keeps the bill total when an archived source is replaced", async () => {
+    const recordPulledUsage = vi.fn().mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    try {
+      for (const [index, id] of ["src_original", "src_replacement"].entries()) {
+        vi.setSystemTime(new Date(`2026-09-09T0${index}:00:00Z`));
+        findUnique.mockResolvedValue({
+          ...SOURCE_ROW,
+          id,
+          sourceType: "copilot_studio_dataverse",
+          createdAt: new Date("2026-09-01"),
+          parserConfig: {
+            adapter: "test_adapter",
+            _azureBillSourceId: "src_original",
+          },
+        });
+        runOnce.mockResolvedValue({
+          events: azureCostEvents({
+            subscriptionId: "subscription-1",
+            days: [
+              {
+                day: "2026-09-08",
+                meterCategory: "Copilot Studio",
+                costMinor: index === 0 ? "100" : "125",
+                costUsd: null,
+                currencyCode: "USD",
+              },
+            ],
+          }),
+          cursor: null,
+          errorCount: 0,
+        });
+        await runIngestionPull({
+          sourceId: id,
+          cursor: null,
+          pulledUsage: { recordPulledUsage },
+        });
+      }
+      const projection = new GovernanceCostRollupFoldProjection({
+        store: { store: async () => undefined, get: async () => null },
+      });
+      const cells = new Map<string, ReturnType<typeof projection.init>>();
+      for (const [index, [data]] of recordPulledUsage.mock.calls.entries()) {
+        const event = {
+          id: `event-${index}`,
+          type: "lw.obs.pulled_usage.observed",
+          tenantId: data.tenantId,
+          aggregateId: data.restatementKey,
+          occurredAt: data.occurredAt,
+          data,
+        } as never;
+        const key = projection.key(event);
+        cells.set(key, projection.apply(cells.get(key) ?? projection.init(), event));
+      }
+      const total = [...cells.values()].reduce(
+        (sum, state) => sum + (governanceCostRollupTotals(state).amountNanoUsd ?? 0),
+        0,
+      );
+      expect(total).toBe(125_000_000_000);
+      expect(insertEvent.mock.calls[1]![0].sourceId).toBe("src_replacement");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   describe("when an adapter returns a priced usage event", () => {
     it("appends one record carrying the source's own attribution", async () => {
       runOnce.mockResolvedValue({
@@ -129,9 +233,11 @@ describe("the pull effect's pulled-usage emit seam", () => {
       const record = recordPulledUsage.mock.calls[0]![0];
       expect(record.organizationId).toBe("org_acme");
       expect(record.teamId).toBe("team_platform");
-      expect(record.projectId).toBeNull();
       expect(record.costStatus).toBe("estimate");
-      // The stream lives under the governance project; the money does not.
+      // Home and owner, side by side: the row is STORED under the governance
+      // project — the event's own projectId, not just the stream's tenant —
+      // and the money still belongs to the source's team (ADR-128).
+      expect(record.projectId).toBe("proj_governance");
       expect(record.tenantId).toBe("proj_governance");
       expect(record.occurredAt).toBe(Date.parse("2026-08-01T00:00:00.000Z"));
     });

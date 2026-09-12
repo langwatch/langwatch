@@ -69,11 +69,15 @@ catalog:
   '@dnd-kit/core': ^6.3.1
   '@dnd-kit/sortable': ^10.0.0
   '@dnd-kit/utilities': 3.2.2
+  '@elevenlabs/client': 1.23.0
   '@emotion/react': ^11.14.0
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
   '@langwatch/ksuid': ^2.0.2
-  '@langwatch/scenario': ^1.3.0
+  # The vendored voice build. A catalog entry may NOT use the `file:` protocol
+  # (ERR_PNPM_CATALOG_ENTRY_INVALID_SPEC), so the version the tarball declares
+  # is named here and the override below is what actually resolves it.
+  '@langwatch/scenario': 1.7.0-dev.voice6
   '@modelcontextprotocol/sdk': ^1.29.0
   '@monaco-editor/react': ^4.7.0
   '@opentelemetry/api': ^1.9.1
@@ -177,6 +181,7 @@ catalog:
   react-dom: ^19.2.7
   react-error-boundary: ^6.1.2
   react-feather: ^2.0.10
+  react-grid-layout: ^2.2.4
   react-hook-form: ^7.80.0
   react-icons: ^5.7.0
   react-markdown: ^10.1.0
@@ -385,10 +390,30 @@ overrides:
   # module init. The published SDK still calls it; the workspace one already
   # moved to `createNoopLogger`, so scenario reads from the same copy the app
   # does instead of a second, older one resolved from npm.
-  # Pinned to the vendored 1.3.0 specifically: mcp/typescript and skills are on
-  # @langwatch/scenario 0.4.x, which pins langwatch to 0.16.1 exactly, and they
-  # are not built through the inlining bundle that breaks.
-  "@langwatch/scenario@1.3.0>langwatch": "workspace:*"
+  # The version in this key MUST be bumped together with the vendored tarball
+  # version below, in the same change, or the crash returns. It was previously
+  # pinned to @langwatch/scenario@1.3.0, and when scenario was bumped 1.3.0 ->
+  # 1.6.0 the pinned key silently stopped matching, so the override no longer
+  # applied and the child bundle fell back to the published npm langwatch (whose
+  # NoopLoggerProvider crashed the run at module init).
+  # The version pin is deliberate, not a convenience. An unversioned selector
+  # ("@langwatch/scenario>langwatch") also matches the OLDER scenario versions
+  # that mcp/typescript (0.4.x) and skills (1.6.x) depend on, and forces THEM
+  # onto the workspace SDK too. Those two are built against npm langwatch 0.16.1,
+  # not through the inlining bundle that breaks, and the workspace SDK is a newer
+  # major with a different zod peer, so pointing them at it introduces peer
+  # mismatches for no benefit. Pinning to the exact vendored version keeps the
+  # override scoped to the one package that needs it, the child-bundle tarball.
+  # Keyed on the version the vendored tarball DECLARES, which is
+  # `1.7.0-dev.voice6` - not `voice7`, the name of the file that carries it.
+  # The two disagree; see vendor/README.md. Keying on the filename would leave
+  # this override silently unmatched, which is the exact failure described above.
+  # Resolves every `catalog:` reference to the vendored tarball. It lives here
+  # rather than in the catalog because catalogs reject `file:`; the path is
+  # relative to the workspace root, which is what makes one entry serve all
+  # five consumers.
+  "@langwatch/scenario": "file:./vendor/langwatch-scenario-1.7.0-dev.voice7.tgz"
+  "@langwatch/scenario@1.7.0-dev.voice6>langwatch": "workspace:*"
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL), then a further escaping

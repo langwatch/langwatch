@@ -12,8 +12,8 @@ export const featureSourceFilenameRule = defineRule({
   kind: "problem",
   messages: {
     filename: {
-      what: "Rename `{{name}}` to `<subject>.<artifact>.ts` in lower kebab case, e.g. `trace-search.service.ts`.",
-      fix: "Allowed artifacts: {{artifacts}}.",
+      what: "`{{name}}` is not `<subject>.<artifact>.ts` in lower kebab case.",
+      fix: "Rename it after the subject and the artifact, e.g. `trace-search.service.ts`; the artifacts are {{artifacts}}.",
     },
   },
   create(context, file) {

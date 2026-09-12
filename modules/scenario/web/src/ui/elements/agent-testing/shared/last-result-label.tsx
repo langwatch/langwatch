@@ -1,14 +1,30 @@
 /**
  * What the last run of a scenario said, in one line: "Passed (3/3)".
+ *
+ * The verdict carries its own dot rather than an icon, so a column of rows
+ * reads as one line of coloured text and the counts line up.
+ *
+ * A case that never ran says so, and a case that is running right now shows a
+ * spinner instead of a verdict it does not have yet.
+ *
+ * The verdict is the one the run stores. A run that met every criterion and
+ * failed a required evaluator reads "Failed" with a full criteria count, and
+ * hovering it names the evaluator that failed it.
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { formatRunStatusLabel } from "@langwatch/suite-web/run-formatters";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import {
+  failedRequiredEvaluatorName,
+  type RunEvaluation,
+} from "../../../sections/agent-testing/results/evaluation-summaries.ts";
 
 export type LastResultCriteria = {
   metCriteria: string[];
   unmetCriteria: string[];
+  /** The evaluators that ran on the scenario, when any did. */
+  evaluations?: RunEvaluation[] | null;
 };
 
 export type LastResultLabelProps = {
@@ -35,6 +51,10 @@ export function LastResultLabel({
 
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
   const label = formatRunStatusLabel({ status, results });
+  const failedEvaluator = results?.evaluations
+    ? failedRequiredEvaluatorName(results.evaluations)
+    : null;
+  const title = failedEvaluator ? `Failed · ${failedEvaluator}` : undefined;
 
   if (!config.isComplete) {
     return (
@@ -48,7 +68,7 @@ export function LastResultLabel({
   }
 
   return (
-    <HStack gap={1.5} whiteSpace="nowrap">
+    <HStack gap={1.5} whiteSpace="nowrap" title={title}>
       <Box
         width="8px"
         height="8px"

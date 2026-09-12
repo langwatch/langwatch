@@ -88,16 +88,15 @@ const modelParams: LiteLLMParams = {
 
 const nlpServiceUrl = "http://localhost:8080";
 
-function nlpResponse(result: Record<string, unknown> | null = { output: "ok" }) {
+function nlpResponse(
+  result: Record<string, unknown> | null = { output: "ok" },
+) {
+  const body = { trace_id: "trace_1", status: "success", result };
   return {
     ok: true,
     status: 200,
-    json: vi.fn().mockResolvedValue({
-      trace_id: "trace_1",
-      status: "success",
-      result,
-    }),
-    text: vi.fn().mockResolvedValue(""),
+    json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(JSON.stringify(body)),
   };
 }
 

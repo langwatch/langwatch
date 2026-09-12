@@ -4,22 +4,24 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, chakra, VStack } from "@chakra-ui/react";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { useEffect, useRef } from "react";
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
-import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import { MissingProviderNotice } from "../../../elements/agent-testing/run/missing-provider-notice.tsx";
 import { RunNoteField } from "../../../elements/agent-testing/run/run-note-field.tsx";
-import { RunParametersSection } from "./run-parameters-section.tsx";
-import { TargetSection } from "./target-section.tsx";
-import type { RunDialogForm } from "./use-run-dialog-form.ts";
-import { useEffect, useRef } from "react";
+import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { CompareAgentsSection } from "./compare-agents-section.tsx";
 import { OfflineTargetsNotice } from "./offline-targets-notice.tsx";
 import { ParameterRowsEditor } from "./parameter-rows-editor.tsx";
+import { RunEvaluatorsSection } from "./RunEvaluatorsSection.tsx";
 import { RunNameField } from "./run-name-field.tsx";
 import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections.tsx";
+import { RunParametersSection } from "./run-parameters-section.tsx";
 import { RunScopeSection } from "./run-scope-section.tsx";
+import { TargetSection } from "./target-section.tsx";
+import type { RunDialogForm } from "./use-run-dialog-form.ts";
 
 /** The blocks a chip added, in the order the chips offer them. */
 function AddedBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean }) {
@@ -47,6 +49,19 @@ function AddedBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean })
             form.setShowRepeat(false);
             form.setRepeatCount(1);
           }}
+        />
+      )}
+
+      {form.showEvaluatorsSection && (
+        <RunEvaluatorsSection
+          inherited={form.inherited}
+          extras={form.extras}
+          evaluatorsById={form.evaluatorsById}
+          missingOf={form.missingOf}
+          onOpenInherited={form.openInherited}
+          onEditExtra={form.editExtra}
+          onAddExtra={form.addExtra}
+          onRemove={form.hasInherited ? undefined : form.removeEvaluatorsBlock}
         />
       )}
 
@@ -131,6 +146,21 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
       {inlineError != null && (
         <Box ref={alert} data-testid="run-dialog-error">
           <HandledErrorAlert error={inlineError} fallbackTitle="Couldn't start the run" />
+          {readHandledError(inlineError)?.code === "suite_evaluator_mappings_missing" && (
+            <chakra.button
+              type="button"
+              marginTop={1}
+              fontSize="12px"
+              fontWeight="medium"
+              color="blue.fg"
+              cursor="pointer"
+              _hover={{ textDecoration: "underline" }}
+              onClick={() => form.openMappingsMissingRefusal(inlineError)}
+              data-testid="run-dialog-open-evaluator"
+            >
+              Configure the evaluator
+            </chakra.button>
+          )}
         </Box>
       )}
     </>

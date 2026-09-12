@@ -1,6 +1,9 @@
 /**
  * The LangWatchQL chart drawn on a page where nothing may be evaluated from a
- * string.
+ * string. Renders `LangWatchQLVegaLiteChart` directly — the shared component
+ * every chart surface (the dashboard widget) draws through — rather than a
+ * page-specific wrapper, since the CSP claim under test is about the Vega
+ * embed pipeline itself, not about any one surface's chrome around it.
  *
  * A Content-Security-Policy without `unsafe-eval` makes `eval` and the
  * `Function` constructor throw. The application's production policy still
@@ -16,38 +19,24 @@
  * test harness itself evaluates modules from source text, and hardening before
  * that would fail the harness rather than the chart.
  *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Spec: specs/analytics/lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@monaco-editor/react", () => {
-  function StubSpecEditor(props: {
-    value?: string;
-    onChange?: (value: string | undefined) => void;
-  }) {
-    return (
-      <textarea
-        data-testid="spec-editor-input"
-        aria-label="Chart specification"
-        value={props.value ?? ""}
-        onChange={(event) => props.onChange?.(event.target.value)}
-      />
-    );
-  }
-
-  return { __esModule: true, default: StubSpecEditor };
-});
-
 import embed from "vega-embed";
 
-import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode.tsx";
-import { lwqlVegaEmbedOptions, type LangWatchQLDatasetColumn } from "../../src/ui/sections/chart.ts";
-import { buildLangWatchQLVegaSpec } from "@langwatch/analytics-contract/visualization";
+import { LangWatchQLVegaLiteChart } from "../../src/ui/sections/langwatch-ql-vega-lite-chart.tsx";
+import { lwqlVegaEmbedOptions } from "../../src/behavior/use-langwatch-ql-vega-view.ts";
+import {
+  buildLangWatchQLVegaSpec,
+  type LangWatchQLDatasetColumn,
+} from "@langwatch/analytics-contract/visualization";
+import { LWQL_QUERY_RESULT_DATASET } from "../../../contract/src/visualization/lwql-dataset-names.ts";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },
@@ -101,7 +90,8 @@ function forbidStringEvaluation(): Hardening {
   };
   refusingFunction.prototype = realFunction.prototype;
 
-  globalThis.eval = refusesStringEvaluation as unknown as typeof globalThis.eval;
+  globalThis.eval =
+    refusesStringEvaluation as unknown as typeof globalThis.eval;
   globalThis.Function = refusingFunction as unknown as FunctionConstructor;
 
   return {
@@ -129,11 +119,16 @@ function forbidStringEvaluation(): Hardening {
 
 function bars(container: ParentNode = document): Element[] {
   return Array.from(
-    container.querySelectorAll('[data-testid="lwql-vega-chart-view"] svg g.mark-rect path'),
+    container.querySelectorAll(
+      '[data-testid="lwql-vega-chart-view"] svg g.mark-rect path',
+    ),
   );
 }
 
-async function poll(check: () => boolean, timeoutMs = 15_000): Promise<boolean> {
+async function poll(
+  check: () => boolean,
+  timeoutMs = 15_000,
+): Promise<boolean> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (check()) return true;
@@ -149,13 +144,16 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe("the LangWatchQL chart on a page that forbids string evaluation", () => {
-  describe("given the workbench served under a policy without unsafe-eval", () => {
+  describe("given the chart rendered on a page served under a policy without unsafe-eval", () => {
     describe("when a valid specification renders as a chart", () => {
-      /** @scenario "The chart renders under CSP without eval" */
+      /** @scenario "The chart renders under a CSP that forbids eval" */
+      /** @scenario "A categorical LangWatchQL result renders as a chart in a real browser" */
       it("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
         // The control differs from the shipped path by exactly one option, and
         // this is the shipped value of it.
-        expect(lwqlVegaEmbedOptions({ themeConfig: {}, colorMode: "light" }).ast).toBe(true);
+        expect(
+          lwqlVegaEmbedOptions({ themeConfig: {}, colorMode: "light" }).ast,
+        ).toBe(true);
 
         // The specification Vega is actually handed, built the way the chart
         // builds it: the member's specification names the dataset, the rows are
@@ -180,12 +178,11 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
 
           render(
             <ChakraProvider value={defaultSystem}>
-              {/* Nothing here edits the specification, so the owner's half of
-                  that state is a starter this test never changes. */}
-              <ThemedLangWatchQLChartMode
-                result={RESULT}
-                editedSpecText={null}
-                onEditedSpecTextChange={() => undefined}
+              <LangWatchQLVegaLiteChart
+                spec={BAR_SPECIFICATION}
+                datasets={{ [LWQL_QUERY_RESULT_DATASET]: RESULT.rows }}
+                columnsByDataset={{ [LWQL_QUERY_RESULT_DATASET]: COLUMNS }}
+                ariaLabel="Evaluations by evaluator"
               />
             </ChakraProvider>,
           );
@@ -195,13 +192,17 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
           // interpreter turned off, so expressions are compiled from source
           // text instead of walked as an abstract syntax tree.
           try {
-            await embed(control, handedToVega.spec as Parameters<typeof embed>[1], {
-              ...lwqlVegaEmbedOptions({
-                themeConfig: {},
-                colorMode: "light",
-              }),
-              ast: false,
-            });
+            await embed(
+              control,
+              handedToVega.spec as Parameters<typeof embed>[1],
+              {
+                ...lwqlVegaEmbedOptions({
+                  themeConfig: {},
+                  colorMode: "light",
+                }),
+                ast: false,
+              },
+            );
           } catch (error) {
             controlFailure = error;
           }
@@ -219,10 +220,9 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
         // Rendering succeeded with no evaluator available at all.
         expect(drawn).toBe(true);
         expect(screen.queryByTestId("lwql-chart-failure")).toBeNull();
-        expect(document.querySelector('[data-testid="lwql-vega-chart-view"]')).toHaveAttribute(
-          "data-chart-status",
-          "ready",
-        );
+        expect(
+          document.querySelector('[data-testid="lwql-vega-chart-view"]'),
+        ).toHaveAttribute("data-chart-status", "ready");
 
         // …and the detector is real: the same specification through the same
         // runtime, with the interpreter disabled, is refused by the policy.

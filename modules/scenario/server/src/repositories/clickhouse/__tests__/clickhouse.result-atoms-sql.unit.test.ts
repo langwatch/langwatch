@@ -90,6 +90,15 @@ describe("buildAtomFilters", () => {
     });
   });
 
+  describe("when the project holds legacy voice-call runs", () => {
+    /** @scenario "The legacy voice-calls set is excluded from run listings" */
+    it("excludes the voice-calls set from every atom read, alongside the agent-test set", () => {
+      const filters = buildAtomFilters(base);
+
+      expect(filters.stableClause).toContain("ScenarioSetId != 'voice-calls'");
+    });
+  });
+
   describe("when the query dedups a run to its latest version", () => {
     /**
      * StartedAt moves between versions of one run, so a dedup scope bounded exactly to the window

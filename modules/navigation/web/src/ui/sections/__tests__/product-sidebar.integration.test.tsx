@@ -297,15 +297,20 @@ describe("the product sidebar", () => {
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
       expect(screen.getByText("Inventory")).toBeInTheDocument();
-      expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
+      expect(screen.getByText("Agents")).toBeInTheDocument();
       expect(screen.getByText("People")).toBeInTheDocument();
-      // The stub flags report the billed-cost placeholders on.
+      // The stub flags report every flag enabled, so Costs is visible here;
+      // enabling it must not expose the unfinished Billed destination.
       expect(screen.getByText("Costs")).toBeInTheDocument();
-      expect(screen.getByText("Billed")).toBeInTheDocument();
+      expect(screen.queryByText("Billed")).not.toBeInTheDocument();
+      // Tool Tiles folded into Inventory's Catalog tab, Anomaly Rules into
+      // its own Inventory tab.
+      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
+      expect(screen.queryByText("Anomaly Rules")).not.toBeInTheDocument();
     });
 
-    /** @scenario With the billed-cost flag off, Costs and Billed do not exist */
-    it("hides Costs and Billed while the billed-cost flag is off", () => {
+    /** @scenario With the billed-cost flag off, Costs does not exist */
+    it("hides Costs while the billed-cost flag is off", () => {
       renderSidebar({ surface: "governance", pathname: "/governance", billedCostEnabled: false });
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
@@ -314,17 +319,42 @@ describe("the product sidebar", () => {
       expect(screen.queryByText("Billed")).not.toBeInTheDocument();
     });
 
-    /** @scenario With the billed-cost flag on, Costs and Billed appear as placeholders */
-    it("shows Costs and Billed between Overview and Inventory while the flag is on", () => {
+    /** @scenario With the billed-cost flag on, Costs appears between Overview and Inventory */
+    it("shows Costs between Overview and Inventory while the flag is on", () => {
       renderSidebar({ surface: "governance", pathname: "/governance", billedCostEnabled: true });
 
       const labels = screen
         .getAllByRole("link")
         .map((link) => link.textContent)
         .filter((label): label is string =>
-          ["Overview", "Costs", "Billed", "Inventory"].includes(label ?? ""),
+          ["Overview", "Costs", "Inventory"].includes(label ?? ""),
         );
-      expect(labels).toEqual(["Overview", "Costs", "Billed", "Inventory"]);
+      expect(labels).toEqual(["Overview", "Costs", "Inventory"]);
+    });
+
+    /** @scenario "The Platform group lists its three entries under one label" */
+    it("groups the Platform entries under one label, after the ungrouped ones", () => {
+      renderSidebar({ surface: "governance", pathname: "/governance" });
+
+      expect(
+        screen.getByRole("button", { name: "Collapse Platform" }),
+      ).toBeInTheDocument();
+      // DOM order, not presence: the group sits after every flat entry
+      // and keeps its own order inside.
+      const labels = screen
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim())
+        .filter((label) =>
+          ["People", "Insights", "Analytics", "Signals & Alerts"].includes(
+            label ?? "",
+          ),
+        );
+      expect(labels).toEqual([
+        "People",
+        "Insights",
+        "Analytics",
+        "Signals & Alerts",
+      ]);
     });
   });
 

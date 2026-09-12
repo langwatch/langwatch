@@ -1,17 +1,15 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import {
-  assertSkillWasRead,
   createClaudeCodeAgent,
   createSkillTestWorkDir,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
-  toolCallFix,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,9 +66,7 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
         script: [
           scenario.user("use langwatch to list my prompts"),
           scenario.agent(),
-          (state) => {
-            toolCallFix(state);
-          },
+          (state) => {},
           scenario.judge(),
         ],
       });
@@ -134,7 +130,6 @@ describe("given the experiments skill installed with a project key in .env", () 
             ),
             scenario.agent(),
             (state) => {
-              toolCallFix(state);
               assertSkillWasRead(state, "experiments");
               // Hard guardrail: the agent must never EXECUTE the AI-tools / device
               // login (that is what routes evaluations to a personal project). We

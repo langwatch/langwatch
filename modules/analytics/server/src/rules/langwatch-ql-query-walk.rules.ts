@@ -1,7 +1,72 @@
 /**
- * LangWatchQL analytics SQL — the default-deny walk, and the rule table it reads.
+ * LangWatchQL analytics SQL — the default-deny AST validator.
+ *
+ * The gateway's half of the isolation model. The database's half is already
+ * proven and shipped in `../services/langwatch-ql-access-model.service.ts`: a readonly identity, per-object
+ * row policies, and a tenant capability the caller cannot forge. This validator
+ * does not carry tenant isolation — it is defense in depth, and the reason it
+ * exists is that a query which never reaches the database cannot exercise a bug
+ * in the layer that would otherwise contain it.
+ *
+ * ## The rule that makes it a gate rather than a filter
+ *
+ * The walk is an **allowlist over node kinds, and over each kind's fields**.
+ * A node type {@link NODE_RULES} does not name is refused; so is a *field* the
+ * rule for that node type does not name. Both matter. A kind-only allowlist
+ * would let new syntax ride into an existing node — `INTO OUTFILE` is a plain
+ * string literal hanging off a field of an otherwise ordinary SELECT — and the
+ * walk would never look at it. So every field is either walked, explicitly
+ * accepted as an inert scalar, restricted to an enumerated set of values, or
+ * refused outright. There is no fourth state, and no field can be listed
+ * without deciding which one it is.
+ *
+ * The consequence is deliberate: when `@clickhouse/parser` learns syntax that
+ * ClickHouse already supports, that syntax arrives here **refused**, and stays
+ * refused until someone adds a rule for it. New capability is a review, never a
+ * silent widening. The version is pinned exactly for the same reason
+ * (`./parser.ts`).
+ *
+ * ## What is allowed
+ *
+ * A single `SELECT`, optionally with `WITH`; aggregates and window functions;
+ * CTEs, subqueries and `UNION` within the depth ceilings; joins; array, map and
+ * JSON access; and bound parameters. Everything else — every write and every
+ * DDL form, `SETTINGS` in any position, role changes, reserved schemas, output
+ * redirection, and every table function — is refused.
+ *
+ * ## Functions are allowlisted by name, in a third list
+ *
+ * Kinds and fields are not enough on their own. Every function call *and every
+ * operator* arrives as one `Function` node, so a walk that stops at the kind
+ * admits `getSetting()`, `currentUser()`, `hostName()` and `version()` — none
+ * of which reaches another tenant, and all of which publish more of the server
+ * than this API means to. `./langwatch-ql-functions.rules.ts` is the name allowlist and carries
+ * the rule that governs it: a function is listed because a LangWatchQL question
+ * needs it, never because it looks harmless. It is applied in two places,
+ * because a name reaches the walk in two shapes — a `Function` node, and the
+ * bare `func_name` string of an `APPLY` column transformer.
+ *
+ * ## Table functions
+ *
+ * Refused **positionally**: a `TableExpression` carrying a `table_function` is
+ * a violation whatever the function is named. That is stronger than the
+ * name-list pre-check `TABLE_FUNCTION_RE` in `src/server/ops/explain-core.ts`
+ * applies to the ops EXPLAIN endpoint, so this file deliberately keeps no list
+ * of its own — a second list is a second thing to keep in sync, and this one
+ * would always be a subset of "all of them".
+ *
+ * Be accurate about why, because the database layer's measured behaviour is not
+ * uniform. `url`, `s3`, `remote`, `file` and `postgresql` are already refused
+ * for the restricted identity by grants (error 497), and `merge()` is *not* a
+ * bypass — it respects row policies. `numbers`, `values`, `view` and
+ * `generateRandom` reach no stored data at all and the database permits them.
+ * So this rule is not standing between a caller and a leak: it is here to keep
+ * the reachable surface uniform and small, so that "which table functions are
+ * safe today" never becomes a question anyone has to re-answer.
+ *
  * @see specs/analytics/lwql-api.feature
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
+ * @see ../services/langwatch-ql-access-model.service.ts — the database-layer isolation this backs up
  */
 import {
   isAllowedLangWatchQLFunction,

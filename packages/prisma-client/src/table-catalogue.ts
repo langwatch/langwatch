@@ -22,6 +22,7 @@ export const prismaTableCatalogue = {
   "ScimSyncState": "ScimSyncState",
   "Project": "Project",
   "Department": "Department",
+  "DepartmentMembershipHistory": "DepartmentMembershipHistory",
   "PlatformToolPolicy": "PlatformToolPolicy",
   "OrganizationInvite": "OrganizationInvite",
   "Monitor": "Monitor",
@@ -124,7 +125,13 @@ export const prismaTableCatalogue = {
   "GatewayRealtimeSession": "GatewayRealtimeSession",
   "SystemMigrationTenantState": "SystemMigrationTenantState",
   "SystemMigrationEnrollment": "SystemMigrationEnrollment",
-  "StoredObject": "StoredObject"
+  "StoredObject": "StoredObject",
+  "DiscoveredPerson": "DiscoveredPerson",
+  "DiscoveredAgent": "DiscoveredAgent",
+  "IdentityMatch": "IdentityMatch",
+  "GovernanceTenantHistory": "GovernanceTenantHistory",
+  "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
+  "IdentityMatchSuggestion": "IdentityMatchSuggestion"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -575,6 +582,15 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "archivedAt"
+  ],
+  "DepartmentMembershipHistory": [
+    "id",
+    "organizationId",
+    "userId",
+    "departmentId",
+    "validFrom",
+    "validTo",
+    "createdAt"
   ],
   "PlatformToolPolicy": [
     "id",
@@ -1459,6 +1475,8 @@ export const prismaModelFieldCatalogue = {
     "judgeModel",
     "maxTurns",
     "minTurns",
+    "fields",
+    "callerVoice",
     "testSuiteId",
     "testSuite",
     "version",
@@ -1497,6 +1515,8 @@ export const prismaModelFieldCatalogue = {
     "judgeModel",
     "kind",
     "scope",
+    "fields",
+    "evaluators",
     "testSuiteScenarios",
     "archivedAt",
     "createdAt",
@@ -1772,7 +1792,13 @@ export const prismaModelFieldCatalogue = {
     "pullSchedule",
     "status",
     "traceProjectId",
+    "providerAccountId",
     "lastEventAt",
+    "lastSuccessAt",
+    "lastReadThroughAt",
+    "lastRunCompleteness",
+    "unpricedUsageSince",
+    "unpricedUsageThrough",
     "archivedAt",
     "createdAt",
     "updatedAt",
@@ -2092,7 +2118,21 @@ export const prismaModelFieldCatalogue = {
     "LastRunError",
     "LastRunErrorCode",
     "ConsecutiveErrors",
+    "LastSuccessAt",
     "LastRunScheduledFor",
+    "LastReadThroughAt",
+    "LastRunCompleteness",
+    "LastAgentsListingAt",
+    "LastAgentsListingOutcome",
+    "LastAgentsListingCount",
+    "LastAgentsListingReason",
+    "LastAgentsListingStatus",
+    "LastPeopleListingAt",
+    "LastPeopleListingOutcome",
+    "LastPeopleDirectoryCount",
+    "LastPeopleWithheldCount",
+    "LastPeopleListingReason",
+    "LastPeopleListingStatus",
     "CreatedAt",
     "UpdatedAt",
     "OccurredAt",
@@ -2202,6 +2242,68 @@ export const prismaModelFieldCatalogue = {
     "legacyFingerprint",
     "createdAt",
     "updatedAt"
+  ],
+  "DiscoveredPerson": [
+    "id",
+    "organizationId",
+    "provider",
+    "rawActorId",
+    "displayText",
+    "kind",
+    "department",
+    "firstSeenAt",
+    "lastSeenAt",
+    "erasedAt",
+    "moneyRowsPendingAt",
+    "moneyRebuildSince",
+    "suspendedAt",
+    "suspendedReason",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DiscoveredAgent": [
+    "id",
+    "organizationId",
+    "provider",
+    "rawAgentId",
+    "displayText",
+    "metadata",
+    "firstSeenAt",
+    "lastSeenAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "IdentityMatch": [
+    "id",
+    "organizationId",
+    "discoveredPersonId",
+    "userId",
+    "evidenceKind",
+    "validFrom",
+    "validTo",
+    "createdAt"
+  ],
+  "GovernanceTenantHistory": [
+    "id",
+    "organizationId",
+    "tenantId",
+    "firstUsedAt",
+    "lastUsedAt"
+  ],
+  "ErasedIdentifierSuppression": [
+    "id",
+    "organizationId",
+    "provider",
+    "identifierHash",
+    "erasedAt"
+  ],
+  "IdentityMatchSuggestion": [
+    "id",
+    "organizationId",
+    "discoveredPersonId",
+    "userId",
+    "score",
+    "computedAt"
   ]
 } as const;
 
@@ -2357,6 +2459,7 @@ export const prismaRelationCatalogue = {
     "ownerUser": "User"
   },
   "Department": {},
+  "DepartmentMembershipHistory": {},
   "PlatformToolPolicy": {},
   "OrganizationInvite": {
     "organization": "Organization",
@@ -2721,7 +2824,13 @@ export const prismaRelationCatalogue = {
   "GatewayRealtimeSession": {},
   "SystemMigrationTenantState": {},
   "SystemMigrationEnrollment": {},
-  "StoredObject": {}
+  "StoredObject": {},
+  "DiscoveredPerson": {},
+  "DiscoveredAgent": {},
+  "IdentityMatch": {},
+  "GovernanceTenantHistory": {},
+  "ErasedIdentifierSuppression": {},
+  "IdentityMatchSuggestion": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

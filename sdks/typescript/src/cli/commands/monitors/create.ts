@@ -1,14 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
+import type { CommandResult } from "../../utils/output.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the created monitor rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -65,7 +66,7 @@ export const createMonitorCommand = async (
       parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/v1/monitors`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/monitors`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

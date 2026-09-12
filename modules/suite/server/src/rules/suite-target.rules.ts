@@ -30,6 +30,10 @@ export function isAgentTarget(target: SuiteTarget): boolean {
     // reference id may also read `<name>@<environment>`, which the run
     // resolves to an agent id before membership is read.
     case "connected":
+    // A voice target names an agent too - the call destination is resolved
+    // from the agent row, the same way the other four resolve an endpoint.
+    // Main's `SCENARIO_AGENT_TYPES` counts it among the agent types.
+    case "voice":
       return true;
     case "prompt":
       return false;

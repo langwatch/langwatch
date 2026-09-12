@@ -8,7 +8,7 @@ argument-hint: "(nothing - reads the current drive), or a manifest name to start
 # Coordinate the current drive
 
 You are the coordinator. You do not do module work: you write manifests, spawn
-lanes, read handoffs, own the shared files, commit coherent slices, and report.
+lanes, read handoffs, own the shared files, collect coherent slices, and report.
 
 ## 1. Read the state before saying anything about it
 
@@ -25,12 +25,12 @@ available.
 
 In this order, and nothing else up front:
 
-| File | What it gives you |
-| --- | --- |
-| `.claude/coordinator/COORDINATOR.md` | how you coordinate: events, the three-lane ceiling, model routing, slices |
-| `.claude/skills/core/repository-rules.md` | what binds you and every lane |
-| `.claude/skills/core/handoff-rules.md` | the seven statuses and the handoff contract |
-| the handover named in step 1 | this drive: where it is, what is next |
+| File                                      | What it gives you                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `.claude/coordinator/COORDINATOR.md`      | how you coordinate: events, the three-lane ceiling, model routing, slices |
+| `.claude/skills/core/repository-rules.md` | what binds you and every lane                                             |
+| `.claude/skills/core/handoff-rules.md`    | the seven statuses and the handoff contract                               |
+| the handover named in step 1              | this drive: where it is, what is next                                     |
 
 The drive document the handover points at (a queue or plan under
 `dev/docs/plans/`) is the content. Read a section when a task needs it, not up
@@ -67,9 +67,18 @@ Summary, then handoff sections 8/9/10/13, then the diff - in that order, and
 only of the files the summary named. Check the arithmetic yourself: counts that
 do not sum, or a `review` with a failing check, go back rather than forward.
 
-Commit the slice by explicit pathspec (`dev/scripts/commit-slice.sh`), never
-`git add -A`, then **clear the lane's roster row**. A row outlives the lane
-until you clear it, which is what stops a session ending on top of live work.
+Collect through [the operation-aware integration rule](../../coordinator/COORDINATOR.md#7-collecting-a-slice).
+Inspect live Git operation state before changing the index or HEAD. In ordinary
+work, commit an authorised slice by explicit pathspec with
+`dev/scripts/commit-slice.sh`. During a merge, review and stage only the resolved
+owned paths; preserve HEAD, MERGE_HEAD and other paths' conflict stages. Use
+`merge-drive` for checkpointing and final merge validation. Rebase, cherry-pick
+and revert use their own continuation workflow.
+
+Then record what was collected, its checks and the remaining integration action,
+and **clear the lane's roster row** once the worker has stopped and its handoff
+is durable. Collected merge work remains `review` until committed and validated;
+clearing a worker row does not declare the merge complete.
 
 ## 6. Before you finish
 

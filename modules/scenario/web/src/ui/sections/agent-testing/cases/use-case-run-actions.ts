@@ -5,12 +5,12 @@
  */
 
 import { useCallback, useState } from "react";
-import { toaster } from "@langwatch/design-system/toaster";
 import { readScenarioTarget } from "../../use-scenario-target.ts";
+import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run.ts";
+import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { RunDialogSubject, RunStartedInfo } from "../run/run-dialog.tsx";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";
-import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run.ts";
+import { useOpenPlanRun } from "./use-open-plan-run.ts";
 
 /**
  * The run dialog subject of a whole suite, with the scenarios it holds.
@@ -35,25 +35,32 @@ function runSubjectForSuite({
 }
 
 /**
- * What happens the moment a run is queued. Shared by the table and the scenario editor,
- * so a run started from either one opens the same way.
+ * What happens the moment a run is queued. Shared by the table, the scenario
+ * editor and the Results tab, so a run started from any of them opens the
+ * same way.
+ *
+ * The run set is always the one of the plan the run joined, so the drawer and
+ * the runs rail read the run back under that plan. A run of several scenarios
+ * opens the Results tab on that plan and that run; a run of one scenario opens
+ * in the drawer instead.
  */
 export function useRunStartedHandler(): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();
+  const openPlanRun = useOpenPlanRun();
   const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   return useCallback(
-    ({ batchRunId, scenarioSetId, scenarioId, targetId }: RunStartedInfo) => {
+    ({ batchRunId, scenarioSetId, planSlug, scenarioId, targetId }: RunStartedInfo) => {
       setPendingRun({ batchRunId, scenarioSetId });
       if (!scenarioId) {
-        toaster.create({ title: "Run scheduled", type: "success" });
+        openPlanRun({ planSlug, batchRunId });
         return;
       }
       // A run of one scenario opens in the drawer right away and streams into
       // it, so the person watches the conversation without leaving the table.
       openLiveRun({ batchRunId, scenarioSetId, scenarioId, targetId });
     },
-    [setPendingRun, openLiveRun],
+    [setPendingRun, openLiveRun, openPlanRun],
   );
 }
 

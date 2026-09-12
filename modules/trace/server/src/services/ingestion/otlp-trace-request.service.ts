@@ -82,7 +82,10 @@ const boolScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
 };
 
 const intScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
-  if (!("intValue" in v) || !v.intValue) {
+  // Absence, not falsiness. A counter sent as `intValue: 0` is a reading, and a
+  // falsy guard here drops it as though the attribute had never been sent - so
+  // "zero errors" and "errors never measured" become the same trace.
+  if (!("intValue" in v) || v.intValue == null) {
     return void 0;
   }
 
@@ -94,7 +97,8 @@ const intScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
 };
 
 const doubleScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
-  if (!("doubleValue" in v) || !v.doubleValue) {
+  // As above: `0` and `0.0` are measurements, not missing attributes.
+  if (!("doubleValue" in v) || v.doubleValue == null) {
     return void 0;
   }
 

@@ -9,7 +9,6 @@ import {
   Heading,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Tabs,
@@ -18,17 +17,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  groupForMode,
+  gatedSourceTypeOptions,
   isOttlEnabledSourceType,
-  modeForSourceType,
-  needsIngestSecret,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
-  PROTOCOL_LABEL,
   routesConversations,
-  SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
-  type SourceGroup,
   type SourceType,
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
@@ -37,28 +31,45 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
+import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
+import { inventorySummaryItems } from "../../../features/ingestion-sources/model/inventory-summary.ts";
+import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sampleIngestionSources.ts";
 import { AddIngestionSourceMenu } from "../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
 import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
 import { TraceDestinationField } from "../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
-import {
-  ChevronRight,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-  Copy,
-  KeyRound,
-  Pencil,
-  Plus,
-  RotateCw,
-  Trash2,
-} from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
-import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
 import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
-import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { DashboardSelect } from "../../../features/ingestion-sources/DashboardSelect.tsx";
+import { IngestionSourcesTable } from "../../../features/ingestion-sources/IngestionSourcesTable.tsx";
+import {
+  AddEnvironmentDialog,
+  EnvironmentsTab,
+  environmentRows,
+} from "../../../features/ingestion-sources/environments/EnvironmentsTab.tsx";
+import type { EnvironmentRow } from "../../../features/ingestion-sources/environments/discoveredEnvironments.ts";
+import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/ToolCatalogTab.tsx";
+import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/toolCards.ts";
 import { ToolCatalogPanel } from "../../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
+import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/useAiToolCatalog.ts";
+import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
+import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
+import {
+  SampleDataBanner,
+  SampleDataToggle,
+} from "../../../ui/elements/sample-data-controls.tsx";
+import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
+import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -69,16 +80,20 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Switch } from "@langwatch/design-system/switch";
 import { Link } from "../../../ui/elements/governance-link.tsx";
+import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
 import {
-  useGovernanceToaster,
   type GovernanceToaster,
+  useGovernanceToaster,
+  useShowErrorToast,
 } from "../../../behavior/governance-feedback.ts";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
-import { useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { api } from "../../../behavior/governance-api.ts";
-import { Temporal, type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import {
   type DestinationContext,
   type Source,
@@ -102,16 +117,6 @@ type SecretDetails = {
   sourceName: string;
   sourceType: SourceType;
 };
-const STATUS_META: Record<string, { icon: typeof CircleCheck; label: string; color: string }> = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
-  awaiting_first_event: {
-    icon: CircleDashed,
-    label: "Awaiting first event",
-    color: "amber.500",
-  },
-  disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
-};
-
 export interface ComposerState {
   sourceType: SourceType;
   name: string;
@@ -142,6 +147,24 @@ export interface ComposerState {
   traceProjectId: string | null;
 }
 
+/**
+ * The parser values a freshly opened form holds: every field that declares a
+ * `defaultValue`, and nothing else.
+ *
+ * Seeded into state rather than resolved at render time so what the picker
+ * shows and what the builder is handed are the same value. A default that only
+ * existed in the render would build a source with the field empty.
+ */
+export function defaultParserValues(
+  sourceType: SourceType,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const field of PARSER_FIELDS[sourceType] ?? []) {
+    if (field.defaultValue) values[field.key] = field.defaultValue;
+  }
+  return values;
+}
+
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
   name: "",
@@ -151,19 +174,6 @@ const blankComposer = (): ComposerState => ({
   pullSchedule: "",
   traceProjectId: null,
 });
-
-function fmtRelative(date: TimeInput | null): string {
-  if (!date) return "-";
-  const diffMs = nowInstant().epochMilliseconds - toEpochMs(date);
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const days = Math.floor(hr / 24);
-  return `${days}d ago`;
-}
 
 /**
  * The pull config the create call should carry, or `null` when the form is not
@@ -191,21 +201,28 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "copilot_studio_dataverse",
   "openai_admin",
   "anthropic_admin",
+  "claude_compliance",
 ] as const;
+
+type PullConfigBuilderSourceType =
+  (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
 
 function resolvePullConfig(
   composer: ComposerState,
+  toaster: GovernanceToaster,
   {
-    toaster,
     shouldRequireCredentials = true,
-  }: { toaster: GovernanceToaster; shouldRequireCredentials?: boolean },
+  }: { shouldRequireCredentials?: boolean } = {},
 ): { pullConfig: Record<string, unknown> | null } | null {
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
   // generic adapter can run unmodified. The locked-shape reference pullers
   // (copilot_studio / openai_compliance / claude_compliance) only need the
   // adapter id - their validateConfig override returns the frozen config.
-  const builders: Partial<Record<SourceType, [() => unknown | null, string, string]>> = {
+  const builders: Record<
+    PullConfigBuilderSourceType,
+    [() => unknown | null, string, string]
+  > = {
     http_custom: [
       () => buildHttpCustomPullConfig(composer),
       "Missing required HTTP source fields",
@@ -228,8 +245,17 @@ function resolvePullConfig(
         ? "An organization Admin API key is required, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
         : "The backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
     ],
+    claude_compliance: [
+      () =>
+        buildClaudeCompliancePullConfig(composer, { shouldRequireCredentials }),
+      "Missing workspace API key",
+      shouldRequireCredentials
+        ? "The workspace API key is required — without it every run authenticates with an unresolved template."
+        : "Leave the workspace API key blank to keep the current one.",
+    ],
     anthropic_admin: [
-      () => buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
+      () =>
+        buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
       "Missing or invalid Anthropic fields",
       shouldRequireCredentials
         ? "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
@@ -238,7 +264,9 @@ function resolvePullConfig(
   };
 
   const builder = (
-    builders as Partial<Record<SourceType, (typeof builders)[keyof typeof builders]>>
+    builders as Partial<
+      Record<SourceType, (typeof builders)[keyof typeof builders]>
+    >
   )[composer.sourceType];
   if (builder) {
     const [build, title, description] = builder;
@@ -254,23 +282,11 @@ function resolvePullConfig(
 
 function InventoryHeader() {
   return (
-    <HStack alignItems="end">
-      <VStack align="start" gap={0}>
-        <HStack gap={2}>
-          <Heading size="md">Catalog</Heading>
-          <Badge colorPalette="purple" size="sm" variant="surface">
-            Preview
-          </Badge>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm" maxW="3xl">
-          Configure cross-platform feeds for the activity monitor. Each source maps an external AI
-          platform into the normalised activity stream via OTel push, webhook, or S3 audit drops.{" "}
-          <Link href="/governance" color="blue.600">
-            Back to governance
-          </Link>
-          .
-        </Text>
-      </VStack>
+    <HStack gap={2}>
+      <Heading size="md">Inventory</Heading>
+      <Badge colorPalette="purple" size="sm" variant="surface">
+        Preview
+      </Badge>
     </HStack>
   );
 }
@@ -286,92 +302,56 @@ function pendingId(mutation: {
   return mutation.isPending ? (mutation.variables?.id ?? null) : null;
 }
 
-function SourceGroupSection({
-  group,
-  sources,
-  knowsFleetIsEmpty,
-  rotatingId,
-  archivingId,
-  canManage,
-  onEdit,
-  onRotate,
-  onArchive,
-}: {
-  group: SourceGroup;
-  sources: Source[];
-  knowsFleetIsEmpty: boolean;
-  rotatingId: string | null;
-  archivingId: string | null;
-  canManage: boolean;
-  onEdit: (id: string) => void;
-  onRotate: (id: string) => void;
-  onArchive: (id: string) => void;
-}) {
-  const { title, blurb } = SOURCE_GROUP_META[group];
-  return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
-      <HStack alignItems="start" marginBottom={3}>
-        <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="semibold">
-            {title}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {blurb}
-          </Text>
-        </VStack>
-        <Spacer />
-      </HStack>
-      <VStack align="stretch" gap={2}>
-        {sources.length === 0 && knowsFleetIsEmpty && (
-          <Text fontSize="sm" color="fg.muted">
-            No sources configured here yet.
-          </Text>
-        )}
-        {sources.map((source) => (
-          <SourceRow
-            key={source.id}
-            source={source}
-            isPendingRotate={rotatingId === source.id}
-            isPendingArchive={archivingId === source.id}
-            canManage={canManage}
-            onEdit={() => onEdit(source.id)}
-            onRotate={() => onRotate(source.id)}
-            onArchive={() => onArchive(source.id)}
-          />
-        ))}
-      </VStack>
-    </Box>
-  );
-}
-
 /**
  * The source list: what the viewer may read, what went wrong when it could
- * not be read, the two delivery-group sections, and the note naming the
- * grant that unlocks the writes.
+ * not be read, the connectors header with its add control, the table, and
+ * the note naming the grant that unlocks the writes.
  */
 function IngestionSourceList({
+  isSample = false,
   canRead,
   canManage,
   isLoading,
   error,
-  grouped,
+  sources,
   rotatingId,
   archivingId,
   onEdit,
   onRotate,
   onArchive,
+  createAction,
 }: {
+  isSample?: boolean;
   canRead: boolean;
   canManage: boolean;
   isLoading: boolean;
   error: unknown;
-  grouped: Record<SourceGroup, Source[]>;
+  sources: Source[] | undefined;
   rotatingId: string | null;
   archivingId: string | null;
   onEdit: (id: string) => void;
   onRotate: (id: string) => void;
   onArchive: (id: string) => void;
+  /**
+   * The page header's OWN create control, rendered a second time inside the
+   * empty state. Not a second control in the sense the create-on-top rule
+   * forbids: same component, so same label, same weight and same flow. This is
+   * deliberately not the `addControl` slot that used to sit in the table's
+   * header — that one was a differently-worded outline button and is gone.
+   */
+  createAction?: ReactNode;
 }) {
+  // Only claim "none connected" when we actually know: on a load failure the
+  // alert below says what went wrong instead, and an empty table read off an
+  // empty `?? []` would tell an admin their entire ingest fleet is gone when
+  // all that happened was a 403.
+  //
+  // THE "CONNECTORS · N SOURCES · N ACTIVE" HEADING THAT USED TO SIT HERE IS
+  // GONE. Both of its figures are now in the page's resume strip above the tab
+  // strip, beside the other two panes' counts, so a reader learns them without
+  // opening this pane. Saying them twice on one screen was the redundancy the
+  // strip was added to remove.
+  const knowsFleet = !error && !isLoading && sources !== undefined;
   return (
     <>
       {!canRead && (
@@ -383,31 +363,44 @@ function IngestionSourceList({
 
       {isLoading && <Spinner size="sm" />}
 
-      {/* The list is the page. Without this the group sections below
-          render "No sources configured here yet." off an empty `?? []`,
-          which tells an admin their entire ingest fleet is gone when all
-          that actually happened was a 403 or a DB blip. */}
-      <HandledErrorAlert error={error} fallbackTitle="Couldn't load ingestion sources" />
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't load ingestion sources"
+      />
 
-      {canRead &&
-        (["realtime", "scheduled"] as const).map((group) => (
-          <SourceGroupSection
-            key={group}
-            group={group}
-            sources={grouped[group]}
-            // Only claim "none configured" when we actually know: on a load
-            // failure the alert above says what went wrong instead.
-            knowsFleetIsEmpty={!error}
-            rotatingId={rotatingId}
-            archivingId={archivingId}
-            canManage={canManage}
-            onEdit={onEdit}
-            onRotate={onRotate}
-            onArchive={onArchive}
-          />
-        ))}
+      {/* A grey sentence used to sit here, which told a reader the state and
+          left them in it. The way out is the page header's own Add source,
+          rendered again here rather than described: a sentence naming a button
+          goes stale the moment the button is renamed, and nothing checks
+          prose. Same component, so one label, one weight, one flow. */}
+      {canRead && knowsFleet && sources.length === 0 && (
+        <GovernanceEmptyState
+          testId="ingestion-sources-empty"
+          icon={Plug}
+          headline="No sources connected yet"
+          description={
+            canManage
+              ? "A source is where this organization's AI usage is read from. Connect one and its events start arriving here."
+              : "A source is where this organization's AI usage is read from. Once someone connects one, its events arrive here."
+          }
+          action={createAction}
+        />
+      )}
 
-      {canRead && !canManage && (
+      {canRead && knowsFleet && sources.length > 0 && (
+        <IngestionSourcesTable
+          sources={sources}
+          isSample={isSample}
+          canManage={canManage}
+          rotatingId={rotatingId}
+          archivingId={archivingId}
+          onEdit={onEdit}
+          onRotate={onRotate}
+          onArchive={onArchive}
+        />
+      )}
+
+      {canRead && !canManage && !isSample && (
         <PermissionRequiredNotice
           permission="ingestionSources:manage"
           detail="You can read the sources. Adding, editing, rotating a secret, and archiving need this grant."
@@ -429,11 +422,10 @@ export function buildCreateInput({
 }: {
   composer: ComposerState;
   organizationId: string;
-  /** Named which field is wrong when a pull config will not build. */
   toaster: GovernanceToaster;
 }) {
   if (!composer.name.trim()) return null;
-  const resolved = resolvePullConfig(composer, { toaster });
+  const resolved = resolvePullConfig(composer, toaster);
   if (!resolved) return null;
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   return {
@@ -444,34 +436,18 @@ export function buildCreateInput({
     parserConfig: buildParserConfig(composer),
     pullConfig: resolved.pullConfig,
     pullSchedule: pullAdapter
-      ? composer.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS[pullAdapter] || null
+      ? composer.pullSchedule.trim() ||
+        PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
+        null
       : null,
     // Read through `routesConversations` rather than sending whatever the
     // draft holds: a type switched mid-compose would otherwise carry a
     // destination its adapter never reads, and a dead column is how a
     // customer comes to believe routing is on.
-    traceProjectId: routesConversations(composer.sourceType) ? composer.traceProjectId : null,
+    traceProjectId: routesConversations(composer.sourceType)
+      ? composer.traceProjectId
+      : null,
   };
-}
-
-/** Sources split into the two group sections the page renders. */
-function useGroupedSources(sources: Source[] | undefined) {
-  return useMemo(() => {
-    const out: Record<SourceGroup, Source[]> = {
-      realtime: [],
-      scheduled: [],
-    };
-    for (const s of sources ?? []) {
-      out[
-        groupForMode(
-          modeForSourceType({
-            sourceType: (s.sourceType ?? "otel_generic") as SourceType,
-          }),
-        )
-      ].push(s);
-    }
-    return out;
-  }, [sources]);
 }
 
 /** The four mutations the page drives, with their toasts and cache busting. */
@@ -488,8 +464,8 @@ function useIngestionSourceMutations({
   setEditingSourceId: (id: string | null) => void;
   setSecretModal: (details: SecretDetails | null) => void;
 }) {
-  const showErrorToast = useShowErrorToast();
   const toaster = useGovernanceToaster();
+  const showErrorToast = useShowErrorToast();
   const create = api.ingestionSources.create.useMutation({
     onSuccess: (data) => {
       void refetch();
@@ -507,7 +483,8 @@ function useIngestionSourceMutations({
         toaster.create({ title: "Source created", type: "success" });
       }
     },
-    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
   });
 
   const rotate = api.ingestionSources.rotateSecret.useMutation({
@@ -521,7 +498,8 @@ function useIngestionSourceMutations({
         sourceType: data.source.sourceType as SourceType,
       });
     },
-    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
 
   const update = api.ingestionSources.update.useMutation({
@@ -530,7 +508,8 @@ function useIngestionSourceMutations({
       setEditingSourceId(null);
       toaster.create({ title: "Source updated", type: "success" });
     },
-    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
   });
 
   const archive = api.ingestionSources.archive.useMutation({
@@ -549,33 +528,162 @@ function useIngestionSourceMutations({
 }
 
 /**
+ * What the Catalog and Environments panes need, and nothing the source
+ * composer does.
+ *
+ * Its own hook because it is a different concern from the source CRUD below:
+ * this is how the page is being READ — which layout, which samples, which
+ * environments the reader typed in — while the other is what is being written.
+ * Keeping them apart also keeps either one small enough to follow.
+ */
+function useInventoryPanes({
+  orgId,
+  canManageTools,
+}: {
+  orgId: string;
+  canManageTools: boolean;
+}) {
+  /**
+   * The organization's tool registry, read here only for the resume strip's
+   * "N tools" figure (`countableCatalogCards`, below).
+   *
+   * The Catalog pane itself is `ToolCatalogPanel` — its own read, its own
+   * drawer, its own delete confirmation, all self-contained (see that
+   * component's docstring). This is a second instance of the same hook, kept
+   * to a different purpose; the underlying query is cached by organization
+   * id, so it is not a second network read.
+   */
+  const catalog = useAiToolCatalog({
+    organizationId: orgId,
+    enabled: canManageTools,
+  });
+
+  const sample = useSampleMode();
+
+  const [addingEnvironment, setAddingEnvironment] = useState(false);
+  /**
+   * Environments the reader added by hand this sitting. Component state on
+   * purpose: nothing persists an environment yet, and the add dialog says so
+   * rather than letting a row look saved.
+   */
+  const [addedEnvironments, setAddedEnvironments] = useState<EnvironmentRow[]>(
+    [],
+  );
+
+  /** Add a hand-entered environment for this sitting only. */
+  const addEnvironment = useCallback(
+    ({ name, description }: { name: string; description: string }) => {
+      setAddedEnvironments((previous) => [
+        ...previous,
+        {
+          id: `added:${name}:${previous.length}`,
+          name,
+          description,
+          createdIso: new Date().toISOString(),
+          createdBy: "You, this session",
+        },
+      ]);
+    },
+    [],
+  );
+
+  return {
+    catalog,
+    sample,
+    addingEnvironment,
+    setAddingEnvironment,
+    addedEnvironments,
+    addEnvironment,
+  };
+}
+
+/**
  * Everything the page needs: the org it is scoped to, the source list, the
- * composer/edit/secret state and the mutations that drive them. State and
- * callbacks only — the component owns the markup.
+ * composer/edit/secret state and the mutations that drive them, plus the pane
+ * state from {@link useInventoryPanes}. State and callbacks only — the
+ * component owns the markup.
  */
 function useIngestionSourcesPage() {
-  const toaster = useGovernanceToaster();
   const { organization, hasAnyPermission } = useGovernanceScope();
+  // The host resolves the organization and its permissions from context
+  // rather than an in-flight query, so there is no loading window to
+  // distinguish from a genuine refusal the way the platform's
+  // `useOrganizationTeamProject` had one.
+  const isOrganizationLoading = false;
   const orgId = organization?.id ?? "";
-  const { isEnterprise } = useGovernancePlan();
+  const { isEnterprise, isLoading: isPlanLoading } = useGovernancePlan();
   const canRead = hasAnyPermission("ingestionSources:view");
   const canManage = hasAnyPermission("ingestionSources:manage");
-  // The Catalog pane's own grant — decides the inventory default tab.
-  const canManageCatalog = hasAnyPermission("aiTools:manage");
-
+  // The Catalog pane's own grant: the registry and the ingest fleet are two
+  // different things to be trusted with.
+  const canManageTools = hasAnyPermission("aiTools:manage");
   const destinationCtx = useDestinationContext(organization);
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canRead, ...SOURCE_HEALTH_REFRESH },
   );
-  const utils = api.useUtils();
-  const refetch = () => utils.ingestionSources.list.invalidate({ organizationId: orgId });
 
+  const panes = useInventoryPanes({ orgId, canManageTools });
+
+  const utils = api.useUtils();
+  const refetch = () =>
+    utils.ingestionSources.list.invalidate({ organizationId: orgId });
+
+  const composer = useSourceComposer({ orgId, refetch });
+
+  useAddParam({
+    isEnterprise,
+    isPlanLoading,
+    isPermissionLoading: isOrganizationLoading,
+    canManage,
+    startComposer: composer.startComposer,
+  });
+
+  return {
+    ...panes,
+    ...composer,
+    orgId,
+    destinationCtx,
+    isEnterprise,
+    canRead,
+    canManage,
+    canManageTools,
+    sourcesQuery,
+  };
+}
+
+/**
+ * The composer drawer's draft and the writes it makes.
+ *
+ * Split from {@link useIngestionSourcesPage} because the draft, the edit
+ * target and the secret reveal are one lifecycle: every mutation below has to
+ * be able to close the drawer and drop the draft, so the state and the
+ * mutations that reset it cannot live on opposite sides of a boundary.
+ */
+function useSourceComposer({
+  orgId,
+  refetch,
+}: {
+  orgId: string;
+  refetch: () => void;
+}) {
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
+  /**
+   * The required fields a refused save found empty.
+   *
+   * Held rather than derived, because "empty" is only a complaint once the
+   * admin has tried to save: marking a field red the moment the drawer opens
+   * tells someone who has typed nothing yet that they have done something
+   * wrong.
+   */
+  const [invalidFieldKeys, setInvalidFieldKeys] = useState<readonly string[]>(
+    [],
+  );
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [secretModal, setSecretModal] = useState<SecretDetails | null>(null);
+  const toaster = useGovernanceToaster();
 
   const mutations = useIngestionSourceMutations({
     refetch,
@@ -586,44 +694,70 @@ function useIngestionSourcesPage() {
   });
 
   const onSubmit = () => {
+    // Named before refused. The builders answer a missing field with `null`
+    // and a toast that names the whole set of fields the source type needs,
+    // which leaves the admin to find which of the six they left empty by
+    // reading the form against the sentence. Anything the form can point at,
+    // it points at.
+    const missing = missingRequiredParserFieldKeys({
+      sourceType: composer.sourceType,
+      values: composer.parserConfig,
+    });
+    setInvalidFieldKeys(missing);
+    if (missing.length > 0) return;
+
     const input = buildCreateInput({ composer, organizationId: orgId, toaster });
-    // A null input means a required field is missing or malformed;
-    // resolvePullConfig has already said which, and the drawer stays open so
-    // the user can fix it.
+    // A null input here means the form is wrong in a way no single required
+    // field explains — Genie's either-or sign-in, a backfill date the adapter
+    // will not parse. `resolvePullConfig` has toasted which, and the drawer
+    // stays open so the user can fix it.
     if (input) mutations.create.mutate(input);
   };
+
+  /**
+   * Take a draft, and drop the complaint about any field it has now filled.
+   *
+   * Cleared on the way in rather than on the next save attempt: a field that
+   * stays red after it has been answered reads as a second, different
+   * rejection.
+   */
+  const updateComposer = useCallback((next: ComposerState) => {
+    setComposer(next);
+    setInvalidFieldKeys((keys) =>
+      keys.filter((key) => (next.parserConfig[key] ?? "").trim() === ""),
+    );
+  }, []);
 
   /**
    * Open the composer on a fresh draft for the picked type — a draft left
    * over from a different type must never leak its parser or OTTL state
    * into this one.
    */
-  const startComposer = (sourceType: SourceType) => {
-    setComposer({ ...blankComposer(), sourceType });
+  const startComposer = useCallback((sourceType: SourceType) => {
+    setComposer({
+      ...blankComposer(),
+      sourceType,
+      parserConfig: defaultParserValues(sourceType),
+    });
+    setInvalidFieldKeys([]);
     setComposing(true);
-  };
+  }, []);
 
   /** Close the composer and drop the draft. */
   const closeComposer = () => {
     setComposing(false);
     setComposer(blankComposer());
+    setInvalidFieldKeys([]);
   };
 
   return {
-    orgId,
-    destinationCtx,
-    isEnterprise,
-    canRead,
-    canManage,
-    canManageCatalog,
     startComposer,
     closeComposer,
-    sourcesQuery,
-    grouped: useGroupedSources(sourcesQuery.data),
     composing,
     setComposing,
     composer,
-    setComposer,
+    setComposer: updateComposer,
+    invalidFieldKeys,
     editingSourceId,
     setEditingSourceId,
     secretModal,
@@ -634,23 +768,166 @@ function useIngestionSourcesPage() {
 }
 
 /**
- * The inventory's tabs: Catalog (the tool-tiles editor, formerly
- * /governance/tool-catalog) and Sources (the ingestion-sources table).
+ * The `?add=` deep link, in one owner.
+ *
+ * Two flows arrive through the same parameter and one hook has to dispatch
+ * between them, because two hooks reading it would race: whichever ran first
+ * would strip the parameter and the other would never see it.
+ *
+ *   `?add=1`            registers a tool. The address the Overview page's
+ *                       "Add tool" chip points at, paired with `?tab=catalog`
+ *                       so the reader lands on the pane the new tool joins.
+ *   `?add=<sourceType>` opens the source composer on that type — the link the
+ *                       docs and the rest of the section hand out.
+ *
+ * The parameter is consumed once and then left off the address, so a refresh
+ * or a back-button does not reopen the drawer the reader just dismissed.
+ *
+ * A source type the Add source menu would not offer (unknown, retired, or
+ * locked on this plan) is dropped silently, and so is either flow arriving for
+ * a reader without the grant it needs. The plan gate is the same
+ * `gatedSourceTypeOptions` the menu reads, so a locked type can no more slip
+ * in through the address than through a click. Nothing is decided until the
+ * plan and the grants are known: an Enterprise link must not be thrown away
+ * because the plan query was a tick behind the page, and a manager's link must
+ * not be thrown away because the organization query was.
  */
-const INVENTORY_TABS = ["catalog", "sources"] as const;
+const ADD_TOOL_PARAM = "1";
+
+/** The address without its `add=` flag, so a refresh does not reopen it. */
+const withoutAddParam = (previous: URLSearchParams) => {
+  const next = new URLSearchParams(previous);
+  next.delete("add");
+  return next;
+};
+
+/**
+ * The source type the address asked for, or null when it named none the Add
+ * source menu would offer on this plan.
+ *
+ * Its own function so the effect below stays a dispatch: the gate is the same
+ * `gatedSourceTypeOptions` the menu reads, which is the point — a locked type
+ * can no more slip in through the address than through a click.
+ */
+function requestedSourceType({
+  requested,
+  isEnterprise,
+}: {
+  requested: string;
+  isEnterprise: boolean;
+}): SourceType | null {
+  const option = gatedSourceTypeOptions({ isEnterprise }).find(
+    (candidate) => candidate.value === requested,
+  );
+  return option && !option.locked ? option.value : null;
+}
+
+/**
+ * Open whichever flow the address asked for, if the reader may open it.
+ *
+ * Either grant missing means nothing opens and the flag is still dropped: a
+ * link is not an authorisation, and leaving the flag on the address would
+ * reopen the refusal on every refresh.
+ */
+function openAddFlow({
+  requested,
+  isEnterprise,
+  canManage,
+  startComposer,
+}: {
+  requested: string;
+  isEnterprise: boolean;
+  canManage: boolean;
+  startComposer: (sourceType: SourceType) => void;
+}) {
+  // `ADD_TOOL_PARAM` ("1") used to open a page-level tool-registration
+  // drawer. The Catalog pane is `ToolCatalogPanel` now, which owns that
+  // drawer's state itself and has no external open trigger, so the deep
+  // link degrades to a no-op rather than reaching into another
+  // component's state.
+  if (requested === ADD_TOOL_PARAM) return;
+  if (!canManage) return;
+  const sourceType = requestedSourceType({ requested, isEnterprise });
+  if (sourceType) startComposer(sourceType);
+}
+
+function useAddParam({
+  isEnterprise,
+  isPlanLoading,
+  isPermissionLoading,
+  canManage,
+  startComposer,
+}: {
+  isEnterprise: boolean;
+  isPlanLoading: boolean;
+  isPermissionLoading: boolean;
+  canManage: boolean;
+  startComposer: (sourceType: SourceType) => void;
+}) {
+  const [searchParams, setSearchParams] = useGovernanceSearchParams();
+  const requested = searchParams.get("add");
+  useEffect(() => {
+    // The plan gate's own reason, applied to grants: an unread grant is not a
+    // refused one. `isPermissionLoading` is always false here — this host
+    // resolves the organization and its permissions synchronously from
+    // context rather than an in-flight query — kept as a parameter so a
+    // future async host still has somewhere to report it.
+    if (requested === null || isPlanLoading || isPermissionLoading) return;
+    openAddFlow({
+      requested,
+      isEnterprise,
+      canManage,
+      startComposer,
+    });
+    setSearchParams(withoutAddParam, { replace: true });
+  }, [
+    requested,
+    isPlanLoading,
+    isPermissionLoading,
+    isEnterprise,
+    canManage,
+    startComposer,
+    setSearchParams,
+  ]);
+}
+
+/**
+ * The inventory's tabs: Catalog (the tool-tiles editor), Environments (where
+ * those tools run) and Sources (the ingestion-sources table). Every one of
+ * them answers "what does this organization run", which is the question this
+ * page exists for.
+ *
+ * ANOMALY RULES USED TO BE A FOURTH TAB AND IS NOT ONE ANY MORE. A rule is a
+ * standing instruction about what to watch for, not a thing the organization
+ * runs, so it belongs with alerts and signals rather than in an inventory.
+ * `AnomalyRulesTab` itself is untouched and still exported, because the
+ * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
+ * the same component.
+ *
+ * THE CATALOG PANE IS `ToolCatalogPanel`, whole. Its `AiToolEntry` registry
+ * read, its drag-to-reorder editor, its starter-pack import and its
+ * registration drawer are all its own — mounted here rather than rebuilt,
+ * so a tool registered from this page cannot drift from one registered from
+ * the tool-catalog editor's own former standalone route. Registering and
+ * editing a tool here opens that panel's own drawer.
+ */
+const INVENTORY_TABS = ["catalog", "environments", "sources"] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
 
 const isInventoryTab = (value: string | null): value is InventoryTab =>
   INVENTORY_TABS.some((tab) => tab === value);
 
 /**
- * A selected non-default tab is part of the address (?tab=); the default
- * stays out of it, and an unknown or stale value degrades to the default
- * instead of a blank pane. The default is permission-sensitive — Catalog
- * for aiTools:manage holders, Sources otherwise — so the BARE address
- * means "your default pane" and can resolve differently for different
- * recipients of the same link. Accepted deliberately (see the spec): the
- * ?tab= form is the stable shareable address.
+ * A selected non-default tab is part of the address (?tab=); the default stays
+ * out of it, and an unknown or stale value degrades to the default instead of
+ * a blank pane.
+ *
+ * The default is permission-sensitive — Catalog for `aiTools:manage` holders,
+ * Sources otherwise — because the Catalog pane is `ToolCatalogPanel`, which
+ * gates on that grant and shows a permission notice without it. So the bare
+ * address means "your default pane" and can resolve differently for
+ * different recipients of the same link; the `?tab=` form is the stable
+ * shareable address.
  */
 function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
   const [searchParams, setSearchParams] = useGovernanceSearchParams();
@@ -669,28 +946,61 @@ function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
   return { inventoryTab, selectInventoryTab };
 }
 
+/** A tab label with the count beside it, once the count is known. */
+function InventoryTabLabel({
+  label,
+  count,
+}: {
+  label: string;
+  count?: number;
+}) {
+  return (
+    <HStack gap={2}>
+      <Text as="span">{label}</Text>
+      {count !== undefined && (
+        <Badge size="sm" variant="surface" colorPalette="gray">
+          {count}
+        </Badge>
+      )}
+    </HStack>
+  );
+}
+
 /**
- * The inventory's tab shell. The Catalog pane mounts the tool-tiles
- * editor; the Sources pane renders the children (the sources table) under
- * an optional actions row (the add-source control, which belongs beside
- * the list it adds to).
+ * The inventory's tab shell.
+ *
+ * Counts sit on a tab only where that pane's own list has actually answered.
+ * Environments is derived from the source list rather than read separately, so
+ * it counts exactly when Sources counts and goes blank whenever Sources does —
+ * one silence cannot be reported as a number on one tab and as nothing on the
+ * tab beside it.
  */
 function InventoryTabs({
-  defaultTab,
-  sourcesActions,
-  children,
+  inventoryTab,
+  selectInventoryTab,
+  catalogCount,
+  environmentCount,
+  sourceCount,
+  catalog,
+  environments,
+  sources,
 }: {
-  defaultTab: InventoryTab;
-  sourcesActions?: ReactNode;
-  children: ReactNode;
+  inventoryTab: InventoryTab;
+  selectInventoryTab: (tab: string) => void;
+  catalogCount?: number;
+  environmentCount?: number;
+  sourceCount?: number;
+  catalog: ReactNode;
+  environments: ReactNode;
+  sources: ReactNode;
 }) {
-  const { inventoryTab, selectInventoryTab } = useInventoryTab({ defaultTab });
   return (
     <Tabs.Root
       value={inventoryTab}
       onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
       lazyMount
+      unmountOnExit
     >
       <Tabs.List>
         <Tabs.Trigger
@@ -698,23 +1008,32 @@ function InventoryTabs({
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          Catalog
+          <InventoryTabLabel label="Catalog" count={catalogCount} />
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="environments"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          <InventoryTabLabel label="Environments" count={environmentCount} />
         </Tabs.Trigger>
         <Tabs.Trigger
           value="sources"
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          Sources
+          <InventoryTabLabel label="Sources" count={sourceCount} />
         </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="catalog" paddingTop={4}>
-        <ToolCatalogPanel />
+        {catalog}
+      </Tabs.Content>
+      <Tabs.Content value="environments" paddingTop={4}>
+        {environments}
       </Tabs.Content>
       <Tabs.Content value="sources" paddingTop={4}>
         <VStack align="stretch" gap={4} width="full">
-          {sourcesActions}
-          {children}
+          {sources}
         </VStack>
       </Tabs.Content>
     </Tabs.Root>
@@ -722,63 +1041,296 @@ function InventoryTabs({
 }
 
 /**
- * The two tabs and everything under the sources one: the actions row an admin
- * only sees with the manage grant, and the list itself.
+ * Everything under the Sources tab: the connectors header with the add control
+ * an admin only sees with the manage grant, and the table itself.
+ *
+ * The load error is withheld while sample mode is on. A page showing invented
+ * figures has already told the reader that nothing on it is real; an alert
+ * about a read that failed underneath them is then noise about data they are
+ * not looking at, and the banner above already says the screen is a mock-up.
  */
-function InventorySourcesTab({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
+function InventorySourcesPane({
+  page,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+}) {
   const { orgId, sourcesQuery, mutations } = page;
   return (
-    <InventoryTabs
-      defaultTab={page.canManageCatalog ? "catalog" : "sources"}
-      sourcesActions={
+    <IngestionSourceList
+      canRead={page.canRead}
+      isSample={page.sample.active}
+      canManage={page.canManage && !page.sample.active}
+      isLoading={!page.sample.active && sourcesQuery.isLoading}
+      error={page.sample.active ? null : sourcesQuery.error}
+      sources={
+        page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data
+      }
+      rotatingId={pendingId(mutations.rotate)}
+      archivingId={pendingId(mutations.archive)}
+      onEdit={page.setEditingSourceId}
+      onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
+      onArchive={(id) =>
+        mutations.archive.mutate({ organizationId: orgId, id })
+      }
+      createAction={
         page.canManage ? (
-          <SourcesActionsRow
+          <AddSourceControl
             isEnterprise={page.isEnterprise}
             sourceCount={sourcesQuery.data?.length ?? 0}
             onAdd={page.startComposer}
           />
         ) : undefined
       }
-    >
-      <IngestionSourceList
-        canRead={page.canRead}
-        canManage={page.canManage}
-        isLoading={sourcesQuery.isLoading}
-        error={sourcesQuery.error}
-        grouped={page.grouped}
-        rotatingId={pendingId(mutations.rotate)}
-        archivingId={pendingId(mutations.archive)}
-        onEdit={page.setEditingSourceId}
-        onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
-        onArchive={(id) => mutations.archive.mutate({ organizationId: orgId, id })}
+    />
+  );
+}
+
+/**
+ * Add environment, in one place.
+ *
+ * The header renders it and so does the empty state, and they must stay the
+ * same control: an empty pane offering a differently-worded button is the
+ * defect the one-create-flow rule exists for.
+ */
+function AddEnvironmentControl({ onAdd }: { onAdd: () => void }) {
+  return (
+    <PageLayout.HeaderButton onClick={onAdd}>
+      <Plus size={14} /> Add environment
+    </PageLayout.HeaderButton>
+  );
+}
+
+/**
+ * The actions at the top right of the page header, for the pane in view.
+ *
+ * They live in the header rather than inside each pane because they are page
+ * actions — the section's rulebook puts every one of them in the same corner
+ * on every screen, so a reader who found "See sample data" on Costs finds it
+ * here without looking. At most one is solid: the single thing this pane is
+ * for adding.
+ *
+ * The Catalog pane has none of its own: `ToolCatalogPanel` (below) owns its
+ * own create affordance per tile type, the way the tool-catalog editor always
+ * has, so a header-level "Add tool" here would be a second, differently
+ * behaved copy of a create flow that already has a home.
+ */
+function InventoryHeaderActions({
+  page,
+  inventoryTab,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+  inventoryTab: InventoryTab;
+}) {
+  return (
+    <HStack gap={2} flexShrink={0}>
+      <SampleDataToggle
+        active={page.sample.active}
+        onToggle={page.sample.toggle}
+        size="sm"
       />
-    </InventoryTabs>
+      {inventoryTab === "sources" && page.canManage && (
+        <AddSourceControl
+          isEnterprise={page.isEnterprise}
+          sourceCount={page.sourcesQuery.data?.length ?? 0}
+          onAdd={page.startComposer}
+        />
+      )}
+      {inventoryTab === "environments" && (
+        <AddEnvironmentControl onAdd={() => page.setAddingEnvironment(true)} />
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * The catalog's cards when the page may honestly count them, and null when it
+ * may not — which is what draws the tab badge blank and the strip's em dash.
+ *
+ * THREE STATES, NOT TWO, and collapsing them is the bug this exists to stop.
+ * Cards mean a counted catalog; an empty array means a catalog counted at
+ * zero; null means the page has not been told. A reader without the registry
+ * grant and a registry read still in flight both land on null, because "0
+ * tools" is a claim about the organization and neither of them supports it.
+ *
+ * The pane itself is not built from this — `ToolCatalogPanel` reads the
+ * registry again on its own hook instance and has its own loading and error
+ * states. This is only what the COUNTERS may say, and the two answers are
+ * deliberately allowed to differ: the pane may show a spinner while the tab
+ * beside it simply shows no number.
+ */
+function countableCatalogCards(
+  page: ReturnType<typeof useIngestionSourcesPage>,
+): ToolCard[] | null {
+  // Sample mode answers from its own list, so no read gates it.
+  if (page.sample.active) {
+    return catalogCards({ tools: undefined, sampleActive: true });
+  }
+  if (!page.canManageTools || !page.catalog.loaded) return null;
+  return catalogCards({
+    tools: page.catalog.entries,
+    sampleActive: false,
+  });
+}
+
+/**
+ * One line for all three panes, above the tabs, so a reader learns the size of
+ * the estate without opening each one.
+ *
+ * Counted here rather than inside the strip: the shared component runs no
+ * query and totals nothing, which is what keeps an unmeasured figure from
+ * quietly becoming a zero on its way through a layout.
+ */
+function InventorySummaryStrip({
+  page,
+  cards,
+  environments,
+  sources,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+  /** Null when the reader cannot see the registry, which draws the dash. */
+  cards: readonly ToolCard[] | null;
+  environments: readonly EnvironmentRow[];
+  sources: readonly Source[] | undefined;
+}) {
+  // Environments are derived from the source list, so an unanswered source
+  // read leaves them unmeasured rather than empty. Without this the strip said
+  // "0 environments" beside a dashed source count, off the same silence.
+  const environmentsMeasured = sources !== undefined;
+  return (
+    <GovernanceSummaryBar
+      testId="inventory-summary"
+      items={inventorySummaryItems({
+        cards,
+        environmentCount: environmentsMeasured ? environments.length : null,
+        // Sample environments are wholly invented, so none of them was typed
+        // in by this reader and all of them count as discovered.
+        discoveredEnvironmentCount: environmentsMeasured
+          ? environments.length -
+            (page.sample.active ? 0 : page.addedEnvironments.length)
+          : null,
+        sourceCount: sources?.length ?? null,
+        activeSourceCount:
+          sources?.filter((source) => source.status === "active").length ??
+          null,
+      })}
+    />
   );
 }
 
 function InventoryPage() {
   const page = useIngestionSourcesPage();
   const { orgId, destinationCtx, sourcesQuery, mutations } = page;
+  const { inventoryTab, selectInventoryTab } = useInventoryTab({
+    defaultTab: page.canManageTools ? "catalog" : "sources",
+  });
+
+  const cards = countableCatalogCards(page);
+  const environments = environmentRows({
+    sources: sourcesQuery.data,
+    sampleActive: page.sample.active,
+    added: page.addedEnvironments,
+  });
+  const sources = page.sample.active
+    ? SAMPLE_INGESTION_SOURCES
+    : sourcesQuery.data;
 
   return (
     <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <InventoryHeader />
+        <HStack justify="space-between" align="center" gap={4} width="full">
+          <InventoryHeader />
+          <InventoryHeaderActions page={page} inventoryTab={inventoryTab} />
+        </HStack>
+
+        {page.sample.active && (
+          <SampleDataBanner>
+            These tools, figures and environments are an illustration of what
+            the inventory holds once your tools report. Nothing here is real.
+          </SampleDataBanner>
+        )}
+
         <SourceComposerDrawer
           isOpen={page.composing}
           organizationId={orgId}
           destinationCtx={destinationCtx}
           composer={page.composer}
           setComposer={page.setComposer}
+          invalidFieldKeys={page.invalidFieldKeys}
           isPending={mutations.create.isPending}
           onSubmit={page.onSubmit}
           onClose={page.closeComposer}
         />
 
-        <InventorySourcesTab page={page} />
+        <InventorySummaryStrip
+          page={page}
+          cards={cards}
+          environments={environments}
+          sources={sources}
+        />
+
+        <InventoryTabs
+          inventoryTab={inventoryTab}
+          selectInventoryTab={selectInventoryTab}
+          catalogCount={cards?.length}
+          // Derived from the source list, so it goes uncounted on the same
+          // silence that leaves the Sources tab uncounted beside it.
+          environmentCount={
+            sources === undefined ? undefined : environments.length
+          }
+          sourceCount={sources?.length}
+          catalog={<ToolCatalogPanel />}
+          environments={
+            <EnvironmentsTab
+              canRead={page.canRead}
+              sources={sourcesQuery.data}
+              sampleActive={page.sample.active}
+              added={page.addedEnvironments}
+              // The header's own control, rendered a second time. Same
+              // component, so one label and one flow — the empty state never
+              // invents a second doorway with different words.
+              createAction={
+                <AddEnvironmentControl
+                  onAdd={() => page.setAddingEnvironment(true)}
+                />
+              }
+            />
+          }
+          sources={<InventorySourcesPane page={page} />}
+        />
       </VStack>
 
-      <SecretModal details={page.secretModal} onClose={() => page.setSecretModal(null)} />
+      <InventoryOverlays page={page} />
+    </GovernanceLayout>
+  );
+}
+
+/**
+ * The page's dialogs and drawers, which sit outside the content column.
+ *
+ * Grouped so the page body reads as the layout it is. Each of them is opened
+ * from somewhere different — a header button, a row menu, a mutation's reply —
+ * and every one of them is closed by writing the page state back to null,
+ * which is the only thing they have in common and the reason they are all
+ * mounted at this level rather than beside whatever opened them.
+ */
+function InventoryOverlays({
+  page,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+}) {
+  const { orgId, destinationCtx, sourcesQuery, mutations } = page;
+  return (
+    <>
+      <AddEnvironmentDialog
+        isOpen={page.addingEnvironment}
+        onClose={() => page.setAddingEnvironment(false)}
+        onAdd={page.addEnvironment}
+      />
+
+      <SecretModal
+        details={page.secretModal}
+        onClose={() => page.setSecretModal(null)}
+      />
 
       <EditingSourceDrawer
         orgId={orgId}
@@ -788,7 +1340,7 @@ function InventoryPage() {
         sourcesQuery={sourcesQuery}
         update={mutations.update}
       />
-    </GovernanceLayout>
+    </>
   );
 }
 
@@ -813,7 +1365,9 @@ function EditingSourceDrawer({
       organizationId={orgId}
       destinationCtx={destinationCtx}
       source={
-        editingSourceId ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null) : null
+        editingSourceId
+          ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
+          : null
       }
       onClose={() => setEditingSourceId(null)}
       onSubmit={(input) => update.mutate(input)}
@@ -823,28 +1377,26 @@ function EditingSourceDrawer({
 }
 
 /**
- * The right-aligned add-source row at the top of the Sources pane.
- * Mounted only for `ingestionSources:manage` holders — a viewer who only
- * reads is not offered a composer the server refuses.
+ * Connect a source, in one place, and only for a viewer holding
+ * `ingestionSources:manage`.
+ *
+ * There used to be two of these: one in the page header and a second, outline
+ * one down inside the Sources table's own header. Both opened the same menu
+ * and created the same thing, so a reader had to work out which of two
+ * differently-worded, differently-weighted buttons was the real one. Create
+ * now lives in the page header, and the empty state renders this same
+ * component rather than a button of its own.
+ *
+ * IT NO LONGER DOUBLES AS "ADD TOOL". While the Catalog pane was built from
+ * the source list, one button under two labels was honest — the two panes were
+ * two views of one object. They are not any more: the catalog lists what the
+ * organization registered and this connects the pipe telemetry arrives on, so
+ * the Catalog pane has its own control ({@link AddToolControl}).
+ *
+ * The plan cap lives here rather than at either call site. It used to be
+ * carried by the in-content control alone, so the header's own button would
+ * happily open a menu for an organization that had already hit its limit.
  */
-function SourcesActionsRow({
-  isEnterprise,
-  sourceCount,
-  onAdd,
-}: {
-  isEnterprise: boolean;
-  sourceCount: number;
-  onAdd: (sourceType: SourceType) => void;
-}) {
-  return (
-    <HStack>
-      <Spacer />
-      <AddSourceControl isEnterprise={isEnterprise} sourceCount={sourceCount} onAdd={onAdd} />
-    </HStack>
-  );
-}
-
-/** Mounted only for a viewer holding `ingestionSources:manage`. */
 function AddSourceControl({
   isEnterprise,
   sourceCount,
@@ -854,135 +1406,131 @@ function AddSourceControl({
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
 }) {
-  const atCap = !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
+  const atCap =
+    !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
   return (
     <AddIngestionSourceMenu
       isEnterprise={isEnterprise}
       disabledReason={
-        atCap ? "Source limit reached. Upgrade to Enterprise for unlimited sources." : undefined
+        atCap
+          ? "Source limit reached. Upgrade to Enterprise for unlimited sources."
+          : undefined
       }
       hint={
         !isEnterprise
           ? `Your plan includes up to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources. Upgrade to Enterprise for unlimited.`
-          : undefined
+          : "A source is where this organization's AI usage is read from."
       }
       onPick={onAdd}
-      renderSourceIcon={(sourceType, size) => (
-        <SourceTypeIconGlyph sourceType={sourceType} size={size} />
-      )}
     >
-      <Button variant="outline" size="sm" disabled={atCap}>
+      <PageLayout.HeaderButton disabled={atCap}>
         <Plus size={14} /> Add source
-      </Button>
+      </PageLayout.HeaderButton>
     </AddIngestionSourceMenu>
   );
 }
 
-function SourceRow({
-  source,
-  isPendingRotate,
-  isPendingArchive,
-  onEdit,
-  onRotate,
-  onArchive,
-  canManage,
+/**
+ * What the create drawer puts behind "Advanced": the two settings an admin
+ * rarely changes, and both safe to leave closed. Cadence arrives holding the
+ * recommended schedule for the source type, and a source with no destination
+ * ingests normally — it simply routes no conversations onward until someone
+ * says where.
+ *
+ * Returns `undefined` rather than an empty fragment for a type that offers
+ * neither, because an element that renders nothing still counts as content to
+ * the group, and would leave a push source's drawer showing an "Advanced"
+ * button that opens onto an empty box.
+ */
+function composerAdvancedExtras({
+  composer,
+  setComposer,
+  destinationCtx,
 }: {
-  source: Source;
-  isPendingRotate: boolean;
-  isPendingArchive: boolean;
-  onEdit: () => void;
-  onRotate: () => void;
-  onArchive: () => void;
-  canManage: boolean;
-}) {
-  const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
-  const StatusIcon = status.icon;
-  const typeLabel = SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
-  const mode = modeForSourceType({ sourceType: source.sourceType as SourceType });
-  const hasSecret = needsIngestSecret({ sourceType: source.sourceType as SourceType });
+  composer: ComposerState;
+  setComposer: (next: ComposerState) => void;
+  destinationCtx: DestinationContext;
+}): ReactNode | undefined {
+  // The same two predicates the fields themselves gate on, read here so the
+  // group knows whether it has anything to hold before it offers itself.
+  const offersCadence = recommendedPullSchedule(composer.sourceType) !== null;
+  const offersDestination = routesConversations(composer.sourceType);
+  if (!offersCadence && !offersDestination) return undefined;
   return (
-    <HStack borderWidth="1px" borderColor="border.muted" borderRadius="sm" padding={3} gap={3}>
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <HStack gap={2}>
-          <SourceTypeIconGlyph sourceType={source.sourceType as SourceType} size="16px" />
-          <Link
-            href={`/governance/inventory/${source.id}`}
-            color="fg"
-            _hover={{ color: "orange.600" }}
-          >
-            <Text fontSize="sm" fontWeight="medium">
-              {source.name}
-            </Text>
-          </Link>
-          <Badge size="sm" variant="surface">
-            {typeLabel}
-          </Badge>
-          <Badge size="sm" variant="outline">
-            {PROTOCOL_LABEL[mode]}
-          </Badge>
-        </HStack>
-        {source.description && (
-          <Text fontSize="xs" color="fg.muted">
-            {source.description}
-          </Text>
-        )}
-        <HStack gap={2} marginTop={1}>
-          <HStack gap={1}>
-            <Box color={status.color} display="flex">
-              <StatusIcon size={12} />
-            </Box>
-            <Text fontSize="xs" color="fg.muted">
-              {status.label}
-            </Text>
-          </HStack>
-          <Text fontSize="xs" color="fg.muted">
-            · last event {fmtRelative(source.lastEventAt ?? null)}
-          </Text>
-        </HStack>
-      </VStack>
-      {canManage && (
-        <>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onEdit}
-            title="Edit source - name, description, OTTL statements"
-          >
-            <Pencil size={14} /> Edit
-          </Button>
-          {hasSecret && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onRotate}
-              loading={isPendingRotate}
-              title="Mint a new ingestSecret (24h grace on the old one)"
-            >
-              <RotateCw size={14} /> Rotate secret
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            colorPalette="red"
-            onClick={onArchive}
-            loading={isPendingArchive}
-            title="Archive (preserves history)"
-          >
-            <Trash2 size={14} />
-          </Button>
-        </>
+    <>
+      {offersCadence && (
+        <PullCadenceField
+          sourceType={composer.sourceType}
+          value={composer.pullSchedule}
+          onChange={(pullSchedule) =>
+            setComposer({ ...composer, pullSchedule })
+          }
+        />
       )}
-    </HStack>
+      {offersDestination && (
+        <TraceDestinationField
+          sourceType={composer.sourceType}
+          value={composer.traceProjectId}
+          onChange={(traceProjectId) =>
+            setComposer({ ...composer, traceProjectId })
+          }
+          mode="create"
+          {...destinationCtx}
+        />
+      )}
+    </>
   );
 }
 
-function SourceComposerDrawer({
+/**
+ * What the closed Advanced group owes the outside: one line saying where this
+ * source's conversations will go.
+ *
+ * The destination picker sits inside the group, so an admin who never opens it
+ * never reads what it says about leaving the destination unset — and a source
+ * created that way routes its conversations nowhere. The default is fine; the
+ * silence about it is not, so the outcome is stated where the admin is
+ * already looking.
+ *
+ * Only for types that route conversations. On a source that produces none,
+ * a line about where conversations land describes a decision its adapter
+ * never makes.
+ */
+function ComposerDestinationHint({
+  composer,
+  destinationCtx,
+}: {
+  composer: ComposerState;
+  destinationCtx: DestinationContext;
+}) {
+  if (!routesConversations(composer.sourceType)) return null;
+  // Silent until a destination is picked: the field tooltips already say
+  // what the silent default means, so the drawer only speaks when it has a
+  // choice to confirm.
+  if (!composer.traceProjectId) return null;
+  // Named from the same list the picker offers, so the line and the control
+  // cannot disagree about which project was chosen.
+  const chosen = destinationCtx.availableProjects.find(
+    (project) => project.id === composer.traceProjectId,
+  );
+  return (
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      data-testid="composer-destination-hint"
+    >
+      {`Conversations will land in ${chosen?.name ?? "the project picked under Advanced"}.`}
+    </Text>
+  );
+}
+
+export function SourceComposerDrawer({
   isOpen,
   organizationId,
   destinationCtx,
   composer,
   setComposer,
+  invalidFieldKeys,
   isPending,
   onSubmit,
   onClose,
@@ -992,11 +1540,18 @@ function SourceComposerDrawer({
   destinationCtx: DestinationContext;
   composer: ComposerState;
   setComposer: (next: ComposerState) => void;
+  /** Required fields a refused save found empty, marked on the form itself. */
+  invalidFieldKeys: readonly string[];
   isPending: boolean;
   onSubmit: () => void;
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
+  const advancedExtras = composerAdvancedExtras({
+    composer,
+    setComposer,
+    destinationCtx,
+  });
   // The type was picked from the Add source menu, which is where the plan
   // gate lives (see gatedSourceTypeOptions) — the composer is committed to
   // it. Changing type means closing and picking again, exactly like the
@@ -1018,6 +1573,19 @@ function SourceComposerDrawer({
             <Heading as="h2" size="md">
               Add {meta?.label ?? "ingestion source"}
             </Heading>
+            {/* What this source reads and what it needs granted, behind the
+                (i) rather than as a paragraph under the first input. It is
+                three or four sentences of prerequisites, and printed in the
+                body it pushed the fields it describes below the fold and was
+                scrolled past by everyone who had already read it once. See
+                dev/docs/best_practices/copywriting.md — the same rule the
+                per-field hints beside it already follow. */}
+            {meta?.blurb && (
+              <FieldInfoTooltip
+                description={meta.blurb}
+                testId="source-type-blurb"
+              />
+            )}
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
@@ -1029,15 +1597,12 @@ function SourceComposerDrawer({
               <Input
                 size="sm"
                 value={composer.name}
-                onChange={(e) => setComposer({ ...composer, name: e.target.value })}
+                onChange={(e) =>
+                  setComposer({ ...composer, name: e.target.value })
+                }
                 placeholder="Display name for this source"
               />
             </VStack>
-            {meta && (
-              <Text fontSize="xs" color="fg.muted">
-                {meta.blurb}
-              </Text>
-            )}
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                 Description (optional)
@@ -1046,7 +1611,9 @@ function SourceComposerDrawer({
                 size="sm"
                 rows={2}
                 value={composer.description}
-                onChange={(e) => setComposer({ ...composer, description: e.target.value })}
+                onChange={(e) =>
+                  setComposer({ ...composer, description: e.target.value })
+                }
                 placeholder="What this fleet covers + who owns it"
               />
             </VStack>
@@ -1054,29 +1621,26 @@ function SourceComposerDrawer({
             <ParserConfigFields
               sourceType={composer.sourceType}
               values={composer.parserConfig}
-              onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
+              onChange={(parserConfig) =>
+                setComposer({ ...composer, parserConfig })
+              }
+              invalidKeys={invalidFieldKeys}
+              advancedExtras={advancedExtras}
+            />
+
+            <ComposerDestinationHint
+              composer={composer}
+              destinationCtx={destinationCtx}
             />
 
             <OttlEditor
               organizationId={organizationId}
               sourceType={composer.sourceType}
               statements={composer.ottlStatements}
-              onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
+              onChange={(ottlStatements) =>
+                setComposer({ ...composer, ottlStatements })
+              }
               enabled={isOttlEnabledSourceType(composer.sourceType)}
-            />
-
-            <PullCadenceField
-              sourceType={composer.sourceType}
-              value={composer.pullSchedule}
-              onChange={(pullSchedule) => setComposer({ ...composer, pullSchedule })}
-            />
-
-            <TraceDestinationField
-              sourceType={composer.sourceType}
-              value={composer.traceProjectId}
-              onChange={(traceProjectId) => setComposer({ ...composer, traceProjectId })}
-              mode="create"
-              {...destinationCtx}
             />
           </VStack>
         </Drawer.Body>
@@ -1128,7 +1692,9 @@ function useSourceEditForm(source: Source | null) {
    * {@link buildEditSubmission} for why an untouched destination must not be
    * echoed back to a server that would re-validate it.
    */
-  const [destination, setDestination] = useState<string | null | undefined>(undefined);
+  const [destination, setDestination] = useState<string | null | undefined>(
+    undefined,
+  );
 
   // Keyed on `source?.id`, not `source`: a re-render that hands back an equal
   // row must not discard what the admin has typed since the drawer opened.
@@ -1139,7 +1705,11 @@ function useSourceEditForm(source: Source | null) {
     setDestination(undefined);
     const parser = (source.parserConfig as Record<string, unknown>) ?? {};
     const raw = parser.ottlStatements;
-    setStatements(Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : []);
+    setStatements(
+      Array.isArray(raw)
+        ? raw.filter((s): s is string => typeof s === "string")
+        : [],
+    );
     setParserConfig(
       seedComposerParserConfig({
         sourceType: source.sourceType as SourceType,
@@ -1191,7 +1761,11 @@ function SourceIdentityFields({
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
           Display name
         </Text>
-        <Input size="sm" value={name} onChange={(e) => onNameChange(e.target.value)} />
+        <Input
+          size="sm"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+        />
       </VStack>
       <VStack align="stretch" gap={1}>
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -1268,6 +1842,7 @@ function PullConfigEditFields({
   pullSchedule,
   onPullScheduleChange,
   hasPulled,
+  destinationField,
 }: {
   sourceType: SourceType;
   parserConfig: Record<string, string>;
@@ -1276,6 +1851,14 @@ function PullConfigEditFields({
   onPullScheduleChange: (next: string) => void;
   /** Whether the source already holds a poller cursor. */
   hasPulled: boolean;
+  /**
+   * The destination picker, when this source type routes conversations, so it
+   * joins the cadence in the one Advanced group instead of opening a second.
+   * No type reaches here with one today — the two that route conversations
+   * are both absent from `EDITABLE_PULL_CONFIG_SOURCE_TYPES` — but the day
+   * one does, the drawer must not sprout a second collapsible for it.
+   */
+  destinationField?: ReactNode;
 }) {
   const isStartLocked = isBackfillStartLocked({
     hasPulled,
@@ -1294,32 +1877,39 @@ function PullConfigEditFields({
         onChange={onParserConfigChange}
         mode="edit"
         readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
+        // Same group, same order as the create drawer: the two forms edit the
+        // same source and must not disagree about where a setting lives.
+        advancedExtras={
+          <>
+            <PullCadenceField
+              sourceType={sourceType}
+              value={pullSchedule}
+              onChange={onPullScheduleChange}
+            />
+            {destinationField}
+          </>
+        }
       />
       {isReportLocked && (
         <Text fontSize="xs" color="fg.muted">
-          The report is fixed once a source has pulled: usage and cost describe the same spend, so
-          recording both for one source would count it twice. To switch, archive this source and
-          create a new one.
+          The report is fixed once a source has pulled: usage and cost describe
+          the same spend, so recording both for one source would count it twice.
+          To switch, archive this source and create a new one.
         </Text>
       )}
       {isStartLocked && (
         <Text fontSize="xs" color="fg.muted">
-          The backfill start is fixed once a source has pulled: the cursor has already moved past it
-          and never rewinds. To re-read older data, archive this source and create a new one with an
-          earlier start.
+          The backfill start is fixed once a source has pulled: the cursor has
+          already moved past it and never rewinds. To re-read older data,
+          archive this source and create a new one with an earlier start.
         </Text>
       )}
       {hasPulled && parserConfig.report === "cost" && (
         <Text fontSize="xs" color="fg.muted">
-          Moving the backfill start re-reads cost history from the new date and restates the figures
-          already recorded for that window.
+          Moving the backfill start re-reads cost history from the new date and
+          restates the figures already recorded for that window.
         </Text>
       )}
-      <PullCadenceField
-        sourceType={sourceType}
-        value={pullSchedule}
-        onChange={onPullScheduleChange}
-      />
     </>
   );
 }
@@ -1375,7 +1965,7 @@ export function SourceEditDrawer({
   /**
    * The teams and projects a destination can be picked from, passed in rather
    * than derived here so this drawer and the create composer offer the same
-   * list — see `useDestinationContext` in `ingestionSourceForms.ts`.
+   * list — see `useDestinationContext` in `ingestion-source-forms.ts`.
    */
   destinationCtx: DestinationContext;
   source: Source | null;
@@ -1383,9 +1973,9 @@ export function SourceEditDrawer({
   onSubmit: (input: EditSubmission) => void;
   isPending: boolean;
 }) {
-  const toaster = useGovernanceToaster();
   const isOpen = !!source;
   const form = useSourceEditForm(source);
+  const toaster = useGovernanceToaster();
 
   // The DTO carries `sourceType` as a bare string; every lookup below is keyed
   // by `SourceType`, and an unknown value simply misses every table rather
@@ -1419,8 +2009,8 @@ export function SourceEditDrawer({
       parserConfig: form.parserConfig,
       ottlStatements: form.statements,
       pullSchedule: form.pullSchedule,
-      destination: form.destination,
       toaster,
+      destination: form.destination,
     });
     // null is a form that is not saveable — an empty name, or a pull field the
     // adapter cannot parse, which has already told the admin which one.
@@ -1506,6 +2096,37 @@ function SourceEditBody({
   // and narrowing `sourceType` is what lets the pull fields below take it as a
   // `SourceType` instead of re-asserting one.
   const isPullMode = isEditablePullSource(sourceType);
+  // Read here rather than left to the field's own early return, because the
+  // Advanced group has to know whether it holds anything before it offers
+  // itself — a disclosure that opens onto an empty box is worse than none.
+  const offersDestination = routesConversations(
+    source.sourceType as SourceType,
+  );
+
+  const destinationField = offersDestination ? (
+    <TraceDestinationField
+      sourceType={source.sourceType as SourceType}
+      // Both props describe `value`, so both have to move together. An
+      // untouched picker shows the stored destination and the archived
+      // notice that describes it; the moment a replacement is picked, the
+      // flag stops applying — it described the project that has just been
+      // replaced, not the one now on screen. Left true, the picker seeds
+      // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
+      // picks a project, sees nothing selected under an unchanged warning,
+      // and concludes the control is dead.
+      value={
+        form.destination === undefined
+          ? (source.traceProjectId ?? null)
+          : form.destination
+      }
+      onChange={form.setDestination}
+      mode="edit"
+      destinationArchived={
+        form.destination === undefined && (source.traceProjectArchived ?? false)
+      }
+      {...destinationCtx}
+    />
+  ) : null;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -1516,7 +2137,7 @@ function SourceEditBody({
         onDescriptionChange={form.setDescription}
       />
 
-      {isPullMode && (
+      {isPullMode ? (
         <PullConfigEditFields
           sourceType={sourceType}
           parserConfig={form.parserConfig}
@@ -1524,7 +2145,14 @@ function SourceEditBody({
           pullSchedule={form.pullSchedule}
           onPullScheduleChange={form.setPullSchedule}
           hasPulled={hasPulled}
+          destinationField={destinationField}
         />
+      ) : (
+        // A source type this form builds no adapter config for still has a
+        // destination to place, and no parser fields to hang the group off.
+        destinationField && (
+          <AdvancedSettingsGroup>{destinationField}</AdvancedSettingsGroup>
+        )
       )}
 
       <OttlEditor
@@ -1533,25 +2161,6 @@ function SourceEditBody({
         statements={form.statements}
         onChange={form.setStatements}
         enabled={isOttlEnabledSourceType(source.sourceType)}
-      />
-
-      <TraceDestinationField
-        sourceType={source.sourceType as SourceType}
-        // Both props describe `value`, so both have to move together. An
-        // untouched picker shows the stored destination and the archived
-        // notice that describes it; the moment a replacement is picked, the
-        // flag stops applying — it described the project that has just been
-        // replaced, not the one now on screen. Left true, the picker seeds
-        // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
-        // picks a project, sees nothing selected under an unchanged warning,
-        // and concludes the control is dead.
-        value={form.destination === undefined ? (source.traceProjectId ?? null) : form.destination}
-        onChange={form.setDestination}
-        mode="edit"
-        destinationArchived={
-          form.destination === undefined && (source.traceProjectArchived ?? false)
-        }
-        {...destinationCtx}
       />
 
       <Text fontSize="xs" color="fg.muted">
@@ -1585,14 +2194,54 @@ interface FieldDef {
    */
   advanced?: boolean;
   /**
+   * The sub-heading this field renders under, for a source whose fields
+   * serve more than one purpose. Consecutive fields sharing a group get one
+   * heading; a field without one renders as before. Purely presentational —
+   * grouping never changes what is saved, only the order it is asked in.
+   */
+  group?: string;
+  /**
+   * Whether the field is shown at all, given the sibling values. Absent means
+   * always. A hidden field's HELD value is deliberately not cleared (see
+   * `reconcileParserValues` — clearing a switch's siblings would discard what
+   * the admin typed on a mis-flip), so a builder reading a conditionally
+   * hidden field must decide from the controlling field, never from whether
+   * the hidden one still holds something.
+   */
+  visibleWhen?: (values: Record<string, string>) => boolean;
+  /**
    * How the field is rendered. Absent means a text input.
    *
    * A field only earns a `select` when its domain is closed and small enough
    * that showing it beats describing it — the point is to move the domain out
    * of the hint and into the control, so a wrong value is unreachable rather
    * than merely rejected. `date` is for values the admin thinks of as a day.
+   * `switch` is for a setting with exactly two states and a right answer for
+   * almost everyone: a two-entry select asks the admin to read both lines to
+   * find out it was already decided for them.
    */
-  control?: "select" | "date";
+  control?: "select" | "date" | "switch";
+  /**
+   * Where a `control: "switch"` sits before anyone touches it.
+   *
+   * Declared on the field rather than assumed, because the form holds strings
+   * and an untouched field holds nothing at all — so "no value" has to name a
+   * state somewhere, and this is the one declaration the render and the
+   * builder both read. They cannot drift into showing one answer and saving
+   * another.
+   */
+  defaultOn?: boolean;
+  /**
+   * What a `control: "select"` holds on a form nobody has touched yet.
+   *
+   * Only for a choice that has a right answer for almost everyone. A required
+   * picker with no default asks the admin to read every option to discover
+   * which one they were always going to pick, and a picker whose default is
+   * only written into `startComposer` would show one answer on create and
+   * another on edit. Declared on the field, so the seed and the option list
+   * cannot drift.
+   */
+  defaultValue?: string;
   /**
    * The choices, for `control: "select"`.
    *
@@ -1627,7 +2276,8 @@ export interface FieldOption {
 export type FieldControl =
   | { kind: "text"; hint?: string }
   | { kind: "date"; hint?: string }
-  | { kind: "select"; options: readonly FieldOption[]; hint?: string };
+  | { kind: "select"; options: readonly FieldOption[]; hint?: string }
+  | { kind: "switch"; defaultOn: boolean; hint?: string };
 
 export function fieldControl({
   field,
@@ -1638,10 +2288,37 @@ export function fieldControl({
 }): FieldControl {
   const hint = field.contextHint?.(values);
   if (field.control === "date") return { kind: "date", hint };
+  if (field.control === "switch") {
+    return { kind: "switch", defaultOn: field.defaultOn ?? false, hint };
+  }
   if (field.control === "select") {
     return { kind: "select", options: field.options?.(values) ?? [], hint };
   }
   return { kind: "text", hint };
+}
+
+/**
+ * Whether a switch field is on, given what the form holds for it.
+ *
+ * The switch writes "true" or "false" and nothing else, so anything else is a
+ * value no control produced — an unset field, a source created before the
+ * field existed, a hand-edited config — and says nothing about what the admin
+ * chose. The field's own declared default is the answer for all of them, which
+ * is what keeps an untouched form and the config it saves agreeing.
+ *
+ * Read by the render and by the builders, deliberately: a second answer to
+ * "is this on" is how a toggle ends up showing one state and saving the other.
+ */
+export function switchFieldIsOn({
+  value,
+  defaultOn,
+}: {
+  value: string | undefined;
+  defaultOn: boolean;
+}): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return defaultOn;
 }
 
 /**
@@ -1654,8 +2331,9 @@ export function fieldControl({
  * whole save for a field the form no longer even offers. Clearing it is the
  * only outcome that matches what the admin is being shown.
  *
- * Deliberately narrow: text and date fields are never touched, because their
- * domains are not enumerable and "not in the list" means nothing there.
+ * Deliberately narrow: text, date and switch fields are never touched,
+ * because their domains are not enumerable and "not in the list" means nothing
+ * there — for a switch it would mean silently turning a deliberate off back on.
  */
 export function reconcileParserValues({
   sourceType,
@@ -1694,13 +2372,9 @@ export function dateInputValue(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const parsed = toEpochMs(trimmed);
+  const parsed = Date.parse(trimmed);
   if (Number.isNaN(parsed)) return "";
-
-  return Temporal.Instant.fromEpochMilliseconds(parsed)
-    .toZonedDateTimeISO("UTC")
-    .toPlainDate()
-    .toString();
+  return new Date(parsed).toISOString().slice(0, 10);
 }
 
 /**
@@ -1714,42 +2388,159 @@ export type ParserConfigMode = "create" | "edit";
 /**
  * The bucket widths Anthropic's usage report accepts, newest-grained first.
  *
- * One list, read by both the picker and `validBucketWidth`, so the form cannot
- * offer a width the builder then refuses. The adapter's own
- * `anthropicAdminPullConfigSchema` declares the same domain server-side and the
- * unit test asserts the two still agree — that cross-check is what keeps this
- * from becoming a second source of truth rather than a projection of the first.
+ * `validBucketWidth` reads it directly. The picker reads it through the type of
+ * `ANTHROPIC_BUCKET_WIDTH_LABELS`, which is keyed off this list: it offers daily
+ * to everyone and additionally whichever of these a source is already being read
+ * at, so opening an old source to edit it does not silently move it to daily.
+ * Adding a width here without labelling it there is a build error, which is what
+ * keeps the two from parting company.
+ *
+ * The adapter's own `anthropicAdminPullConfigSchema` declares the same domain
+ * server-side and `anthropicFormControls.unit.test.ts` asserts the two still
+ * agree, which is what keeps this a projection of the schema rather than a
+ * second source of truth.
  */
-const ANTHROPIC_BUCKET_WIDTHS = ["1m", "1h", "1d"] as const;
+export const ANTHROPIC_BUCKET_WIDTHS = ["1m", "1h", "1d"] as const;
 
-const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<string, string> = {
+/**
+ * What each width in `ANTHROPIC_BUCKET_WIDTHS` is called on the form.
+ *
+ * Keyed off that list rather than `string`, so adding a width there without a
+ * label here is a build error instead of a picker entry reading `2h`.
+ *
+ * Daily is deliberately absent: `ANTHROPIC_DAILY_BUCKET_OPTION` owns that
+ * wording, and the only reader of this map has already returned for a held
+ * `1d` before it gets here. A second copy could only drift from the first.
+ */
+const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<
+  Exclude<(typeof ANTHROPIC_BUCKET_WIDTHS)[number], "1d">,
+  string
+> = {
   "1m": "1m — per minute",
   "1h": "1h — hourly",
-  "1d": "1d — daily",
 };
 
 /**
- * The bucket widths offered for the report currently selected.
+ * The one bucket width either report is read at.
  *
- * The cost report gets the default entry alone. Not politeness: the puller
- * pins `COST_REPORT_BUCKET_WIDTH` and ignores `config.bucketWidth`, so
- * `validBucketWidth` rejects any width on a cost source — offering one would
- * offer a value whose only effect is to fail the save.
+ * Daily on both, and the same entry on both. The cost report has never had a
+ * choice — the puller pins `COST_REPORT_BUCKET_WIDTH` and ignores
+ * `config.bucketWidth` — and the usage report no longer offers one either: the
+ * finer widths multiply the rows a day costs without changing any figure the
+ * pillar shows, since every screen that reads this data reads it by day.
+ *
+ * It carries no value on purpose. Empty means "say nothing", which leaves the
+ * adapter's own `1d` default to apply, so the form is not a second place daily
+ * is written down and cannot come to disagree with the schema.
  */
-function anthropicBucketWidthOptions(values: Record<string, string>): readonly FieldOption[] {
-  const isUsage = (values.report ?? "").trim().toLowerCase() === "usage";
-  const fallback: FieldOption = {
-    value: "",
-    label: isUsage ? "Default (1d — daily)" : "1d — daily",
-  };
-  if (!isUsage) return [fallback];
-  return [
-    fallback,
-    ...ANTHROPIC_BUCKET_WIDTHS.map((width) => ({
-      value: width,
-      label: ANTHROPIC_BUCKET_WIDTH_LABELS[width] ?? width,
-    })),
-  ];
+const ANTHROPIC_DAILY_BUCKET_OPTION: FieldOption = {
+  value: "",
+  label: "1d — daily",
+};
+
+/**
+ * The bucket widths offered: daily, plus the one this source is already read at
+ * if that is something else.
+ *
+ * Daily alone would have been a silent migration rather than a narrowing.
+ * `reconcileParserValues` drops any held value the picker does not offer, so a
+ * usage source saved back when `1m` and `1h` were offered would have had its
+ * width cleared the next time anyone opened its drawer — for an unrelated
+ * change, with nothing on screen saying so. The finer widths are withdrawn from
+ * new sources; they are not taken away from the sources already using them.
+ *
+ * The retained entry is the held value verbatim, so choosing daily is still how
+ * you move off it. `1d` is not retained — the daily entry already means daily,
+ * and two entries saying so is a choice between identical answers.
+ *
+ * Exactly two things retire a held width, and both are stated positively here
+ * rather than deferred to `validBucketWidth`. That function answers a different
+ * question — what the builder may store — and its "anything but `usage`"
+ * includes the empty report, which on this side of the form is not a verdict
+ * but a state the admin passes through: the report picker keeps an empty entry
+ * so a cleared field is refused rather than refilled, so clearing it to re-pick
+ * it is an ordinary gesture. Reading a drop out of that would take the width
+ * away mid-gesture and not give it back — the silent migration this function
+ * exists to prevent, arriving by a second route. Nothing can be saved from that
+ * state regardless: the builder refuses an empty report before it reads a width.
+ */
+function anthropicBucketWidthOptions(
+  values: Record<string, string>,
+): readonly FieldOption[] {
+  const held = (values.bucketWidth ?? "").trim();
+  if (held === "" || held === "1d") return [ANTHROPIC_DAILY_BUCKET_OPTION];
+
+  // Positively cost: the puller pins `COST_REPORT_BUCKET_WIDTH` and ignores the
+  // setting, so a width stored here was never in effect.
+  const report = (values.report ?? "").trim().toLowerCase();
+  if (report === "cost") return [ANTHROPIC_DAILY_BUCKET_OPTION];
+
+  // Not a width the adapter knows — a hand-edited config, or one saved before
+  // the domain changed. There is nothing to offer and nothing to keep.
+  const label =
+    ANTHROPIC_BUCKET_WIDTH_LABELS[
+      held as keyof typeof ANTHROPIC_BUCKET_WIDTH_LABELS
+    ];
+  if (!label) return [ANTHROPIC_DAILY_BUCKET_OPTION];
+
+  return [ANTHROPIC_DAILY_BUCKET_OPTION, { value: held, label }];
+}
+
+/**
+ * Whether a Copilot Studio source reads the tenant's seat licences when nobody
+ * has said either way.
+ *
+ * One constant because two readers need the same answer: the switch renders
+ * from it, and `buildCopilotStudioDataversePullConfig` saves from it for a form
+ * that was never touched. Split them and the form shows one state while the
+ * save stores the other.
+ */
+const READ_SEATS_DEFAULT_ON = true;
+
+/**
+ * Whether a Copilot Studio source reads the tenant's directory when nobody has
+ * said either way.
+ *
+ * On, for the same reason the seat read is on: a source that records who ran an
+ * agent and never says who they are answers "who is using this" with a list of
+ * opaque ids, and an admin who wanted the answer would have had to know the
+ * setting existed to get it. The directory read is what turns those ids into
+ * people, departments and the agents' own owners - every screen in the pillar
+ * that names a person is downstream of it.
+ *
+ * The consent is real and heavier than the seat read's - `/users` needs
+ * `User.Read.All` - which is why the switch stays on the form rather than being
+ * assumed: an admin who does not want it turns it off in the same sitting. What
+ * it must not do is default off and stay unmentioned, which is how the product
+ * came to show an empty People screen with no page anywhere saying why. A
+ * refusal costs nothing: `readMicrosoftDirectory` holds the day rather than
+ * failing the run.
+ *
+ * One constant, read by the switch and by the builder, so an untouched form
+ * cannot show one state and save the other.
+ */
+const READ_DIRECTORY_DEFAULT_ON = true;
+
+/**
+ * Whether a new Copilot Studio source uses one app registration for both the
+ * conversation read and the bill, when nobody has said either way.
+ *
+ * On, because most admins set up one app and stop there (issue #7775). The
+ * split-credential arrangement stays the recommendation for tenants whose
+ * finance approval is separate (ADR-128 §21.1) — it is one switch away, not
+ * the price of entry. Same one-constant rule as `READ_SEATS_DEFAULT_ON`:
+ * the switch renders from it, the billing fields hide from it, and the
+ * builder saves from it, so an untouched form cannot show one arrangement
+ * and store another.
+ */
+const AZURE_ONE_APP_DEFAULT_ON = true;
+
+/** Whether the form's held values choose one app registration for everything. */
+function azureOneAppChosen(values: Record<string, string>): boolean {
+  return switchFieldIsOn({
+    value: values.azureBillingUsesSameApp,
+    defaultOn: AZURE_ONE_APP_DEFAULT_ON,
+  });
 }
 
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
@@ -1809,6 +2600,10 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "How often to call Purview Audit. Default 300s.",
     },
   ],
+  // Three groups, in the order admins care (issue #7775): where the
+  // environment lives, what it costs, and who may read its conversations.
+  // Grouping is presentational only — every key, secret flag and builder
+  // below is unchanged by it.
   copilot_studio_dataverse: [
     {
       key: "environmentUrl",
@@ -1816,6 +2611,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "https://org12345.crm.dynamics.com",
       hint: "From Power Platform admin centre → your environment → Environment URL. Environments served from a custom domain are not supported yet.",
       required: true,
+      group: "Connection",
     },
     {
       // Named `credentials*` on purpose, like the Databricks fields: the
@@ -1827,6 +2623,19 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      group: "Connection",
+    },
+    {
+      // NOT a `credentials*` field, unlike the tenant id above. A
+      // subscription id is a coordinate rather than a secret, and the adapter
+      // reads it off the config itself; naming it
+      // `credentialsAzureSubscriptionId` would bury it in the encrypted
+      // subtree where the config schema never looks.
+      key: "azureSubscriptionId",
+      label: "Azure subscription ID (optional)",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      hint: "Add this to also record what the environment costs each day. Leave it empty to record conversations only.",
+      group: "Cost",
     },
     {
       key: "credentialsClientId",
@@ -1834,6 +2643,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      group: "Conversation access",
     },
     {
       key: "credentialsClientSecret",
@@ -1842,6 +2652,86 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
       required: true,
       secret: true,
+      group: "Conversation access",
+    },
+    {
+      // One app for both reads is what most admins actually set up; the
+      // split-credential arrangement (ADR-128 §21.1) stays one flip away for
+      // tenants whose finance approval is separate. The choice itself is
+      // persisted by the builder (`azureBillingUsesSameApp`), because it
+      // cannot be reconstructed from the stored credentials once they are
+      // sealed. Last on the form: it refers back to the credential above it,
+      // and most admins never touch it.
+      key: "azureBillingUsesSameApp",
+      label: "Use one app registration for everything",
+      placeholder: "",
+      hint: "On, the app registration under Conversation access also reads the subscription's bill — grant it the Cost Management Reader role on the subscription. Turn it off to give the bill its own app registration, holding that role and nothing else, so the finance approval never hands out conversation access.",
+      control: "switch",
+      defaultOn: AZURE_ONE_APP_DEFAULT_ON,
+      group: "Billing",
+    },
+    {
+      // The bill's OWN app registration: it holds Cost Management Reader on
+      // the subscription and nothing else, so the person who approves the
+      // finance grant hands out a permission that reads money and cannot read
+      // a conversation. Only offered once the admin has turned the one-app
+      // switch off — hidden, the copy in `copilotAzureBillingFrom` answers
+      // instead.
+      key: "credentialsBillingClientId",
+      label: "Billing app registration client ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription — it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
+      secret: true,
+      group: "Billing",
+      visibleWhen: (values) => !azureOneAppChosen(values),
+    },
+    {
+      key: "credentialsBillingClientSecret",
+      label: "Billing app registration client secret",
+      placeholder: "(value pasted from the Azure portal)",
+      secret: true,
+      group: "Billing",
+      visibleWhen: (values) => !azureOneAppChosen(values),
+    },
+    {
+      // Declared by the customer, never inferred (ADR-128 §21.4): prepaid
+      // credit packs create no Azure resource, so the cost feed returns
+      // nothing — byte-for-byte what a quiet pay-as-you-go month returns.
+      // Only this declaration licenses the panel's prepaid sentence.
+      // Advanced because almost nobody runs on packs: the declaration is
+      // where an admin goes to disagree with the pay-as-you-go default.
+      key: "azureBillingIsPrepaid",
+      label: "This Copilot runs on prepaid message packs",
+      placeholder: "",
+      hint: "Prepaid message packs never appear on the Azure bill. Turn this on and the spend panel will say so instead of showing an empty bill as if nothing ran.",
+      control: "switch",
+      defaultOn: false,
+      advanced: true,
+    },
+    {
+      key: "readSeats",
+      label: "Also record licence counts",
+      placeholder: "",
+      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned — only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
+      control: "switch",
+      defaultOn: READ_SEATS_DEFAULT_ON,
+      // Advanced because the default is already the answer for almost
+      // everyone: the collapsed group is where an admin goes to disagree, not
+      // where the setting hides.
+      advanced: true,
+    },
+    {
+      // Primary, not advanced, unlike the seat read beside it. The two switches
+      // look alike and are not: turning this one off empties the People and
+      // Departments screens and leaves every agent unowned, so it is a choice
+      // an admin should make while looking at it rather than discover later
+      // behind a collapsed group.
+      key: "readDirectory",
+      label: "Also record people and departments",
+      placeholder: "",
+      hint: "Reads once a day the directory entries of the people who ran an agent, so the pillar can show names, departments and agent owners instead of opaque ids. It needs a consent the conversation read does not: a tenant admin must grant the app registration the User.Read.All application permission, which lets this source read every user in the tenant. Turn it off and conversations are still recorded, just against ids nobody can put a name to. Without the grant the read is refused, nothing is recorded, and the run still succeeds.",
+      control: "switch",
+      defaultOn: READ_DIRECTORY_DEFAULT_ON,
     },
   ],
   openai_compliance: [
@@ -1891,7 +2781,12 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   ],
   claude_compliance: [
     {
-      key: "workspaceApiKey",
+      // `credentials*` prefix, like every other secret this form collects:
+      // it is what routes the value into the encrypted `credentials` subtree
+      // the adapter's frozen `${{credentials.token}}` header reads. Under its
+      // old name the field was collected, dropped by `parserFieldValue` as a
+      // secret, and put back by nothing.
+      key: "credentialsToken",
       label: "Workspace API key",
       placeholder: "sk-ant-admin-...",
       hint: "Generate under Anthropic Admin Console → Compliance → Workspace API Keys. We hash this server-side.",
@@ -1922,10 +2817,15 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "Exactly one per source. `cost` carries Anthropic's own reported spend (Priority Tier usage is excluded, so it is close to but not the invoice); `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
       required: true,
       control: "select",
-      // The empty first entry is load-bearing, not decorative: a controlled
-      // <select> holding "" with no "" option displays its first real option,
-      // so the admin would be shown a report they never chose on a field the
-      // form marks required.
+      // Cost, because it is what almost every organization adds this source
+      // for: it is the provider's own figure for what was spent, and the usage
+      // report is the specialist choice made by someone who wants our pricing
+      // applied to raw token counts instead.
+      defaultValue: "cost",
+      // The empty first entry stays even though the field now opens on an
+      // answer: an admin who clears the picker has said something, and the
+      // form refuses the save and marks the field rather than quietly
+      // reinstating the default they just removed.
       options: () => [
         { value: "", label: "Select a report…" },
         { value: "usage", label: "Usage — token counts, priced by us" },
@@ -1960,10 +2860,13 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
     },
     {
-      // Named `credentials*` on purpose: `buildParserConfig` routes every
-      // `credentials*` field into the `credentials` subtree, which is the ONLY
-      // part of parserConfig the server encrypts before it reaches the
-      // database. A field named `clientId` would sit in the JSONB in plaintext.
+      // Named `credentials*` on purpose. `buildParserConfig` does not route
+      // these anywhere — it DROPS every secret field, so none is ever written
+      // to the plaintext part of parserConfig. Putting them back under
+      // `credentials`, the ONLY subtree the server encrypts before the row
+      // reaches the database, is this source type's pull-config builder's
+      // job. A field named `clientId` would be dropped just the same and
+      // never reach the adapter at all.
       key: "credentialsClientId",
       label: "Service principal client ID",
       placeholder: "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
@@ -1997,7 +2900,19 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       label: "SQL warehouse ID (optional)",
       advanced: true,
       placeholder: "095eb666b2ed2762",
-      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded at zero cost, which is what Genie itself charges. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
+      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded without an amount, since the compute behind them was never read. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
+    },
+    {
+      key: "readPaidGenieBill",
+      label: "Also record Genie's own bill line",
+      placeholder: "",
+      hint: "Reads the usage Databricks bills under the Genie product itself — the per-message and inference charges, separate from the warehouse compute the questions run on — and records it per person, per day, per price line, at list price. It runs on the same SQL warehouse as the question pricing and needs the same SELECT on the `system` catalogue; with no warehouse named the read cannot start and the run says so. Off by default because most workspaces are still on Genie's free line, which this read records as usage with no amount.",
+      control: "switch",
+      defaultOn: false,
+      // Advanced for the same reason the warehouse id beside it is: it is a
+      // billing read a metastore admin has to grant, not part of getting the
+      // source to record conversations at all.
+      advanced: true,
     },
   ],
   s3_custom: [
@@ -2134,7 +3049,9 @@ export function isSecretFieldKey(key: string): boolean {
  * required-field markers rather than fire a dispatch that the worker
  * would reject at validateConfig time.
  */
-function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | null {
+function buildHttpCustomPullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
   const p = c.parserConfig;
   const url = (p.url ?? "").trim();
   const headerName = (p.authHeaderName ?? "Authorization").trim();
@@ -2144,7 +3061,14 @@ function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | 
   const cursorPath = (p.cursorJsonPath ?? "").trim();
   const cursorParam = (p.cursorQueryParam ?? "").trim() || "cursor";
   const mappingDsl = (p.eventMappingDsl ?? "").trim();
-  if (!url || !headerValue || !token || !eventsPath || !cursorPath || !mappingDsl) {
+  if (
+    !url ||
+    !headerValue ||
+    !token ||
+    !eventsPath ||
+    !cursorPath ||
+    !mappingDsl
+  ) {
     return null;
   }
   const eventMapping: Record<string, string> = {};
@@ -2167,12 +3091,65 @@ function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | 
     cursorJsonPath: cursorPath,
     cursorQueryParam: cursorParam,
     eventsJsonPath: eventsPath,
-    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.http_polling ||
+      "*/15 * * * *",
     eventMapping,
     // Per HttpPollingPullerAdapter contract: caller-supplied secrets land
     // on `pullConfig.credentials.*` and the adapter substitutes them into
     // the header template via the `${{credentials.<key>}}` syntax.
     credentials: { token },
+  };
+}
+
+/**
+ * The Claude Enterprise Compliance adapter config, or null when a new source
+ * names no workspace API key.
+ *
+ * The adapter's shape is frozen — `ClaudeComplianceReferencePuller.validateConfig`
+ * returns `CLAUDE_COMPLIANCE_PULL_CONFIG` whatever is stored — so the only
+ * thing this builder has to get right is the credential: the frozen header
+ * reads `${{credentials.token}}`, and `credentials` is the one subtree the
+ * server encrypts. Everything else the form collects (the polling cadence)
+ * keeps travelling through `buildParserConfig` exactly as before.
+ *
+ * The adapter id is written explicitly rather than copied from the frozen
+ * config, which names the generic `http_polling` adapter it is built on:
+ * `resolvePullAdapter` dispatches on this field, so copying it would run the
+ * generic puller in place of this one. The frozen config is not imported here
+ * at all — it lives in a server puller module, and pulling that into the
+ * inventory page would drag the puller stack into the browser bundle.
+ *
+ * `shouldRequireCredentials` carries the same meaning as it does for the two
+ * Admin builders below: on edit a blank key means "leave it alone", so the
+ * key is OMITTED rather than emitted empty, because `updateSource` carries the
+ * stored envelope across only for a key that is genuinely absent.
+ *
+ * NEITHER PATH REACHES THIS BUILDER TODAY. The type is `deprecated` in the
+ * catalog, so the create picker never offers it, and it is absent from
+ * `EDITABLE_PULL_CONFIG_SOURCE_TYPES`, so `buildEditSubmission` never asks
+ * for it. The builder exists so that the day the type is offered again, the
+ * secret already lands where the adapter reads it (#7583) instead of under
+ * the old `workspaceApiKey` name the adapter never looked at. The coverage
+ * guard in `pullConfigBuilderCoverage.unit.test.ts` is what keeps it wired.
+ */
+export function buildClaudeCompliancePullConfig(
+  c: ComposerState,
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
+): Record<string, unknown> | null {
+  const token = trimmedField(c.parserConfig, "credentialsToken");
+  if (!token && shouldRequireCredentials) return null;
+
+  return {
+    adapter: "claude_compliance",
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.claude_compliance ||
+      "*/15 * * * *",
+    ...(token ? { credentials: { token } } : {}),
   };
 }
 
@@ -2196,44 +3173,11 @@ function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | 
  * is how the two paths would drift into disagreeing about what a valid bucket
  * width is.
  */
-/**
- * The pullConfig for an OpenAI Admin source, or null when a required field is
- * empty or a supplied backfill start is not a real instant.
- *
- * The composer's dispatch table has always named this builder and it was never
- * written, so choosing "OpenAI Admin" threw `ReferenceError` before any
- * validation could run.
- *
- * The shape is the puller's own (`openaiAdminPullConfigSchema`): one report,
- * `cost`, because `/v1/organization/costs` is the only surface this adapter
- * reads; `startingAt` as an ISO instant, which is why a bare calendar date is
- * normalised rather than passed through; and the key under `credentials`, the
- * one subtree the server encrypts at rest.
- */
-export function buildOpenAiAdminPullConfig(
-  c: ComposerState,
-  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
-): Record<string, unknown> | null {
-  const token = trimmedField(c.parserConfig, "credentialsToken");
-  if (!token && shouldRequireCredentials) return null;
-
-  const startingAt = normalizeStartingAt(trimmedField(c.parserConfig, "startingAt"));
-  if (startingAt === null) return null;
-
-  return {
-    adapter: "openai_admin",
-    report: "cost",
-    ...(startingAt ? { startingAt } : {}),
-    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.openai_admin || "0 * * * *",
-    // Omitted, not blanked: on the edit path a blank field means "keep the
-    // stored key", and `credentials: { token: "" }` would overwrite it.
-    ...(token ? { credentials: { token } } : {}),
-  };
-}
-
 export function buildAnthropicAdminPullConfig(
   c: ComposerState,
-  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const token = trimmedField(p, "credentialsToken");
@@ -2252,9 +3196,47 @@ export function buildAnthropicAdminPullConfig(
     report,
     ...(bucketWidth ? { bucketWidth } : {}),
     ...(startingAt ? { startingAt } : {}),
-    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
-    // Omitted, not blanked: on the edit path a blank field means "keep the
-    // stored key", and `credentials: { token: "" }` would overwrite it.
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
+      "0 * * * *",
+    ...(token ? { credentials: { token } } : {}),
+  };
+}
+
+/**
+ * The OpenAI Admin adapter config, or null when a required field is empty or
+ * the backfill start is not a date the adapter will accept. Nothing validates
+ * pullConfig against the adapter schema at save time, so the builder is the
+ * last checkpoint before the database.
+ *
+ * There is no report to choose: the adapter pulls the cost report and only the
+ * cost report, because the provider's usage surface returns nothing for spend
+ * the cost surface bills. `shouldRequireCredentials` carries the same meaning
+ * as it does for Anthropic above — on edit a blank key means "leave it alone",
+ * so the key must be OMITTED rather than written empty.
+ */
+export function buildOpenAiAdminPullConfig(
+  c: ComposerState,
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const token = trimmedField(p, "credentialsToken");
+  if (!token && shouldRequireCredentials) return null;
+
+  const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
+  if (startingAt === null) return null;
+
+  return {
+    adapter: "openai_admin",
+    report: "cost",
+    ...(startingAt ? { startingAt } : {}),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.openai_admin ||
+      "0 * * * *",
     ...(token ? { credentials: { token } } : {}),
   };
 }
@@ -2274,17 +3256,25 @@ function trimmedField(p: Record<string, string>, key: string): string {
  *
  * Empty yields undefined (the field is optional); rejected yields null.
  */
-function validBucketWidth(raw: string, report: string): string | null | undefined {
+function validBucketWidth(
+  raw: string,
+  report: string,
+): string | null | undefined {
   if (!raw) return undefined;
   if (report !== "usage") return null;
-  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw) ? raw : null;
+  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw)
+    ? raw
+    : null;
 }
 
 /** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
 function isRealCalendarDate(year: number, month: number, day: number): boolean {
-  const probe = Temporal.PlainDate.from({ year, month, day }, { overflow: "constrain" });
-
-  return probe.year === year && probe.month === month && probe.day === day;
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return (
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day
+  );
 }
 
 /**
@@ -2313,26 +3303,16 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 
   const match = STARTING_AT.exec(raw);
   if (!match) return null;
-  if (!isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))) {
+  if (
+    !isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
+  ) {
     return null;
   }
 
-  const parsed = toEpochMs(raw);
-
-  return Number.isNaN(parsed)
-    ? null
-    : Temporal.Instant.fromEpochMilliseconds(parsed).toString({ fractionalSecondDigits: 3 });
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
 
-/**
- * The Databricks Genie adapter config, or null when a required field is empty.
- *
- * Genie needs a real builder rather than the bare `{ adapter }` the other
- * reference pullers get, for two reasons the form cannot express on its own:
- * the token has to land under `credentials` so the server encrypts it, and
- * `spaceIds` is a comma-separated string in the form but an array in the
- * adapter's schema.
- */
 /**
  * The pullConfig for a Copilot Studio source reading Dataverse.
  *
@@ -2344,7 +3324,9 @@ function normalizeStartingAt(raw: string): string | null | undefined {
  * the source would save looking complete and fail every run for want of a
  * credential it did ask for.
  */
-function buildCopilotStudioDataversePullConfig(c: ComposerState): Record<string, unknown> | null {
+export function buildCopilotStudioDataversePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
   const p = c.parserConfig;
   const environmentUrl = (p.environmentUrl ?? "").trim().replace(/\/+$/, "");
   const tenantId = (p.credentialsTenantId ?? "").trim();
@@ -2355,6 +3337,7 @@ function buildCopilotStudioDataversePullConfig(c: ComposerState): Record<string,
   // and accepting it would save a source that cannot run.
   if (!environmentUrl || !tenantId || !clientId || !clientSecret) return null;
 
+  const billing = copilotAzureBillingFrom(p);
   return {
     adapter: "copilot_studio_dataverse",
     environmentUrl,
@@ -2365,12 +3348,128 @@ function buildCopilotStudioDataversePullConfig(c: ComposerState): Record<string,
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
     schedule:
-      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse || "*/15 * * * *",
-    credentials: { tenantId, clientId, clientSecret },
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
+      "*/15 * * * *",
+    ...billing.config,
+    // A real boolean, because the adapter's schema is `z.boolean()` and would
+    // refuse the form's string on every run. The default comes from the field
+    // definition the switch renders from, so a form nobody touched saves the
+    // state it was showing.
+    readSeats: switchFieldIsOn({
+      value: p.readSeats,
+      defaultOn: READ_SEATS_DEFAULT_ON,
+    }),
+    // Same rule as `readSeats` above: a real boolean, from the same constant
+    // the switch renders from, so an untouched form saves what it was showing.
+    readDirectory: switchFieldIsOn({
+      value: p.readDirectory,
+      defaultOn: READ_DIRECTORY_DEFAULT_ON,
+    }),
+    credentials: { tenantId, clientId, clientSecret, ...billing.credentials },
   };
 }
 
-function buildDatabricksGeniePullConfig(c: ComposerState): Record<string, unknown> | null {
+/**
+ * The Azure billing part of a Copilot Studio pullConfig: the subscription and
+ * prepaid declaration for the config itself, and the billing identity's pair
+ * for the encrypted credentials subtree.
+ *
+ * The subscription is omitted rather than sent empty, the same way Genie
+ * omits an unset warehouse: the adapter reads "no subscription named" as "do
+ * not read cost", and an empty string is a subscription id it would then ask
+ * Azure about — and the schema would refuse it as not a uuid, failing the
+ * save for a field the customer deliberately left blank. The prepaid flag
+ * rides only beside a subscription: without a bill to read the declaration
+ * has nothing to explain, and a stored `true` would spring back the day a
+ * subscription is added — declared by nobody.
+ *
+ * The billing keys are present or absent, never empty strings, which
+ * everything downstream would read as credentials. Whether the pair is
+ * COMPLETE is judged server-side (`assertAzureBillHasItsOwnCredential`),
+ * whose refusal names what is missing; the builder's job is only to not
+ * manufacture values.
+ *
+ * With one app chosen (the form's default), the billing slots are COPIES of
+ * the conversation pair, decided here at save time from the switch alone —
+ * never from leftover billing values the form may still hold from a two-app
+ * detour, which the form deliberately never clears. The choice itself is
+ * written as `azureBillingUsesSameApp`, and only beside a subscription (same
+ * rule as the prepaid flag): it is the only durable record — once the
+ * credentials are sealed, equal-looking pairs cannot be told apart from a
+ * deliberate second app with the same values.
+ */
+function copilotAzureBillingFrom(p: Record<string, string>): {
+  config: Record<string, unknown>;
+  credentials: Record<string, string>;
+} {
+  const azureSubscriptionId = (p.azureSubscriptionId ?? "").trim();
+  const oneApp = azureOneAppChosen(p);
+
+  const config: Record<string, unknown> = {};
+  if (azureSubscriptionId) {
+    config.azureSubscriptionId = azureSubscriptionId;
+    config.azureBillingIsPrepaid = switchFieldIsOn({
+      value: p.azureBillingIsPrepaid,
+      defaultOn: false,
+    });
+    config.azureBillingUsesSameApp = oneApp;
+  }
+
+  return {
+    config,
+    credentials: copilotBillingCredentialsFrom({
+      p,
+      oneApp,
+      hasBillToRead: azureSubscriptionId.length > 0,
+    }),
+  };
+}
+
+/**
+ * Which values land in the billing credential slots, given the one-app
+ * choice. One app: the conversation pair, and only when there is a bill to
+ * read — never a speculative credential, and never the leftover billing
+ * values a two-app detour may have left in form state. Two apps: what the
+ * admin typed in the billing fields, exactly as before the switch existed.
+ */
+function copilotBillingCredentialsFrom({
+  p,
+  oneApp,
+  hasBillToRead,
+}: {
+  p: Record<string, string>;
+  oneApp: boolean;
+  hasBillToRead: boolean;
+}): Record<string, string> {
+  if (oneApp && !hasBillToRead) return {};
+  const source = oneApp
+    ? { id: p.credentialsClientId, secret: p.credentialsClientSecret }
+    : {
+        id: p.credentialsBillingClientId,
+        secret: p.credentialsBillingClientSecret,
+      };
+
+  const id = (source.id ?? "").trim();
+  const secret = (source.secret ?? "").trim();
+  const credentials: Record<string, string> = {};
+  if (id) credentials.billingClientId = id;
+  if (secret) credentials.billingClientSecret = secret;
+  return credentials;
+}
+
+/**
+ * The Databricks Genie adapter config, or null when a required field is empty.
+ *
+ * Genie needs a real builder rather than the bare `{ adapter }` the other
+ * reference pullers get, for two reasons the form cannot express on its own:
+ * the token has to land under `credentials` so the server encrypts it, and
+ * `spaceIds` is a comma-separated string in the form but an array in the
+ * adapter's schema.
+ */
+function buildDatabricksGeniePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
   const credentials = genieCredentialsFrom(p);
@@ -2386,11 +3485,21 @@ function buildDatabricksGeniePullConfig(c: ComposerState): Record<string, unknow
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
-    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.databricks_genie || "*/15 * * * *",
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.databricks_genie ||
+      "*/15 * * * *",
     // Omitted rather than sent empty: the adapter reads "no warehouse named" as
     // "do not price these questions", and an empty string is a warehouse id it
     // would then ask the workspace about.
     ...(warehouseId ? { warehouseId } : {}),
+    // A real boolean, from the same constant the field declares, so what the
+    // adapter reads is what the switch showed: off unless the admin turned it
+    // on, never the absence of a form value read as a setting.
+    readPaidGenieBill: switchFieldIsOn({
+      value: p.readPaidGenieBill,
+      defaultOn: false,
+    }),
     credentials,
   };
 }
@@ -2402,7 +3511,9 @@ function buildDatabricksGeniePullConfig(c: ComposerState): Record<string, unknow
  * signing in is complete — half of the service principal pair is not one,
  * and accepting it would save a source that cannot run.
  */
-function genieCredentialsFrom(p: Record<string, string>): Record<string, string> | null {
+function genieCredentialsFrom(
+  p: Record<string, string>,
+): Record<string, string> | null {
   const token = (p.credentialsToken ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
@@ -2464,6 +3575,134 @@ export function parserFieldPresentation({
 }
 
 /**
+ * What a bare input looks like once the form has refused to save because of it.
+ *
+ * The border, not just a sentence underneath: a toast saying some value is
+ * wrong leaves the admin to audit a form of a dozen fields, so the offending
+ * control has to be the thing that looks wrong. Spread onto the element rather
+ * than passed as a prop, because these are bare Chakra inputs — there is no
+ * `Field.Root` around them to carry an `invalid` state down. `aria-invalid`
+ * rides along because a red border a screen reader cannot see is not a
+ * rejection anyone was told about.
+ */
+function invalidInputStyles(isInvalid: boolean) {
+  return isInvalid
+    ? ({
+        borderColor: "red.500",
+        _hover: { borderColor: "red.500" },
+        "aria-invalid": true,
+      } as const)
+    : {};
+}
+
+/**
+ * A choice, rendered as the dashboard's own picker.
+ *
+ * Its own component for the same reason `ParserSwitchInput` is: the read-only
+ * case is not the same control with an attribute set, it is a different
+ * element, and that branch reads better beside the control it stands in for
+ * than as a third early return inside `ParserFieldInput`.
+ */
+function ParserSelectInput({
+  ariaLabel,
+  isInvalid,
+  options,
+  readOnly,
+  value,
+  onChange,
+}: {
+  ariaLabel: string;
+  isInvalid: boolean;
+  options: readonly FieldOption[];
+  readOnly: boolean;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  // A select has no readOnly — HTML ignores the attribute on the native one,
+  // and `disabled` is the only thing that would stop the change, at the cost
+  // of dropping the field out of the tab order. So a locked choice is shown
+  // as its own label in a readOnly input instead: genuinely unchangeable, and
+  // still reachable and readable, which is the rule every branch here keeps.
+  if (readOnly) {
+    const chosen = options.find((option) => option.value === value);
+    return (
+      <Input
+        size="sm"
+        aria-label={ariaLabel}
+        value={chosen?.label ?? value}
+        readOnly
+      />
+    );
+  }
+
+  return (
+    <DashboardSelect
+      ariaLabel={ariaLabel}
+      options={options}
+      value={value}
+      invalid={isInvalid}
+      onChange={onChange}
+    />
+  );
+}
+
+/**
+ * A two-state setting, rendered as a toggle.
+ *
+ * Its own component rather than another branch in `ParserFieldInput` because
+ * it is the only control whose displayed state is derived rather than held:
+ * the form stores a string that can be absent, and absent means the field's
+ * declared default. That derivation belongs beside the toggle that shows it.
+ */
+function ParserSwitchInput({
+  ariaLabel,
+  defaultOn,
+  fieldKey,
+  readOnly,
+  value,
+  onChange,
+}: {
+  ariaLabel: string;
+  defaultOn: boolean;
+  fieldKey: string;
+  readOnly: boolean;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const on = switchFieldIsOn({ value, defaultOn });
+
+  // Same reasoning as the select branch below: a switch has no readOnly
+  // either, and `disabled` would drop it out of the tab order where a keyboard
+  // or screen-reader user could not read what it holds. So a locked toggle is
+  // shown as its own state in a readOnly input instead.
+  if (readOnly) {
+    return (
+      <Input
+        size="sm"
+        aria-label={ariaLabel}
+        value={on ? "On" : "Off"}
+        readOnly
+      />
+    );
+  }
+
+  return (
+    <Switch
+      checked={on}
+      // Never blank: blank means the field's declared default, which is not
+      // always off, so writing it back would flip a deliberate choice.
+      onCheckedChange={({ checked }) => onChange(checked ? "true" : "false")}
+      // The field label beside this is a heading, not a bound <label>, so the
+      // accessible name has to come from the control itself.
+      inputProps={{
+        "aria-label": ariaLabel,
+        "data-testid": `parser-switch-${fieldKey}`,
+      }}
+    />
+  );
+}
+
+/**
  * The input itself, chosen by control kind.
  *
  * Split from `ParserConfigField` so the label, the required marker and the hint
@@ -2472,7 +3711,10 @@ export function parserFieldPresentation({
  * labelling another.
  */
 function ParserFieldInput({
+  ariaLabel,
   control,
+  fieldKey,
+  isInvalid,
   isMultiline,
   isSecret,
   placeholder,
@@ -2480,7 +3722,21 @@ function ParserFieldInput({
   value,
   onChange,
 }: {
+  /**
+   * The field's label.
+   *
+   * Every branch reads it. The label beside a field is a heading rather than a
+   * bound `<label>`, so without it none of these controls has an accessible
+   * name at all — a screen reader announcing "edit text, blank" beside a
+   * heading it has no way to connect. The switch was the only branch that used
+   * to carry one, which made it the only field on the form a non-sighted admin
+   * could identify.
+   */
+  ariaLabel: string;
   control: FieldControl;
+  fieldKey: string;
+  /** The save was refused because this field is empty. */
+  isInvalid: boolean;
   isMultiline: boolean;
   isSecret: boolean;
   placeholder: string;
@@ -2488,41 +3744,47 @@ function ParserFieldInput({
   value: string;
   onChange: (next: string) => void;
 }) {
+  const invalidStyles = invalidInputStyles(isInvalid);
+
   if (isMultiline) {
     return (
       <Textarea
         size="sm"
         rows={6}
+        aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         fontFamily="mono"
         readOnly={readOnly}
+        {...invalidStyles}
       />
     );
   }
 
   if (control.kind === "select") {
-    // A native select has no readOnly — HTML ignores the attribute there, and
-    // `disabled` is the only thing that would stop the change, at the cost of
-    // dropping the field out of the tab order. So a locked choice is shown as
-    // its own label in a readOnly input instead: genuinely unchangeable, and
-    // still reachable and readable, which is the rule the branches below keep.
-    if (readOnly) {
-      const chosen = control.options.find((option) => option.value === value);
-      return <Input size="sm" value={chosen?.label ?? value} readOnly />;
-    }
     return (
-      <NativeSelect.Root size="sm">
-        <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
-          {control.options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      <ParserSelectInput
+        ariaLabel={ariaLabel}
+        isInvalid={isInvalid}
+        options={control.options}
+        readOnly={readOnly}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
+
+  if (control.kind === "switch") {
+    return (
+      <ParserSwitchInput
+        ariaLabel={ariaLabel}
+        defaultOn={control.defaultOn}
+        fieldKey={fieldKey}
+        readOnly={readOnly}
+        value={value}
+        onChange={onChange}
+      />
     );
   }
 
@@ -2531,11 +3793,13 @@ function ParserFieldInput({
       <Input
         size="sm"
         type="date"
+        aria-label={ariaLabel}
         // Display-only truncation — see `dateInputValue`. The held value stays
         // whatever was stored until the admin picks a different day.
         value={dateInputValue(value)}
         onChange={(e) => onChange(e.target.value)}
         readOnly={readOnly}
+        {...invalidStyles}
       />
     );
   }
@@ -2544,6 +3808,7 @@ function ParserFieldInput({
     <Input
       size="sm"
       type={isSecret ? "password" : "text"}
+      aria-label={ariaLabel}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
@@ -2552,6 +3817,7 @@ function ParserFieldInput({
       // order where a keyboard or screen-reader user cannot reach it. The
       // Textarea branch above says the same thing.
       readOnly={readOnly}
+      {...invalidStyles}
     />
   );
 }
@@ -2562,32 +3828,55 @@ function ParserConfigField({
   onChange,
   mode = "create",
   readOnly = false,
+  isInvalid = false,
 }: {
   field: FieldDef;
   values: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
   mode?: ParserConfigMode;
   readOnly?: boolean;
+  /** The save was refused because this required field is empty. */
+  isInvalid?: boolean;
 }) {
-  const { isSecret, isMultiline, isRequired, hint, placeholder } = parserFieldPresentation({
-    field,
-    mode,
-  });
-  const control = fieldControl({ field, values });
+  const { isSecret, isMultiline, isRequired, hint, placeholder } =
+    parserFieldPresentation({ field, mode });
+  // `fieldControl` builds a fresh options array every call, and a select below
+  // hands it straight to `DashboardSelect`, whose collection is keyed on that
+  // array's identity — so an unmemoized call resets highlight and scroll under
+  // an open dropdown. It still rebuilds when `values` change, which is correct:
+  // these options are a function of the form's other answers.
+  const control = useMemo(
+    () => fieldControl({ field, values }),
+    [field, values],
+  );
   const shownHint = control.hint ?? hint;
 
   return (
     <VStack align="stretch" gap={1}>
-      <Text fontSize="xs" fontWeight="medium">
-        {field.label}
-        {isRequired && (
-          <Text as="span" color="red.500" marginLeft={1}>
-            *
-          </Text>
+      {/* The explanation sits behind the (i), never under the input: a
+          paragraph per field turned this form into a wall of grey text an
+          admin scrolls past. See dev/docs/best_practices/copywriting.md. */}
+      <HStack gap={0} alignItems="center">
+        <Text fontSize="xs" fontWeight="medium">
+          {field.label}
+          {isRequired && (
+            <Text as="span" color="red.500" marginLeft={1}>
+              *
+            </Text>
+          )}
+        </Text>
+        {shownHint && (
+          <FieldInfoTooltip
+            description={shownHint}
+            testId={`parser-field-info-${field.key}`}
+          />
         )}
-      </Text>
+      </HStack>
       <ParserFieldInput
+        ariaLabel={field.label}
         control={control}
+        fieldKey={field.key}
+        isInvalid={isInvalid}
         isMultiline={isMultiline}
         isSecret={isSecret}
         placeholder={placeholder}
@@ -2595,13 +3884,160 @@ function ParserConfigField({
         value={values[field.key] ?? ""}
         onChange={(next) => onChange({ ...values, [field.key]: next })}
       />
-      {shownHint && (
-        <Text fontSize="xs" color="fg.muted">
-          {shownHint}
+      {/* Under the input it belongs to, never in the toast alone. The message
+          says what to do rather than restating that something is invalid —
+          the red border has already said that much. */}
+      {isInvalid && (
+        <Text
+          fontSize="xs"
+          color="red.500"
+          data-testid={`parser-field-error-${field.key}`}
+        >
+          Enter a value — this source cannot be saved without it.
         </Text>
       )}
     </VStack>
   );
+}
+
+/**
+ * The one collapsed group a source drawer offers.
+ *
+ * Unmounted while closed, so the collapsed state genuinely holds nothing the
+ * admin needs: create must produce a working source without it ever being
+ * opened. Which is also the constraint on what goes in — anything here that
+ * kept its own state would throw the admin's choice away on every collapse,
+ * so every child is driven from the drawer's state.
+ *
+ * Extracted rather than left inside `ParserConfigFields` because the edit
+ * drawer reaches the group down a path that renders no parser fields at all:
+ * the two source types that route conversations are both absent from
+ * `EDITABLE_PULL_CONFIG_SOURCE_TYPES`, so their destination has to be grouped
+ * by something that does not belong to the parser config.
+ */
+function AdvancedSettingsGroup({
+  children,
+  openWhen = false,
+}: {
+  children: ReactNode;
+  /**
+   * A demand from outside that the group be open — raised when a refused save
+   * marked a field inside it.
+   *
+   * One-way on purpose. It opens the group and never closes it, so a caller
+   * whose demand goes away does not slam shut a group the admin has since
+   * opened for themselves. Expansion otherwise stays this component's own
+   * business, which is what lets the caller with nothing to demand render it
+   * with no props at all.
+   */
+  openWhen?: boolean;
+}) {
+  const [isOpen, setOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (openWhen) setOpen(true);
+  }, [openWhen]);
+
+  // The trigger sits at the bottom of a drawer that is already taller than its
+  // viewport, so expanding it otherwise opens the settings below the fold and
+  // leaves the admin looking at the button they just pressed, with no sign
+  // anything happened. Deferred one frame because the collapsible measures its
+  // content on the tick it opens, and a scroll issued before that measurement
+  // lands against the collapsed height.
+  useEffect(() => {
+    if (!isOpen) return;
+    const frame = requestAnimationFrame(() => {
+      contentRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen]);
+
+  return (
+    <Collapsible.Root
+      // Still unmounted while closed, which is what the rule above about
+      // caller-owned state pays for. The model-provider drawer this is
+      // modelled on keeps its content mounted; matching its LOOK is the point,
+      // not its mounting, and mounting a dozen hidden inputs into every source
+      // drawer would buy nothing.
+      lazyMount
+      unmountOnExit
+      open={isOpen}
+      onOpenChange={({ open }) => setOpen(open)}
+      borderTopWidth="1px"
+      borderColor="border.muted"
+    >
+      {/* A full-width row with the label on the left and the chevron on the
+          right, matching the model-provider drawer's Advanced section. It read
+          as a small grey button before, which put the one control on the form
+          that opens more form in the same visual class as Cancel. */}
+      <Collapsible.Trigger
+        width="full"
+        paddingY={2}
+        cursor="pointer"
+        _hover={{ "& svg": { color: "fg" } }}
+      >
+        <HStack width="full" justify="space-between">
+          <SmallLabel>Advanced</SmallLabel>
+          <ChevronDown
+            size={14}
+            // Rotated rather than swapped for a second glyph, so the open and
+            // closed states are the same shape turning and not two icons an
+            // eye has to tell apart.
+            style={{
+              color: "var(--chakra-colors-fg-muted)",
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 150ms ease",
+            }}
+          />
+        </HStack>
+      </Collapsible.Trigger>
+      <Collapsible.Content>
+        <VStack
+          ref={contentRef}
+          align="stretch"
+          gap={3}
+          paddingTop={2}
+          paddingBottom={2}
+        >
+          {children}
+        </VStack>
+      </Collapsible.Content>
+    </Collapsible.Root>
+  );
+}
+
+/**
+ * The required fields this form is showing that hold nothing.
+ *
+ * Visibility first: a field hidden by `visibleWhen` is not something the admin
+ * can answer, and marking one red points at a control that is not on screen.
+ * Requiredness comes from `parserFieldPresentation`, the same answer the label
+ * beside the input renders its asterisk from, so the form cannot mark a field
+ * required and then refuse to complain about it — or complain about one it
+ * never said was needed.
+ *
+ * Exported for the tests, which hold it against `PARSER_FIELDS`: a source type
+ * whose builder refuses a field the form never marks required would toast a
+ * sentence and highlight nothing, which is the failure this replaces.
+ */
+export function missingRequiredParserFieldKeys({
+  sourceType,
+  values,
+  mode = "create",
+}: {
+  sourceType: SourceType;
+  values: Record<string, string>;
+  mode?: ParserConfigMode;
+}): string[] {
+  return (PARSER_FIELDS[sourceType] ?? [])
+    .filter((field) => field.visibleWhen?.(values) ?? true)
+    .filter((field) => parserFieldPresentation({ field, mode }).isRequired)
+    .filter((field) => (values[field.key] ?? "").trim() === "")
+    .map((field) => field.key);
 }
 
 export function ParserConfigFields({
@@ -2610,6 +4046,8 @@ export function ParserConfigFields({
   onChange,
   mode = "create",
   readOnlyKeys,
+  invalidKeys,
+  advancedExtras,
 }: {
   sourceType: SourceType;
   values: Record<string, string>;
@@ -2622,6 +4060,28 @@ export function ParserConfigFields({
    * nothing is worse than no input at all.
    */
   readOnlyKeys?: readonly string[];
+  /**
+   * Required fields a refused save found empty. Each is marked on the control
+   * itself, and the Advanced group opens if one of them is inside it — a
+   * complaint about a field nobody can see is not a complaint.
+   */
+  invalidKeys?: readonly string[];
+  /**
+   * Settings that belong in the Advanced group without being parser fields —
+   * the pull cadence and the trace destination. Passed in rather than given a
+   * collapsible of their own: two "Advanced" headings in one drawer would
+   * leave an admin guessing which holds the thing they came for.
+   *
+   * Pass `undefined` when the source type offers none of them. An element
+   * that happens to render nothing still counts as content here, and would
+   * leave a push source's drawer showing an "Advanced" button that opens onto
+   * an empty box.
+   *
+   * Whatever goes here must hold its value in the caller's state. The group
+   * unmounts its contents when it closes, so a child holding its own would
+   * silently discard the admin's choice on every collapse.
+   */
+  advancedExtras?: ReactNode;
 }) {
   // A held value can stop being offered without the admin touching its field —
   // switching the Anthropic report to `cost` retires every bucket width. Left
@@ -2634,43 +4094,66 @@ export function ParserConfigFields({
   }, [sourceType, values, onChange]);
 
   const fields = PARSER_FIELDS[sourceType];
-  const primaryFields = fields.filter((f) => !f.advanced);
-  const advancedFields = fields.filter((f) => f.advanced);
-  if (fields.length === 0) return null;
+  const isVisible = (f: FieldDef) => f.visibleWhen?.(values) ?? true;
+  const primaryFields = fields.filter((f) => !f.advanced && isVisible(f));
+  const advancedFields = fields.filter((f) => f.advanced && isVisible(f));
+  const isInvalid = (key: string) => invalidKeys?.includes(key) ?? false;
+  // A refusal opens the group rather than merely marking what is inside it.
+  // Left closed, the admin is told the save failed and shown a form on which
+  // every visible field is filled in.
+  const hasInvalidAdvancedField = advancedFields.some((f) => isInvalid(f.key));
+
+  // Extras alone are reason enough to render: a source type with no
+  // parser fields of its own still has a cadence to offer.
+  if (fields.length === 0 && !advancedExtras) return null;
   const isReadOnly = (key: string) => readOnlyKeys?.includes(key) ?? false;
   return (
     <VStack align="stretch" gap={3}>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-        Source-specific configuration
-      </Text>
-      {primaryFields.map((f) => (
-        <ParserConfigField key={f.key} field={f} values={values} onChange={onChange} />
+      {/* The category, one step above the group headings under it. They were
+          the same size, which made "Connection" read as a sibling of the
+          heading that contains it rather than a division of it. */}
+      {fields.length > 0 && (
+        <Text fontSize="sm" fontWeight="semibold" color="fg">
+          Configuration
+        </Text>
+      )}
+      {primaryFields.map((f, i) => (
+        <Fragment key={f.key}>
+          {f.group && f.group !== primaryFields[i - 1]?.group && (
+            <Text
+              fontSize="xs"
+              fontWeight="semibold"
+              color="fg.muted"
+              pt={i > 0 ? 2 : 0}
+            >
+              {f.group}
+            </Text>
+          )}
+          <ParserConfigField
+            field={f}
+            values={values}
+            onChange={onChange}
+            mode={mode}
+            readOnly={isReadOnly(f.key)}
+            isInvalid={isInvalid(f.key)}
+          />
+        </Fragment>
       ))}
-      {advancedFields.length > 0 && (
-        // Unmounted while closed so the collapsed state genuinely holds
-        // nothing the admin needs: create must work without ever opening it.
-        <Collapsible.Root lazyMount unmountOnExit>
-          <Collapsible.Trigger asChild>
-            <Button size="xs" variant="ghost" color="fg.muted">
-              <ChevronRight />
-              Advanced
-            </Button>
-          </Collapsible.Trigger>
-          <Collapsible.Content>
-            <VStack align="stretch" gap={3} paddingTop={2}>
-              {advancedFields.map((f) => (
-                <ParserConfigField
-                  key={f.key}
-                  field={f}
-                  values={values}
-                  onChange={onChange}
-                  mode={mode}
-                  readOnly={isReadOnly(f.key)}
-                />
-              ))}
-            </VStack>
-          </Collapsible.Content>
-        </Collapsible.Root>
+      {(advancedFields.length > 0 || advancedExtras) && (
+        <AdvancedSettingsGroup openWhen={hasInvalidAdvancedField}>
+          {advancedFields.map((f) => (
+            <ParserConfigField
+              key={f.key}
+              field={f}
+              values={values}
+              onChange={onChange}
+              mode={mode}
+              readOnly={isReadOnly(f.key)}
+              isInvalid={isInvalid(f.key)}
+            />
+          ))}
+          {advancedExtras}
+        </AdvancedSettingsGroup>
       )}
     </VStack>
   );
@@ -2687,17 +4170,65 @@ export function ParserConfigFields({
  * schema, so the string would win and the source would fail validation at pull
  * time — a broken source that looked fine when it was saved.
  */
-const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> = {
-  // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
-  // normalized to an ISO instant by the builder — the raw form value
-  // winning the merge would fail the adapter's `.datetime()` check at
-  // pull time.
-  anthropic_admin: ["report", "bucketWidth", "startingAt"],
-  // `warehouseId` is here because the builder DROPS it when empty. Left to
-  // the merge, the raw form value would persist `warehouseId: ""`, which the
-  // adapter reads as a warehouse to go ask the workspace about.
-  databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId"],
-};
+const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
+  {
+    // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
+    // normalized to an ISO instant by the builder — the raw form value
+    // winning the merge would fail the adapter's `.datetime()` check at
+    // pull time.
+    anthropic_admin: ["report", "bucketWidth", "startingAt"],
+    // Same reason as `startingAt` above: the builder normalizes it to an ISO
+    // instant, and the raw form value winning the merge would fail the
+    // adapter's `.datetime()` check at pull time.
+    openai_admin: ["startingAt"],
+    // `warehouseId` is here because the builder DROPS it when empty. Left to
+    // the merge, the raw form value would persist `warehouseId: ""`, which the
+    // adapter reads as a warehouse to go ask the workspace about.
+    // `readPaidGenieBill` for the reason `readSeats` is owned further down:
+    // the builder turns the switch's form value into a real boolean, and the
+    // raw value winning the merge would hand the adapter a string.
+    databricks_genie: [
+      "workspaceUrl",
+      "spaceIds",
+      "warehouseId",
+      "readPaidGenieBill",
+    ],
+    // The builder normalises `environmentUrl` (trailing slashes stripped) and
+    // turns `botIds` from a comma-separated string into an array. The raw form
+    // values winning the merge would leave a string where the adapter's schema
+    // expects a list, and an address the destination check reads differently
+    // from the one the adapter calls.
+    //
+    // `azureSubscriptionId` is here because the builder OMITS it when empty,
+    // exactly like Genie's `warehouseId`. An empty form value is already
+    // dropped before parserConfig, so this is not fixing a live escape — it
+    // keeps the single rule "a field a builder decides about is owned by the
+    // builder" true for this field too, so the day the builder starts
+    // normalising it there is no raw copy left to win the merge.
+    //
+    // `readSeats` is owned for a stronger reason than either: the builder
+    // converts it from the form's string to a boolean, so the raw "yes"
+    // winning the merge would reach the adapter as a string where its schema
+    // demands a boolean — a source that saved cleanly and fails to parse on
+    // every run.
+    // `azureBillingIsPrepaid` is owned for the same reason as `readSeats`:
+    // the builder converts the switch's string to the boolean the adapter's
+    // schema demands, and it also OMITS the field when no subscription is
+    // named — the raw form string winning the merge would undo both.
+    // `azureBillingUsesSameApp` is owned for both of those reasons AND
+    // because an untouched switch holds nothing at all: the flag is the only
+    // durable record of the one-app choice, so it must come from the builder,
+    // which writes the declared default explicitly.
+    copilot_studio_dataverse: [
+      "environmentUrl",
+      "botIds",
+      "azureSubscriptionId",
+      "azureBillingIsPrepaid",
+      "azureBillingUsesSameApp",
+      "readSeats",
+      "readDirectory",
+    ],
+  };
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept
 // distinct from a legitimately-falsy value an admin typed.
@@ -2706,7 +4237,10 @@ const DROP_PARSER_FIELD = Symbol("drop");
 // The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
 // it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
 // flat instead of a five-deep branch ladder.
-function parserFieldValue(key: string, value: unknown): unknown | typeof DROP_PARSER_FIELD {
+function parserFieldValue(
+  key: string,
+  value: unknown,
+): unknown | typeof DROP_PARSER_FIELD {
   if (value == null || value === "") return DROP_PARSER_FIELD;
   // Secrets travel in exactly one place: `pullConfig.credentials`, which is
   // the only subtree `encryptParserConfigCredentials` wraps before the row
@@ -2905,7 +4439,9 @@ export function buildEditedParserConfig({
  * the DTO's bare `sourceType` string gets a `SourceType` inside the guard
  * without a second cast.
  */
-export function isEditablePullSource(sourceType: SourceType | undefined): sourceType is SourceType {
+export function isEditablePullSource(
+  sourceType: SourceType | undefined,
+): sourceType is SourceType {
   return (
     !!sourceType &&
     !!PULL_ADAPTER_FOR_SOURCE[sourceType] &&
@@ -2969,7 +4505,6 @@ export function buildEditSubmission({
   pullSchedule: string;
   /** `undefined` = untouched, `null` = cleared, an id = picked. */
   destination: string | null | undefined;
-  /** Named which field is wrong when a pull config will not build. */
   toaster: GovernanceToaster;
 }): EditSubmission | null {
   const trimmedName = name.trim();
@@ -2996,7 +4531,8 @@ export function buildEditSubmission({
         // this literal satisfies ComposerState without implying otherwise.
         traceProjectId: null,
       },
-      { toaster, shouldRequireCredentials: false },
+      toaster,
+      { shouldRequireCredentials: false },
     );
     // Refusing here is the whole point of the builder: nothing validates this
     // server-side, so a bad value saved now surfaces as a failing pull an hour
@@ -3012,7 +4548,8 @@ export function buildEditSubmission({
     description: description.trim() || null,
     parserConfig: buildEditedParserConfig({
       sourceType,
-      storedParserConfig: (source.parserConfig as Record<string, unknown>) ?? {},
+      storedParserConfig:
+        (source.parserConfig as Record<string, unknown>) ?? {},
       rebuiltPullConfig,
       ottlStatements,
     }),
@@ -3027,7 +4564,8 @@ export function buildEditSubmission({
     // rebuilt parser config, still showed it running on the default.
     ...(isPullMode
       ? {
-          pullSchedule: pullSchedule.trim() || recommendedPullSchedule(sourceType),
+          pullSchedule:
+            pullSchedule.trim() || recommendedPullSchedule(sourceType),
         }
       : {}),
     // Same guard as create: a type that routes nothing must never carry a
@@ -3117,7 +4655,7 @@ function buildTestCurl({
               spans: [
                 {
                   name: "chat.completion",
-                  startTimeUnixNano: `${nowInstant().epochMilliseconds}000000`,
+                  startTimeUnixNano: `${Date.now()}000000`,
                   attributes: [
                     {
                       key: "gen_ai.usage.input_tokens",
@@ -3181,7 +4719,13 @@ function IngestSecretPanel({
         Ingest secret (bearer token)
       </Text>
       <HStack gap={2}>
-        <Code flex={1} padding={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
+        <Code
+          flex={1}
+          padding={2}
+          fontSize="xs"
+          whiteSpace="pre-wrap"
+          wordBreak="break-all"
+        >
           {secret}
         </Code>
         <Button size="sm" variant="outline" onClick={() => onCopy(secret)}>
@@ -3228,9 +4772,10 @@ function SecretGraceNotice() {
       borderRadius="sm"
     >
       <Text fontSize="xs" color="amber.900">
-        <strong>Important:</strong> the secret above will not be shown again. We retained the prior
-        secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time to roll
-        the new value through every upstream client.
+        <strong>Important:</strong> the secret above will not be shown again. We
+        retained the prior secret&apos;s hash for a 24h grace window if
+        you&apos;re rotating, so you have time to roll the new value through
+        every upstream client.
       </Text>
     </Box>
   );
@@ -3258,10 +4803,11 @@ function OtlpEndpointPanel({
         </Button>
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        Spans push into the LangWatch trace store with this source&apos;s origin tag and become
-        viewable in the trace viewer. If you are sending agent traces from your own LangWatch SDK,
-        use <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key - different
-        auth, same trace store. See{" "}
+        Spans push into the LangWatch trace store with this source&apos;s origin
+        tag and become viewable in the trace viewer. If you are sending agent
+        traces from your own LangWatch SDK, use{" "}
+        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
+        - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -3292,7 +4838,13 @@ function ClaudeCodeEnvBlockPanel({
           <Copy size={12} /> Copy block
         </Button>
       </HStack>
-      <Code padding={3} fontSize="xs" whiteSpace="pre" display="block" overflowX="auto">
+      <Code
+        padding={3}
+        fontSize="xs"
+        whiteSpace="pre"
+        display="block"
+        overflowX="auto"
+      >
         {envBlock}
       </Code>
       <Text fontSize="xs" color="fg.muted">
@@ -3308,13 +4860,13 @@ function ClaudeCodeEnvBlockPanel({
         <Code fontSize="xs" backgroundColor="transparent">
           /v1/metrics
         </Code>{" "}
-        itself off the base endpoint. To attribute spend to a specific team or department, also
-        export{" "}
+        itself off the base endpoint. To attribute spend to a specific team or
+        department, also export{" "}
         <Code fontSize="xs" backgroundColor="transparent">
           OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
         </Code>{" "}
-        - those land as resource attributes and slot into /governance&apos;s spendByTeam without
-        further config.
+        - those land as resource attributes and slot into /governance&apos;s
+        spendByTeam without further config.
       </Text>
     </VStack>
   );
@@ -3336,7 +4888,13 @@ function TestCurlPanel({
         Test it now - paste this into a terminal
       </Text>
       <Box position="relative">
-        <Code display="block" padding={3} fontSize="xs" whiteSpace="pre" overflowX="auto">
+        <Code
+          display="block"
+          padding={3}
+          fontSize="xs"
+          whiteSpace="pre"
+          overflowX="auto"
+        >
           {curl}
         </Code>
         <Button
@@ -3351,9 +4909,9 @@ function TestCurlPanel({
         </Button>
       </Box>
       <Text fontSize="xs" color="fg.muted">
-        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
-        <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse - check
-        the docs.
+        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success.
+        If you get <Code fontSize="xs">events: 0</Code> with a hint, the body
+        shape didn&apos;t parse - check the docs.
       </Text>
     </VStack>
   );
@@ -3362,26 +4920,40 @@ function TestCurlPanel({
 /** The endpoints and source-type flags a secret reveal is rendered against. */
 function secretModalTargets(details: SecretDetails | null) {
   const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://langwatch.invalid";
   return {
     otlpUrl: details ? `${baseUrl}/api/ingest/otel/${details.sourceId}` : "",
-    webhookUrl: details ? `${baseUrl}/api/ingest/webhook/${details.sourceId}` : "",
+    webhookUrl: details
+      ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
+      : "",
     usesPushUrl:
       details?.sourceType === "otel_generic" ||
       details?.sourceType === "claude_cowork" ||
       details?.sourceType === "claude_code",
-    usesWebhookUrl: details?.sourceType === "workato" || details?.sourceType === "s3_custom",
+    usesWebhookUrl:
+      details?.sourceType === "workato" || details?.sourceType === "s3_custom",
     isClaudeCode: details?.sourceType === "claude_code",
   };
 }
 
-function SecretModal({ details, onClose }: { details: SecretDetails | null; onClose: () => void }) {
+function SecretModal({
+  details,
+  onClose,
+}: {
+  details: SecretDetails | null;
+  onClose: () => void;
+}) {
   const [copied, setCopied] = useState(false);
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
 
   const claudeCodeEnvBlock = useMemo(
-    () => (isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : ""),
+    () =>
+      isClaudeCode && details
+        ? buildClaudeCodeEnvBlock({ details, otlpUrl })
+        : "",
     [isClaudeCode, details, otlpUrl],
   );
 
@@ -3408,7 +4980,11 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
   };
 
   return (
-    <DialogRoot open onOpenChange={(e) => !e.open && onClose()} closeOnInteractOutside={false}>
+    <DialogRoot
+      open
+      onOpenChange={(e) => !e.open && onClose()}
+      closeOnInteractOutside={false}
+    >
       <DialogContent maxWidth="2xl">
         <DialogHeader>
           <DialogTitle>
@@ -3422,8 +4998,9 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
-              into the upstream platform&apos;s admin console. We store only its hash.
+              This is the only time we&apos;ll show this secret. Save it
+              somewhere safe and paste it into the upstream platform&apos;s
+              admin console. We store only its hash.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -3436,13 +5013,26 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
                 </Badge>
               </Text>
             </VStack>
-            <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
-            {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
-            {usesWebhookUrl && <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />}
-            {isClaudeCode && (
-              <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
+            <IngestSecretPanel
+              secret={details.secret}
+              copied={copied}
+              onCopy={copy}
+            />
+            {usesPushUrl && (
+              <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />
             )}
-            {testCurl && <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />}
+            {usesWebhookUrl && (
+              <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />
+            )}
+            {isClaudeCode && (
+              <ClaudeCodeEnvBlockPanel
+                envBlock={claudeCodeEnvBlock}
+                onCopy={copy}
+              />
+            )}
+            {testCurl && (
+              <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />
+            )}
             <SecretGraceNotice />
           </VStack>
         </DialogBody>

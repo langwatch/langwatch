@@ -41,11 +41,26 @@ describe("moduleVitestTestOptions", () => {
   });
 
   describe("given the jsdom kind", () => {
-    it("keeps isolation on so hoisted module mocks stay per file", () => {
+    it("selects the jsdom environment and leaves isolation off like every kind", () => {
       const test = moduleVitestTestOptions({ kind: "jsdom" });
 
       expect(test?.environment).toBe("jsdom");
-      expect(test?.isolate).toBe(true);
+      expect(test?.isolate).toBe(false);
+    });
+  });
+
+  describe("given fast mode collapses the run onto one worker", () => {
+    it("asks for a single worker through maxWorkers, not the removed poolOptions", () => {
+      const test = moduleVitestTestOptions({ kind: "node" }) ?? {};
+
+      expect(test.maxWorkers).toBe(1);
+      expect("poolOptions" in test).toBe(false);
+    });
+
+    it("leaves the worker count alone when the suite keeps isolation", () => {
+      const test = moduleVitestTestOptions({ kind: "node", isolate: true }) ?? {};
+
+      expect("maxWorkers" in test).toBe(false);
     });
   });
 

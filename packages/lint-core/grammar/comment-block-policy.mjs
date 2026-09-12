@@ -6,16 +6,22 @@
 export const REVIEW_LINE_COUNT = 4;
 export const MAX_COMMENT_BLOCK_LINES = 5;
 
-export const COMMENT_BLOCK_SIZE_ALLOWED =
-  "Split the explanation near the code it describes, or move durable narrative to an ADR or developer document.";
+/**
+ * The per-file command a reader can paste to get every comment finding in one
+ * file at once, which is what turns a pile of single reports into one task.
+ */
+export const COMMENT_SWEEP_COMMAND = "pnpm exec oxlint --config .oxlintrc.architecture.json <file>";
 
-// The one wording, as a template so a rule can declare it under a messageId
-// and let the linter interpolate, and as a function for the callers that
-// already hold the count.
-export const COMMENT_BLOCK_SIZE_MESSAGE =
-  "Comment block has {{lines}} lines; the maximum is {{max}}." +
-  " Comments exist to make code readable and good code needs almost none: keep the why in a" +
-  " line or two, and put design narrative in an ADR the comment points to.";
+/** Declared as `what` + `fix` so a rule can interpolate either half. */
+export const COMMENT_BLOCK_SIZE_WHAT = "Comment block has {{lines}} lines; the maximum is {{max}}.";
+
+export const COMMENT_BLOCK_SIZE_FIX =
+  "Keep one or two lines of why beside the code and move the narrative into an ADR or a" +
+  " dev/docs page this comment links; delete it outright when the code already says it." +
+  ` More than one block in a file is a sweep, not an edit: list them with \`${COMMENT_SWEEP_COMMAND}\`` +
+  " and hand that list to a haiku subagent to rewrite in one pass.";
+
+export const COMMENT_BLOCK_SIZE_MESSAGE = `${COMMENT_BLOCK_SIZE_WHAT} ${COMMENT_BLOCK_SIZE_FIX}`;
 
 export function commentBlockSizeMessage(lines) {
   return COMMENT_BLOCK_SIZE_MESSAGE.replace("{{lines}}", String(lines)).replace(

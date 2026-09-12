@@ -354,6 +354,12 @@ const buildTargetNode = (
           throw new Error(
             `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
           );
+        case "voice":
+          // A voice agent runs as a scenario against a live call, not as an
+          // experiment cell — there is no node that dials the transport.
+          throw new Error(
+            `Voice agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           // Every declared agent type is handled above, so the narrowing has
           // nothing left here and `loadedData.agent` is itself `never`. The
@@ -682,17 +688,23 @@ export const buildSignatureNodeFromAgent = (
 ): StudioNode<Signature> => {
   const config = agent.config;
 
-  // Get inputs with value mappings applied
-  const inputs = (config.inputs ?? []).map((input) => ({
-    identifier: input.identifier,
-    type: input.type as Field["type"],
-    value: getInputValue(input.identifier, targetConfig, cell),
-  }));
+  // Get inputs with value mappings applied. The `in` guards keep the union
+  // narrow: a voice agent's config carries neither inputs nor outputs, and it
+  // never reaches this builder anyway (buildTargetNode dispatches by type).
+  const inputs = ("inputs" in config ? (config.inputs ?? []) : []).map(
+    (input) => ({
+      identifier: input.identifier,
+      type: input.type as Field["type"],
+      value: getInputValue(input.identifier, targetConfig, cell),
+    }),
+  );
 
-  const outputs = (config.outputs ?? []).map((output) => ({
-    identifier: output.identifier,
-    type: output.type as Field["type"],
-  }));
+  const outputs = ("outputs" in config ? (config.outputs ?? []) : []).map(
+    (output) => ({
+      identifier: output.identifier,
+      type: output.type as Field["type"],
+    }),
+  );
 
   // Build parameters array, normalizing from top-level fields or existing parameters
   const parameters = buildSignatureNodeParameters(config);
@@ -716,7 +728,11 @@ export const buildSignatureNodeFromAgent = (
 const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => {
   // Only the studio node kinds carry node fields as parameters; a connected
   // agent's parameters are run parameter declarations, never node fields.
-  const baseParams = ("sdk" in config ? [] : (config.parameters ?? [])) as Field[];
+  const baseParams = (
+    "sdk" in config || !("parameters" in config)
+      ? []
+      : (config.parameters ?? [])
+  ) as Field[];
 
   // Start with existing parameters (may already have llm, instructions, messages)
   const resultParams: Field[] = [...baseParams];
@@ -775,17 +791,23 @@ export const buildCodeNodeFromAgent = (
 ): StudioNode<Code> => {
   const config = agent.config;
 
-  // Get inputs with value mappings applied
-  const inputs = (config.inputs ?? []).map((input) => ({
-    identifier: input.identifier,
-    type: input.type as Field["type"],
-    value: getInputValue(input.identifier, targetConfig, cell),
-  }));
+  // Get inputs with value mappings applied. The `in` guards keep the union
+  // narrow: a voice agent's config carries neither inputs nor outputs, and it
+  // never reaches this builder anyway (buildTargetNode dispatches by type).
+  const inputs = ("inputs" in config ? (config.inputs ?? []) : []).map(
+    (input) => ({
+      identifier: input.identifier,
+      type: input.type as Field["type"],
+      value: getInputValue(input.identifier, targetConfig, cell),
+    }),
+  );
 
-  const outputs = (config.outputs ?? []).map((output) => ({
-    identifier: output.identifier,
-    type: output.type as Field["type"],
-  }));
+  const outputs = ("outputs" in config ? (config.outputs ?? []) : []).map(
+    (output) => ({
+      identifier: output.identifier,
+      type: output.type as Field["type"],
+    }),
+  );
 
   return {
     id: nodeId,
@@ -797,7 +819,9 @@ export const buildCodeNodeFromAgent = (
       outputs,
       // The caller dispatched on `agent.type === "code"`, so the parameters
       // are the code node's own fields.
-      parameters: ("sdk" in config ? [] : (config.parameters ?? [])) as Field[],
+      parameters: ("sdk" in config || !("parameters" in config)
+        ? []
+        : (config.parameters ?? [])) as Field[],
       cls: "Code",
     },
   };

@@ -11,7 +11,14 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
 
 ROSTER=.claude/coordinator/LANES.md
-HANDOVER=$(ls -1 dev/docs/plans/handover-*.md 2>/dev/null | sort | tail -1 || true)
+# The roster may name this drive's handover, and when it does that is the
+# answer. With two drives in flight the newest filename is not the current
+# one: `handover-<date>-<drive>.md` sorts before `handover-<date>.md`, so the
+# sort below silently reports the other drive's next action.
+HANDOVER=$(sed -n 's/^handover: *//p' "$ROSTER" 2>/dev/null | head -1 || true)
+if [ -z "$HANDOVER" ] || [ ! -f "$HANDOVER" ]; then
+  HANDOVER=$(ls -1 dev/docs/plans/handover-*.md 2>/dev/null | sort | tail -1 || true)
+fi
 
 active=0
 if [ -f "$ROSTER" ]; then

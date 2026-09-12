@@ -14,6 +14,7 @@ import {
 import type { ArchitectureViolation } from "../../types.ts";
 import { walkFiles } from "../../workspace/layout.ts";
 import {
+  COMMENT_SWEEP_COMMAND,
   MAX_COMMENT_BLOCK_LINES,
   REVIEW_LINE_COUNT,
   collectCommentBlocks,
@@ -321,7 +322,11 @@ function reviewsForFile(file: string, resolvedRoot: string): CommentBlockReview[
       file: relativePath,
       line: block.line,
       lines: block.lines,
-      message: `Comment block has ${block.lines} lines and should receive review attention.`,
+      message:
+        `Comment block has ${block.lines} lines, at the ${MAX_COMMENT_BLOCK_LINES}-line limit. ` +
+        "Cut it to the one or two lines of why, or move the narrative into an ADR this comment " +
+        "links, before it grows past the limit. A file with several is one haiku-subagent sweep: " +
+        `list them with \`${COMMENT_SWEEP_COMMAND}\`.`,
     });
   }
 

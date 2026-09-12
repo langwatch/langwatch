@@ -31,7 +31,7 @@ export {
   UnavailableWorkflowEnvironmentDecryptor,
   type WorkflowEnvironmentDecryptor,
 } from "./services/workflow-project-environment.service.ts";
-export { WorkflowAgentMappingAdapter } from "./services/workflow-agent-mapping.service.ts";
+export { WorkflowAgentMappingAdapter } from "./adapters/workflow-agent-mapping.adapter.ts";
 export { ContractWorkflowDslMigrationAdapter } from "./services/workflow-dsl-migration.service.ts";
 export {
   HttpWorkflowNlpRuntimeAdapter,
@@ -46,7 +46,7 @@ export {
   type NlpInvokeRequest,
   type NlpInvokeResponse,
   type NlpInvokeStagingConfig,
-} from "./channels/workflow-nlp-lambda.channel.ts";
+} from "./adapters/workflow-nlp-lambda.adapter.ts";
 export {
   NlpLambdaInvoke,
   NlpPayloadStaging,
@@ -70,7 +70,7 @@ export {
   findLwaPreludeSeparator,
 } from "./rules/lambda-web-adapter-stream.rules.ts";
 export { LambdaWebAdapterStreamService } from "./services/lambda-web-adapter-stream.service.ts";
-export { ModelProviderWorkflowStudioDslAdapter } from "./services/workflow-studio-dsl.service.ts";
+export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter.ts";
 export {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
@@ -150,7 +150,7 @@ export {
   WorkflowCodeCompletionAdapter,
   type WorkflowModelResolver,
 } from "./services/workflow-code-completion.service.ts";
-export { AwsNlpLambdaFleetAdapter } from "./channels/aws.nlp-lambda-fleet.channel.ts";
+export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
 export {
   NlpLambdaCleanupService,
   type NlpLambdaCleanupReport,
@@ -173,9 +173,9 @@ export {
   NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
 } from "./app/workflow.app.ts";
-export { AwsNlpLambdaStreamInvokeAdapter } from "./channels/aws.nlp-lambda-stream-invoke.channel.ts";
-export { AwsNlpLambdaArnResolverAdapter } from "./channels/aws.nlp-lambda-arn-resolver.channel.ts";
+export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
+export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
 export {
   LambdaWorkflowStudioStreamAdapter,
   type LambdaWorkflowStudioStreamOptions,
-} from "./channels/lambda.workflow-studio-stream.channel.ts";
+} from "./adapters/lambda.workflow-studio-stream.adapter.ts";

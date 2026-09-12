@@ -48,6 +48,7 @@
     "@langwatch/feature-flag-server": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
@@ -58,6 +59,7 @@
     "hono": "catalog:",
     "hono-openapi": "catalog:",
     "langwatch": "workspace:*",
+    "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

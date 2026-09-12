@@ -8,7 +8,9 @@ import { iconWithLabel, singleIcon, themedIcon } from "../../../../model/shared/
 import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types.ts";
 import goAnthropicSource from "./snippets/go/anthropic.snippet.go?raw";
 import goAzureSource from "./snippets/go/azure.snippet.go?raw";
+import goBedrockSource from "./snippets/go/bedrock.snippet.go?raw";
 import goGeminiSource from "./snippets/go/gemini.snippet.go?raw";
+import goGenkitSource from "./snippets/go/genkit.snippet.go?raw";
 import goGrokSource from "./snippets/go/grok.snippet.go?raw";
 import goGroqSource from "./snippets/go/groq.snippet.go?raw";
 import goMistralSource from "./snippets/go/mistral.snippet.go?raw";
@@ -460,7 +462,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
     snippet: goRef(goOpenaiSource as unknown as string),
@@ -477,7 +480,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/azure.svg", "Azure OpenAI"),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/azureopenai github.com/openai/openai-go/v3",
       },
     },
     snippet: goRef(goAzureSource as unknown as string),
@@ -498,7 +502,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/anthropic github.com/anthropics/anthropic-sdk-go",
       },
     },
     snippet: goRef(goAnthropicSource as unknown as string),
@@ -515,7 +520,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/google.svg", "Gemini"),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/googlegenai google.golang.org/genai",
       },
     },
     snippet: goRef(goGeminiSource as unknown as string),
@@ -532,7 +538,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
     snippet: goRef(goGroqSource as unknown as string),
@@ -553,7 +560,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
     snippet: goRef(goGrokSource as unknown as string),
@@ -567,7 +575,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/mistral.svg", "Mistral"),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
     snippet: goRef(goMistralSource as unknown as string),
@@ -588,10 +597,51 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/ollama github.com/ollama/ollama/api",
       },
     },
     snippet: goRef(goOllamaSource as unknown as string),
+  },
+  {
+    platform: "go",
+    framework: "bedrock",
+    label: "AWS Bedrock",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/amazon-bedrock",
+      external: "https://docs.aws.amazon.com/bedrock/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/aws-lighttheme.svg",
+      "/images/external-icons/aws-darktheme.svg",
+      "AWS Bedrock",
+    ),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/bedrock github.com/aws/aws-sdk-go-v2/config github.com/aws/aws-sdk-go-v2/service/bedrockruntime",
+      },
+    },
+    snippet: goRef(goBedrockSource as unknown as string),
+  },
+  {
+    platform: "go",
+    framework: "genkit",
+    label: "Genkit",
+    category: "agents",
+    docs: {
+      internal: "/integration/go/integrations/genkit",
+      external: "https://genkit.dev/go/docs/get-started-go/",
+    },
+    icon: singleIcon("/images/external-icons/custom.svg", "Genkit"),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go/instrumentation/genkit github.com/firebase/genkit/go",
+      },
+    },
+    snippet: goRef(goGenkitSource as unknown as string),
   },
 
   // Java

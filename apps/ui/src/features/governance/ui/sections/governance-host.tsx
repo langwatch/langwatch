@@ -59,6 +59,10 @@ export function GovernanceHost({ children }: { children: ReactNode }) {
           organizationId: scope.organizationId,
           organizations: organizations.data ?? [],
         }),
+      currentUser: () => {
+        const actor = session.currentUser();
+        return actor ? { id: actor.id, name: actor.name, email: actor.email } : null;
+      },
       hasPermission: (permission) => session.hasPermission(permission),
       isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
       plan: () => ({

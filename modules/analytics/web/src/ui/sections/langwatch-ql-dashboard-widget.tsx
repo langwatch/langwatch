@@ -36,10 +36,11 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
+import { usePeriodSelector } from "~/components/PeriodSelector";
+import { HandledErrorAlert } from "~/features/errors";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import { api } from "~/utils/api";
 
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";
@@ -73,9 +74,10 @@ export function LangWatchQLDashboardWidget({
   granularitySeconds,
   name,
 }: LangWatchQLDashboardWidgetProps) {
-  const { period } = useAnalyticsPeriod();
+  const { period } = usePeriodSelector();
+  const refreshedAt = useDashboardRefreshedAt();
 
-  const chartQuery = analyticsApi.analytics.savedWorkbenchCharts.getById.useQuery(
+  const chartQuery = api.analytics.savedWorkbenchCharts.getById.useQuery(
     { id: chartId, projectId },
     { enabled: !!projectId && !!chartId },
   );
@@ -89,7 +91,9 @@ export function LangWatchQLDashboardWidget({
     isChartLoaded: !!chartQuery.data,
     start: period.startDate.getTime(),
     end: period.endDate.getTime(),
-    granularitySeconds: granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+    granularitySeconds:
+      granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+    ...(refreshedAt === undefined ? {} : { refreshedAt }),
   });
 
   const columns = useMemo(
@@ -107,7 +111,12 @@ export function LangWatchQLDashboardWidget({
   // failure the platform genuinely cannot name falls back to the generic
   // treatment, under a headline that at least says what the card was doing.
   if (error) {
-    return <HandledErrorAlert error={error} fallbackTitle="Couldn't run this chart's query" />;
+    return (
+      <HandledErrorAlert
+        error={error}
+        fallbackTitle="Couldn't run this chart's query"
+      />
+    );
   }
 
   if (!chartQuery.data || !result) {
@@ -145,19 +154,20 @@ function WidgetBody({
 
   return (
     <VStack align="stretch" gap={2} height="full" minWidth={0}>
-      {coarsenedFrom !== undefined && result.granularitySeconds !== undefined && (
-        <Box
-          role="status"
-          data-testid="lwql-widget-coarsened-notice"
-          fontSize="12px"
-          color="fg.muted"
-        >
-          {widgetCoarsenedNotice({
-            from: coarsenedFrom,
-            to: result.granularitySeconds,
-          })}
-        </Box>
-      )}
+      {coarsenedFrom !== undefined &&
+        result.granularitySeconds !== undefined && (
+          <Box
+            role="status"
+            data-testid="lwql-widget-coarsened-notice"
+            fontSize="12px"
+            color="fg.muted"
+          >
+            {widgetCoarsenedNotice({
+              from: coarsenedFrom,
+              to: result.granularitySeconds,
+            })}
+          </Box>
+        )}
 
       <Box flex={1} minHeight={0}>
         <LazyLangWatchQLWidgetChart

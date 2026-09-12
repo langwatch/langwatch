@@ -59,7 +59,7 @@ Webhook and billing REST surfaces authenticate with an **organization API key** 
 
 ## Billing settlement window
 
-A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#settled-events-and-supersession)). The default grace is **30 minutes**. Tune it with:
+A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#event-lifecycle)). The default grace is **30 minutes**. Tune it with:
 
 ```
 LW_SPEND_SETTLEMENT_GRACE_MS=1800000

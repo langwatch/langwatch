@@ -29,6 +29,11 @@ export const suiteTargetTypeSchema = z.enum([
   // own code (ADR-128). Its reference id may also read `<name>@<environment>`,
   // which the run resolves to an agent id before anything is scheduled.
   "connected",
+  // A voice agent, reached over a live call rather than a request/response
+  // API. The run drives the call and the transcript is what the scenarios
+  // judge, so the target resolves to a call destination rather than an
+  // endpoint.
+  "voice",
 ]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;
 

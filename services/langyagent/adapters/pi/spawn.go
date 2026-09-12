@@ -110,6 +110,9 @@ type workerConfig struct {
 	AgentsFilePath string            `json:"agentsFilePath"`
 	SkillsDir      string            `json:"skillsDir,omitempty"`
 	SessionDir     string            `json:"sessionDir"`
+	// DisabledSkills mirrors domain.Credentials.DisabledSkillIds — the flag-
+	// gated-off skill ids the worker must hide from the model this turn.
+	DisabledSkills []string `json:"disabledSkills,omitempty"`
 }
 
 // modelLane maps a provider-prefixed model id onto the pi API lane and compat
@@ -283,6 +286,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,
+		DisabledSkills: in.Creds.DisabledSkillIds,
 	}
 	configBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -404,6 +408,11 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// is a short-lived, revocable, per-conversation session key.
 		"LANGWATCH_API_KEY="+in.Creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+in.Creds.LangwatchEndpoint,
+		// Without this, every `langwatch` CLI call that reads/writes
+		// project-scoped data (playground-widget, trace search, analytics)
+		// fails with "No project is in scope" unless the worker also passes
+		// --project on each invocation, which the skill does not instruct.
+		"LANGWATCH_PROJECT_ID="+in.Creds.ProjectID,
 		// Long provider-cache retention: only takes effect on lanes whose
 		// model carries compat.supportsLongCacheRetention (see modelLane) —
 		// anthropic stamps ttl "1h" on its cache_control breakpoints, the

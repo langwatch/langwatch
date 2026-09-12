@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -9,8 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
@@ -99,7 +97,6 @@ describe("Level-up Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "level-up");
             // Verify tracing was added
             expectTracingInSource({ tempFolder, extension: ".py" });
@@ -146,7 +143,6 @@ describe("Level-up Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "level-up");
             expectTracingInSource({ tempFolder, extension: ".ts" });
           },
@@ -192,7 +188,6 @@ describe("Level-up Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "level-up");
             expectTracingInSource({ tempFolder, extension: ".py" });
           },
@@ -236,7 +231,6 @@ describe("Level-up Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "level-up");
             expectTracingInSource({ tempFolder, extension: ".ts" });
           },

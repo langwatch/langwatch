@@ -190,6 +190,23 @@ export const AUTHZ_RESOURCES = {
     actions: ["manageExperiments"],
     scopes: ["project", "organization"],
   },
+  governanceCost: {
+    // The organization's cost screen (ADR-128): what the provider billed,
+    // what the gateway metered, and the seat lane, side by side.
+    //
+    // `view` only. Nothing on the screen is editable — the figures are
+    // summarized from the cost rollup, so there is no write grain to grant,
+    // and a `manage` nobody can act on would still widen `view` through the
+    // hierarchy rule for anyone holding it.
+    //
+    // Org-tier only: the screen aggregates every lane of the organization's
+    // spend across every team, so a team- or project-scoped binding must
+    // never grant it — which is what the org-only `scopes` below states.
+    // (Main said ORG_EXCLUSIVE_RESOURCES in rbac.ts; that set lives in the
+    // monolith this branch deletes, and the registry is the mechanism here.)
+    actions: ["view"],
+    scopes: ["organization"],
+  },
 } as const satisfies Record<
   string,
   {

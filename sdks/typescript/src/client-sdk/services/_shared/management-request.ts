@@ -2,8 +2,9 @@
  * The raw-fetch request path the management API services share.
  */
 import { scopedApiKey } from "@/internal/credentialContext";
-import { formatApiErrorForOperation } from "./format-api-error";
-import { throwIfHandledError } from "./throw-handled-error";
+import { formatApiErrorForOperation } from "./format-api-error.ts";
+import { throwIfHandledError } from "./throw-handled-error.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Builds the family's own error for a failure the platform did not name. */
 export type ManagementErrorFactory = (params: {
@@ -87,7 +88,7 @@ export const createManagementRequest = ({
     query,
     signal,
   }: ManagementRequestParams): Promise<T> => {
-    const response = await fetch(`${endpoint}${path}${buildQueryString(query)}`, {
+    const response = await langwatchFetch(`${endpoint}${path}${buildQueryString(query)}`, {
       ...(method ? { method } : {}),
       headers: {
         Authorization: `Bearer ${token}`,

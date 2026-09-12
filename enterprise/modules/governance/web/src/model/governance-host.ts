@@ -93,6 +93,13 @@ export type GovernancePlan = {
  * the frontend feature constructs once and a test double is an obvious object
  * literal.
  */
+/** The reader, as much of them as a greeting needs. */
+export type GovernanceActor = {
+  id: string;
+  name: string | null;
+  email: string | null;
+};
+
 export abstract class GovernanceHostPort {
   /** The organization and project this page is about. */
   abstract scope(): GovernanceScope;
@@ -102,6 +109,13 @@ export abstract class GovernanceHostPort {
 
   /** The organization the section is scoped to, resolved from the scope. */
   abstract organization(): GovernanceOrganization | undefined;
+
+  /**
+   * Who is reading, when the shell knows. `null` covers both "not signed in"
+   * and "not answered yet", because a greeting is the only caller and it has
+   * the same anonymous fallback for either.
+   */
+  abstract currentUser(): GovernanceActor | null;
 
   /** Fails closed: an answer that has not arrived reads as no. */
   abstract hasPermission(permission: string): boolean;

@@ -29,8 +29,7 @@ export class TestHttp implements GovernanceHttpClient {
       url: string,
       init: Parameters<GovernanceHttpClient["fetch"]>[1],
     ) => Promise<GovernanceHttpResponse>,
-  ) {
-  }
+  ) {}
 
   fetch(
     url: string,
@@ -50,6 +49,7 @@ export class FetchHttp implements GovernanceHttpClient {
       ok: response.ok,
       status: response.status,
       statusText: response.statusText,
+      headers: response.headers,
       json: () => response.json(),
       text: () => response.text(),
     };
@@ -77,16 +77,19 @@ export class TestObjectStorage implements GovernanceObjectStore {
     credentials: GovernanceObjectStorageCredentials;
     signal?: AbortSignal;
     limit: number;
-  }): Promise<string[]> {
+  }): Promise<{ keys: string[]; isTruncated: boolean }> {
     this.lastList = input;
-    return this.objects
+    const matching = this.objects
       .filter(
         (object) =>
           object.key.startsWith(input.prefix) &&
           (input.startAfter === undefined || object.key > input.startAfter),
       )
-      .slice(0, input.limit)
       .map((object) => object.key);
+    return {
+      keys: matching.slice(0, input.limit),
+      isTruncated: matching.length > input.limit,
+    };
   }
 
   async readText(input: {

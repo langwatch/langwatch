@@ -15,6 +15,9 @@ import * as cliApi from "../cli-api";
 import { buildOtelEnvBlock } from "../otel-env-block";
 import { buildScopedToolFunction, persistBlockToRc, rcPath, toolMarkers } from "../shell-rc";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
+import { runningCodeRestartNotice } from "../running-code";
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 import {
   baseCfg,
   CURRENT_ENDPOINT,
@@ -37,6 +40,32 @@ vi.mock("../cli-api", async () => {
 const temp = installTempHomeAndCwd();
 
 describe("refreshTelemetryWiringForLogin", () => {
+  describe("when login changes the instance used by an active langwatch code launcher", () => {
+    /** @scenario "Login refresh reports the same restart advice" */
+    it("returns restart advice with the successful wiring refresh", async () => {
+      const notice =
+        "Restart `langwatch code` to apply the updated telemetry settings.";
+      vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "code",
+          buildOtelEnvBlock("code", STALE_ENDPOINT, STALE_TOKEN),
+          "zsh",
+        ),
+        toolMarkers("code"),
+      );
+      vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+        token: CURRENT_TOKEN,
+        prefix: "ik-lw-test",
+        endpoint: CURRENT_ENDPOINT,
+      });
+
+      const result = await refreshTelemetryWiringForLogin(baseCfg());
+
+      expect(result).toMatchObject({ warnings: [notice] });
+    });
+  });
   describe("given persisted wiring pointing at a previous instance", () => {
     beforeEach(() => {
       // claude → user-level settings env at the stale instance

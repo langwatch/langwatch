@@ -1,11 +1,19 @@
 /**
  * The agents a simulation can be pointed at, and what each of them reads as.
+ *
+ * A connected agent is one of them (ADR-128): it carries an environment, a
+ * presence and, in a development environment, an owner. A development agent
+ * that belongs to another person can only be run by that person, and a
+ * connected agent no process is holding cannot be run at all, so the picker
+ * draws either disabled and says why on hover.
+ *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
 import { useMemo } from "react";
-import { connectedAgentSelectability } from "@langwatch/agent-contract";
+import { connectedAgentSelectability, ownerOnlyCopy } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
+import { OFFLINE_AGENT_SELECT_COPY } from "../../../../../../apps/ui/src/features/simulations/ui/offlineAgentCopy.ts";
 import type { TargetValue } from "../../model/scenario-target.ts";
 
 /** Agent types that can be used as scenario targets */
@@ -14,6 +22,7 @@ const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
   "code",
   "workflow",
   "connected",
+  "voice",
 ]);
 
 /** What the picker reads off an agent row. */
@@ -31,7 +40,12 @@ export type AgentLike = {
   owner?: { userId: string; name: string | null } | null;
 };
 
-export type ScenarioAgentType = "http" | "code" | "workflow" | "connected";
+export type ScenarioAgentType =
+  | "http"
+  | "code"
+  | "workflow"
+  | "connected"
+  | "voice";
 
 /** One agent as the picker offers it. */
 export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
@@ -40,9 +54,16 @@ export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
   label: string;
   /** True when a development agent belongs to another person. */
   isTeammateOwned: boolean;
-  /** False only for a development agent of another person. */
+  /** True when a connected agent has no process holding it. */
+  isOffline: boolean;
+  /** False for a development agent of another person and for an offline agent. */
   isRunnable: boolean;
 };
+
+/** True when this agent is a connected agent that no process is holding. */
+export function isOfflineAgent(agent: Pick<AgentLike, "type" | "status">): boolean {
+  return agent.type === "connected" && agent.status === "offline";
+}
 
 /** The label of one agent: its name, and the environment of a connected one. */
 export function agentTargetLabel(agent: AgentLike): string {
@@ -89,11 +110,13 @@ export function scenarioAgentsOf<T extends AgentLike>({
     )
     .map((agent): ScenarioAgent<T> => {
       const teammates = isTeammateOwned({ agent, viewerUserId });
+      const offline = isOfflineAgent(agent);
       return {
         ...agent,
         label: agentTargetLabel(agent),
         isTeammateOwned: teammates,
-        isRunnable: !teammates,
+        isOffline: offline,
+        isRunnable: !teammates && !offline,
       };
     });
   const sorted = [...scenarioAgents].sort(
@@ -125,4 +148,21 @@ export function isAgentTarget(
   target: TargetValue,
 ): target is NonNullable<TargetValue> & { type: ScenarioAgentType } {
   return target !== null && SCENARIO_AGENT_TYPES.has(target.type);
+}
+
+/**
+ * Why an agent cannot be picked as a run target.
+ *
+ * A development agent of another person can never be run by the reader, so
+ * that reason comes first even when the agent is offline too.
+ */
+export function notRunnableCopy(agent: {
+  isTeammateOwned?: boolean;
+  owner?: { name: string | null } | null;
+  isOffline?: boolean;
+}): string {
+  if (agent.isOffline && !agent.isTeammateOwned) {
+    return OFFLINE_AGENT_SELECT_COPY;
+  }
+  return ownerOnlyCopy(agent.owner?.name);
 }

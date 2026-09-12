@@ -20,14 +20,13 @@ export default defineConfig({
     hookTimeout: 30_000,
     environment: "node",
     // Each test spawns child processes (the compiled CLI). Forks pool
-    // gives us isolated child_process workers; the default threads
-    // pool blocks spawnSync indefinitely.
+    // gives us isolated child_process workers; a threads pool blocks
+    // spawnSync indefinitely.
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    // Was `poolOptions.forks.singleFork`, removed by vitest 4's pool rework
+    // in favour of a top-level worker count.
+    // https://v4.vitest.dev/guide/migration#pool-rework
+    maxWorkers: 1,
     include: ["__tests__/e2e/cli/governance-wrapper.e2e.test.ts"],
     passWithNoTests: false,
   },

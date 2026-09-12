@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@langwatch/api-key-server": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-server": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",

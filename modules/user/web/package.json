@@ -18,6 +18,10 @@
       "langwatch-declaration-source": "./src/personal-workspace.ts",
       "types": "./dist/personal-workspace.d.ts",
       "default": "./src/personal-workspace.ts"
+    },
+    "./surfaces/tile-icon": {
+      "types": "./dist/ui/elements/tile-icon.d.ts",
+      "default": "./src/ui/elements/tile-icon.tsx"
     }
   },
   "scripts": {

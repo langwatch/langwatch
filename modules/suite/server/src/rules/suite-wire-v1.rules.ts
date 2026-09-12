@@ -5,10 +5,22 @@
  */
 import { defineRestMiddleware } from "@langwatch/api/rest";
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
-import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
+import type { SimulationSuite } from "@langwatch/prisma-client/generated";
+import {
+  evaluatorAttachmentSchema,
+  MAX_EVALUATOR_ATTACHMENTS,
+  MAX_SUITE_FIELDS,
+  parseEvaluatorAttachments,
+  parseSuiteFieldDefinitions,
+  runNoteSchema,
+  runParameterValuesSchema,
+  scenarioMappingSchema,
+  suiteFieldDefinitionSchema,
+} from "@langwatch/scenario-contract";
 import {
   MAX_PLAN_NAME_LENGTH,
   MAX_REPEAT_COUNT,
+  parseSuiteScope,
   suiteScopeSchema,
   suiteTargetSchema,
   type SuiteTarget,
@@ -21,6 +33,40 @@ import { z } from "zod";
  * bound once by the process that reads the header.
  */
 export const suiteSurfaceFact = defineRestMiddleware("suiteSurface", z.string().nullable());
+
+export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
+  "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
+);
+
+export const suiteFieldsWireSchema = z
+  .array(suiteFieldWireSchema)
+  .max(MAX_SUITE_FIELDS)
+  .describe(
+    `The fields the test suite declares, in the order the platform shows them. Up to ${MAX_SUITE_FIELDS}. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.`,
+  );
+
+export const scenarioMappingWireSchema = scenarioMappingSchema.describe(
+  "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal.",
+);
+
+export const evaluatorAttachmentWireSchema = evaluatorAttachmentSchema
+  .extend({
+    mappings: z
+      .record(z.string().min(1).max(128), scenarioMappingWireSchema)
+      .describe(
+        "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.",
+      ),
+  })
+  .describe(
+    "One evaluator that runs after every scenario run, with where each of its inputs reads from.",
+  );
+
+export const evaluatorAttachmentsWireSchema = z
+  .array(evaluatorAttachmentWireSchema)
+  .max(MAX_EVALUATOR_ATTACHMENTS)
+  .describe(
+    `The evaluators that run after every scenario run. Up to ${MAX_EVALUATOR_ATTACHMENTS}. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.`,
+  );
 
 /** What a query string may say for yes and for no. Compared case-folded. */
 const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
@@ -84,6 +130,11 @@ export const runPlanConfigWireSchema = z.object({
     .optional()
     .describe(
       "The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time.",
+    ),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds.",
     ),
 });
 
@@ -195,6 +246,11 @@ export const runPlanWireSchema = z.object({
     .nullable()
     .describe("The model that judges the run, or null for the scenario or project default."),
   labels: z.array(z.string()).describe("The labels the plan carries."),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The plan's own evaluators. Absent on servers that predate evaluators on this family.",
+    ),
   archivedAt: z
     .string()
     .nullable()
@@ -245,6 +301,16 @@ export const testSuiteWireSchema = z.object({
     .array(z.string())
     .describe("The scenarios filed in this suite, in the order it shows them."),
   scenarioCount: z.number().describe("How many scenarios are filed in it."),
+  fields: suiteFieldsWireSchema
+    .optional()
+    .describe(
+      "The fields the test suite declares. Absent on servers that predate fields on this family.",
+    ),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.",
+    ),
   archivedAt: z
     .string()
     .nullable()
@@ -269,6 +335,38 @@ export const testSuiteDetailWireSchema = testSuiteWireSchema.extend({
     .describe("The active scenarios filed in this suite. An archived scenario is left out."),
 });
 
+export const testSuiteCreateInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_PLAN_NAME_LENGTH)
+    .describe("The test suite name, as it reads in the platform."),
+  fields: suiteFieldsWireSchema.optional(),
+  evaluators: evaluatorAttachmentsWireSchema.optional(),
+});
+
+export const testSuiteUpdateInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_PLAN_NAME_LENGTH)
+    .optional()
+    .describe("The new name. The slug is kept."),
+  fields: suiteFieldsWireSchema
+    .optional()
+    .describe(
+      "The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use.",
+    ),
+  evaluators: evaluatorAttachmentsWireSchema
+    .optional()
+    .describe(
+      "The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid.",
+    ),
+});
+
+export type SuiteTargetWire = z.infer<typeof suiteTargetSchema>;
 export type RunPlanRunResultWire = z.infer<typeof runPlanRunResultSchema>;
 
 /**
@@ -288,4 +386,82 @@ export function toRunItemsWire(
     target: { type: item.target.type, referenceId: item.target.referenceId },
     name: item.name ?? null,
   }));
+}
+
+/**
+ * The stored targets column, as the wire shape.
+ *
+ * The column is JSON, and rows written before the current shape may hold a
+ * string, so it is read defensively rather than parsed strictly: a plan whose
+ * targets cannot be read still lists, it just lists with none. Each entry is
+ * parsed on its own, so one bad entry costs its own row and not the rest.
+ * Casting instead would publish `type` and `referenceId` as undefined.
+ */
+function readTargets(raw: unknown): SuiteTargetWire[] {
+  const value = typeof raw === "string" ? parseJson(raw) : raw;
+  if (!Array.isArray(value)) return [];
+  const targets: SuiteTargetWire[] = [];
+  for (const entry of value) {
+    const parsed = suiteTargetSchema.safeParse(entry);
+    if (parsed.success) targets.push(parsed.data);
+  }
+  return targets;
+}
+
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** One run plan row, as the API publishes it. */
+export function toRunPlanWire({
+  suite,
+  platformUrl,
+}: {
+  suite: SimulationSuite;
+  platformUrl: string;
+}): RunPlanWire {
+  return {
+    id: suite.id,
+    name: suite.name,
+    slug: suite.slug,
+    scope: parseSuiteScope(suite.scope),
+    scenarioIds: suite.scenarioIds,
+    targets: readTargets(suite.targets),
+    repeatCount: suite.repeatCount,
+    simulatorModel: suite.simulatorModel,
+    judgeModel: suite.judgeModel,
+    labels: suite.labels,
+    evaluators: parseEvaluatorAttachments(suite.evaluators),
+    archivedAt: suite.archivedAt?.toISOString() ?? null,
+    createdAt: suite.createdAt.toISOString(),
+    updatedAt: suite.updatedAt.toISOString(),
+    platformUrl,
+  };
+}
+
+/** One test suite row, as the API publishes it. */
+export function toTestSuiteWire({
+  suite,
+  platformUrl,
+}: {
+  suite: SimulationSuite;
+  platformUrl: string;
+}): TestSuiteWire {
+  return {
+    id: suite.id,
+    name: suite.name,
+    slug: suite.slug,
+    scenarioIds: suite.scenarioIds,
+    scenarioCount: suite.scenarioIds.length,
+    fields: parseSuiteFieldDefinitions(suite.fields),
+    evaluators: parseEvaluatorAttachments(suite.evaluators),
+    archivedAt: suite.archivedAt?.toISOString() ?? null,
+    createdAt: suite.createdAt.toISOString(),
+    updatedAt: suite.updatedAt.toISOString(),
+    platformUrl,
+  };
 }

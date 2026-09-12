@@ -187,6 +187,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Layout:      detectLayout(p.WorktreeDir),
 		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		PublicURL:        o.cfg.PublicURL,
 		LangyTier:        opts.LangyTier,
 		LangyImage:       opts.langyImageTag,
 		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,

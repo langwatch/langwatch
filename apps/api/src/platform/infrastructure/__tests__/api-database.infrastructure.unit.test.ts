@@ -36,7 +36,7 @@ import {
 import {
   ApiDatabaseAbsenceReport,
   ApiDatabaseInfrastructure,
-} from "../api-database.infrastructure.ts";
+} from "../api-database.members.ts";
 
 type ConnectionParts = {
   connection: PrismaConnection;

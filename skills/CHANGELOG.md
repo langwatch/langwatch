@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/langwatch/langwatch/compare/skills@v1.3.0...skills@v1.4.0) (2026-09-06)
+
+
+### Features
+
+* **agent-testing:** suite fields and evaluators on scenario runs ([#7867](https://github.com/langwatch/langwatch/issues/7867)) ([0bcf01e](https://github.com/langwatch/langwatch/commit/0bcf01edb3d8cc36aa62cd48e6ee147a7b01b45b))
+* **langy:** langy works on the developer's code through a shared local folder or GitHub ([#7879](https://github.com/langwatch/langwatch/issues/7879)) ([ad87487](https://github.com/langwatch/langwatch/commit/ad874879284ee71416fa8a538a58f76e39a03bcd))
+
+
+### Documentation
+
+* **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
+
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/skills@v1.2.0...skills@v1.3.0) (2026-09-01)
 
 ### Features

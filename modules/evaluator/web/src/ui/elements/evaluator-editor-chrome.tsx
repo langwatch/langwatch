@@ -1,6 +1,36 @@
 import { Button, Circle, Heading, HStack, Spacer } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
+export const REMOVE_EVALUATOR_LABEL = "Remove evaluator";
+
+/**
+ * The button that takes the attachment off, when the editor is open on one,
+ * and the spacer that pins it to its own side of the footer.
+ */
+function FooterRemoveArea({
+  onRemove,
+  hasSpacer,
+}: {
+  onRemove: (() => void) | undefined;
+  hasSpacer: boolean;
+}) {
+  if (!onRemove) return null;
+  return (
+    <>
+      <Button
+        variant="ghost"
+        colorPalette="red"
+        size="sm"
+        onClick={onRemove}
+        data-testid="evaluator-remove-button"
+      >
+        {REMOVE_EVALUATOR_LABEL}
+      </Button>
+      {hasSpacer && <Spacer />}
+    </>
+  );
+}
+
 export type EvaluatorEditorActionsProps = {
   mode: "local" | "persisted";
   isEditing: boolean;
@@ -13,6 +43,8 @@ export type EvaluatorEditorActionsProps = {
   onDiscard: () => void;
   onApply: () => void;
   onCancel: () => void;
+  /** Called when the attachment is taken off. Renders a "Remove evaluator" button when present. */
+  onRemove?: (() => void) | undefined;
 };
 
 /** Evaluator editor actions with all transport and navigation supplied by the host. */
@@ -28,10 +60,12 @@ export function EvaluatorEditorActions({
   onDiscard,
   onApply,
   onCancel,
+  onRemove,
 }: EvaluatorEditorActionsProps) {
   if (mode === "local") {
     return (
       <HStack width="full">
+        <FooterRemoveArea onRemove={onRemove} hasSpacer={false} />
         {hasUnsavedChanges && (
           <Button
             variant="outline"
@@ -67,7 +101,8 @@ export function EvaluatorEditorActions({
   }
 
   return (
-    <HStack gap={3}>
+    <HStack gap={3} width={onRemove ? "full" : undefined}>
+      <FooterRemoveArea onRemove={onRemove} hasSpacer={true} />
       <Button variant="outline" onClick={onCancel}>
         Cancel
       </Button>

@@ -110,6 +110,11 @@ function usePersonalWorkspace(): {
   personalProjectSlug: string | null;
   features: PersonalWorkspaceFeatures | undefined;
 } {
+  // Scoped to the organization the chrome is showing: a personal workspace
+  // exists per organization, and `openableTeams()` is already derived from
+  // the ambient organization with the ambient team ordered first, so finding
+  // the first personal team here carries the same per-organization scoping
+  // main's `findPersonalProject({ organizationId })` fix added.
   const host = useNavigationHost();
   const openableTeams = host.openableTeams();
 

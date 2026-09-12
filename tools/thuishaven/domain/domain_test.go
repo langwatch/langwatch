@@ -1,6 +1,10 @@
 package domain
 
-import "testing"
+import (
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestDeriveSlugIsTheWorktreeName(t *testing.T) {
 	if got := DeriveSlug("/work/trees/portless", nil); got != "portless" {
@@ -182,6 +186,30 @@ func TestOverlayOptsOutOfBackupMetricsWhenManagingClickHouse(t *testing.T) {
 	}
 }
 
+// The app sizes its ClickHouse pool from the server's stated cap, and assumes a
+// 300-query server when nobody states it. haven renders the cap into the
+// container's config, so it is the one party that knows the number; left
+// unexported, a 32-query dev server met a pool sized for a 300-query one and
+// rejected the governance cost pull mid-page (#8064).
+func TestOverlayExportsClickHouseConcurrencyCapWhenManaged(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES") {
+		t.Fatalf("unmanaged stack must not claim to know its ClickHouse server's cap")
+	}
+	managed := base
+	managed.ClickHouseHTTPPort = 18123
+	managed.ClickHouseDatabase = "lw_brave_otter"
+	want := strconv.Itoa(ClickHouseMaxConcurrentQueries)
+	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"); got != want {
+		t.Errorf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES = %q, want %q (the cap haven renders)", got, want)
+	}
+	if !strings.Contains(RenderClickHouseConfig(DefaultClickHouseLimits()), "<max_concurrent_queries>"+want+"</max_concurrent_queries>") {
+		t.Errorf("the exported cap must be the one rendered into the server's config")
+	}
+}
+
 func TestOverlayEmitsPostgresURLOnlyWhenManaged(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
@@ -275,6 +303,24 @@ func validCHIdentifier(s string) bool {
 		}
 	}
 	return true
+}
+
+// @scenario "a tunneled stack signs in through its public origin"
+func TestOverlayCarriesPublicURLOnlyOnAuthLines(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.portless.langwatch.localhost"},
+		{Name: "gateway"}, {Name: "nlp"},
+	}, PublicURL: "https://box.example.ts.net:8443"}
+	env := st.OverlayEnv()
+	if got := valueOf(env, "BASE_HOST"); got != st.PublicURL {
+		t.Errorf("BASE_HOST = %q, want the public URL %q", got, st.PublicURL)
+	}
+	if got := valueOf(env, "NEXTAUTH_URL"); got != st.PublicURL {
+		t.Errorf("NEXTAUTH_URL = %q, want the public URL %q", got, st.PublicURL)
+	}
+	if got := valueOf(env, "LANGWATCH_ENDPOINT"); got != "https://app.portless.langwatch.localhost" {
+		t.Errorf("LANGWATCH_ENDPOINT = %q, want the local app URL unchanged", got)
+	}
 }
 
 func TestOverlayEmitsHavenSeedLangwatchAPIKey(t *testing.T) {

@@ -5,7 +5,7 @@
  */
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRateLimitInfrastructure } from "../api-rate-limit.infrastructure.ts";
+import { ApiRateLimitInfrastructure } from "../api-rate-limit.members.ts";
 
 const START = new Date("2026-09-01T10:00:00.000Z");
 

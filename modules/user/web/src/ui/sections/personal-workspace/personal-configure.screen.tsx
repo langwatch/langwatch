@@ -65,9 +65,7 @@ export function PersonalConfigureScreen() {
       });
       setNewKeyLabel("");
       setShowAddForm(false);
-      void utils.personalVirtualKeys.list.invalidate({
-        organizationId: ctx.organizationId,
-      });
+      void utils.personalVirtualKeys.list.invalidate();
       toaster.create({
         title: `Issued personal key '${issued.label}'`,
         type: "success",
@@ -139,9 +137,7 @@ export function PersonalConfigureScreen() {
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
     onSuccess: () => {
-      void utils.personalVirtualKeys.list.invalidate({
-        organizationId: ctx.organizationId,
-      });
+      void utils.personalVirtualKeys.list.invalidate();
       setPendingRevokeId(null);
       toaster.create({
         title: "Key revoked",

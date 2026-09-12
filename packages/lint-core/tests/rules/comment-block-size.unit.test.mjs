@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
+import { commentBlockSizeMessage } from "../../grammar/comment-block-policy.mjs";
 import { commentBlockSizeRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -25,11 +26,9 @@ describe("given a source file outside the burn-down allowlist", () => {
       const found = report(`${commentLines(9)}\nexport const x = 1;`);
 
       expect(found).toHaveLength(1);
-      expect(found[0].message).toBe(
-        "Comment block has 9 lines; the maximum is 5." +
-          " Comments exist to make code readable and good code needs almost none: keep the why in a" +
-          " line or two, and put design narrative in an ADR the comment points to.",
-      );
+      expect(found[0].message).toBe(commentBlockSizeMessage(9));
+      expect(found[0].message).toContain("Comment block has 9 lines; the maximum is 5.");
+      expect(found[0].message).toContain("haiku subagent");
     });
   });
 
@@ -42,7 +41,8 @@ describe("given a source file outside the burn-down allowlist", () => {
       expect(found.map((entry) => entry.messageId)).toEqual(["commentColumns"]);
       expect(found[0].data.width).toBe(wide.length);
       expect(found[0].message).toBe(
-        `Comment line is ${wide.length} columns; wrap at 100. Wrap the line.`,
+        `Comment line is ${wide.length} columns; wrap at 100.` +
+          " Rewrap the block at 100 columns, or cut it to the sentence that earns its place.",
       );
     });
   });

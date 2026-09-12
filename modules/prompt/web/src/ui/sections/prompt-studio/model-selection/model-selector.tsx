@@ -314,6 +314,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   mode,
   showConfigureAction = false,
   forFeatureLabel,
+  featureKey,
   open,
   onOpenChange,
 }: {
@@ -322,6 +323,11 @@ export const ModelSelector = React.memo(function ModelSelector({
   onChange: (model: string) => void;
   size?: "sm" | "md" | "full";
   mode?: "chat" | "embedding";
+  /** The feature this picker serves, for the restricted-provider gate
+   *  (`filterRestrictedModels`): a picker that names a codex-licensed
+   *  feature (e.g. Langy's `langy.chat`) may offer codex models; one
+   *  that names none never sees them. */
+  featureKey?: string;
   /** When true, shows a "Configure available models" link at the bottom of the dropdown */
   showConfigureAction?: boolean;
   /** Surface-specific label used in the empty-state callout when no
@@ -337,6 +343,7 @@ export const ModelSelector = React.memo(function ModelSelector({
     options,
     model,
     mode,
+    { featureKey },
   );
 
   // ALL hooks must run unconditionally - keep the empty-state early

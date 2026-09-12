@@ -40,7 +40,12 @@ interface FetchCall {
 }
 
 let capturedCalls: FetchCall[] = [];
-let responseQueue: Array<{ status: number; body: unknown }> = [];
+let responseQueue: Array<{
+  status: number;
+  body: unknown;
+  /** Extra response headers, for the answers whose meaning is in a header. */
+  headers?: Record<string, string>;
+}> = [];
 
 class TestHttp implements GovernanceHttpClient {
   async fetch(
@@ -50,12 +55,22 @@ class TestHttp implements GovernanceHttpClient {
     capturedCalls.push({ url, init });
     const next = responseQueue.shift();
     if (!next) throw new Error("test bug: no queued response");
+    // Source headers carry the decrypted upstream secret, and `init` above
+    // always asks not to follow a redirect. A fixture that queues one models
+    // what a redirect-refusing transport does with it: refuse, rather than
+    // hand the credential to wherever the redirect points.
+    if (next.status >= 300 && next.status < 400) {
+      const refused = new Error("Redirect refused");
+      refused.name = "RedirectRefusedError";
+      throw refused;
+    }
     return {
       ok: next.status >= 200 && next.status < 300,
       status: next.status,
       statusText: next.status === 200 ? "OK" : "failed",
       json: async () => next.body,
       text: async () => JSON.stringify(next.body),
+      headers: next.headers ? { get: (name: string) => next.headers![name] ?? null } : undefined,
     };
   }
 }
@@ -70,7 +85,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.resetModules();
   vi.clearAllMocks();
 });
 
@@ -105,6 +119,55 @@ describe("HttpPollingPullerAdapter", () => {
       const { method: _omit, ...withoutMethod } = VALID_CONFIG;
       const parsed = adapter.validateConfig(withoutMethod);
       expect(parsed.method).toBe("GET");
+    });
+  });
+
+  describe("given a request that carries the source's credential", () => {
+    /**
+     * The request headers carry the source's decrypted upstream secret, and
+     * the transport behind `GovernanceHttpClient` follows redirects by
+     * default — re-sending those headers to each host it lands on. A
+     * configured endpoint that starts answering with a redirect would hand
+     * the credential to wherever it points, with nothing in a pull run
+     * reporting it.
+     *
+     * Asserted on the call rather than through a redirecting fixture on
+     * purpose: the inherited default is to follow, so the only thing that
+     * proves this adapter opted out is the option itself being passed.
+     */
+    /** @scenario "A redirect never carries the credentials onward" */
+    it("tells the fetch helper not to follow redirects", async () => {
+      const adapter = makeAdapter();
+      responseQueue.push({
+        status: 200,
+        body: { events: [], next_cursor: null },
+      });
+
+      await adapter.runOnce(
+        { cursor: null, credentials: { token: "secret-xyz" } },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      expect(capturedCalls).toHaveLength(1);
+      expect((capturedCalls[0]!.init as { followRedirects?: boolean }).followRedirects).toBe(false);
+    });
+
+    /**
+     * A configured endpoint that redirects is a permanent property of that
+     * endpoint, so retrying it only delays the error the admin needs to read.
+     */
+    /** @scenario "A redirect never carries the credentials onward" */
+    it("fails immediately on a refused redirect instead of retrying it", async () => {
+      const adapter = makeAdapter();
+      responseQueue.push({ status: 302, body: {} });
+
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: { token: "secret-xyz" } },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      expect(result.errorCount).toBe(1);
+      expect(capturedCalls).toHaveLength(1);
     });
   });
 
@@ -287,6 +350,59 @@ describe("HttpPollingPullerAdapter", () => {
         adapter.validateConfig(VALID_CONFIG),
       );
       expect(result.cursor).toBeNull();
+    });
+  });
+
+  /**
+   * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+   *
+   * This adapter is one of the two scheduled sources that used to let a
+   * provider's wait fall on the floor: a 429 landed in the generic 4xx branch,
+   * which ends the run correctly and throws away the header saying when it is
+   * safe to come back.
+   */
+  describe("given a provider answering that too many requests were made", () => {
+    /** @scenario "A provider that says too many requests were made is asked only once in that run" */
+    it("stops the run rather than asking a second time", async () => {
+      const adapter = makeAdapter();
+      responseQueue.push({
+        status: 429,
+        body: { message: "slow down" },
+        headers: { "retry-after": "120" },
+      });
+
+      await expect(
+        adapter.runOnce(
+          { cursor: null, credentials: { token: "secret-xyz" } },
+          adapter.validateConfig(VALID_CONFIG),
+        ),
+      ).rejects.toThrow(/429/);
+
+      // One queued answer, one request. A second would have emptied the queue
+      // and failed with the harness's own "no queued response".
+      expect(capturedCalls).toHaveLength(1);
+    });
+
+    /** @scenario "A provider that says too many requests were made is asked only once in that run" */
+    it("carries away the wait the provider named", async () => {
+      const adapter = makeAdapter();
+      responseQueue.push({
+        status: 429,
+        body: { message: "slow down" },
+        headers: { "retry-after": "120" },
+      });
+
+      const thrown = await adapter
+        .runOnce(
+          { cursor: null, credentials: { token: "secret-xyz" } },
+          adapter.validateConfig(VALID_CONFIG),
+        )
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(Reflect.get(thrown as object, "retryAfterMs")).toBe(120_000);
     });
   });
 });

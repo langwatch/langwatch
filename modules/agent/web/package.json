@@ -45,6 +45,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-web": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "lucide-react": "catalog:",

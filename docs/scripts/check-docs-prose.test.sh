@@ -72,6 +72,20 @@ else
   check "the percent sign reads as %25" no
 fi
 
+# awk compares against a limit that does not read as a number as a string, so
+# every paragraph passes and the rule is off. The script refuses such a limit.
+LIMIT_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=eighty bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+LIMIT_STATUS=$?
+
+if [[ $LIMIT_STATUS -eq 2 ]] && printf '%s\n' "$LIMIT_OUTPUT" \
+  | grep -q 'DOCS_PROSE_MAX_PARAGRAPH_WORDS must be a whole number, got: eighty'; then
+  check "a paragraph limit that is not a whole number is refused" yes
+else
+  check "a paragraph limit that is not a whole number is refused" no
+  echo "Status: $LIMIT_STATUS"
+  echo "Output: $LIMIT_OUTPUT"
+fi
+
 # A paragraph over the word limit fails, a list item over it fails, and a
 # table row or a paragraph split in two passes. An indented heading, a table
 # written without its outer pipes and a list item of exactly the limit pass
@@ -168,6 +182,72 @@ if printf '%s\n' "$NESTED_OUTPUT" | grep -q 'words, the limit is 10'; then
   echo "Output: $NESTED_OUTPUT"
 else
   check "a four-backtick fence that quotes three-backtick fences stays one code block" yes
+fi
+
+# A table written without its outer pipes ends the paragraph that ran into it.
+# Without that, the prose before the table and the prose after it count as one
+# paragraph and a page under the limit on both sides reports a violation. The
+# long page goes first so the only page left is under the limit throughout, and
+# the run has to come back clean rather than merely quiet about this page: a
+# checker that died early would report no violation here either.
+rm -f "$LONG_PAGE"
+TABLE_PAGE="$WORK/docs/table.mdx"
+{
+  printf -- '---\ntitle: Table\n---\n\n'
+  printf 'one two three four five six seven eight\n'
+  printf 'name | description\n'
+  printf -- '--- | ---\n'
+  printf 'a | b\n'
+  printf 'one two three four five six seven eight\n'
+} > "$TABLE_PAGE"
+
+TABLE_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+TABLE_STATUS=$?
+
+if [[ $TABLE_STATUS -eq 0 ]] && ! printf '%s\n' "$TABLE_OUTPUT" | grep -q 'table.mdx,line='; then
+  check "prose either side of a table without outer pipes is two paragraphs" yes
+else
+  check "prose either side of a table without outer pipes is two paragraphs" no
+  echo "Status: $TABLE_STATUS"
+  echo "Output: $TABLE_OUTPUT"
+fi
+
+# A fence indented four spaces inside a JSX component is still a code fence.
+# The scanner reads .mdx only, and MDX has no indented-code-block construct:
+# under <Tab> and friends the indentation is formatting, and an indented fence
+# is parsed as a fence. So the code inside must never count as a paragraph.
+#
+# The page carries a long paragraph after the closing fence as well, and the
+# run has to report that one. Blanking the code is only half the contract: a
+# scanner that opened the fence and never closed it would also come back
+# quiet, and would silently stop reading the rest of every page that nests a
+# fence this way.
+rm -f "$TABLE_PAGE"
+INDENTED_PAGE="$WORK/docs/indented.mdx"
+{
+  printf -- '---\ntitle: Indented\n---\n\n'
+  printf '<Tabs>\n  <Tab title="Python">\n'
+  printf '    ```python\n'
+  printf '    # one two three four five six seven eight nine ten eleven twelve\n'
+  printf '    ```\n'
+  printf '  </Tab>\n</Tabs>\n\n'
+  printf 'one two three four five six seven eight nine ten eleven twelve\n'
+} > "$INDENTED_PAGE"
+
+INDENTED_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+
+if ! printf '%s\n' "$INDENTED_OUTPUT" | grep -qE 'indented.mdx,line=([5-9]|1[012])::'; then
+  check "a fence indented four spaces inside a JSX component stays a code block" yes
+else
+  check "a fence indented four spaces inside a JSX component stays a code block" no
+  echo "Output: $INDENTED_OUTPUT"
+fi
+
+if printf '%s\n' "$INDENTED_OUTPUT" | grep -q 'indented.mdx,line=13::'; then
+  check "prose after an indented fence block is still read" yes
+else
+  check "prose after an indented fence block is still read" no
+  echo "Output: $INDENTED_OUTPUT"
 fi
 
 if [[ $FAILURES -gt 0 ]]; then

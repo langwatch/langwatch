@@ -25,6 +25,7 @@ export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.STALLED]: "STALLED",
   [ScenarioRunStatus.QUEUED]: "QUEUED",
   [ScenarioRunStatus.RUNNING]: "RUNNING",
+  [ScenarioRunStatus.PENDING_EVALUATION]: "EVALUATING",
 };
 
 export const REASONING_VERDICT_COLOR_MAP: Record<Verdict, Tokens["colors"]> = {

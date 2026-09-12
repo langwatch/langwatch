@@ -51,18 +51,3 @@ Feature: Anthropic-format transcripts reach the run conversation
     When the wire validator parses the event
     Then the parse succeeds
     And the message keeps its top-level tool_calls when it declares them
-
-  @unit
-  Scenario: A block the transcript cannot carry leaves a line naming it
-    Given a Claude Code transcript whose turn holds an image or a document block
-    When the adapter converts the transcript
-    Then the turn stays in the conversation
-    And a line names the type of the block that is not shown
-
-  @unit
-  Scenario: The Claude Code adapter of the skill tests reports tool calls as AI SDK parts
-    Given a Claude Code stream-json transcript with a thinking block, a text block, a tool_use block and its tool_result
-    When the adapter converts the transcript
-    Then the assistant message holds one text part followed by a tool-call part with the tool name and input
-    And the tool result becomes a tool message with a tool-result part that names the tool it answers
-    And the thinking block is not part of the conversation

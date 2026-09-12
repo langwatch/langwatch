@@ -6,10 +6,14 @@
 
 import { useCallback, useMemo } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import type { Scenario } from "../../../../model/prisma-types.ts";
+import {
+  parseEvaluatorAttachments,
+  parseSuiteFieldDefinitions,
+} from "@langwatch/scenario-contract";
 import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { Scenario } from "../../../../model/prisma-types.ts";
 import { CaseModal } from "./case-modal.tsx";
 // The key lives in a component-free module so a static importer never pulls
 // this drawer's React and Chakra dependencies into its own chunk. The drawer
@@ -49,6 +53,8 @@ function useEditorSuites(projectId: string): TestSuiteEntry[] {
         name: testSuite.name,
         slug: testSuite.slug,
         caseCount: 0,
+        fields: parseSuiteFieldDefinitions(testSuite.fields),
+        evaluators: parseEvaluatorAttachments(testSuite.evaluators),
       })),
     [testSuites],
   );
@@ -86,6 +92,7 @@ export function AgentTestingCaseEditorDrawer(_props: AgentTestingCaseEditorDrawe
     projectId,
     scenarioId,
     testSuiteId,
+    suites,
     onSaved,
   });
 

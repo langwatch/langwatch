@@ -20,6 +20,13 @@ import {
 } from "../../model/connected-agent-rows.ts";
 
 /**
+ * What a connected agent's Test action says on hover while it is offline.
+ * @see specs/features/agents/connected-agents-ui.feature
+ */
+export const OFFLINE_AGENT_TEST_COPY =
+  "This agent is offline. Start the process that runs it to be able to test it.";
+
+/**
  * The connected agents as cards.
  */
 export function ConnectedAgentsSection({
@@ -133,6 +140,37 @@ function ScopeChip({ agent }: { agent: ConnectedAgentBrowser }) {
   );
 }
 
+/**
+ * An agent no process is holding cannot answer, so the entry is disabled and
+ * the reason reads on hover rather than after a refused run.
+ */
+function TestAgentItem({
+  agent,
+  onTest,
+}: {
+  agent: ConnectedAgentBrowser;
+  onTest: () => void;
+}) {
+  const isOffline = agent.status === "offline";
+  return (
+    <Tooltip content={OFFLINE_AGENT_TEST_COPY} disabled={!isOffline}>
+      <Menu.Item
+        value="test"
+        disabled={isOffline}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (isOffline) return;
+          onTest();
+        }}
+        data-testid={`agent-test-${agent.id}`}
+      >
+        <Play size={14} />
+        Test agent
+      </Menu.Item>
+    </Tooltip>
+  );
+}
+
 /** The actions of one card: open the agent, test it, or delete it. */
 function ConnectedAgentMenu({
   agent,
@@ -159,19 +197,7 @@ function ConnectedAgentMenu({
           <ExternalLink size={14} />
           Open
         </Menu.Item>
-        {onTest && (
-          <Menu.Item
-            value="test"
-            onClick={(event) => {
-              event.stopPropagation();
-              onTest();
-            }}
-            data-testid={`agent-test-${agent.id}`}
-          >
-            <Play size={14} />
-            Test agent
-          </Menu.Item>
-        )}
+        {onTest && <TestAgentItem agent={agent} onTest={onTest} />}
         {onDelete && (
           <Menu.Item
             value="delete"

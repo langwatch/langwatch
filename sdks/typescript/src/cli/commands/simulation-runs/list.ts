@@ -1,14 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { readFetchFailure } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { formatRelativeTime } from "../../utils/formatting";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { readFetchFailure } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { formatRelativeTime } from "../../utils/formatting.ts";
+import type { CommandResult } from "../../utils/output.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 type SimulationRunListItem = {
   scenarioRunId: string;
@@ -65,10 +66,13 @@ export const listSimulationRunsCommand = async (options: {
       if (limit) params.set("limit", limit);
       if (cursor) params.set("cursor", cursor);
 
-      const response = await fetch(`${endpoint}/api/v1/simulation-runs?${params.toString()}`, {
-        method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
-      });
+      const response = await langwatchFetch(
+        `${endpoint}/api/v1/simulation-runs?${params.toString()}`,
+        {
+          method: "GET",
+          headers: buildAuthHeaders({ apiKey }),
+        },
+      );
 
       if (!response.ok) {
         // The status and the body go to the reader together, so a handled

@@ -3,10 +3,21 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { Box, Button, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  ClientOnly,
+  CodeBlock as ChakraCodeBlock,
+  HStack,
+  Tabs,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   connectSnippets,
@@ -87,6 +98,10 @@ function SnippetTabs({
   snippets: Record<(typeof SNIPPET_LANGUAGES)[number], string>;
   renderCopyButton: ConnectFromCodeDrawerProps["renderCopyButton"];
 }) {
+  // The theme is unresolved for the first render, before the theme provider
+  // mounts, and that render paints light rather than a dark block that flips.
+  const { colorMode } = useColorMode();
+  const codeColorMode = colorMode === "dark" ? "dark" : "light";
   return (
     // Without a colorPalette the line variant paints the selected trigger
     // with the default palette's fg, which reads fainter than the unselected
@@ -105,11 +120,15 @@ function SnippetTabs({
             <CodeBlock
               code={INSTALL_COMMANDS[language]}
               label="Install command"
+              language="bash"
+              colorMode={codeColorMode}
               renderCopyButton={renderCopyButton}
             />
             <CodeBlock
               code={snippets[language]}
               label="Snippet"
+              language={language}
+              colorMode={codeColorMode}
               renderCopyButton={renderCopyButton}
             />
           </VStack>
@@ -119,22 +138,49 @@ function SnippetTabs({
   );
 }
 
+/**
+ * A highlighted, copyable block. Long lines keep their width and scroll
+ * sideways, so the code the reader copies is the code shown.
+ */
 function CodeBlock({
   code,
   label,
+  language,
+  colorMode,
   renderCopyButton,
 }: {
   code: string;
   label: string;
+  language: string;
+  colorMode: "light" | "dark";
   renderCopyButton: ConnectFromCodeDrawerProps["renderCopyButton"];
 }) {
+  const adapter = useShikiAdapter(colorMode);
   return (
-    <HStack align="start" gap={2} background="bg.muted" borderRadius="md" paddingX={3} paddingY={2}>
-      <Box as="pre" flex={1} overflowX="auto" fontFamily="mono" fontSize="12px" whiteSpace="pre">
-        {code}
-      </Box>
-      {renderCopyButton({ value: code, label })}
-    </HStack>
+    <ChakraCodeBlock.AdapterProvider value={adapter}>
+      <ClientOnly>
+        {() => (
+          <ChakraCodeBlock.Root
+            code={code}
+            language={language}
+            size="sm"
+            meta={{ colorScheme: colorMode }}
+            borderRadius="md"
+            overflow="hidden"
+            data-testid={`connect-code-${language}`}
+          >
+            <ChakraCodeBlock.Content overflowX="auto">
+              <ChakraCodeBlock.Code>
+                <ChakraCodeBlock.CodeText />
+              </ChakraCodeBlock.Code>
+            </ChakraCodeBlock.Content>
+            <HStack justify="flex-end" paddingX={2} paddingY={1}>
+              {renderCopyButton({ value: code, label })}
+            </HStack>
+          </ChakraCodeBlock.Root>
+        )}
+      </ClientOnly>
+    </ChakraCodeBlock.AdapterProvider>
   );
 }
 

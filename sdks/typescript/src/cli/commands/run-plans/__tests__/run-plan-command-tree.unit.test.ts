@@ -13,10 +13,10 @@ vi.mock("@/internal/api/client", () => ({
   createLangWatchApiClient: vi.fn(() => ({ use: useSpy })),
 }));
 
-import { buildProgram } from "../../../program";
-import { createCliRunPlansService } from "../cli-run-plans-service";
-import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service";
-import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../../utils/governance/surface";
+import { buildProgram } from "../../../program.ts";
+import { createCliRunPlansService } from "../cli-run-plans-service.ts";
+import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service.ts";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../../utils/governance/surface.ts";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant, which
 // no test runner defines (see help-topic.unit.test.ts).
@@ -67,7 +67,7 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
 
     expect(testSuite).toBeDefined();
     const subcommands = testSuite!.commands.map((command) => command.name());
-    expect(subcommands).toEqual(["list", "create", "get", "rename", "archive", "run"]);
+    expect(subcommands).toEqual(["list", "create", "update", "get", "rename", "archive", "run"]);
     expect(
       subcommands
         .filter((name) => name !== "run")

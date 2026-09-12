@@ -10,13 +10,13 @@ import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
 import { ensureSetup } from "@/observability-sdk/setup/node";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { generateHumanReadableId } from "./humanReadableId";
+import { generateHumanReadableId } from "./humanReadableId.ts";
 import {
   ExperimentInitError,
   TargetMetadataConflictError,
   ComparisonError,
   EvaluatorError,
-} from "./errors";
+} from "./errors/index.ts";
 import type {
   Batch,
   BatchEntry,
@@ -38,8 +38,8 @@ import type {
   TargetResult,
   TargetExecutionContext,
   TargetContext,
-} from "./types";
-import type { CapturedTargetOutput } from "./comparison";
+} from "./types.ts";
+import type { CapturedTargetOutput } from "./comparison.ts";
 import {
   COMPARISON_EVALUATOR_SLUG,
   DEFAULT_COMPARISON_NAME,
@@ -51,9 +51,10 @@ import {
   describeSkippedComparison,
   renderTargetOutput,
   toComparisonVerdict,
-} from "./comparison";
-import { printSummary } from "./printSummary";
+} from "./comparison.ts";
+import { printSummary } from "./printSummary.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -199,7 +200,7 @@ export class Experiment {
     }
 
     try {
-      const response = await fetch(`${this.endpoint}/api/v1/experiment/init`, {
+      const response = await langwatchFetch(`${this.endpoint}/api/v1/experiment/init`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -600,22 +601,25 @@ export class Experiment {
     spanId?: string | null;
     asGuardrail?: boolean;
   }): Promise<RunEvaluatorResponse> {
-    const response = await fetch(`${this.endpoint}/api/v1/evaluations/${evaluatorSlug}/evaluate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
+    const response = await langwatchFetch(
+      `${this.endpoint}/api/v1/evaluations/${evaluatorSlug}/evaluate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey: this.apiKey }),
+        },
+        body: JSON.stringify({
+          trace_id: traceId ?? null,
+          span_id: spanId ?? null,
+          name: name ?? evaluatorSlug,
+          data,
+          settings,
+          as_guardrail: asGuardrail,
+        }),
+        signal: AbortSignal.timeout(EVALUATOR_TIMEOUT_MS),
       },
-      body: JSON.stringify({
-        trace_id: traceId ?? null,
-        span_id: spanId ?? null,
-        name: name ?? evaluatorSlug,
-        data,
-        settings,
-        as_guardrail: asGuardrail,
-      }),
-      signal: AbortSignal.timeout(EVALUATOR_TIMEOUT_MS),
-    });
+    );
 
     if (!response.ok) {
       const text = await response.text();
@@ -1213,7 +1217,7 @@ export class Experiment {
     };
 
     // Fire and forget (with error logging)
-    this.pendingFlush = fetch(`${this.endpoint}/api/v1/evaluations/batch/log_results`, {
+    this.pendingFlush = langwatchFetch(`${this.endpoint}/api/v1/evaluations/batch/log_results`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

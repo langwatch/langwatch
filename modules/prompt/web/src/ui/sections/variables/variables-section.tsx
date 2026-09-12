@@ -1,4 +1,13 @@
-import { Box, Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Menu } from "@langwatch/design-system/menu";
@@ -418,8 +427,11 @@ const VariableRow = ({
               />
             </Box>
           ) : (
-            // Simple value input (for Prompt Playground)
-            <Input
+            // The value typed in the Prompt Playground. It opens two lines
+            // tall and grows with the text up to a limit, then scrolls, so a
+            // long value reads in full without pushing the rows below it
+            // off the panel.
+            <Textarea
               value={defaultValue ?? ""}
               onChange={(e) => onDefaultValueChange?.(e.target.value)}
               size="sm"
@@ -429,6 +441,11 @@ const VariableRow = ({
               fontSize="13px"
               variant="flushed"
               borderColor="border"
+              autoresize
+              resize="none"
+              rows={2}
+              maxHeight="240px"
+              data-testid={`variable-value-input-${variable.identifier}`}
             />
           )}
         </>

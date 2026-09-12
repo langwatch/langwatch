@@ -16,7 +16,7 @@ import {
   type StagedNlpPayload,
 } from "../../app/workflow.app.ts";
 import type { WorkflowStudioStreamInput } from "../../app/workflow.app.ts";
-import { LambdaWorkflowStudioStreamAdapter } from "../lambda.workflow-studio-stream.channel.ts";
+import { LambdaWorkflowStudioStreamAdapter } from "../../adapters/lambda.workflow-studio-stream.adapter.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 

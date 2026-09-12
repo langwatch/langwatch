@@ -35,13 +35,38 @@ specifier can become `@langwatch/test-harness/vitest-config` in one pass.
 | key | value | why |
 | --- | --- | --- |
 | `test.pool` | `"forks"` | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation |
-| `test.isolate` | `false` for `kind: "node"`, `true` for `kind: "jsdom"` | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker |
-| `test.fsModuleCache` | `true` | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share |
+| `test.isolate` | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker |
+| `test.maxWorkers` | `1` in fast mode, when isolation is off | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
+| `test.fsModuleCache` | `true` in fast mode | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share |
+| `test.css` | `false` in fast mode | skips CSS parse/transform on import; no package under the helper asserts on real computed CSS |
 | `test.fileParallelism` | `true` | the default, declared because `fileParallelism: false` silently pins `maxWorkers` to 1 |
 | `test.watch` | `false` | a run in CI or from an agent never watches |
-| `test.experimental.importDurations` | `{ print: "on-warn" }` | prints the per-import breakdown when an import crosses the warn threshold, which is how you find the module that costs the suite its time |
 | `test.environment` | `"node"` or `"jsdom"` | per-file `@vitest-environment` docblocks still win |
 | `test.exclude` | `["**/node_modules/**", "**/dist/**"]` | the default a package overrides when it has a second lane |
+
+`kind: "unit"` is `kind: "node"` plus the console-output guard. It does not
+change isolation.
+
+## Fast mode, and the one environment variable that outranks it
+
+`LANGWATCH_VITEST_FAST` is on unless it is set to `0`. Off, the helper drops
+`maxWorkers`, `fsModuleCache` and the CSS skip and returns the pre-fast-mode
+shape, so a package with a suite that breaks under one of them can opt a single
+run out without editing this helper or its own config.
+
+`test.maxWorkers` is a request, not a guarantee. vitest applies
+`VITEST_MAX_WORKERS` *after* it resolves the config, so an exported worker count
+wins over the `1` above - which is what CI wants, since it sets the runner's
+physical core count. A suite that must be serial for correctness therefore
+withdraws the variable rather than trusting the helper; see
+`packages/test-harness/src/integration-file-concurrency.ts`.
+
+This replaced `poolOptions.forks.singleFork`. vitest 4's pool rework removed
+`test.poolOptions` wholesale and moved every option in it to the top level, so
+a config still carrying that block is not slow - it is inert, and vitest only
+warns. Anything reintroducing `poolOptions` (including
+`poolOptions.vmForks.memoryLimit`, now `vmMemoryLimit`) is reintroducing that
+warning. https://v4.vitest.dev/guide/migration#pool-rework
 
 `test.dir` is a parameter, not a default. It limits the directory vitest scans
 for test files, and it is only correct when every include pattern sits under
@@ -90,8 +115,9 @@ Two further reasons, both worth checking before flipping a package:
   counter at import time keeps it across files.
 - **`window` and friends.** A jsdom package shares one document between files
   when isolation is off, so anything a test appends to `document.body` and does
-  not clean up is visible to the next file. jsdom packages therefore default to
-  `isolate: true` even when they are mock-free.
+  not clean up is visible to the next file. jsdom packages get no exemption from
+  the `isolate: false` default, so a jsdom suite that leaks DOM state between
+  files has to clean up after itself or set `isolate: true` explicitly.
 
 A package that fails only with isolation off has either a leak worth fixing or
 a legitimate reason to keep it on. Record the reason in the config, next to

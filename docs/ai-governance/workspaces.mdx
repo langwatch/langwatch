@@ -12,11 +12,7 @@ LangWatch organizes everything around three workspace scopes. Every Virtual Key,
 
 Every workspace lives **inside an organization**. Think of the org as the tenant boundary; the three workspaces are the inner partitions.
 
-<Info>
-  **Pairs with:** [Members & invites](/ai-governance/members-and-invites) (who lives in your org)
-  and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's
-  gateway behaviour inherits).
-</Info>
+<Info>**Pairs with:** [Members and Teams](/platform/members-and-teams) (who lives in your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's gateway behaviour inherits).</Info>
 
 ## When to pick which
 
@@ -74,7 +70,7 @@ Teams are groups of people. They:
 - Inherit the org's default Routing Policy unless a team-scoped policy overrides it.
 - Carry their own audit log scope, budgets, and tool-catalog entries when admin-scoped to the team.
 
-Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/ai-governance/members-and-invites#adding-a-single-member).
+Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/platform/members-and-teams#invite-people).
 
 Teams scope down what an `aiTools:view` permission shows on `/me`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
 
@@ -137,5 +133,5 @@ A virtual key's effective policy is the deepest applicable: VK > Project > Team 
 - **Make a key, mint VKs in the right scope**: [Personal IDE keys](/ai-gateway/governance/personal-keys), [Virtual Keys](/ai-gateway/virtual-keys).
 - **Cap spend**: [Budgets](/ai-gateway/budgets).
 - **Override the routing chain for a team or project**: [Routing Policies](/ai-gateway/governance/routing-policies).
-- **Audit who did what to which workspace**: [Audit log](/ai-governance/audit-log).
-- **Invite someone into a team**: [Members & invites](/ai-governance/members-and-invites).
+- **Audit who did what to which workspace**: [Audit log](/platform/audit-log).
+- **Invite someone into a team**: [Members and Teams](/platform/members-and-teams).

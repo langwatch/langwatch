@@ -7,8 +7,8 @@
 import { loadConfig } from "@/cli/utils/governance/config";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
-import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook";
-import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
+import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
 import {
   defaultStateDir,
   readFingerprint,
@@ -34,7 +34,8 @@ import {
 import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
 import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
 
-import { type ResolvedSession, resolveSession } from "./context-session";
+import { type ResolvedSession, resolveSession } from "./context-session.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface ContextCommandOptions {
   /** Declare for this session instead of resolving the live one. */
@@ -69,7 +70,7 @@ export async function contextCommand({
   env = process.env,
   cwd = process.cwd(),
   runGit = runGitCommand,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
   now = Date.now,
   stateDir = defaultStateDir(),
   claudeRegistryDir,

@@ -18,7 +18,7 @@
  *
  * ADR-088 v7, Decision 9.
  */
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
@@ -114,17 +114,27 @@ const renderDrawer = (source = sourceLandingInAnalytics) => {
   return host;
 };
 
-/** The destination picker, which is a native select the field labels. */
-const destinationPicker = () => screen.getByLabelText<HTMLSelectElement>("Destination project");
+/**
+ * The destination sits behind the drawer's "Advanced" group, so every test
+ * that touches the picker has to open it first. Kept as its own step rather
+ * than folded into `renderDrawer`, because the one test that saves without
+ * ever opening the group is making a claim about exactly that.
+ */
+const openAdvanced = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByText("Advanced"));
+  await screen.findByTestId("ingestion-trace-destination");
+};
 
+/** The destination picker is `ScopeChipPicker` in single-select mode: a combobox. */
 const pickDestination = async ({
   user,
-  projectId,
+  projectName,
 }: {
   user: ReturnType<typeof userEvent.setup>;
-  projectId: string;
+  projectName: string;
 }) => {
-  await user.selectOptions(destinationPicker(), projectId);
+  await user.click(screen.getByRole("combobox"));
+  await user.click(within(screen.getByRole("listbox")).getByText(projectName));
 };
 
 const submittedInput = () => onSubmit.mock.calls[0]?.[0];
@@ -143,10 +153,18 @@ describe("given a Genie source that already lands in Analytics", () => {
      * second half — changing it and saving — is the test below.
      */
     /** @scenario "The edit drawer changes a destination and says history stays" */
-    it("shows Analytics as the destination it is stored with, and says routed history stays", () => {
+    it("shows Analytics as the destination it is stored with, and says routed history stays", async () => {
+      const user = userEvent.setup();
       renderDrawer();
-      expect(destinationPicker().value).toBe("proj_analytics");
-      expect(screen.getByTestId("ingestion-trace-destination-history")).toBeTruthy();
+      await openAdvanced(user);
+
+      expect(within(screen.getByRole("combobox")).getByText("Analytics · Data")).toBeTruthy();
+
+      await user.click(screen.getByTestId("ingestion-trace-destination-info"));
+      const tooltip = await screen.findByText(/data-privacy policy/);
+      expect(tooltip.closest('[data-scope="popover"]')?.textContent ?? "").toContain(
+        "stay where they are",
+      );
     });
   });
 
@@ -156,7 +174,8 @@ describe("given a Genie source that already lands in Analytics", () => {
       const user = userEvent.setup();
       renderDrawer();
 
-      await pickDestination({ user, projectId: "proj_support" });
+      await openAdvanced(user);
+      await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -179,7 +198,8 @@ describe("given a Genie source that already lands in Analytics", () => {
       const user = userEvent.setup();
       renderDrawer();
 
-      await pickDestination({ user, projectId: "proj_support" });
+      await openAdvanced(user);
+      await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(submittedInput()).toMatchObject({
@@ -200,6 +220,10 @@ describe("given a Genie source that already lands in Analytics", () => {
      * (`ingestionSource.service.ts:529-539`) and would reject a stored id
      * whose project has since been archived — locking the admin out of
      * renaming the source, let alone repointing it.
+     *
+     * This one deliberately never opens Advanced: the group unmounts what it
+     * holds, and a destination that only exists while the group is open must
+     * still leave the save alone when it was never opened at all.
      */
     it("sends no destination key, rather than echoing the stored one", async () => {
       const user = userEvent.setup();
@@ -232,14 +256,15 @@ describe("given a Genie source whose destination project has been archived", () 
     it("shows the replacement in the picker and drops the archived warning", async () => {
       const user = userEvent.setup();
       renderDrawer(sourceLandingInAnArchivedProject);
+      await openAdvanced(user);
 
       expect(screen.getByTestId("ingestion-trace-destination-archived")).toBeTruthy();
       // The archived id is not a project the picker can name, so it seeds empty.
-      expect(destinationPicker().value).toBe("");
+      expect(within(screen.getByRole("combobox")).getByText("Select a project")).toBeTruthy();
 
-      await pickDestination({ user, projectId: "proj_support" });
+      await pickDestination({ user, projectName: "Support · CX" });
 
-      expect(destinationPicker().value).toBe("proj_support");
+      expect(within(screen.getByRole("combobox")).getByText("Support · CX")).toBeTruthy();
       expect(screen.queryByTestId("ingestion-trace-destination-archived")).toBeNull();
     });
 
@@ -251,7 +276,8 @@ describe("given a Genie source whose destination project has been archived", () 
       const user = userEvent.setup();
       renderDrawer(sourceLandingInAnArchivedProject);
 
-      await pickDestination({ user, projectId: "proj_support" });
+      await openAdvanced(user);
+      await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(submittedInput()).toMatchObject({

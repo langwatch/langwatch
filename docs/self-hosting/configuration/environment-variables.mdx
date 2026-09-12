@@ -132,7 +132,9 @@ When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set,
 </Note>
 
 <Warning>
-`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely: the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart.
+
+Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely: the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
 </Warning>
 
 ## Object Storage (Azure Blob)
@@ -141,27 +143,23 @@ Azure Blob Storage is an alternative to S3 for the same dataplane consumers (sto
 
 Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured for that project) beats the azure toggle; the azure toggle beats `S3_BUCKET_NAME`; `S3_BUCKET_NAME` beats the local-filesystem fallback. This azure backend covers datasets too: the destination resolver is shared by both write paths.
 
-| Variable                    | Description                                                                                                                                                                                       | Default                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `STORED_OBJECTS_BACKEND`    | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | -                                             |
-| `AZURE_BLOB_ACCOUNT_NAME`   | Azure Storage account name                                                                                                                                                                        | -                                             |
-| `AZURE_BLOB_ACCOUNT_KEY`    | Azure Storage account key. Required only by `AZURE_BLOB_AUTH_MODE=sharedKey`                                                                                                                      | -                                             |
-| `AZURE_BLOB_AUTH_MODE`      | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli`                                                                                                            | `sharedKey`                                   |
-| `AZURE_BLOB_AUTHORITY_HOST` | Entra authority host. Required for sovereign clouds                                                                                                                                               | Public cloud                                  |
-| `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only                                                                                                                                                    | `https://storage.azure.com`                   |
-| `AZURE_BLOB_CONTAINER`      | Azure Blob container name                                                                                                                                                                         | -                                             |
-| `AZURE_BLOB_ENDPOINT`       | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator              | `https://{accountName}.blob.core.windows.net` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` does not select a backend by itself. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
+| `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | - |
+| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required only by `AZURE_BLOB_AUTH_MODE=sharedKey` | - |
+| `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
+| `AZURE_BLOB_AUTHORITY_HOST` | Entra authority host. Required for sovereign clouds | Public cloud |
+| `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
+| `AZURE_BLOB_CONTAINER` | Azure Blob container name | - |
+| `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-  When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER`
-  are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the
-  default). Under an identity mode the key must be absent (see below). An incomplete active Azure
-  configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure
-  settings are validated only when an `azure-blob://` address is used, so they cannot break global
-  or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart:
-  `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it
-  defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked
-  separately (issue #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below).
+
+An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic.
+
+Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
 </Warning>
 
 ### Migrating an existing installation
@@ -182,7 +180,9 @@ OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
 pnpm --filter @langwatch/tasks task object-storage-migrate verify
 ```
 
-`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references.
+
+Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
 
 After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
 
@@ -234,7 +234,7 @@ Three rules before you configure it:
 - **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
 - **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
 
-In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have no ServiceAccount to bind to. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
 
 On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
 
@@ -347,47 +347,48 @@ Langy, the automated AI engineer, runs as a separate agent pod that is off by de
 
 When using the Helm chart, configuration is set in `values.yaml` rather than environment variables directly. Here's how key values map:
 
-| Helm Value                                                | Environment Variable                                                                                                                                                                                                                                             |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app.http.baseHost`                                       | `BASE_HOST`                                                                                                                                                                                                                                                      |
-| `app.http.publicUrl`                                      | `NEXTAUTH_URL`                                                                                                                                                                                                                                                   |
-| `app.nextAuth.provider`                                   | `NEXTAUTH_PROVIDER`                                                                                                                                                                                                                                              |
-| `app.nextAuth.secret.value`                               | `NEXTAUTH_SECRET`                                                                                                                                                                                                                                                |
-| `app.credentialsEncryptionKey.value`                      | `CREDENTIALS_SECRET`                                                                                                                                                                                                                                             |
-| `app.cronApiKey.value`                                    | `CRON_API_KEY`                                                                                                                                                                                                                                                   |
-| `app.features.skipEnvValidation`                          | `SKIP_ENV_VALIDATION`                                                                                                                                                                                                                                            |
-| `app.email.provider`                                      | `EMAIL_PROVIDER`                                                                                                                                                                                                                                                 |
-| `app.email.providers.sendgrid.apiKey.value`               | `SENDGRID_API_KEY`                                                                                                                                                                                                                                               |
-| `app.email.providers.ses.region`                          | `AWS_REGION` (with `USE_AWS_SES=true`)                                                                                                                                                                                                                           |
-| `app.email.providers.ses.endpoint`                        | `AWS_SES_ENDPOINT`                                                                                                                                                                                                                                               |
-| `app.email.providers.smtp.url.value`                      | `SMTP_URL`                                                                                                                                                                                                                                                       |
-| `app.email.providers.smtp.host`                           | `SMTP_HOST`                                                                                                                                                                                                                                                      |
-| `app.email.providers.smtp.port`                           | `SMTP_PORT`                                                                                                                                                                                                                                                      |
-| `app.email.providers.smtp.secure`                         | `SMTP_SECURE`                                                                                                                                                                                                                                                    |
-| `app.email.providers.smtp.user`                           | `SMTP_USER`                                                                                                                                                                                                                                                      |
-| `app.email.providers.smtp.password.value`                 | `SMTP_PASSWORD`                                                                                                                                                                                                                                                  |
-| `app.email.providers.resend.apiKey.value`                 | `RESEND_API_KEY`                                                                                                                                                                                                                                                 |
-| `app.evaluators.azureOpenAI.enabled`                      | `AZURE_OPENAI_EVALUATOR_ENABLED`                                                                                                                                                                                                                                 |
-| `app.evaluators.azureOpenAI.endpoint.value`               | `AZURE_OPENAI_EVALUATOR_ENDPOINT`                                                                                                                                                                                                                                |
-| `app.evaluators.azureOpenAI.apiKey.value`                 | `AZURE_OPENAI_EVALUATOR_API_KEY`                                                                                                                                                                                                                                 |
-| `app.evaluators.google.enabled`                           | `GOOGLE_EVALUATOR_ENABLED`                                                                                                                                                                                                                                       |
-| `app.evaluators.google.credentials.value`                 | `GOOGLE_CREDENTIALS_JSON`                                                                                                                                                                                                                                        |
-| `app.telemetry.usage.enabled`                             | Inverse of `DISABLE_USAGE_STATS`                                                                                                                                                                                                                                 |
-| `app.dataplane.enabled`                                   | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`)                                                                                                                                     |
-| `app.dataplane.bucket`                                    | `S3_BUCKET_NAME`                                                                                                                                                                                                                                                 |
-| `app.dataplane.providers.azureBlob.accountName.value`     | `AZURE_BLOB_ACCOUNT_NAME`                                                                                                                                                                                                                                        |
-| `app.dataplane.providers.azureBlob.accountKey.value`      | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only)                                                                                                                                                                                                                   |
-| `app.dataplane.providers.azureBlob.authMode`              | `AZURE_BLOB_AUTH_MODE`                                                                                                                                                                                                                                           |
-| `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA)                                                                                                                                                                                               |
-| `app.dataplane.providers.azureBlob.container.value`       | `AZURE_BLOB_CONTAINER`                                                                                                                                                                                                                                           |
-| `app.dataplane.providers.azureBlob.endpoint.value`        | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator)                                                                                                                                                                                            |
-| `app.dataplane.providers.azureBlob.authorityHost.value`   | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode                                                                                                                                                                       |
-| `app.dataplane.providers.azureBlob.tokenAudience.value`   | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override                                                                                                                                                                                                 |
-| `app.dataplane.legacyS3ReadBucket`                        | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
-| `app.dataplane.legacyAzureRead`                           | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers                          |
-| `postgresql.external.connectionString.value`              | `DATABASE_URL`                                                                                                                                                                                                                                                   |
-| `redis.external.connectionString.value`                   | `REDIS_URL`                                                                                                                                                                                                                                                      |
-| `workers.enabled`                                         | Not an environment variable — toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to.                                                                                                             |
+| Helm Value | Environment Variable |
+|------------|---------------------|
+| `app.http.baseHost` | `BASE_HOST` |
+| `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
+| `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
+| `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
+| `app.cronApiKey.value` | `CRON_API_KEY` |
+| `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
+| `app.email.provider` | `EMAIL_PROVIDER` |
+| `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
+| `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |
+| `app.email.providers.ses.endpoint` | `AWS_SES_ENDPOINT` |
+| `app.email.providers.smtp.url.value` | `SMTP_URL` |
+| `app.email.providers.smtp.host` | `SMTP_HOST` |
+| `app.email.providers.smtp.port` | `SMTP_PORT` |
+| `app.email.providers.smtp.secure` | `SMTP_SECURE` |
+| `app.email.providers.smtp.user` | `SMTP_USER` |
+| `app.email.providers.smtp.password.value` | `SMTP_PASSWORD` |
+| `app.email.providers.resend.apiKey.value` | `RESEND_API_KEY` |
+| `app.evaluators.azureOpenAI.enabled` | `AZURE_OPENAI_EVALUATOR_ENABLED` |
+| `app.evaluators.azureOpenAI.endpoint.value` | `AZURE_OPENAI_EVALUATOR_ENDPOINT` |
+| `app.evaluators.azureOpenAI.apiKey.value` | `AZURE_OPENAI_EVALUATOR_API_KEY` |
+| `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
+| `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
+| `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.dataplane.bucket` | `S3_BUCKET_NAME` |
+| `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
+| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
+| `app.dataplane.providers.azureBlob.authMode` | `AZURE_BLOB_AUTH_MODE` |
+| `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
+| `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
+| `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST`. Required alongside a sovereign endpoint in a token-based mode |
+| `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE`. Sovereign storage audience override |
+| `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
+| `app.dataplane.legacyAzureRead` | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers |
+| `app.governance.erasurePseudonymSecret.value` | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET`. Derives the stand-in that replaces an erased identifier. Optional until somebody is erased; required in the app and the workers alike afterwards, with the same value in both |
+| `postgresql.external.connectionString.value` | `DATABASE_URL` |
+| `redis.external.connectionString.value` | `REDIS_URL` |
+| `workers.enabled` | Not an environment variable — toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to. |
 
 <Tip>
 For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:

@@ -421,9 +421,13 @@ describe("traceRequest.utils", () => {
       });
 
       it("preserves boolValue false via !== null check", () => {
-        // NOTE: The boolValue check uses `v.boolValue !== null` (not a truthy
-        // check), so false IS correctly returned -- unlike intValue/doubleValue.
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ boolValue: false }, "flag");
+        // NOTE: The boolValue check asks whether the value is there, not
+        // whether it is truthy, so false is correctly returned. intValue and
+        // doubleValue now ask the same question.
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
+          { boolValue: false },
+          "flag",
+        );
 
         expect(result).toEqual({ flag: false });
       });
@@ -446,27 +450,34 @@ describe("traceRequest.utils", () => {
         expect(result).toEqual({ flag: false });
       });
 
-      it("drops intValue 0 due to falsy check", () => {
-        // BUG: scalar() checks `v.intValue` which is falsy for 0,
-        // so intValue: 0 is never captured and returns undefined.
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ intValue: 0 }, "count");
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
+      it("keeps intValue 0", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
+          { intValue: 0 },
+          "count",
+        );
 
-        expect(result).toEqual({});
+        expect(result).toEqual({ count: 0 });
       });
 
-      it("drops doubleValue 0 due to falsy check", () => {
-        // BUG: scalar() checks `v.doubleValue` which is falsy for 0,
-        // so doubleValue: 0 is never captured and returns undefined.
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 0 }, "value");
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
+      it("keeps doubleValue 0", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
+          { doubleValue: 0 },
+          "value",
+        );
 
-        expect(result).toEqual({});
+        expect(result).toEqual({ value: 0 });
       });
 
-      it("drops doubleValue 0.0 due to falsy check", () => {
-        // BUG: 0.0 === 0 in JavaScript, still falsy.
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 0.0 }, "value");
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
+      it("keeps doubleValue 0.0", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
+          { doubleValue: 0.0 },
+          "value",
+        );
 
-        expect(result).toEqual({});
+        expect(result).toEqual({ value: 0 });
       });
 
       it("returns empty object when scalar root has no rootKey", () => {
@@ -956,6 +967,88 @@ describe("traceRequest.utils", () => {
             },
           },
         ]);
+      });
+    });
+
+    /**
+     * Spec: specs/traces/zero-valued-attributes-survive-ingest.feature
+     *
+     * A tracked event's metrics arrive here as numeric attributes, so an
+     * attribute dropped for being zero is a vote, a count or a score that was
+     * accepted and then stored as absent.
+     */
+    describe("when a numeric attribute is zero", () => {
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
+      it("keeps a whole-number zero", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([
+          { key: "event.metrics.vote", value: { intValue: 0 } },
+        ]);
+
+        expect(result["event.metrics.vote"]).toBe(0);
+      });
+
+      /** @scenario "A neutral vote is kept as the value it was sent as" */
+      it("keeps a fractional zero", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([
+          { key: "event.metrics.vote", value: { doubleValue: 0 } },
+        ]);
+
+        expect(result["event.metrics.vote"]).toBe(0);
+      });
+
+      /** @scenario "A zero sent over the wire as text is still a zero" */
+      it("keeps a zero that arrived as text", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([
+          { key: "event.metrics.count", value: { intValue: "0" } },
+          { key: "event.metrics.latency", value: { doubleValue: "0.0" } },
+        ]);
+
+        expect(result["event.metrics.count"]).toBe(0);
+        expect(result["event.metrics.latency"]).toBe(0);
+      });
+
+      /** @scenario "A list of readings keeps the zeroes in it" */
+      it("keeps zeroes inside a list", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([
+          {
+            key: "event.metrics.scores",
+            value: {
+              arrayValue: {
+                values: [
+                  { doubleValue: 0 },
+                  { doubleValue: 0.5 },
+                ] as OtlpAnyValue[],
+              },
+            },
+          },
+        ]);
+
+        expect(result["event.metrics.scores"]).toEqual([0, 0.5]);
+      });
+
+      /** @scenario "An attribute that carries no value at all is still absent" */
+      it("still drops an attribute that carries no value", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([
+          { key: "event.metrics.missing", value: {} as OtlpAnyValue },
+        ]);
+
+        expect(result).not.toHaveProperty("event.metrics.missing");
+      });
+    });
+
+    /**
+     * The control for the change above, deliberately unbound: no scenario in
+     * the spec claims it, because a reading that was never at risk is not a
+     * behaviour anyone asked for. It is here so that widening the check to
+     * presence is shown not to have moved anything else.
+     */
+    describe("when a numeric attribute is not zero", () => {
+      it("keeps the reading untouched", () => {
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([
+          { key: "event.metrics.vote", value: { doubleValue: -1 } },
+        ]);
+
+        expect(result["event.metrics.vote"]).toBe(-1);
       });
     });
   });

@@ -12,14 +12,15 @@ const CONSOLE_GUARD_SETUP = fileURLToPath(new URL("./console-guard.ts", import.m
  */
 export interface ModuleVitestConfigOptions {
   /**
-   * `node` runs with isolation off by default; `jsdom` keeps isolation on.
-   * `unit` is `node` plus the console-output guard (piloted here first,
+   * Chooses the environment, and for `unit` the console-output guard. It does
+   * not change isolation: every kind runs with isolation off by default,
+   * `jsdom` included. `unit` is `node` plus the guard (piloted here first,
    * before it rolls out to every unit suite).
    */
   kind: "node" | "jsdom" | "unit";
   include?: string[];
   exclude?: string[];
-  /** Overrides the default for the kind. Set `true` when a suite mocks modules. */
+  /** Overrides the default of `false`. Set `true` when a suite mocks modules. */
   isolate?: boolean;
   /** Overrides the fast-mode default (`false`). Set `true` for a suite that breaks with CSS processing off. */
   css?: boolean;
@@ -55,13 +56,12 @@ export function moduleVitestTestOptions(
     environment: kind === "jsdom" ? "jsdom" : "node",
     isolate: resolvedIsolate,
     pool: "forks",
-    // With isolate already off, singleFork additionally collapses every test
-    // file in the run onto one child process instead of one per CPU core,
-    // cutting fork/spawn overhead further. Only safe together with
-    // isolate:false (https://vitest.dev/config/#pooloptions).
-    ...(FAST_MODE && !resolvedIsolate
-      ? { poolOptions: { forks: { isolate: false, singleFork: true } } }
-      : {}),
+    // One worker collapses the run onto one child process rather than one per
+    // core. Only safe with isolate:false. Was `poolOptions.forks.singleFork`,
+    // which vitest 4's pool rework removed. Not absolute: `VITEST_MAX_WORKERS`
+    // is applied after the config and outranks it (see
+    // ./integration-file-concurrency.ts, and testing-speed.md for both).
+    ...(FAST_MODE && !resolvedIsolate ? { maxWorkers: 1 } : {}),
     // Persists transformed modules between runs, so a rerun skips the
     // transform share of the run entirely.
     // https://vitest.dev/config/#fsmodulecache (top-level since vitest 4.0.11)

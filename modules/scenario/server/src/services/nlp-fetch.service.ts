@@ -128,7 +128,7 @@ function createNlpFetchDispatcher({ timeoutMs }: { timeoutMs: number }): Dispatc
  * builds a fresh `Agent` instead of reusing a closed one. Wired into the
  * worker process's own shutdown.
  */
-async function closeNlpFetchDispatchers(): Promise<void> {
+export async function closeNlpFetchDispatchers(): Promise<void> {
   const dispatchers = [...dispatchersByTimeoutMs.values()];
   dispatchersByTimeoutMs.clear();
   await Promise.all(dispatchers.map((dispatcher) => dispatcher.close()));

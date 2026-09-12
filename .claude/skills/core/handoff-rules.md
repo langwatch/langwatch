@@ -8,10 +8,10 @@ much it says.
 
 ## 1. Two documents, two jobs
 
-| Document | Written by | Answers | Lives in |
-| --- | --- | --- | --- |
-| Manifest | Coordinator, once, before the lane starts | What is this task, what may it touch, when is it done? | `.claude/manifests/<task-id>.md` |
-| Handoff | Lane, rewritten before it stops | Where is the work now, and what is the very next action? | `.claude/handoffs/<task-id>.md` |
+| Document | Written by                                | Answers                                                  | Lives in                         |
+| -------- | ----------------------------------------- | -------------------------------------------------------- | -------------------------------- |
+| Manifest | Coordinator, once, before the lane starts | What is this task, what may it touch, when is it done?   | `.claude/manifests/<task-id>.md` |
+| Handoff  | Lane, rewritten before it stops           | Where is the work now, and what is the very next action? | `.claude/handoffs/<task-id>.md`  |
 
 The manifest is a contract and changes only when the coordinator changes it. The
 handoff is a **snapshot** and is rewritten in place - the lane overwrites it, it
@@ -67,20 +67,27 @@ should verify, not "nothing".
 
 Exactly these seven. No others, no adverbs, no "mostly complete".
 
-| Status | Means | Coordinator does |
-| --- | --- | --- |
-| `ready` | Manifest written, lane not started | Start the lane |
-| `in_progress` | Lane is working | Nothing - wait for a checkpoint |
-| `partial` | Budget reached, work is green but unfinished | Review and commit what landed, start a fresh lane from the handoff |
-| `blocked` | Cannot proceed without a decision, a shared file, or another task | Resolve the blocker; the lane does not wait |
-| `review` | Lane believes it is done and wants the diff read | Review, then commit or return it |
-| `complete` | Reviewed, committed, checks passed | Close the task |
-| `abandoned` | Task was wrong, superseded, or not worth finishing | Record why, close |
+| Status        | Means                                                             | Coordinator does                                                                          |
+| ------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `ready`       | Manifest written, lane not started                                | Start the lane                                                                            |
+| `in_progress` | Lane is working                                                   | Nothing - wait for a checkpoint                                                           |
+| `partial`     | Budget reached, work is green but unfinished                      | Collect verified work under COORDINATOR.md section 7, start a fresh lane from the handoff |
+| `blocked`     | Cannot proceed without a decision, a shared file, or another task | Resolve the blocker; the lane does not wait                                               |
+| `review`      | Lane believes it is done and wants the diff read                  | Review, then collect under COORDINATOR.md section 7 or return it                          |
+| `complete`    | Reviewed, committed, checks passed                                | Close the task                                                                            |
+| `abandoned`   | Task was wrong, superseded, or not worth finishing                | Record why, close                                                                         |
 
 `partial` and `blocked` are the honest, expected endings. A lane that reports
 `review` with failing checks, or `complete` without a commit, has misreported -
 and misreporting is more expensive than any blocker, because the coordinator
 stops checking.
+
+Collecting a lane and completing integration are separate. During an unfinished
+merge, a reviewed, staged resolution remains `review`; `partial` or `blocked`
+still applies when checks or work remain. Its stopped worker can be removed from
+the active roster once the handoff records the collected paths and next action.
+Do not make an intermediate commit to obtain `complete`. Follow
+[the coordinator's operation-aware collection rule](../../coordinator/COORDINATOR.md#7-collecting-a-slice).
 
 ## 5. Green means green
 

@@ -1,17 +1,18 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
-import { resolveCredentials } from "../utils/apiKey";
+import { createSpinner } from "../utils/spinner.ts";
+import { resolveCredentials } from "../utils/apiKey.ts";
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { printResult, type RawOutputFlags } from "../utils/output";
-import { buildProgram } from "../program";
-import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog";
+import { printResult, type RawOutputFlags } from "../utils/output.ts";
+import { buildProgram } from "../program.ts";
+import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog.ts";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Budgets at or above this utilization are worth a human's attention. */
@@ -151,7 +152,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     url: string,
     options?: { method?: "GET" | "POST"; body?: unknown },
   ): Promise<{ data: unknown; error?: unknown; status?: number }> {
-    const response = await fetch(`${endpoint}${url}`, {
+    const response = await langwatchFetch(`${endpoint}${url}`, {
       method: options?.method,
       headers: {
         ...buildAuthHeaders({ apiKey, projectId: credentials.projectId }),

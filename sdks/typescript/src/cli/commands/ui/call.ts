@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { handledErrorFrom } from "@/internal/api/errors";
-import { resolveCredentials } from "../../utils/apiKey";
-import { reportCommandError } from "../../utils/errorOutput";
-import type { CommandResult } from "../../utils/output";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { reportCommandError } from "../../utils/errorOutput.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Bound the request so a wedged control plane cannot hold the whole turn.
@@ -97,8 +98,9 @@ export const uiCallCommand = async (
   }
 
   let response: Response;
+  let text: string;
   try {
-    response = await fetch(`${endpoint}/api/v1/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/v1/langy/ui/actions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -114,11 +116,16 @@ export const uiCallCommand = async (
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+    // The deadline covers the body too: a socket that goes quiet after the
+    // headers aborts this read, not the send.
+    text = await response.text();
   } catch (error) {
     // A tripped deadline rejects with a bare TimeoutError, which reads as a
     // crash rather than as the limit this command set. Name it. Every other
-    // failure is left to the caller's error path.
-    if ((error as { name?: string } | null)?.name !== "TimeoutError") throw error;
+    // failure is left to the caller's error path. An aborted body read arrives
+    // as an AbortError instead.
+    const name = (error as { name?: string } | null)?.name;
+    if (name !== "TimeoutError" && name !== "AbortError") throw error;
     process.stderr.write(
       `${endpoint} did not answer "${kind}" within ${REQUEST_TIMEOUT_MS / 1000}s. ` +
         `${MAY_HAVE_APPLIED}\n`,
@@ -127,7 +134,6 @@ export const uiCallCommand = async (
     return;
   }
 
-  const text = await response.text();
   if (!response.ok) {
     // Through the shared reporter, not straight to stderr. The body is the platform's REST
     // envelope (`{error: {...}}`), and the reader on the other end — the panel's tool card —

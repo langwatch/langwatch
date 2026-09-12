@@ -153,7 +153,7 @@ function hint(result: { events: Array<{ extra?: Record<string, unknown> }> }) {
     .object({
       costBasis: z.string(),
       costStatus: z.string(),
-      costUsd: z.string(),
+      costUsd: z.string().optional(),
       dimensions: z.record(z.string(), z.string()),
     })
     .parse(result.events[0]?.extra?.[PULLED_USAGE_HINT_KEY]);
@@ -169,9 +169,11 @@ describe("Databricks Genie puller", () => {
     expect(result.events[0]).toMatchObject({
       source_event_id: expect.stringContaining(messageId),
       actor: "dana@example.test",
-      cost_usd: "0",
     });
-    expect(hint(result)).toMatchObject({ costStatus: "estimate", costUsd: "0" });
+    // No warehouse, so nothing priced it - and an unpriced question carries no
+// amount rather than a zero, which the ledger would read as a measurement.
+    expect(hint(result).costStatus).toBe("estimate");
+    expect(hint(result).costUsd).toBeUndefined();
     expect(workspace.costRequests).toEqual([]);
   });
 
@@ -259,7 +261,7 @@ describe("Databricks Genie puller", () => {
     const result = await run(workspace, { warehouseId });
 
     expect(result.events).toHaveLength(1);
-    expect(hint(result).costUsd).toBe("0");
+    expect(hint(result).costUsd).toBeUndefined();
   });
 
   it("holds the watermark for a cut-short billing period rather than skipping it", async () => {
@@ -303,6 +305,6 @@ describe("Databricks Genie puller", () => {
     const result = await run(workspace, { warehouseId });
 
     expect(result.events).toHaveLength(1);
-    expect(hint(result).costUsd).toBe("0");
+    expect(hint(result).costUsd).toBeUndefined();
   });
 });

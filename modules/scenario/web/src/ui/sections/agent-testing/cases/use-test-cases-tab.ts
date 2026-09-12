@@ -11,11 +11,20 @@ import type {
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
 import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
-import { useCan } from "../../../../behavior/use-can.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+// DANGLING: `useOpenSuiteEditor` / `OpenSuiteEditorParams` do not exist
+// anywhere in this tree - part of the never-ported suite-editor surface
+// (SuiteEditorDrawer, suiteEditorStore, SuiteEvaluatorsSection,
+// evaluators/attachment-rules, useOpenScenarioEvaluatorEditor,
+// useProjectEvaluators). See handoff merge-scenario-dangling-imports.
+import {
+  type OpenSuiteEditorParams,
+  useOpenSuiteEditor,
+} from "../../../../behavior/agent-testing/suite/use-open-suite-editor.ts";
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useCan } from "../../../../behavior/use-can.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
 import { AGENT_TYPE_SELECTOR_DRAWER } from "./drawer-keys.ts";
@@ -51,6 +60,8 @@ export type TestCasesTabBase = {
   onNewTestCase: (testSuiteId: string | null) => void;
   /** Opens the flow that connects the agent to be tested. */
   onConnectAgent: () => void;
+  /** Opens the suite editor on one suite, at one attachment when asked. */
+  openSuiteEditor: (params: OpenSuiteEditorParams) => void;
 };
 
 function useTestCasesTabBase(): TestCasesTabBase {
@@ -67,6 +78,7 @@ function useTestCasesTabBase(): TestCasesTabBase {
     [openDrawer],
   );
   const onConnectAgent = useCallback(() => openDrawer(AGENT_TYPE_SELECTOR_DRAWER), [openDrawer]);
+  const openSuiteEditor = useOpenSuiteEditor();
 
   return {
     projectId: project?.id ?? "",
@@ -79,6 +91,7 @@ function useTestCasesTabBase(): TestCasesTabBase {
     toggleRail,
     onNewTestCase,
     onConnectAgent,
+    openSuiteEditor,
   };
 }
 
@@ -117,10 +130,7 @@ export function useTestCasesTab(): TestCasesTabModel {
     selectedSuiteId: view.selectedSuite?.id ?? null,
     selectSuite,
   });
-  const suiteDialog = useSuiteNameDialog({
-    suites: data.suites,
-    suiteMutations,
-  });
+  const suiteDialog = useSuiteNameDialog({ suiteMutations });
 
   const caseMutations = useCaseMutations(projectId);
   const open = useCaseOpenActions();

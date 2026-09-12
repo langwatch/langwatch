@@ -12,17 +12,7 @@ sidebarTitle: MCP server
   specifically for setting up and querying governance state.
 </Info>
 
-<Note>
-  **Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools
-  register on every MCP session the hosted endpoint opens, through the session tool registrar bound
-  in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via `registerGovernanceMcpTools(server, ctx)`,
-  and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.)
-  directly with `surface: "mcp"`. They do NOT route through `/api/v1/governance/*` over HTTP. Reason:
-  it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit
-  `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes.
-  Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer
-  is the single source of truth, and `metadata.surface` distinguishes the entrypoint.
-</Note>
+<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `platform/app/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches the explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
 
 <Note>
   **RBAC enforced at the tool layer.** Per
@@ -148,7 +138,7 @@ The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
 ## Audit emission
 
-Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type in `enterprise/modules/governance/contract/src/governance-audit.ts`, threaded through every mutating governance service method):
+Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Lane B-3 at `fc6d54100`):
 
 | Tool                                                 | Audit row                                                              |
 | ---------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -169,7 +159,7 @@ An agent connecting through the OAuth flow as an admin can fully configure gover
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/v1/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create`, rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
-5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
+5. `governance_audit_log_query`, verify steps 2-4 all emitted audit rows
 
 If every step succeeds and step 5 returns the matching audit rows, an agent can run the whole setup without a single UI click.
 
@@ -177,7 +167,7 @@ If every step succeeds and step 5 returns the matching audit rows, an agent can 
 
 - [Governance REST API](/ai-governance/api): the API the MCP tools shell over
 - [Governance CLI](/ai-governance/cli): same surface for shell invocation
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes the MCP server enforces
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes the MCP server enforces
+- [Audit log](/platform/audit-log): where state-change rows land
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

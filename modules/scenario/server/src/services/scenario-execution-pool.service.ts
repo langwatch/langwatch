@@ -159,7 +159,7 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
           pendingCount: this._pending.length + 1,
           activeCount: this._active.size,
         },
-        "Execution pool full, buffering job",
+        "Execution pool full or voice cap reached, buffering job",
       );
       this._pending.push(jobData);
     }
@@ -225,6 +225,8 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
         continue;
       }
 
+      const next = this._pending.splice(startIdx, 1)[0];
+      if (!next) return;
       logger.debug(
         {
           scenarioRunId: next.scenarioRunId,

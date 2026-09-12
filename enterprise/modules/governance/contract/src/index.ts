@@ -14,6 +14,7 @@ export * from "./governance.errors.ts";
 export * from "./governance-events.ts";
 export * from "./governance.api.ts";
 export * from "./session-policy.ts";
+export * from "./source-health.ts";
 export * from "./governance.responses.ts";
 export * from "./ingestion-source.ts";
 export * from "./ingestion-source.commands.ts";

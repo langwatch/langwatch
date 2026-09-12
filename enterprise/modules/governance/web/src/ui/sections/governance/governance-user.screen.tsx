@@ -61,8 +61,8 @@ function GovernanceUserDetailPage() {
               ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/governance/users" color="blue.600">
-              All users
+            <Link href="/governance/people" color="blue.600">
+              People
             </Link>
           </Text>
           <HStack gap={2}>
@@ -70,7 +70,12 @@ function GovernanceUserDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
+              // The filled state is a palette hue keyed off the name. The empty
+              // state was `fg.muted`, a text token, which painted the swatch at
+              // reading contrast — a near-black dot louder than the heading
+              // beside it. A swatch with no name behind it is a surface, so it
+              // takes a surface token.
+              backgroundColor={actor ? getHexColorForString(actor) : "bg.emphasized"}
             />
             <Heading size="md">{user?.actor ?? actor ?? "User not found"}</Heading>
           </HStack>
@@ -97,10 +102,10 @@ function GovernanceUserDetailPage() {
         ) : (
           <>
             <SimpleGrid columns={{ base: 1, md: 4 }} gap={3}>
-              <Stat label="Spend (30 d)" value={fmtUsd(user.spendUsd)} />
+              <Stat label="Spend, last 30 days" value={fmtUsd(user.spendUsd)} />
               <Stat label="Requests" value={numeral(user.requests).format("0,0")} />
               <Stat label="Last active" value={fmtRelative(user.lastActivityIso)} />
-              <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
+              <Stat label="Most used" value={user.mostUsedTarget ?? "—"} />
             </SimpleGrid>
 
             <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
@@ -108,8 +113,7 @@ function GovernanceUserDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend trend and per-model breakdown for this user will land here in a
-                follow-up.
+                Per-day spend trend and per-model breakdown for this user are not available yet.
               </Text>
               {personalProject && (
                 <>
