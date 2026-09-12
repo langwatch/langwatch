@@ -725,10 +725,12 @@ export async function startWorkers(
         case "voice-ws-listener":
           await bootVoiceListener(shutdownHandles, voiceEnv);
           break;
-        case "metrics":
-          // Already booted above, before the voice tunnel — see the
-          // metrics-first comment near the top of this function.
-          break;
+        // "metrics" is deliberately absent: TypeScript's inferred type
+        // predicate on the `remainingPlan` filter above already narrows
+        // "metrics" out of `stage`'s type here, so a case for it is
+        // unreachable (and TS errors on it as such). It's already booted,
+        // before the voice tunnel — see the metrics-first comment near the
+        // top of this function.
       }
     }
   } catch (error) {
