@@ -16,7 +16,7 @@ export { LangyService } from "./services/langy.service.ts";
 export type { LangyInfrastructure } from "./app/langy.app.ts";
 export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";
-export { LangyNavigateProject } from "./app/langy.members.ts";
+export { type LangyNavigateProject } from "./app/langy.members.ts";
 export { LangyNavigateResource } from "./app/langy.members.ts";
 export {
   LANGY_NAVIGATE_RESOURCE_KINDS,
@@ -30,7 +30,7 @@ export {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
 } from "./services/langy-session-key.service.ts";
-export { LangySessionKeyMetrics } from "./app/langy.members.ts";
+export { type LangySessionKeyMetrics } from "./app/langy.members.ts";
 export { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
 export { LangySessionKeyReapRepository } from "./repositories/langy-session-key-reap.repository.ts";
 export {
@@ -82,7 +82,7 @@ export {
 } from "./services/langy-ui-action.service.ts";
 export {
   type LangyUiActionBackendMode,
-  LangyUiActionCatalog,
+  type LangyUiActionCatalog,
   type LangyUiActionDefinition,
 } from "./app/langy.members.ts";
 export {
@@ -90,7 +90,7 @@ export {
   type LangyBackendRunResult,
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
-  LangyUiActionBackend,
+  type LangyUiActionBackend,
 } from "./app/langy.members.ts";
 export { LangyUiActionBackendService } from "./services/langy-ui-action-backend.service.ts";
 

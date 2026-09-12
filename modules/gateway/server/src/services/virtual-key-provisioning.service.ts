@@ -16,10 +16,10 @@ import {
   virtualKeyConfigSchema,
   translateExternalIdConflict,
 } from "@langwatch/gateway-contract";
-import { GatewayAudit } from "../app/gateway.members.ts";
-import { GatewayChangeEvents } from "../app/gateway.members.ts";
+import { type GatewayAudit } from "../app/gateway.members.ts";
+import { type GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { GatewayTransaction } from "../app/gateway.members.ts";
-import { GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
+import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
 import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";

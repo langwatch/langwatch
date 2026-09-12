@@ -140,7 +140,7 @@ export {
   InviteSendThrottleService,
 } from "./services/invite-send-throttle.service.ts";
 export {
-  OrganizationInviteMail,
-  OrganizationInviteRateLimit,
-  OrganizationInviteSeatCensus,
+  type OrganizationInviteMail,
+  type OrganizationInviteRateLimit,
+  type OrganizationInviteSeatCensus,
 } from "./app/organization.members.ts";

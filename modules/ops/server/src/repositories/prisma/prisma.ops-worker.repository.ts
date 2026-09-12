@@ -5,7 +5,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import type { AnomalyHardTierAlert } from "../../app/ops.app.ts";
 import {
-  OpsWorker,
+  type OpsWorker,
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
 } from "../../app/ops.app.ts";

@@ -3,7 +3,7 @@ export { codingAgentRepositories } from "./repositories/coding-agent-repositorie
 export { ClickHouseCodingAgentRepositories } from "./repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
 export { MemoryCodingAgentRepositories } from "./repositories/memory/memory.coding-agent.repositories.ts";
 export type { CodingAgentRepositories } from "./repositories/coding-agent.repositories.ts";
-export {
+export type {
   CodingAgentBillingPolicy,
   CodingAgentClock,
   CodingAgentCostEstimator,
@@ -27,7 +27,7 @@ export {
   type CodingAgentProcessingPipelineDeps,
 } from "./repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 export { OtelCodingAgentCostMetricsAdapter } from "./services/coding-agent-cost-metrics.service.ts";
-export {
+export type {
   CodingAgentCostMetrics,
   CodingAgentTraceProcessing,
 } from "./app/coding-agent.members.ts";
@@ -37,7 +37,7 @@ export { createCodingAgentSpanFactsDispatchSubscriber } from "./subscribers/codi
 export { createPullRequestMappingSubscriber } from "./subscribers/pull-request-mapping.subscriber.ts";
 export { NoopCodingAgentReadMetrics } from "./services/coding-agent-read-metrics-noop.service.ts";
 export {
-  CodingAgentReadMetrics,
+  type CodingAgentReadMetrics,
   type CodingAgentSessionListReadOutcome,
 } from "./app/coding-agent.members.ts";
 /**
@@ -52,10 +52,10 @@ export {
   type CodingAgentCallerScopeDependencies,
 } from "./services/coding-agent-caller-scope.service.ts";
 export {
-  CodingAgentCallerScopeDirectory,
+  type CodingAgentCallerScopeDirectory,
   type CodingAgentScopeCaller,
   type CodingAgentScopePermission,
-  CodingAgentScopePermissions,
+  type CodingAgentScopePermissions,
   type CodingAgentScopeProject,
 } from "./app/coding-agent.members.ts";
 export {

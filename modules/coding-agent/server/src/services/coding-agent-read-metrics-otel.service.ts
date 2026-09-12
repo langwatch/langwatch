@@ -1,7 +1,7 @@
 import { histogram, type HistogramHandle } from "@langwatch/observability/metrics";
-import {
+import type {
   CodingAgentReadMetrics,
-  type CodingAgentSessionListReadOutcome,
+  CodingAgentSessionListReadOutcome,
 } from "../app/coding-agent.members.ts";
 
 export const CODING_AGENT_SESSION_LIST_READ_METRIC_NAME =

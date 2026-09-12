@@ -26,7 +26,7 @@ export {
   type McpAuthorizeProject,
 } from "./services/mcp-authorization.service.ts";
 export {
-  McpAuthorizeApi,
+  type McpAuthorizeApi,
   mcpAuthorizeApprover,
   mcpAuthorizeRest,
 } from "./transport/mcp-authorize.rest.ts";

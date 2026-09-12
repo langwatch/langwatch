@@ -113,7 +113,7 @@ vi.mock("~/utils/api", () => {
           if (property === "useQuery") {
             return () => ({
               ...queryResult(),
-              ...(harness.queryResults[procedure] ?? {}),
+              ...harness.queryResults[procedure],
             });
           }
           if (property === "useMutation") {

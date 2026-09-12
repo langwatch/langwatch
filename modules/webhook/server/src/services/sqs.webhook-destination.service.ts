@@ -10,7 +10,7 @@ import {
 } from "@langwatch/egress";
 
 import {
-  WebhookDestination,
+  type WebhookDestination,
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
 } from "../app/webhook.app.ts";

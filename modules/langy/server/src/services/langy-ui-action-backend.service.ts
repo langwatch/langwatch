@@ -6,7 +6,7 @@ import {
 import type { LangyUiActionDefinition } from "../app/langy.members.ts";
 import {
   type LangyBackendActor,
-  LangyUiActionBackend,
+  type LangyUiActionBackend,
 } from "../app/langy.members.ts";
 import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 
@@ -147,7 +147,7 @@ export class LangyUiActionBackendService {
       commitMessage: `Applied ${kind}`,
     });
     if (saved.saved) {
-      return { ...(asRecord(applied.result) ?? {}), version: saved.version };
+      return { ...asRecord(applied.result), version: saved.version };
     }
 
     // One retry on a concurrent write: re-read, re-apply, re-save. The

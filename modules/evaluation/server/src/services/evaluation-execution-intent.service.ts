@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  EvaluationExecutionIntent,
+  type EvaluationExecutionIntent,
   type ExecuteEvaluationCommandDeps,
 } from "../app/evaluation.members.ts";
 import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";

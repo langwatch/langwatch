@@ -85,8 +85,8 @@ const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroun
         updateTabData({
           tabId,
           updater: (data) => ({
-            ...(data ?? {}),
-            chat: { ...(data?.chat ?? {}), initialMessagesFromSpanData: messages },
+            ...data,
+            chat: { ...data?.chat, initialMessagesFromSpanData: messages },
           }),
         });
       },

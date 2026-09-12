@@ -36,10 +36,10 @@ export { githubServer } from "./github.server.ts";
 // `github-langy` aliases held by App registrations we do not own.
 export {
   githubInstallRest,
-  GithubInstallApi,
+  type GithubInstallApi,
   type GithubInstallSession,
 } from "./transport/github-install.rest.ts";
 
 // The `github.*` procedures: the connection, its repositories, the live
 // pull-request read and the disconnect.
-export { githubTrpcTransport, GithubConnectionApi } from "./transport/github.trpc.ts";
+export { githubTrpcTransport, type GithubConnectionApi } from "./transport/github.trpc.ts";

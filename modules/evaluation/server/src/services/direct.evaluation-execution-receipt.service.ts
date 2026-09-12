@@ -4,9 +4,9 @@ import type {
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  EvaluationCostRecorder,
-  EvaluationExecution,
-  EvaluationExecutionReceipt,
+  type EvaluationCostRecorder,
+  type EvaluationExecution,
+  type EvaluationExecutionReceipt,
 } from "../app/evaluation.members.ts";
 
 const logger = createLogger("langwatch:evaluation:execution-receipt");

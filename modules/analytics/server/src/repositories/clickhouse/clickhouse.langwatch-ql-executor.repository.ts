@@ -3,6 +3,7 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
+  LangWatchQLProvisioningIncompleteError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "@langwatch/analytics-contract";
@@ -14,7 +15,8 @@ import {
   LangWatchQLExecutor,
 } from "../langwatch-ql-executor.repository.ts";
 import {
-  isClickHouseObjectUnavailableError,
+  isClickHouseObjectAccessDeniedError,
+  isClickHouseObjectMissingError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -44,8 +46,12 @@ function elapsedMs(elapsedSeconds: number | undefined): number {
  * What a failed governed run is reported as.
  */
 function refusalFor({ error, durationMs }: { error: unknown; durationMs: number }): unknown {
-  if (isClickHouseObjectUnavailableError(error)) {
+  if (isClickHouseObjectMissingError(error)) {
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+
+  if (isClickHouseObjectAccessDeniedError(error)) {
+    return new LangWatchQLProvisioningIncompleteError({ reasons: [toError(error)] });
   }
 
   if (isClickHouseUnknownIdentifierError(error)) {

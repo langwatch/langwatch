@@ -1,5 +1,5 @@
 import {
-  TraceWindowedReadMetrics,
+  type TraceWindowedReadMetrics,
   type TraceWindowedReadOutcome,
 } from "../../app/trace.members.ts";
 

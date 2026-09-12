@@ -2,9 +2,9 @@ import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
 import {
-  GroupIdentity,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
+  type GroupIdentity,
+  type PersonalWorkspaceIdentity,
+  type TeamIdentity,
 } from "../app/organization.members.ts";
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
 

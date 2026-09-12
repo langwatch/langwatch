@@ -39,11 +39,11 @@ export { GatewaySpendEventsService } from "./services/gateway-spend-events.servi
 export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter.ts";
 export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service.ts";
 export * from "./services/gateway-usage.service.ts";
-export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend as GatewayBudgetSpend } from "./app/gateway.members.ts";
-export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents as GatewayChangeEvents } from "./app/gateway.members.ts";
-export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit as GatewayAudit } from "./app/gateway.members.ts";
+export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend } from "./app/gateway.members.ts";
+export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents } from "./app/gateway.members.ts";
+export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit } from "./app/gateway.members.ts";
 export * from "./ports/gateway-virtual-key.port.ts";
-export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse as GatewayClickHouse } from "./app/gateway.members.ts";
+export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse } from "./app/gateway.members.ts";
 export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
 export * from "./ports/gateway-spend-events.port.ts";
 export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.members.ts";

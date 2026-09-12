@@ -1,6 +1,6 @@
 import { killSwitchDescriptorsFor, type StaticPipelineDefinition } from "@langwatch/eventing";
 import {
-  OpsEventingIntrospection,
+  type OpsEventingIntrospection,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
   type OpsKillSwitchDescriptor,

@@ -29,20 +29,20 @@ export {
   ProjectStoredObjects,
 } from "./services/project.service.ts";
 export {
-  ProjectManagementApi,
+  type ProjectManagementApi,
   projectRest,
   projectRestCredential,
   type ProjectManagementDirectory,
 } from "./transport/project.rest.ts";
 export {
-  ProjectBrowserApi,
+  type ProjectBrowserApi,
   projectTrpcTransport,
   type ProjectFieldProtections,
   type ProjectPermissionScope,
 } from "./transport/project.trpc.ts";
-export { ProjectHomeApi, homeTrpcTransport } from "./transport/home.trpc.ts";
+export { type ProjectHomeApi, homeTrpcTransport } from "./transport/home.trpc.ts";
 export {
-  IntegrationsChecksApi,
+  type IntegrationsChecksApi,
   integrationsChecksTrpcTransport,
 } from "./transport/integrations-checks.trpc.ts";
 export {

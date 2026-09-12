@@ -1,6 +1,6 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import {
-  TraceEvaluationLoopMetrics,
+  type TraceEvaluationLoopMetrics,
   type TraceEvaluationLoopBlockReason,
 } from "../app/trace.members.ts";
 

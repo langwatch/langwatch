@@ -36,7 +36,7 @@ import {
   RedisGithubAdapter,
   type GithubRedisConnection,
 } from "../repositories/redis/github-redis.connection.ts";
-import { GithubBranchDemand } from "./github.members.ts";
+import { type GithubBranchDemand } from "./github.members.ts";
 import type { GithubBranchMaintenance } from "./github.members.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";

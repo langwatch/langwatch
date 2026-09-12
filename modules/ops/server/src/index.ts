@@ -30,7 +30,7 @@ export {
   RedisSchedulerWakeRepository as RedisSchedulerWakeAdapter,
   type SchedulerWakeRedis,
 } from "./repositories/redis/redis.scheduler-wake.repository.ts";
-export { OpsSnapshotRedis } from "./app/ops.app.ts";
+export { type OpsSnapshotRedis } from "./app/ops.app.ts";
 export {
   ProcessAuditRepository,
   SchedulerAuditRepository,
@@ -44,7 +44,7 @@ export type {
   ScheduledJobRecord,
 } from "./repositories/process/scheduler-ops.repository.ts";
 export { NoopSchedulerWakeService } from "./services/scheduler-wake.service.ts";
-export { SchedulerWake } from "./app/ops.app.ts";
+export { type SchedulerWake } from "./app/ops.app.ts";
 export {
   type AdminAccess,
   AdminAccessService,
@@ -54,8 +54,8 @@ export { AdminAuditSink } from "./services/impersonation.service.ts";
 export * from "./rules/ops-error-normalizer.rules.ts";
 export * from "./rules/ops-redis-engine-cpu.rules.ts";
 export { PrismaOpsWorkerRepository as OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./repositories/prisma/prisma.ops-worker.repository.ts";
-export { AnomalyHardTierAlert } from "./app/ops.app.ts";
-export { StorageStatsMetrics } from "./app/ops.app.ts";
+export { type AnomalyHardTierAlert } from "./app/ops.app.ts";
+export { type StorageStatsMetrics } from "./app/ops.app.ts";
 export { OtelStorageStatsMetricsAdapter } from "./services/otel.storage-stats-metrics.service.ts";
 export {
   StorageStatsCollectionService,
@@ -64,14 +64,14 @@ export {
   type StorageStatsCollectionOptions,
   type StorageStatsInstance,
 } from "./services/storage-stats-collection.service.ts";
-export { QueuePayloadDecoder } from "./app/ops.app.ts";
+export { type QueuePayloadDecoder } from "./app/ops.app.ts";
 export {
-  UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
+  type UsageStatsErrorReporter,
+  type UsageStatsTelemetryClient,
   type UsageStatsWorkerDatabase,
 } from "./app/ops.app.ts";
 export {
-  OpsWorker,
+  type OpsWorker,
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
 } from "./app/ops.app.ts";
@@ -94,13 +94,13 @@ export { QueueRedisRepository } from "./repositories/redis/queue.repository.ts";
 export { RedisOpsMetricsRepository } from "./repositories/redis/redis.ops-metrics.repository.ts";
 export { totalInFlight, type InFlightCounts } from "./rules/ops-in-flight.rules.ts";
 export {
-  OpsEventingIntrospection,
+  type OpsEventingIntrospection,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
   type OpsProjectionMetadata,
 } from "./app/ops.app.ts";
 export { EventingOpsIntrospectionAdapter } from "./services/eventing.ops-introspection.service.ts";
-export { OpsReplayRuntimeFactory, type OpsReplayRuntime } from "./app/ops.app.ts";
+export { type OpsReplayRuntimeFactory, type OpsReplayRuntime } from "./app/ops.app.ts";
 export { MemoryEventExplorerRepository } from "./repositories/memory/memory.event-explorer.repository.ts";
 export type {
   AggregateDiscoveryRow,
@@ -160,7 +160,7 @@ export { NullOrganizationDataplaneAdapter } from "./services/null.organization-d
 export { RoutingTableOrganizationDataplaneAdapter } from "./services/routing-table.organization-dataplane.service.ts";
 export {
   type OrganizationDataplane,
-  OrganizationDataplaneResolver,
+  type OrganizationDataplaneResolver,
 } from "./app/ops.app.ts";
 export {
   type OrganizationCohortAdmission,

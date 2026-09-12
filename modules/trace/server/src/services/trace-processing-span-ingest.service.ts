@@ -1,4 +1,4 @@
-import { TraceSpanIngest } from "../app/trace.members.ts";
+import { type TraceSpanIngest } from "../app/trace.members.ts";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { TraceProcessingCommands } from "../app/trace.members.ts";
 

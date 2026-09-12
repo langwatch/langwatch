@@ -4,9 +4,9 @@ import type {
   GraphTriggerEvaluationResult,
   TriggerSummary,
 } from "@langwatch/automation-contract";
-import {
+import type {
   AutomationGraphActivity,
-  type AutomationProjectIdentityPort,
+  AutomationProjectIdentityPort,
 } from "../app/automation.members.ts";
 import type { AutomationClock } from "../app/automation.members.ts";
 import {

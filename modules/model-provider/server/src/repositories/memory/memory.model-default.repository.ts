@@ -80,7 +80,7 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
     authorId: string | null;
   }): Promise<void> {
     const existing = this.newestOnScope(input.scope);
-    const config = { ...(existing?.config ?? {}) };
+    const config = { ...existing?.config };
     if (input.model === null) delete config[input.key];
     else config[input.key] = input.model;
 

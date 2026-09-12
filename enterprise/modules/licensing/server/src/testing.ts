@@ -7,7 +7,7 @@ import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
 import { planQuantities } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
-import { LicenseStorage, type StoredLicense } from "./app/licensing.members.ts";
+import { type LicenseStorage, type StoredLicense } from "./app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
 /**

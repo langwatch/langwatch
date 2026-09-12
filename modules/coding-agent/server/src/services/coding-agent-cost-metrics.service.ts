@@ -1,7 +1,7 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import {
+import type {
   CodingAgentCostMetrics,
-  type CodingAgentCostMetric,
+  CodingAgentCostMetric,
 } from "../app/coding-agent.members.ts";
 
 /**

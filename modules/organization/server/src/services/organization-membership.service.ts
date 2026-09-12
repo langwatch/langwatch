@@ -18,10 +18,10 @@ import { OrganizationMemberRoleService } from "./organization-member-role.servic
 import { CannotRemoveSelfError, MemberNotFoundError } from "@langwatch/organization-contract";
 
 import {
-  OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSessionRevocation,
+  type OrganizationGrantCache,
+  type OrganizationPromptSeed,
+  type OrganizationSeatLicense,
+  type OrganizationSessionRevocation,
   type OrganizationPlanUser,
 } from "../app/organization.members.ts";
 import type {

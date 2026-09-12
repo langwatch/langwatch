@@ -3,10 +3,10 @@ import type {
   GovernanceTraceEvent,
 } from "../app/governance.members.ts";
 import {
-  TraceAlertMetricsSink,
-  TraceAlertOriginGuard,
-  TraceAlertTriggerMatchChannel,
-  TraceAlertTriggerReader,
+  type TraceAlertMetricsSink,
+  type TraceAlertOriginGuard,
+  type TraceAlertTriggerMatchChannel,
+  type TraceAlertTriggerReader,
 } from "../app/governance.members.ts";
 
 export class TraceAlertTriggerMatchSubscriber {

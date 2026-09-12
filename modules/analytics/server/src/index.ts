@@ -9,17 +9,17 @@ export {
 } from "./transport/analytics.rest.ts";
 export { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 export {
-  AnalyticsQueryApi,
+  type AnalyticsQueryApi,
   langWatchQLCallerProtections,
   queryRest,
 } from "./transport/query.rest.ts";
 export {
-  SavedWorkbenchChartApi,
+  type SavedWorkbenchChartApi,
   savedWorkbenchChartRest,
   savedWorkbenchChartUrl,
 } from "./transport/saved-workbench-chart.rest.ts";
 export { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
-export { AnalyticsLwqlApi, analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
+export { type AnalyticsLwqlApi, analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
 export {
   AnalyticsApp,
   type AnalyticsInfrastructure,

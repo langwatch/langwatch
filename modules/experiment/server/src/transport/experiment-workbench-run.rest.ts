@@ -29,7 +29,7 @@ import { ExperimentExecutionDataService } from "../services/experiment-execution
 import { ExperimentRunResultsWriterService } from "../services/experiment-run-results-writer.service.ts";
 import { ExperimentRunStateMirrorService } from "../services/experiment-run-state-mirror.service.ts";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
-import { ExperimentV3RestApi, jsonAnswer, runLoopOf } from "./experiment-v3.rest.ts";
+import { type ExperimentV3RestApi, jsonAnswer, runLoopOf } from "./experiment-v3.rest.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 

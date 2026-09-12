@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  GatewayBudgetLedger,
+  type GatewayBudgetLedger,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,

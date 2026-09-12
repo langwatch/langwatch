@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  LangevalsPayloadStaging,
+  type LangevalsPayloadStaging,
   STAGED_PAYLOAD_HEADER,
 } from "../app/topic.members.ts";
 

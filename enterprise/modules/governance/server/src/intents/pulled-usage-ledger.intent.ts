@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PulledUsageLedgerRepository } from "../app/governance.members.ts";
+import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
 import { Temporal } from "@langwatch/time";
 
 export const writePulledUsageSchema = z.object({

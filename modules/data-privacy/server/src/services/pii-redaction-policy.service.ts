@@ -12,7 +12,7 @@ import {
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
 } from "@langwatch/redaction/pii";
-import { type PIICheckOptions, PiiAnalysis } from "../app/data-privacy.members.ts";
+import { type PIICheckOptions, type PiiAnalysis } from "../app/data-privacy.members.ts";
 
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";

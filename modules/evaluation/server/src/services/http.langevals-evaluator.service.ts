@@ -10,7 +10,7 @@ import {
 } from "@langwatch/evaluation-contract";
 import { tryAndConvertTo } from "@langwatch/dataset-contract";
 import {
-  EvaluationLangevals,
+  type EvaluationLangevals,
   type EvaluationExecutionTelemetry,
   type LangevalsEvaluateParams,
 } from "../app/evaluation.members.ts";

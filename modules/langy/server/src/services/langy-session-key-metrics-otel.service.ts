@@ -1,5 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
-import { LangySessionKeyMetrics } from "../app/langy.members.ts";
+import { type LangySessionKeyMetrics } from "../app/langy.members.ts";
 
 /**
  * The series name, pinned because two processes write it.

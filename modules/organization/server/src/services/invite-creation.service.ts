@@ -256,9 +256,7 @@ export class InviteCreationService {
           ...(await this.tryCountProjects(organization.id)),
         },
         ...(inviter?.name ? { inviter: { name: inviter.name } } : {}),
-        firstSteps: {
-          ...(organization.primaryIntent ? { intent: organization.primaryIntent } : {}),
-        },
+        firstSteps: (organization.primaryIntent ? { intent: organization.primaryIntent } : {}),
         acceptInviteUrl: buildInviteAcceptUrl(this.deps.baseHost, inviteCode),
       });
 

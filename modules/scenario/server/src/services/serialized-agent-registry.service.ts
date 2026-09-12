@@ -5,7 +5,7 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
-import { AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
+import { type AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
 import { SerializedCodeAgentAdapter } from "./serialized-code-agent.service.ts";
 import { SerializedHttpAgentAdapter } from "./serialized-http-agent.service.ts";

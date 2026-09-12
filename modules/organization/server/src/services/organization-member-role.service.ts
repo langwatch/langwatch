@@ -18,10 +18,10 @@ import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-u
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import {
-  OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSessionRevocation,
+  type OrganizationGrantCache,
+  type OrganizationPromptSeed,
+  type OrganizationSeatLicense,
+  type OrganizationSessionRevocation,
   type OrganizationPlanUser,
 } from "../app/organization.members.ts";
 import type {

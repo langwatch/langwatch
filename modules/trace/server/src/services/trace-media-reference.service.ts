@@ -6,7 +6,7 @@ import {
   type TraceMediaRef,
 } from "@langwatch/trace-contract";
 import {
-  TraceMediaReferenceResolver,
+  type TraceMediaReferenceResolver,
   type TraceMediaReference,
 } from "../app/trace.members.ts";
 

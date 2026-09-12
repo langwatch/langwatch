@@ -4,7 +4,7 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import {
-  GatewayAudit,
+  type GatewayAudit,
   type AppendGatewayAuditInput,
   type GatewayAuditTransaction,
 } from "../../app/gateway.members.ts";

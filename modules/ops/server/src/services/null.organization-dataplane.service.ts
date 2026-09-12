@@ -1,6 +1,6 @@
 import {
   type OrganizationDataplane,
-  OrganizationDataplaneResolver,
+  type OrganizationDataplaneResolver,
 } from "../app/ops.app.ts";
 
 /** Every organization on the shared instance — a deployment with no private routes. */

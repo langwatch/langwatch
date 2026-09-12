@@ -1,6 +1,6 @@
 import {
   type OrganizationDataplane,
-  OrganizationDataplaneResolver,
+  type OrganizationDataplaneResolver,
 } from "../app/ops.app.ts";
 
 /**

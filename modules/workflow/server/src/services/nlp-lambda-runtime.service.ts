@@ -5,7 +5,7 @@
  */
 import type { Logger } from "@langwatch/observability";
 import {
-  NlpLambdaArnResolver,
+  type NlpLambdaArnResolver,
   type NlpLambdaArnEntry,
 } from "../app/workflow.app.ts";
 import type { NlpLambdaArnCache } from "../app/workflow.app.ts";

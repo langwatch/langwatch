@@ -7,8 +7,8 @@ import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  EvaluationAzureSafetyCredentials,
-  EvaluationSettingsRecovery,
+  type EvaluationAzureSafetyCredentials,
+  type EvaluationSettingsRecovery,
   type EvaluationMonitorLookup,
   type EvaluationTraceEvidence,
 } from "../app/evaluation.members.ts";

@@ -139,7 +139,7 @@ export function mapToOcsfRow({
         // exports a euro figure labelled as dollars. No shipped adapter names
         // one of these keys, so nothing here changes for them; what changes is
         // that a future one cannot.
-        ...(event.extra ?? {}),
+        ...event.extra,
         uid: "langwatch.governance",
         source_type: sourceType,
         source_id: ingestionSourceId,

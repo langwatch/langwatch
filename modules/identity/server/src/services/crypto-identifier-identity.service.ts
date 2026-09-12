@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { Instance, Ksuid } from "@langwatch/ksuid";
 import {
   type DeriveIdentifierIdInput,
-  IdentifierIdentity,
+  type IdentifierIdentity,
 } from "../app/identity.members.ts";
 
 /**

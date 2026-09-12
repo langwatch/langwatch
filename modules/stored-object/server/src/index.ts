@@ -18,7 +18,7 @@ export {
   FILE_VIEW_PERMISSIONS,
   isPermissionDenial,
   requiredPermissionForPurpose,
-  StoredObjectFileApi,
+  type StoredObjectFileApi,
   storedObjectFileRest,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,

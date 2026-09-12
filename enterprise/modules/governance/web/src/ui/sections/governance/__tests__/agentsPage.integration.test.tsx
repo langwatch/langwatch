@@ -122,7 +122,7 @@ vi.mock("~/utils/api", () => {
               if (options?.enabled !== false) harness.requested.push(procedure);
               return {
                 ...queryResult(),
-                ...(harness.queryResults[procedure] ?? {}),
+                ...harness.queryResults[procedure],
               };
             };
           }

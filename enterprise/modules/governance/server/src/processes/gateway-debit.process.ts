@@ -8,7 +8,7 @@ import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  GatewayBudgetLedger,
+  type GatewayBudgetLedger,
   type GatewaySpendAdmittedData,
   type GatewaySpendAttribution,
   type GatewaySpendFailedData,

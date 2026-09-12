@@ -1,4 +1,4 @@
-import { SchedulerWake } from "../../app/ops.app.ts";
+import { type SchedulerWake } from "../../app/ops.app.ts";
 
 const SCHEDULER_WAKE_CHANNEL = "scheduler:wake";
 

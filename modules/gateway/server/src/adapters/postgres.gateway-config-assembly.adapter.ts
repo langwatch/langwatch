@@ -8,7 +8,7 @@ import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { GatewayConfigAssembly } from "../app/gateway.members.ts";
+import { type GatewayConfigAssembly } from "../app/gateway.members.ts";
 
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";

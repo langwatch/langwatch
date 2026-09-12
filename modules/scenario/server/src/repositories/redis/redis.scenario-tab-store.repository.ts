@@ -1,4 +1,4 @@
-import { ScenarioTabStore } from "../../app/scenario.app.ts";
+import { type ScenarioTabStore } from "../../app/scenario.app.ts";
 
 export interface ScenarioTabRedisMulti {
   zadd(key: string, score: number, member: string): ScenarioTabRedisMulti;

@@ -1,6 +1,6 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceSpanTokenEstimation } from "../app/trace.members.ts";
+import { type TraceSpanTokenEstimation } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../app/trace.members.ts";
 import { OtlpSpanTokenEstimationService } from "./span/span-token-estimation.service.ts";
 

@@ -13,9 +13,9 @@ import {
   withResolvedModels,
 } from "@langwatch/scenario-contract";
 import {
-  SuiteExecution,
-  SuiteRunCommands,
-  SuiteRunId,
+  type SuiteExecution,
+  type SuiteRunCommands,
+  type SuiteRunId,
 } from "../app/suite.app.ts";
 import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
 

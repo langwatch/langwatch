@@ -18,7 +18,7 @@ import type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
 } from "../repositories/process/scheduler-ops.repository.ts";
-import { SchedulerWake } from "../app/ops.app.ts";
+import { type SchedulerWake } from "../app/ops.app.ts";
 
 const logger = createLogger("langwatch:ops:scheduler");
 

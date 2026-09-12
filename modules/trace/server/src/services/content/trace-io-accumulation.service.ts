@@ -3,9 +3,9 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
-  TraceMediaReferenceResolver,
+  type TraceMediaReferenceResolver,
 } from "../../app/trace.members.ts";
-import { TraceIoExtraction } from "../../app/trace.members.ts";
+import { type TraceIoExtraction } from "../../app/trace.members.ts";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const OUTPUT_SOURCE = {

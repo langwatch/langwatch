@@ -5,7 +5,7 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 
-import { ScenarioProcessorServiceMetrics } from "../app/scenario.app.ts";
+import { type ScenarioProcessorServiceMetrics } from "../app/scenario.app.ts";
 
 const JOB_TYPE = "scenario";
 

@@ -9,7 +9,7 @@ import {
   PulledUsageLedgerIntent,
   writePulledUsageSchema,
 } from "../intents/pulled-usage-ledger.intent.ts";
-import { PulledUsageLedgerRepository } from "../app/governance.members.ts";
+import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
 
 /**
  * What this item is worth in the ledger's dollars, or null when nobody can say.

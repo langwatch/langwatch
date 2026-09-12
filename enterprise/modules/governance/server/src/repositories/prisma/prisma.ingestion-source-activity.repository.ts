@@ -36,7 +36,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import {
-  ActivityMonitorRepository,
+  type ActivityMonitorRepository,
   type GovernanceClickHouseClient,
   type GovernanceClickHouseResolver,
 } from "../../app/governance.members.ts";

@@ -81,7 +81,7 @@ export {
 // "signed out" to every caller.
 export {
   authRest,
-  AuthDoorApi,
+  type AuthDoorApi,
   type AuthRestFederatedLogout,
   type AuthRestSession,
 } from "./transport/auth.rest.ts";
@@ -92,7 +92,7 @@ export {
 // keyspace: see the transport's docblock.
 export {
   authCliDeviceFlowRest,
-  AuthCliDeviceFlowApi,
+  type AuthCliDeviceFlowApi,
   type CliBrowserSession,
   type CliPersonalWorkspace,
 } from "./transport/auth-cli-device-flow.rest.ts";

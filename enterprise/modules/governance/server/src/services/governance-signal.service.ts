@@ -4,7 +4,7 @@ import type { GovernanceBudgetCrossingData } from "../app/governance.members.ts"
 import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import {
-  GovernanceSignalChannel,
+  type GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
   type GovernanceVirtualKeyLifecycleSignal,
 } from "../app/governance.members.ts";

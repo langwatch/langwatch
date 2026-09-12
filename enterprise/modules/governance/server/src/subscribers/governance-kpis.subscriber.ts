@@ -3,8 +3,8 @@ import {
   isGovernanceOriginTrace,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  GovernanceKpiContributionWriter,
-  GovernanceSubscriberDiagnosticsSink,
+  type GovernanceKpiContributionWriter,
+  type GovernanceSubscriberDiagnosticsSink,
   type GovernanceKpiContribution,
   type GovernanceTraceContext,
   type GovernanceTraceEvent,

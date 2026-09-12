@@ -5,7 +5,7 @@ import {
   type DatasetNormalizationSender,
 } from "@langwatch/dataset-contract";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import { DatasetNormalizeQueue, type DatasetNormalize } from "../app/dataset.app.ts";
+import { type DatasetNormalizeQueue, type DatasetNormalize } from "../app/dataset.app.ts";
 import { UploadNotPendingError } from "@langwatch/dataset-contract";
 
 /**

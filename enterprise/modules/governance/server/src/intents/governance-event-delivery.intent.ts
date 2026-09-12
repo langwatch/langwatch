@@ -1,7 +1,7 @@
 import type { IntentContext, NewOutboxMessage } from "@langwatch/eventing";
 import { z } from "zod";
 import {
-  GovernanceWebhookChannel,
+  type GovernanceWebhookChannel,
   type GovernanceWebhookEnvelope,
 } from "../app/governance.members.ts";
 

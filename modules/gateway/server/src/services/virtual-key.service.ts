@@ -7,11 +7,11 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import type { ScopeInput, VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { GatewayAudit } from "../app/gateway.members.ts";
-import { GatewayChangeEvents } from "../app/gateway.members.ts";
+import { type GatewayAudit } from "../app/gateway.members.ts";
+import { type GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { GatewayTransaction } from "../app/gateway.members.ts";
 import type { GatewayKeyBudgetRepository } from "../repositories/gateway-key-budget.repository.ts";
-import { GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
+import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
 import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";

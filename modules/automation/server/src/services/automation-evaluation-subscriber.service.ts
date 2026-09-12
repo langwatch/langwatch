@@ -8,7 +8,7 @@ import { handleEvaluationAlertTriggerMatch } from "../subscribers/evaluation-ale
 import { handleGraphTriggerActivity } from "../subscribers/graph-trigger-activity.subscriber.ts";
 import type { AutomationGraphActivity } from "../app/automation.members.ts";
 import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
-import {
+import type {
   AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter,
   AutomationTriggerMatchRecorder,

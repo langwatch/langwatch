@@ -4,7 +4,7 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import {
-  GatewayChangeEvents,
+  type GatewayChangeEvents,
   type AppendGatewayChangeEventInput,
   type GatewayChangeEventKind,
   type GatewayPersistenceTransaction,

@@ -10,7 +10,7 @@ import {
   type GatewayTraceRow,
   type GatewayUsageBucket,
   type GatewayVirtualKeySpendRow,
-  GatewayVirtualKeySpend,
+  type GatewayVirtualKeySpend,
 } from "../../app/gateway.members.ts";
 import { usdDisplayString } from "@langwatch/gateway-contract";
 

@@ -3,17 +3,17 @@
  * resolve. A mount binds a fact; nothing else may.
  */
 export {
-  BillingStripeWebhookApi,
+  type BillingStripeWebhookApi,
   billingStripeWebhookRest,
 } from "./transport/billing-stripe-webhook.rest.ts";
 export {
-  BillingCurrencyApi,
+  type BillingCurrencyApi,
   currencyRequestHeadersFact,
   currencyTrpcTransport,
 } from "./transport/currency.trpc.ts";
 export {
   billingCallerEmailFact,
-  BillingSubscriptionApi,
+  type BillingSubscriptionApi,
   subscriptionTrpcTransport,
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";

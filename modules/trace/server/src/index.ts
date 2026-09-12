@@ -480,7 +480,7 @@ export {
   trackedEventRest,
   trackedEventRestErrorHandler,
   trackedEventLegacyPathRest,
-  TrackedEventLegacyPathApi,
+  type TrackedEventLegacyPathApi,
   TRACKED_EVENT_CANONICAL_PATH,
   TRACKED_EVENT_LEGACY_PATH,
   type TrackedEventMembers,

@@ -25,7 +25,7 @@ import type {
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
-import type { TraceSpanSpool as TraceSpanSpool } from "../app/trace.members.ts";
+import type { TraceSpanSpool } from "../app/trace.members.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
 import { TraceAttributeCapService } from "./attribute/trace-attribute-cap.service.ts";
 

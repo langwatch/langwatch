@@ -1,6 +1,6 @@
 import { observableGauge } from "@langwatch/observability/metrics";
 
-import { StorageStatsMetrics } from "../app/ops.app.ts";
+import { type StorageStatsMetrics } from "../app/ops.app.ts";
 
 /**
  * The storage gauges, published on the export interval from the last tick's

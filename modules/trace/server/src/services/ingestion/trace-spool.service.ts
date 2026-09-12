@@ -4,8 +4,8 @@ import {
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 import {
-  TraceSpoolLegacyObject,
-  TraceSpoolStorage,
+  type TraceSpoolLegacyObject,
+  type TraceSpoolStorage,
   type TraceSpoolObjectStore,
 } from "../../app/trace.members.ts";
 import {

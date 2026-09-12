@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  NlpLambdaInvoke,
-  NlpPayloadStaging,
+  type NlpLambdaInvoke,
+  type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
 } from "../app/workflow.app.ts";

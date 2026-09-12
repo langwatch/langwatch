@@ -5,7 +5,7 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 import {
-  PiiAnalysisMetrics,
+  type PiiAnalysisMetrics,
   type PiiAnalysisOutcome,
 } from "../app/data-privacy.members.ts";
 

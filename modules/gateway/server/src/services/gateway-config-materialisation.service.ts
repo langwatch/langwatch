@@ -6,10 +6,10 @@
 import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
-import { GatewayConfigAssembly } from "../app/gateway.members.ts";
+import { type GatewayConfigAssembly } from "../app/gateway.members.ts";
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
-import { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   budgetPeriodFloorMs,

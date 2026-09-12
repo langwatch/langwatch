@@ -16,7 +16,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { AuthzCompatibilityLedger } from "../app/authz.app.ts";
+import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import {
   BindingMissingError,

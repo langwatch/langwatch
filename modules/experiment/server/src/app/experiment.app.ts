@@ -521,9 +521,7 @@ export class ExperimentApp implements ExperimentApi {
   ): AsyncIterable<ExperimentUpdateFrame> {
     const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
     try {
-      for await (const eventArgs of on(emitter, "experiment_updated", {
-        ...(input.signal ? { signal: input.signal } : {}),
-      })) {
+      for await (const eventArgs of on(emitter, "experiment_updated", (input.signal ? { signal: input.signal } : {}))) {
         yield (eventArgs as unknown[])[0] as ExperimentUpdateFrame;
       }
     } finally {

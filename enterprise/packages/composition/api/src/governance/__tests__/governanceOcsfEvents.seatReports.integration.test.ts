@@ -164,7 +164,7 @@ function seatRowsFor({
             tokens_input: event.tokens_input,
             tokens_output: event.tokens_output,
             raw_event: event.raw_payload,
-            ...(event.extra ?? {}),
+            ...event.extra,
           },
         },
       }),

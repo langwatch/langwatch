@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
-import { GithubAppClient } from "../app/github.app.ts";
+import { type GithubAppClient } from "../app/github.app.ts";
 import {
   GithubInstallationNotFoundError,
   type GithubInstallationDetails,

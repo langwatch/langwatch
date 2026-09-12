@@ -21,18 +21,18 @@ export {
 export { EvaluationRunProjectionRepository as EvaluationRunProjection } from "./repositories/evaluation-run-projection.repository.ts";
 export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
 export {
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationExecutionReceipt,
-  EvaluationAnalyticsAttributePolicy,
-  EvaluationCostRecorder,
-  EvaluationInputStorage,
-  EvaluationInputOffloadAvailability,
-  EvaluationAzureSafetyCredentials,
-  EvaluationSettingsRecovery,
-  EvaluationInputsOffload,
-  EvaluationInputsResolution,
-  EvaluationRetentionFloor,
+  type EvaluationExecution,
+  type EvaluationExecutionIntent,
+  type EvaluationExecutionReceipt,
+  type EvaluationAnalyticsAttributePolicy,
+  type EvaluationCostRecorder,
+  type EvaluationInputStorage,
+  type EvaluationInputOffloadAvailability,
+  type EvaluationAzureSafetyCredentials,
+  type EvaluationSettingsRecovery,
+  type EvaluationInputsOffload,
+  type EvaluationInputsResolution,
+  type EvaluationRetentionFloor,
 } from "./app/evaluation.members.ts";
 export {
   type EvaluationClickHouseResolver,
@@ -74,12 +74,12 @@ export {
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
 export { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 export {
-  EvaluationCustomEvaluators,
-  EvaluationInstallEnvironment,
-  EvaluationReport,
-  EvaluationRescore,
-  EvaluationRunAnalytics,
-  EvaluationWarmupProbe,
+  type EvaluationCustomEvaluators,
+  type EvaluationInstallEnvironment,
+  type EvaluationReport,
+  type EvaluationRescore,
+  type EvaluationRunAnalytics,
+  type EvaluationWarmupProbe,
 } from "./app/evaluation.members.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 export {
@@ -105,14 +105,14 @@ export {
   type GetThreadTraces,
 } from "./services/evaluation-thread-mapping.service.ts";
 export {
-  EvaluationMonitorLookup,
-  EvaluationTraceEvidence,
-  EvaluationExecutionTelemetry,
-  EvaluationLangevals,
-  EvaluationModelEnv,
-  EvaluationSpanDigest,
-  EvaluationTraceRead,
-  EvaluationWorkflowExecutor,
+  type EvaluationMonitorLookup,
+  type EvaluationTraceEvidence,
+  type EvaluationExecutionTelemetry,
+  type EvaluationLangevals,
+  type EvaluationModelEnv,
+  type EvaluationSpanDigest,
+  type EvaluationTraceRead,
+  type EvaluationWorkflowExecutor,
   type EvaluationTraceProtections,
   type LangevalsEvaluateParams,
 } from "./app/evaluation.members.ts";

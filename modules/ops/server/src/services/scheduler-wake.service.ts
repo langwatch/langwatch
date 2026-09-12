@@ -1,4 +1,4 @@
-import { SchedulerWake } from "../app/ops.app.ts";
+import { type SchedulerWake } from "../app/ops.app.ts";
 
 export class NoopSchedulerWakeService implements SchedulerWake {
   private constructor() {

@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
-import { WebhookId } from "../../app/webhook.app.ts";
-import { WebhookSecret } from "../../app/webhook.app.ts";
+import { type WebhookId } from "../../app/webhook.app.ts";
+import { type WebhookSecret } from "../../app/webhook.app.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import { MemoryWebhookDatabase } from "./memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";

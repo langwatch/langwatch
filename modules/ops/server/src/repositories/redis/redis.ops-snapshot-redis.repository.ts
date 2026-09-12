@@ -1,5 +1,5 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
-import { OpsSnapshotRedis } from "../../app/ops.app.ts";
+import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
 
 /** The snapshot store's four commands over a live connection. */
 export class RedisOpsSnapshotRedisRepository implements OpsSnapshotRedis {
