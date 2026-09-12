@@ -210,4 +210,45 @@ describe("OtlpSpanPiiRedactionService what still reaches analysis", () => {
       expect(submitted()).toContain("raised by Jane");
     });
   });
+
+  // The two suites above key their attributes by the real name, so the
+  // `attributeNames` lookup on the submission path falls through to the raw key
+  // and is never exercised: deleting it leaves them green. The native path has
+  // its own cover next door; this is the submission half.
+  //
+  // The value has to be one the hold-out decides on the NAME alone, or the test
+  // proves nothing. A decimal identifier is withheld under every spelling
+  // because a phone detector claims it, and a 32-char hex is withheld by the
+  // value rule wherever it appears — under either, both halves of the contrast
+  // below go missing and the lookup could be deleted unnoticed. Twelve hex
+  // characters is under the opaque-run floor and carries no PII shape, so the
+  // reserved name is the only thing that can hold it back.
+  describe("given attributes keyed by a flattened name", () => {
+    /** @scenario "A flattened attribute is held out under its real name" */
+    it("resolves each key through attributeNames, holding out only the reserved one", async () => {
+      const { service, submitted } = makeService();
+      // mulberry32, seed 20260912, hex alphabet, draws 97-108.
+      const address = "c9eae7b78cb2";
+      const log = {
+        body: "request handled for Jane Doe",
+        attributes: {
+          "attributes.0.value": address,
+          "attributes.1.value": address,
+        },
+        attributeNames: {
+          "attributes.0.value": "metadata.trace_id",
+          "attributes.1.value": "app.correlation",
+        },
+        resourceAttributes: {},
+      };
+
+      await service.redactLog(log, "STRICT", TENANT);
+
+      // One copy, not none and not both: the reserved name withheld its copy
+      // and the unreserved one still went out. Without the lookup neither key
+      // is reserved and both copies leave.
+      expect(submitted().filter((value) => value === address)).toHaveLength(1);
+      expect(submitted()).toContain("request handled for Jane Doe");
+    });
+  });
 });

@@ -495,6 +495,17 @@ Feature: Redacting personal data from traces
     Then the analysis service never received the identifier
     And the analysis service received the prose
 
+  # A record can arrive keyed by a flattened path rather than by the attribute's
+  # own name, with a side table carrying the real names. The hold-out decides on
+  # the name, so it has to be told the real one on the submission path too, not
+  # only where the value is rewritten in place.
+  @unit
+  Scenario: A flattened attribute is held out under its real name
+    Given the resolved PII level for "web-app" is strict
+    When a log record is ingested with two flattened attributes carrying the same identifier, one named as a reserved trace address and one not
+    Then the analysis service received that value exactly once
+    And the analysis service received the log body
+
   # Detection heuristics over-trigger on business identifiers that merely look
   # like PII: a 14-digit reservation number reads as a credit card, an
   # "orders@acme.internal" queue address reads as a personal email. Exception
