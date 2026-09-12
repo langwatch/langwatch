@@ -7,6 +7,8 @@ import {
 import {
   GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
   GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
+} from "@langwatch/enterprise-governance-contract";
+import {
   type GovernanceWebhookChannel,
   type GovernanceBudgetCrossingData,
   type GovernanceEventsProcessingEvent,
