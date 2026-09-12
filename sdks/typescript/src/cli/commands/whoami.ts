@@ -36,18 +36,79 @@ export const loginKeyPermissionsLine = (
 };
 
 /**
+ * Builds the `--json` document field by field from an explicit allowlist,
+ * never by spreading `cfg`. The persisted config is a long-lived credential
+ * store (access/refresh tokens, project API keys, personal VK secret, the
+ * org-wide CLI key) and this output is meant to be piped into other tools —
+ * a spread would leak the next secret the config grows without anyone
+ * noticing. A field/sub-object is omitted entirely when the config does not
+ * hold it, rather than emitted as `null`.
+ */
+const buildWhoamiJson = (cfg: GovernanceConfig): Record<string, unknown> => {
+  const doc: Record<string, unknown> = {};
+
+  if (cfg.user?.id || cfg.user?.email || cfg.user?.name) {
+    doc.user = {
+      ...(cfg.user?.id !== undefined && { id: cfg.user.id }),
+      ...(cfg.user?.email !== undefined && { email: cfg.user.email }),
+      ...(cfg.user?.name !== undefined && { name: cfg.user.name }),
+    };
+  }
+
+  if (cfg.organization?.id || cfg.organization?.slug || cfg.organization?.name) {
+    doc.organization = {
+      ...(cfg.organization?.id !== undefined && { id: cfg.organization.id }),
+      ...(cfg.organization?.slug !== undefined && { slug: cfg.organization.slug }),
+      ...(cfg.organization?.name !== undefined && { name: cfg.organization.name }),
+    };
+  }
+
+  if (cfg.personal_project?.id || cfg.personal_project?.slug || cfg.personal_project?.name) {
+    doc.personal_project = {
+      ...(cfg.personal_project?.id !== undefined && { id: cfg.personal_project.id }),
+      ...(cfg.personal_project?.slug !== undefined && { slug: cfg.personal_project.slug }),
+      ...(cfg.personal_project?.name !== undefined && { name: cfg.personal_project.name }),
+    };
+  }
+
+  if (cfg.cli_api_key_scope) {
+    doc.cli_api_key_scope = {
+      kind: cfg.cli_api_key_scope.kind,
+      project_ids: cfg.cli_api_key_scope.project_ids,
+      ...(cfg.cli_api_key_scope.permissions !== undefined && {
+        permissions: cfg.cli_api_key_scope.permissions,
+      }),
+    };
+  }
+
+  if (cfg.gateway_url !== undefined) doc.gateway_url = cfg.gateway_url;
+  if (cfg.control_plane_url !== undefined) doc.control_plane_url = cfg.control_plane_url;
+
+  return doc;
+};
+
+/**
  * `langwatch whoami` — prints the device-flow identity persisted at
  * ~/.langwatch/config.json. Mirrors `git config user.name` /
- * `gh auth status` ergonomics.
+ * `gh auth status` ergonomics. `--json` prints a secret-free machine-readable
+ * snapshot instead, built via `buildWhoamiJson`'s allowlist so a new secret
+ * field added to `GovernanceConfig` later can't leak by accident.
  */
-export const whoamiCommand = async (): Promise<void> => {
+export const whoamiCommand = async (options?: { json?: boolean }): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     console.error(
       chalk.yellow("Not logged in. Run `langwatch login --device` to sign in via your company SSO."),
     );
     process.exit(1);
+    return;
   }
+
+  if (options?.json) {
+    console.log(JSON.stringify(buildWhoamiJson(cfg), null, 2));
+    return;
+  }
+
   if (cfg.user?.email) console.log(`User:         ${cfg.user.email}`);
   if (cfg.user?.name) console.log(`Name:         ${cfg.user.name}`);
   if (cfg.organization?.name) console.log(`Organization: ${cfg.organization.name}`);

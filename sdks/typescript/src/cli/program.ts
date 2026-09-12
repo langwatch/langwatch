@@ -392,10 +392,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   program
     .command("whoami")
     .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+    .option("--json", "Print the identity as JSON (ids and scope, never keys)")
+    .action(async (options: { json?: boolean }) => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        await whoamiCommand({ json: Boolean(options.json) });
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });

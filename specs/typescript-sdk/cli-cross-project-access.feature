@@ -92,3 +92,37 @@ Feature: CLI cross-project access with the user-scoped login key
       Given the login predates the permissions field
       When the user runs `langwatch whoami`
       Then no permissions line is printed
+
+  Rule: whoami --json prints a secret-free machine-readable snapshot
+
+    @unit
+    Scenario: whoami --json prints one secret-free JSON object and exits 0
+      Given the user is logged in
+      When the user runs `langwatch whoami --json`
+      Then stdout is exactly one JSON object with user, organization,
+        personal_project, cli_api_key_scope, gateway_url, and control_plane_url
+      And a field present only when the config holds it is omitted otherwise
+      And the object contains none of the keys api_key, cli_api_key, secret,
+        default_personal_ingest_keys, or default_personal_vk
+      And no string value in the object starts with "sk-lw-", "ik-lw-", or "pkey_"
+      And the command exits 0
+
+    @unit
+    Scenario: whoami --json when logged out fails on stderr with nothing on stdout
+      Given the user is not logged in
+      When the user runs `langwatch whoami --json`
+      Then the command exits 1
+      And the existing "Not logged in" message is printed on stderr
+      And nothing is printed on stdout
+
+    @unit
+    Scenario: whoami without --json keeps its existing human-readable output
+      Given the user is logged in
+      When the user runs `langwatch whoami`
+      Then the existing human-readable lines are printed unchanged
+      And the command exits 0
+
+# --- AC Coverage Map ---
+# AC12 "whoami --json secret-free shape, exit 0" → Scenario: whoami --json prints one secret-free JSON object and exits 0
+# AC13 "whoami --json when not logged in exits 1, stderr only" → Scenario: whoami --json when logged out fails on stderr with nothing on stdout
+# AC14 "whoami without --json unchanged, exits 0" → Scenario: whoami without --json keeps its existing human-readable output
