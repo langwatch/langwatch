@@ -141,10 +141,15 @@ func TestWorktreeAddArgs(t *testing.T) {
 	}
 }
 
+// TestComposeArgs pins --project-directory into every invocation. It is what
+// makes compose.dev.yml's `env_file: .env` resolve to the repository root
+// rather than to dev/, where no .env exists: without it both `up` and `down`
+// fail with "env file .../dev/.env not found". This assertion used to pin the
+// argument list WITHOUT it, which is how the gap survived.
 func TestComposeArgs(t *testing.T) {
 	cmd := composeCmd{project: "apidiff", branchDir: "/repo", override: "/repo/.apidiff/x/compose.apidiff.yml"}
 	got := composeArgs(cmd, "up", "-d")
-	want := "compose -p apidiff -f /repo/dev/compose.dev.yml -f /repo/.apidiff/x/compose.apidiff.yml up -d"
+	want := "compose -p apidiff --project-directory /repo -f /repo/dev/compose.dev.yml -f /repo/.apidiff/x/compose.apidiff.yml up -d"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("composeArgs = %q, want %q", strings.Join(got, " "), want)
 	}

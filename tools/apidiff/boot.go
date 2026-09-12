@@ -282,11 +282,21 @@ type composeCmd struct {
 	override  string
 }
 
-// composeArgs prefixes every docker compose invocation with the project and
-// both compose files.
+// composeArgs prefixes every docker compose invocation with the project, the
+// project directory and both compose files.
+//
+// --project-directory is not optional. compose.dev.yml declares `env_file:
+// .env`, and compose resolves that against the project directory, which
+// defaults to the directory holding the first -f file — dev/, where no .env
+// exists or ever has. Every other caller in the repository passes
+// `--project-directory .` for exactly this reason (Makefile:91,
+// dev/scripts/dev-up.sh:15, dev/scripts/dev.sh:18). Without it `up` and `down`
+// both fail with "env file .../dev/.env not found", and a failed `down` leaks
+// the run's containers.
 func composeArgs(cmd composeCmd, args ...string) []string {
 	base := []string{
 		"compose", "-p", cmd.project,
+		"--project-directory", cmd.branchDir,
 		"-f", filepath.Join(cmd.branchDir, composeServiceFile),
 	}
 	if cmd.override != "" {
