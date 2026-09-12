@@ -46,6 +46,17 @@ const (
 	// 32+ character length is main's env-create.mjs minimum.
 	throwawayInstanceAdminKey = "apidiff-instance-admin-key-00000000"
 
+	// The gateway secrets are all-or-none and each at least 32 characters
+	// (assertGatewaySecretsAllOrNone, modules/gateway/contract/src/gateway.config.ts).
+	// A developer .env carrying short placeholders is enough to make the api
+	// refuse to boot, so the run supplies its own rather than inheriting them —
+	// the same reason CREDENTIALS_SECRET is composed above. Never the
+	// developer's real values: a diff harness has no business handling them,
+	// and the gateway is excluded from probing by default anyway.
+	throwawayGatewayInternalSecret = "apidiff-gateway-internal-secret-000000000000000000000000000000"
+	throwawayGatewayJWTSecret      = "apidiff-gateway-jwt-secret-0000000000000000000000000000000000"
+	throwawayVirtualKeyPepper      = "apidiff-virtual-key-pepper-0000000000000000000000000000000000"
+
 	// scimProbeToken is provisioned into both instances' ScimToken tables so
 	// scim_bearer operations authenticate. Tokens verify by plain sha256 in
 	// both layouts (scim.service.ts hashToken), so a fixed hash inserted at
@@ -224,6 +235,7 @@ var managedEnvKeys = []string{
 	"NODE_ENV",
 	"API_TOKEN_JWT_SECRET", "LANGWATCH_NLP_SERVICE", "LANGWATCH_ENDPOINT",
 	"LANGWATCH_INSTANCE_ADMIN_API_KEY",
+	"LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", "LW_VIRTUAL_KEY_PEPPER",
 }
 
 // instanceEnvSpec carries the per-instance values instanceEnv composes.
@@ -262,6 +274,9 @@ func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 		"CREDENTIALS_SECRET="+throwawayCredentialsSecret,
 		"NEXTAUTH_SECRET="+throwawayNextAuthSecret,
 		"LANGWATCH_INSTANCE_ADMIN_API_KEY="+throwawayInstanceAdminKey,
+		"LW_GATEWAY_INTERNAL_SECRET="+throwawayGatewayInternalSecret,
+		"LW_GATEWAY_JWT_SECRET="+throwawayGatewayJWTSecret,
+		"LW_VIRTUAL_KEY_PEPPER="+throwawayVirtualKeyPepper,
 		"BASE_HOST="+base,
 		"NEXTAUTH_URL="+base,
 	)
