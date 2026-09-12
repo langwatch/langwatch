@@ -132,6 +132,16 @@ export interface TraceApi {
   }): Promise<Trace[]>;
   /** The caller's read-time redactions for one project, resolved from who they are. */
   resolveViewerProtections(input: { projectId: string; userId: string | null }): Promise<Protections>;
+  /**
+   * The same redactions for an API-KEY caller: the public branch of every
+   * content category, plus the credential's own `cost:view` grant. A legacy
+   * project key (`apiKeyId: null`) predates RBAC and sees costs.
+   */
+  resolveApiKeyProtections(input: {
+    projectId: string;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<Protections>;
   findExistingTraceIds(input: {
     projectId: string;
     traceIds: readonly string[];

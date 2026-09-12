@@ -6,6 +6,8 @@
  * vocabulary is the other half of the search body and stays a process concern
  * (it is built from that process's own list-input schema).
  */
+import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
+import { flexibleDateSchema } from "@langwatch/api/rest";
 import { z } from "zod";
 
 import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
@@ -41,6 +43,55 @@ export const traceSearchBodyExtensions = {
     ),
   ...projectionRequestSchema.shape,
 } as const;
+
+/**
+ * Offset pagination was dropped when trace search moved to ClickHouse: deep
+ * OFFSET degrades badly, and keyset (`scrollId`) replaced it. The field
+ * remains on the schema so that sending it produces an explanatory error
+ * rather than being silently discarded.
+ */
+const pageOffsetInput = z
+  .number()
+  .optional()
+  .describe(
+    "Removed. Offset pagination is no longer supported and any value other " +
+      "than 0 is rejected. Page with the scrollId returned by the previous " +
+      "response instead. The field remains on the schema so that sending it " +
+      "produces an explanatory error rather than being silently discarded.",
+  )
+  .refine((value) => value === undefined || value === 0, {
+    message:
+      "pageOffset is no longer supported \u2014 offset pagination was removed. Use the scrollId returned by the previous response to fetch the next page.",
+  });
+
+/**
+ * The filter half of the search body: the shared analytics filter vocabulary
+ * plus the paging and ordering the list read understands. `projectId` comes
+ * from the credential, and the two dates are re-added in flexible form.
+ */
+export const traceSearchFilterSchema = z.object({
+  ...sharedFiltersInputSchema.omit({ projectId: true, startDate: true, endDate: true }).shape,
+  pageOffset: pageOffsetInput,
+  // Non-negative integers only (#2163): a fractional or negative page size
+  // reaches ClickHouse as a LIMIT and fails there instead of at the boundary.
+  pageSize: z.number().int().positive().optional(),
+  groupBy: z.string().optional(),
+  sortBy: z.string().optional(),
+  sortDirection: z.string().optional(),
+  updatedAt: z.number().optional(),
+  scrollId: z.string().optional().nullable(),
+});
+
+/** The whole trace, as `GET /:traceId` answers it: too open a shape to enumerate. */
+export const traceDetailResponseSchema = z.object({}).passthrough();
+
+/** The v1 search body: the filter vocabulary, the flexible dates, the additive half last. */
+export const traceSearchBodySchema = z.object({
+  ...traceSearchFilterSchema.shape,
+  startDate: flexibleDateSchema,
+  endDate: flexibleDateSchema,
+  ...traceSearchBodyExtensions,
+});
 
 /** What a caller may send to `POST /search`. Everything else is the deployment's filter vocabulary. */
 export type TraceSearchBody = ProjectionRequest &

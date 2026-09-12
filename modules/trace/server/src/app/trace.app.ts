@@ -475,6 +475,15 @@ export class TraceApp implements TraceApi {
     });
   }
 
+  resolveApiKeyProtections(input: {
+    projectId: string;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<Protections> {
+    if (!this.#dependencies.protections) throw new Error("Trace protections service is unavailable");
+    return this.#dependencies.protections.resolveForApiKey(input);
+  }
+
   findExistingTraceIds(input: {
     projectId: string;
     traceIds: readonly string[];

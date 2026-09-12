@@ -4,10 +4,10 @@
  * register before the bare `:traceId`, so the literal segments are not
  * swallowed by the parameter.
  *
- * `platformUrl` now resolves through `TraceApi.platformUrl`. `getProtections`
- * stays a factory parameter - it asks a question of the caller's credential
- * that only the process's authz wiring can answer - so this family is not
- * yet registered on `traceServer`; see the module handover.
+ * `platformUrl` resolves through `TraceApi.platformUrl`, and the caller's
+ * read-time redactions through `TraceApi.resolveApiKeyProtections` - the
+ * module declares `authz` among its dependencies, so it answers its own
+ * credential question and the family registers on `traceServer`.
  */
 import { TraceFormattingService } from "#services/support/trace-formatting.service";
 import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
@@ -16,11 +16,14 @@ import { AmbiguousTraceIdPrefixError } from "#services/read/trace-legacy-read.se
 import { traceMetadataUpdateSchema } from "#services/support/trace-metadata-write.service";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import {
+  badRequestSchema,
   defineRestMiddleware,
   defineRestRouter,
+  documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   RequestValidationError,
+  resolver,
   type RestRawResult,
 } from "@langwatch/api/rest";
 import {
@@ -30,7 +33,12 @@ import {
   ProjectionValidationError,
   traceFormatQuerySchema,
   traceIdParamsSchema,
+  traceAmbiguousPrefixBodySchema,
+  traceDetailResponseSchema,
+  traceNotFoundBodySchema,
   traceSearchBodyExtensions,
+  traceSearchBodySchema,
+  traceSearchResponseSchema,
   tracesRestCredentialSchema,
   transcriptResponseSchema,
   type CompiledProjection,
@@ -49,9 +57,15 @@ export const tracesRestCredential = defineRestMiddleware(
   "tracesRestCredential",
   tracesRestCredentialSchema,
 );
-type TracesRestCaller = z.infer<(typeof tracesRestCredential)["schema"]>;
-
 const traceMetadataBodySchema = z.object({ metadata: traceMetadataUpdateSchema });
+
+/** Written out because the search route writes its own body, so no output schema speaks for it. */
+const SHARED_ERROR_ANSWERS = documentedResponses({
+  400: badRequestSchema,
+  401: badRequestSchema,
+  422: badRequestSchema,
+  500: badRequestSchema,
+});
 
 /** The one trace a `:traceId` route names, or the two errors it maps to. */
 async function readOneTraceOrThrow(input: {
@@ -139,12 +153,8 @@ function coerceToEpochOrThrow(value: unknown, field: string): number {
   });
 }
 
-/** What this process supplies beyond `TraceApi` itself. */
-export type TracesRestOptions<Schema extends z.ZodObject<z.ZodRawShape>> = Readonly<{
-  /** The deployment's shared analytics filter vocabulary, merged with `traceSearchBodyExtensions`. */
-  searchBodySchema: Schema;
-  /** The caller's read-time redactions for one project, keyed by their credential. */
-  getProtections(input: Readonly<{ projectId: string; caller: TracesRestCaller }>): Promise<unknown>;
+/** What a caller supplies beyond `TraceApi` itself; both members may be absent. */
+export type TracesRestOptions = Readonly<{
   /** Absent where the process registered no command queue; the route is not registered at all. */
   updateTraceMetadata?:
     | ((input: Readonly<{ projectId: string; traceId: string; metadata: unknown }>) => Promise<void>)
@@ -163,21 +173,28 @@ export type TracesRestOptions<Schema extends z.ZodObject<z.ZodRawShape>> = Reado
 }>;
 
 /** The `/api/traces` and `/api/v1/traces` family. */
-export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
-  options: TracesRestOptions<Schema>,
-) {
-  const { searchBodySchema, getProtections, updateTraceMetadata, readCodingAgentTranscript } = options;
+export function createTracesRest(options: TracesRestOptions = {}) {
+  const { updateTraceMetadata, readCodingAgentTranscript } = options;
 
   let router = defineRestRouter(TraceApi)
     .withNamespace("traces")
     .withVersion(MANAGEMENT_API_VERSION)
 
     .post("/search", "searchTraces")
-    .withInput(searchBodySchema)
+    .withInput(traceSearchBodySchema)
     .withPermission("traces:view")
     .withRawResponse({ produces: "application/json" })
     .withMiddleware(projectRestFacts, tracesRestCredential)
-    .withDocs({ description: "Search traces for a project" })
+    .withDocs({
+      description: "Search traces for a project",
+      responses: {
+        200: {
+          description: "Matching traces with pagination",
+          content: { "application/json": { schema: resolver(traceSearchResponseSchema) } },
+        },
+        ...SHARED_ERROR_ANSWERS,
+      },
+    })
     .handle(async ({ app, input, scope }, project, caller): Promise<Response> => {
       const params = input as unknown as Record<string, unknown>;
       const {
@@ -209,7 +226,11 @@ export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
       logger.info({ projectId: scope.id }, "Searching traces for project");
 
       const pageSize = Math.min(rawPageSize ?? 1000, 1000);
-      const protections = await getProtections({ projectId: scope.id, caller });
+      const protections = await app.resolveApiKeyProtections({
+        projectId: scope.id,
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+      });
 
       let projection: CompiledProjection | undefined;
       if (Array.isArray(select) && select.length > 0) {
@@ -298,7 +319,11 @@ export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
         const { traceId } = input;
         logger.info({ projectId: scope.id, traceId }, "Getting trace transcript");
 
-        const protections = await getProtections({ projectId: scope.id, caller });
+        const protections = await app.resolveApiKeyProtections({
+        projectId: scope.id,
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+      });
         const trace = await readOneTraceOrThrow({ app, projectId: scope.id, traceId, protections });
 
         return readCodingAgentTranscript({
@@ -339,16 +364,38 @@ export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
     .withParams(traceIdParamsSchema)
     .withQuery(traceFormatQuerySchema)
     .withPermission("traces:view")
-    .withOutput(z.object({}).passthrough())
+    .withOutput(traceDetailResponseSchema)
     .withMiddleware(projectRestFacts, tracesRestCredential)
-    .withDocs({ description: "Get a single trace by ID." })
+    .withDocs({
+      description: "Get a single trace by ID.",
+      responses: {
+        200: {
+          description: "Trace detail with spans, evaluations, and ASCII tree",
+          content: { "application/json": { schema: resolver(traceDetailResponseSchema) } },
+        },
+        ...SHARED_ERROR_ANSWERS,
+        404: {
+          description: "Trace not found",
+          content: { "application/json": { schema: resolver(traceNotFoundBodySchema) } },
+        },
+        409: {
+          description:
+            "Ambiguous trace ID prefix \u2014 the prefix matches more than one trace",
+          content: { "application/json": { schema: resolver(traceAmbiguousPrefixBodySchema) } },
+        },
+      },
+    })
     .handle(async ({ app, input, scope }, project, caller) => {
       const { traceId } = input;
       const format = input.format ?? (input.llmMode === "true" || input.llmMode === "1" ? "digest" : "json");
 
       logger.info({ projectId: scope.id, traceId }, "Getting trace by ID");
 
-      const protections = await getProtections({ projectId: scope.id, caller });
+      const protections = await app.resolveApiKeyProtections({
+        projectId: scope.id,
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+      });
       const trace = await readOneTraceOrThrow({
         app,
         projectId: scope.id,
@@ -387,6 +434,13 @@ export function createTracesRest<Schema extends z.ZodObject<z.ZodRawShape>>(
 
   return router.build();
 }
+
+/**
+ * `POST /search` and `GET /:traceId`. The metadata amendment and the
+ * coding-agent transcript stay absent - no module member answers their
+ * collaborators, and an unregistered route beats one that always 500s.
+ */
+export const tracesRest = createTracesRest();
 
 export { traceSearchBodyExtensions };
 export type { TraceSearchBody };

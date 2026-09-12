@@ -62,6 +62,39 @@ export class TraceViewerProtectionService {
     }
   }
 
+  /**
+   * The redactions an API-KEY caller reads a project's traces through: the
+   * anonymous resolution, then the CREDENTIAL's own cost grant on top.
+   * `resolve` with no user id takes the public branch of every content
+   * category, which is what a key must see. Costs are the key's own
+   * `cost:view`, asked through the same check the route chain enforces a
+   * declared permission with. A legacy project key predates RBAC and carries
+   * full project access by design, so for that class alone the answer stays yes.
+   */
+  async resolveForApiKey(
+    input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
+  ): Promise<Protections> {
+    const [protections, canSeeCosts] = await Promise.all([
+      this.resolve({ projectId: input.projectId, userId: void 0, publiclyShared: false }),
+      this.keyPermitted(input),
+    ]);
+    return { ...protections, canSeeCosts };
+  }
+
+  /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
+  private keyPermitted(
+    input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
+  ): Promise<boolean> {
+    if (input.apiKeyId === null) return Promise.resolve(true);
+    return this.options.authz.hasApiKeyPermission({
+      apiKeyId: input.apiKeyId,
+      userId: input.userId,
+      organizationId: "",
+      scope: { type: "project", id: input.projectId, teamId: "" },
+      permission: "cost:view",
+    });
+  }
+
   async resolve(
     input: Readonly<{ projectId: string; userId: string | undefined; publiclyShared: boolean }>,
   ): Promise<Protections> {
