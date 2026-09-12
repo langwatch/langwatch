@@ -165,6 +165,41 @@ The `auth.setup.ts` handles this:
 
 To reset authentication, delete `.auth/user.json` and re-run tests.
 
+## Credential-gated tests
+
+Some journeys drive real third-party calls and skip cleanly when their
+credentials are absent (`test.skip(cond, reason)`). Set these to run them.
+
+**Voice agent contract** (`tests/voice/voice-agent-contract.spec.ts`):
+
+| Variable | Test | Purpose |
+|---|---|---|
+| `TWILIO_ACCOUNT_SID` | phone | Twilio account SID that can place calls |
+| `TWILIO_AUTH_TOKEN` | phone | Twilio auth token |
+| `TWILIO_FROM_NUMBER` | phone | E.164 number Twilio dials from |
+| `E2E_VOICE_PHONE_NUMBER` | phone | E.164 number of the agent under test to call |
+| `ELEVENLABS_API_KEY` | ElevenLabs | Key that signs a ConvAI session |
+| `E2E_ELEVENLABS_AGENT_ID` | ElevenLabs | ElevenLabs agent id to talk to |
+
+Both also need, in the target project (not gated — prerequisites): the
+`release_voice_agents_enabled` feature flag on, and an LLM model provider so the
+simulated user and judge can run.
+
+Two more prerequisites are specific to the media-in-traces assertions:
+
+- **`release_trace_media_extraction` must be force-enabled** (e.g. via
+  `FEATURE_FLAG_FORCE_ENABLE=release_trace_media_extraction`), or the trace
+  drawer never extracts the call audio and `thenTheTracesCarryTheAudio` fails.
+- **The project id must be production-shaped (`project_…`).** The suite runs in
+  whatever project `getProjectSlug` selects, and it now prefers a
+  production-shaped project for exactly this reason. Redaction only allowlists
+  the `project` id prefix, so a legacy/seeded project such as
+  `local-dev-project` makes the media player's `/api/files/<projectId>/so_…`
+  URL get rewritten to `[SECRET]`, 404, and never render. Do **not** pin
+  `E2E_PROJECT_SLUG` at a legacy-id project; leave it unset (the harness
+  creates and selects a fresh production-shaped project) or point it at another
+  `project_…` project.
+
 ## Running Tests
 
 ```bash

@@ -71,6 +71,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // binding surface for @e2e-tagged specs about Langy's conversational
   // behavior. Without this root those specs could only be @unimplemented.
   "platform/app/e2e",
+  // The Playwright agentic-e2e suite: `.spec.ts` journeys against a live stack,
+  // outside every CI vitest lane, but the only binding surface for `@e2e` specs
+  // that describe full-UI journeys (e.g. the voice-agent simulation contract).
+  "tests/agentic-e2e",
   "packages",
   // Langy's pi-harness wrapper: the process that turns the manager's config
   // into pi's model registry and speaks the stdio protocol. Scenarios about
@@ -565,12 +569,6 @@ const LEGACY_INERT: string[] = [
   "specs/server/spa-fallback.feature",
   "specs/settings/decompose-model-provider-form-hook.feature",
   "specs/settings/settings-table-responsiveness.feature",
-  // The voice epic's two contract journeys (#7978). Both describe the whole
-  // user journey end to end and neither is built yet, so both scenarios are
-  // @unimplemented and the files are inert by design. They leave this list
-  // when the journeys have e2e tests bound to them.
-  "specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature",
-  "specs/simulation-testing/voice-agents/testing-phone-agents.feature",
   "specs/setup/docker-dev-worktree-isolation.feature",
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
@@ -797,7 +795,13 @@ const LEGACY_PARTIAL: string[] = [
   "specs/traces/saved-views.feature",
 ];
 
-const TEST_FILE_RE = /\.test\.tsx?$/;
+// `.spec.ts(x)` is included alongside `.test.ts(x)` because the Playwright
+// agentic-e2e suite (a DEFAULT_TEST_ROOT below) names its files `.spec.ts`
+// exclusively, and an `@e2e` spec bound only from a `.spec.ts` would otherwise
+// be invisible to this scan — reading as enforced-but-unbound, which is fatal.
+// No `.spec.ts` under the other roots carries a `@scenario` annotation, so
+// widening the pattern only adds the e2e bindings, never a stray one.
+const TEST_FILE_RE = /\.(?:test|spec)\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
 const SHELL_TEST_FILE_RE = /\.sh$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
