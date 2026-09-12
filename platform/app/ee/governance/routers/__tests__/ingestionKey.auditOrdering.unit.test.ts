@@ -22,6 +22,7 @@
  * handler could still be waiting on has drained by the time it fires.
  */
 
+import type { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "~/server/api/trpc";
@@ -59,9 +60,17 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
  * Only the router's own write is held open. The tRPC middleware audits every
  * mutation under its procedure path and runs *after* the handler, so holding
  * that one would block the caller however the router dispatches — the case
- * would pass against the unfixed code. `install` is separable by action
- * (`ingestionKey.mint` vs the middleware's path); `rotate` is not, so it is
- * held by the `apiKeyId` only the router records.
+ * would pass against the unfixed code.
+ *
+ * Here the action alone separates them for both mutations: this file drives
+ * `ingestionKeyRouter.createCaller`, so the middleware's `path` is the bare
+ * procedure name (`install`, `rotate`) while the router names
+ * `ingestionKey.mint` and `ingestionKey.rotate`. The extra `args.apiKeyId`
+ * check on rotate is therefore not load-bearing today; it is kept because
+ * only the router's write records an `apiKeyId`, so the predicate still
+ * picks the right row if this router is ever driven through `appRouter` —
+ * where the middleware's path *would* be `ingestionKey.rotate` and collide.
+ * That is exactly the case the integration file in this directory drives.
  */
 const { held } = vi.hoisted(() => ({
   held: {
@@ -83,9 +92,12 @@ const ORG_ID = "org_1";
 const USER_ID = "user_1";
 const API_KEY_ID = "ak_ingest_1";
 
+// Typed against the real service so a mocked return that drifts from the
+// shape the router reads fails at typecheck instead of quietly feeding it
+// `undefined` — which is how `revokedDeviceLabels` went missing here.
 const service = vi.hoisted(() => ({
-  mint: vi.fn(),
-  revokeForSource: vi.fn(),
+  mint: vi.fn<IngestionKeyService["mint"]>(),
+  revokeForSource: vi.fn<IngestionKeyService["revokeForSource"]>(),
 }));
 
 // The service is a collaborator, not the unit: these cases are about when
@@ -141,10 +153,12 @@ describe("ingestionKey router — the audit row is durable before the caller is 
     service.mint.mockResolvedValue({
       apiKeyId: API_KEY_ID,
       token: "ik-lw-test-token",
+      prefix: "ik-lw",
+      sourceType: INPUT.sourceType,
     });
     service.revokeForSource.mockResolvedValue({
       revokedCount: 2,
-      sessions: [],
+      deviceLabels: ["laptop", "ci-runner"],
     });
     caller = buildCaller();
   });
@@ -178,7 +192,14 @@ describe("ingestionKey router — the audit row is durable before the caller is 
       expect(state.settled).toBe(false);
 
       held.release?.();
-      expect(await observed).toMatchObject({ token: "ik-lw-test-token" });
+      // The retired devices are part of what rotate answers with, so they
+      // are asserted here too: a mocked return that stops matching the
+      // service would otherwise leave this field silently undefined.
+      expect(await observed).toMatchObject({
+        token: "ik-lw-test-token",
+        revokedCount: 2,
+        revokedDeviceLabels: ["laptop", "ci-runner"],
+      });
     });
   });
 });
