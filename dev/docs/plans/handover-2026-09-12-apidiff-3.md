@@ -30,8 +30,16 @@ means it could not complete, which is where the last two sessions lived.
 It needs no person and no trusted CA: with `-no-haven` and no
 `-pg-url/-ch-url/-redis-url` it brings up its own compose stack from
 `dev/compose.dev.yml` under the `apidiff` compose project, and Docker is
-available on this machine. **The `security add-trusted-cert` line in the older
-handovers is a visualdiff prerequisite only.**
+available on this machine.
+
+**The CA is no longer a blocker for anything, and it never needed a person.**
+Every older handover calls `security add-trusted-cert ...` a thing a human must
+run once. That is the hard way round: `portless trust` exits 0 on its own — no
+sudo, no password, no GUI prompt — and the visualdiff session ran it this
+afternoon. `security verify-cert -c ~/.portless/ca.pem` now reports success,
+portless wrote its `ca.trusted` marker, and haven's `ensureTrusted`
+(`adapters/portlessproxy/proxy.go:134`) skips the step from here on. Do not ask
+the user for it.
 
 Before you run it, read "Coordinate with the visualdiff session" below — another
 agent may be using the same machine and the same checkout.
@@ -115,7 +123,12 @@ blocks `pnpm --filter @langwatch/platform-api test:unit` through its
 ## Coordinate with the visualdiff session
 
 Another Claude session is driving `tools/visualdiff` **in this same checkout**.
-As of this writing it is holding, waiting for a ping before it boots anything.
+**It has a run IN FLIGHT** as of 2026-09-12 23:24 — base `origin/main`,
+candidate `bfbb3783ab`, 125 routes and 13 flows each side, run directory
+`.visualdiff/20260912-232427`, started with `-keep` so both stacks survive for
+recapture. **Check whether those stacks are still up before you start apidiff**
+— four stacks and four installs on one laptop will thrash and neither report
+will be trustworthy.
 
 - It owns `tools/visualdiff/**`, `.visualdiff/**`,
   `specs/tooling/visualdiff*.feature`.
@@ -127,8 +140,8 @@ As of this writing it is holding, waiting for a ping before it boots anything.
 - It was gated on the same gate 1 — `dev/scripts/ensure-built.mjs` builds the
   `langwatch` SDK first, so while that build was red its candidate stack could
   never come up. It can boot now, against `dbc7f57afe` or later.
-- It is asking the user for the portless CA trust itself, as a visualdiff-only
-  prerequisite. Do not duplicate that ask.
+- The portless CA is already trusted — it ran `portless trust`, which needs no
+  sudo and no person. Nothing is waiting on a human here.
 
 Its offer, which is worth taking: it will send the set difference both ways
 between its `restore-gap` findings (a screen that renders while its endpoint
@@ -139,6 +152,38 @@ restore-gap is a screen that lost its data path silently.
 One thing it flagged that the older handovers get wrong: visualdiff CAN boot a
 monolith base now (`tools/visualdiff/haven.go:20`, bound scenarios at
 `haven_test.go:453` and `:489`), so `origin/main` being the monolith is fine.
+
+## A third class of gap, found by neither tool
+
+`dev/docs/plans/route-surface-parity-2026-09-12.md` (written by the visualdiff
+session) records something both this drive and visualdiff were structurally
+blind to.
+
+**Four addresses main serves as real pages have no page, no contributed route
+and no redirect on this branch**, so they fall through to the catch-all and
+404:
+
+    /governance/agents   /governance/analytics
+    /governance/insights /governance/signals
+
+All four exist on main as `platform/app/src/pages/governance/*.tsx`. Governance
+was reworked rather than ported — the branch adds anomaly-rules and inventory
+that main lacks — so this may be deliberate retirement. But nothing in the repo
+records that decision, and other retired addresses on this branch
+(`/me/devices`, `/ops/queues`) got a redirect entry instead of a 404.
+
+Why it was invisible: not in the 70 unserved operations, because a dropped page
+is not a documented API operation; and not in visualdiff either, because
+visualdiff only renders routes listed in `visualdiff.yaml` and none of the four
+was listed. **A route that fell out of the route table and out of the
+visualdiff list in the same change was measured by nothing at all.** The four
+have since been added to `visualdiff.yaml` so a run reports them.
+
+That file also lists sixteen addresses main serves that this branch answers
+with a deliberate redirect (messages->traces, evaluations->experiments,
+admin->ops/backoffice, and so on). Eleven are in `visualdiff.yaml` and will
+classify as `changed`. **They are not regressions** — they are kept in the list
+on purpose, because a redirect that stops redirecting would be one.
 
 ## Open decisions, not yet made
 
