@@ -9,7 +9,11 @@ const costUsdSchema = z
     if (candidate === "" || candidate === "0" || candidate === "0.0") return "0";
     if (!COST_USD_PATTERN.test(candidate)) return "0";
     const numeric = Number(candidate);
-    return Number.isFinite(numeric) && numeric >= 0 ? candidate : "0";
+    // Signed: a provider that credits a period reports the credit in the
+    // same field a charge arrives in, and clamping it to zero leaves the
+    // charge it reverses standing alone. The finite check still catches
+    // "-" and "-1e999", which match the pattern and are not money.
+    return Number.isFinite(numeric) ? candidate : "0";
   })
   .default("0");
 
@@ -21,6 +25,10 @@ export const normalizedPullEventSchema = z
     action: z.string(),
     target: z.string(),
     cost_usd: costUsdSchema,
+    /** The provider's billed amount, named by cost_currency beside it. */
+    cost_amount: z.string().optional(),
+    /** ISO 4217 code for cost_amount. Absent means dollars. */
+    cost_currency: z.string().length(3).optional(),
     tokens_input: z.number().nonnegative().int().default(0),
     tokens_output: z.number().nonnegative().int().default(0),
     raw_payload: z.string(),
@@ -111,6 +119,19 @@ export const pulledUsageHintSchema = z
         message: "a pulled usage hint must name at least one dimension to key on",
       }),
     costUsd: z.string().optional(),
+    /**
+     * Which currency costUsd is in, ISO 4217. Absent means dollars.
+     * Deliberately NOT a dimension: dimensions are the restatement
+     * identity, so a re-denominated period would mint a fresh key and
+     * add its correction beside the figure it corrects.
+     */
+    currency: z.string().length(3).optional(),
+    /**
+     * The BILLER's own conversion of costUsd into dollars, as the exact
+     * decimal string it published. Absent stays absent - nothing fills
+     * it from a rate of ours. Not a dimension, same reason as above.
+     */
+    costUsdBiller: z.string().optional(),
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
     tokensCacheWrite: z.number().int().nonnegative().default(0),

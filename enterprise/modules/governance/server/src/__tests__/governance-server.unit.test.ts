@@ -17,7 +17,7 @@ describe("governance server", () => {
         basis: "provider_reported",
         costUsd: "0.000044999999999999996",
         costStatus: "exact",
-      }).costNanoUsd,
+      }).costNanoMinor,
     ).toBe(45_000);
   });
 

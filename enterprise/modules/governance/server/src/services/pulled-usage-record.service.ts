@@ -17,9 +17,11 @@
 import { createHash } from "node:crypto";
 import {
   PULLED_USAGE_COST_BASIS,
+  PULLED_USAGE_DEFAULT_CURRENCY_CODE,
   PULLED_USAGE_HINT_KEY,
   pulledUsageHintSchema,
   type NormalizedPullEvent,
+  type PulledUsageHint,
   type PulledUsageObservedEventData,
   type PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
@@ -57,6 +59,43 @@ function restatementKeyFor({
   ];
 
   return createHash("sha256").update(JSON.stringify(coordinates)).digest("hex");
+}
+
+/**
+ * The provider's reported amount together with the currency that names it.
+ *
+ * One function returning both halves, and that is the whole point of it. The
+ * homes are read in falling order of precision, and each home supplies BOTH
+ * halves or neither: taking the amount from one home and the currency from
+ * another is how a dollar figure ends up denominated in euros — a wrong number
+ * stated with a straight face, in a column nothing downstream re-derives.
+ *
+ *   - The hint's own string is the exact one the adapter kept, so no digit is
+ *     lost to the float `cost_usd` had to be to fit the canonical event shape.
+ *     Its currency is the hint's own, and absent there means dollars.
+ *   - The canonical `cost_usd` field means DOLLARS or nothing. It is never a
+ *     stand-in for an amount in another currency, because nothing beside it
+ *     could say otherwise.
+ *
+ * A third home — the event's own billed amount, named by a currency that
+ * arrived beside it for exactly this purpose — exists on `origin/main` and not
+ * yet here: `NormalizedPullEvent` carries no `cost_amount`/`cost_currency`
+ * pair, and neither does the hint carry `currency`/`costUsdBiller`. Adding
+ * them is a change to the puller contract, which is where the branches still
+ * differ. Until then every adapter on this branch reports dollars, which is
+ * what makes the constant below the honest answer rather than a placeholder.
+ */
+function reportedMoney({
+  hint,
+  event,
+}: {
+  hint: PulledUsageHint;
+  event: NormalizedPullEvent;
+}): { amount: string; currencyCode: string } {
+  if (hint.costUsd !== undefined) {
+    return { amount: hint.costUsd, currencyCode: PULLED_USAGE_DEFAULT_CURRENCY_CODE };
+  }
+  return { amount: event.cost_usd, currencyCode: PULLED_USAGE_DEFAULT_CURRENCY_CODE };
 }
 
 /**
@@ -108,13 +147,17 @@ export class PulledUsageRecordService {
     };
     const model = hint.model ?? event.target;
 
+    // Both halves of the provider's figure, from one decision. Read once into
+    // one binding so there is no line at which a later edit could take the
+    // amount from here and the currency from somewhere else.
+    const reported = reportedMoney({ hint, event });
+
     const priced =
       hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED
         ? this.pricing.price({
             basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
-            // The string when the adapter kept one, so no digit is lost to the
-            // float `cost_usd` had to be to fit the canonical event shape.
-            costUsd: hint.costUsd ?? event.cost_usd,
+            costUsd: reported.amount,
+            currencyCode: reported.currencyCode,
             // Present by the schema's own refinement on this branch.
             costStatus: hint.costStatus!,
           })
@@ -143,6 +186,11 @@ export class PulledUsageRecordService {
       projectId: null,
       model,
       ...quantities,
+      // The three money fields travel as one unit, straight off the price the
+      // seam produced. Never assembled from separate sources here — the amount
+      // is denominated by the code beside it and by nothing else.
+      costNanoMinor: priced.costNanoMinor,
+      currencyCode: priced.currencyCode,
       costNanoUsd: priced.costNanoUsd,
       rateVersion: priced.rateVersion,
       costBasis: priced.costBasis,

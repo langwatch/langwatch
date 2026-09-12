@@ -22,6 +22,12 @@ export function pulledUsageObservationKey(
 ): string {
   return [
     data.restatementKey,
+    data.costNanoMinor,
+    // Both, and both matter. A provider that re-denominates a period or lands
+    // its dollar conversion later has changed the record without changing the
+    // native amount, and a key blind to either would dedup that correction
+    // away as an unchanged re-pull.
+    data.currencyCode,
     data.costNanoUsd,
     data.tokensInput,
     data.tokensOutput,

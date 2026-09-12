@@ -36,7 +36,11 @@ const RecordPulledUsageCommand = defineCommand({
     "payload.ingestion_source_id": data.ingestionSourceId,
     "payload.cost_basis": data.costBasis,
     "payload.cost_status": data.costStatus,
-    "payload.cost_nano_usd": data.costNanoUsd,
+    // The amount and the code that denominates it, on the same span. A trace
+    // showing only the figure cannot be read: 1_533_525_880 is a different
+    // amount of money depending on the next line.
+    "payload.cost_nano_minor": data.costNanoMinor,
+    "payload.currency_code": data.currencyCode,
   }),
   makeJobId: (data) => pulledUsageObservationKey(data),
 });
