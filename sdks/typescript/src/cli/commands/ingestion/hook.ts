@@ -7,9 +7,21 @@
  * run our code inside a session reaches this same command, and each hands it
  * the same three facts on stdin (`session_id`, `cwd`, `hook_event_name`):
  *
- *   - Claude Code and Codex call it directly as a command hook.
+ *   - Claude Code and Codex call it directly as a command hook, and the
+ *     LangWatch Claude Code plugin calls it through its launcher
+ *     (`plugins/langwatch/scripts/launch.mjs`), which runs whatever
+ *     `langwatch` is installed.
  *   - opencode has no command hooks, so the plugin the CLI installs subscribes
  *     to its session event bus and spawns this command with the same payload.
+ *
+ * THE CROSS-VERSION CONTRACT. The plugin and the CLI release separately, so a
+ * plugin from any version has to run with a CLI from any version. This
+ * command and `ingest guidance` therefore accept and ignore options and
+ * arguments they do not know (registered with `allowUnknownOption` and
+ * `allowExcessArguments` in program.ts) and always exit zero, whatever they
+ * were called with. A future plugin passing an argument this build does not
+ * understand still gets the session reported; a usage error there would be
+ * prose on stderr and a non-zero exit on every session start.
  *
  * The session id each seam reports is the one that agent puts on its own
  * telemetry, so the record this posts joins the session the agent is already

@@ -865,11 +865,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     );
 
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
-  // Hidden: nobody types this, the install path writes it into the agent's
-  // settings. It reads its payload on stdin, writes nothing to stdout (a
-  // SessionStart hook's stdout is injected into the user's session context)
-  // and always exits zero, so a hook can never be why a session broke.
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries and the
+  // Claude Code plugin's launcher run. Hidden: the install path writes it into
+  // the agent's settings and the plugin ships it in its launcher. It reads its
+  // payload on stdin, writes nothing to stdout (a SessionStart hook's stdout
+  // is injected into the user's session context) and always exits zero, so a
+  // hook can never be why a session broke.
+  //
+  // Unknown options and extra arguments are accepted and ignored, here and on
+  // `ingest guidance` below. That is the cross-version contract the plugin
+  // rests on: a plugin hooks.json from any version has to run with a CLI from
+  // any version, and a usage error over an argument this build does not know
+  // would be a non-zero exit with prose on stderr on every session start.
   //
   // Registered as rendering its own result because it renders NO result, in
   // any format. Left unregistered, the auto-detected agent mode a hook always
@@ -881,7 +888,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("hook <tool>", { hidden: true })
       .description(
         "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
-      ),
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
       const { hookCommand } = await import("./commands/ingestion/hook.js");
@@ -924,13 +933,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // `langwatch ingest guidance <tool>`: prints the declare-your-context
   // guidance as SessionStart additionalContext JSON. Hidden: nobody types
   // this, the session-hooks install writes it into claude's settings for
-  // installs without plugin support (the plugin carries its own copy).
+  // installs without plugin support, and the Claude Code plugin's launcher
+  // runs it on every session start. Same cross-version contract as `ingest
+  // hook` above: unknown arguments are ignored, the exit is always zero.
   rendersOwnResult(
     ingestCmd
       .command("guidance <tool>", { hidden: true })
       .description(
         "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
-      ),
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
       if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;

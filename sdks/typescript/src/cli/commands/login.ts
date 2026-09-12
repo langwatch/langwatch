@@ -17,6 +17,7 @@ import {
   fetchProjectKeyBySlug,
   SessionApiError,
 } from "@/cli/utils/governance/session-api";
+import { recordCliLocation } from "@/cli/utils/governance/cli-location";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -199,6 +200,10 @@ export const loginCommand = async (
   },
 ): Promise<void> => {
   try {
+    // First, so every flow below reads a config that already says how to run
+    // this CLI; the Claude Code plugin's hooks look it up there.
+    recordCliLocation();
+
     // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
     // resolved value BEFORE the chosen flow runs so subsequent reads
     // (in the device flow, the API-key flow, any sub-command spawned

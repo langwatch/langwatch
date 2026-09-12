@@ -19,6 +19,7 @@
  */
 
 import { lwTag } from "../utils/governance/brand";
+import { recordCliLocation } from "../utils/governance/cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "../utils/governance/config";
 import { installTelemetryWiring } from "../utils/governance/instrument-wiring";
 import { SOURCE_TYPE_BY_TOOL } from "../utils/governance/otel-env-block";
@@ -76,6 +77,9 @@ export async function instrumentCommand(
 		);
 	}
 
+	// Before the config is read, so the copy this command saves carries it;
+	// the Claude Code plugin's hooks run the CLI through this record.
+	recordCliLocation();
 	const cfg = loadConfig();
 
 	// Every wiring target this command writes is the direct-OTLP path, the

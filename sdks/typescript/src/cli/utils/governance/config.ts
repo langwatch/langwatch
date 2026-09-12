@@ -11,6 +11,12 @@ import * as path from "node:path";
 
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 
+/** Where a CLI runs from: the node binary and the entry script, both absolute. */
+export interface CliLocation {
+  node: string;
+  entry: string;
+}
+
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
   gateway_url: string;
@@ -159,6 +165,22 @@ export interface GovernanceConfig {
    * check found an update or not. Absent = never checked.
    */
   claude_plugin_last_update_check?: number;
+
+  /**
+   * How to run this CLI from a process that cannot resolve it on PATH: the
+   * absolute path of the node binary it last ran under and of its own entry
+   * script. Written by `langwatch login`, `langwatch claude` and `langwatch
+   * instrument`, only when the values changed (see cli-location.ts).
+   *
+   * Read by the Claude Code plugin's launcher (`plugins/langwatch/scripts/
+   * launch.mjs`), which runs the hook commands through it before falling back
+   * to `langwatch` on PATH. A Claude Code started from a desktop app inherits
+   * a PATH with no version manager on it, and this is what still finds the
+   * CLI there. The launcher checks both paths exist before using them, so a
+   * node upgraded through a version manager leaves a stale record that is
+   * simply skipped.
+   */
+  cli_location?: CliLocation;
 
   /**
    * Per-wrapped-tool routing mode answer.

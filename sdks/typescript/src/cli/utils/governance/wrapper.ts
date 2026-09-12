@@ -23,6 +23,7 @@ import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
+import { recordCliLocation } from "./cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import {
 	copilotGatewayModelPreflight,
@@ -347,6 +348,11 @@ export async function withTelemetrySetupSpinner<T>({
  * code (or 2 if the budget pre-check fired).
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
+	// Before the config is read, so every save below carries it. The Claude
+	// Code plugin's hooks run the CLI through this record when PATH cannot
+	// resolve it, which is the case for a Claude Code started from a desktop
+	// app.
+	recordCliLocation();
 	let cfg = loadConfig();
 	if (!isLoggedIn(cfg)) {
 		if (!shouldAutoLogin()) {
