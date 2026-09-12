@@ -499,6 +499,48 @@ shape for 5 operations. Registering the family will never surface these —
 the ROUTES have to be ported into the declaration. Sweep every registered
 family for this class rather than assuming registration completed it.
 
+## After the refreeze — where gate 1 actually stands
+
+The document was refrozen in `0a0f549cfd`. `openapi-check` now reports
+**removed 0, added 0, changed 0**: the published contract and the module
+declarations finally say the same thing.
+
+Gate 1 is NOT passed. `pnpm --filter langwatch build` reports **74 errors in 17
+files**, up from 33 — and the trade is worth understanding before anyone
+reverts it:
+
+- the 27 `fields`/`evaluators` errors are **gone**, fixed at source (4acd4167e5)
+- the 6 dashboard-widgets errors are **gone** (7e85bd00ee)
+- what replaced them was masked by the stale document all along
+
+Split by where the errors are:
+
+    20  shipped source
+    54  test fixtures  (39 of them in prompts.facade.unit.test.ts alone)
+
+**The prompts cluster is not a regression.** Main's document carries no inline
+schema at all for `GET /api/v1/prompts`; the branch declares 25 properties with
+14 required, including `platformUrl`. The branch is the STRICTER side, and the
+SDK's fixtures — written against main's loose shape — do not satisfy it. That
+is under-specified test data meeting a real contract. Update the fixtures; do
+not loosen the declaration to match a document that described nothing.
+
+**The experiments cluster IS a real gap, and it is ours.** The eight operations
+published in `21d4639b9d` declare no response content:
+
+    GET /api/v1/experiments/runs/{runId}   200: NO CONTENT, 401: NO CONTENT, 404: NO CONTENT
+
+so `openapi-typescript` types every 200 body `undefined` and
+`experiments-api.service.ts:51` and four siblings fail on
+`["content"]["application/json"]`. Those routes need `.withOutput(...)`. Note
+all three paths are **absent from main's document entirely**, so there is no
+prior shape to copy — the declaration is the only source of truth for them, and
+whoever writes it is deciding the contract.
+
+Remaining to open gate 1: the 20 source errors (5 traces, 5 experiments, 2
+prompts, 2 experiment-cli, 2 experiments-facade, and four singletons) and the
+54 fixture updates. None of them needs the document touched again.
+
 ## Exact next action
 
 1. Lane `suite` first — 3 families, 18 routes, needs the agent platformUrl
@@ -530,11 +572,14 @@ family for this class rather than assuming registration completed it.
 
 ## Measured state
 
-    generator      exits 0, 258 operations from 61 families / 274 routes
+    generator      exits 0, 266 operations from 63 families / 284 routes
                    (was 170 / 48 / 186 when this session started)
-    openapi-check  373 removed (was 453). Non-dated: 83, of which 13 are
-                   v1-canonicalization and 70 genuinely missing (was 163).
-                   93 real removals recovered this session.
+    openapi-check  removed 0, added 0, changed 0 — the document is generated
+                   from the declarations as of 0a0f549cfd. The 70 operations
+                   the branch still does not serve are recorded in
+                   dev/docs/plans/unserved-documented-operations-2026-09-12.md
+    SDK build      74 errors in 17 files (20 source, 54 fixtures); was 33
+                   before the refreeze, and the original 33 are fixed
     published now  suite's 11 paths (test-suites, run-plans, suites),
                    gateway 20 routes, workflow/cron 2, dashboard-widgets 3
                    paths / 6 operations with the create body's `queries` array
