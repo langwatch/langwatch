@@ -174,6 +174,327 @@ Feature: Redacting personal data from traces
     When a trace is ingested with an attribute whose whole value is an email address with digits in it
     Then the stored attribute has the email address redacted
 
+  # The hold-out above only bites when nothing claims to have PROVEN its finding.
+  # A recognizer marked self-proving keeps running on an identifier-shaped value,
+  # on the promise that it carries a checksum or a marker no machine identifier
+  # holds by accident. Two of them did not keep that promise, and a trace id is
+  # not recoverable once a marker is written over it, because redaction runs
+  # before the event store.
+  #
+  # The bitcoin address pattern matched on shape alone - any 26 to 35 character
+  # token that starts with "1" or "3" and avoids the four look-alike characters -
+  # so roughly one in sixty random 32-character hex trace ids was stored as a
+  # crypto marker, at every level including the default. It now verifies the
+  # address checksum, so real addresses are still redacted and hex ids are not.
+  # The card pattern accepted any digit run that passes the Luhn check, which a
+  # thirteen-digit millisecond timestamp does about one time in ten. It now also
+  # asks whether a card scheme could have issued that number at that length,
+  # which the timestamps cannot be: the only scheme numbering from a leading one
+  # issues fifteen digits, and timestamps are thirteen, sixteen or nineteen. The
+  # rule is deliberately narrow, because a range excluded here is a real card
+  # number stored in the clear, so every other leading digit is still accepted.
+
+  @unit
+  Scenario: An opaque trace identifier survives redaction at the default level
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a hex trace identifier starting with a one
+    Then the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A corpus of random hex identifiers survives the native engine intact
+    Given the resolved PII level for "web-app" is essential
+    When two thousand random hex trace identifiers are ingested as whole attribute values
+    Then every stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A real bitcoin address is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a valid bitcoin address
+    Then the stored attribute has the address redacted
+
+  @unit
+  Scenario: A taproot address is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute whose whole value is a valid taproot address
+    Then the stored attribute has the address redacted
+
+  # A checksum is only as narrow as the grammar behind it. The character after
+  # the "bc1" prefix is the witness version, read from a thirty-two character
+  # alphabet, and bitcoin defines only the first seventeen of those. A token
+  # carrying one of the other fifteen decodes to no address at all, so treating
+  # it as one would put a marker over a value that was never a payment address.
+  @unit
+  Scenario: A token using a witness version bitcoin does not define is not an address
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute holding a checksum valid token whose witness version is seventeen
+    Then the stored attribute still reads as it was sent
+
+  # The same argument one level down. A checksum covers the characters, not what
+  # they mean, so a token can clear it and still encode no output anyone could
+  # pay to: a payload that does not unpack to whole bytes, one shorter or longer
+  # than any witness program, or a version zero payload that is neither of the
+  # two lengths that version allows.
+  @unit
+  Scenario: A token whose witness program bitcoin does not allow is not an address
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with an attribute holding a checksum valid token whose witness program length is not one bitcoin allows
+    Then the stored attribute still reads as it was sent
+
+  # BIP-173 defines a segwit address as case-insensitive, and QR encoders emit
+  # the uppercase form because uppercase packs into a QR alphanumeric segment.
+  # A wallet address pasted from a QR scan is the same address as the lowercase
+  # one and is redacted the same way. Mixed case is not an address at all, and
+  # stays untouched.
+  @unit
+  Scenario: An uppercase segwit address is redacted like its lowercase form
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a segwit address written in uppercase
+    Then the stored input has the address redacted
+
+  @unit
+  Scenario: A millisecond timestamp is not read as a card number
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a thirteen digit millisecond timestamp that passes the Luhn check
+    Then the stored input still contains the timestamp
+
+  @unit
+  Scenario: A timestamp is not read as a card number at any of its widths
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds millisecond, microsecond and nanosecond timestamps that pass the Luhn check
+    Then the stored input still contains every timestamp
+
+  @unit
+  Scenario: A timestamp from the 2040s is not read as a card number
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a Luhn passing number inside the Mastercard range at a width Mastercard does not issue
+    Then the stored input still contains the number
+
+  @unit
+  Scenario: Every card scheme in circulation is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds one valid card number from each scheme
+    Then the stored input has every card number redacted
+
+  @unit
+  Scenario: A card number written without separators is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested whose input holds a card number written as one digit run
+    Then the stored input has the card number redacted
+
+  # The strict level adds names and locations, which need the external analysis
+  # service. That service guesses from wording, and an opaque identifier gives it
+  # nothing to go on, so it labels hex ids as people and places. Values are
+  # therefore filtered before they leave the process: an attribute whose whole
+  # value is one opaque identifier is never sent, and neither is an attribute
+  # under one of the reserved trace and span identifier names whose value is
+  # shaped like the address that name promises - hexadecimal, or a decimal run
+  # of at most thirty-two digits. The name alone withholds nothing: anyone who
+  # can write a span attribute can write one of those names, so a value that is
+  # not an address is analysed like any other, which is what keeps an email
+  # address parked under "metadata.trace_id" from being stored in the clear.
+  #
+  # "Opaque" has to be a high bar here, higher than the bar the native engine
+  # uses, because holding a value back from this service is what stops a name or
+  # a place ever being found in it. A value qualifies only when it carries a run
+  # of at least sixteen letters and digits that no person would type: a hex
+  # digest, or a run mixing letters with at least two digits. A hyphenated or
+  # run-together name - "Elise-Marin-Van-Toren", "AnneMarieJohansson",
+  # "Saint-Jean-Baptiste-Hospital" - has no such run, so it still goes for
+  # analysis and is still redacted.
+  #
+  # Correlation attributes a customer fills in themselves - the user, customer,
+  # thread and conversation identifiers - are deliberately NOT on the reserved
+  # list. Customers routinely put an email address in them, and never analysing
+  # them would store that email in the clear. They are covered by the same rule
+  # as every other attribute: held back when the whole value is one opaque
+  # identifier, analysed when it is personal data.
+
+  @unit
+  Scenario: An opaque identifier attribute value is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose whole value is a hex span identifier
+    Then the analysis service never received that value
+    And the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A reserved trace identifier attribute is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a reserved trace identifier attribute
+    Then the analysis service never received that value
+
+  # The reserved names are not a namespace anyone owns. Attributes arrive on the
+  # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
+  # put an email address under a trace identifier name - by mistake or on
+  # purpose - and a rule that went on the name alone would then store that email
+  # in the clear forever. The name earns the exemption only for a value that
+  # could be the address it promises, which is to say hexadecimal or decimal.
+  @unit
+  Scenario: A reserved trace identifier name holding an email address is redacted at the strict level
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a reserved trace identifier attribute whose value is an email address
+    Then the stored attribute has the email address redacted
+    And the analysis service never received the email address in the clear
+
+  @unit
+  Scenario: A reserved trace identifier name holding an email address is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute whose value is an email address
+    Then the stored attribute has the email address redacted
+
+  # A decimal trace identifier and a card number are the same shape, so no rule
+  # reading the value alone can separate them. What separates them is proof: the
+  # reserved name stands the shape-only detectors down, the way it does for any
+  # identifier, and leaves running the ones that can prove what they are looking
+  # at. A number carrying a card checksum inside a range a scheme actually
+  # issues is redacted whatever attribute it arrives under.
+  @unit
+  Scenario: A card number written under a reserved trace identifier name is still redacted
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute whose value is a valid card number
+    Then the stored attribute has the card number redacted
+
+  # The reserved names buy an exemption from the two secret rules that judge a
+  # token by its shape alone, because a trace identifier minted as a random body
+  # looks exactly as random as a key. "traceid" and "spanid" carry no
+  # underscore, so the ordinary rule for identifier-named attributes cannot
+  # reach them and the reserved list is the only thing that can.
+  #
+  # That exemption reads the value too. The ingestion endpoint forwards
+  # attribute names exactly as the sender wrote them, so a reserved name is a
+  # claim by whoever sent the span and nothing more; if the name alone bought
+  # the exemption, anyone could park a credential under "metadata.traceid" and
+  # keep the shape rules off it.
+  @unit
+  Scenario: A reserved trace identifier name keeps the address it promises
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute holding a decimal address
+    Then the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A reserved trace identifier name does not exempt a credential
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute holding a token only the shape rules can match
+    Then the stored attribute has the token redacted
+
+  # A decimal identifier of eleven digits is the shape of an international
+  # phone number, and nothing in the value says otherwise. It is the one
+  # decimal width where the reserved name changes what gets stored, which makes
+  # it the case worth stating: every other width survives redaction whether the
+  # name is reserved or not. The same value under an unreserved name is
+  # redacted, so what is being described here is the name and not the value.
+  @unit
+  Scenario: A decimal trace identifier a phone detector claims is kept under a reserved name
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute whose decimal value reads as a phone number
+    Then the stored attribute still reads as it was sent
+    And the same value under an unreserved attribute name has the phone number redacted
+
+  # The reserved list earns its keep on exactly this case, so it is worth
+  # stating on its own. The names without an underscore are the ones no other
+  # rule can reach: an attribute ending in "_id" is already exempt by a suffix
+  # rule older than this list, and a value long enough to look random is already
+  # held back by its shape. A short decimal address under a name like "traceid"
+  # has neither, so the reserved list is the only thing standing between it and
+  # a phone-number marker written over it permanently.
+  @unit
+  Scenario: A reserved name keeps an address the shape rule is too short to see
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a short decimal trace address under a reserved name carrying no identifier suffix
+    Then the stored attribute still reads as it was sent
+    And the same value under an unreserved attribute name has the phone number redacted
+
+  # A customer sending metadata to the ingestion endpoint does not have it
+  # stored under the name they wrote. It is carried under one of the product's
+  # own namespaces through ingestion and put back to its plain name only once
+  # the trace is assembled, which is after redaction has had its say. There is
+  # more than one such namespace and they all collapse to the same plain name,
+  # so the reserved names have to be recognised under every spelling, or they
+  # protect only a caller writing raw OpenTelemetry attributes by hand.
+  #
+  # This covers senders that put metadata in attribute NAMES: the ingestion
+  # endpoint itself and the Go SDK. The Python and TypeScript SDKs send all
+  # custom metadata as a single JSON-encoded attribute, which is unpacked after
+  # redaction, so a reserved name inside that blob is not seen here at all.
+  @unit
+  Scenario: Caller metadata keeps a reserved trace identifier through the REST collector rewrite
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested whose caller metadata holds a reserved trace identifier written in decimal
+    Then the stored metadata still reads as it was sent
+    And the analysis service never received that value
+
+  @unit
+  Scenario: A corpus of opaque identifiers is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with attributes holding hex identifiers, dashed uuids and prefixed ULIDs
+    Then the analysis service received none of them
+
+  @unit
+  Scenario: A corpus of short opaque tokens is almost never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with twelve hundred short hex span identifiers and prefixed ULIDs
+    Then the analysis service received fewer than one in a hundred of them
+
+  @unit
+  Scenario: A corpus of written names is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with two thousand generated names as attribute values
+    Then the analysis service received every one of them
+
+  @unit
+  Scenario: Prose that holds a name is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose value is a sentence naming a person
+    Then the analysis service received that sentence
+
+  # Holding a value back is decided on the WHOLE value, never on a part of it.
+  # Carrying an identifier is not the same as being one: a sentence that quotes
+  # a trace id is still a sentence, and the words around the id are exactly what
+  # the analysis pass exists to read. Deciding on a part would mean any message
+  # with a request id in it stopped being scanned for names.
+  @unit
+  Scenario: Prose that quotes an opaque identifier is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose value is a sentence naming a person next to a trace identifier
+    Then the analysis service received that sentence
+
+  @unit
+  Scenario: A customer identifier that holds a person name is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a user identifier attribute whose value is a person name
+    Then the analysis service received that value
+
+  @unit
+  Scenario: A hyphenated or run-together name is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with attributes holding names written with hyphens, with dots and with no separator at all
+    Then the analysis service received every one of them
+
+  @unit
+  Scenario: A place written as one hyphenated token is still sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with an attribute whose value is a hyphenated place name
+    Then the analysis service received that value
+
+  @unit
+  Scenario: A reserved identifier attribute survives even when its value is all digits
+    Given the resolved PII level for "web-app" is essential
+    When a trace is ingested with a reserved trace identifier attribute written in decimal
+    Then the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: Log attributes hold opaque identifiers back from analysis
+    Given the resolved PII level for "web-app" is strict
+    When a log record is ingested with an attribute whose whole value is a hex identifier
+    Then the analysis service never received that value
+    And the analysis service received the log body
+
+  @unit
+  Scenario: Metric attributes hold opaque identifiers back from analysis
+    Given the resolved PII level for "web-app" is strict
+    When a metric is ingested with one attribute holding a hex identifier and another holding prose
+    Then the analysis service never received the identifier
+    And the analysis service received the prose
+
   # Detection heuristics over-trigger on business identifiers that merely look
   # like PII: a 14-digit reservation number reads as a credit card, an
   # "orders@acme.internal" queue address reads as a personal email. Exception
