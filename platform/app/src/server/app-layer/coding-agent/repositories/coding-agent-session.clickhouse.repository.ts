@@ -638,6 +638,17 @@ export class CodingAgentSessionClickHouseRepository
    * Only `TenantId` is genuinely immune, because it is part of the key.
    * Omitted for personal-workspace usage, where the personal project already
    * isolates the user.
+   *
+   * Sessions the agent ran for itself (00096) leave the read in the dedup
+   * group, as `HAVING max(Auxiliary) = 0`. That is not the row predicate the
+   * paragraph above rules out: `HAVING` runs after the grouping, so it changes
+   * no group's winner. It drops a session outright whenever ANY of its
+   * versions carried the mark, which is exactly what the fold's sticky flag
+   * means, and a marked version losing a `max(UpdatedAt)` tie can no longer
+   * list the unmarked tie in its place. Dropping them here rather than after
+   * the read is also what keeps the page full: `LIMIT` counts only sessions
+   * the caller can see, so a run of helper threads can neither shorten the
+   * list nor leave a session out of `getUsageTotals`.
    */
   async findManyRecent({
     tenantId,
@@ -683,6 +694,7 @@ export class CodingAgentSessionClickHouseRepository
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
               GROUP BY TenantId, SessionId
+              HAVING max(toUInt8(Auxiliary)) = 0
             )
           ORDER BY StartedAt DESC
           LIMIT {limit:UInt32}
@@ -716,10 +728,9 @@ export class CodingAgentSessionClickHouseRepository
     // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
-    // The auxiliary mark is read off the version the dedup settles on, never
-    // in SQL: two versions of one session can tie on `max(UpdatedAt)`, and a
-    // SQL predicate would drop the marked version before `preferredOf` could
-    // rank it, listing the unmarked tie in its place.
+    // Marked sessions left the read with the dedup group above; this repeats
+    // the rule on the version the dedup settles on, so the method's answer
+    // holds whatever the query returned.
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
       .filter((row) => !row.auxiliary)

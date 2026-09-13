@@ -349,6 +349,13 @@ Rule: A helper thread the agent ran for itself is not a session
     Then both sessions are listed
 
   @integration
+  Scenario: A run of helper threads does not shorten the list
+    Given more auxiliary helper sessions than a page holds, all started after
+      the user's own sessions
+    When a page of the sessions list is read
+    Then the page holds as many user sessions as it asked for
+
+  @integration
   Scenario: A session marked auxiliary after it was first stored drops out of the list
     Given a session whose first stored version was not yet marked auxiliary
     When a later version marks it auxiliary

@@ -909,5 +909,47 @@ describe("session_metric_series converged totals (migration 00052)", () => {
       );
       expect(await listedIds()).not.toContain(sessionId);
     });
+
+    /** @scenario "A run of helper threads does not shorten the list" */
+    it("fills the page with visible sessions when helpers are the most recent", async () => {
+      // Its own window, so only these rows answer: the page is the assertion.
+      const pageWindow = { fromMs: baseMs + 15_000, toMs: baseMs + 30_000 };
+      const limit = 3;
+      const visible = [0, 1, 2].map((i) => `${tag}-codex-page-user-${i}`);
+      const helpers = [0, 1, 2, 3].map((i) => `${tag}-codex-page-helper-${i}`);
+
+      for (const [i, sessionId] of visible.entries()) {
+        await sessions.upsert(
+          sessionRow({
+            sessionId,
+            agent: "codex",
+            startedAtMs: baseMs + 20_000 + i * 1_000,
+          }),
+          30,
+        );
+      }
+      // Started after every visible session, so an unfiltered page of
+      // `limit * LIST_READ_DEDUP_OVERFETCH` rows is mostly helper threads.
+      for (const [i, sessionId] of helpers.entries()) {
+        await sessions.upsert(
+          sessionRow({
+            sessionId,
+            agent: "codex",
+            auxiliary: true,
+            startedAtMs: baseMs + 25_000 + i * 1_000,
+          }),
+          30,
+        );
+      }
+
+      const page = await sessions.findManyRecent({
+        tenantId,
+        fromMs: pageWindow.fromMs,
+        toMs: pageWindow.toMs,
+        limit,
+      });
+
+      expect(page.map((row) => row.sessionId).sort()).toEqual(visible.sort());
+    });
   });
 });

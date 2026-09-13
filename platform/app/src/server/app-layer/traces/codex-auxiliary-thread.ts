@@ -49,8 +49,19 @@ export const AUXILIARY_SESSION_ATTR = "langwatch.session.auxiliary";
 
 const TEMPORARY_STRUCTURED_REQUEST_ID_PREFIX = "temporary-structured-";
 
-/** How long an auxiliary trace is remembered for its remaining spans. */
-export const AUXILIARY_TRACE_MEMO_TTL_SECONDS = 24 * 60 * 60;
+/**
+ * How long an auxiliary trace is remembered for its remaining spans.
+ *
+ * The same 31 days ingestion accepts a span's start time from
+ * (`SPAN_MAX_PAST_MS` in `trace-request-collection.service.ts`, pinned to this
+ * constant by the module's unit test). The request span and the turn span it
+ * marks normally land seconds apart, but nothing in the exporter contract
+ * bounds the delay between two batches, and a memo that expired first would
+ * store the turn unmarked and let the helper thread list as a session. Any
+ * span that arrives late enough for the memo to be gone is a span ingestion
+ * rejects anyway.
+ */
+export const AUXILIARY_TRACE_MEMO_TTL_SECONDS = 31 * 24 * 60 * 60;
 
 /**
  * Whether a codex span is one of the app-server request spans codex's

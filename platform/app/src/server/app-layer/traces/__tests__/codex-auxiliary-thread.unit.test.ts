@@ -14,11 +14,15 @@ import type {
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   AUXILIARY_SESSION_ATTR,
+  AUXILIARY_TRACE_MEMO_TTL_SECONDS,
   InMemoryAuxiliaryTraceMemo,
   isCodexTemporaryStructuredRequestSpan,
 } from "../codex-auxiliary-thread";
 import type { SpanDedupService } from "../span-dedupe.service";
-import { TraceRequestCollectionService } from "../trace-request-collection.service";
+import {
+  SPAN_MAX_PAST_MS,
+  TraceRequestCollectionService,
+} from "../trace-request-collection.service";
 import fixture from "./fixtures/codex-0154-helper-thread.spans.json";
 
 const tenantId = "project_test";
@@ -136,6 +140,18 @@ describe("isCodexTemporaryStructuredRequestSpan", () => {
           }),
         ).toBe(false);
       });
+    });
+  });
+});
+
+describe("the auxiliary trace memo", () => {
+  describe("given a turn span that arrives long after the request that marked it", () => {
+    /** @scenario "An auxiliary trace is remembered for as long as ingestion accepts its spans" */
+    it("remembers the trace for as long as ingestion accepts the span", () => {
+      // A shorter memo would store the late turn unmarked and list the helper
+      // thread as a session; a longer one would keep keys for traces whose
+      // spans ingestion already rejects.
+      expect(AUXILIARY_TRACE_MEMO_TTL_SECONDS * 1000).toBe(SPAN_MAX_PAST_MS);
     });
   });
 });

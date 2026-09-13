@@ -224,6 +224,12 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the stored span carries the auxiliary session mark
 
   @unit
+  Scenario: An auxiliary trace is remembered for as long as ingestion accepts its spans
+    Given a trace remembered as auxiliary
+    When the memo's lifetime is compared to the oldest span start time ingestion accepts
+    Then the memo outlives every span that could still carry the mark
+
+  @unit
   Scenario: A codex turn span of an ordinary trace is not stamped
     Given a codex turn/start span whose request id is the client's own counter
     When the turn's spans are ingested
