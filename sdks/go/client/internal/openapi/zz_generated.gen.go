@@ -25300,6 +25300,7 @@ type PostLangyControlFramesJSONBodyFrames0 struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -25679,6 +25680,7 @@ type RegisterLangyControlSessionJSONBody struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -25745,6 +25747,7 @@ type ApproveLangyControlRequestJSONBody struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`

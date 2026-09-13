@@ -100,6 +100,8 @@ describe("given the share-control command", () => {
       const workspace = describeWorkspace(root);
       expect(workspace.root).toBe(root);
       expect(workspace.name).toBe("project");
+      expect(workspace.gitRepository).toBe(false);
+      expect(workspace.gitBranch).toBeUndefined();
       expect(workspace.packageManager).toBe("pnpm");
       expect(workspace.nodeVersion).toBe(process.version);
       expect(workspace.os).toContain(os.platform());

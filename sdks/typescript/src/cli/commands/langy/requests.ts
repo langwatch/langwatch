@@ -134,8 +134,12 @@ export function packageManagerOf(root: string): string | undefined {
  * shares its folder, the skill just learns less about it.
  */
 export function describeWorkspace(root: string): WorkspaceInfo {
-  const inside = quiet("git", ["rev-parse", "--is-inside-work-tree"], root);
-  const isRepository = inside === "true";
+  // rev-parse fails the same way when git is missing and when the folder is
+  // not a repository; only with git present does the failure say "not a repository".
+  const gitPresent = quiet("git", ["--version"], root) !== null;
+  const isRepository =
+    gitPresent &&
+    quiet("git", ["rev-parse", "--is-inside-work-tree"], root) === "true";
   const branch = isRepository
     ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root)
     : null;
@@ -151,6 +155,7 @@ export function describeWorkspace(root: string): WorkspaceInfo {
   return {
     root,
     name: path.basename(root),
+    ...(gitPresent ? { gitRepository: isRepository } : {}),
     ...(branch ? { gitBranch: branch } : {}),
     ...(remote ? { gitRemote: remote } : {}),
     ...(status === null ? {} : { gitDirty: status !== "" }),

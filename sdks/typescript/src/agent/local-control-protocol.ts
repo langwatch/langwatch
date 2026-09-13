@@ -142,6 +142,8 @@ export type LocalToolCall =
 export interface WorkspaceInfo {
   root: string;
   name: string;
+  /** False when the folder is not a git repository; absent when git could not be run. */
+  gitRepository?: boolean;
   gitBranch?: string;
   gitRemote?: string;
   gitDirty?: boolean;

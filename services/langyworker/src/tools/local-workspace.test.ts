@@ -15,6 +15,7 @@ import {
   createLocalWorkspaceExtension,
   ranInFolder,
   readCodeAccess,
+  renderWorkspaceFacts,
 } from "./local-workspace.js";
 import { TurnEventMapper } from "../events.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
@@ -342,6 +343,55 @@ describe("the sandbox file tools while a folder is connected", () => {
       "grep",
       "find",
     ]);
+  });
+});
+
+describe("the folder facts code_access renders", () => {
+  const folder = {
+    root: "/Users/dev/acme-app",
+    name: "acme-app",
+    os: "darwin",
+    nodeVersion: "v22.14.0",
+    ghAuthenticated: true,
+    packageManager: "pnpm",
+  };
+
+  describe("when the folder is a repository", () => {
+    it("names the branch, the remote and the dirty flag", () => {
+      const text = renderWorkspaceFacts({
+        ...folder,
+        gitRepository: true,
+        gitBranch: "main",
+        gitRemote: "git@github.com:acme/acme-app.git",
+        gitDirty: false,
+      });
+      expect(text).toContain("git branch: main");
+      expect(text).toContain("git remote: git@github.com:acme/acme-app.git");
+      expect(text).toContain("uncommitted changes: no");
+      expect(text).not.toContain("not a repository");
+    });
+  });
+
+  describe("when the folder is not a repository", () => {
+    /** @scenario "A folder that is not a repository says so in its facts" */
+    it("says so in one line and leaves out the branch, remote and dirty lines", () => {
+      const text = renderWorkspaceFacts({ ...folder, gitRepository: false });
+      expect(text).toContain("git: not a repository");
+      expect(text).not.toContain("git branch:");
+      expect(text).not.toContain("git remote:");
+      expect(text).not.toContain("uncommitted changes:");
+      expect(text).toContain("package manager: pnpm");
+    });
+  });
+
+  describe("when the command line could not run git", () => {
+    it("keeps the unknown lines rather than calling the folder a non-repository", () => {
+      const text = renderWorkspaceFacts(folder);
+      expect(text).toContain("git branch: unknown");
+      expect(text).toContain("git remote: none");
+      expect(text).toContain("uncommitted changes: unknown");
+      expect(text).not.toContain("not a repository");
+    });
   });
 });
 

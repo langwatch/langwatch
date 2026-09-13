@@ -136,6 +136,11 @@ export const workspaceInfoSchema = z.object({
   root: z.string().min(1).max(4096),
   /** The last path segment, what the chip shows. */
   name: z.string().min(1).max(255),
+  /**
+   * False when the folder is not a git repository, so the branch, remote and
+   * dirty facts do not apply; absent when git itself could not be run.
+   */
+  gitRepository: z.boolean().optional(),
   gitBranch: z.string().max(255).optional(),
   gitRemote: z.string().max(2048).optional(),
   gitDirty: z.boolean().optional(),

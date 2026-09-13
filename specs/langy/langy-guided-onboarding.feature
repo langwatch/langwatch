@@ -590,6 +590,38 @@ Feature: Langy guides the first setup after sign-up
 
   Rule: A step that fails stops the path
 
+    # A run ended on "the shared folder is not a Git repository, so I can't
+    # create the required branch": the way out was known and never offered.
+    # The folder facts name the case, and the skill asks instead of stopping.
+    @unit
+    Scenario: A folder that is not a repository gets the offer to make it one
+      When the compiled guided-onboarding skill is read
+      Then a folder whose facts say it is not a repository is a question, not a stop
+      And the options are "Create a repository for me" and "I'll choose another folder", plain answers with no ref
+      And the first option runs git init, a first commit of what is there, and then step 2 as the no-remote path
+      And the second ends the turn naming the code access card
+
+    # The facts printed `git branch: unknown` for a folder with no repository,
+    # the same as for a machine with no git, so the skill walked into a
+    # checkout before it learned. The command line reads the answer and the
+    # facts name the case.
+    @unit
+    Scenario: A folder that is not a repository says so in its facts
+      Given the command line reports the folder is not a git repository
+      When the code access facts are rendered
+      Then they say "git: not a repository" and carry no branch, remote or dirty line
+      And a folder where git could not be run keeps the unknown lines
+
+    # A run ended on "this folder does not have the pip package manager
+    # available" after one `pip install` answered 127: pip3, python -m pip and
+    # uv were never tried.
+    @unit
+    Scenario: A missing pip climbs the install ladder before it asks
+      When the compiled guided-onboarding skill is read
+      Then the Python install is a ladder from uv to the folder's interpreter to pip, pip3, python3 -m pip and python -m pip
+      And a command not found moves to the next rung without a retry
+      And only when every rung is missing does the question offer "Install uv for me" or "I'll set up Python myself"
+
     # The wait is one CLI call, not a loop the model writes: a hand-written
     # poll once misread the list and gave up on an agent that was online.
     @unit

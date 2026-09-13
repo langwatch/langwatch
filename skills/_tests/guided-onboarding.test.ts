@@ -530,7 +530,7 @@ describe("the guided-onboarding skill", () => {
       expect(install).toBeGreaterThan(branch);
       expect(tracingItem).toBeGreaterThan(install);
       const how = rendered.indexOf(
-        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager: `uv add langwatch` when the project has a `uv.lock`, `pip install langwatch` otherwise; `npm install langwatch` or `pnpm add langwatch` by the lockfile present.",
+        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager. For Python the install is a ladder, not one command: `uv add langwatch` when the folder has a `uv.lock` or the workspace facts name uv; otherwise the folder's own interpreter first, `.venv/bin/python -m pip install langwatch` when `.venv` exists, then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`, stopping at the first that works.",
       );
       const tracingStep = rendered.indexOf("2. `tracing` for the detected framework.");
       expect(how).toBeGreaterThan(-1);
@@ -852,6 +852,58 @@ describe("the guided-onboarding skill", () => {
       const line = rendered.indexOf(VERBATIM_LINES["the two-things line"]);
       expect(explanation).toBeGreaterThan(-1);
       expect(line).toBeGreaterThan(explanation);
+    });
+
+    /** @scenario "A folder that is not a repository gets the offer to make it one" */
+    it("asks about git init instead of stopping when the folder is not a repository", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain(
+        "an unlock is asked, never stopped on: ask with the `question` tool, one option that does the unlock for you and one that lets the person go another way, both plain answers with no `ref`, the turn ends on the card, and the answer is acted on in the next turn.",
+      );
+      expect(section).toContain(
+        "This folder isn't a git repository yet, so I can't make a branch for the tracing change. Want me to create one?",
+      );
+      expect(section).toContain(
+        'Options, in this order: "Create a repository for me" and "I\'ll choose another folder".',
+      );
+      expect(section).toContain(
+        'On "Create a repository for me": `git init`; when the folder has no `.gitignore`, write one with `local_write` naming `.env`, `node_modules/`, `.venv/` and `__pycache__/`, so the first commit never carries a key; then `git add -A` and `git commit -m "Initial commit"`, one command each, in the shared folder.',
+      );
+      expect(section).toContain(
+        "Then step 2 continues on the langy branch exactly as the no-remote path says: `git checkout -b langy/<slug>` from the branch `git init` made, no `git fetch`, no `git push`, and the no-remote line takes the pull request line's place.",
+      );
+      expect(section).toContain(
+        'On "I\'ll choose another folder": end the turn saying which folder to connect next through the code access card, and nothing else runs.',
+      );
+      expect(section).toContain("`gh` not signed in is not a dead end");
+      expect(rendered).toContain(
+        "When the workspace facts say `git: not a repository`, there is no branch to make: that is the first unlock question of \"When a step fails\", asked before any command of this step.",
+      );
+    });
+
+    /** @scenario "A missing pip climbs the install ladder before it asks" */
+    it("climbs the Python install ladder on a command not found and asks only when every rung is missing", () => {
+      expect(rendered).toContain(
+        "Each attempt is one command, and a command not found (exit 127, \"command not found\") moves to the next rung without a retry: it is a missing spelling, never a missing capability.",
+      );
+      expect(rendered).toContain(
+        "For JavaScript, `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile, and a 127 on the named manager falls back to `npm`.",
+      );
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain(
+        "I couldn't find pip or uv on this machine, so I can't install the LangWatch package. Want me to install uv?",
+      );
+      expect(section).toContain(
+        'Options, in this order: "Install uv for me" and "I\'ll set up Python myself".',
+      );
+      expect(section).toContain(
+        'On "Install uv for me": run the official installer, `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `uv init` when the folder has no `pyproject.toml`, then `uv add langwatch`, and item 1 goes on.',
+      );
+      expect(section).toContain(
+        'On "I\'ll set up Python myself": end the turn saying what to install, Python 3 with pip or uv, and to send a message when it is done.',
+      );
     });
 
     /** @scenario "A failed step stops with one line and no completion" */

@@ -18811,6 +18811,7 @@ export interface operations {
                         gitBranch?: string;
                         gitRemote?: string;
                         gitDirty?: boolean;
+                        gitRepository?: boolean;
                         os: string;
                         nodeVersion?: string;
                         pythonVersion?: string;
@@ -19074,6 +19075,7 @@ export interface operations {
                             gitBranch?: string;
                             gitRemote?: string;
                             gitDirty?: boolean;
+                            gitRepository?: boolean;
                             os: string;
                             nodeVersion?: string;
                             pythonVersion?: string;
@@ -19221,6 +19223,7 @@ export interface operations {
                         gitBranch?: string;
                         gitRemote?: string;
                         gitDirty?: boolean;
+                        gitRepository?: boolean;
                         os: string;
                         nodeVersion?: string;
                         pythonVersion?: string;

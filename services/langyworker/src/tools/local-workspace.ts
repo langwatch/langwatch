@@ -216,6 +216,8 @@ type PollCallResponse = {
 type WorkspaceInfo = {
   root: string;
   name: string;
+  /** False when the folder is not a git repository; absent when git could not be run. */
+  gitRepository?: boolean;
   gitBranch?: string;
   gitRemote?: string;
   gitDirty?: boolean;
@@ -390,14 +392,26 @@ export function renderBashOutput(output: BashOutput): string {
   return lines.join("\n\n");
 }
 
+/**
+ * The git facts: one line saying the folder is not a repository, so the
+ * skill asks about `git init` instead of walking into a checkout; otherwise
+ * the branch, the remote and the dirty flag.
+ */
+function gitFacts(workspace: WorkspaceInfo): string[] {
+  if (workspace.gitRepository === false) return ["git: not a repository"];
+  return [
+    `git branch: ${workspace.gitBranch ?? "unknown"}`,
+    `git remote: ${workspace.gitRemote ?? "none"}`,
+    `uncommitted changes: ${workspace.gitDirty === undefined ? "unknown" : workspace.gitDirty ? "yes" : "no"}`,
+  ];
+}
+
 /** The folder facts `code_access` gives the model when the folder is there. */
 export function renderWorkspaceFacts(workspace: WorkspaceInfo): string {
   const lines = [
     `folder: ${workspace.root}`,
     `name: ${workspace.name}`,
-    `git branch: ${workspace.gitBranch ?? "unknown"}`,
-    `git remote: ${workspace.gitRemote ?? "none"}`,
-    `uncommitted changes: ${workspace.gitDirty === undefined ? "unknown" : workspace.gitDirty ? "yes" : "no"}`,
+    ...gitFacts(workspace),
     `operating system: ${workspace.os}`,
     `node: ${workspace.nodeVersion ?? "not found"}`,
     `python: ${workspace.pythonVersion ?? "not found"}`,
