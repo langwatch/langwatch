@@ -99,7 +99,18 @@ function envelopeIdentity(row: SpendEventRow): Record<string, unknown> {
   };
 }
 
-/** Usage and cost as the wire carries them, for the rows that know both. */
+/**
+ * Usage and cost as the wire carries them, for the rows that know both.
+ *
+ * Every quantity is published on every row, 0 where the request used none,
+ * the same way the cache and reasoning counts already read on a call that
+ * used neither. Consumers sum these fields to reconcile a period, and an
+ * omitted field turns that sum into NaN where a 0 does not.
+ *
+ * The buckets are disjoint. An image generation reports output_tokens 0 with
+ * its render under output_image_tokens, so a consumer summing output_tokens
+ * alone undercounts image traffic; cost is the sum across all buckets.
+ */
 function envelopeQuantities(row: SpendEventRow): {
   usage: Record<string, number>;
   cost: Record<string, unknown>;

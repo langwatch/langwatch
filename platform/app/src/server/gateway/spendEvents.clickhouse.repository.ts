@@ -66,9 +66,12 @@ export type SpendEventRow = {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
-  /** Image tokens billed on the input side, disjoint from tokensInput. */
+  /** Image tokens billed on the input side, 0 on a request with no image.
+   *  Disjoint from tokensInput: each token is priced in one bucket only, so
+   *  the request's cost is the sum across buckets. */
   tokensInputImage: number;
-  /** Image tokens billed on the output side, disjoint from tokensOutput. */
+  /** Image tokens the answer was billed for, 0 when it held no image.
+   *  Disjoint from tokensOutput, which is 0 on an image generation. */
   tokensOutputImage: number;
   /** Images the request carried, priced per image rather than per token. */
   imageCount: number;

@@ -88,10 +88,10 @@ export const listSpendEventsCommand = async (options: {
             // Image tokens are priced separately from the text buckets, so an
             // image request shows its quantities here and 0 out under In/Out.
             "Image in/out": e.data.usage
-              ? `${e.data.usage.input_image_tokens ?? 0}/${e.data.usage.output_image_tokens ?? 0}`
+              ? `${e.data.usage.input_image_tokens}/${e.data.usage.output_image_tokens}`
               : chalk.gray("?"),
             Images: e.data.usage
-              ? `${e.data.usage.image_count ?? 0}`
+              ? `${e.data.usage.image_count}`
               : chalk.gray("?"),
             "Cost USD": e.data.cost?.total_usd ?? chalk.yellow("unknown"),
             Status:

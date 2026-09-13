@@ -13,13 +13,13 @@ import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
- * The quantities one priced request or rollup carries.
+ * The quantities one priced request or rollup carries. Every field is always
+ * present; a bucket the request never used reports 0.
  *
- * The buckets are disjoint, not nested: an image generation reports its
- * output under `output_image_tokens` with `output_tokens` at 0, so a
- * reconciliation that only reads the text buckets sees cost with no quantity
- * behind it. The image fields are absent on servers older than the release
- * that added them.
+ * The buckets are disjoint, not nested. An image generation reports its
+ * render under `output_image_tokens` with `output_tokens` at 0, so summing
+ * `output_tokens` alone undercounts image traffic, and cost is the sum across
+ * every bucket.
  */
 export interface SpendUsage {
   input_tokens: number;
@@ -27,9 +27,9 @@ export interface SpendUsage {
   cache_read_input_tokens: number;
   cache_creation_input_tokens: number;
   reasoning_tokens: number;
-  input_image_tokens?: number;
-  output_image_tokens?: number;
-  image_count?: number;
+  input_image_tokens: number;
+  output_image_tokens: number;
+  image_count: number;
 }
 
 export interface SpendEvent {

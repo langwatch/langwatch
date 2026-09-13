@@ -74483,15 +74483,15 @@
                               },
                               "input_image_tokens": {
                                 "type": "integer",
-                                "description": "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset."
+                                "description": "Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request."
                               },
                               "output_image_tokens": {
                                 "type": "integer",
-                                "description": "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here."
+                                "description": "Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic."
                               },
                               "image_count": {
                                 "type": "integer",
-                                "description": "Images the request carried, for models priced per image instead of per token. Zero on text requests."
+                                "description": "Images the request carried, for models priced per image instead of per token. 0 on a request that carried none."
                               }
                             },
                             "required": [
@@ -74499,7 +74499,10 @@
                               "output_tokens",
                               "cache_read_input_tokens",
                               "cache_creation_input_tokens",
-                              "reasoning_tokens"
+                              "reasoning_tokens",
+                              "input_image_tokens",
+                              "output_image_tokens",
+                              "image_count"
                             ]
                           },
                           "cost": {
@@ -75150,15 +75153,15 @@
                                   },
                                   "input_image_tokens": {
                                     "type": "integer",
-                                    "description": "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset."
+                                    "description": "Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request."
                                   },
                                   "output_image_tokens": {
                                     "type": "integer",
-                                    "description": "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here."
+                                    "description": "Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic."
                                   },
                                   "image_count": {
                                     "type": "integer",
-                                    "description": "Images the request carried, for models priced per image instead of per token. Zero on text requests."
+                                    "description": "Images the request carried, for models priced per image instead of per token. 0 on a request that carried none."
                                   }
                                 },
                                 "required": [
@@ -75166,7 +75169,10 @@
                                   "output_tokens",
                                   "cache_read_input_tokens",
                                   "cache_creation_input_tokens",
-                                  "reasoning_tokens"
+                                  "reasoning_tokens",
+                                  "input_image_tokens",
+                                  "output_image_tokens",
+                                  "image_count"
                                 ]
                               },
                               "cost": {
@@ -75840,15 +75846,15 @@
                             },
                             "input_image_tokens": {
                               "type": "integer",
-                              "description": "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset."
+                              "description": "Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request."
                             },
                             "output_image_tokens": {
                               "type": "integer",
-                              "description": "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here."
+                              "description": "Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic."
                             },
                             "image_count": {
                               "type": "integer",
-                              "description": "Images the request carried, for models priced per image instead of per token. Zero on text requests."
+                              "description": "Images the request carried, for models priced per image instead of per token. 0 on a request that carried none."
                             }
                           },
                           "required": [
@@ -75856,7 +75862,10 @@
                             "output_tokens",
                             "cache_read_input_tokens",
                             "cache_creation_input_tokens",
-                            "reasoning_tokens"
+                            "reasoning_tokens",
+                            "input_image_tokens",
+                            "output_image_tokens",
+                            "image_count"
                           ]
                         },
                         "caps": {

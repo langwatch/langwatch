@@ -153,29 +153,28 @@ const usageSchema = z.object({
   cache_read_input_tokens: z.number().int(),
   cache_creation_input_tokens: z.number().int(),
   reasoning_tokens: z.number().int(),
-  // Optional in the document, always sent by the server: a client generated
-  // from this document reads a required field with no fallback, and would
-  // break against a deployment that predates these quantities.
+  // Always present, 0 on a request that used no images. The object already
+  // carries the cache and reasoning counts as 0 on calls that never used
+  // them, so an optional field would put two conventions in one payload;
+  // reconciliation consumers sum these fields, and a missing one turns a sum
+  // into NaN where a 0 does not.
   input_image_tokens: z
     .number()
     .int()
-    .optional()
     .describe(
-      "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.",
+      "Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request.",
     ),
   output_image_tokens: z
     .number()
     .int()
-    .optional()
     .describe(
-      "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.",
+      "Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic.",
     ),
   image_count: z
     .number()
     .int()
-    .optional()
     .describe(
-      "Images the request carried, for models priced per image instead of per token. Zero on text requests.",
+      "Images the request carried, for models priced per image instead of per token. 0 on a request that carried none.",
     ),
 });
 

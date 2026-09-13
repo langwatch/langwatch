@@ -33078,12 +33078,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
-                                /** @description Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset. */
-                                input_image_tokens?: number;
-                                /** @description Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here. */
-                                output_image_tokens?: number;
-                                /** @description Images the request carried, for models priced per image instead of per token. Zero on text requests. */
-                                image_count?: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, for models priced per image instead of per token. 0 on a request that carried none. */
+                                image_count: number;
                             };
                             cost: {
                                 /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -33229,12 +33229,12 @@ export interface operations {
                                     cache_read_input_tokens: number;
                                     cache_creation_input_tokens: number;
                                     reasoning_tokens: number;
-                                    /** @description Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset. */
-                                    input_image_tokens?: number;
-                                    /** @description Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here. */
-                                    output_image_tokens?: number;
-                                    /** @description Images the request carried, for models priced per image instead of per token. Zero on text requests. */
-                                    image_count?: number;
+                                    /** @description Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request. */
+                                    input_image_tokens: number;
+                                    /** @description Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic. */
+                                    output_image_tokens: number;
+                                    /** @description Images the request carried, for models priced per image instead of per token. 0 on a request that carried none. */
+                                    image_count: number;
                                 } | null;
                                 cost: {
                                     /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -33385,12 +33385,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
-                                /** @description Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset. */
-                                input_image_tokens?: number;
-                                /** @description Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here. */
-                                output_image_tokens?: number;
-                                /** @description Images the request carried, for models priced per image instead of per token. Zero on text requests. */
-                                image_count?: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, for models priced per image instead of per token. 0 on a request that carried none. */
+                                image_count: number;
                             };
                             caps: {
                                 budget_id: string;

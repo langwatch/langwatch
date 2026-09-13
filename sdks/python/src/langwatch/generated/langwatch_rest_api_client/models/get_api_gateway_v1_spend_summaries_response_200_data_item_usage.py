@@ -6,8 +6,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 T = TypeVar("T", bound="GetApiGatewayV1SpendSummariesResponse200DataItemUsage")
 
 
@@ -20,9 +18,9 @@ class GetApiGatewayV1SpendSummariesResponse200DataItemUsage:
         cache_read_input_tokens (int):
         cache_creation_input_tokens (int):
         reasoning_tokens (int):
-        input_image_tokens (int | Unset): Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.
-        output_image_tokens (int | Unset): Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.
-        image_count (int | Unset): Images the request carried, for models priced per image instead of per token. Zero on text requests.
+        input_image_tokens (int): Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request.
+        output_image_tokens (int): Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic.
+        image_count (int): Images the request carried, for models priced per image instead of per token. 0 on a request that carried none.
     """
 
     input_tokens: int
@@ -30,9 +28,9 @@ class GetApiGatewayV1SpendSummariesResponse200DataItemUsage:
     cache_read_input_tokens: int
     cache_creation_input_tokens: int
     reasoning_tokens: int
-    input_image_tokens: int | Unset = UNSET
-    output_image_tokens: int | Unset = UNSET
-    image_count: int | Unset = UNSET
+    input_image_tokens: int
+    output_image_tokens: int
+    image_count: int
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,14 +59,11 @@ class GetApiGatewayV1SpendSummariesResponse200DataItemUsage:
                 "cache_read_input_tokens": cache_read_input_tokens,
                 "cache_creation_input_tokens": cache_creation_input_tokens,
                 "reasoning_tokens": reasoning_tokens,
+                "input_image_tokens": input_image_tokens,
+                "output_image_tokens": output_image_tokens,
+                "image_count": image_count,
             }
         )
-        if input_image_tokens is not UNSET:
-            field_dict["input_image_tokens"] = input_image_tokens
-        if output_image_tokens is not UNSET:
-            field_dict["output_image_tokens"] = output_image_tokens
-        if image_count is not UNSET:
-            field_dict["image_count"] = image_count
 
         return field_dict
 
@@ -85,11 +80,11 @@ class GetApiGatewayV1SpendSummariesResponse200DataItemUsage:
 
         reasoning_tokens = d.pop("reasoning_tokens")
 
-        input_image_tokens = d.pop("input_image_tokens", UNSET)
+        input_image_tokens = d.pop("input_image_tokens")
 
-        output_image_tokens = d.pop("output_image_tokens", UNSET)
+        output_image_tokens = d.pop("output_image_tokens")
 
-        image_count = d.pop("image_count", UNSET)
+        image_count = d.pop("image_count")
 
         get_api_gateway_v1_spend_summaries_response_200_data_item_usage = cls(
             input_tokens=input_tokens,
