@@ -1,8 +1,4 @@
 <p align="center">
-  <a href="https://langwatch.ai"><img src=".github/readme/cover.jpg" alt="LangWatch: the open-source platform for AI in production" width="100%"></a>
-</p>
-
-<p align="center">
 <a href="https://discord.gg/kT4PhDS2gH" target="_blank"><img src="https://img.shields.io/discord/1227886780536324106?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord"></a>
 <a href="https://pypi.org/project/langwatch/" target="_blank"><img src="https://img.shields.io/pypi/dm/langwatch?logo=python&logoColor=white&label=pypi%20langwatch&color=blue" alt="langwatch Python package on PyPi"></a>
 <a href="https://www.npmjs.com/package/langwatch" target="_blank"><img src="https://img.shields.io/npm/dm/langwatch?logo=npm&logoColor=white&label=npm%20langwatch&color=blue" alt="langwatch npm package"></a>
@@ -10,9 +6,11 @@
 <img src="https://img.shields.io/badge/license-Apache%202.0%20%2B%20Enterprise-blue" alt="Open-core: Apache 2.0 core + Enterprise extension">
 </p>
 
-<video src="https://github.com/user-attachments/assets/b0dee97b-b5be-43f8-9d08-18ae1201d017" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
+<p align="center">
+  <a href="https://langwatch.ai"><img src=".github/readme/cover.jpg" alt="LangWatch: the open-source platform for AI in production" width="100%"></a>
+</p>
 
-LangWatch is the open-source platform for AI in production: trace, test, route and govern every LLM call in your company, from the agents you build to the coding assistants your engineers use. LangWatch is Apache 2.0.
+LangWatch is the open-source platform for AI in production: trace, test, route and govern every LLM call in your company, from the agents you build to the coding assistants your engineers use. LangWatch is Apache 2.0. [View docs](https://langwatch.ai/docs/introduction).
 
 ## Get started
 
@@ -35,6 +33,10 @@ npx @langwatch/server
 ```
 
 Only Node.js required. For production, see [Self-hosting LangWatch](https://langwatch.ai/docs/self-hosting/overview).
+
+## Demo
+
+<video src="https://github.com/user-attachments/assets/b0dee97b-b5be-43f8-9d08-18ae1201d017" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
 
 ## What you get
 

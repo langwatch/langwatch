@@ -17,7 +17,7 @@ const root = path.resolve(here, "..", "..");
 const PAGES = {
   cover: { width: 1200, height: 400, out: "cover.jpg" },
   areas: { width: 1200, height: 340, out: "areas.jpg" },
-  signup: { width: 260, height: 56, out: "signup.png", transparent: true },
+  signup: { width: 260, height: 56, out: "signup.png", transparent: true, element: ".btn" },
 };
 
 function loadPlaywright() {
@@ -58,7 +58,8 @@ for (const name of selected) {
   await tab.goto(url.href, { waitUntil: "networkidle" });
   await tab.evaluate(() => document.fonts.ready);
   await tab.waitForTimeout(300);
-  await tab.screenshot(
+  const target = page.element ? tab.locator(page.element) : tab;
+  await target.screenshot(
     out.endsWith(".png")
       ? { path: out, type: "png", omitBackground: !!page.transparent }
       : { path: out, type: "jpeg", quality: 90 },
