@@ -251,20 +251,36 @@ classify as `changed` in any visualdiff report. Read it before triaging one.
 
 ## Exact next actions
 
-> **Updated 2026-09-13.** Items 1, 2 and 5 below are DONE (`64af8f1446`,
-> `eddbdfe58d`; audit-log-null was already linked — moot). The list now:
+> **Updated 2026-09-13, late afternoon.** The ksuid migration LANDED
+> (`23cb2058ce`, the user's own session). The worker's boot-driven loop then
+> cleared, in order: four enterprise-composition link walls (renames
+> GatewayDebit→GatewayBudgetLedger, GovernanceWebhook→GovernanceWebhookChannel,
+> GovernanceBudgetOverview→CliBudgetOverviewReader; two type-only re-exports —
+> `a36bd947f8`), the repository-selection vocabulary ({backend, infrastructure}
+> → {tier, members}, 11 files), the webhook live tier's new member bag, and the
+> two audit-log compositions passing config to a boot() that reads no arguments
+> (`324ac2c9e2`). The fast link probe that replaced boot-per-wall:
+> `node --experimental-transform-types -e "await import('<entry>')"`.
 >
-> 1. Wait for the "migrate ksuid package" session to commit its workspace
->    migration (it owns packages/ksuid, ksuid-python, the ~15 package.json
->    catalog→workspace changes, pnpm-workspace.yaml, the lockfile and the
->    deleted ksuid patch — nobody else commits those). Its src imports were
->    `.js`-specified and killed every boot; the `.ts` rewrite is already in
->    the working tree.
-> 2. Boot `apps/worker` (and the dev-runtime backend lane) for real; fix what
->    it names, one wall at a time — static detection is exhausted.
-> 3. The api install-order queue stays with the apidiff session (identity
->    composed; 4 erased-extends sites in apps/api named in its queue).
-> 4. Then `visualdiff run -keep -agent -boot-timeout 40m`, and triage the
+> **The worker now stops at `createWorkerFoundationApps`**, which speaks the
+> pre-v2 builder (withPersistence / per-module withModule bags / boot(args)).
+> Rewriting it depends on the apidiff session's module-conversion queue (ops in
+> flight; organization/scenario/stored-object/automation/analytics predicted;
+> silent set langy/dashboard/feature-flag/topic). Standing division, agreed on
+> the channel: apidiff lands module conversions (they serve both processes);
+> this drive owns the foundation rewrite, manifest ready at
+> `.claude/manifests/worker-foundation-v2.md` (marked BLOCKED UNTIL the api
+> boots from committed state; api-production.composition.ts is the exemplar).
+> Per-module claim-first protocol is in force in both directions.
+>
+> The remaining list:
+>
+> 1. apidiff's queue lands → api boots committed → spawn worker-foundation-v2.
+> 2. Worker boots on the haven stack for this worktree (slug
+>    feat-strict-feature-layout-v0; note `HAVEN_PG_FORMULA=postgresql@14` is now
+>    in `.env`, and the brew postgres needed `CREATE ROLE lw SUPERUSER LOGIN` —
+>    its datadir predates the machine's user rename from afr).
+> 3. Then `visualdiff run -keep -agent -boot-timeout 40m`, and triage the
 >    report against `route-surface-parity-2026-09-12.md`'s redirect list.
 
 The original analysis behind the completed items, kept for the record:
