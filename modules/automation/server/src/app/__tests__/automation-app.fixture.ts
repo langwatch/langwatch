@@ -1,4 +1,5 @@
 import { automationServerConfigSchema } from "@langwatch/automation-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -11,10 +12,8 @@ import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitl
 import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationClock } from "../automation.members.ts";
-import type {
-  AutomationGraphNotifier,
-  AutomationLogger,
-} from "../automation.members.ts";
+import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
+import type { AutomationLogger } from "../../services/automation-graph-runtime.service.ts";
 import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
@@ -193,8 +192,12 @@ export function createCanonicalAutomationApp(): {
   };
   const resources = new ResourceScope();
   resources.own("automation-test-database", () => database.$disconnect());
+  const auditLog: AuditLogApi = {
+    record: vi.fn(async () => undefined),
+    listEntityHistory: vi.fn(async () => []),
+  };
   return {
-    app: AutomationApp.create({
+    app: AutomationApp.fromInfrastructure({
       repositories: PostgresAutomationRepositories.create({ prisma: database, clock }),
       dependencies: {
         analytics,
@@ -204,10 +207,10 @@ export function createCanonicalAutomationApp(): {
         entitlement: {
           getActivePlan: vi.fn<EntitlementApiContract["getActivePlan"]>(),
         },
+        auditLog,
       },
-      members,
-      config: automationServerConfigSchema.parse({}),
-      resources,
+      infrastructure: members,
+      config: { ...automationServerConfigSchema.parse({}), baseHost: "", unsubscribeSecret: undefined },
     }),
     triggerCreate,
     resources,

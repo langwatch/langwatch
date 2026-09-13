@@ -164,7 +164,11 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       processName: config.serviceName,
       publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
     },
-    automation: {},
+    /** Verbatim from the deleted composition: the public host and the unsubscribe signing secret. */
+    automation: {
+      baseHost: config.infrastructure.execution.publicBaseUrl ?? "",
+      unsubscribeSecret: config.storedSecretEncryptionKey,
+    },
     log: {},
     "platform-health": config.platformHealth,
   };

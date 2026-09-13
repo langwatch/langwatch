@@ -1,7 +1,9 @@
-import type { AlertType, AutomationLimitNextStep, DatasetActionParams, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, GraphTriggerSweepCandidate, SlackActionParams, SlackPayload, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput } from "@langwatch/automation-contract";
+import type { AlertType, AutomationLimitNextStep, DatasetActionParams, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, GraphTriggerSweepCandidate, SlackActionParams, SlackPayload, Trigger, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput, GraphAlertTemplateContext } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
+import type { TraceQueryClassification, TraceSummaryData } from "@langwatch/trace-contract";
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { LimitEmailKind } from "../channels/automation-runaway-notice.channel.ts";
 import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
@@ -13,6 +15,17 @@ import type { AutomationScheduledIntent } from "../services/automation-scheduled
 import type { AutomationSlackBotTokenDecryptor, AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
+
+// Re-exported: several files in this module still import these names from
+// here rather than from where they are actually declared.
+export type {
+  AutomationDispatchError,
+  AutomationGraphNotifier,
+  AutomationHeartbeat,
+  AutomationLogger,
+  AutomationNotificationDelivery,
+  AutomationSlackBotTokenDecryptor,
+};
 export interface AutomationInfrastructure {  automationClock: AutomationClock;
   automationDatasetMapper: AutomationDatasetMapper;
   automationDispatchError: AutomationDispatchError;

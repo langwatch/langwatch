@@ -30,7 +30,7 @@ export const serverModuleMembers = {
   github: [],
   "hosted-mcp": [],
   identity: ["eventing", "prisma"],
-  langy: [],
+  langy: ["prisma", "redis"],
   log: [],
   metric: [],
   "model-provider": [],

@@ -49,18 +49,22 @@ import {
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup, ResolvedTokens } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
+import { AuditLogApi, type AuditLogApi as AuditLogApiContract } from "@langwatch/audit-log-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { z } from "zod";
+import { buildAutomationInfrastructure } from "./automation-composition.build.ts";
 
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import type { AutomationClock } from "./automation.members.ts";
+import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type {
   AutomationDispatchError,
-  AutomationGraphNotifier,
   AutomationHeartbeat,
   AutomationLogger,
-  AutomationSlackBotTokenDecryptor,
-} from "./automation.members.ts";
+} from "../services/automation-graph-runtime.service.ts";
+import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
@@ -200,18 +204,50 @@ const UNSUBSCRIBE_WINDOW_SECONDS = 60;
 const UNSUBSCRIBE_RESOLVE_MAX = 30;
 const UNSUBSCRIBE_CONFIRM_MAX = 10;
 
+/**
+ * The persist-daily ceilings the contract already defines, plus the two
+ * api-config values the deleted composition (`options.baseHost`,
+ * `options.unsubscribeSecret`) used to receive as constructor arguments
+ * instead of through this module's own schema. Both default to that
+ * composition's own absent-config answer: an empty public origin (every link
+ * built from it is then a relative path, and `platformUrl` refuses by name)
+ * and no signing secret, which {@link HmacUnsubscribeTokenAdapter} already
+ * reads as "refuse to verify".
+ */
+const automationAppExtraConfigSchema = z.object({
+  baseHost: z.string().default(""),
+  unsubscribeSecret: z.string().optional(),
+});
+export type AutomationAppConfig = AutomationServerConfig &
+  z.infer<typeof automationAppExtraConfigSchema>;
+
+/** Parses the contract's own fields and this app's two extra ones from the same input. */
+const automationAppConfigSchema: { parse(value: unknown): AutomationAppConfig } = {
+  parse(value: unknown): AutomationAppConfig {
+    return {
+      ...automationServerConfigSchema.parse(value),
+      ...automationAppExtraConfigSchema.parse(value),
+    };
+  },
+};
+
 type AutomationDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   monitors: typeof MonitorApi;
   featureFlags: typeof FeatureFlagApi;
   entitlement: typeof EntitlementApi;
   projects: typeof ProjectApi;
+  /** The SAME trail every other completed mutation on this process is recorded on. */
+  auditLog: typeof AuditLogApi;
 }>;
+
+/** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
+type AutomationRuntimeDependencies = ResolvedTokens<AutomationDependencies>;
 
 type AutomationSetup = FeatureSetup<
   AutomationDependencies,
-  AutomationInfrastructure,
-  AutomationServerConfig
+  MembersRead<typeof AutomationApp.reads>,
+  AutomationAppConfig
 > &
   Readonly<{ repositories: AutomationRepositories }>;
 
@@ -234,36 +270,70 @@ export class AutomationApp implements AutomationApi {
     featureFlags: FeatureFlagApi,
     entitlement: EntitlementApi,
     projects: ProjectApi,
+    auditLog: AuditLogApi,
   };
-  static readonly configSchema: { parse(value: unknown): AutomationServerConfig } =
-    automationServerConfigSchema;
+  static readonly configSchema: { parse(value: unknown): AutomationAppConfig } =
+    automationAppConfigSchema;
+  static readonly reads = reads("prisma", "redis", "logger", "encryption");
 
+  /**
+   * Builds this process's own {@link AutomationInfrastructure} from the
+   * members it reads and its own config, then composes over it exactly as
+   * {@link AutomationApp.fromInfrastructure} does. What a hand composition
+   * (or a test) still supplies directly.
+   */
   static create(setup: AutomationSetup): AutomationApp {
-    const persistCaps = AutomationPersistCapService.create({
-      projects: setup.dependencies.projects,
-      planProvider: setup.dependencies.entitlement,
-      config: {
-        free: setup.config.persistDailyCapFree,
-        paid: setup.config.persistDailyCapPaid,
-        enterprise: setup.config.persistDailyCapEnterprise,
-      },
-      redis: setup.members.redis,
+    const infrastructure = buildAutomationInfrastructure({
+      members: setup.members,
+      config: setup.config,
+      auditLog: setup.dependencies.auditLog,
     });
-    const repositories = setup.repositories;
+
+    return AutomationApp.fromInfrastructure({
+      infrastructure,
+      dependencies: setup.dependencies,
+      repositories: setup.repositories,
+      config: setup.config,
+    });
+  }
+
+  /**
+   * Composes over an already-built {@link AutomationInfrastructure}. Kept
+   * because a hand composition (and every unit test's fixture) still builds
+   * one directly rather than reading process members.
+   */
+  static fromInfrastructure(setup: {
+    infrastructure: AutomationInfrastructure;
+    dependencies: AutomationRuntimeDependencies;
+    repositories: AutomationRepositories;
+    config: AutomationAppConfig;
+  }): AutomationApp {
+    const { infrastructure: members, dependencies, repositories, config } = setup;
+
+    const persistCaps = AutomationPersistCapService.create({
+      projects: dependencies.projects,
+      planProvider: dependencies.entitlement,
+      config: {
+        free: config.persistDailyCapFree,
+        paid: config.persistDailyCapPaid,
+        enterprise: config.persistDailyCapEnterprise,
+      },
+      redis: members.redis,
+    });
     const graph = AutomationGraphService.create({
       triggers: repositories.triggers,
       customGraphs: repositories.customGraphs,
-      projects: setup.dependencies.projects,
-      analytics: setup.dependencies.analytics,
-      notifier: setup.members.notifier,
+      projects: dependencies.projects,
+      analytics: dependencies.analytics,
+      notifier: members.notifier,
       triggerSent: repositories.graphTriggerSent,
-      logger: setup.members.logger,
-      slackTokens: setup.members.slackTokens,
-      dispatchErrors: setup.members.dispatchErrors,
-      heartbeat: setup.members.heartbeat,
-      runaway: setup.members.runaway,
-      clock: setup.members.clock,
-      baseHost: setup.config.baseHost,
+      logger: members.logger,
+      slackTokens: members.slackTokens,
+      dispatchErrors: members.dispatchErrors,
+      heartbeat: members.heartbeat,
+      runaway: members.runaway,
+      clock: members.clock,
+      baseHost: config.baseHost,
     });
     const automation = AutomationService.create({
       triggers: repositories.triggers,
@@ -272,25 +342,25 @@ export class AutomationApp implements AutomationApi {
       names: repositories.names,
       customGraphs: repositories.customGraphs,
       webhookDeliveries: repositories.webhookDeliveries,
-      verifier: setup.members.verifier,
+      verifier: members.verifier,
       reportSchedules: ReportScheduleService.create({
-        jobs: setup.members.jobs,
-        clock: setup.members.clock,
-        wake: setup.members.wake,
+        jobs: members.jobs,
+        clock: members.clock,
+        wake: members.wake,
         triggers: repositories.triggers,
       }),
-      clock: setup.members.clock,
+      clock: members.clock,
       graph,
       templates: AutomationTemplateService.create({
-        baseHost: setup.config.baseHost,
-        delivery: setup.members.testFire,
+        baseHost: config.baseHost,
+        delivery: members.testFire,
       }),
       persistCaps,
     });
     const rules = AutomationRulesService.create({
       automation,
-      projects: setup.dependencies.projects,
-      featureFlags: setup.dependencies.featureFlags,
+      projects: dependencies.projects,
+      featureFlags: dependencies.featureFlags,
     });
 
     return new AutomationApp({
@@ -299,16 +369,16 @@ export class AutomationApp implements AutomationApi {
       authoring: AutomationAuthoringService.create({
         automation,
         rules,
-        monitors: setup.dependencies.monitors,
-        providers: setup.members.providers,
-        slackChannels: setup.members.slackChannels,
-        traceFilters: setup.members.traceFilters,
-        limits: setup.members.limits,
+        monitors: dependencies.monitors,
+        providers: members.providers,
+        slackChannels: members.slackChannels,
+        traceFilters: members.traceFilters,
+        limits: members.limits,
       }),
-      monitors: setup.dependencies.monitors,
-      audit: setup.members.audit,
-      limits: setup.members.limits,
-      publicBaseUrl: setup.members.publicBaseUrl,
+      monitors: dependencies.monitors,
+      audit: members.audit,
+      limits: members.limits,
+      publicBaseUrl: members.publicBaseUrl,
     });
   }
 
