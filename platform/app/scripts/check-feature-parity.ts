@@ -375,7 +375,6 @@ const LEGACY_INERT: string[] = [
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
   "specs/ci/migration-order.feature",
-  "specs/ci/no-committed-screenshots.feature",
   "specs/ci/no-docker-integration-tests.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",

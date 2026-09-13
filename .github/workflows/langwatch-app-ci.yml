@@ -1440,6 +1440,9 @@ jobs:
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
+      - name: Test check-added-images.sh
+        run: bash .github/scripts/__tests__/check-added-images.test.sh
+
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which
       # .github/** is not — so it would never start for a change to its own
