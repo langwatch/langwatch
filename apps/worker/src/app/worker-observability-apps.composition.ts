@@ -16,7 +16,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { evaluatorServer } from "@langwatch/evaluator-server";
-import type { EventSourcing, FoldProjectionStore } from "@langwatch/eventing";
+import type { EventSourcing } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { logServer } from "@langwatch/log-server";
@@ -33,12 +33,8 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { createApp, membersFrom, type ResourceScope } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
-import {
-  TraceApi,
-  type TraceCanonicalisationService,
-  type TraceSummaryData,
-} from "@langwatch/trace-contract";
-import { traceServer, type TraceProcessingCommands } from "@langwatch/trace-server";
+import { TraceApi } from "@langwatch/trace-contract";
+import { traceServer } from "@langwatch/trace-server";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -91,9 +87,6 @@ export type WorkerObservabilityAppsOptions = Readonly<{
   plans: EntitlementApi;
   featureFlags: FeatureFlagApi;
   resources: ResourceScope;
-  canonicalisation: TraceCanonicalisationService;
-  summaryStore: FoldProjectionStore<TraceSummaryData>;
-  commands: TraceProcessingCommands;
   evaluation: WorkerEvaluationInfrastructure;
   githubSigningKey: string;
 }>;
@@ -145,7 +138,21 @@ export async function createWorkerObservabilityApps(
   const workerEvaluationServer = createWorkerEvaluationServer(options.evaluation);
   const builder = createApp({
     role: "worker",
-    config: { log: telemetry.logConfig, evaluator: {} },
+    config: {
+      log: telemetry.logConfig,
+      evaluator: {},
+      /**
+       * This process is Trace's PROCESSING role, not its producer one: the
+       * install phase below registers Trace's complete `trace_processing`
+       * definition, so composing the producer registration here as well would
+       * be a second registration of one name - which the runtime refuses.
+       * Trace's commands resolve off that one registration instead.
+       *
+       * `processName` is this process's own, so a capability Trace refuses on
+       * the worker names the worker rather than the api.
+       */
+      trace: { processName: options.config.serviceName, registersProcessingPipeline: false },
+    },
     members: membersFrom({
       prisma: options.connection.client,
       logger: createLogger(options.config.serviceName),

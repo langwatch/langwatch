@@ -25,6 +25,7 @@ import type {
   TraceClickHouseWriteResolver,
 } from "../repositories/trace-clickhouse-client.repository.ts";
 import { TraceCanonicalisationService } from "../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
 import { TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
@@ -60,6 +61,18 @@ export type TraceBuildConfig = Readonly<{
   processName: string;
   fallbackVisibilityDays: number;
   publicBaseUrl?: string | undefined;
+  /**
+   * Whether THIS process registers the `trace_processing` pipeline when it
+   * composes Trace's read graph. True is the producer role - the api - and it
+   * is the default, so a process that states nothing keeps that behaviour.
+   *
+   * A process that also drains the pipeline states `false`: its install phase
+   * registers Trace's complete definition (subscribers, fold projections, the
+   * real stores) through {@link TraceProcessingServerInstallerAdapter}, which
+   * is this module's code too. Registering the producer definition beside it
+   * would be a second registration of one name, and the runtime refuses that.
+   */
+  registersProcessingPipeline: boolean;
 }>;
 
 /** Builds this process's Trace collaborators from its members and config. */
@@ -86,10 +99,15 @@ export function buildTraceCollaborators(input: {
     }),
     // This process folds no trace projections; the summary read comes off the
     // ClickHouse row rather than a fold store.
-    commands: buildTraceProducerCommands({
-      eventing: members.eventing,
-      processName: config.processName,
-    }),
+    commands: config.registersProcessingPipeline
+      ? buildTraceProducerCommands({
+          eventing: members.eventing,
+          processName: config.processName,
+        })
+      : buildTraceProcessRegistrationCommands({
+          eventing: members.eventing,
+          processName: config.processName,
+        }),
     broadcast: refusingBroadcast(refuse),
     fallbackVisibilityDays: config.fallbackVisibilityDays,
     processName: config.processName,
@@ -131,6 +149,52 @@ export function buildTraceProducerCommands(input: {
     addAnnotation: (data) => add.send(data),
     removeAnnotation: (data) => remove.send(data),
     changeTraceName: () => Promise.reject(refuse("the trace rename command")),
+  };
+}
+
+/**
+ * The senders of a `trace_processing` registration this process does not make
+ * itself, resolved at the first send rather than at composition.
+ *
+ * A process that drains the pipeline composes Trace's read graph BEFORE its
+ * install phase runs, and the install phase is what registers the complete
+ * definition. So there is nothing to resolve yet when this runs, and there is
+ * no second registration to make: one runtime holds one pipeline per name, and
+ * a producer-only definition registered beside the full one would either be
+ * refused or - worse, and this is what once shipped - win the name and drain
+ * every span into stand-ins that reject by design.
+ *
+ * Each command therefore looks its sender up on the process's own registration
+ * at call time. Every one of the four exists there, the rename included: it is
+ * the processing role's command and this IS the processing role, which is why
+ * this shape answers it where the producer shape refuses it.
+ */
+export function buildTraceProcessRegistrationCommands(input: {
+  eventing: EventSourcing;
+  processName: string;
+}): TraceProcessingCommands {
+  const refuse = refusalFactory(input.processName);
+  const sender = (name: string): CommandSender => {
+    // Throws by name when nothing has registered the pipeline yet - a caller
+    // that reaches trace before the install phase is a composition-order bug
+    // and says so, rather than dropping the command.
+    const registered = input.eventing.getPipeline(TRACE_PROCESSING_PIPELINE_NAME);
+    const command = (registered.commands as Record<string, unknown>)[name];
+    if (!isSender(command)) {
+      throw refuse(`the trace_processing "${name}" command`);
+    }
+    return command;
+  };
+
+  // Async, so a resolution failure REJECTS rather than throwing into the
+  // caller's synchronous frame: every one of these is declared to return a
+  // promise, and an ingest path that catches its command rejection would
+  // otherwise be unwound by a composition-order bug it could have reported.
+  return {
+    recordSpan: async (data) => sender("recordSpan").send(data),
+    addAnnotation: async (data) => sender("addAnnotation").send(data),
+    removeAnnotation: async (data) => sender("removeAnnotation").send(data),
+    changeTraceName: async (data) => sender("changeTraceName").send(data),
   };
 }
 

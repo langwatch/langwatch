@@ -255,6 +255,39 @@ export class EventSourcing {
   }
 
   /**
+   * Both sides of a same-name collision, described well enough to say which
+   * composition to delete. The two definitions differ - if they did not there
+   * would be no second registrant - and the difference is precisely the
+   * capability whichever one lost would have taken with it.
+   */
+  private describeDuplicateRegistration(incoming: StaticPipelineDefinition<any, any, any>): string {
+    const existing = this._definitions.find(
+      (registered) => registered.metadata.name === incoming.metadata.name,
+    );
+    return [
+      `Pipeline "${incoming.metadata.name}" is already registered on this runtime.`,
+      `Already registered: ${this.describeDefinition(existing)}.`,
+      `Refused: ${this.describeDefinition(incoming)}.`,
+      "One runtime registers one pipeline per name - compose exactly one of them in this process.",
+    ].join(" ");
+  }
+
+  /** One registration's capabilities, as a line a boot failure can carry. */
+  private describeDefinition(definition: StaticPipelineDefinition<any, any, any> | undefined): string {
+    if (!definition) return "an earlier registration this runtime kept no definition for";
+    const subscribers =
+      definition.foldSubscribers.size +
+      definition.mapSubscribers.size +
+      definition.eventSubscribers.size;
+    const commands = definition.commands.map((command) => command.name).join(", ");
+    return (
+      `aggregate "${definition.metadata.aggregateType}", ` +
+      `${definition.foldProjections.size} fold and ${definition.mapProjections.size} map projections, ` +
+      `${subscribers} subscribers, commands [${commands}]`
+    );
+  }
+
+  /**
    * The body of `register()`, run inside its tracing span. Extracted to a
    * named method so its branching is counted on its own rather than folded
    * into `register`'s complexity.
@@ -271,22 +304,23 @@ export class EventSourcing {
       ? Record<string, EventSourcedQueueProcessor<any>>
       : CommandsToProcessors<Commands>
   > {
-    // One runtime, one registration per pipeline name: a second registrant -
-    // typically a module's producer beside the process's full pipeline over
-    // the same aggregate - receives the existing registration's senders.
     type ReturnType = PipelineWithCommandHandlers<
       RegisteredPipeline<EventType, ProjectionTypes>,
       [Commands] extends [NoCommands]
         ? Record<string, EventSourcedQueueProcessor<any>>
         : CommandsToProcessors<Commands>
     >;
-    const existing = this.pipelines.get(definition.metadata.name);
-    if (existing) {
-      logger.info(
-        { pipeline: definition.metadata.name },
-        "pipeline already registered on this runtime; the existing registration serves both registrants",
-      );
-      return existing as ReturnType;
+    // One runtime, one registration per pipeline name, and a collision is
+    // fatal at boot rather than quiet.
+    //
+    // Handing the second registrant the first registration reads like
+    // idempotency and is not: the two definitions differ, so whichever ran
+    // first decides what the process can do. A producer-only definition that
+    // won a name this way kept the whole process's ingest draining into
+    // stand-ins that refuse every span, with one info line to say so. Compose
+    // exactly one registration per name and let the process state which.
+    if (this.pipelines.has(definition.metadata.name)) {
+      throw new Error(this.describeDuplicateRegistration(definition));
     }
     if (definition.processManagers.size > 0) {
       if (this._processManagerMode === "producer-only") {

@@ -21,7 +21,6 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { Deferred } from "@langwatch/eventing";
 import type { QueueAnnotationTracesInput } from "@langwatch/annotation-contract";
-import type { TraceProcessingCommands } from "@langwatch/trace-server";
 import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
 import { createWorkerFoundationApps } from "./worker-foundation-apps.composition.ts";
 import { createWorkerObservabilityApps } from "./worker-observability-apps.composition.ts";
@@ -1207,24 +1206,6 @@ export class WorkerProductionComposition {
       prisma: traceDatabase,
       clock: automationClock,
     });
-    const recordSpanDispatch = new Deferred<TraceProcessingCommands["recordSpan"]>(
-      "worker.trace.recordSpan",
-    );
-    const renameTraceDispatch = new Deferred<TraceProcessingCommands["changeTraceName"]>(
-      "worker.trace.changeTraceName",
-    );
-    const addAnnotationDispatch = new Deferred<TraceProcessingCommands["addAnnotation"]>(
-      "worker.trace.addAnnotation",
-    );
-    const removeAnnotationDispatch = new Deferred<TraceProcessingCommands["removeAnnotation"]>(
-      "worker.trace.removeAnnotation",
-    );
-    const traceCommands: TraceProcessingCommands = {
-      recordSpan: recordSpanDispatch.fn,
-      changeTraceName: renameTraceDispatch.fn,
-      addAnnotation: addAnnotationDispatch.fn,
-      removeAnnotation: removeAnnotationDispatch.fn,
-    };
     const evaluationAnalytics = options.featureClickHouse
       ? createWorkerAnalytics({
           resolveClickHouseClient: options.featureClickHouse.resolveClient,
@@ -1284,9 +1265,6 @@ export class WorkerProductionComposition {
             plans,
             featureFlags,
             resources: options.resources,
-            canonicalisation: traceCanonicalisation,
-            summaryStore: traceStores.traceSummaryStore,
-            commands: traceCommands,
             evaluation: {
               database: options.connection.client,
               workflows: evaluationWorkflows,
@@ -1431,10 +1409,6 @@ export class WorkerProductionComposition {
     // The one dispatch Trace makes into itself: the tracked-event reactor mints
     // a synthetic span and sends it the way an SDK export would, so it can only
     // be wired once the definition that contains the reactor is registered.
-    recordSpanDispatch.resolve(trace.commands.recordSpan);
-    renameTraceDispatch.resolve(trace.commands.changeTraceName);
-    addAnnotationDispatch.resolve(trace.commands.addAnnotation);
-    removeAnnotationDispatch.resolve(trace.commands.removeAnnotation);
     trackedEvents.connect(trace.commands.recordSpan);
     // Topic's runtime, composed here rather than received. Its execution
     // ports are this process's own — the tenant-keyed ClickHouse client the

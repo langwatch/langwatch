@@ -384,11 +384,23 @@ const traceAppConfigSchema = z
     processName: z.string().default("langwatch-api"),
     fallbackVisibilityDays: z.number().default(14),
     publicBaseUrl: z.string().optional(),
+    /**
+     * Whether this process registers the `trace_processing` pipeline while
+     * composing Trace, which is the producer role and the default. A process
+     * that ALSO drains the pipeline states `false`: its install phase
+     * registers Trace's complete definition, and one runtime holds one
+     * registration per pipeline name.
+     */
+    registersProcessingPipeline: z.boolean().default(true),
   })
   // Defaulted as a whole so a process that states no `trace` slice still boots:
   // every field here names a refusal or a link, and none of them decides what
   // a caller may read.
-  .default(() => ({ processName: "langwatch-api", fallbackVisibilityDays: 14 }));
+  .default(() => ({
+    processName: "langwatch-api",
+    fallbackVisibilityDays: 14,
+    registersProcessingPipeline: true,
+  }));
 export type TraceAppConfig = z.infer<typeof traceAppConfigSchema>;
 
 type TraceSetup = FeatureSetup<
