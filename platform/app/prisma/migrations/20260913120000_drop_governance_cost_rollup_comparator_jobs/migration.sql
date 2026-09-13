@@ -11,8 +11,12 @@
 -- one is not re-derived because the process replaces it.
 DELETE FROM "ScheduledJob" WHERE "targetType" = 'governanceCostRollupComparator';
 
--- Down
+-- IRREVERSIBLE: there is no down migration, and none is needed.
 --
--- Nothing to undo. The entries were minted at worker boot by a reconciler
--- this change deletes, so rolling the code back re-creates them on the next
--- boot without any statement here.
+-- The deleted rows cannot be re-inserted by SQL, because they were never
+-- written by SQL: one was minted per project at worker boot by the reconciler
+-- this change deletes. Rolling the code back re-creates them on the next boot
+-- from the same reconciler, so a down step here would either duplicate that
+-- work or guess at project ids it does not have.
+--
+-- Nothing is lost either way. A schedule carries no data of its own.

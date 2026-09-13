@@ -344,6 +344,15 @@ Feature: The daily cost check is driven by the charges, not by a clock
       # failure, and a comparison that reports success without reading
       # anything is a watchdog that has been taught to say "fine".
 
+    @unit
+    Scenario: A deployment that can compare but holds no summary mounts no check
+      Given a deployment configured to compare days but with no cost summary store
+      Then the check is not mounted at all
+      # The comparer and the summary are two separate pieces of configuration,
+      # so a deployment can hold either one alone. Arming on the comparer by
+      # itself is the same broken deployment as the scenario above, reached
+      # from the other side: days compared against a summary nobody writes.
+
   Rule: A check that was missed still happens
 
     @integration

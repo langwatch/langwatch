@@ -57,8 +57,9 @@ import type { PulledUsageProcessingEvent } from "./schemas/events";
  * construction (`CostSource` is in the key) and can never contend.
  *
  * Process manager: `costRollupWatch` (ADR-128) — the drift check, armed by the
- * charges themselves. Mounted only where a comparator exists, which means only
- * where the summary it reads exists: a deployment holding no summary mounts
+ * charges themselves. Mounted only where BOTH the summary store and the
+ * comparator exist, because the comparison reads the summary this pipeline's
+ * own projection writes: a deployment holding one without the other mounts
  * nothing rather than asking for comparisons that would either die in the
  * outbox five attempts at a time or report success without reading anything.
  */
@@ -86,7 +87,7 @@ export function createPulledUsageProcessingPipeline(
       pulledUsageLedgerPM(deps.ledger),
     );
   }
-  if (deps.costRollupComparator) {
+  if (deps.costRollupStore && deps.costRollupComparator) {
     pipeline = pipeline.withProcessManager(
       COST_ROLLUP_WATCH_PROCESS_NAME,
       costRollupWatchPM({ comparator: deps.costRollupComparator }),
