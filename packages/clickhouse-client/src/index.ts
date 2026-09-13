@@ -74,6 +74,8 @@ export type {
   ClickHouseVendorClientOptions,
   UnscopedStatementDeclaration,
 } from "./managed-client.ts";
+export type { RoutableStatementClient } from "./routingDriver.ts";
+export { routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";
 export {
   DEFAULT_CLIENTS_PER_PROCESS,

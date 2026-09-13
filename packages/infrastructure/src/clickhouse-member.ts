@@ -19,13 +19,9 @@ import {
   ClickHouseShutdownService,
   ConcurrencyLimiter,
   RetryPolicy,
+  routingDriver,
   TenantGuard,
   type ClickHouseClientCreationInput,
-  type ClickHouseConnection,
-  type InsertRequest,
-  type QueryDriver,
-  type QueryRequest,
-  type QueryResult,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
 import type { ClickHouseConfig } from "./config.ts";
@@ -97,60 +93,5 @@ export function buildClickHouse(options: {
   return {
     value: client,
     close: () => ClickHouseShutdownService.create().shutdown(connection),
-  };
-}
-
-/**
- * One statement, sent to the server the tenant belongs on.
- *
- * A statement that names a tenant is routed by it, whether or not it also
- * declares itself unscoped: a TTL reconciliation for a private organization
- * belongs on that organization's server, not on shared. Only a statement with
- * no tenant at all — a migration, a `system.*` read — goes to the shared
- * server, and the tenant guard has already refused it unless the author wrote
- * down why it has none.
- */
-function routingDriver(connection: ClickHouseConnection<ClickHouseClient>): QueryDriver {
-  /** The server this statement's tenant belongs on, shared only when it has none. */
-  const serverFor = async (tenantId: string): Promise<ClickHouseClient> =>
-    tenantId === "" ? connection.shared() : await connection.resolve(tenantId);
-
-  return {
-    async insert(request: InsertRequest): Promise<void> {
-      const vendor = await serverFor(request.tenantId);
-      await vendor.insert({
-        table: request.table,
-        values: request.rows as Record<string, unknown>[],
-        format: "JSONEachRow",
-        ...(request.settings === undefined
-          ? {}
-          : { clickhouse_settings: request.settings as Record<string, never> }),
-      });
-    },
-
-    async command(request: QueryRequest): Promise<void> {
-      const vendor = await serverFor(request.tenantId);
-      await vendor.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-        ...(request.signal === undefined ? {} : { abort_signal: request.signal as AbortSignal }),
-      });
-    },
-
-    async execute<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-      const vendor = await serverFor(request.tenantId);
-
-      const started = Date.now();
-      const resultSet = await vendor.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-        ...(request.signal === undefined ? {} : { abort_signal: request.signal as AbortSignal }),
-      });
-      const rows = await resultSet.json<Row>();
-      return { rows, stats: { durationMs: Date.now() - started } };
-    },
   };
 }

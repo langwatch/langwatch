@@ -4,6 +4,7 @@
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
 import {
@@ -11,8 +12,6 @@ import {
   OpsWorkerAdapter,
   OtelStorageStatsMetricsAdapter,
   StorageStatsCollectionService,
-  UsageStatsClickHouseClient,
-  UsageStatsClickHouseClientResolver,
   type UsageStatsErrorReporter,
   type UsageStatsTelemetryClient,
   type OpsWorker,
@@ -52,10 +51,8 @@ export type WorkerOpsCompositionInput = Readonly<{
   /** The counters the enqueue-rate baseline is kept in; absent disables the tick. */
   redis: RedisConnection | null | undefined;
   featureFlags: FeatureFlagApi;
-  /** The organization's own ClickHouse endpoint, for its usage counts. */
-  resolveOrganizationClient:
-    | ((organizationId: string) => UsageStatsClickHouseClient)
-    | undefined;
+  /** The process's one routed ClickHouse client, which the usage-stats read runs over. */
+  clickhouse: ClickHouseQueryClient | undefined;
   /**
    * Every configured endpoint, for the one read that is nobody's tenant. `system.parts` is a
    * property of an INSTALL rather than of a tenant, and an install with private organization routes
@@ -86,7 +83,7 @@ export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsCo
     queueMetrics: { redis: options.redis ?? undefined },
     usageStats: {
       database: options.database,
-      clickhouse: WorkerUsageStatsClickHouse.create(options.resolveOrganizationClient),
+      clickhouse: options.clickhouse,
       config: { ...options.config.ops.usageStats, now: nowInstant },
       telemetry: WorkerUsageStatsTelemetry.create(),
       errors: LoggedUsageStatsErrors.create(logger),
@@ -114,14 +111,12 @@ export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsCo
  * tenant this loop is wrong about would be cut off by a heuristic, so the detector surfaces the
  * anomaly and an operator decides. The log line is the page.
  */
-class LoggedHardTierAlert extends AnomalyHardTierAlert {
+class LoggedHardTierAlert implements AnomalyHardTierAlert {
   static create(logger: Logger): LoggedHardTierAlert {
     return new LoggedHardTierAlert(logger);
   }
 
-  private constructor(private readonly logger: Logger) {
-    super();
-  }
+  private constructor(private readonly logger: Logger) {}
 
   notify(anomaly: Anomaly): Promise<void> {
     this.logger.error(
@@ -137,40 +132,17 @@ class LoggedHardTierAlert extends AnomalyHardTierAlert {
   }
 }
 
-/** An organization's own endpoint, or nothing where this process routes none. */
-class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolver {
-  static create(
-    resolve: ((organizationId: string) => UsageStatsClickHouseClient) | undefined,
-  ): WorkerUsageStatsClickHouse {
-    return new WorkerUsageStatsClickHouse(resolve);
-  }
-
-  private constructor(
-    private readonly resolve:
-      | ((organizationId: string) => UsageStatsClickHouseClient)
-      | undefined,
-  ) {
-    super();
-  }
-
-  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClient | null> {
-    return Promise.resolve(this.resolve ? this.resolve(organizationId) : null);
-  }
-}
-
 /**
  * The receiver, which is LangWatch's own hosted install. A plain fetch rather than the SSRF-fenced
  * sender: the destination is a constant in this file rather than anything a customer configured, so
  * there is no customer-supplied host to fence and nothing of the customer's own to leak to one.
  */
-class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClient {
+class WorkerUsageStatsTelemetry implements UsageStatsTelemetryClient {
   static create(): WorkerUsageStatsTelemetry {
     return new WorkerUsageStatsTelemetry();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   async send(report: Record<string, unknown>): Promise<void> {
     await fetch(USAGE_STATS_RECEIVER, {
@@ -182,14 +154,12 @@ class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClient {
 }
 
 /** A failed report is logged and the loop continues to the next organization. */
-class LoggedUsageStatsErrors extends UsageStatsErrorReporter {
+class LoggedUsageStatsErrors implements UsageStatsErrorReporter {
   static create(logger: Logger): LoggedUsageStatsErrors {
     return new LoggedUsageStatsErrors(logger);
   }
 
-  private constructor(private readonly logger: Logger) {
-    super();
-  }
+  private constructor(private readonly logger: Logger) {}
 
   capture(input: { instanceId: string; error: unknown }): Promise<void> {
     this.logger.error(input, "failed to send usage stats for an install");

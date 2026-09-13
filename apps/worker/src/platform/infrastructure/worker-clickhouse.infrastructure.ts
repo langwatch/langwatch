@@ -12,7 +12,10 @@ import {
   ClickHouseManagedClientService,
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
+  ClickHouseQueryClient,
   ClickHouseShutdownService,
+  routingDriver,
+  TenantGuard,
   VendorClientResiliencePolicy,
   type ClickHouseConnection,
   type ClickHouseVendorClient,
@@ -170,9 +173,22 @@ export class WorkerClickHouseInfrastructure {
     return infrastructure;
   }
 
+  /**
+   * The process's one routed query client, over the SAME connection every fold and every append
+   * resolves its own vendor client through. No `RetryPolicy` and no `ConcurrencyLimiter` here: this
+   * connection's vendor clients are already wrapped by `ClickHouseManagedClientService` (retries and
+   * a statement limiter at the vendor layer), so a second layer of either here would retry retries.
+   */
+  readonly queryClient: ClickHouseQueryClient;
+
   private constructor(
     private readonly connection: ClickHouseConnection<ClickHouseClient & ClickHouseVendorClient>,
-  ) {}
+  ) {
+    this.queryClient = new ClickHouseQueryClient({
+      driver: routingDriver(connection),
+      tenantGuard: new TenantGuard(),
+    });
+  }
 
   /**
    * The tenant-keyed resolver every fold and every append runs through. Bound as a closure rather
@@ -183,14 +199,6 @@ export class WorkerClickHouseInfrastructure {
     this.connection.resolve(tenantId);
 
   readonly eventLogClient = (): ClickHouseClient => this.connection.shared();
-
-  /**
-   * Every physical endpoint this deployment configured, the shared one and each private route, each
-   * labelled with the target it serves. The one question above deliberately answers "the client for
-   * THIS tenant", and every fold and append must keep asking only that.
-   */
-  readonly resolveOrganizationClient = (organizationId: string): ClickHouseClient =>
-    this.connection.resolveOrganization(organizationId);
 
   readonly resolveInstances = async (): Promise<{ target: string; client: ClickHouseClient }[]> => [
     ...this.connection.instances(),

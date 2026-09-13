@@ -36,6 +36,7 @@ import { QueueService } from "../../services/queue.service.ts";
 
 const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");
 const queueMetricsLogger = createLogger("langwatch:ops:queueMetricsWriter");
+const usageStatsLogger = createLogger("langwatch:workers:usageStatsWorker");
 
 export interface OpsWorkerAdapterOptions {
   anomaly: {
@@ -50,7 +51,7 @@ export interface OpsWorkerAdapterOptions {
   usageStats: {
     database: UsageStatsWorkerDatabase;
     /** The process's one ClickHouse client, which routes each read itself. */
-    clickhouse: ClickHouseQueryClient;
+    clickhouse: ClickHouseQueryClient | undefined;
     config: UsageStatsWorkerConfig;
     telemetry: UsageStatsTelemetryClient;
     errors: UsageStatsErrorReporter;
@@ -114,9 +115,17 @@ export class PrismaOpsWorkerRepository implements OpsWorker {
 
   tryStartUsageStatsWorker(): OpsWorkerHandle | undefined {
     const usageStats = this.options.usageStats;
+    const clickhouse = usageStats.clickhouse;
+    if (!clickhouse) {
+      usageStatsLogger.warn(
+        "ClickHouse client unavailable, usage-stats worker disabled: this install reports no anonymous usage",
+      );
+      return void 0;
+    }
+
     const collector = UsageStatsCollectionService.create({
       projects: PrismaUsageStatsProjectRepository.create(usageStats.database),
-      clickhouse: ClickHouseUsageStatsRepository.create(usageStats.clickhouse),
+      clickhouse: ClickHouseUsageStatsRepository.create(clickhouse),
       builderChartKind: usageStats.builderChartKind,
       now: usageStats.config.now,
     });

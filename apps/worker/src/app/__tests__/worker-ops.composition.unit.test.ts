@@ -61,7 +61,7 @@ function compose(
     database: {} as never,
     redis: (overrides.withRedis ?? true) ? (redis as never) : null,
     featureFlags: { isEnabled: async () => false } as never,
-    resolveOrganizationClient: undefined,
+    clickhouse: undefined,
     resolveClickHouseInstances:
       (overrides.withInstances ?? true)
         ? async () => [
@@ -212,7 +212,7 @@ describe("given the fleet's queue-metrics writer", () => {
         database: {} as never,
         redis: recordingRedis as never,
         featureFlags: { isEnabled: async () => false } as never,
-        resolveOrganizationClient: undefined,
+        clickhouse: undefined,
         resolveClickHouseInstances: undefined,
       });
       const writer = ops.workers.tryStartQueueMetricsWriter();

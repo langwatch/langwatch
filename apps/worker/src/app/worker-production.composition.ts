@@ -11,6 +11,7 @@ import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
 import { TraceApi } from "@langwatch/trace-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -358,12 +359,6 @@ type WorkerEventingConsumerCompositionOptions = {
    * may ask.
    */
   resolveClickHouseInstances?: WorkerGatewaySpendCompositionInput["resolveClickHouseInstances"];
-  /**
-   * One ORGANIZATION's endpoint, with no directory lookup. The anonymous usage report counts an
-   * organization's projects together and already holds the organization, so routing through a
-   * project id would be a lookup to arrive back where it started.
-   */
-  resolveClickHouseOrganizationClient?: (organizationId: string) => unknown;
 };
 
 type WorkerProductionCompositionBaseOptions = {
@@ -379,6 +374,8 @@ type WorkerProductionCompositionBaseOptions = {
   featureClickHouse?: {
     resolveClient: (tenantId: string) => Promise<ClickHouseClient>;
     eventLogClient: () => ClickHouseClient;
+    /** The process's one routed query client, for the usage-stats read. */
+    queryClient: ClickHouseQueryClient;
   };
   /**
    * Pipeline groups whose features have moved out of the legacy registry. Each stays optional until
@@ -977,8 +974,8 @@ export class WorkerProductionComposition {
       database: options.database,
       redis: processRedis,
       featureFlags,
-      resolveOrganizationClient: options.eventing.resolveClickHouseOrganizationClient as never,
-      resolveClickHouseInstances: options.eventing.resolveClickHouseInstances as never,
+      clickhouse: options.featureClickHouse?.queryClient,
+      resolveClickHouseInstances: options.eventing.resolveClickHouseInstances,
       ...(WorkerProductionComposition.opsAbsence(options)
         ? { absence: WorkerProductionComposition.opsAbsence(options)! }
         : {}),
@@ -2474,7 +2471,7 @@ export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReport
  * Reached only where `BASE_HOST` is unset, which is the same condition that already refuses every
  * outbound delivery: a graph alert that fired here could not be sent anywhere.
  */
-class AbsentEvaluationGraphActivity extends AutomationGraphActivity {
+class AbsentEvaluationGraphActivity implements AutomationGraphActivity {
   async getActiveGraphTriggersForProject(): Promise<[]> {
     return [];
   }
@@ -2509,7 +2506,7 @@ export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReport {
 /**
  * The trigger-match recorder a non-consuming graph gets.
  */
-class AbsentTraceTriggerMatches extends AutomationTriggerMatchRecorder {
+class AbsentTraceTriggerMatches implements AutomationTriggerMatchRecorder {
   async send(): Promise<void> {
     throw new Error("Trace processing recorded a trigger match, but Automation is not composed.");
   }
