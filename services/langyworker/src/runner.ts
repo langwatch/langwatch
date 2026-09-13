@@ -34,6 +34,7 @@ import {
   GUIDED_TURN_CONTINUED_LOG,
   TurnCallLog,
   decideGuidedContinuation,
+  guidedSegment,
   historyHasGuidedKickoff,
 } from "./guided-turn-end.js";
 import { prependResumeSeed } from "./system-prompt.js";
@@ -60,8 +61,12 @@ type TurnState = {
   mapper: TurnEventMapper;
   /** The turn's settled calls, read by the guided turn end guard. */
   calls: TurnCallLog;
-  /** Continuation messages appended to this turn so far; one is the limit. */
+  /** The segment of the turn the guard last read: 1, plus one per card answered inside the turn. */
+  segment: number;
+  /** Continuation messages appended to that segment so far; one is the limit. */
   continuations: number;
+  /** Continuation messages appended to the turn over all its segments; MAX_TURN_CONTINUATIONS is the cap. */
+  turnContinuations: number;
 };
 
 export type TurnRunnerOptions = {
@@ -199,7 +204,9 @@ export class TurnRunner {
       terminalEmitted: false,
       mapper: new TurnEventMapper(command.turnId),
       calls: new TurnCallLog(),
+      segment: 1,
       continuations: 0,
+      turnContinuations: 0,
     };
     this.current = state;
     if (this.options.turnContext) {
@@ -275,11 +282,13 @@ export class TurnRunner {
 
   /**
    * The guided turn end guard. A turn on the guided path that ended clean but
-   * on none of the calls the skill allows (a card, the closing line, the one
-   * line of a failed step) gets one continuation message, appended to the same
-   * turn, naming what it still owes; the model goes on and the terminal is
-   * derived again. A second bare end is reported and left. A newer turn from
-   * the user, submitted meanwhile, takes precedence: the turn is theirs to
+   * on none of the calls the skill allows (a card still waiting, the closing
+   * line, the one line of a failed step) gets one continuation message,
+   * appended to the same turn, naming what it still owes; the model goes on
+   * and the terminal is derived again. A second bare end is reported and
+   * left. A card answered inside the turn starts a new segment with a
+   * continuation of its own, capped over the turn. A newer turn from the
+   * user, submitted meanwhile, takes precedence: the turn is theirs to
    * continue then, not the guard's.
    */
   private async continueGuidedTurn({
@@ -297,19 +306,26 @@ export class TurnRunner {
     const guided =
       isGuidedKickoffPrompt(command.prompt) ||
       historyHasGuidedKickoff(this.options.session.agent.state.messages);
+    const segment = guidedSegment(state.calls.calls).index;
+    if (segment !== state.segment) {
+      state.segment = segment;
+      state.continuations = 0;
+    }
     const decision = decideGuidedContinuation({
       calls: state.calls.calls,
       guided,
       continuations: state.continuations,
+      turnContinuations: state.turnContinuations,
     });
     if (decision.kind === "leave") return terminal;
     if (decision.kind === "give_up") {
-      await this.reportGuidedTurn({ state, event: GUIDED_TURN_BARE_END_LOG, missing: decision.missing });
+      await this.reportGuidedTurn({ state, event: GUIDED_TURN_BARE_END_LOG, decision });
       return terminal;
     }
     if (state.abortRequested || seq !== this.submitSeq) return terminal;
     state.continuations += 1;
-    await this.reportGuidedTurn({ state, event: GUIDED_TURN_CONTINUED_LOG, missing: decision.missing });
+    state.turnContinuations += 1;
+    await this.reportGuidedTurn({ state, event: GUIDED_TURN_CONTINUED_LOG, decision });
     let thrown: unknown;
     try {
       await this.options.session.prompt(decision.message);
@@ -328,18 +344,24 @@ export class TurnRunner {
    * The guard's report goes to the manager as a protocol event, ahead of the
    * turn's terminal. The manager does not read worker stderr, so a log line
    * written here would be lost; it logs the event under its name, with the
-   * turn id and what the turn owed.
+   * turn id, the segment and what the turn owed.
    */
   private async reportGuidedTurn({
     state,
     event,
-    missing,
+    decision,
   }: {
     state: TurnState;
     event: GuidedTurnEvent["event"];
-    missing: string[];
+    decision: { segment: number; missing: string[] };
   }): Promise<void> {
-    const report: GuidedTurnEvent = { type: "guided_turn", turnId: state.turnId, event, missing };
+    const report: GuidedTurnEvent = {
+      type: "guided_turn",
+      turnId: state.turnId,
+      event,
+      segment: decision.segment,
+      missing: decision.missing,
+    };
     await this.options.writer.emit(report);
   }
 

@@ -129,6 +129,8 @@ export type GuidedTurnEvent = {
   type: "guided_turn";
   turnId: string;
   event: "guided_turn_continued" | "guided_turn_bare_end";
+  /** 1 for the calls before any card answered inside the turn, one more per answered card. */
+  segment: number;
   missing: string[];
 };
 

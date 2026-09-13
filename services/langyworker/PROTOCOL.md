@@ -73,7 +73,7 @@ Per turn, all tagged with the turn's `turnId`:
 {"type":"tool_update","turnId":"t1","id":"call_1","name":"bash","output":"partial output"}
 {"type":"tool_end","turnId":"t1","id":"call_1","name":"bash","input":{"command":"ls"},"isError":false,"output":"full output"}
 {"type":"plan","turnId":"t1","items":[{"content":"Find the slowest traces","status":"in_progress"}]}
-{"type":"guided_turn","turnId":"t1","event":"guided_turn_continued","missing":["the branch line","the first scenario card"]}
+{"type":"guided_turn","turnId":"t1","event":"guided_turn_continued","segment":1,"missing":["the branch line","the first scenario card"]}
 ```
 
 Event payload shapes follow pi's native session events: `delta` and `reasoning`
@@ -91,11 +91,14 @@ emitted on every successful `todowrite` tool call with the full current list;
 `guided_turn` is the report of the guided turn end guard (`guided-turn-end.ts`):
 `event` is `guided_turn_continued` when the wrapper appended a continuation to a
 guided turn that ended on none of the calls the skill allows, and
-`guided_turn_bare_end` when it gave up on a second bare end. `missing` names what
-the turn owed, in the guard's own words (line and card names, never the model's
-text). The manager logs it under the event name and draws no frame for it. The
-wrapper's stderr is not read by the manager, so this event is the guard's only
-sink.
+`guided_turn_bare_end` when it gave up on a second bare end. `segment` is 1 for
+the calls before any card answered inside the turn and one more per answered
+card: a card answered in the turn hands the turn the work that follows, so the
+guard reads the calls after it as a segment of their own, with one continuation
+of their own and a small cap over the turn. `missing` names what the turn owed,
+in the guard's own words (line and card names, never the model's text). The
+manager logs it under the event name and draws no frame for it. The wrapper's
+stderr is not read by the manager, so this event is the guard's only sink.
 
 Terminal (the LAST line ever emitted for a `turnId`; nothing follows it):
 

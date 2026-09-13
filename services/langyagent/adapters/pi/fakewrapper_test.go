@@ -94,6 +94,7 @@ func fakeWrapperMain(mode string) {
 				fakeEmit(map[string]any{
 					"type": "guided_turn", "turnId": cmd.TurnID,
 					"event":   "guided_turn_continued",
+					"segment": 1,
 					"missing": []string{"the branch line", "the first scenario card"},
 				})
 				fakeEmit(map[string]any{"type": "turn_done", "turnId": cmd.TurnID, "outcome": "ok"})

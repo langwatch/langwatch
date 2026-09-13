@@ -343,7 +343,7 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 func logGuidedTurn(ctx context.Context, ev wireEvent) {
 	switch ev.Event {
 	case guidedTurnContinued, guidedTurnBareEnd:
-		clog.Get(ctx).Info(ev.Event, zap.String("missing", strings.Join(ev.Missing, "; ")))
+		clog.Get(ctx).Info(ev.Event, zap.Int("segment", ev.Segment), zap.String("missing", strings.Join(ev.Missing, "; ")))
 	default:
 		clog.Get(ctx).Warn("pi worker emitted a guided_turn event of an unknown kind", zap.String("event", ev.Event))
 	}

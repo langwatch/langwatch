@@ -61,9 +61,11 @@ type wireEvent struct {
 	// handoff
 	Seed string `json:"seed"`
 	// guided_turn: the wrapper's guided turn end guard reporting what it did
-	// (continued the turn, or gave up on a second bare end) and what the turn
-	// owed, in the guard's own words.
+	// (continued the turn, or gave up on a second bare end), which segment of
+	// the turn it read (1, plus one per card answered inside the turn) and
+	// what the turn owed, in the guard's own words.
 	Event   string   `json:"event"`
+	Segment int      `json:"segment"`
 	Missing []string `json:"missing"`
 }
 

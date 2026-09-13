@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { ANSWERED_CARD_MESSAGE } from "./guided-turn-end.js";
 import { TurnRunner, lastAssistantError, type SessionLike } from "./runner.js";
+import { ANSWERED_CONTINUE_LINE } from "./tools/question.js";
 import { createTurnContext, type TurnContext } from "./tools/turn-context.js";
 import { ProtocolWriter } from "./writer.js";
 
@@ -184,6 +186,7 @@ describe("TurnRunner", () => {
         type: "guided_turn",
         turnId: "t2",
         event: "guided_turn_continued",
+        segment: 1,
         missing: ["the branch line", "the first scenario card"],
       });
       expect(events.some((event) => event.type === "turn_done")).toBe(false);
@@ -196,6 +199,7 @@ describe("TurnRunner", () => {
           type: "guided_turn",
           turnId: "t2",
           event: "guided_turn_bare_end",
+          segment: 1,
           missing: ["the branch line", "the first scenario card"],
         },
         { type: "turn_done", turnId: "t2", outcome: "ok" },
@@ -220,8 +224,55 @@ describe("TurnRunner", () => {
         type: "guided_turn",
         turnId: "t2",
         event: "guided_turn_bare_end",
+        segment: 1,
         missing: ["the first scenario card"],
       });
+    });
+
+    /** @scenario "An answered card is not an ending" */
+    it("continues after a card answered inside the turn, with a continuation of that segment's own", async () => {
+      const fake = makeFakeSession();
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const { runner, events } = makeRunner({ session: fake.session });
+      const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
+      await until(() => fake.promptCalls.length === 1);
+      feedStep2WithoutBranchLine(runner);
+      fake.finish();
+      // The first segment's one continuation is spent here.
+      await until(() => fake.promptCalls.length === 2);
+      settle(runner, { id: "s3", name: "say", input: { text: STEP2_LINES.branch }, output: "Said." });
+      settle(runner, {
+        id: "q1",
+        name: "question",
+        input: { questions: [{ header: "Propose the first scenario" }] },
+        output: `Q: The proposal\nA: Create it\n\n${ANSWERED_CONTINUE_LINE}`,
+      });
+      // The turn stops right on the answered card.
+      fake.finish();
+      await until(() => fake.promptCalls.length === 3);
+      expect(fake.promptCalls[2]?.prompt).toBe(ANSWERED_CARD_MESSAGE);
+      expect(events).toContainEqual({
+        type: "guided_turn",
+        turnId: "t2",
+        event: "guided_turn_continued",
+        segment: 2,
+        missing: ["the work that follows the answer"],
+      });
+      // Bare again in the second segment: reported with the segment, and left.
+      settle(runner, { id: "s4", name: "say", input: { text: "Running it against your agent now." }, output: "Said." });
+      fake.finish();
+      await done;
+      expect(fake.promptCalls).toHaveLength(3);
+      expect(events.slice(-2)).toEqual([
+        {
+          type: "guided_turn",
+          turnId: "t2",
+          event: "guided_turn_bare_end",
+          segment: 2,
+          missing: ["the work that follows the answer"],
+        },
+        { type: "turn_done", turnId: "t2", outcome: "ok" },
+      ]);
     });
 
     /** @scenario "A turn that ended on a card, a closing line or a failed step is left alone" */

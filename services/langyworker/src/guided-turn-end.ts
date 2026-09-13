@@ -8,9 +8,15 @@
  * 2 lines said" with one of the lines never said. The prose does not hold on
  * its own, so the runner reads the turn's own calls: a guided turn that ends
  * bare gets one continuation message naming what it still owes, and the model
- * goes on in the same turn. Once per turn; a second bare end is reported and
- * left. Both reports ride the protocol as `guided_turn` events: the manager
- * does not read worker stderr, so it logs them under their names.
+ * goes on in the same turn. Once per segment; a second bare end is reported
+ * and left. Both reports ride the protocol as `guided_turn` events: the
+ * manager does not read worker stderr, so it logs them under their names.
+ *
+ * A card is an ending only while it waits. The product answers a card inside
+ * the turn when the person picks before the turn ends, and the tool result
+ * then carries the answer and the go, so the turn owes the work that
+ * follows. The calls after an answered card are read as a segment of their
+ * own, with one continuation of their own, and a small cap over the turn.
  *
  * The closing line has a rule of its own, read by the `say` tool as the line
  * is said rather than at the turn's end: it comes after the complete-path
@@ -29,7 +35,7 @@ import {
   LOCAL_TOOL_NAMES,
   SANDBOX_FILE_TOOL_NAMES,
 } from "./tools/local-workspace.js";
-import { QUESTION_TOOL_NAME } from "./tools/question.js";
+import { ANSWERED_CONTINUE_LINE, QUESTION_TOOL_NAME } from "./tools/question.js";
 import { SAY_TOOL_NAME } from "./tools/say.js";
 import { SKILL_TOOL_NAME } from "./tools/skill.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
@@ -69,8 +75,15 @@ export const STEP2_LINE_TEMPLATES = {
   failedOpen: "The branch {branch} is pushed; opening the pull request failed with: {error}.",
 } as const;
 
-/** The tools whose card holds the turn: a turn that ends on one ended as written. */
+/** The tools whose card holds the turn: a turn that ends on one, still waiting, ended as written. */
 const CARD_TOOL_NAMES = new Set([QUESTION_TOOL_NAME, CODE_ACCESS_TOOL_NAME]);
+
+/** The message after a card answered inside the turn whose work never followed. */
+export const ANSWERED_CARD_MESSAGE =
+  "The card was answered. Continue with the work that follows the answer: step 4 and step 5 of the guided onboarding skill, through `langwatch onboarding complete-path` and the closing line.";
+
+/** Continuations over one turn, all its segments counted; one per segment within it. */
+export const MAX_TURN_CONTINUATIONS = 3;
 
 /** The shell tools, in the worker's names and the CLI's. */
 const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
@@ -193,6 +206,35 @@ export function closingLineRefusal({
   return completePathRan(calls) ? undefined : CLOSING_LINE_PUSHBACK;
 }
 
+/**
+ * A question card answered inside the turn: its result carries the answers
+ * and the go. The code access card has no in-turn answer, the folder
+ * connecting starts the next turn, so it is never one of these.
+ */
+function answeredInTurn(call: TurnCall): boolean {
+  return call.name === QUESTION_TOOL_NAME && !call.isError && call.output.includes(ANSWERED_CONTINUE_LINE);
+}
+
+export type GuidedSegment = {
+  /** 1 for the calls before any card answered in the turn, one more per answered card. */
+  index: number;
+  /** The calls since the last answered card, or the whole turn when none was. */
+  calls: TurnCall[];
+};
+
+/** The turn's current segment: what the ender and the budget are read on. */
+export function guidedSegment(calls: readonly TurnCall[]): GuidedSegment {
+  let start = 0;
+  let index = 1;
+  calls.forEach((call, position) => {
+    if (answeredInTurn(call)) {
+      start = position + 1;
+      index += 1;
+    }
+  });
+  return { index, calls: calls.slice(start) };
+}
+
 export type GuidedTurnEnder = "card" | "closing_line" | "failed_step" | "bare";
 
 /**
@@ -282,32 +324,46 @@ export function continuationMessage({
 
 export type GuidedContinuation =
   | { kind: "leave"; reason: "not_guided" | Exclude<GuidedTurnEnder, "bare"> }
-  | { kind: "continue"; missing: string[]; message: string }
-  | { kind: "give_up"; missing: string[] };
+  | { kind: "continue"; segment: number; missing: string[]; message: string }
+  | { kind: "give_up"; segment: number; missing: string[] };
 
 /**
- * What to do with a guided turn that just ended. `continuations` counts the
- * messages already appended to this turn: one is the limit.
+ * What to do with a guided turn that just ended. The ender is read on the
+ * turn's current segment, the calls since the last card answered inside the
+ * turn. `continuations` counts the messages already appended to that
+ * segment, one is the limit; `turnContinuations` counts them over the whole
+ * turn, MAX_TURN_CONTINUATIONS is the cap.
  */
 export function decideGuidedContinuation({
   calls,
   guided,
   continuations,
+  turnContinuations = 0,
 }: {
   calls: readonly TurnCall[];
   guided: boolean;
   continuations: number;
+  turnContinuations?: number;
 }): GuidedContinuation {
   if (!guided) return { kind: "leave", reason: "not_guided" };
-  const ender = guidedTurnEnding(calls);
+  const segment = guidedSegment(calls);
+  const ender = guidedTurnEnding(segment.calls);
   if (ender !== "bare") return { kind: "leave", reason: ender };
-  const step2 = isStep2Turn(calls);
-  const missingLines = step2 ? missingStep2Lines(calls) : [];
-  const missing = step2 ? [...missingLines, "the first scenario card"] : ["the next step"];
-  if (continuations >= 1) return { kind: "give_up", missing };
+  const afterAnswer = segment.index > 1;
+  const step2 = !afterAnswer && isStep2Turn(segment.calls);
+  const missingLines = step2 ? missingStep2Lines(segment.calls) : [];
+  const missing = afterAnswer
+    ? ["the work that follows the answer"]
+    : step2
+      ? [...missingLines, "the first scenario card"]
+      : ["the next step"];
+  if (continuations >= 1 || turnContinuations >= MAX_TURN_CONTINUATIONS) {
+    return { kind: "give_up", segment: segment.index, missing };
+  }
   return {
     kind: "continue",
+    segment: segment.index,
     missing,
-    message: continuationMessage({ step2, missing: missingLines }),
+    message: afterAnswer ? ANSWERED_CARD_MESSAGE : continuationMessage({ step2, missing: missingLines }),
   };
 }

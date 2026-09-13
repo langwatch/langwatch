@@ -1182,6 +1182,20 @@ Feature: Langy guides the first setup after sign-up
       And it reports guided_turn_continued to the manager with what the turn owes
       And a second bare end reports guided_turn_bare_end ahead of the terminal, and the turn ends
 
+    # A card is an ending only while it waits. The product answers a card
+    # inside the turn when the person picks before the turn ends, and the
+    # tool result then carries the answer and the go; a turn that stops right
+    # there has the work after the answer undone, and the one continuation
+    # of the turn was spent before the card went up.
+    @unit
+    Scenario: An answered card is not an ending
+      Given a guided turn whose question card was answered inside the turn
+      When the turn ends bare after the answer, on the card itself or on lines only
+      Then the worker appends a continuation naming the work that follows the answer: step 4 and step 5, through complete-path and the closing line
+      And a turn that ends on a card still waiting is left alone, before and after an answer
+      And each answered card starts a segment with one continuation of its own, three per turn at most
+      And the reports name the segment
+
     @unit
     Scenario: The continuation names the step 2 lines the turn did not say
       Given a step 2 turn whose say calls miss the branch line
@@ -1229,7 +1243,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The manager logs the guard's report under its name
       Given the worker sent a guided_turn event for a turn
       When the manager reads it
-      Then it logs the event's name on one line, with the turn id once and what the turn owed beside it
+      Then it logs the event's name on one line, with the turn id once, the segment and what the turn owed beside it
       And no frame reaches the panel for it
 
     # The record the panel keeps places a turn's navigates at its end whatever

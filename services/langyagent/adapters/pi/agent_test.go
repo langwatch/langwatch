@@ -191,6 +191,9 @@ func TestAgent_GuidedTurnEvent_IsLoggedNotFramed(t *testing.T) {
 	if got := fields["missing"]; got != "the branch line; the first scenario card" {
 		t.Errorf("missing = %v, want the guard's two items on one string", got)
 	}
+	if got := fields["segment"]; got != int64(1) {
+		t.Errorf("segment = %v, want 1", got)
+	}
 }
 
 // ansiSequence matches the color codes the pretty console writes.
@@ -257,6 +260,9 @@ func TestAgent_GuidedTurnEvent_PrettyConsoleLine(t *testing.T) {
 	}
 	if !strings.Contains(line, "missing=") || !strings.Contains(line, "the branch line; the first scenario card") {
 		t.Errorf("the line must carry what the turn owed:\n%s", line)
+	}
+	if !strings.Contains(line, "segment=1") {
+		t.Errorf("the line must name the segment:\n%s", line)
 	}
 }
 

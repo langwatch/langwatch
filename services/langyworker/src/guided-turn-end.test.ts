@@ -5,23 +5,27 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  ANSWERED_CARD_MESSAGE,
   CLOSING_LINE,
   CLOSING_LINE_PUSHBACK,
   closingLineRefusal,
   COMPLETE_PATH_COMMAND,
   completePathRan,
   FRAMEWORK_LINE_SHAPE,
+  MAX_TURN_CONTINUATIONS,
   STEP2_LINE_TEMPLATES,
   STEP2_LINES_ITEM,
   TRANSPARENT_TOOL_NAMES,
   TurnCallLog,
   decideGuidedContinuation,
+  guidedSegment,
   guidedTurnEnding,
   historyHasGuidedKickoff,
   missingStep2Lines,
   templatePattern,
   type TurnCall,
 } from "./guided-turn-end.js";
+import { ANSWERED_CONTINUE_LINE } from "./tools/question.js";
 
 const FRAMEWORK = "I found a LangGraph agent in app/graph.py.";
 const BRANCH = "I left branch langy/acme-checkout checked out: the agent you started runs on it.";
@@ -46,6 +50,12 @@ const plan = (status: string) =>
 const shell = (command: string, exitCode = 0) =>
   call("local_bash", { command }, { output: `exit code: ${exitCode}\n\nstdout:\n` });
 const question = () => call("question", { questions: [{ header: "Create the first scenario" }] });
+const answered = () =>
+  call(
+    "question",
+    { questions: [{ header: "Propose the first scenario" }] },
+    { output: `Q: The proposal\nA: Create "Guest completes checkout" as your first scenario test\n\n${ANSWERED_CONTINUE_LINE}` },
+  );
 
 describe("the guided turn end guard", () => {
   describe("when the turn ended on a card, a closing line or a failed step", () => {
@@ -143,12 +153,14 @@ describe("the guided turn end guard", () => {
       const first = decideGuidedContinuation({ calls, guided: true, continuations: 0 });
       expect(first).toEqual({
         kind: "continue",
+        segment: 1,
         missing: ["the first scenario card"],
         message:
           "Step 2 is finished but step 3 never started: the first scenario card was not asked. Continue with step 3 and end on the question card.",
       });
       expect(decideGuidedContinuation({ calls, guided: true, continuations: 1 })).toEqual({
         kind: "give_up",
+        segment: 1,
         missing: ["the first scenario card"],
       });
     });
@@ -157,10 +169,75 @@ describe("the guided turn end guard", () => {
       const calls = [shell("langwatch scenario run scenario_1 --wait --format json"), say("Two things.")];
       expect(decideGuidedContinuation({ calls, guided: true, continuations: 0 })).toEqual({
         kind: "continue",
+        segment: 1,
         missing: ["the next step"],
         message:
           "The path is not finished. Continue with the next step of the guided onboarding skill; end on the question card or the closing line.",
       });
+    });
+  });
+
+  describe("when a card was answered inside the turn", () => {
+    const step2 = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(NO_REMOTE)];
+
+    /** @scenario "An answered card is not an ending" */
+    it("reads the calls after the answer as a segment of their own, and continues a bare end there", () => {
+      // The r42 shape: the card answered, then nothing.
+      const stopped = [...step2, answered()];
+      expect(guidedSegment(stopped)).toEqual({ index: 2, calls: [] });
+      expect(decideGuidedContinuation({ calls: stopped, guided: true, continuations: 0 })).toEqual({
+        kind: "continue",
+        segment: 2,
+        missing: ["the work that follows the answer"],
+        message: ANSWERED_CARD_MESSAGE,
+      });
+      expect(ANSWERED_CARD_MESSAGE).toBe(
+        "The card was answered. Continue with the work that follows the answer: step 4 and step 5 of the guided onboarding skill, through `langwatch onboarding complete-path` and the closing line.",
+      );
+      // Lines only after the answer are bare too, and the step 2 reading does not follow the answer.
+      const linesOnly = [...stopped, say("Running it against your agent now."), plan("completed")];
+      expect(decideGuidedContinuation({ calls: linesOnly, guided: true, continuations: 0 })).toMatchObject({
+        kind: "continue",
+        segment: 2,
+        message: ANSWERED_CARD_MESSAGE,
+      });
+      // A card still waiting is an ending, before and after an answer.
+      expect(decideGuidedContinuation({ calls: [...step2, question()], guided: true, continuations: 0 })).toEqual({
+        kind: "leave",
+        reason: "card",
+      });
+      expect(decideGuidedContinuation({ calls: [...stopped, question()], guided: true, continuations: 0 })).toEqual({
+        kind: "leave",
+        reason: "card",
+      });
+      // The work after the answer, done to the closing line, is left alone.
+      const finished = [...stopped, shell(`${COMPLETE_PATH_COMMAND} llmops`), say(CLOSING_LINE)];
+      expect(decideGuidedContinuation({ calls: finished, guided: true, continuations: 0 })).toEqual({
+        kind: "leave",
+        reason: "closing_line",
+      });
+    });
+
+    /** @scenario "An answered card is not an ending" */
+    it("gives each segment one continuation, three per turn at most", () => {
+      const stopped = [...step2, answered()];
+      // The segment's own continuation was spent: reported and left.
+      expect(decideGuidedContinuation({ calls: stopped, guided: true, continuations: 1 })).toEqual({
+        kind: "give_up",
+        segment: 2,
+        missing: ["the work that follows the answer"],
+      });
+      // A fresh segment with the turn's cap reached is left too.
+      expect(MAX_TURN_CONTINUATIONS).toBe(3);
+      expect(
+        decideGuidedContinuation({ calls: stopped, guided: true, continuations: 0, turnContinuations: 3 }),
+      ).toEqual({ kind: "give_up", segment: 2, missing: ["the work that follows the answer"] });
+      expect(
+        decideGuidedContinuation({ calls: stopped, guided: true, continuations: 0, turnContinuations: 2 }),
+      ).toMatchObject({ kind: "continue", segment: 2 });
+      // Two answered cards: the third segment.
+      const twice = [...stopped, say("Running it against your agent now."), answered()];
+      expect(guidedSegment(twice).index).toBe(3);
     });
   });
 
@@ -173,6 +250,7 @@ describe("the guided turn end guard", () => {
       expect(missingStep2Lines(r40)).toEqual(["the branch line"]);
       expect(decideGuidedContinuation({ calls: r40, guided: true, continuations: 0 })).toEqual({
         kind: "continue",
+        segment: 1,
         missing: ["the branch line", "the first scenario card"],
         message:
           "Step 2 is not finished: the branch line was not said, and the first scenario card was not asked. Say the missing line, then continue with step 3 and end on the question card.",
