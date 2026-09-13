@@ -775,11 +775,11 @@ export class LangyTokenBuffer {
    * gets 2× the heartbeat interval; the stream key gets a full
    * STREAM_TTL_SECONDS from now.
    *
-   * The stream TTL used to move on `append` alone, so a turn that spent longer
+   * A stream TTL that moves on `append` alone lets a turn that spends longer
    * than STREAM_TTL_SECONDS inside one tool call, a suite run waited on, a
-   * long build, lost its whole buffer while the worker was provably alive and
-   * still beating. A reader attaching after that replayed an empty tail, and
-   * the turn-order reader at finalize recorded the turn's parts with no order.
+   * long build, lose its whole buffer while the worker is provably alive and
+   * still beating: a reader attaching after that replays an empty tail, and
+   * the turn-order reader at finalize records the turn's parts with no order.
    * A heartbeat IS the statement that this turn is still live, and the stream
    * is that turn's live edge, so it carries the same proof: one EXPIRE, no
    * entry, so the buffer's content and its MAXLEN are untouched. A turn with no

@@ -396,11 +396,11 @@ export class LangyConversationService {
    * A conversation whose create was just accepted has a turn receipt, written
    * in the admission transaction at send time, before its projection row
    * lands, so "missing row + receipt" means NOT YET, never "never". In that
-   * window this retries instead of reporting the very lie the `getById` doc
-   * below spends three paragraphs on: the panel used to render "conversation
-   * not found" moments before the same conversation's turn was accepted, and
-   * the worker's first `code_access` read got the same answer and ended the
-   * turn without its card. A miss with NO receipt stays a quick not-found: an
+   * window this retries instead of reporting "conversation not found", the
+   * answer the panel would render moments before the same conversation's
+   * turn is accepted, and the answer the worker's first `code_access` read
+   * would end the turn on, without its card (see `getById` below). A miss
+   * with NO receipt stays a quick not-found: an
    * unknown id must not grow a probe-friendly delay. The receipt is read for
    * this user, and the retried read still enforces visibility, so the
    * receipt's existence never widens access.

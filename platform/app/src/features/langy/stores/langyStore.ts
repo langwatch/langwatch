@@ -232,7 +232,7 @@ interface LangyState extends TurnPhaseState {
    * without one it starts fresh and attaches what the transport creates.
    */
   queueGuidedKickoff: (kickoff: GuidedKickoff) => void;
-  /** The panel has taken the queued kickoff — clear it so it sends once. */
+  /** The panel has taken the queued kickoff: clear it so it sends once. */
   consumePendingKickoff: () => void;
 
   /**

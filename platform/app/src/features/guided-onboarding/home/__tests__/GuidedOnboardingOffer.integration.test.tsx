@@ -321,7 +321,7 @@ describe("GuidedOnboardingOffer", () => {
     });
   });
 
-  describe("while the begin request is in flight", () => {
+  describe("when the begin request is in flight", () => {
     /** @scenario the offer is disabled while the path is being begun */
     it("cannot be clicked twice", async () => {
       let resolve: (v: GuidedOnboardingState) => void = () => {};

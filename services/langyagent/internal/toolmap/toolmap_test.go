@@ -290,7 +290,7 @@ func TestToolCallTracker_PlanToolSettleContributesNoTiming(t *testing.T) {
 	tracker.EndIfNew("plan_1", "todowrite")
 
 	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
-		{Content: "Scanning — 1/10", Status: "in_progress"},
+		{Content: "Scanning - 1/10", Status: "in_progress"},
 	})
 	if !ok {
 		t.Fatalf("expected a measured progress frame")
@@ -311,7 +311,7 @@ func TestToolCallTracker_SayToolSettleContributesNoTiming(t *testing.T) {
 	tracker.EndIfNew("say_1", "say")
 
 	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
-		{Content: "Scanning — 1/10", Status: "in_progress"},
+		{Content: "Scanning - 1/10", Status: "in_progress"},
 	})
 	if !ok {
 		t.Fatalf("expected a measured progress frame")

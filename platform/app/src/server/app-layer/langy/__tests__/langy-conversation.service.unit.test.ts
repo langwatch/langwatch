@@ -92,8 +92,8 @@ describe("LangyConversationService", () => {
   describe("given a conversation whose create was just dispatched (projection lagging)", () => {
     // The dispatch window: the send is admitted (a turn receipt exists,
     // written in the admission transaction) before the projection row lands.
-    // A read in that window must wait it out, not report "not found" — the
-    // panel used to render the lie moments before the turn was accepted.
+    // A read in that window waits it out instead of reporting "not found",
+    // the answer the panel would render moments before the turn is accepted.
     /** @scenario "A read in the dispatch window waits for the projection row" */
     it("getById waits out the projection lag and returns the row", async () => {
       vi.useFakeTimers();
@@ -164,7 +164,7 @@ describe("LangyConversationService", () => {
           .mockResolvedValue(row());
         const repo = makeRepo({
           findVisibleById,
-          // Nothing to see on the first probe — the send is younger than
+          // Nothing to see on the first probe: the send is younger than
           // this read by a few milliseconds.
           hasAdmittedTurn: vi
             .fn()

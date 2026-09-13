@@ -5,9 +5,9 @@
  *
  * The guided tour runs before Langy has anything to say: the kickoff user
  * message, and so the card that renders it, only exists once the tour hands
- * over. The panel used to spend the whole tour on the empty state's invitation
- * ("Hey, I'm Langy!" plus starter suggestions), then swap in the card. This pins
- * that the tour card is there in its in-progress state for the whole tour and
+ * over. The empty state's invitation ("Hey, I'm Langy!" plus starter
+ * suggestions) is not what the tour shows in the meantime. This pins that
+ * the tour card is there in its in-progress state for the whole tour and
  * that the kickoff message takes over without the invitation showing in between.
  *
  * Spec: specs/langy/langy-guided-onboarding.feature

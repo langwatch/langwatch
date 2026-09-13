@@ -778,7 +778,7 @@ describe("TraceListClickHouseRepository with the explorer's hidden origins", () 
   const originFacetExpression = (() => {
     const def = FACET_REGISTRY.find((facet) => facet.key === "origin");
     if (!def || !("expression" in def)) {
-      throw new Error("the origin facet no longer carries an expression");
+      throw new Error("the origin facet carries no expression");
     }
     return def.expression;
   })();

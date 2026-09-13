@@ -105,10 +105,9 @@ const reportsOnline = (agents: AgentResponse[], wanted: string): boolean =>
  *
  * With `--wait-online`, the list is read again until the named agent reports
  * online. A process that has just started takes a few seconds to register,
- * and the wait belongs here rather than in a loop the caller writes: the
- * guided onboarding skill used to script its own poll around this command
- * and misread the document it got back, so it gave up on an agent that was
- * online the whole time.
+ * and the wait belongs here rather than in a loop the caller writes: a
+ * caller polling this command reads the document back itself, and one
+ * misread gives up on an agent that is online the whole time.
  *
  * @see specs/typescript-sdk/cli-agents.feature
  */

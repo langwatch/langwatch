@@ -63,7 +63,7 @@ describe("queueGuidedKickoff", () => {
     });
   });
 
-  describe("consumePendingKickoff", () => {
+  describe("when the panel consumes the pending kickoff", () => {
     /** @scenario "The panel sends the kickoff exactly once" */
     it("clears the queued kickoff so the panel sends it once", () => {
       useLangyStore.getState().queueGuidedKickoff(KICKOFF);

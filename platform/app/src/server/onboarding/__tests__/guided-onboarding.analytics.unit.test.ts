@@ -222,7 +222,7 @@ describe("trackGuidedOnboardingEvent()", () => {
     });
   });
 
-  describe("for any guided event", () => {
+  describe("given any guided event", () => {
     /** @scenario "every guided event sets the onboarding person properties" */
     it("sets onboarding_variant, onboarding_paths and onboarding_primary_path on the person", () => {
       trackGuidedOnboardingEvent(

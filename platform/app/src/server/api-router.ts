@@ -204,7 +204,7 @@ export function createApiRouter() {
   api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
   api.route("/", langyLocalApp); // /api/langy/local, /api/langy/waits — the worker's door onto the developer's folder
   api.route("/", langyControlApp); // /api/v1/langy/control — control requests and the long-poll transport
-  api.route("/", onboardingApp); // /api/v1/onboarding/guided — the guided onboarding state through a project key
+  api.route("/", onboardingApp); // /api/v1/onboarding/guided: the guided onboarding state through a project key
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId

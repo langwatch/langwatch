@@ -399,7 +399,7 @@
 			// Cutting it again only moves an argument list from one side of a
 			// call to the other.
 			//
-			// REMOVE THIS BLOCK if logic ever comes back into the body -- the
+			// REMOVE THIS BLOCK if logic ever comes back into the body: the
 			// moment the cognitive rule fires here, the line count is telling
 			// the truth again.
 			"includes": [

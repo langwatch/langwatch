@@ -21,7 +21,7 @@ export type ScopeKind =
   | "PROJECT"
   /** Organizations created on or after a date — shown as "New users". */
   | "NEW_USERS"
-  /** A stable share of users, in percent — shown as "Percentage of users". */
+  /** A stable share of users, in percent, shown as "Percentage of users". */
   | "PERCENTAGE"
   /** Signed-in users at one or more email domains, shown as "Email domain". */
   | "EMAIL_DOMAIN";

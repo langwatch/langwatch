@@ -4,11 +4,11 @@ Feature: Langy shows a secret once, in a card, never in the conversation
   So that the secret is never stored in the conversation, the events or the panel history
 
   # A virtual key secret exists in plaintext at one moment: when the key is
-  # minted. Langy used to paste it into a chat code block, and from there it
-  # was in the conversation store, the projection, the history list, every
-  # viewer's screen and the CLI follow-along, for ever.
+  # minted. A secret pasted into a chat code block is in the conversation
+  # store, the projection, the history list, every viewer's screen and the
+  # CLI follow-along, for ever.
   #
-  # Now the create stashes the secret under a one-time reveal id, encrypted,
+  # So the create stashes the secret under a one-time reveal id, encrypted,
   # for a day. Langy calls its `secret_snippet` tool with that id and a
   # template; the panel renders the card, and the card is what reads the
   # secret, once, straight from the server. The model never sees the value.

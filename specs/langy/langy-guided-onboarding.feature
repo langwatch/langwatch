@@ -480,10 +480,10 @@ Feature: Langy guides the first setup after sign-up
       And the commit stages the changed files by name, never the env file, with the message "Add LangWatch tracing and the connect endpoint" and no trailer
       And Langy keeps that branch checked out for the agent it started, and says so with the branch line, naming the branch the command printed
 
-    # The pull request used to come at the very end of the path, after the
-    # suite, so the person waited the whole path to see the change they could
-    # already merge. It opens right after the commit now, and the address is
-    # said in one sentence before the proposal; the card comes at the end.
+    # The pull request opens right after the commit, not at the end of the
+    # path after the suite: the person sees the change they can already merge
+    # without waiting the whole path for it. The address is said in one
+    # sentence before the proposal; the card comes at the end.
     @unit
     Scenario: The pull request is opened before the proposal
       When the compiled guided-onboarding skill is read

@@ -21,7 +21,7 @@ describe("given a rule enabling the flag for half the users", () => {
 
 describe("given a percentage rule that disables the flag", () => {
   describe("when the summary is rendered", () => {
-    it("names no share, because the rule switches nobody on", () => {
+    it("names no share, because the rule switches no one on", () => {
       const summary = summarizeTargeting([
         { match: { percentageRollout: 50 }, enabled: false },
       ]);
