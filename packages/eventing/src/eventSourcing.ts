@@ -271,6 +271,23 @@ export class EventSourcing {
       ? Record<string, EventSourcedQueueProcessor<any>>
       : CommandsToProcessors<Commands>
   > {
+    // One runtime, one registration per pipeline name: a second registrant -
+    // typically a module's producer beside the process's full pipeline over
+    // the same aggregate - receives the existing registration's senders.
+    type ReturnType = PipelineWithCommandHandlers<
+      RegisteredPipeline<EventType, ProjectionTypes>,
+      [Commands] extends [NoCommands]
+        ? Record<string, EventSourcedQueueProcessor<any>>
+        : CommandsToProcessors<Commands>
+    >;
+    const existing = this.pipelines.get(definition.metadata.name);
+    if (existing) {
+      logger.info(
+        { pipeline: definition.metadata.name },
+        "pipeline already registered on this runtime; the existing registration serves both registrants",
+      );
+      return existing as ReturnType;
+    }
     if (definition.processManagers.size > 0) {
       if (this._processManagerMode === "producer-only") {
         this.declineProcessManagers(definition);
@@ -278,18 +295,18 @@ export class EventSourcing {
         this.requireProcessStore();
       }
     }
-    createEventCatalogue([
-      ...this._definitions.map((registered) => registered.aggregate),
-      definition.aggregate,
-    ]);
+    try {
+      createEventCatalogue([
+        ...this._definitions.map((registered) => registered.aggregate),
+        definition.aggregate,
+      ]);
+    } catch (error) {
+      const registered = this._definitions.map((existing) => existing.metadata.name).join(", ");
+      throw new Error(
+        `Registering pipeline "${definition.metadata.name}" failed against the already-registered [${registered}]: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     this._definitions.push(definition);
-
-    type ReturnType = PipelineWithCommandHandlers<
-      RegisteredPipeline<EventType, ProjectionTypes>,
-      [Commands] extends [NoCommands]
-        ? Record<string, EventSourcedQueueProcessor<any>>
-        : CommandsToProcessors<Commands>
-    >;
 
     if (!this._enabled || !this.eventStore) {
       logger.warn(
