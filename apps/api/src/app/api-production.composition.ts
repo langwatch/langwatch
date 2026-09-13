@@ -152,6 +152,8 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
+    /** Where a Studio graph runs; absent, workflow's runs refuse by name. */
+    workflow: { nlpServiceUrl: config.infrastructure.modelProvider.nlpServiceUrl },
     /** The blob backends, as the api already parses them; a Map becomes the JSON shape the schema reads. */
     "stored-object": {
       backend: config.infrastructure.storedObjects.backend,
