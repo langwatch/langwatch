@@ -10,7 +10,7 @@
 // resolved. Every handler reads the CREDENTIAL's project, never the claim.
 
 import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
-import { defineRestRouter } from "@langwatch/api/rest";
+import { defineRestRouter, type RestTransportDeclaration } from "@langwatch/api/rest";
 import type { Actor } from "@langwatch/actor";
 import {
   SecretApi,
@@ -45,7 +45,14 @@ function callerOf(actor: Actor | null): SecretCaller {
   throw new AuthenticatedActorRequiredError();
 }
 
-function defineSecretRest(namespace: string, operationSuffix: string) {
+function defineSecretRest(
+  namespace: string,
+  operationSuffix: string,
+): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<SecretApi>;
+}> {
   return defineRestRouter(SecretApi)
     .withNamespace(namespace)
     .withVersion(SECRET_REST_VERSION)

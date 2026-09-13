@@ -11,26 +11,24 @@
  * @see specs/scenarios/scenario-fields.feature
  */
 
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import {
   attachmentMissingInputs,
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
   fieldIdentifiersReadBy,
   scenarioMappingPathIssue,
-} from "@langwatch/scenario-contract";
-import {
   SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE,
   type SuiteFieldDefinition,
   suiteFieldDefinitionsSchema,
-} from "~/server/scenarios/suite-fields";
+} from "@langwatch/scenario-contract";
 import {
   SuiteEvaluatorMappingInvalidError,
   SuiteEvaluatorNotFoundError,
   SuiteFieldIdentifierDuplicateError,
   SuiteFieldIdentifierInvalidError,
   SuiteFieldInUseError,
-} from "./errors";
+} from "./errors.ts";
 
 /**
  * The fields a write declares, or the handled refusal.
