@@ -601,7 +601,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",
   "specs/traces-v2/multiplayer-presence.feature",
-  "specs/traces-v2/onboarding-empty-state.feature",
   "specs/traces-v2/prompt-facets.feature",
   "specs/traces-v2/prompt-integration.feature",
   "specs/traces-v2/skill-invocation-highlight.feature",
@@ -790,6 +789,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/skills/skills-testing.feature",
   "specs/suites/suite-model-selection.feature",
   "specs/topic-clustering/event-sourced-scheduling.feature",
+  // Reason: the first-trace poll scenario is the one the Trace Explorer
+  // binds; the other scenarios describe the onboarding journey, which no
+  // test on this branch is tagged against.
+  "specs/traces-v2/onboarding-empty-state.feature",
   "specs/traces-v2/annotations.feature",
   "specs/traces-v2/bulk-actions.feature",
   "specs/traces-v2/code-block-language-fallback.feature",
