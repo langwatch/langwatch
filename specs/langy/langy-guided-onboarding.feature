@@ -890,6 +890,17 @@ Feature: Langy guides the first setup after sign-up
       Then the folder becomes a repository with a first commit and a .gitignore naming .env
       And the path carries on the langy branch, with the no-remote line in the pull request line's place
 
+    @e2e
+    Scenario: An interpreter the SDK does not ship for is asked about, not written against
+      Given a shared folder whose manifest is requirements.txt
+      And a terminal whose only interpreter is a Python every current langwatch release excludes
+      When Langy runs the llmops path
+      Then the installed release is checked for the tracing API before any file is edited
+      And the turn ends on the question "Your Python 3.14 is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?"
+      And its options are "Install Python 3.13 with uv for me" and "I'll pick the interpreter myself", in that order
+      And the project's code is untouched when the card is answered
+      And pip install langwatch --upgrade is never run against that interpreter
+
   # ===========================================================================
   # The skill and its routing
   # ===========================================================================

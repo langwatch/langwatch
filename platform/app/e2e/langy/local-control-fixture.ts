@@ -770,12 +770,34 @@ export async function createFixtureFolder({
   };
 }
 
+/**
+ * The newest interpreter on this machine that the published SDK supports.
+ *
+ * Every `langwatch` release from 0.2.11 to 1.4.0 declares
+ * `requires-python >=3.10,<3.14`. On a machine whose `python3` is 3.14, pip
+ * resolves `pip install langwatch` past all of them and down to 0.1.32, a
+ * release from before `setup()` and `connect_agent()` existed: the install
+ * reports success, and the tracing code the project just gained cannot
+ * import. A scenario about a missing package manager spelling would then be
+ * failing on the interpreter instead, so the venv is built from a version the
+ * SDK actually ships for.
+ */
+function supportedPython(): string {
+  for (const name of ["python3.13", "python3.12", "python3"]) {
+    const found = spawnSync("which", [name], { encoding: "utf8" });
+    if (found.status === 0 && found.stdout.trim()) return found.stdout.trim();
+  }
+  return "python3";
+}
+
 /** A Python interpreter of a scenario's own, and the ways it uses one. */
 export interface PythonEnv {
   /** Goes on the terminal's PATH: it carries `python3`, `pip3` and `pip`. */
   binDir: string;
   /** The interpreter itself, for a test that asserts on what got installed. */
   python: string;
+  /** Its `major.minor`, for a scenario whose premise is the version. */
+  version: string;
   /** Whether the interpreter can import a module, which an install proves. */
   canImport: (module: string) => boolean;
 }
@@ -802,12 +824,21 @@ export interface PythonEnv {
 export async function createPythonEnv({
   at,
   forFolder,
+  interpreter = "supported",
 }: {
   at: string;
   forFolder?: string;
+  /**
+   * Which interpreter the environment is built from. `supported` is the
+   * newest version the published SDK ships for, which is what a scenario
+   * about anything else wants. `machine-default` is whatever `python3` is on
+   * this machine, for the one scenario whose subject IS the interpreter.
+   */
+  interpreter?: "supported" | "machine-default";
 }): Promise<PythonEnv> {
   await fs.rm(at, { recursive: true, force: true });
-  sh("python3", ["-m", "venv", at], { timeoutMs: 300_000 });
+  const base = interpreter === "supported" ? supportedPython() : "python3";
+  sh(base, ["-m", "venv", at], { timeoutMs: 300_000 });
   const binDir = path.join(at, "bin");
   const python = path.join(binDir, "python3");
   const requirements = forFolder && path.join(forFolder, "requirements.txt");
@@ -819,6 +850,13 @@ export async function createPythonEnv({
   return {
     binDir,
     python,
+    version: sh(
+      python,
+      ["-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
+      {
+        timeoutMs: 120_000,
+      },
+    ).trim(),
     canImport: (module: string) => {
       try {
         sh(python, ["-c", `import ${module}`], { timeoutMs: 120_000 });
