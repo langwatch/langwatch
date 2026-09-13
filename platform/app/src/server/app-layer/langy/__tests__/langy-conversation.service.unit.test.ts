@@ -238,6 +238,18 @@ describe("LangyConversationService", () => {
         type: "lw.langy_conversation.conversation_started",
         data: { conversationId: "c1", userId },
       });
+    const firstMessageBy = (userId: string) =>
+      spineEvent({
+        id: "e-msg",
+        type: "lw.langy_conversation.message_recorded",
+        data: {
+          conversationId: "c1",
+          userId,
+          messageId: "m1",
+          role: "user",
+          parts: [],
+        },
+      });
     const sharedWord = (isShared: boolean) =>
       spineEvent({
         id: `e-meta-${isShared}`,
@@ -318,6 +330,39 @@ describe("LangyConversationService", () => {
           await outcome;
           // Full budget spent: one read per attempt, not a grace exit.
           expect(findVisibleById.mock.calls.length).toBeGreaterThan(5);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the conversation was created lazily, owned by its first message", () => {
+      it("waits out the lag for that owner — the fold's own ownership rule", async () => {
+        vi.useFakeTimers();
+        try {
+          // A lazily created conversation's log can lead with the recorded
+          // message; the fold sets the owner from it first-writer-wins, so
+          // the evidence must too, or the owner's first read gives up at the
+          // grace and 404s a conversation whose row IS coming.
+          const findVisibleById = vi.fn().mockResolvedValue(row());
+          for (let i = 0; i < 8; i++) {
+            findVisibleById.mockResolvedValueOnce(null);
+          }
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            readerOf([firstMessageBy("alice")]),
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          await vi.advanceTimersByTimeAsync(10_000);
+          const detail = await pending;
+          expect(detail.id).toBe("c1");
+          expect(findVisibleById.mock.calls.length).toBeGreaterThanOrEqual(9);
         } finally {
           vi.useRealTimers();
         }
@@ -1185,7 +1230,7 @@ describe("LangyConversationService", () => {
     });
   });
 
-  describe("turnExists — the durable result path's cross-check", () => {
+  describe("when the durable result path cross-checks a turn (turnExists)", () => {
     const acceptedTurn = (turnId: string) => ({
       id: `e-${turnId}`,
       aggregateId: "c1",

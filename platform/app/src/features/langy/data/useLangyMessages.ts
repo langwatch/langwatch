@@ -92,7 +92,7 @@ const UNCONFIRMED_POLL_MS = 1_000;
  * indicator outlives the answer. Stops itself the moment the turn settles.
  *
  * A read with NO data for a conversation this tab just minted also polls
- * (`unconfirmed` — see `unconfirmedConversations`): the projection row is
+ * (`isUnconfirmed` — see `unconfirmedConversations`): the projection row is
  * written by an asynchronous fold, so the first read routinely 404s, the
  * query's retry policy rightly never retries a 404, and nothing else would
  * ever re-ask. Stops itself on the first successful read — data lands, the
@@ -100,10 +100,10 @@ const UNCONFIRMED_POLL_MS = 1_000;
  */
 export function langyMessagesPollInterval(
   data: { isTurnInFlight: boolean } | undefined,
-  unconfirmed = false,
+  isUnconfirmed = false,
 ): number | false {
   if (data?.isTurnInFlight) return TURN_IN_FLIGHT_POLL_MS;
-  if (!data && unconfirmed) return UNCONFIRMED_POLL_MS;
+  if (!data && isUnconfirmed) return UNCONFIRMED_POLL_MS;
   return false;
 }
 
@@ -120,7 +120,7 @@ export function useLangyMessages(
 
   // Subscribed on THIS hook's conversation (not the store's active one): the
   // poll must follow the query it drives, and the two ids diverge mid-switch.
-  const unconfirmed = useLangyStore(
+  const isUnconfirmed = useLangyStore(
     (s) => !!conversationId && !!s.unconfirmedConversations[conversationId],
   );
 
@@ -135,13 +135,18 @@ export function useLangyMessages(
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
       refetchInterval: (query) =>
-        langyMessagesPollInterval(query.state.data, unconfirmed),
+        langyMessagesPollInterval(query.state.data, isUnconfirmed),
     },
   );
 
   // A successful read is durable proof the conversation's projection exists —
   // confirms a freshly-minted conversation (see `unconfirmedConversations`).
-  const conversationRead = !!conversationId && query.isSuccess;
+  // Placeholder data is NOT that proof: `keepPreviousData` reports success
+  // for the conversation just left while the new one is still fetching, and
+  // confirming off it would stop the unconfirmed poll on the very 404 it
+  // exists to retry.
+  const conversationRead =
+    !!conversationId && query.isSuccess && !query.isPlaceholderData;
   useEffect(() => {
     if (conversationRead && conversationId) {
       useLangyStore.getState().confirmConversation(conversationId);

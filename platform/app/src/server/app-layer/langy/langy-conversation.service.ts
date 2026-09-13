@@ -380,11 +380,14 @@ function isLangyWaitEventType(type: string): boolean {
 
 /**
  * Whether this caller will see the conversation's projection row once the
- * fold lands it, decided from the raw event log by the fold's own rules: a
- * birth event (started or forked) names the owner first-writer-wins, the
- * latest metadata word decides shared, and an archive is terminal — the
- * vocabulary has no unarchive, so one archive event means the visible row is
- * never coming back and waiting cannot help.
+ * fold lands it, decided from the raw event log by the fold's own rules
+ * (`foldLangyConversationState`): the owner is named first-writer-wins by a
+ * started, forked or message_recorded event — the last because a lazily
+ * created conversation's first message is what owns it — the latest metadata
+ * word decides shared, and an archive is terminal. The vocabulary has no
+ * unarchive, so one archive event means the visible row is never coming back
+ * and waiting cannot help. (message_imported carries no userId and never
+ * sets ownership, exactly like the fold.)
  *
  * Only meaningful for a NON-EMPTY log; an empty one says nothing about
  * whether the conversation exists (the caller owns that distinction).
@@ -398,7 +401,8 @@ function eventLogSaysVisible(
   for (const event of events) {
     if (
       event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED ||
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED ||
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED
     ) {
       owner ??= event.data.userId;
     } else if (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED) {
