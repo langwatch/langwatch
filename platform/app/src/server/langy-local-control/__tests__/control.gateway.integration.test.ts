@@ -801,7 +801,7 @@ describe("given a folder shared with the conversation", () => {
         call: {
           tool: "local_bash",
           params: {
-            command: "git fetch origin && git checkout -b langy/x origin/main",
+            command: "uv sync && uv run pytest -s",
           },
         },
         timeoutMs: 30_000,
@@ -810,20 +810,20 @@ describe("given a folder shared with the conversation", () => {
       cli.send({
         type: "permission_required",
         callId: call.callId,
-        summary: "git fetch origin && git checkout -b langy/x origin/main",
-        pattern: "git fetch",
-        reason: "changes the git repository and reaches the network",
+        summary: "uv sync && uv run pytest -s",
+        pattern: "uv sync",
+        reason: "installs packages and runs the project's own checks",
         skipOffered: true,
         timeoutSeconds: 300,
         segments: [
           {
-            command: "git fetch origin",
-            pattern: "git fetch",
+            command: "uv sync",
+            pattern: "uv sync",
             readOnly: false,
           },
           {
-            command: "git checkout -b langy/x origin/main",
-            pattern: "git checkout",
+            command: "uv run pytest -s",
+            pattern: "uv run",
             readOnly: false,
           },
         ],
@@ -837,7 +837,7 @@ describe("given a folder shared with the conversation", () => {
       expect(
         liveEntries.find((e) => e.kind === "local_permission")?.payload,
       ).toMatchObject({
-        patterns: ["git fetch", "git checkout"],
+        patterns: ["uv sync", "uv run"],
         timeoutSeconds: 300,
       });
     });

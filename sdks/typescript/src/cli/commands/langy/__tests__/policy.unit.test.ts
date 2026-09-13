@@ -98,18 +98,26 @@ describe("given a folder shared with a Langy conversation", () => {
     });
 
     /** @scenario "A git chain that only reads runs at once" */
-    it("runs a git chain that only reads, and still asks when a reference or a value is written", () => {
+    it("runs a git chain that only reads, and still asks when a reference is moved by hand", () => {
       expect(
         bash(
           "git status --porcelain && git remote -v && git symbolic-ref --short refs/remotes/origin/HEAD || true",
         ),
       ).toEqual({ kind: "run" });
 
+      // Ordinary git work in the folder needs no answer: a repo-scoped config
+      // value and the remote's branch list are part of it.
+      for (const command of [
+        "git config user.name Riley",
+        "git config --unset user.name",
+        "git ls-remote origin",
+      ]) {
+        expect(bash(command), command).toEqual({ kind: "run" });
+      }
+
       const writes = [
         "git symbolic-ref HEAD refs/heads/main",
         "git symbolic-ref --delete refs/remotes/origin/HEAD",
-        "git config user.name Riley",
-        "git config --unset user.name",
       ];
       for (const command of writes) {
         const decision = bash(command);
@@ -117,11 +125,6 @@ describe("given a folder shared with a Langy conversation", () => {
         if (decision.kind !== "ask") continue;
         expect(decision.reason, command).toBe("This changes the git repository.");
       }
-
-      const remote = bash("git ls-remote origin");
-      expect(remote.kind).toBe("ask");
-      if (remote.kind !== "ask") return;
-      expect(remote.reason).toBe("This reaches the network.");
     });
 
     /** @scenario "The GitHub CLI sign-in check runs at once" */
@@ -141,17 +144,241 @@ describe("given a folder shared with a Langy conversation", () => {
 
   describe("when Langy lists the git worktrees", () => {
     /** @scenario "Listing the git worktrees runs at once" */
-    it("runs the list and asks for every other worktree verb", () => {
+    it("runs the worktree verbs and asks for the one that forces a removal", () => {
       const worktrees: [string, PolicyDecision["kind"]][] = [
         ["git worktree list", "run"],
         ["git worktree list --porcelain", "run"],
+        ["git worktree add langy-work -b langy/x", "run"],
+        ["git worktree remove old", "run"],
+        ["git worktree prune", "run"],
+        ["git worktree move old new", "run"],
+        ["git worktree lock old", "run"],
+        ["git worktree remove --force old", "ask"],
+        // A worktree outside the folder is refused before anything else.
         ["git worktree add ../copy main", "refuse"],
-        ["git worktree remove old", "ask"],
-        ["git worktree prune", "ask"],
-        ["git worktree move old new", "ask"],
-        ["git worktree lock old", "ask"],
       ];
       for (const [command, kind] of worktrees) {
+        expect(bash(command).kind, command).toBe(kind);
+      }
+    });
+  });
+
+  describe("when Langy does ordinary git work in the folder", () => {
+    /**
+     * The git a person expects an agent working in their repository to run.
+     * Langy works on a `langy/*` branch of their own checkout and commits in
+     * their own git identity, so none of these spends a card.
+     */
+    const ordinary: readonly string[] = [
+      "git add app.py",
+      "git add .",
+      'git commit -m "Initial commit"',
+      "git checkout -b langy/add-tracing origin/main",
+      "git checkout main",
+      "git switch -c langy/add-tracing",
+      "git branch langy/add-tracing",
+      "git branch -d langy/old",
+      "git fetch origin",
+      "git pull --rebase origin main",
+      "git push -u origin HEAD",
+      "git push origin langy/add-tracing",
+      "git merge origin/main",
+      "git rebase origin/main",
+      "git stash push -m wip",
+      "git stash pop",
+      "git tag v1.2.0",
+      "git tag -d v1.2.0",
+      "git worktree add langy-work -b langy/add-tracing",
+      "git init",
+      "git remote add upstream https://example.test/acme.git",
+      "git config user.email dev@example.test",
+      "git config --get user.email",
+      "git cherry-pick a1b2c3d",
+      "git revert a1b2c3d",
+      "git restore --staged app.py",
+      "git reset HEAD app.py",
+      "git rm old.py",
+      "git mv old.py new.py",
+      "git clean -n",
+      // The chains the code-changes skill runs.
+      'git add app.py && git commit -m "Initial commit"',
+      "git fetch origin && git checkout -b langy/x origin/main",
+      'git branch --list "langy/*" && git ls-remote --heads origin "langy/*"',
+    ];
+
+    /** @scenario "Git work in the folder runs without asking" */
+    it("runs every one of them with no card", () => {
+      for (const command of ordinary) {
+        expect(bash(command), command).toEqual({ kind: "run" });
+      }
+    });
+
+    /**
+     * The forms that throw work away, rewrite history another machine has
+     * already read, or change git outside the folder. Each is decided by
+     * parsing the command, never by what the model says about it.
+     */
+    const destructive: Array<[string, string, string]> = [
+      ["git push --force", "git push --force", "rewrites history on the remote"],
+      ["git push -f origin main", "git push -f", "rewrites history on the remote"],
+      [
+        "git push --force-with-lease origin main",
+        "git push --force-with-lease",
+        "rewrites history on the remote",
+      ],
+      [
+        "git push origin +main:main",
+        "git push +main:main",
+        "rewrites history on the remote",
+      ],
+      [
+        "git push --delete origin langy/x",
+        "git push --delete",
+        "deletes a branch on the remote",
+      ],
+      [
+        "git push origin :langy/x",
+        "git push :langy/x",
+        "deletes a branch on the remote",
+      ],
+      [
+        "git reset --hard origin/main",
+        "git reset --hard",
+        "discards work in the git repository",
+      ],
+      ["git clean -fd", "git clean -fd", "discards work in the git repository"],
+      ["git clean -x", "git clean -x", "discards work in the git repository"],
+      [
+        "git checkout -- app.py",
+        "git checkout --",
+        "discards work in the git repository",
+      ],
+      ["git checkout .", "git checkout .", "discards work in the git repository"],
+      [
+        "git checkout -f main",
+        "git checkout -f",
+        "discards work in the git repository",
+      ],
+      ["git restore app.py", "git restore", "discards work in the git repository"],
+      [
+        "git switch --discard-changes main",
+        "git switch --discard-changes",
+        "discards work in the git repository",
+      ],
+      [
+        "git branch -D langy/old",
+        "git branch -D",
+        "discards work in the git repository",
+      ],
+      [
+        "git branch --delete --force langy/old",
+        "git branch --delete --force",
+        "discards work in the git repository",
+      ],
+      ["git stash drop", "git stash drop", "discards work in the git repository"],
+      [
+        "git stash clear",
+        "git stash clear",
+        "discards work in the git repository",
+      ],
+      [
+        "git filter-branch --tree-filter x HEAD",
+        "git filter-branch",
+        "rewrites the history of the git repository",
+      ],
+      [
+        "git filter-repo --path src",
+        "git filter-repo",
+        "rewrites the history of the git repository",
+      ],
+      [
+        "git reflog expire --expire=now --all",
+        "git reflog expire",
+        "discards work in the git repository",
+      ],
+      [
+        "git gc --prune=now",
+        "git gc --prune=now",
+        "discards work in the git repository",
+      ],
+      [
+        "git worktree remove --force old",
+        "git worktree remove --force",
+        "discards work in the git repository",
+      ],
+      ["git rm -f old.py", "git rm -f", "discards work in the git repository"],
+      [
+        "git update-ref -d refs/heads/langy/x",
+        "git update-ref -d",
+        "discards work in the git repository",
+      ],
+      [
+        "git config --global user.email dev@example.test",
+        "git config --global",
+        "changes git settings outside this folder",
+      ],
+      [
+        "git config --system core.editor vim",
+        "git config --system",
+        "changes git settings outside this folder",
+      ],
+    ];
+
+    /** @scenario "Destructive git forms still ask" */
+    it("asks for each destructive form and says what it does", () => {
+      for (const [command, pattern, clause] of destructive) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("ask");
+        if (decision.kind !== "ask") continue;
+        expect(decision.pattern, command).toBe(pattern);
+        expect(decision.reason, command).toBe(`This ${clause}.`);
+      }
+    });
+
+    /** @scenario "Destructive git forms still ask" */
+    it("asks for a git subcommand this policy has never heard of", () => {
+      const unknown: [string, string][] = [
+        ["git bisect start", "This changes the git repository."],
+        ["git apply patch.diff", "This changes the git repository."],
+        ["git submodule update --init", "This reaches the network."],
+      ];
+      for (const [command, reason] of unknown) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("ask");
+        if (decision.kind !== "ask") continue;
+        expect(decision.reason, command).toBe(reason);
+      }
+    });
+
+    /** @scenario "Destructive git forms still ask" */
+    it("asks for the whole chain when one part of it is destructive", () => {
+      const decision = bash("git add . && git push --force");
+      expect(decision.kind).toBe("ask");
+      if (decision.kind !== "ask") return;
+      expect(decision.pattern).toBe("git push --force");
+      expect(decision.patterns).toEqual(["git push --force"]);
+      expect(decision.reason).toBe("This rewrites history on the remote.");
+      expect(decision.segments).toEqual([
+        { command: "git add .", pattern: "git add", readOnly: true },
+        {
+          command: "git push --force",
+          pattern: "git push --force",
+          readOnly: false,
+        },
+      ]);
+    });
+
+    /** @scenario "Git work in the folder runs without asking" */
+    it("still judges the path, the redirect and the program name of a git part", () => {
+      const guarded: [string, PolicyDecision["kind"]][] = [
+        ["git add ../other/notes.txt", "refuse"],
+        ["git -C /etc add .", "refuse"],
+        ["git add . > staged.txt", "ask"],
+        ["./git add .", "ask"],
+        ["FOO=1 git add .", "ask"],
+        ["git add $(ls)", "ask"],
+      ];
+      for (const [command, kind] of guarded) {
         expect(bash(command).kind, command).toBe(kind);
       }
     });
@@ -192,25 +419,33 @@ describe("given a folder shared with a Langy conversation", () => {
         "git add app.py README.md",
         'git commit -m "feat: add tracing"',
         "git push -u origin HEAD",
+        "pnpm typecheck",
         'gh pr create --base main --title "Add tracing"',
       ].join(" && ");
       const decision = bash(chain);
       expect(decision.kind).toBe("ask");
       if (decision.kind !== "ask") return;
+      // The git parts run on their own, so the answer is about the parts that
+      // ask: the pull request and the check that runs before it.
       expect(decision.segments).toEqual([
         {
           command: "git add app.py README.md",
           pattern: "git add",
-          readOnly: false,
+          readOnly: true,
         },
         {
           command: 'git commit -m "feat: add tracing"',
           pattern: "git commit",
-          readOnly: false,
+          readOnly: true,
         },
         {
           command: "git push -u origin HEAD",
           pattern: "git push",
+          readOnly: true,
+        },
+        {
+          command: "pnpm typecheck",
+          pattern: "pnpm typecheck",
           readOnly: false,
         },
         {
@@ -219,12 +454,7 @@ describe("given a folder shared with a Langy conversation", () => {
           readOnly: false,
         },
       ]);
-      expect(decision.patterns).toEqual([
-        "git add",
-        "git commit",
-        "git push",
-        "gh pr",
-      ]);
+      expect(decision.patterns).toEqual(["pnpm typecheck", "gh pr"]);
     });
 
     /** @scenario "A here-document is one command" */
@@ -265,18 +495,26 @@ describe("given a folder shared with a Langy conversation", () => {
 
     /** @scenario "A pattern grant covers exactly the segments the card named" */
     it("runs a later chain whose segments the grants all cover, and asks otherwise", () => {
-      const grants = ["git add", "git commit", "git push", "gh pr"];
+      const grants = ["pnpm typecheck", "git push --force", "gh pr"];
       expect(
-        bash('git add . && git commit -m "wip" && git push', { grants }),
+        bash('git add . && git commit -m "wip" && git push --force', {
+          grants,
+        }),
       ).toEqual({ kind: "run" });
+      expect(bash("pnpm typecheck && gh pr create --title x", { grants })).toEqual(
+        { kind: "run" },
+      );
 
-      const wider = bash("git add . && git tag -d v1", { grants });
+      // The grant names the form: a force push is allowed, a delete is not.
+      const wider = bash("git add . && git push --delete origin langy/x", {
+        grants,
+      });
       expect(wider.kind).toBe("ask");
       if (wider.kind !== "ask") return;
-      expect(wider.pattern).toBe("git tag");
+      expect(wider.pattern).toBe("git push --delete");
       expect(wider.segments?.map((segment) => segment.command)).toEqual([
         "git add .",
-        "git tag -d v1",
+        "git push --delete origin langy/x",
       ]);
     });
 
@@ -289,11 +527,11 @@ describe("given a folder shared with a Langy conversation", () => {
         },
         { command: "rm -rf build", reason: "This writes files in the folder." },
         {
-          command: "git commit -m done",
+          command: "git bisect start",
           reason: "This changes the git repository.",
         },
         {
-          command: "git fetch origin",
+          command: "gh pr create --title x",
           reason: "This reaches the network.",
         },
         {
@@ -302,8 +540,15 @@ describe("given a folder shared with a Langy conversation", () => {
             "This installs packages and runs the project's own checks.",
         },
         {
-          command:
-            'git add . && git commit -m "feat: x" && git push -u origin HEAD',
+          command: "git reset --hard origin/main",
+          reason: "This discards work in the git repository.",
+        },
+        {
+          command: 'git add . && git commit -m "feat: x" && git push --force',
+          reason: "This rewrites history on the remote.",
+        },
+        {
+          command: "git bisect start && gh pr create --title x",
           reason: "This changes the git repository and reaches the network.",
         },
         {
@@ -401,16 +646,27 @@ describe("given a folder shared with a Langy conversation", () => {
   describe("when the user allowed a pattern for this session", () => {
     /** @scenario "A grant follows the command name and its first argument" */
     it("runs a command with the same name and first argument", () => {
-      expect(bash("git push origin feature-x", { grants: ["git push"] })).toEqual({
-        kind: "run",
-      });
-      expect(bash("git push", { grants: ["git push"] })).toEqual({ kind: "run" });
+      expect(
+        bash("uv run pytest -s tests", { grants: ["uv run"] }),
+      ).toEqual({ kind: "run" });
+      expect(bash("uv run", { grants: ["uv run"] })).toEqual({ kind: "run" });
     });
 
     it("still asks for the same command with another first argument", () => {
-      const decision = bash("git commit -m done", { grants: ["git push"] });
+      const decision = bash("uv sync", { grants: ["uv run"] });
       expect(decision.kind).toBe("ask");
-      if (decision.kind === "ask") expect(decision.pattern).toBe("git commit");
+      if (decision.kind === "ask") expect(decision.pattern).toBe("uv sync");
+    });
+
+    /** @scenario "Destructive git forms still ask" */
+    it("grants one destructive git form and not the whole subcommand", () => {
+      const grants = ["git push --force"];
+      expect(bash("git push --force origin main", { grants })).toEqual({
+        kind: "run",
+      });
+      const other = bash("git push --delete origin langy/x", { grants });
+      expect(other.kind).toBe("ask");
+      if (other.kind === "ask") expect(other.pattern).toBe("git push --delete");
     });
 
     it("runs any command of a name granted with a star", () => {
@@ -923,15 +1179,16 @@ describe("when an allowed command carries an operand that writes", () => {
     ["git branch", "run"],
     ["git branch -a", "run"],
     ["git branch --list", "run"],
-    ["git branch new-branch", "ask"],
-    ["git branch -d old-branch", "ask"],
+    ["git branch new-branch", "run"],
+    ["git branch -d old-branch", "run"],
+    ["git branch -D old-branch", "ask"],
     ["git tag", "run"],
-    ["git tag v1.2.0", "ask"],
+    ["git tag v1.2.0", "run"],
     ["git remote", "run"],
     ["git remote -v", "run"],
     ["git remote get-url origin", "run"],
-    ["git remote show origin", "ask"],
-    ["git remote add upstream https://example.test/acme.git", "ask"],
+    ["git remote show origin", "run"],
+    ["git remote add upstream https://example.test/acme.git", "run"],
     ["git worktree list", "run"],
     ["git worktree add ../copy main", "refuse"],
     ["git status --porcelain", "run"],
@@ -992,8 +1249,8 @@ describe("when a shell command reads a file that may hold secrets", () => {
 describe("when Langy lists the branches or the tags of the repository", () => {
   /**
    * The listing forms of the subcommands that also write. The skill asks
-   * Langy to list the branches of a prefix before it makes one, so these run
-   * with no card, and their operands are references rather than file names.
+   * Langy to list the branches of a prefix before it makes one, so these are
+   * read-only, and their operands are references rather than file names.
    */
   const listings: Array<[string, PolicyDecision["kind"]]> = [
     ["git branch --list 'langy/*'", "run"],
@@ -1006,15 +1263,22 @@ describe("when Langy lists the branches or the tags of the repository", () => {
     ["git branch --sort=-committerdate", "run"],
     ["git tag -l 'v*'", "run"],
     ["git tag --list 'v*'", "run"],
-    ["git branch langy/add-tracing", "ask"],
-    ["git tag v1.2.0", "ask"],
-    ["git branch -d langy/old", "ask"],
+    // Making one runs too, and only the forced delete asks.
+    ["git branch langy/add-tracing", "run"],
+    ["git tag v1.2.0", "run"],
+    ["git branch -d langy/old", "run"],
+    ["git branch -D langy/old", "ask"],
   ];
 
   /** @scenario "A listing form of a git subcommand that also writes runs" */
-  it("runs the listing forms and asks for the ones that write", () => {
+  it("runs the listing forms as reads", () => {
     for (const [command, kind] of listings) {
       expect(bash(command).kind, command).toBe(kind);
+    }
+    const listed = bash("git branch --list 'langy/*' && pnpm typecheck");
+    expect(listed.kind).toBe("ask");
+    if (listed.kind === "ask") {
+      expect(listed.segments?.[0]?.readOnly).toBe(true);
     }
   });
 

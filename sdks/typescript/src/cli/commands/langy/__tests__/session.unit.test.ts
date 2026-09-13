@@ -397,7 +397,7 @@ describe("given a folder connected to a Langy conversation", () => {
       lines.length = 0;
 
       const chain =
-        'git add app.py && git commit -m "feat: add tracing" && git push -u origin HEAD';
+        'uv sync && uv run pytest -s && gh pr create --title "Add tracing"';
       socket.deliver(
         callFrame({ tool: "local_bash", params: { command: chain } }),
       );
@@ -420,10 +420,10 @@ describe("given a folder connected to a Langy conversation", () => {
       const answer = lines.filter((line) => line.includes("Allowed"));
       expect(answer).toHaveLength(1);
       expect(answer[0]).toContain(
-        '"git add", "git commit" and "git push" for this session',
+        '"uv sync", "uv run" and "gh pr" for this session',
       );
       expect(answer[0]).toContain("on the card in LangWatch");
-      expect(answer[0]).not.toContain("feat: add tracing");
+      expect(answer[0]).not.toContain("Add tracing");
 
       // The grant covers every segment the card named, so the next chain of
       // the same shape runs with no card.
@@ -432,7 +432,7 @@ describe("given a folder connected to a Langy conversation", () => {
         call: {
           ...callFrame({
             tool: "local_bash",
-            params: { command: 'git add README.md && git commit -m "docs"' },
+            params: { command: "uv run pytest -s tests && gh pr view 12" },
           }).call,
           callId: "call-2",
         },
