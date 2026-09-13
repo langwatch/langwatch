@@ -199,6 +199,36 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the span is filtered out and not stored
     And the tool call is still shown in the terminal view from its tool_result log
 
+  # --- Codex helper threads -------------------------------------------------
+  # Codex 0.154's TUI starts the thread title generator and the recap as
+  # hidden ephemeral threads through its in-process app-server. The request
+  # spans that start and drive them carry request ids minted by its temporary
+  # structured request helper (`temporary-structured-<uuid>` on thread/start,
+  # `temporary-structured-turn-<uuid>` on turn/start), and the turn/start span
+  # is the root of the same trace the helper's session_task.turn lands in. The
+  # request spans stay filtered as noise; what they state about their trace
+  # is remembered and stamped on the turn span, which arrives in a later
+  # export batch.
+
+  @unit
+  Scenario: A codex temporary structured request marks its trace as auxiliary
+    Given a codex app-server turn/start span whose request id says temporary structured
+    When the span is ingested
+    Then the span is filtered out and not stored
+    And its trace is remembered as auxiliary
+
+  @unit
+  Scenario: The codex turn span of an auxiliary trace is stamped
+    Given a trace remembered as auxiliary
+    When its session_task.turn span is ingested in a later export batch
+    Then the stored span carries the auxiliary session mark
+
+  @unit
+  Scenario: A codex turn span of an ordinary trace is not stamped
+    Given a codex turn/start span whose request id is the client's own counter
+    When the turn's spans are ingested
+    Then no span carries the auxiliary session mark
+
   @unit
   Scenario: Opencode infrastructure spans are filtered out at ingestion
     Given an opencode Path B infrastructure span (sql, config, filesystem, auth)

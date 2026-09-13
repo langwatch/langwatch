@@ -78,6 +78,7 @@ function emptyState() {
     gitWorktree: null,
     title: null,
     titleSource: null,
+    auxiliary: false,
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,

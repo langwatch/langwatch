@@ -40,6 +40,11 @@ const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([
   OPENCODE_SCOPE,
 ]);
 
+/** Whether this scope is one of codex's (the TUI's and `codex exec`'s). */
+export function isCodexScope(scopeName: string | null | undefined): boolean {
+  return typeof scopeName === "string" && CODEX_SCOPES.has(scopeName);
+}
+
 /** Whether spans under this scope are subject to the coding-agent filter. */
 export function isCodingAgentNoiseScope(
   scopeName: string | null | undefined,

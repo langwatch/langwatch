@@ -69,6 +69,7 @@ function sessionRow(
     gitWorktree: "widgets-feat",
     title: "Add git context to the session row",
     titleSource: "",
+    auxiliary: false,
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,
@@ -808,5 +809,105 @@ describe("session_metric_series converged totals (migration 00052)", () => {
       (t) => t.metricName === "claude_code.cost.usage",
     );
     expect(costAfterCorrection?.total).toBeCloseTo(1.1);
+  });
+  describe("codex helper threads", () => {
+    const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
+    const listedIds = async () =>
+      (
+        await sessions.findManyRecent({
+          tenantId,
+          fromMs: window.fromMs,
+          toMs: window.toMs,
+          limit: 50,
+        })
+      ).map((row) => row.sessionId);
+
+    /** @scenario "An auxiliary session is not listed" */
+    it("lists the codex session and not the helper that titled it", async () => {
+      const user = `${tag}-codex-user`;
+      const helper = `${tag}-codex-title-helper`;
+      await sessions.upsert(
+        sessionRow({
+          sessionId: user,
+          agent: "codex",
+          title: "Reply hello",
+          titleSource: "name",
+          models: ["gpt-5.6-sol"],
+        }),
+        30,
+      );
+      await sessions.upsert(
+        sessionRow({
+          sessionId: helper,
+          agent: "codex",
+          title: "",
+          titleSource: "",
+          models: ["gpt-5.6-luna"],
+          auxiliary: true,
+          startedAtMs: baseMs + 1_000,
+        }),
+        30,
+      );
+
+      const ids = await listedIds();
+      expect(ids).toContain(user);
+      expect(ids).not.toContain(helper);
+
+      // The helper keeps its row: a session read by id still answers.
+      const read = await sessions.findBySessionId({
+        tenantId,
+        sessionId: helper,
+        window,
+      });
+      expect(read?.auxiliary).toBe(true);
+    });
+
+    /** @scenario "A second session started seconds later is listed on its own" */
+    it("lists two user sessions started seconds apart", async () => {
+      const first = `${tag}-codex-first`;
+      const second = `${tag}-codex-second`;
+      await sessions.upsert(
+        sessionRow({ sessionId: first, agent: "codex", startedAtMs: baseMs }),
+        30,
+      );
+      await sessions.upsert(
+        sessionRow({
+          sessionId: second,
+          agent: "codex",
+          startedAtMs: baseMs + 3_000,
+        }),
+        30,
+      );
+
+      const ids = await listedIds();
+      expect(ids).toContain(first);
+      expect(ids).toContain(second);
+    });
+
+    /** @scenario "A session marked auxiliary after it was first stored drops out of the list" */
+    it("drops a session once a later version marks it auxiliary", async () => {
+      const sessionId = `${tag}-codex-marked-late`;
+      // The helper's log events fold before its stamped turn span arrives, so
+      // the first stored version is unmarked.
+      const unmarked = sessionRow({
+        sessionId,
+        agent: "codex",
+        modelCalls: 0,
+        auxiliary: false,
+      });
+      await sessions.upsert(unmarked, 30);
+      expect(await listedIds()).toContain(sessionId);
+
+      await sessions.upsert(
+        {
+          ...unmarked,
+          modelCalls: 1,
+          auxiliary: true,
+          lastEventOccurredAt: baseMs + 40,
+        },
+        30,
+      );
+      expect(await listedIds()).not.toContain(sessionId);
+    });
   });
 });

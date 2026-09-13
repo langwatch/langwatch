@@ -461,6 +461,11 @@ export interface CodingAgentSessionRow {
   entrypoint: string;
   parentSessionId: string;
   isFork: boolean;
+  /**
+   * A thread the agent ran for itself (00096): codex's thread title
+   * generator, its recap. Kept and priced, never listed as a session.
+   */
+  auxiliary: boolean;
   /** Git identity from the companion event, and the generated title (00075). */
   repositoryHost: string;
   repositoryOwner: string;
@@ -604,6 +609,7 @@ export function projectCodingAgentSessionToRow({
     entrypoint: state.entrypoint ?? "",
     parentSessionId: state.parentSessionId ?? "",
     isFork: state.isFork,
+    auxiliary: state.auxiliary,
     ...gitContextColumns(state),
 
     modelCalls: state.modelCalls,
@@ -790,6 +796,7 @@ export function codingAgentSessionStateFromRow(
     userId: nullIfEmpty(row.userId),
     parentSessionId: nullIfEmpty(row.parentSessionId),
     isFork: row.isFork,
+    auxiliary: row.auxiliary,
     repositoryHost: nullIfEmpty(row.repositoryHost),
     repositoryOwner: nullIfEmpty(row.repositoryOwner),
     repositoryName: nullIfEmpty(row.repositoryName),

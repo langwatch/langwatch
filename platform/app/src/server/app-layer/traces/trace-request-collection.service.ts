@@ -18,7 +18,15 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
+import {
+  AUXILIARY_SESSION_ATTR,
+  type AuxiliaryTraceMemo,
+  isCodexTemporaryStructuredRequestSpan,
+} from "./codex-auxiliary-thread";
+import {
+  isCodexScope,
+  shouldFilterCodingAgentSpan,
+} from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
 import { SpanIngestionTally } from "./span-ingestion-tally";
 
@@ -117,6 +125,13 @@ export interface TraceRequestCollectionDeps {
   processCommandData?: (
     data: RecordSpanCommandData,
   ) => Promise<RecordSpanCommandData>;
+  /**
+   * Remembers which codex traces belong to a helper thread codex ran for
+   * itself (see `codex-auxiliary-thread.ts`), so the helper's turn span can
+   * be stamped when it arrives in a later export batch. Absent in a process
+   * with no Redis, where no span is stamped.
+   */
+  auxiliaryTraces?: AuxiliaryTraceMemo;
 }
 
 /**
@@ -177,6 +192,12 @@ export class TraceRequestCollectionService {
                 "Error parsing OTLP scope",
               );
             }
+
+            await this.rememberAuxiliaryTraces({
+              tenantId,
+              scopeName: scopeParseResult.data?.name,
+              otelSpans: scopeSpan?.spans ?? [],
+            });
 
             for (const otelSpan of scopeSpan?.spans ?? []) {
               const result = await this.processSpan({
@@ -355,11 +376,91 @@ export class TraceRequestCollectionService {
 
     return await this.ingestNormalizedSpan({
       tenantId,
-      span: normalizeSpanIds(spanParseResult.data),
+      span: normalizeSpanIds(
+        await this.stampAuxiliaryTrace({
+          tenantId,
+          scopeName: scope?.name,
+          span: spanParseResult.data,
+        }),
+      ),
       resource,
       instrumentationScope: scope,
       piiRedactionLevel,
       otelSpanRef,
     });
+  }
+
+  /**
+   * Before a scope's spans are processed, mark the traces its codex temporary
+   * structured request spans belong to. Done over the whole scope first so the
+   * stamp does not depend on the order spans sit in one batch. Fail-open: a
+   * memo that cannot be written leaves the helper's session unmarked, never
+   * the batch unprocessed.
+   */
+  private async rememberAuxiliaryTraces({
+    tenantId,
+    scopeName,
+    otelSpans,
+  }: {
+    tenantId: string;
+    scopeName: string | undefined;
+    otelSpans: unknown[];
+  }): Promise<void> {
+    const memo = this.deps.auxiliaryTraces;
+    if (!memo || !isCodexScope(scopeName)) return;
+    for (const otelSpan of otelSpans) {
+      const parsed = spanSchema.safeParse(otelSpan);
+      if (!parsed.success) continue;
+      const attributes = Object.fromEntries(
+        parsed.data.attributes.map((a) => [a.key, a.value.stringValue]),
+      );
+      if (!isCodexTemporaryStructuredRequestSpan({ scopeName, attributes })) {
+        continue;
+      }
+      const traceId = normalizeSpanIds(parsed.data).traceId;
+      try {
+        await memo.mark({ tenantId, traceId });
+      } catch (error) {
+        this.logger.warn(
+          { error, tenantId, traceId },
+          "could not remember a codex auxiliary trace; its session stays unmarked",
+        );
+      }
+    }
+  }
+
+  /**
+   * A kept codex span of a trace remembered as auxiliary carries the mark
+   * downstream on its attributes. Fail-open like the write above.
+   */
+  private async stampAuxiliaryTrace({
+    tenantId,
+    scopeName,
+    span,
+  }: {
+    tenantId: string;
+    scopeName: string | undefined;
+    span: OtlpSpan;
+  }): Promise<OtlpSpan> {
+    const memo = this.deps.auxiliaryTraces;
+    if (!memo || !isCodexScope(scopeName)) return span;
+    const traceId = normalizeSpanIds(span).traceId;
+    let auxiliary = false;
+    try {
+      auxiliary = await memo.has({ tenantId, traceId });
+    } catch (error) {
+      this.logger.warn(
+        { error, tenantId, traceId },
+        "could not read the codex auxiliary trace memo; the span is stored unmarked",
+      );
+    }
+    if (!auxiliary) return span;
+    return {
+      ...span,
+      attributes: [
+        ...span.attributes,
+        { key: AUXILIARY_SESSION_ATTR, value: { stringValue: "true" } },
+      ],
+    };
   }
 }

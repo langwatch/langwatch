@@ -1,4 +1,5 @@
 import { claudeCacheWritesLongLived } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import { AUXILIARY_SESSION_ATTR } from "~/server/app-layer/traces/codex-auxiliary-thread";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
@@ -289,6 +290,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     userId: null,
     parentSessionId: null,
     isFork: false,
+    auxiliary: false,
     repositoryHost: null,
     repositoryOwner: null,
     repositoryName: null,
@@ -553,6 +555,11 @@ function withIdentity(
     // session": the two are indistinguishable from here.
     parentSessionId: state.parentSessionId ?? str(attrs.parent_session_id),
     isFork: state.isFork || scalarStr(attrs.is_fork) === "true",
+    // The ingestion stamp of a helper thread's trace (codex's title
+    // generator, its recap). Sticky: the thread's log events fold before
+    // the stamped turn span arrives, and nothing after it may unmark.
+    auxiliary:
+      state.auxiliary || scalarStr(attrs[AUXILIARY_SESSION_ATTR]) === "true",
   };
 }
 

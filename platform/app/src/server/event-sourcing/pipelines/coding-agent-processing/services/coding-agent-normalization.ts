@@ -18,6 +18,7 @@
  * evidence that forced it.
  */
 
+import { AUXILIARY_SESSION_ATTR } from "~/server/app-layer/traces/codex-auxiliary-thread";
 import { CODING_AGENT_REGISTRY } from "../agents";
 import type {
   CodingAgent,
@@ -332,6 +333,10 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "parent_session_id",
   "parent_agent_id",
   "is_fork",
+  // Stamped at ingestion on every kept span of a trace codex started for a
+  // helper thread of its own (the thread title generator, the recap): the
+  // session it folds into is marked auxiliary and the Sessions list omits it.
+  AUXILIARY_SESSION_ATTR,
   "depth",
   "spawn_mode",
   "mcp_server_scope",

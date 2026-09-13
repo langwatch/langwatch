@@ -203,3 +203,37 @@ Feature: Coding-agent sessions
     When the log dispatcher considers it
     Then no session contribution is made for it
     And the record itself is still stored
+
+  # Codex helper threads. Codex 0.154's TUI starts hidden threads of its own,
+  # with their own thread id, on the same telemetry exporter: the thread title
+  # generator right after the first prompt, and the recap. Neither carries a
+  # link to the thread it serves. What Codex does state is how it started
+  # them: its temporary structured request helper mints the app-server request
+  # ids (`temporary-structured-turn-<uuid>` on the turn/start request that is
+  # the root of the helper turn's trace), and ingestion stamps that statement
+  # onto the helper's turn span as the auxiliary session mark.
+
+  Scenario: a codex helper thread's turn marks its session as auxiliary
+    When a codex turn span arrives carrying the auxiliary session mark
+    Then the session it folds into is marked auxiliary
+    And a later contribution from the same thread does not clear the mark
+
+  Scenario: a codex turn without the mark keeps its session unmarked
+    When a codex turn span arrives without the auxiliary session mark
+    Then the session it folds into is not marked auxiliary
+
+  Scenario: an auxiliary session round-trips through its stored row
+    Given a session marked auxiliary
+    When its row is stored and read back
+    Then the read-back state is still marked auxiliary
+    And a row from before the mark existed reads back as not auxiliary
+
+  # Codex 0.154 names no parent on a helper thread's spans or events, so
+  # there is nothing to attribute the helper's tokens by. They stay on the
+  # helper's own trace, priced and counted in project usage, until Codex
+  # emits the link. Recorded as the target.
+  @unimplemented
+  Scenario: a codex helper thread's cost lands on the session it served
+    Given a codex helper thread whose telemetry names the thread it served
+    When its turn is folded
+    Then its tokens and cost count toward that session

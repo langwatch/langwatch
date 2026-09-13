@@ -93,6 +93,7 @@ interface ClickHouseWriteRecord {
   Entrypoint: string;
   ParentSessionId: string;
   IsFork: boolean;
+  Auxiliary: boolean;
   RepositoryHost: string;
   RepositoryOwner: string;
   RepositoryName: string;
@@ -255,6 +256,7 @@ function toRecord({
     Entrypoint: row.entrypoint,
     ParentSessionId: row.parentSessionId,
     IsFork: row.isFork,
+    Auxiliary: row.auxiliary,
     RepositoryHost: row.repositoryHost,
     RepositoryOwner: row.repositoryOwner,
     RepositoryName: row.repositoryName,
@@ -714,8 +716,13 @@ export class CodingAgentSessionClickHouseRepository
     // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
+    // The auxiliary mark is read off the version the dedup settles on, never
+    // in SQL: two versions of one session can tie on `max(UpdatedAt)`, and a
+    // SQL predicate would drop the marked version before `preferredOf` could
+    // rank it, listing the unmarked tie in its place.
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
+      .filter((row) => !row.auxiliary)
       .sort((a, b) => b.startedAtMs - a.startedAtMs)
       .slice(0, limit);
   }
@@ -1149,6 +1156,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     entrypoint: String(record.Entrypoint ?? ""),
     parentSessionId: String(record.ParentSessionId ?? ""),
     isFork: Boolean(record.IsFork),
+    auxiliary: Boolean(record.Auxiliary),
     repositoryHost: String(record.RepositoryHost ?? ""),
     repositoryOwner: String(record.RepositoryOwner ?? ""),
     repositoryName: String(record.RepositoryName ?? ""),
