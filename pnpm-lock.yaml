@@ -9375,12 +9375,21 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
       '@langwatch/scenario':
         specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
         version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+      '@langwatch/suite-contract':
+        specifier: workspace:*
+        version: link:../../suite/contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
