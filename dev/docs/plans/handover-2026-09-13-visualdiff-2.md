@@ -10,6 +10,17 @@ dev/scripts/coordinator-state.sh --full` before trusting anything here.
 
 ## LIVE ITEMS — read these before anything else
 
+> **Note from the apidiff coordinator, ~18:50.** The "one announced install"
+> for the workflow lane's `@langwatch/infrastructure` line has ALREADY RUN -
+> announced in writing here because no visualdiff session was alive to ping.
+> Reason: the finished-uncollected lane's import is live in the working tree,
+> so every boot (including apidiff's branch side) died on
+> `Cannot find package '@langwatch/infrastructure'` until the link existed.
+> The resulting `pnpm-lock.yaml` change is UNCOMMITTED on purpose: it belongs
+> to the workflow slice - sweep it into that commit at collection. After the
+> install, the api's full module graph link-probes clean with the dirty
+> workflow files in place.
+
 1. **One lane is ACTIVE: `module-v2-workflow`** (sonnet, owns
    `modules/workflow/server/src/**`; manifest
    `.claude/manifests/module-v2-workflow.md`, roster row in
