@@ -26,6 +26,7 @@ import {
   createFirstScenarioLabel,
   createGuidedCheckout,
   expectAgentOnlineBeforeFirstRun,
+  expectInstrumentationLeavesRepoWorking,
   expectSaidLinesMatchRepo,
   GUIDED_LINES,
   GUIDED_OPTIONS,
@@ -146,6 +147,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                   "Before the first scenario runs, Langy starts the agent and confirms it is online with one langwatch agent list --wait-online call; no scenario or suite runs against an agent that did not report online.",
                   "Langy installs the langwatch package through the project's own package manager (uv add, pip install, npm install or pnpm add) before it starts the agent, so the agent process finds the module at import. An agent started before the install, or a start that dies on a missing langwatch module with no install and restart after it, fails this criterion.",
                   "The connect adapter Langy writes is the SDK's own connect call, the connect_agent decorator in Python or connectAgent in TypeScript, in the file that starts the service. A route of Langy's own answering on a path such as /langwatch/connect registers nothing with the platform, so writing one while the SDK is installed fails this criterion.",
+                  "The connect call goes on a new function that wraps the entry point the repository already has and returns its reply text. Functions the repository already has keep their signature and their return value, since other files call them, and the agent is declared once: one connect call, one decorated function. Decorating an existing function in place and changing what it returns, or decorating both it and a wrapper around it, fails this criterion.",
                   "Langy says the no-remote line only when the commands showed that cause. A push that printed a new branch on a remote means the folder has one, so a pull request that fails after it is reported with the failed-open line, which names the branch and the line the command printed, and the no-remote line is wrong there. The three lines are alternatives: exactly one of them is said.",
                   "Langy never prints an environment file to the terminal: no command that shows the values in a .env file. Reading the key names alone, such as sed 's/=.*//' .env, is fine, and so is writing the file through the env tool.",
                   `Langy proposes the first scenario as one bare question card: the card's own text is the proposal, word for word from "${GUIDED_LINES.proposalStart}" up to the reason, shown as a paragraph above exactly two options, one reading Create "<the scenario title>" as your first scenario test and the quiet "${GUIDED_OPTIONS.chatAboutThis}". The framework line, the pull request sentence and the branch line arrive as Langy's own lines right before that card, in that order, and nothing is said between the branch line and the card. It creates nothing before the developer picks the create option, and once the developer picks it, its next action is creating the scenario, with no sentence first and none of the step 2 lines said again.`,
@@ -273,6 +275,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
         console.log("[layer2] said:", said.join(" | "));
         expectSaidLinesMatchRepo({ lines: said, repo, messages: stored });
         expectAgentOnlineBeforeFirstRun(stored);
+        await expectInstrumentationLeavesRepoWorking({ repo, branch });
 
         // Layer 2: the proposal came as a question with the quiet way out,
         // and nothing existed while it was open.

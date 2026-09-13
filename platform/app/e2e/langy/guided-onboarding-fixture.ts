@@ -37,6 +37,7 @@ import {
 } from "./config";
 import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import {
+  callDemoChatRoute,
   createDemoRepo,
   type DemoRepo,
   demoProviderEnvLines,
@@ -177,10 +178,51 @@ const SDK_CONNECT_CALLS = [/\bconnect_agent\s*\(/, /\bconnectAgent\s*\(/];
  * opens the connection.
  */
 export function diffAddsSdkConnect(diff: string): boolean {
+  return connectCallsAdded(diff) > 0;
+}
+
+/** The lines a diff adds, without its file headers. */
+function addedLines(diff: string): string[] {
   return diff
     .split("\n")
-    .filter((line) => line.startsWith("+"))
-    .some((line) => SDK_CONNECT_CALLS.some((call) => call.test(line)));
+    .filter((line) => line.startsWith("+") && !line.startsWith("+++"));
+}
+
+/**
+ * How many connect calls the diff adds.
+ *
+ * One agent is one connect call, so one decorated function. A run decorated
+ * the entry point and then a wrapper around it with the same agent name, and
+ * the SDK said so on startup: "acme-checkout@development was declared twice,
+ * the last declaration wins".
+ */
+export function connectCallsAdded(diff: string): number {
+  return addedLines(diff).filter((line) =>
+    SDK_CONNECT_CALLS.some((call) => call.test(line)),
+  ).length;
+}
+
+/**
+ * Does this diff rewrite code the repository already had?
+ *
+ * Instrumentation is added around what is there: a new function that wraps the
+ * entry point, an import, a decorator line. A run instead decorated `run_turn`
+ * itself and changed its return from the dictionary `app/main.py` reads to a
+ * string, so the repository's own route raised on the result of its only call.
+ * A signature or a return that changed is a removed `def` or `return` line in
+ * the diff, which is what this reads: adding lines never removes one.
+ */
+export function diffRewritesExistingCode(diff: string): string[] {
+  return diff
+    .split("\n")
+    .filter(
+      (line) =>
+        line.startsWith("-") &&
+        !line.startsWith("---") &&
+        /^-\s*(async def |def |export function |export default function |function |return\b)/.test(
+          line,
+        ),
+    );
 }
 
 /** What one guided run stored, message by message. */
@@ -309,6 +351,47 @@ export function expectSaidLinesMatchRepo({
       "the failed-open line carries no pull request address",
     ).not.toMatch(/https?:\/\/\S+/);
   }
+}
+
+/**
+ * Layer 2: the instrumentation left the repository working.
+ *
+ * The diff is read for the shape the skill asks for, a new function around
+ * what is there, and then the application's own endpoint is asked for a turn
+ * from the branch Langy left checked out. The endpoint is the part the
+ * scenarios never touch: they reach the agent through the SDK's connection, so
+ * a run once passed every check with a `POST /chat` that raised on the first
+ * request.
+ */
+export async function expectInstrumentationLeavesRepoWorking({
+  repo,
+  branch,
+}: {
+  repo: DemoRepo;
+  branch: string;
+}): Promise<void> {
+  const diff = repo.diffAgainstMain(branch);
+  expect(
+    diffRewritesExistingCode(diff),
+    "the instrumentation is added around the code that was there, so the diff removes no signature and no return",
+  ).toEqual([]);
+  expect(
+    connectCallsAdded(diff),
+    "one agent is one connect call, so one decorated function",
+  ).toBe(1);
+  const answer = await callDemoChatRoute({ repo });
+  expect(
+    answer.unreachable,
+    `the application could not be asked for a turn: ${answer.unreachable}\n${answer.lines}`,
+  ).toBe("");
+  expect(
+    answer.status,
+    `the repository's own endpoint answers on the instrumented branch, and it said:\n${answer.lines}`,
+  ).toBe(200);
+  expect(
+    answer.output.trim(),
+    "the endpoint's answer carries the output its response model declares",
+  ).not.toBe("");
 }
 
 /**

@@ -20,8 +20,14 @@
  * @see dev/docs/adr/129-langy-local-control.md
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, promises as fs, readFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import {
+  closeSync,
+  existsSync,
+  promises as fs,
+  openSync,
+  readFileSync,
+} from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1866,6 +1872,19 @@ async function excludeFromGit({
   await fs.appendFile(excludeFile, `${separator}${entry}\n`, "utf8");
 }
 
+/** How the repository itself starts the demo application, on one port. */
+function demoStartCommand({ repo, port }: { repo: DemoRepo; port: number }): {
+  command: string;
+  args: string[];
+} {
+  return DEMO[repo.language].runtime === "uv"
+    ? {
+        command: "uv",
+        args: ["run", "uvicorn", "app.main:app", "--port", String(port)],
+      }
+    : { command: "npm", args: ["run", "start"] };
+}
+
 /** The demo application, running from the shared folder. */
 export interface DemoApp {
   port: number;
@@ -1917,10 +1936,8 @@ export async function startDemoApp({
   await excludeFromGit({ root: repo.root, entry: ".env" });
   const sessionName = `acme-${label}-${Date.now().toString(36)}`;
   const logPath = path.join(repo.root, "..", `${sessionName}.log`);
-  const command =
-    DEMO[repo.language].runtime === "uv"
-      ? `uv run uvicorn app.main:app --port ${chosenPort}`
-      : `npm run start`;
+  const start = demoStartCommand({ repo, port: chosenPort });
+  const command = [start.command, ...start.args].join(" ");
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
   await fs.writeFile(
     script,
@@ -1964,6 +1981,147 @@ export async function startDemoApp({
       spawnSync("tmux", ["kill-session", "-t", sessionName]);
     },
   };
+}
+
+/** What the demo's own HTTP route answered, on the branch Langy left behind. */
+export interface DemoRouteAnswer {
+  status: number;
+  /** The `output` field of the reply, empty when there was none. */
+  output: string;
+  /** Empty when the route answered, otherwise why it could not be reached. */
+  unreachable: string;
+  /** The last lines the application printed, which name the exception. */
+  lines: string;
+}
+
+/**
+ * Ask the demo application's own endpoint for one turn, from the branch that
+ * is checked out.
+ *
+ * The scenarios reach the agent through the connection the SDK opens, which
+ * says nothing about the HTTP endpoint the repository already had. A run
+ * decorated the entry point in place and changed its return from the
+ * dictionary the route reads to a string; the connection worked, every
+ * scenario passed, and `POST /chat` raised on the first request.
+ *
+ * The application is started here rather than reused from Langy's own start:
+ * what Langy starts is its choice, and a start such as `python -m app.main`
+ * serves no HTTP at all, so there is no port to find. This starts it the way
+ * the repository documents, on a free port, and stops it again.
+ */
+export async function callDemoChatRoute({
+  repo,
+  message = "where is my order 10042?",
+  startTimeoutMs = 240_000,
+  replyTimeoutMs = 180_000,
+}: {
+  repo: DemoRepo;
+  message?: string;
+  startTimeoutMs?: number;
+  replyTimeoutMs?: number;
+}): Promise<DemoRouteAnswer> {
+  const port = await freePort();
+  const logPath = path.join(
+    repo.root,
+    "..",
+    `chat-route-${Date.now().toString(36)}.log`,
+  );
+  const log = openSync(logPath, "w");
+  const start = demoStartCommand({ repo, port });
+  const child = spawn(start.command, start.args, {
+    cwd: repo.root,
+    detached: true,
+    stdio: ["ignore", log, log],
+    env: { ...process.env, PORT: String(port) },
+  });
+  let spawnFailure = "";
+  child.on("error", (error) => {
+    spawnFailure = String(error);
+  });
+  const base = `http://127.0.0.1:${port}`;
+  const tail = (): string => {
+    const text = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    return text.split("\n").slice(-12).join("\n").trim();
+  };
+  const stop = (): void => {
+    try {
+      if (child.pid) process.kill(-child.pid, "SIGTERM");
+    } catch {
+      // The process group is already gone, which is the state this wants.
+    }
+  };
+
+  try {
+    const deadline = Date.now() + startTimeoutMs;
+    let healthy = false;
+    while (!healthy && Date.now() < deadline) {
+      if (spawnFailure !== "") {
+        return {
+          status: 0,
+          output: "",
+          unreachable: `it could not be started: ${spawnFailure}`,
+          lines: tail(),
+        };
+      }
+      if (child.exitCode !== null) {
+        return {
+          status: 0,
+          output: "",
+          unreachable: `it exited with code ${child.exitCode} before it listened`,
+          lines: tail(),
+        };
+      }
+      try {
+        healthy = (await fetch(`${base}/health`)).ok;
+      } catch {
+        // Not listening yet.
+      }
+      if (!healthy) await sleep(2_000);
+    }
+    if (!healthy) {
+      return {
+        status: 0,
+        output: "",
+        unreachable: `it never answered on ${base}/health within ${Math.round(startTimeoutMs / 1000)}s`,
+        lines: tail(),
+      };
+    }
+    let reply: Response;
+    try {
+      reply = await fetch(`${base}/chat`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: message }],
+        }),
+        signal: AbortSignal.timeout(replyTimeoutMs),
+      });
+    } catch (error) {
+      return {
+        status: 0,
+        output: "",
+        unreachable: `it did not answer the request within ${Math.round(replyTimeoutMs / 1000)}s: ${String(error)}`,
+        lines: tail(),
+      };
+    }
+    const text = await reply.text();
+    let output = "";
+    try {
+      output = String((JSON.parse(text) as { output?: unknown }).output ?? "");
+    } catch {
+      // A failed request answers with the server's own text, which the caller
+      // reads out of the log rather than out of a field that is not there.
+    }
+    return {
+      status: reply.status,
+      output,
+      unreachable: "",
+      lines: tail(),
+    };
+  } finally {
+    stop();
+    closeSync(log);
+  }
 }
 
 /** The agents this project has registered, read back over the public API. */
