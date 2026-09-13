@@ -1,7 +1,8 @@
+import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { PromptApp } from "./app/prompt.app.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
-import { promptRest } from "./transport/prompt.rest.ts";
+import { promptRest, promptRestCredential } from "./transport/prompt.rest.ts";
 import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
 
 /**
@@ -17,4 +18,23 @@ import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
 export const promptServer = defineServerModule("prompt")
   .withApp(PromptApp)
   .withTransports(promptRest, promptTrpcTransport, promptTagTrpcTransport)
+  // The credential the request itself already carries, read straight off it -
+  // no process collaborator involved. `promptRestFacts` (organizationId, the
+  // deep link back into the library) is NOT bound here: organizationId is the
+  // same read, but the deep link needs this app's own `publicBaseUrl`, which
+  // no config this module declares supplies yet - see the module handover.
+  .withTransportFacts(() => [
+    bindRestMiddleware(promptRestCredential, (context) => {
+      const credential = projectCredentialOfRequest(context.req.raw);
+
+      return credential.type === "legacyProjectKey"
+        ? { type: "legacyProjectKey" as const, projectId: credential.project.id }
+        : {
+            type: "apiKey" as const,
+            apiKeyId: credential.apiKeyId,
+            userId: credential.userId,
+            organizationId: credential.organizationId,
+          };
+    }),
+  ])
   .build();
