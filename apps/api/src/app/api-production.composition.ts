@@ -62,6 +62,28 @@ const coreAuditLog = serverModules.some((module) => (module.name as string) === 
  * the api parses nothing for them, so anything else would be inventing
  * configuration rather than passing it on.
  */
+/**
+ * One config slice with its empty strings dropped.
+ *
+ * A resolution that writes `""` for "the operator set nothing" is saying
+ * absent in a value that is present, and a module declaring
+ * `Config.optionalSecret` — `z.string().min(1).optional()` — refuses it,
+ * because the `optional()` branch is unreachable for an empty string. The api
+ * resolves github's four credentials that way (`appId?.trim() ?? ""`) while
+ * resolving `host` beside them as `|| undefined`, so the inconsistency is
+ * inside one object literal.
+ *
+ * Filtered here rather than at the resolution, because
+ * `ApiGithubConfigResolution` types those four as `string` and other readers
+ * are entitled to that. What crosses into a module is the module's own
+ * statement of absence.
+ */
+function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Slice> {
+  return Object.fromEntries(
+    Object.entries(slice).filter(([, value]) => value !== ""),
+  ) as Partial<Slice>;
+}
+
 function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
   return {
     agent: {
@@ -79,7 +101,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     "data-retention": {
       platformDefaultRetentionDays: config.platformDefaultRetentionDays,
     },
-    github: config.infrastructure.github,
+    github: stated(config.infrastructure.github),
     /** The origin a hosted MCP server advertises is the api's public one. */
     "hosted-mcp": { baseHost: config.infrastructure.execution.publicBaseUrl },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
