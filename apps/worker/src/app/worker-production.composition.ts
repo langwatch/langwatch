@@ -1289,6 +1289,8 @@ export class WorkerProductionComposition {
             redis: processRedis,
             storage: objectStorage,
             resolveClickHouseClient: options.featureClickHouse.resolveClient,
+            clickhouse: options.featureClickHouse.queryClient,
+            eventing: eventing.eventSourcing,
             foundation: {
               projects: foundation.tenancy.projects,
               organizations: foundation.tenancy.organizations,

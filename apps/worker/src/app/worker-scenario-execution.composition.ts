@@ -25,7 +25,12 @@ import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
-import { createApp, instantiateRepositories, type ResourceScope } from "@langwatch/runtime-composition";
+import {
+  createApp,
+  instantiateRepositories,
+  membersFrom,
+  type ResourceScope,
+} from "@langwatch/runtime-composition";
 import {
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
@@ -44,7 +49,7 @@ import {
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
 import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
-import { suiteServer, type SuiteExecution } from "@langwatch/suite-server";
+import { suiteServer } from "@langwatch/suite-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
@@ -263,22 +268,16 @@ export async function createWorkerScenarioExecutionGraph(input: {
   // The suite application, over the feature's own repositories. This process
   // starts no run — the refusal below says so by name — but it reads the plans
   // and the run projection a scenario child reports against.
-  const suiteRuntime = await createApp({ name: "langwatch-worker-suite" })
-    .withPersistence("postgres", { prisma })
-    .withInfrastructure({})
+  const suiteRuntime = await createApp({
+    role: "worker",
+    members: membersFrom({ prisma }),
+  })
     .withProvided(ScenarioApi, input.scenarioApi)
     .withProvided(AgentApi, agents)
     .withProvided(PromptApi, promptApp)
     .withProvided(ProjectApi, deps.projects)
-    .withModule(suiteServer, {
-      infrastructure: {
-        resolveClickHouseClient: deps.resolveClickHouseClient,
-        defaultRetentionDays: deps.defaultRetentionDays,
-        execution: new WorkerSuiteStartRefusal(deps.config.serviceName),
-        generateId: () => `suite_${nanoid()}`,
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([suiteServer])
+    .boot();
   input.resources.own("worker scenario suites", () => suiteRuntime.stop());
   const suites = suiteRuntime.module(suiteServer).provided;
 
@@ -320,11 +319,12 @@ export async function createWorkerScenarioExecutionGraph(input: {
 
   // The SAME cipher the child processes decrypt a run's parameters with, over this
   // pod's own connection: the secret feature owns the reserved-name list itself now.
-  const secretRuntime = await createApp({ name: "langwatch-worker-secret" })
-    .withPersistence("postgres", { prisma })
-    .withInfrastructure({})
-    .withModule(secretServer, { infrastructure: { encryption } })
-    .boot({ role: "worker" });
+  const secretRuntime = await createApp({
+    role: "worker",
+    members: membersFrom({ prisma, encryption }),
+  })
+    .withModules([secretServer])
+    .boot();
   input.resources.own("worker scenario secrets", () => secretRuntime.stop());
   const secrets = secretRuntime.module(secretServer).provided;
 
@@ -435,23 +435,6 @@ class WorkerScenarioSecretCipher implements ScenarioSecretCipher {
 
   decrypt(ciphertext: string): string {
     return this.encryption.decrypt(ciphertext);
-  }
-}
-
-/**
- * Starting a suite run, on the process that DRAINS suite runs. Refused rather than composed: the
- * start is a browser write dispatched on the API's own producer, and this process reads a suite
- * only to resolve the plan overrides a simulation already in flight was configured with.
- */
-class WorkerSuiteStartRefusal implements SuiteExecution {
-  constructor(private readonly processName: string) {}
-
-  execute(input: { suiteId: string }): Promise<never> {
-    return Promise.reject(
-      new Error(
-        `${this.processName} composes no suite start; suiteId=${input.suiteId} must be started through the API.`,
-      ),
-    );
   }
 }
 

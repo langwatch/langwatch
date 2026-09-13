@@ -11,9 +11,9 @@ import {
   PostgresGovernanceAdapter,
   type PostgresGovernanceServices,
 } from "@langwatch/enterprise-governance-server";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
-import type { FoldProjectionStore } from "@langwatch/eventing";
+import type { EventSourcing, FoldProjectionStore } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { logServer } from "@langwatch/log-server";
@@ -21,10 +21,11 @@ import { metricServer } from "@langwatch/metric-server";
 import { modelProviderServer } from "@langwatch/model-provider-server";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, type ResourceScope } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -44,7 +45,6 @@ import type { WorkerEvaluationProcessing } from "./worker-evaluation-processing.
 import type { WorkerModelProviders } from "./worker-model-provider.composition.ts";
 import type { WorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { createWorkerTelemetryReadInfrastructure } from "./worker-telemetry-read.composition.ts";
-import { createWorkerTraceInfrastructure } from "./worker-trace-app.composition.ts";
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
 
 export type WorkerObservabilityFoundation = Readonly<{
@@ -63,6 +63,16 @@ export type WorkerObservabilityAppsOptions = Readonly<{
   redis: RedisConnection | null;
   storage: WorkerObjectStorage;
   resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
+  /**
+   * The process's routed query client, over the same connection the
+   * resolver above dials per-tenant. The trace module reads this member
+   * directly; a caller that names none leaves trace to refuse at boot
+   * naming "clickhouse", rather than this composition inventing a resolver
+   * shaped like one.
+   */
+  clickhouse?: ClickHouseQueryClient;
+  /** The trace module's command pipeline. Absent, trace refuses at boot naming "eventing". */
+  eventing?: EventSourcing;
   foundation: WorkerObservabilityFoundation;
   models: WorkerModelProviders;
   plans: EntitlementApi;
@@ -97,17 +107,6 @@ export async function createWorkerObservabilityApps(
     defaultRetentionDays: options.config.retention.defaultDays,
     resources: options.resources,
   });
-  const traces = createWorkerTraceInfrastructure({
-    resolveClickHouseClient: options.resolveClickHouseClient,
-    defaultRetentionDays: options.config.retention.defaultDays,
-    canonicalisation: options.canonicalisation,
-    summaryStore: options.summaryStore,
-    commands: options.commands,
-    broadcast,
-    storage: options.storage,
-    fallbackVisibilityDays: FREE_VISIBILITY_DAYS,
-    processName: options.config.serviceName,
-  });
   const policy = PostgresGovernanceAdapter.create({ database: options.connection.client }).build()
     .policy;
   const codingAgents = await createWorkerCodingAgentApp({
@@ -128,29 +127,16 @@ export async function createWorkerObservabilityApps(
     },
     signingKey: options.githubSigningKey,
   });
-  // Assigned once the runtime below has booted. The cost-rule preview reads
-  // spans through this runtime's OWN trace application, and that application
-  // does not exist until every module on the runtime is installed.
-  let traceApp: TraceApi | undefined;
-  const readSpansThrough = (): TraceApi => {
-    if (!traceApp) throw new Error("The worker read spans before its trace application existed.");
-
-    return traceApp;
-  };
-  const runtime = await createApp({ name: "langwatch-worker-observability" })
-    .withPersistence("postgres", {
+  const runtime = await createApp({
+    role: "worker",
+    config: { log: telemetry.logConfig },
+    members: membersFrom({
       prisma: options.connection.client,
-      // The trace tier spans two stores that coexist: Postgres holds the
-      // reviewer correction, ClickHouse the projections the fold commits
-      // through, so both are required inputs of the one live tier.
-      clickhouse: options.resolveClickHouseClient,
-      defaultRetentionDays: options.config.retention.defaultDays,
-      // The model-provider repositories are built over the deployment's own
-      // cipher: the stored credential is a wire format shared between
-      // processes, so it travels with the connection.
-      credentials: options.models.installation.credentials,
-    })
-    .withInfrastructure({})
+      logger: createLogger(options.config.serviceName),
+      ...(options.clickhouse ? { clickhouse: options.clickhouse } : {}),
+      ...(options.eventing ? { eventing: options.eventing } : {}),
+    }),
+  })
     .withProvided(ProjectApi, foundation.projects)
     .withProvided(OrganizationApi, foundation.organizations)
     .withProvided(AuthzApi, foundation.authorization)
@@ -161,31 +147,24 @@ export async function createWorkerObservabilityApps(
     .withProvided(EntitlementApi, options.plans)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withProvided(CodingAgentApi, codingAgents.app)
-    .withModule(modelProviderServer, {
-      infrastructure: {
-        ...options.models.installation.infrastructure,
-        // The cost-rule preview reads spans through this runtime's OWN trace
-        // application, resolved on use rather than held: the trace module is
-        // installed on this same runtime, a line below.
-        spans: new WorkerModelProviderTraceSpans(readSpansThrough),
-      },
-    })
-    .withModule(traceServer, { infrastructure: traces })
-    .withModule(annotationServer)
-    .withModule(dataPrivacyServer, { infrastructure: telemetry.dataPrivacy })
-    .withModule(logServer, { infrastructure: telemetry.log })
-    // Beside the log half and in the SAME graph: a metric point is redacted by
-    // the one Data Privacy application this runtime already provides.
-    .withModule(metricServer)
-    .withModule(workerEvaluationServer, { infrastructure: options.evaluation })
+    .withModules([
+      modelProviderServer,
+      traceServer,
+      annotationServer,
+      dataPrivacyServer,
+      logServer,
+      // Beside the log half and in the SAME graph: a metric point is redacted
+      // by the one Data Privacy application this runtime already provides.
+      metricServer,
+      workerEvaluationServer,
+    ])
     .withService({
       name: "worker trace broadcast",
       start: () => broadcast.start(),
       stop: () => broadcast.close(),
     })
-    .boot({ role: "worker", config: { log: telemetry.logConfig } });
+    .boot();
 
-  traceApp = runtime.module(traceServer).provided;
   options.resources.own("worker observability feature runtime", () => runtime.stop());
   const processing = options.evaluation.processing.tryGet();
   if (!processing) {
@@ -202,37 +181,6 @@ export async function createWorkerObservabilityApps(
       await runtime.start();
     },
   };
-}
-
-class WorkerModelProviderTraceSpans {
-  #traces: () => TraceApi;
-  constructor(traces: () => TraceApi) {
-    this.#traces = traces;
-  }
-
-  getModelUsageStats(input: { tenantId: string; fromMs: number; limit: number }) {
-    return this.#traces().readModelUsageStats({
-      projectId: input.tenantId,
-      fromMs: input.fromMs,
-      limit: input.limit,
-    });
-  }
-
-  getRecentSpansByModels(input: {
-    tenantId: string;
-    models: string[];
-    fromMs: number;
-    perModelLimit: number;
-    limit: number;
-  }) {
-    return this.#traces().readRecentSpansByModels({
-      projectId: input.tenantId,
-      models: input.models,
-      fromMs: input.fromMs,
-      perModelLimit: input.perModelLimit,
-      limit: input.limit,
-    });
-  }
 }
 
 class WorkerCodingAgentBilling implements CodingAgentBillingPolicy {
