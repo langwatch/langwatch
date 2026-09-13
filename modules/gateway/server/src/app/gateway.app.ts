@@ -54,6 +54,22 @@ import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
 } from "../services/gateway-elevenlabs-webhook.service.ts";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { WebhookApi } from "@langwatch/webhook-contract";
+// The billing envelope and the subscription grammar are the webhook
+// platform's, and a reconciliation pull has to answer the same bytes a push
+// delivers, so both ARRIVE from that module rather than being restated here.
+import { eventMatches, WebhookEnvelopeService } from "@langwatch/webhook-server";
+// The application's own refusal for "the store these figures live in is not
+// reachable": one taxonomy for an unreachable ClickHouse, shared with every
+// other read of it.
+import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { FixedGatewaySettlementPolicyAdapter } from "../adapters/fixed-gateway-settlement.adapter.ts";
+import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
+import { GatewaySpendScopeAdapter } from "../adapters/postgres.gateway-spend-scope.adapter.ts";
+import { settlementGraceMs } from "../intents/gateway-spend-settlement.intent.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped API key or legacy project key, and what any of those IS belongs to the process's authentication, not this feature — the doors hand one straight to the checks below and never read it.
@@ -412,21 +428,81 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
 }
 
 export type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
-type GatewaySetup = FeatureSetup<Record<never, never>, GatewayInfrastructure, undefined>;
+
+/**
+ * What the billing reconciliation family reads that is neither the gateway's
+ * own ledger nor a peer's application: the one guarded connection its two
+ * Postgres resolutions run on, and how long after a request an outcome may
+ * still arrive.
+ */
+export type GatewaySpendCollaborators = Readonly<{
+  prisma: PrismaClient;
+  webhooks: WebhookApi;
+  settlementGraceMs: number;
+}>;
+
+type GatewaySetup = FeatureSetup<
+  typeof GatewayApp.dependencies,
+  MembersRead<typeof GatewayApp.reads>,
+  undefined
+>;
 
 export class GatewayApp implements GatewayApi {
   static readonly contract = GatewayApiToken;
-  static readonly dependencies = {};
+  /**
+   * `webhooks` is the SAME outbound platform a live spend push is delivered
+   * through, reached through its module API: the reconciliation pull and the
+   * push are two views of one ledger, so a second reading of either the
+   * envelope format or the subscription grammar could disagree with what a
+   * customer already received.
+   *
+   * `entitlement` is this deployment's plan lookup. The application never asks
+   * it anything — the billing REST door does, for the ADR-072 plan gate — and
+   * it is declared HERE so a process that composed no plan store refuses at
+   * boot naming it, rather than mounting an enterprise surface that answers
+   * every organization as entitled.
+   */
+  static readonly dependencies = {
+    webhooks: WebhookApi,
+    entitlement: EntitlementApi,
+  };
+  /**
+   * The billing family's scope resolution and its per-end-user caps are
+   * Postgres reads, so the module takes the process's one guarded connection
+   * rather than a bag a composition root fills.
+   */
+  static readonly reads = reads("prisma");
 
   static create(setup: GatewaySetup): GatewayApp {
-    return new GatewayApp(setup.members);
+    return new GatewayApp(
+      // Not a placeholder for a bag that arrives later: this module declares
+      // `reads("prisma")` and nothing else, so the installer hands it exactly
+      // that, and the control-plane infrastructure below is absent on every
+      // process until the gateway's own composition of it lands. Every core
+      // path refuses by name in the meantime (`#dependencies`).
+      {},
+      {
+        prisma: setup.members.prisma,
+        webhooks: setup.dependencies.webhooks,
+        // `settlementGraceMs` owns the parse, the bound and the warning on the
+        // raw `LW_SPEND_SETTLEMENT_GRACE_MS` string; with no gateway config
+        // slice on this process it answers the module's own default, which is
+        // the same number the settlement sweeper falls back to.
+        settlementGraceMs: settlementGraceMs(undefined),
+      },
+    );
   }
 
   #coreDependencies: GatewayAppDependencies | undefined;
   #agentCache: GatewayAgentCacheService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
+  #spend: GatewaySpendCollaborators | undefined;
+  #spendScope: GatewaySpendScopeAdapter | undefined;
+  #settlementPolicy: FixedGatewaySettlementPolicyAdapter | undefined;
+  readonly #envelopes = WebhookEnvelopeService.create();
 
-  private constructor(members: GatewayInfrastructure) {
+  private constructor(members: GatewayInfrastructure, spend?: GatewaySpendCollaborators) {
+    this.#spend = spend;
     this.#coreDependencies = "virtualKeys" in members ? members : void 0;
     this.#agentCache = members.agentCache
       ? GatewayAgentCacheService.create(members.agentCache)
@@ -461,6 +537,121 @@ export class GatewayApp implements GatewayApi {
     if (!service) throw new Error("The ElevenLabs family was mounted without its members");
 
     return service.receive(input);
+  }
+
+  // ── The billing reconciliation family (ADR-072) ─────────────────────────
+  //
+  // The four `/api/gateway/v1` spend routes read the members below. They are
+  // answered HERE rather than filled by a process composition, so a
+  // deployment cannot mount the pull surface over a different envelope
+  // format, a different subscription grammar or a different settlement grace
+  // than the push half already uses.
+
+  /** The endpoint registry a replay names its destination in. */
+  get webhookEndpoints(): {
+    tryGetDeliverable(input: {
+      organizationId: string;
+      endpointId: string;
+    }): Promise<{ id: string; enabledEvents: readonly string[] } | null>;
+  } {
+    const webhooks = this.#spendCollaborators.webhooks;
+
+    return { tryGetDeliverable: (input) => webhooks.findDeliverable(input) };
+  }
+
+  /** The emitted-envelope log a replay walks, one page at a time. */
+  get webhookEvents(): WebhookApi {
+    return this.#spendCollaborators.webhooks;
+  }
+
+  /**
+   * The live delivery path a replay appends to. `undefined` until the webhook
+   * platform publishes its replay append on `WebhookApi`: the service that
+   * owns it (`WebhookDeliveryService.appendReplayToEndpointStream`) is that
+   * module's private runtime, so a replay refuses by name rather than being
+   * shipped through a second delivery path of the gateway's own.
+   */
+  get webhookDelivery(): undefined {
+    return void 0;
+  }
+
+  /** One spend row rendered as the canonical billing envelope. */
+  spendEventEnvelope(
+    row: Parameters<WebhookEnvelopeService["fromSpendRow"]>[0],
+  ): ReturnType<WebhookEnvelopeService["fromSpendRow"]> {
+    return this.#envelopes.fromSpendRow(row);
+  }
+
+  /** Whether an endpoint's subscriptions cover one event type. */
+  endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean {
+    return eventMatches(input.enabledEvents, input.eventType);
+  }
+
+  /** How long after a request an outcome may still arrive. */
+  get settlementPolicy(): FixedGatewaySettlementPolicyAdapter {
+    return (this.#settlementPolicy ??= FixedGatewaySettlementPolicyAdapter.create(
+      this.#spendCollaborators.settlementGraceMs,
+    ));
+  }
+
+  /** Resolves Postgres filters to ClickHouse ids. A no-match resolves to EMPTY. */
+  resolveSpendScope(
+    input: Parameters<GatewaySpendScopeAdapter["resolveSpendScope"]>[0],
+  ): ReturnType<GatewaySpendScopeAdapter["resolveSpendScope"]> {
+    // Held rather than rebuilt per call: the adapter keeps a project cache, and
+    // a fresh one per request would resolve every filter from cold.
+    this.#spendScope ??= GatewaySpendScopeAdapter.create({
+      database: this.#spendCollaborators.prisma,
+    });
+
+    return this.#spendScope.resolveSpendScope(input);
+  }
+
+  /** Every attributed-user budget that applies to one end user, with spend. */
+  endUserCaps(input: {
+    organizationId: string;
+    endUserId: string;
+    tenantIds: string[];
+    virtualKeyId?: string;
+    budgetRepository: GatewayBudgetSpend;
+  }): Promise<Array<Record<string, unknown>>> {
+    const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
+
+    return GatewayEndUserCapsAdapter.create({
+      database: this.#spendCollaborators.prisma,
+      spend: budgetRepository,
+    }).forEndUser({
+      organizationId,
+      endUserId,
+      tenantIds,
+      ...(virtualKeyId === undefined ? {} : { virtualKeyId }),
+    });
+  }
+
+  /** The refusal for "the store these figures live in is not reachable". */
+  spendStoreUnavailable(): Error {
+    return new ClickHouseUnavailableError();
+  }
+
+  /**
+   * The spend-event ledger reader and the budget ledger, as the reconciliation
+   * routes read them. `undefined` where this process composed no gateway
+   * control plane, which the routes refuse by name rather than answering a
+   * reconciliation query with a confident zero.
+   */
+  get spendEvents(): GatewaySpendEventsService | undefined {
+    return this.#coreDependencies?.spendEvents;
+  }
+
+  get budgetSpend(): GatewayBudgetSpend | undefined {
+    return this.#coreDependencies?.budgetSpend;
+  }
+
+  get #spendCollaborators(): GatewaySpendCollaborators {
+    const spend = this.#spend;
+    if (!spend) throw new Error("The gateway billing family was mounted without its members");
+
+    return spend;
   }
 
   #agentCacheService(): GatewayAgentCacheService {

@@ -107,10 +107,16 @@ export type GatewaySpendWebhookDelivery = {
 };
 
 /**
- * The whole of what the four reconciliation routes ask the process for. The
- * webhook half is described structurally, not by name: it belongs to the
- * Enterprise webhook platform, which this core package may not depend on, so
- * the process binds the real implementations.
+ * The whole of what the four reconciliation routes ask the application for.
+ *
+ * The webhook half is still described structurally rather than by importing
+ * the platform's own types, but NOT because this package may not depend on it:
+ * `modules/webhook` is fully OSS and publishes `WebhookApi`, and the gateway
+ * module declares it as a peer, so the members below are answered by
+ * `GatewayApp` from that peer. Structural descriptions stay because they say
+ * exactly what a route reads — an endpoint's id and its subscriptions, one
+ * page of envelopes — and a route that named the whole platform API would
+ * claim reach it does not use.
  */
 export type GatewaySpendApp = Readonly<{
   /**
@@ -175,9 +181,10 @@ export const GatewaySpendApi = moduleApi<GatewaySpendApp>("gateway");
 /**
  * Whether the credential's organization holds the plan the billing events API
  * is sold under (ADR-072: pull and push are two views of one enterprise
- * capability). Bound by the apps/api mount to the deployment's plan lookup, and
- * resolved right before each handler — after authentication and after the
- * permission check, the ordering the pre-conversion per-route gate held.
+ * capability). Bound in this module's own `withTransportFacts` against the
+ * `entitlement` peer its App declares, and resolved right before each handler
+ * — after authentication and after the permission check, the ordering the
+ * pre-conversion per-route gate held.
  */
 export const gatewaySpendBillingPlanGate = defineRestMiddleware(
   "gatewaySpendBillingPlanGate",
