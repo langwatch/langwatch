@@ -111,6 +111,9 @@ function envelopeQuantities(row: SpendEventRow): {
       cache_read_input_tokens: row.tokensCacheRead,
       cache_creation_input_tokens: row.tokensCacheWrite,
       reasoning_tokens: row.tokensReasoning,
+      input_image_tokens: row.tokensInputImage,
+      output_image_tokens: row.tokensOutputImage,
+      image_count: row.imageCount,
     },
     cost: {
       total_usd: row.costUsd,

@@ -6067,6 +6067,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description No process is holding the connected agent right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     callConnectedAgent: {
@@ -33071,6 +33078,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset. */
+                                input_image_tokens?: number;
+                                /** @description Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here. */
+                                output_image_tokens?: number;
+                                /** @description Images the request carried, for models priced per image instead of per token. Zero on text requests. */
+                                image_count?: number;
                             };
                             cost: {
                                 /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -33216,6 +33229,12 @@ export interface operations {
                                     cache_read_input_tokens: number;
                                     cache_creation_input_tokens: number;
                                     reasoning_tokens: number;
+                                    /** @description Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset. */
+                                    input_image_tokens?: number;
+                                    /** @description Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here. */
+                                    output_image_tokens?: number;
+                                    /** @description Images the request carried, for models priced per image instead of per token. Zero on text requests. */
+                                    image_count?: number;
                                 } | null;
                                 cost: {
                                     /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -33366,6 +33385,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset. */
+                                input_image_tokens?: number;
+                                /** @description Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here. */
+                                output_image_tokens?: number;
+                                /** @description Images the request carried, for models priced per image instead of per token. Zero on text requests. */
+                                image_count?: number;
                             };
                             caps: {
                                 budget_id: string;

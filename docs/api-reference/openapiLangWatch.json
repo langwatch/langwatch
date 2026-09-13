@@ -74480,6 +74480,18 @@
                               },
                               "reasoning_tokens": {
                                 "type": "integer"
+                              },
+                              "input_image_tokens": {
+                                "type": "integer",
+                                "description": "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset."
+                              },
+                              "output_image_tokens": {
+                                "type": "integer",
+                                "description": "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here."
+                              },
+                              "image_count": {
+                                "type": "integer",
+                                "description": "Images the request carried, for models priced per image instead of per token. Zero on text requests."
                               }
                             },
                             "required": [
@@ -75135,6 +75147,18 @@
                                   },
                                   "reasoning_tokens": {
                                     "type": "integer"
+                                  },
+                                  "input_image_tokens": {
+                                    "type": "integer",
+                                    "description": "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset."
+                                  },
+                                  "output_image_tokens": {
+                                    "type": "integer",
+                                    "description": "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here."
+                                  },
+                                  "image_count": {
+                                    "type": "integer",
+                                    "description": "Images the request carried, for models priced per image instead of per token. Zero on text requests."
                                   }
                                 },
                                 "required": [
@@ -75813,6 +75837,18 @@
                             },
                             "reasoning_tokens": {
                               "type": "integer"
+                            },
+                            "input_image_tokens": {
+                              "type": "integer",
+                              "description": "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset."
+                            },
+                            "output_image_tokens": {
+                              "type": "integer",
+                              "description": "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here."
+                            },
+                            "image_count": {
+                              "type": "integer",
+                              "description": "Images the request carried, for models priced per image instead of per token. Zero on text requests."
                             }
                           },
                           "required": [

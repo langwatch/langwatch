@@ -153,6 +153,30 @@ const usageSchema = z.object({
   cache_read_input_tokens: z.number().int(),
   cache_creation_input_tokens: z.number().int(),
   reasoning_tokens: z.number().int(),
+  // Optional in the document, always sent by the server: a client generated
+  // from this document reads a required field with no fallback, and would
+  // break against a deployment that predates these quantities.
+  input_image_tokens: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.",
+    ),
+  output_image_tokens: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.",
+    ),
+  image_count: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "Images the request carried, for models priced per image instead of per token. Zero on text requests.",
+    ),
 });
 
 /** Money is published twice: a display string and the canonical integer. */
@@ -473,6 +497,9 @@ secured.access(requires("gatewaySpend:view")).get(
           cache_read_input_tokens: r.tokensCacheRead,
           cache_creation_input_tokens: r.tokensCacheWrite,
           reasoning_tokens: r.tokensReasoning,
+          input_image_tokens: r.tokensInputImage,
+          output_image_tokens: r.tokensOutputImage,
+          image_count: r.imageCount,
         },
         cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
       })),
@@ -587,6 +614,9 @@ secured.access(requires("gatewaySpend:view")).get(
           cache_read_input_tokens: rollup.tokensCacheRead,
           cache_creation_input_tokens: rollup.tokensCacheWrite,
           reasoning_tokens: rollup.tokensReasoning,
+          input_image_tokens: rollup.tokensInputImage,
+          output_image_tokens: rollup.tokensOutputImage,
+          image_count: rollup.imageCount,
         },
         caps,
       },

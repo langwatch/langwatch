@@ -50,6 +50,9 @@ function tokensSummary(row: SpendRow) {
   if (row.tokensCacheRead > 0) parts.push(`${row.tokensCacheRead} cr`);
   if (row.tokensCacheWrite > 0) parts.push(`${row.tokensCacheWrite} cw`);
   if (row.tokensReasoning > 0) parts.push(`${row.tokensReasoning} rsn`);
+  if (row.tokensInputImage > 0) parts.push(`${row.tokensInputImage} img in`);
+  if (row.tokensOutputImage > 0) parts.push(`${row.tokensOutputImage} img out`);
+  if (row.imageCount > 0) parts.push(`${row.imageCount} img`);
   return parts.join(" / ");
 }
 

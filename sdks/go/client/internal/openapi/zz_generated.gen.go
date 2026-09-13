@@ -19873,9 +19873,18 @@ type GetApiGatewayV1SpendEvents200JSONResponseBody_Data_Data struct {
 	Usage               *struct {
 		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-		InputTokens              int `json:"input_tokens"`
-		OutputTokens             int `json:"output_tokens"`
-		ReasoningTokens          int `json:"reasoning_tokens"`
+
+		// ImageCount Images the request carried, for models priced per image instead of per token. Zero on text requests.
+		ImageCount *int `json:"image_count,omitempty"`
+
+		// InputImageTokens Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.
+		InputImageTokens *int `json:"input_image_tokens,omitempty"`
+		InputTokens      int  `json:"input_tokens"`
+
+		// OutputImageTokens Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.
+		OutputImageTokens *int `json:"output_image_tokens,omitempty"`
+		OutputTokens      int  `json:"output_tokens"`
+		ReasoningTokens   int  `json:"reasoning_tokens"`
 	} `json:"usage"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
@@ -93427,9 +93436,18 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 			Usage        struct {
 				CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 				CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-				InputTokens              int `json:"input_tokens"`
-				OutputTokens             int `json:"output_tokens"`
-				ReasoningTokens          int `json:"reasoning_tokens"`
+
+				// ImageCount Images the request carried, for models priced per image instead of per token. Zero on text requests.
+				ImageCount *int `json:"image_count,omitempty"`
+
+				// InputImageTokens Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.
+				InputImageTokens *int `json:"input_image_tokens,omitempty"`
+				InputTokens      int  `json:"input_tokens"`
+
+				// OutputImageTokens Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.
+				OutputImageTokens *int `json:"output_image_tokens,omitempty"`
+				OutputTokens      int  `json:"output_tokens"`
+				ReasoningTokens   int  `json:"reasoning_tokens"`
 			} `json:"usage"`
 			Window string `json:"window"`
 		} `json:"data"`
@@ -93995,9 +94013,18 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 			Usage        struct {
 				CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 				CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-				InputTokens              int `json:"input_tokens"`
-				OutputTokens             int `json:"output_tokens"`
-				ReasoningTokens          int `json:"reasoning_tokens"`
+
+				// ImageCount Images the request carried, for models priced per image instead of per token. Zero on text requests.
+				ImageCount *int `json:"image_count,omitempty"`
+
+				// InputImageTokens Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.
+				InputImageTokens *int `json:"input_image_tokens,omitempty"`
+				InputTokens      int  `json:"input_tokens"`
+
+				// OutputImageTokens Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.
+				OutputImageTokens *int `json:"output_image_tokens,omitempty"`
+				OutputTokens      int  `json:"output_tokens"`
+				ReasoningTokens   int  `json:"reasoning_tokens"`
 			} `json:"usage"`
 		} `json:"data"`
 		NextCursor *string `json:"next_cursor"`
@@ -117193,9 +117220,18 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 				Usage        struct {
 					CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 					CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-					InputTokens              int `json:"input_tokens"`
-					OutputTokens             int `json:"output_tokens"`
-					ReasoningTokens          int `json:"reasoning_tokens"`
+
+					// ImageCount Images the request carried, for models priced per image instead of per token. Zero on text requests.
+					ImageCount *int `json:"image_count,omitempty"`
+
+					// InputImageTokens Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.
+					InputImageTokens *int `json:"input_image_tokens,omitempty"`
+					InputTokens      int  `json:"input_tokens"`
+
+					// OutputImageTokens Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.
+					OutputImageTokens *int `json:"output_image_tokens,omitempty"`
+					OutputTokens      int  `json:"output_tokens"`
+					ReasoningTokens   int  `json:"reasoning_tokens"`
 				} `json:"usage"`
 				Window string `json:"window"`
 			} `json:"data"`
@@ -117901,9 +117937,18 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 				Usage        struct {
 					CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 					CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-					InputTokens              int `json:"input_tokens"`
-					OutputTokens             int `json:"output_tokens"`
-					ReasoningTokens          int `json:"reasoning_tokens"`
+
+					// ImageCount Images the request carried, for models priced per image instead of per token. Zero on text requests.
+					ImageCount *int `json:"image_count,omitempty"`
+
+					// InputImageTokens Image tokens billed on the input side. Disjoint from input_tokens, so reconcile it as its own priced quantity rather than as a subset.
+					InputImageTokens *int `json:"input_image_tokens,omitempty"`
+					InputTokens      int  `json:"input_tokens"`
+
+					// OutputImageTokens Image tokens billed on the output side. Disjoint from output_tokens, so an image generation reports 0 output_tokens and a non-zero figure here.
+					OutputImageTokens *int `json:"output_image_tokens,omitempty"`
+					OutputTokens      int  `json:"output_tokens"`
+					ReasoningTokens   int  `json:"reasoning_tokens"`
 				} `json:"usage"`
 			} `json:"data"`
 			NextCursor *string `json:"next_cursor"`

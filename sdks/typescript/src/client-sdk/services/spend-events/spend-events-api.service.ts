@@ -12,6 +12,26 @@ import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
+/**
+ * The quantities one priced request or rollup carries.
+ *
+ * The buckets are disjoint, not nested: an image generation reports its
+ * output under `output_image_tokens` with `output_tokens` at 0, so a
+ * reconciliation that only reads the text buckets sees cost with no quantity
+ * behind it. The image fields are absent on servers older than the release
+ * that added them.
+ */
+export interface SpendUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  reasoning_tokens: number;
+  input_image_tokens?: number;
+  output_image_tokens?: number;
+  image_count?: number;
+}
+
 export interface SpendEvent {
   id: string;
   type: string;
@@ -39,13 +59,7 @@ export interface SpendEvent {
     model_provider_id: string | null;
     request_type: string | null;
     /** Null on settled events: unknown is not zero. */
-    usage: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_read_input_tokens: number;
-      cache_creation_input_tokens: number;
-      reasoning_tokens: number;
-    } | null;
+    usage: SpendUsage | null;
     /** Null on settled events: unknown is not zero. */
     cost: {
       total_usd: string;
@@ -78,13 +92,7 @@ export interface SpendSummaryRow {
   event_count: number;
   /** Unpriced settled requests, counted separately: never in cost sums. */
   settled_count: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-    reasoning_tokens: number;
-  };
+  usage: SpendUsage;
   cost: { total_usd: string; nano_usd: number };
 }
 
@@ -257,13 +265,7 @@ export interface EndUserSpend {
   to: string;
   cost: { total_usd: string; nano_usd?: number };
   request_count: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-    reasoning_tokens: number;
-  };
+  usage: SpendUsage;
   /**
    * The attributed-user template caps that apply to this end user, each
    * with its boundary-aware current-period spend. Empty when the
