@@ -113,6 +113,8 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     "data-retention": {
       platformDefaultRetentionDays: config.platformDefaultRetentionDays,
     },
+    /** Already resolved by the api's own parse — the module takes the RESOLVED record (re-parsing emptied the force-enable list, a defect the worker's tests caught). */
+    "feature-flag": config.featureFlags,
     github: stated(config.infrastructure.github),
     /** The origin a hosted MCP server advertises is the api's public one. */
     "hosted-mcp": { baseHost: config.infrastructure.execution.publicBaseUrl },
