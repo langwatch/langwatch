@@ -357,7 +357,6 @@ const LEGACY_INERT: string[] = [
   "specs/analytics/posthog-cost-control.feature",
   "specs/audit-log/audit-log.feature",
   "specs/auth/auth-signin-flows.feature",
-  "specs/auth/dev-port-origin-alignment.feature",
   "specs/auth/diagnostic-logging-on-auth-failure.feature",
   "specs/auth/impersonation-banner.feature",
   "specs/auth/sign-in-failure-messages.feature",
