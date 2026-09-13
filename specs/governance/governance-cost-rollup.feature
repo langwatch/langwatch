@@ -128,33 +128,18 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
   @integration
   Scenario: The comparator counts a summary that drifted from its events
     Given a summary row that no longer matches the sum of its events
-    When the scheduled comparator runs
+    When the comparator runs for that day
     # Reported = the mismatch metric increments (prom-client counter,
     # labelled by cost source, org in the log line). Wave 1 surfaces
     # signals and sends nothing — no alert fires anywhere.
     Then the drift metric counts the mismatch
     And the mismatch details are in the log
 
-  # The comparator checks the billed lane alone. It once checked the
-  # gateway lane too, and the scheduled rows it created for that half are
-  # still in the database; they are marked inactive at start and a start
-  # never recreates them. A row that fires anyway, racing that boot step,
-  # settles as delivered so the scheduler does not retry the slot.
-
-  @integration
-  Scenario: The nightly rollup check covers the billed lane alone
-    Given a scheduled check of the metered lane left over from before
-    When the app starts
-    Then that scheduled check is marked inactive
-    And a later start leaves it inactive
-    And the billed lane's check stays active
-
-  @integration
-  Scenario: A leftover metered check that fires anyway settles quietly
-    Given a scheduled check of the metered lane that fires after all
-    When it runs
-    Then it completes without an error
-    And that slot is not retried
+  # The comparator checks the billed lane alone. It is no longer run by a
+  # nightly schedule at all: a pulled charge marks its own day and the day
+  # is compared at the next 04:23 UTC. See cost-rollup-watch.feature, which
+  # owns that behaviour and the two scenarios about leftover scheduled rows
+  # that used to sit here — the rows are deleted and nothing creates them.
 
   @unit
   Scenario: The summary's lag behind the event log is measured
