@@ -164,6 +164,16 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the browser navigates to that link
       And asking to open the batch the lookup named navigates to the same link
 
+    # The shared folder runs the same CLI as the sandbox, through its own
+    # shell tool. A langwatch call is the CLI's whichever shell ran it: it is
+    # re-typed, its link remembered and its navigate intercepted the same way.
+    @unit
+    Scenario: A navigate run in the shared folder opens the resource just the same
+      Given Langy runs its commands in the folder I shared from my machine
+      When the agent looks a resource up there and then asks to open it
+      Then the browser navigates to the platform's link for that resource
+      And the navigate call draws no card of its own
+
   Rule: An id the conversation never surfaced still resolves through the platform
 
     # The link store is an optimization, not the source of truth. The model

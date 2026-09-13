@@ -636,6 +636,66 @@ describe("LangyTurnRelay", () => {
       }
     });
 
+    /** @scenario "A navigate run in the shared folder opens the resource just the same" */
+    it("fires a navigate run in the shared folder, with no card for the call", async () => {
+      // The guided run does its work in the folder the developer shared, so
+      // the lookup and the navigate both reach the relay as `local_bash`
+      // calls. The shell's name says where a command ran, not what it was.
+      const { relay, buffer, conversations } = makeRelay();
+      const localCall = (id: string, command: string) =>
+        [
+          { phase: "start" as const },
+          {
+            phase: "end" as const,
+            output: JSON.stringify({
+              trace_id: "run_1",
+              platformUrl:
+                "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+            }),
+          },
+        ].map((phase) =>
+          frame({
+            type: "tool",
+            id,
+            name: "local_bash",
+            local: true,
+            ...phase,
+            input: { command },
+          }),
+        );
+
+      for (const f of localCall(
+        "call-local-surface",
+        "langwatch trace get run_1",
+      )) {
+        await relay.handle(f);
+      }
+      // The lookup is a call like any other: a card, re-typed as the CLI
+      // capability it ran, still marked as run in the folder.
+      expect(buffer.appendTool).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "langwatch.trace.get", local: true }),
+      );
+      buffer.appendTool.mockClear();
+      conversations.recordToolCallStarted.mockClear();
+      conversations.recordToolCallCompleted.mockClear();
+
+      for (const f of localCall(
+        "call-local-navigate",
+        "langwatch navigate open run_1",
+      )) {
+        await relay.handle(f);
+      }
+
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/simulations/set_1/batch_1?openRun=run_1",
+      });
+      expect(buffer.appendTool).not.toHaveBeenCalled();
+      expect(conversations.recordToolCallStarted).not.toHaveBeenCalled();
+      expect(conversations.recordToolCallCompleted).not.toHaveBeenCalled();
+    });
+
     it("fires a navigate CHAINED onto another command — while the call keeps its normal card life", async () => {
       // Live failure: the model chained `…get X && langwatch navigate open X`
       // into ONE bash call. Only the sole plain invocation was intercepted,
