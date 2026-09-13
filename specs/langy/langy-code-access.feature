@@ -181,6 +181,15 @@ Feature: Langy asks how to reach the customer's code, once
       And it says the remote list reaches the network, so it goes with the fetch
 
     @unit
+    Scenario: A dirty tree gets a branch with no start point and a commit by file name
+      Given the code changes skill
+      When its branching step is read
+      Then it says a dirty tree branches with no start point, so the uncommitted files come along
+      And it says a nested worktree is not the answer, because every command runs from the shared folder and a cd asks
+      And it says a dirty file the change needs is asked about before it is edited
+      And its commit step says to stage the changed files by name and never the whole tree
+
+    @unit
     Scenario: A pull request body of more than one line goes in a file
       Given the code changes skill
       When its pull request step is read

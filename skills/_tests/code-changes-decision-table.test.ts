@@ -111,6 +111,17 @@ describe("the code-changes skill", () => {
       expect(rendered).toContain("Decide routine things yourself");
     });
 
+    /** @scenario "A dirty tree gets a branch with no start point and a commit by file name" */
+    it("branches a dirty tree in place, asks before touching a dirty file, and stages by name", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("`git checkout -b langy/<slug>` with no start point");
+      expect(rendered).not.toContain("git worktree add");
+      expect(rendered).toContain("asks on every command");
+      expect(rendered).toContain("Include them in my commit");
+      expect(rendered).toContain("I'll commit them first");
+      expect(rendered).toContain("never `git add .` or `git add -A`");
+    });
+
     /** @scenario "A branch name is picked from the names the folder already has" */
     it("lists the langy branches of the folder and of the remote before it names a new one", () => {
       const rendered = codeChangesSkill();

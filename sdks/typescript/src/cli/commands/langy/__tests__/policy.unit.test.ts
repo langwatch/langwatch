@@ -174,6 +174,9 @@ describe("given a folder shared with a Langy conversation", () => {
       "git add .",
       'git commit -m "Initial commit"',
       "git checkout -b langy/add-tracing origin/main",
+      // A dirty tree branches with no start point and commits by file name.
+      "git checkout -b langy/add-tracing",
+      'git add app.py langwatch_setup.py && git commit -m "Add LangWatch tracing"',
       "git checkout main",
       "git switch -c langy/add-tracing",
       "git branch langy/add-tracing",
