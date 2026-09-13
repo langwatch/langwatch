@@ -32,6 +32,25 @@ export interface SpendUsage {
   image_count: number;
 }
 
+/**
+ * Fill the image quantities a server older than the release that added them
+ * does not send.
+ *
+ * `SpendUsage` declares the three because a current server always sends them.
+ * The cast is what a response from a deployment one release behind actually
+ * looks like: three integers that are genuinely zero there, worth defaulting
+ * rather than handing a caller `undefined` in the middle of a spend page.
+ */
+function spendUsageFromWire(usage: SpendUsage): SpendUsage {
+  const wire = usage as Partial<SpendUsage>;
+  return {
+    ...usage,
+    input_image_tokens: wire.input_image_tokens ?? 0,
+    output_image_tokens: wire.output_image_tokens ?? 0,
+    image_count: wire.image_count ?? 0,
+  };
+}
+
 export interface SpendEvent {
   id: string;
   type: string;
@@ -392,10 +411,23 @@ export class SpendEventsApiService {
     if (options.limit !== undefined) params.set("limit", String(options.limit));
     appendSpendFilters({ params, filters: options });
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
-    return await this.request<SpendEventsPage>(
+    const page = await this.request<SpendEventsPage>(
       "list spend events",
       `/api/gateway/v1/spend-events${qs}`,
     );
+    return {
+      ...page,
+      data: page.data.map((event) => ({
+        ...event,
+        data: {
+          ...event.data,
+          usage:
+            event.data.usage === null
+              ? null
+              : spendUsageFromWire(event.data.usage),
+        },
+      })),
+    };
   }
 
   /**
@@ -461,10 +493,17 @@ export class SpendEventsApiService {
     appendSpendFilters({ params, filters: options });
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
-    return await this.request<SpendSummariesPage>(
+    const page = await this.request<SpendSummariesPage>(
       "read spend summaries",
       `/api/gateway/v1/spend-summaries?${params.toString()}`,
     );
+    return {
+      ...page,
+      data: page.data.map((row) => ({
+        ...row,
+        usage: spendUsageFromWire(row.usage),
+      })),
+    };
   }
 
   /**
@@ -547,6 +586,6 @@ export class SpendEventsApiService {
       "read end-user spend",
       `/api/gateway/v1/end-users/${encodeURIComponent(endUserId)}/spend${qs}`,
     );
-    return res.data;
+    return { ...res.data, usage: spendUsageFromWire(res.data.usage) };
   }
 }
