@@ -11,7 +11,6 @@ export type {
   DataRetentionInfrastructure,
   RetentionOrganizationDirectory,
   RetentionProjectLineage,
-  TenantClickHouseClientResolver,
 } from "./app/data-retention.app.ts";
 export {
   type DataRetentionPlan,

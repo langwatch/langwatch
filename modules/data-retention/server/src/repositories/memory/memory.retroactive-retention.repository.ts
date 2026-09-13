@@ -60,7 +60,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   async getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
     return (this.#mutations.get(input.projectId) ?? [])
       .filter((mutation) => !mutation.isDone)
-      .toReversed();
+      .reverse();
   }
 
   async killMutation(input: { projectId: string; mutationId: string }): Promise<void> {
