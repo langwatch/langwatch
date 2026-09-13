@@ -801,6 +801,16 @@ Feature: Langy guides the first setup after sign-up
       And nothing Langy says calls the folder unmanaged
 
     @e2e
+    Scenario: Every missing rung is tried once, and the ladder still installs
+      Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
+      And a terminal where uv, pip and pip3 each answer command not found and exit 127
+      When Langy runs the llmops path
+      Then each missing spelling is tried at most once and never asked again
+      And the install goes through the interpreter's own -m pip
+      And the manifest names langwatch and the interpreter can import it
+      And the question offering to install uv is never asked
+
+    @e2e
     Scenario: A folder with no repository is asked about, not branched in
       Given a shared folder with no git repository in it
       When Langy runs the llmops path

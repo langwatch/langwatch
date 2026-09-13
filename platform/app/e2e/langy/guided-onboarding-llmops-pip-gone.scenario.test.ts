@@ -1,25 +1,24 @@
 /**
- * The llmops path in a folder whose Python install ladder has a rung missing.
+ * The llmops path when every rung of the install ladder above `python3 -m pip`
+ * is gone.
  *
- * The shared folder is the ACME notes application: `requirements.txt` as its
- * manifest, no lock file, no virtual environment, so the folder facts name
- * `pip` as its package manager and the ladder of item 1 starts at
- * `pip install langwatch`. That spelling is not on the terminal's PATH: it
- * answers "pip: command not found" and exits 127, while `pip3` and
- * `python3 -m pip` work. A command not found is a missing spelling, never a
- * missing capability, so the ladder is expected to move to the next rung
- * instead of retrying the one that is gone or telling the developer their
- * folder has no package manager.
+ * The sibling scenario takes one spelling away. This one takes all of them:
+ * `uv`, `pip` and `pip3` each answer "command not found" and exit 127, and the
+ * shared folder has no lock file and no virtual environment of its own, so the
+ * ladder's only working rung is the interpreter's own `-m pip`. That is the
+ * shape the rule is written for: a command not found is a missing spelling,
+ * never a missing capability, so the ladder walks down to a rung that works
+ * instead of retrying one that is gone, and the folder is never called
+ * unmanaged while an interpreter on PATH can still install into it.
  *
- * Layer 2 comes before the judge: what the manifest names afterwards, whether
- * the interpreter can import the package, how many `pip install` attempts
- * Langy made, and that the "no pip or uv" unlock card never came up, since
- * only one rung of the ladder was missing.
+ * Each shim writes the call it refused to a log, so the run can say which
+ * rungs Langy actually reached for rather than infer it from what survived.
  *
  * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run guided-onboarding-llmops-pip-missing.scenario.test.ts --reporter=verbose
+ *   cd platform/app/e2e/langy && npx vitest run guided-onboarding-llmops-pip-gone.scenario.test.ts --reporter=verbose
  */
 
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -58,20 +57,30 @@ const model = guidedHarnessModel();
 /** The budget of a run that installs an SDK, edits code and starts the agent. */
 const LONG_RUN_TIMEOUT_MS = 2_700_000;
 
+/** The spellings this terminal will not have. */
+const GONE = ["uv", "pip", "pip3"] as const;
+
 /**
- * What the missing spelling answers. Both halves matter: the text is what a
- * shell prints for a command it cannot find, and 127 is the exit code the
- * ladder reads.
+ * What a gone spelling answers: the line a shell prints for a command it
+ * cannot find, and the 127 the ladder reads, with the call itself appended to
+ * the log first so the run knows the rung was reached.
  */
-const PIP_NOT_FOUND = 'echo "pip: command not found" >&2\nexit 127';
+function goneShim({ name, log }: { name: string; log: string }): string {
+  return [
+    `printf '%s\\n' "${name} $*" >> ${JSON.stringify(log)}`,
+    `echo "${name}: command not found" >&2`,
+    "exit 127",
+  ].join("\n");
+}
 
 let org: GuidedOrganization;
 let folder: FixtureFolder;
 let python: PythonEnv;
+let shimLog: string;
 let terminal: CliTerminal | undefined;
 let watcher: ConversationWatcher | undefined;
 
-describe("Langy installs the package when pip is not on PATH", () => {
+describe("Langy walks the install ladder down to a rung that works", () => {
   beforeAll(async () => {
     assertToolsPresent();
     org = await seedGuidedOrganization({
@@ -82,22 +91,23 @@ describe("Langy installs the package when pip is not on PATH", () => {
     await setCodeAccessPreference(null);
     folder = await createFixtureFolder({
       fixture: "acme-notes",
-      name: "guided-pip-missing",
+      name: "guided-pip-gone",
       git: true,
     });
     python = await createPythonEnv({
-      at: path.join(folder.root, "..", "guided-pip-missing-python"),
+      at: path.join(folder.root, "..", "guided-pip-gone-python"),
     });
+    shimLog = path.join(folder.root, "..", "guided-pip-gone-shims.log");
   }, 1_200_000);
 
   afterAll(async () => {
     await teardown({ terminal, watcher, repo: folder });
   });
 
-  describe("when the folder's own package manager spelling is gone", () => {
-    /** @scenario A command not found moves the install ladder to the next rung */
+  describe("when uv, pip and pip3 are all missing from the terminal", () => {
+    /** @scenario Every missing rung is tried once, and the ladder still installs */
     it(
-      "tries the next spelling instead of retrying pip or calling the folder unmanaged",
+      "installs through the interpreter without retrying a spelling that is gone",
       async () => {
         const langy = makeLangyAdapter();
         watcher = watchLangyConversation({
@@ -124,9 +134,9 @@ describe("Langy installs the package when pip is not on PATH", () => {
 
         const result = await runScenarioAndLog({
           config: {
-            name: "guided onboarding: the llmops path when pip is not on PATH",
+            name: "guided onboarding: the llmops path with uv, pip and pip3 all gone",
             description:
-              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal\'s PATH has no `pip`: that spelling answers "pip: command not found" and exits 127, while `pip3` and `python3 -m pip` work. Langy must install the LangWatch package anyway, through the next spelling on the ladder.',
+              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal has no `uv`, no `pip` and no `pip3`: each answers "command not found" and exits 127. The interpreter on PATH works and can install through `-m pip`. Langy must install the LangWatch package through it.',
             agents: [
               langy,
               scenario.userSimulatorAgent({ model }),
@@ -135,7 +145,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
                 criteria: [
                   "After a command answers that it is not found, Langy tries a different spelling of the same tool before it reports anything to the developer. Retrying the spelling that was not found, or stopping at it, fails this criterion.",
                   "Langy installs the LangWatch package into the project and says so. A reply that leaves the package uninstalled fails this criterion.",
-                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. Only the spelling `pip` was absent.",
+                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. The interpreter on PATH could install the whole time.",
                   "Langy does not ask the developer to run the install by hand while the folder is connected; it does the work itself.",
                   ...LANGY_CORE_RULE_CRITERIA,
                 ],
@@ -159,9 +169,14 @@ describe("Langy installs the package when pip is not on PATH", () => {
               async (_state, executor) => {
                 terminal = await startShareControl({
                   repo: folder,
-                  label: "guided-pip-missing",
+                  label: "guided-pip-gone",
                   clearOpenRequests: false,
-                  shims: { pip: PIP_NOT_FOUND },
+                  shims: Object.fromEntries(
+                    GONE.map((name) => [
+                      name,
+                      goneShim({ name, log: shimLog }),
+                    ]),
+                  ),
                   pathDirs: [python.binDir],
                 });
                 await terminal.approve();
@@ -198,34 +213,37 @@ describe("Langy installs the package when pip is not on PATH", () => {
         console.log("[layer2] commands:", commands.join(" | "));
         console.log(terminalSection(terminal!));
 
-        // The rung that is gone was tried once at most, and the ladder moved
-        // on rather than retrying a spelling that is not there. Only the bare
-        // spelling counts: `python3 -m pip install` is a later rung that
-        // happens to carry the same word.
-        const pipAttempts = commands.filter(
-          (command) =>
-            /(?:^|[\s;&|])pip\s+install\b/.test(command) &&
-            !/-m\s+pip\s+install\b/.test(command),
-        );
-        console.log("[layer2] pip attempts:", pipAttempts.join(" | "));
-        expect(pipAttempts.length).toBeLessThanOrEqual(1);
+        // Which rungs Langy actually reached for, from the shims themselves.
+        const refused = existsSync(shimLog)
+          ? readFileSync(shimLog, "utf8").split("\n").filter(Boolean)
+          : [];
+        console.log("[layer2] rungs refused:", refused.join(" | "));
+
+        // A spelling that answered 127 was not asked again. The count is per
+        // spelling, so an install tried through one of them stays one attempt
+        // whatever the ladder did with the others.
+        for (const name of GONE) {
+          const attempts = refused.filter((call) =>
+            new RegExp(`^${name} (install|add)\\b`).test(call),
+          );
+          console.log(`[layer2] ${name} attempts:`, attempts.length);
+          expect(attempts.length).toBeLessThanOrEqual(1);
+        }
+
+        // Item 1 is done through the rung that was there: the manifest names
+        // the package and the interpreter the terminal used can import it.
         expect(
           commands.some((command) =>
-            /(pip3\s+install|python3?\s+-m\s+pip\s+install|uv\s+add)/.test(
-              command,
-            ),
+            /python3?\s+-m\s+pip\s+install/.test(command),
           ),
         ).toBe(true);
-
-        // Item 1 is done: the manifest names the package and the interpreter
-        // the terminal used can import it.
         const manifest = folder.read("requirements.txt");
         console.log("[layer2] requirements.txt:", JSON.stringify(manifest));
         expect(manifest).toMatch(/langwatch/i);
         expect(python.canImport("langwatch")).toBe(true);
 
-        // One rung was missing, not the whole ladder, so the unlock question
-        // that offers to install uv has no business being asked.
+        // The ladder had a rung left, so the question that offers to install uv
+        // has no business being asked.
         const asked = watcher.questions
           .flatMap((ask) => ask.questions)
           .map((question) => question.question ?? "");
