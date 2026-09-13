@@ -33,6 +33,7 @@ function session(
     gitWorktree: "",
     title: "",
     titleSource: "",
+    auxiliary: false,
     modelCalls: 10,
     toolCalls: 20,
     subAgents: 0,

@@ -41,6 +41,7 @@ function sessionRow(
     gitBranches: ["feat/one", "feat/two"],
     title: "Add the sessions screen",
     titleSource: "",
+    auxiliary: false,
     ...over,
   });
 }
