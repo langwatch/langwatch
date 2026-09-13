@@ -461,19 +461,39 @@ been reconnected to it — which is this whole lane in one sentence.
 `9ab4161571`. authz-server: 574 tests passing, typecheck 4 errors to 2, both
 pre-existing TS2883s.
 
-### Where it stops, and what the rest of this lane looks like
+### Where it stops now: identity, and the shape repeats
 
-    TypeError: Cannot read properties of undefined (reading 'auditLog')
-      at PrismaAuthzAuditRepository.create (prisma.authz-audit.repository.ts:41)
-      at PostgresAuthzAdapter.build (postgres-authz.build.ts:277)
-      at AuthzApp.create (authz.app.ts:64)
+With authz composed, boot reaches the next module in install order and fails
+the same way:
 
-That wall is fixed; see the section above. The remaining lane is **per-module App wiring**, not a single port: for each
-module that used to be hand-composed, its App must declare what it reads and
-build its own collaborators from members. authz is the expensive one because
-its dispatcher needs a producer-only eventing registration. Expect others
-behind it — the boot names them one at a time, which has been a reliable and
-cheap loop all session.
+    TypeError: Cannot read properties of undefined (reading 'ttlMs')
+      at IdentityApp.create (modules/identity/server/src/app/identity.app.ts:51)
+
+`IdentityApp` reads `setup.members.latch` and `setup.members.ledger` and
+declares no `reads(...)`, so boot hands it `{}`. `IdentityInfrastructure` names
+five collaborators, none of them a platform member:
+
+    eventing   IdentityEventing — "a producer-only stand-in where the process
+               composed no queue"
+    operators  PlatformOperator, from ADMIN_EMAILS
+    mail       JoinRequestMail | null — null where the process composed no gateway
+    latch      { ttlMs, maxUsers, now } — "overridden only by tests", so the
+               default belongs in the module
+    ledger     IdentityLedger — "built by the process from its own Prisma
+               client and its own reservations row"
+
+Four of the five look constructible from the `prisma` and `eventing` members
+plus module defaults, which is the authz shape again. `operators` needs a
+config entry, so identity probably wants a `configSchema` and a line in
+`apiModuleConfig`.
+
+### What the rest of this lane looks like
+
+**Per-module App wiring**, not a single port: for each module that used to be
+hand-composed, its App must declare what it reads and build its own
+collaborators from members. authz was the expensive one because its dispatcher
+needed an eventing registration; identity is next. The boot names them one at a
+time, which has been a reliable and cheap loop all session.
 
 ### How to run this loop
 
