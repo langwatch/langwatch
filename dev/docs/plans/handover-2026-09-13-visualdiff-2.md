@@ -19,7 +19,24 @@ dev/scripts/coordinator-state.sh --full` before trusting anything here.
    framework's lazy API clients resolve their mutual dependency; a two-app
    split cannot). It was spawned from THIS session, so its completion
    notification dies with the session — **check
-   `.claude/handoffs/module-v2-workflow.md` on disk**; the lane rewrites it
+   `.claude/handoffs/module-v2-workflow.md` on disk** — **UPDATE, minutes
+   before this session ended: the lane FINISHED, status `partial`, and that
+   handoff now EXISTS — it is your collection input, not a salvage.** The
+   short version: the manifest's four named collaborators (evaluators token,
+   modelProviders→studioDsl, agents→agentMappings, prisma→workflowRows) are
+   converted per the deleted-composition recipe; its package.json gained the
+   infrastructure dep AFTER the freeze lifted, so the ANNOUNCED `pnpm
+   install` at collection is REQUIRED before its tests can even link (23
+   files currently fail on `Cannot find package
+   '@langwatch/infrastructure/members'` — expected, clears with install).
+   §10 has the exact new `WorkflowApp.create` shape for
+   worker-agent-apps.composition.ts. §11 item 1 is an OPUS-GRADE decision
+   the lane rightly refused to guess: ~24 remaining `WorkflowHostMembers`
+   fields (permissions, lineage, publications, evaluations, nlpLambda*, …)
+   have NO existing adapters anywhere and the framework's
+   `withInfrastructure` escape hatch is gone — decide their seam (or a
+   staged subset) before any lane touches them; security- and data-relevant.
+   The lane rewrites it
    before stopping, whatever happens. If the handoff shows no update and no
    lane output for ~20 minutes, treat it as dead and salvage from the working
    tree (`git status modules/workflow`). It may add
