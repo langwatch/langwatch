@@ -117,6 +117,21 @@ export type TurnDoneEvent = {
 };
 export type HandoffEvent = { type: "handoff"; turnId: string; seed: string };
 
+/**
+ * The guided turn end guard's report (guided-turn-end.ts): the wrapper
+ * appended a continuation to the turn, or gave up on a second bare end.
+ * `missing` names what the turn owed, in the guard's own words (the names
+ * of lines and cards, never the model's text). The manager logs the event
+ * under its name and draws no frame for it; wrapper stderr is not read, so
+ * this is the guard's only sink.
+ */
+export type GuidedTurnEvent = {
+  type: "guided_turn";
+  turnId: string;
+  event: "guided_turn_continued" | "guided_turn_bare_end";
+  missing: string[];
+};
+
 export type WorkerEvent =
   | ReadyEvent
   | PongEvent
@@ -127,6 +142,7 @@ export type WorkerEvent =
   | ToolUpdateEvent
   | ToolEndEvent
   | PlanEvent
+  | GuidedTurnEvent
   | TurnDoneEvent
   | HandoffEvent;
 

@@ -9,6 +9,7 @@ import {
   FRAMEWORK_LINE_SHAPE,
   STEP2_LINE_TEMPLATES,
   STEP2_LINES_ITEM,
+  TRANSPARENT_TOOL_NAMES,
   TurnCallLog,
   decideGuidedContinuation,
   guidedTurnEnding,
@@ -84,6 +85,49 @@ describe("the guided turn end guard", () => {
       expect(
         decideGuidedContinuation({ calls: [say("Here is what I found.")], guided: false, continuations: 0 }),
       ).toEqual({ kind: "leave", reason: "not_guided" });
+    });
+  });
+
+  describe("when the turn ends on calls that say nothing", () => {
+    const navigate = (id: string, tool = "bash") => call(tool, { command: `langwatch navigate open ${id}`, timeout: 30 });
+    const closing = say("All ready! Let me know if there is anything I can help with.");
+
+    /** @scenario "Calls that say nothing are transparent to the ender" */
+    it("reads through navigates and lookups to the closing line, and names the calls it reads through", () => {
+      // The t1 turn as the panel's record orders it: complete-path, the
+      // closing line, then the two navigates.
+      const t1 = [shell(`${COMPLETE_PATH_COMMAND} llmops`), closing, navigate("scenario_1"), navigate("scenariorun_1", "local_bash")];
+      expect(guidedTurnEnding(t1)).toBe("closing_line");
+      expect(decideGuidedContinuation({ calls: t1, guided: true, continuations: 0 })).toEqual({
+        kind: "leave",
+        reason: "closing_line",
+      });
+      expect(guidedTurnEnding([shell(`${COMPLETE_PATH_COMMAND} llmops`), navigate("scenariorun_1"), closing])).toBe(
+        "closing_line",
+      );
+      expect(
+        guidedTurnEnding([question(), call("local_read", { path: "app/graph.py" }), call("skill", { name: "tracing" })]),
+      ).toBe("card");
+
+      // A line that is not the closing line, followed by the same calls, still ends bare.
+      const bare = [shell("langwatch scenario run scenario_1 --wait --format json"), say("Two things."), navigate("scenariorun_1")];
+      expect(guidedTurnEnding(bare)).toBe("bare");
+      // A file write is not read through: the turn ended on it.
+      expect(guidedTurnEnding([...t1, call("local_edit", { path: "app/graph.py" })])).toBe("bare");
+
+      expect([...TRANSPARENT_TOOL_NAMES].sort()).toEqual([
+        "find",
+        "grep",
+        "local_find",
+        "local_grep",
+        "local_langwatch_env",
+        "local_ls",
+        "local_read",
+        "ls",
+        "read",
+        "skill",
+        "todowrite",
+      ]);
     });
   });
 

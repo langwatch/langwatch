@@ -17,6 +17,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
+	"go.uber.org/zap"
 )
 
 // progressInterval is the heartbeat cadence:
@@ -315,6 +316,10 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 	if isTerminal(ev.Type) {
 		return true, a.finishTurn(ctx, st, ev)
 	}
+	if ev.Type == eventGuidedTurn {
+		logGuidedTurn(ctx, ev)
+		return false, nil
+	}
 	// A failed emit must NOT end the turn: the worker is still executing, and
 	// concluding here made driveTurn post a completed durable final for a turn
 	// that was mid-tool, release the worker, and let the idle reaper kill it
@@ -323,6 +328,19 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 	// consuming to the real terminal; the durable fold stays complete.
 	_ = st.apply(ev)
 	return false, nil
+}
+
+// logGuidedTurn writes the wrapper's guided turn end guard report to the
+// manager's log. Worker stderr is discarded (see Spawn), so this event is the
+// guard's only sink, and the event name is the log message so a grep for it
+// finds the line. No frame: the panel has nothing to draw for it.
+func logGuidedTurn(ctx context.Context, ev wireEvent) {
+	switch ev.Event {
+	case guidedTurnContinued, guidedTurnBareEnd:
+		clog.Get(ctx).Info(ev.Event, zap.String("turn_id", ev.TurnID), zap.Strings("missing", ev.Missing))
+	default:
+		clog.Get(ctx).Warn("pi worker emitted a guided_turn event of an unknown kind", zap.String("event", ev.Event))
+	}
 }
 
 // finishTurn maps the terminal event per the table on Stream.

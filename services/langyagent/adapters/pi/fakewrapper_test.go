@@ -90,6 +90,13 @@ func fakeWrapperMain(mode string) {
 				// Emit one delta so the test can observe the turn running,
 				// then wait for the abort / shutdown_imminent command.
 				fakeEmit(map[string]any{"type": "delta", "turnId": cmd.TurnID, "text": "partial"})
+			case "guided":
+				fakeEmit(map[string]any{
+					"type": "guided_turn", "turnId": cmd.TurnID,
+					"event":   "guided_turn_continued",
+					"missing": []string{"the branch line", "the first scenario card"},
+				})
+				fakeEmit(map[string]any{"type": "turn_done", "turnId": cmd.TurnID, "outcome": "ok"})
 			case "die":
 				os.Exit(1)
 			case "junk":

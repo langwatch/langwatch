@@ -20,6 +20,7 @@ import { buildHandoffDigest } from "./digest.js";
 import { TurnEventMapper, type SessionEventLike } from "./events.js";
 import {
   boundText,
+  type GuidedTurnEvent,
   type TerminalEvent,
   type TurnCommand,
 } from "./protocol.js";
@@ -271,8 +272,8 @@ export class TurnRunner {
    * on none of the calls the skill allows (a card, the closing line, the one
    * line of a failed step) gets one continuation message, appended to the same
    * turn, naming what it still owes; the model goes on and the terminal is
-   * derived again. A second bare end is logged and left. A newer turn from the
-   * user, submitted meanwhile, takes precedence: the turn is theirs to
+   * derived again. A second bare end is reported and left. A newer turn from
+   * the user, submitted meanwhile, takes precedence: the turn is theirs to
    * continue then, not the guard's.
    */
   private async continueGuidedTurn({
@@ -296,14 +297,13 @@ export class TurnRunner {
       continuations: state.continuations,
     });
     if (decision.kind === "leave") return terminal;
-    const missing = decision.missing.join("; ");
     if (decision.kind === "give_up") {
-      this.warn(`${GUIDED_TURN_BARE_END_LOG} turn=${state.turnId} missing=${missing}`);
+      await this.reportGuidedTurn({ state, event: GUIDED_TURN_BARE_END_LOG, missing: decision.missing });
       return terminal;
     }
     if (state.abortRequested || seq !== this.submitSeq) return terminal;
     state.continuations += 1;
-    this.warn(`${GUIDED_TURN_CONTINUED_LOG} turn=${state.turnId} missing=${missing}`);
+    await this.reportGuidedTurn({ state, event: GUIDED_TURN_CONTINUED_LOG, missing: decision.missing });
     let thrown: unknown;
     try {
       await this.options.session.prompt(decision.message);
@@ -316,6 +316,25 @@ export class TurnRunner {
       seq,
       terminal: this.deriveTerminal(state, thrown),
     });
+  }
+
+  /**
+   * The guard's report goes to the manager as a protocol event, ahead of the
+   * turn's terminal. The manager does not read worker stderr, so a log line
+   * written here would be lost; it logs the event under its name, with the
+   * turn id and what the turn owed.
+   */
+  private async reportGuidedTurn({
+    state,
+    event,
+    missing,
+  }: {
+    state: TurnState;
+    event: GuidedTurnEvent["event"];
+    missing: string[];
+  }): Promise<void> {
+    const report: GuidedTurnEvent = { type: "guided_turn", turnId: state.turnId, event, missing };
+    await this.options.writer.emit(report);
   }
 
   private deriveTerminal(state: TurnState, thrown: unknown): TerminalEvent {

@@ -1179,8 +1179,8 @@ Feature: Langy guides the first setup after sign-up
       Given a turn on the guided path that ended clean on neither a card, the closing line nor a failed-step line
       When the worker reads the turn's calls
       Then it appends one continuation message to the same turn and lets the model go on
-      And it logs guided_turn_continued with what the turn owes
-      And a second bare end logs guided_turn_bare_end and the turn ends
+      And it reports guided_turn_continued to the manager with what the turn owes
+      And a second bare end reports guided_turn_bare_end ahead of the terminal, and the turn ends
 
     @unit
     Scenario: The continuation names the step 2 lines the turn did not say
@@ -1207,6 +1207,27 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The step 2 lines the guard checks are the skill's own
       Given the guided-onboarding skill source
       Then every line template, the framework line's shape, the checklist item and the complete-path command the guard reads are in it word for word
+
+    # The manager spawns the worker with its stderr discarded, so a log line
+    # written in the worker reaches no log: the report rides the protocol.
+    @unit
+    Scenario: The manager logs the guard's report under its name
+      Given the worker sent a guided_turn event for a turn
+      When the manager reads it
+      Then it logs the event's name with the turn id and what the turn owed
+      And no frame reaches the panel for it
+
+    # The record the panel keeps places a turn's navigates at its end whatever
+    # order they ran in, and a finished path opens the run beside the panel
+    # after its closing line. A call that says nothing is not what a turn
+    # ended on.
+    @unit
+    Scenario: Calls that say nothing are transparent to the ender
+      Given a guided turn that ended on the closing line after complete-path, followed by navigate calls or lookups
+      When the worker reads the turn's calls
+      Then it reads the closing line as the ender and appends no continuation
+      And a line that is not the closing line, followed by the same calls, still ends bare
+      And the calls it reads through are the plan write, the skill load, the read-only lookups of both tool sets and langwatch navigate
 
   Rule: The complete-path result renders as one line, the panel's done marker
 

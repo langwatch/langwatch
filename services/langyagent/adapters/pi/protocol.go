@@ -60,6 +60,11 @@ type wireEvent struct {
 	ErrorMessage string `json:"errorMessage"`
 	// handoff
 	Seed string `json:"seed"`
+	// guided_turn: the wrapper's guided turn end guard reporting what it did
+	// (continued the turn, or gave up on a second bare end) and what the turn
+	// owed, in the guard's own words.
+	Event   string   `json:"event"`
+	Missing []string `json:"missing"`
 }
 
 // Event type discriminants (wrapper -> manager).
@@ -73,8 +78,15 @@ const (
 	eventToolUpdate  = "tool_update"
 	eventToolEnd     = "tool_end"
 	eventPlan        = "plan"
+	eventGuidedTurn  = "guided_turn"
 	eventTurnDone    = "turn_done"
 	eventHandoff     = "handoff"
+)
+
+// guided_turn event kinds, logged under these names so a log grep finds them.
+const (
+	guidedTurnContinued = "guided_turn_continued"
+	guidedTurnBareEnd   = "guided_turn_bare_end"
 )
 
 // turn_done outcomes.

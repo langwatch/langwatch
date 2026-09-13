@@ -8,8 +8,9 @@
  * 2 lines said" with one of the lines never said. The prose does not hold on
  * its own, so the runner reads the turn's own calls: a guided turn that ends
  * bare gets one continuation message naming what it still owes, and the model
- * goes on in the same turn. Once per turn; a second bare end is logged and
- * left.
+ * goes on in the same turn. Once per turn; a second bare end is reported and
+ * left. Both reports ride the protocol as `guided_turn` events: the manager
+ * does not read worker stderr, so it logs them under their names.
  *
  * The step 2 lines and the checklist item are the skill's own words. This
  * package does not depend on the skills tree, so the copies here are pinned
@@ -18,12 +19,17 @@
 
 import { contentText } from "./events.js";
 import { GUIDED_KICKOFF_OPENER } from "./guided-kickoff.js";
-import { CODE_ACCESS_TOOL_NAME } from "./tools/local-workspace.js";
+import {
+  CODE_ACCESS_TOOL_NAME,
+  LOCAL_TOOL_NAMES,
+  SANDBOX_FILE_TOOL_NAMES,
+} from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME } from "./tools/question.js";
 import { SAY_TOOL_NAME } from "./tools/say.js";
+import { SKILL_TOOL_NAME } from "./tools/skill.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
 
-/** The log lines the runner writes, greppable by name. */
+/** The names of the guard's two reports, sent to the manager and logged there under these names. */
 export const GUIDED_TURN_CONTINUED_LOG = "guided_turn_continued";
 export const GUIDED_TURN_BARE_END_LOG = "guided_turn_bare_end";
 
@@ -55,6 +61,26 @@ const CARD_TOOL_NAMES = new Set([QUESTION_TOOL_NAME, CODE_ACCESS_TOOL_NAME]);
 
 /** The shell tools, in the worker's names and the CLI's. */
 const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
+
+/** The tools that write a file: a turn that ends on one ended on it. */
+const WRITING_TOOL_NAMES = new Set(["write", "edit", "local_write", "local_edit"]);
+
+/**
+ * The calls the ender reads through. A plan write, a skill load and the
+ * read-only lookups of both tool sets say nothing to the user, so a turn
+ * whose last calls are these ended on whatever came before them. A `say`, a
+ * card, a file write and a shell call are what a turn ends on, with one
+ * exception: `langwatch navigate` below.
+ */
+export const TRANSPARENT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
+  TODOWRITE_TOOL_NAME,
+  SKILL_TOOL_NAME,
+  ...SANDBOX_FILE_TOOL_NAMES.filter((name) => !WRITING_TOOL_NAMES.has(name)),
+  ...LOCAL_TOOL_NAMES.filter((name) => !WRITING_TOOL_NAMES.has(name) && !SHELL_TOOL_NAMES.has(name)),
+]);
+
+/** `langwatch navigate ...` opens a page beside the panel and says nothing: a shell call the ender reads through. */
+const NAVIGATE_COMMAND = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*langwatch\s+navigate\b/;
 
 export type TurnCall = {
   name: string;
@@ -118,6 +144,12 @@ function shellCommand(call: TurnCall): string | undefined {
   return typeof command === "string" ? command : undefined;
 }
 
+function transparent(call: TurnCall): boolean {
+  if (TRANSPARENT_TOOL_NAMES.has(call.name)) return true;
+  const command = shellCommand(call);
+  return command !== undefined && NAVIGATE_COMMAND.test(command.trim());
+}
+
 /** A shell result's exit code, as the CLI prints it on its first line. */
 function exitCodeOf(output: string): number | undefined {
   const match = /^exit code:\s*(\d+)/m.exec(output);
@@ -133,12 +165,12 @@ function failed(call: TurnCall): boolean {
 export type GuidedTurnEnder = "card" | "closing_line" | "failed_step" | "bare";
 
 /**
- * What the turn ended on. Plan writes are bookkeeping and do not count as the
- * last call: a turn whose last calls are `todowrite` ended on whatever came
- * before them.
+ * What the turn ended on, read off the last call that is not transparent: a
+ * turn whose last calls are plan writes, lookups or navigates ended on
+ * whatever came before them.
  */
 export function guidedTurnEnding(calls: readonly TurnCall[]): GuidedTurnEnder {
-  const meaningful = calls.filter((call) => call.name !== TODOWRITE_TOOL_NAME);
+  const meaningful = calls.filter((call) => !transparent(call));
   const last = meaningful[meaningful.length - 1];
   if (!last) return "bare";
   if (CARD_TOOL_NAMES.has(last.name)) return "card";

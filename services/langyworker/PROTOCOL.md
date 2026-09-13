@@ -73,6 +73,7 @@ Per turn, all tagged with the turn's `turnId`:
 {"type":"tool_update","turnId":"t1","id":"call_1","name":"bash","output":"partial output"}
 {"type":"tool_end","turnId":"t1","id":"call_1","name":"bash","input":{"command":"ls"},"isError":false,"output":"full output"}
 {"type":"plan","turnId":"t1","items":[{"content":"Find the slowest traces","status":"in_progress"}]}
+{"type":"guided_turn","turnId":"t1","event":"guided_turn_continued","missing":["the branch line","the first scenario card"]}
 ```
 
 Event payload shapes follow pi's native session events: `delta` and `reasoning`
@@ -86,6 +87,15 @@ absent when it ran in the sandbox; the manager's GitHub gate and the panel read
 it, since a git push or a gh call there used the developer's own credentials. `plan` is
 emitted on every successful `todowrite` tool call with the full current list;
 `status` is one of `pending`, `in_progress`, `completed`, `cancelled`.
+
+`guided_turn` is the report of the guided turn end guard (`guided-turn-end.ts`):
+`event` is `guided_turn_continued` when the wrapper appended a continuation to a
+guided turn that ended on none of the calls the skill allows, and
+`guided_turn_bare_end` when it gave up on a second bare end. `missing` names what
+the turn owed, in the guard's own words (line and card names, never the model's
+text). The manager logs it under the event name and draws no frame for it. The
+wrapper's stderr is not read by the manager, so this event is the guard's only
+sink.
 
 Terminal (the LAST line ever emitted for a `turnId`; nothing follows it):
 

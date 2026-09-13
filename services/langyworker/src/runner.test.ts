@@ -168,14 +168,10 @@ describe("TurnRunner", () => {
 
   describe("when a guided turn ends on none of the calls the skill allows", () => {
     /** @scenario "A guided turn that ends bare is continued once" */
-    it("appends one continuation to the same turn, then ends the turn and logs the second bare end", async () => {
+    it("appends one continuation to the same turn, then ends the turn and reports the second bare end", async () => {
       const fake = makeFakeSession();
       fake.session.agent.state.messages = GUIDED_HISTORY;
-      const warnings: string[] = [];
-      const { runner, events } = makeRunner({
-        session: fake.session,
-        options: { warn: (message) => warnings.push(message) },
-      });
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
       await until(() => fake.promptCalls.length === 1);
       feedStep2WithoutBranchLine(runner);
@@ -184,21 +180,33 @@ describe("TurnRunner", () => {
       expect(fake.promptCalls[1]?.prompt).toBe(
         "Step 2 is not finished: the branch line was not said, and the first scenario card was not asked. Say the missing line, then continue with step 3 and end on the question card.",
       );
-      expect(warnings).toContain("guided_turn_continued turn=t2 missing=the branch line; the first scenario card");
+      expect(events).toContainEqual({
+        type: "guided_turn",
+        turnId: "t2",
+        event: "guided_turn_continued",
+        missing: ["the branch line", "the first scenario card"],
+      });
       expect(events.some((event) => event.type === "turn_done")).toBe(false);
       fake.finish();
       await done;
       expect(fake.promptCalls).toHaveLength(2);
-      expect(events[events.length - 1]).toEqual({ type: "turn_done", turnId: "t2", outcome: "ok" });
-      expect(warnings).toContain("guided_turn_bare_end turn=t2 missing=the branch line; the first scenario card");
+      // The report lands on the protocol ahead of the terminal.
+      expect(events.slice(-2)).toEqual([
+        {
+          type: "guided_turn",
+          turnId: "t2",
+          event: "guided_turn_bare_end",
+          missing: ["the branch line", "the first scenario card"],
+        },
+        { type: "turn_done", turnId: "t2", outcome: "ok" },
+      ]);
     });
 
     /** @scenario "The continuation names the step 2 lines the turn did not say" */
     it("continues with only the card named once the missing line was said on the second pass, and stops there", async () => {
       const fake = makeFakeSession();
       fake.session.agent.state.messages = GUIDED_HISTORY;
-      const warnings: string[] = [];
-      const { runner } = makeRunner({ session: fake.session, options: { warn: (message) => warnings.push(message) } });
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
       await until(() => fake.promptCalls.length === 1);
       feedStep2WithoutBranchLine(runner);
@@ -208,15 +216,19 @@ describe("TurnRunner", () => {
       fake.finish();
       await done;
       expect(fake.promptCalls).toHaveLength(2);
-      expect(warnings).toContain("guided_turn_bare_end turn=t2 missing=the first scenario card");
+      expect(events).toContainEqual({
+        type: "guided_turn",
+        turnId: "t2",
+        event: "guided_turn_bare_end",
+        missing: ["the first scenario card"],
+      });
     });
 
     /** @scenario "A turn that ended on a card, a closing line or a failed step is left alone" */
     it("leaves a turn that ended on the question card alone", async () => {
       const fake = makeFakeSession();
       fake.session.agent.state.messages = GUIDED_HISTORY;
-      const warnings: string[] = [];
-      const { runner, events } = makeRunner({ session: fake.session, options: { warn: (message) => warnings.push(message) } });
+      const { runner, events } = makeRunner({ session: fake.session });
       const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
       await until(() => fake.promptCalls.length === 1);
       feedStep2WithoutBranchLine(runner);
@@ -225,7 +237,7 @@ describe("TurnRunner", () => {
       fake.finish();
       await done;
       expect(fake.promptCalls).toHaveLength(1);
-      expect(warnings).toEqual([]);
+      expect(events.filter((event) => event.type === "guided_turn")).toEqual([]);
       expect(events[events.length - 1]).toEqual({ type: "turn_done", turnId: "t2", outcome: "ok" });
     });
 
@@ -244,8 +256,7 @@ describe("TurnRunner", () => {
     it("does not continue a turn the user has already moved past", async () => {
       const fake = makeFakeSession();
       fake.session.agent.state.messages = GUIDED_HISTORY;
-      const warnings: string[] = [];
-      const { runner, events } = makeRunner({ session: fake.session, options: { warn: (message) => warnings.push(message) } });
+      const { runner, events } = makeRunner({ session: fake.session });
       const first = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
       await until(() => fake.promptCalls.length === 1);
       feedStep2WithoutBranchLine(runner);
@@ -254,7 +265,7 @@ describe("TurnRunner", () => {
       await first;
       await until(() => fake.promptCalls.length === 2);
       expect(fake.promptCalls[1]?.prompt).toBe("Actually, use the other folder.");
-      expect(warnings.filter((message) => message.startsWith("guided_turn_continued"))).toEqual([]);
+      expect(events.filter((event) => event.type === "guided_turn")).toEqual([]);
       // The newer turn ends on the card, as written.
       settle(runner, { id: "q1", name: "question", input: { questions: [] } });
       fake.finish();

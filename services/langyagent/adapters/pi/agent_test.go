@@ -4,15 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // frameSink is a thread-safe app.ChatSink capturing emitted frame payloads
@@ -57,8 +62,14 @@ func (s *frameSink) waitFor(t *testing.T, want string) {
 // guarantee between them. Returns the sink and the stream outcome.
 func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 	t.Helper()
+	return runTurnIn(t, context.Background(), agent, turnID)
+}
+
+// runTurnIn is runTurn on the caller's context (one carrying a test logger).
+func runTurnIn(t *testing.T, base context.Context, agent *Agent, turnID string) (*frameSink, error) {
+	t.Helper()
 	sink := &frameSink{}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(base, 10*time.Second)
 	t.Cleanup(cancel)
 
 	errCh := make(chan error, 1)
@@ -141,6 +152,39 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 	}
 	if got := strings.Count(joined, `"phase":"end"`); got != 1 {
 		t.Errorf("end frames = %d, want exactly 1", got)
+	}
+}
+
+// The wrapper's guided turn end guard reports through the protocol, since the
+// wrapper's stderr is discarded: the manager logs the event under the guard's
+// own name with the turn id and what the turn owed, and draws no frame for it.
+//
+// @scenario "The manager logs the guard's report under its name"
+func TestAgent_GuidedTurnEvent_IsLoggedNotFramed(t *testing.T) {
+	agent := spawnFake(t, "guided", 20*time.Second)
+	if err := agent.WaitReady(context.Background()); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+	core, logs := observer.New(zapcore.InfoLevel)
+	ctx := clog.Set(context.Background(), zap.New(core))
+
+	sink, err := runTurnIn(t, ctx, agent, "turn-1")
+	if err != nil {
+		t.Fatalf("Stream = %v, want nil on turn_done ok", err)
+	}
+	if strings.Contains(sink.joined(), "guided") {
+		t.Errorf("guided_turn must draw no frame, got:\n%s", sink.joined())
+	}
+	entries := logs.FilterMessage("guided_turn_continued").All()
+	if len(entries) != 1 {
+		t.Fatalf("guided_turn_continued log lines = %d, want 1; all lines: %v", len(entries), logs.All())
+	}
+	fields := entries[0].ContextMap()
+	if got := fields["turn_id"]; got != "turn-1" {
+		t.Errorf("turn_id = %v, want turn-1", got)
+	}
+	if got := fmt.Sprint(fields["missing"]); got != "[the branch line the first scenario card]" {
+		t.Errorf("missing = %s, want the guard's two items", got)
 	}
 }
 
