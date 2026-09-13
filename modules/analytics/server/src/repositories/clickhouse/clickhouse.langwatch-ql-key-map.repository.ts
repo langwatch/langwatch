@@ -31,7 +31,10 @@ export class LwqlKeyMapClickHouseRepository extends LwqlKeyMapRepository {
     const client = await this.resolveClient(row.TenantId);
     await client.insert({
       table,
-      values: [row],
+      // A fresh literal, not `row` itself: `LwqlKeyMapRow` names its two
+      // columns rather than an index signature, so it does not satisfy the
+      // session's `Record<string, unknown>` row shape on its own.
+      values: [{ KeyHash: row.KeyHash, TenantId: row.TenantId }],
       format: "JSONEachRow",
       clickhouse_settings: LWQL_KEY_MAP_INSERT_SETTINGS,
     });

@@ -43,12 +43,16 @@ import type {
   AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { AnalyticsAdapter } from "../services/analytics-composition.service.ts";
 import { FilterOptionsAdapter } from "../services/filter-options-composition.service.ts";
 import { LangWatchQLAdapter } from "../services/langwatch-ql-composition.service.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 
 /**
  * The filter-value read this feature makes on the host's filter registry.
@@ -100,7 +104,7 @@ export type AnalyticsInfrastructure = Readonly<{
 
 type AnalyticsSetup = FeatureSetup<
   Record<never, never>,
-  AnalyticsInfrastructure,
+  MembersRead<typeof AnalyticsApp.reads>,
   AnalyticsServerConfig
 >;
 
@@ -114,17 +118,71 @@ const langWatchQlConnection = (values: readonly string[]): LangWatchQLConnection
   return { url, username, password, database, tenantSetting };
 };
 
+/**
+ * Adapts the process's ONE routing `clickhouse` member to the per-tenant
+ * session shape Analytics' repositories were written against —
+ * `.query({query, query_params, format, clickhouse_settings})` /
+ * `.insert({table, values, format, clickhouse_settings})`, the same calling
+ * convention `@clickhouse/client` itself exposes. The member already routes
+ * and guards every statement by `tenantId` internally (`packages/infrastructure`'s
+ * `clickhouse` member docblock), so this session is a thin translation bound to
+ * one tenant, not a second connection: `query`/`insert` carry that tenant on to
+ * {@link ClickHouseQueryClient.query} / {@link ClickHouseQueryClient.insert}.
+ */
+class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
+  constructor(
+    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly tenantId: string,
+  ) {}
+
+  async query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: ClickHouseSettings;
+  }): Promise<{ json(): Promise<Record<string, unknown>[]> }> {
+    const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+      tenantId: this.tenantId,
+      sql: input.query,
+      params: input.query_params,
+      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
+    });
+    return { json: () => Promise.resolve(rows) };
+  }
+
+  async insert(input: {
+    table: string;
+    values: Record<string, unknown>[];
+    format: "JSONEachRow";
+    clickhouse_settings?: ClickHouseSettings;
+  }): Promise<unknown> {
+    await this.clickhouse.insert({
+      tenantId: this.tenantId,
+      table: input.table,
+      rows: input.values,
+      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
+    });
+    return undefined;
+  }
+}
+
 export class AnalyticsApp implements AnalyticsApiContract {
   static readonly contract = AnalyticsApiToken;
   static readonly dependencies = {};
   static readonly configSchema = analyticsServerConfigSchema;
+  static readonly reads = reads("clickhouse");
 
   static create(setup: AnalyticsSetup): AnalyticsApp {
-    const resolveClient = setup.members.resolveClickHouseClient;
+    const clickhouse = setup.members.clickhouse;
+    const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
+      Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
     const analytics = AnalyticsAdapter.create({
-      resolveClient: async (tenantId) => (resolveClient ? resolveClient(tenantId) : null),
-      clickhouseEnabled: setup.members.clickhouseEnabled ?? resolveClient !== null,
-      defaultRetentionDays: setup.members.defaultRetentionDays,
+      resolveClient,
+      // The member is a `reads("clickhouse")` claim: boot refuses this
+      // process before `create()` runs if no ClickHouse was configured, so by
+      // the time this constructs, ClickHouse is always available.
+      clickhouseEnabled: true,
+      defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
     });
     const langwatchQl = setup.config.langwatchQl;
     const connectionValues = [
@@ -141,15 +199,7 @@ export class AnalyticsApp implements AnalyticsApiContract {
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
     return new AnalyticsApp({
       analytics,
-      filterOptions: FilterOptionsAdapter.create({
-        resolveClient: resolveClient
-          ? async (tenantId) => {
-              const client = await resolveClient(tenantId);
-              if (!client) throw new Error("ClickHouse client is not available");
-              return client;
-            }
-          : null,
-      }),
+      filterOptions: FilterOptionsAdapter.create({ resolveClient }),
       langWatchQL,
     });
   }

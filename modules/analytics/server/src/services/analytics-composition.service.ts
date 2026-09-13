@@ -2,7 +2,6 @@ import type {
   AnalyticsEvaluationReadMetrics,
   AnalyticsService as AnalyticsServiceContract,
 } from "@langwatch/analytics-contract";
-import type { ClickHouseClient } from "@clickhouse/client";
 import { AnalyticsService } from "./analytics.service.ts";
 import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
 import { NullAnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
@@ -12,10 +11,18 @@ import {
 } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import type { AnalyticsTripwire } from "@langwatch/analytics-contract";
 
-/** Process composition binds the one Analytics repository to the service. */
+/**
+ * Process composition binds the one Analytics repository to the service.
+ *
+ * `resolveClient` answers the SAME narrow session shape
+ * ({@link EvaluationAnalyticsClickHouseClient}) both the timeseries repository
+ * and the evaluation repository call — one tenant-bound session, not a raw
+ * `@clickhouse/client` handle, so whatever builds it (today, a thin wrapper
+ * over the process's routing `clickhouse` member) has one shape to satisfy.
+ */
 export class AnalyticsAdapter {
   static create(options: {
-    resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
+    resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
     clickhouseEnabled: boolean;
     tripwire?: AnalyticsTripwire;
     defaultRetentionDays?: number;
@@ -28,39 +35,11 @@ export class AnalyticsAdapter {
       tripwire: options.tripwire,
       evaluationRepository: options.clickhouseEnabled
         ? ClickHouseAnalyticsEvaluationRepository.create({
-            resolveClient: async (tenantId) => {
-              const client = await options.resolveClient(tenantId);
-              return client ? new ClickHouseEvaluationAnalyticsClient(client) : null;
-            },
+            resolveClient: options.resolveClient,
             defaultRetentionDays: options.defaultRetentionDays ?? 30,
             readMetrics: options.evaluationReadMetrics,
           })
         : NullAnalyticsEvaluationRepository.create(),
     });
-  }
-}
-
-class ClickHouseEvaluationAnalyticsClient implements EvaluationAnalyticsClickHouseClient {
-  constructor(private readonly client: ClickHouseClient) {}
-
-  insert(input: {
-    table: string;
-    values: Record<string, unknown>[];
-    format: "JSONEachRow";
-    clickhouse_settings?: import("@clickhouse/client").ClickHouseSettings;
-  }): Promise<unknown> {
-    return this.client.insert(input);
-  }
-
-  async query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    clickhouse_settings?: import("@clickhouse/client").ClickHouseSettings;
-  }): Promise<{ json(): Promise<Record<string, unknown>[]> }> {
-    const result = await this.client.query(input);
-    return {
-      json: () => result.json<Record<string, unknown>>(),
-    };
   }
 }

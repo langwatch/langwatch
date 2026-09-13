@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
 import {
   analyticsTimeseriesResultSchema,
   type AnalyticsFeedbacksResult,
@@ -62,7 +62,7 @@ const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
 /** The one ClickHouse persistence implementation for all timeseries tables. */
 export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   static create(options: {
-    resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
+    resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
   }): ClickHouseAnalyticsRepository {
     return new ClickHouseAnalyticsRepository(options.resolveClient);
   }
@@ -70,7 +70,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
 
   private constructor(
-    private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>,
+    private readonly resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>,
   ) {
     super();
   }
@@ -239,7 +239,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     }
   }
 
-  private async clientFor(tenantId: string): Promise<ClickHouseClient> {
+  private async clientFor(tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> {
     const client = await this.resolveClient(tenantId);
     if (!client) throw new AnalyticsClientUnavailableError(tenantId);
     return client;
