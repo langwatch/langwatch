@@ -22,14 +22,17 @@ import { bootApiProcess } from "./app/api-production.composition.ts";
  */
 class ApiProductionComposition extends ApiRuntimeComposition {
   async compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcess> {
-    const runtime = await bootApiProcess({
+    const { runtime, trpc } = await bootApiProcess({
       config: options.config,
       secrets: options.secrets,
     });
-    // The process's own lifecycle routes first, then every family boot
-    // mounted, in install order. Each mounted family carries its own absolute
-    // paths, so this is a route table and not a prefix scheme.
+    // The process's own lifecycle routes first, then the tRPC door - the
+    // request lane at /api/trpc and the subscription lane over the same
+    // router - then every REST family boot mounted, in install order. Each
+    // mounted family carries its own absolute paths, so this is a route table
+    // and not a prefix scheme.
     const application = ApiProcessLifecycleRoutes.create({});
+    application.route("/", trpc.door(runtime.transports.trpc));
     for (const family of runtime.transports.rest) application.route("/", family);
 
     const listener = ApiHttpListener.create({

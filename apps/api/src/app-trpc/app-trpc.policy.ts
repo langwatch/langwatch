@@ -1,12 +1,11 @@
 /**
  * The API process's own tRPC policy chain, built on its own root.
  *
- * Until now this process mounted two feature routers on a bare
- * `root.procedure` wrapped in one hand-written span-and-audit middleware. That
- * is enough for a surface whose every procedure authorizes inside its own
- * handler, and not enough for the packaged surfaces: those declare their access
- * as an `AuthzDeclaration` and are mounted through `AppTrpcPolicyMiddlewares`,
- * which the process — not the feature — has to supply.
+ * A declared namespace states its access as an `AuthzDeclaration` and the
+ * runtime installs the check for it, so what the PROCESS supplies is the ports
+ * behind that check rather than a chain of its own middlewares. The hand-mount
+ * kit this file used to hand back went with the assembly that consumed it
+ * (b383462d96); `declaredRuntime` is the whole of what a door needs now.
  *
  * Everything the chain is made of is already packaged in `@langwatch/api/trpc`.
  * What was missing was a process that filled the ports: an identity port over
@@ -19,19 +18,14 @@
  * composition puts them in it.
  */
 import type { Actor } from "@langwatch/actor";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  createDeclaredAuthzMiddlewares,
-  createScopeLineageGuard,
   createTrpcRuntime,
   createTrpcRuntimePolicy,
   isAuditLogExempt,
   redactAuditArgs,
-  type AppTrpcPolicyMiddlewares,
   type TrpcAudit,
   type TrpcAuthorizationDecisions,
   type TrpcAuthorizationDenial,
-  type TrpcAuthorization,
   type TrpcCauseTranslation,
   type TrpcErrorReporting,
   type TrpcDeclaredAuthzContext,
@@ -41,7 +35,6 @@ import {
   type TrpcRuntimeContext,
   type TrpcRuntimePorts,
 } from "@langwatch/api/trpc";
-import { declaredCheckFrom } from "./app-trpc.declared-check.ts";
 
 /**
  * What the process fills for the chain to exist.
@@ -82,41 +75,8 @@ export function createApiTrpcPolicy<
     causes: ports.causes,
   });
 
-  const authorization: TrpcAuthorization<TContext> = {
-    forRequest: () => ports.authz,
-  };
-
-  const declared = createDeclaredAuthzMiddlewares<TContext>({
-    identity: ports.identity,
-    authorization,
-    denials: ports.denials,
-  });
-
-  const scopeLineage = createScopeLineageGuard<TContext>({ authorization });
-
-  const middlewares: AppTrpcPolicyMiddlewares = {
-    tracer: runtime.tracerMiddleware,
-    logger: runtime.loggerMiddleware,
-    handledError: runtime.handledErrorMiddleware,
-    scopeLineageGuard: (declaration) => scopeLineage(declaration),
-    declaredCheck: declaredCheckFrom({
-      permission: (input) => declared.permission(input),
-      // Widened at this seam rather than in the declaration: a
-      // `permission-any` declaration is parsed from a non-empty tuple, and the
-      // builder states that non-emptiness while the process-facing builder
-      // interface states only "some permissions". Refusing an empty list here
-      // is what keeps the two honest.
-      permissionAny: (permissions) => declared.permissionAny(asNonEmpty(permissions)),
-      noPermission: (input) => declared.noPermission(input),
-      serviceAuthorized: (input) => declared.serviceAuthorized(input),
-    }),
-    enforceCheck: runtime.enforcePermissionCheck,
-    auditMutations: runtime.auditLogMutations,
-  };
-
   return {
     protectedProcedure: runtime.authProtectedProcedure,
-    middlewares,
     // The declared path, on the same collaborators. Built here rather than
     // beside the mounts so a second root can never hand out its middlewares.
     declaredRuntime: createTrpcRuntime<TContext>({
@@ -171,19 +131,4 @@ function actorOf(
     id: actor.id,
     ...(actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : {}),
   };
-}
-
-/**
- * A `permission-any` declaration with no permissions would install a check
- * that can never pass and would read, in the declaration sweep, as a covered
- * procedure. Refusing it at composition is the only reading that is safe.
- */
-function asNonEmpty(
-  permissions: readonly AuthzPermission[],
-): readonly [AuthzPermission, ...AuthzPermission[]] {
-  const [first, ...rest] = permissions;
-  if (!first) {
-    throw new Error("a permission-any authorization declaration named no permissions");
-  }
-  return [first, ...rest];
 }

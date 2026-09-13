@@ -4,10 +4,10 @@
  *
  * A module never mounts itself and the process never re-declares a route: what
  * the process owns is the DOORS - which credential kinds it opens, what each
- * resolves, and the envelope a refusal is written in. `apiRestHosts` is a
- * factory rather than a value because every door here is built from a peer App
- * (api-key, authz, organization, scim), and those are resolved by the same
- * boot that mounts the routes.
+ * resolves, and the envelope a refusal is written in. The host is built by BOOT
+ * rather than by the composition literal because every door here is built from
+ * a peer App (api-key, authz, organization, scim), and those are resolved by
+ * the same boot that mounts the routes.
  */
 import type { Actor } from "@langwatch/actor";
 import {
@@ -32,7 +32,6 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   FeatureRestHost,
   FeatureRestMountOptions,
-  FeatureTransportHosts,
   MountableTransport,
   TransportPeers,
 } from "@langwatch/runtime-composition";
@@ -70,18 +69,6 @@ export type ApiRestDoorConfig = Readonly<{
    */
   browserSession?: ((request: Request) => Promise<ApiRestBrowserCaller | null>) | undefined;
 }>;
-
-/**
- * The doors this process opens, and the hosts boot mounts the declared
- * transports on. Every credential kind an installed module's declaration may
- * name is opened here, so a mount refuses by KIND only for a kind nothing in
- * this build declares.
- */
-export function apiRestHosts(options: {
-  readonly config: ApiRestDoorConfig;
-}): (peers: TransportPeers) => FeatureTransportHosts<MountableRestApp, never> {
-  return (peers) => ({ rest: ApiRestHost.create({ peers, config: options.config }) });
-}
 
 /** Builds this process's door table once, and mounts declared families on it. */
 export class ApiRestHost implements FeatureRestHost<MountableRestApp> {

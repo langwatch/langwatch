@@ -18,9 +18,19 @@ import {
 } from "@langwatch/infrastructure";
 import type { MountableRestApp } from "@langwatch/api/rest";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
+import { createLogger } from "@langwatch/observability";
 import { serverModules } from "@langwatch/installed-modules/server";
-import { ResourceScope, type BootedRuntime } from "@langwatch/runtime-composition";
-import { apiRestHosts, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
+import { ResourceScope, type BootedRuntime, type TransportPeers } from "@langwatch/runtime-composition";
+import { ApiRestHost, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
+import {
+  ApiTrpcHost,
+  type ApiTrpcNamespace,
+  type ApiTrpcSessionResolver,
+} from "../app-trpc/api-trpc.host.ts";
+import {
+  ABSENT_API_TRPC_NAMESPACES,
+  absentNamespaceReason,
+} from "../app-trpc/app-trpc.namespaces.ts";
 import type { ApiConfig } from "../platform/config/api.config.ts";
 import { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.members.ts";
 import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.members.ts";
@@ -308,7 +318,13 @@ export function bootApiProcess(options: {
   readonly browserSession?:
     | ((request: Request) => Promise<ApiRestBrowserCaller | null>)
     | undefined;
-}): Promise<BootedRuntime<ProcessMembers, MountableRestApp, never>> {
+  /**
+   * The same cookie, resolved to the whole signed-in person, for the tRPC door.
+   * A narrower answer than REST's on purpose: a procedure renders the person,
+   * a byte route only needs to know there is one.
+   */
+  readonly trpcSession?: ApiTrpcSessionResolver | undefined;
+}): Promise<ApiBootedProcess> {
   const config = options.config;
 
   // The api's `eventing` member: a producer, and only ever a producer (the
@@ -332,7 +348,12 @@ export function bootApiProcess(options: {
     processName: config.serviceName,
   });
 
-  return createProcess({
+  // Held from the doors factory: the tRPC host is the one object that can
+  // compose what boot mounted on it, and boot builds it because only boot
+  // holds the peers its authorization port reads.
+  let trpc: ApiTrpcHost | undefined;
+
+  const runtime = await createProcess({
     role: "api",
     config: apiProcessConfig({ config, secrets: options.secrets }),
     moduleConfig: apiModuleConfig(config),
@@ -348,8 +369,9 @@ export function bootApiProcess(options: {
       start: () => void 0,
       stop: () => producerResources.close(),
     })
-    .withTransports(
-      apiRestHosts({
+    .withTransports((peers: TransportPeers) => ({
+      rest: ApiRestHost.create({
+        peers,
         config: {
           // Which secret guards which internal family. One door, several
           // secrets: a cron bearer must not reach the agent manager.
@@ -361,6 +383,50 @@ export function bootApiProcess(options: {
           ...(options.browserSession ? { browserSession: options.browserSession } : {}),
         },
       }),
-    )
+      trpc: (trpc = ApiTrpcHost.create({
+        peers,
+        config: {
+          ...(options.trpcSession ? { browserSession: options.trpcSession } : {}),
+        },
+      })),
+    }))
     .boot();
+
+  if (!trpc) {
+    throw new Error("The api process booted without opening its tRPC door.");
+  }
+  reportAbsentTrpcNamespaces(runtime.transports.trpc);
+
+  return { runtime, trpc };
+}
+
+/**
+ * What the api process booted into: everything boot constructed, plus the one
+ * door that can turn the namespaces it mounted into a served router.
+ */
+export type ApiBootedProcess = Readonly<{
+  runtime: BootedRuntime<ProcessMembers, MountableRestApp, ApiTrpcNamespace>;
+  trpc: ApiTrpcHost;
+}>;
+
+/**
+ * Names each namespace this build does not serve, once, at boot.
+ *
+ * The list is a conversion queue, not a failure: a namespace leaves it the
+ * moment its module declares its transport. What WOULD be a failure is a
+ * namespace that is neither mounted nor listed, so an entry the process turned
+ * out to serve is reported too — a stale line hides a converted module.
+ */
+function reportAbsentTrpcNamespaces(mounted: Readonly<Record<string, unknown>>): void {
+  const logger = createLogger("langwatch:api:trpc");
+  for (const entry of ABSENT_API_TRPC_NAMESPACES) {
+    if (Object.hasOwn(mounted, entry.namespace)) {
+      logger.warn(
+        { namespace: entry.namespace, module: entry.module },
+        "This namespace is served and still listed absent; drop its entry from ABSENT_API_TRPC_NAMESPACES",
+      );
+      continue;
+    }
+    logger.warn({ namespace: entry.namespace }, absentNamespaceReason(entry));
+  }
 }
