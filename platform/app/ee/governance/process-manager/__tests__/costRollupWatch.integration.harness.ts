@@ -123,11 +123,14 @@ function summarizing(runtime: WatchRuntime) {
         tenantId: runtime.tenant,
         ...params,
       }),
-    writeSummary: (amountNanoMinor: number) =>
+    writeSummary: (params: {
+      amountNanoMinor: number;
+      occurredAtMs?: number;
+    }) =>
       summary.writeSummary({
         repo: runtime.repo,
         tenantId: runtime.tenant,
-        amountNanoMinor,
+        ...params,
       }),
     summarizedAmountsFor: (day: string) =>
       summary.summarizedAmountsFor({

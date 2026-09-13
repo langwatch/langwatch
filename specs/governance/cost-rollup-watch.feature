@@ -281,6 +281,59 @@ Feature: The daily cost check is driven by the charges, not by a clock
       Then the second has nothing marked
       And the second has no check armed
 
+  Rule: A check waits for the summary to catch up rather than calling it drift
+
+    # The summary and the check are driven by two separate queues, and nothing
+    # orders one against the other. A charge landing shortly before the slot
+    # can be re-derived by the check while the summary is still folding it, so
+    # the two sides disagree for a few seconds about a rollup that is perfectly
+    # correct. Reporting that would do double damage: a false alarm, AND the
+    # day cleared, because a comparison that answers is a comparison that
+    # happened and nothing marks the day again.
+    #
+    # Every summary row already carries the newest charge moment folded into
+    # it, and the check re-derives the same figure from the day's charges, so
+    # "the summary has not caught up" is a question the two sides can answer
+    # between themselves without anything new being stored.
+
+    @integration
+    Scenario: A charge the summary has not folded yet is waited for rather than counted as drift
+      Given a pulled charge landed just before tonight's check
+      And the day's summary does not yet cover that charge
+      When the check compares that day
+      Then no drift is reported for that day
+      And the comparison is left to be attempted again
+      When the summary catches up with that charge
+      Then the next attempt compares the day once and finds it agrees
+
+    @unit
+    Scenario: A summary that already covers every charge of the day is compared as before
+      Given a day whose summary covers every charge it holds
+      When the check compares that day
+      Then drift between the two figures is reported as before
+      # The guard on the guard. Without it, a check that refused to compare
+      # anything at all would satisfy every scenario above.
+
+    @unit
+    Scenario: A cell the summary holds nothing for is waited for
+      Given a pulled charge whose rollup cell the summary holds no row for
+      When the check compares that day
+      Then no drift is reported for that day
+      And the comparison is left to be attempted again
+      # A cell the charges describe and the summary has never heard of is the
+      # strongest form of behind, not a separate condition. Only time tells it
+      # apart from a fold that will never run, and the retry ladder is how that
+      # time is spent.
+
+    @unit
+    Scenario: A charge carrying no usable moment never parks the check
+      Given a pulled charge that carries no moment the summary can be measured against
+      When the check compares that day
+      Then the day is compared rather than waited on
+      # There is no evidence the summary is behind anything, and reading "we
+      # cannot tell" as "wait" would park that day in the retry ladder until it
+      # died, on every run, forever.
+
   Rule: A failing comparison is retried, and never holds up the money
 
     @integration

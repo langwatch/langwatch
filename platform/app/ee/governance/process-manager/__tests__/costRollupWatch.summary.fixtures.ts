@@ -133,15 +133,22 @@ export async function appendObserved({
  * Writes the day's summary at whatever figure the test wants it to claim, by
  * folding one observation through the real projection. Hand-writing the row
  * would let the comparison agree with a summary the fold could never produce.
+ *
+ * `occurredAtMs` is the moment of the newest charge the summary has folded,
+ * and it is a parameter because that is the whole of what tells a summary
+ * that has caught up from one that has not. Stamping it always at `NOW` would
+ * make every summary look current no matter which charges the log holds.
  */
 export async function writeSummary({
   repo,
   tenantId,
   amountNanoMinor,
+  occurredAtMs = NOW,
 }: {
   repo: GovernanceCostRollupClickHouseRepository;
   tenantId: string;
   amountNanoMinor: number;
+  occurredAtMs?: number;
 }): Promise<void> {
   const projection = new GovernanceCostRollupFoldProjection({
     store: { store: async () => undefined, get: async () => null },
@@ -151,11 +158,11 @@ export async function writeSummary({
     type: PULLED_USAGE_EVENT_TYPES.OBSERVED,
     tenantId,
     aggregateId: "seed",
-    occurredAt: NOW,
+    occurredAt: occurredAtMs,
     data: observedData({
       tenantId,
       costNanoMinor: amountNanoMinor,
-      occurredAtMs: NOW,
+      occurredAtMs,
       restatementKey: "seed",
     }),
   } as never);

@@ -41,7 +41,7 @@ describe("finding drift without changing anything", () => {
     it("counts the drift and names both figures in the log", async () => {
       await h.appendObserved({ costNanoMinor: 5_000_000_000 });
       await h.appendObserved({ costNanoMinor: 7_340_000_000 });
-      await h.writeSummary(9_999_000_000);
+      await h.writeSummary({ amountNanoMinor: 9_999_000_000 });
       // The spy sees the log object before pino serializes it, which is what
       // the line renders — a counter alone cannot say which way drift went.
       const logged = vi.spyOn(comparatorLogger, "error");
@@ -65,7 +65,7 @@ describe("finding drift without changing anything", () => {
     /** @scenario Finding drift leaves the summary exactly as it was */
     it("leaves the stored summary alone and records no correcting event", async () => {
       await h.appendObserved({ costNanoMinor: 5_000_000_000 });
-      await h.writeSummary(9_999_000_000);
+      await h.writeSummary({ amountNanoMinor: 9_999_000_000 });
       const summaryBefore = await h.summarizedAmountsFor(TODAY);
       const eventsBefore = await h.eventLogCount();
 
@@ -83,7 +83,7 @@ describe("finding drift without changing anything", () => {
     /** @scenario Comparing a day twice over changes nothing that is stored */
     it("reports the same finding the second time and stores nothing", async () => {
       await h.appendObserved({ costNanoMinor: 5_000_000_000 });
-      await h.writeSummary(9_999_000_000);
+      await h.writeSummary({ amountNanoMinor: 9_999_000_000 });
       await h.record(h.charge());
       await h.runDueCheck();
       await h.drainOutbox();

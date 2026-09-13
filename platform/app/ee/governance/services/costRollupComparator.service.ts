@@ -24,6 +24,10 @@ import type {
   GovernanceCostRollupRow,
 } from "./governanceCostRollup.clickhouse.repository";
 import { computeCostRollupLagMs } from "./logic/costRollupLag";
+import {
+  type CostRollupCellBehind,
+  cellsBehindTheirEvents,
+} from "./logic/costRollupSummaryFreshness";
 
 const logger = createLogger("langwatch:governance:cost-rollup:comparator");
 
@@ -91,6 +95,60 @@ export interface CostRollupComparison {
 }
 
 /**
+ * The day's summary has not folded every charge the day holds yet, so there is
+ * nothing honest to compare it against.
+ *
+ * A refusal to answer rather than an answer of "drift". The fold and the check
+ * run on independent queues, so a charge landing shortly before the check's
+ * slot can be re-derived here while its own projection job is still queued —
+ * and the only thing that fixes that is waiting. Throwing is how this asks to
+ * be asked again: the caller is the process manager's outbox, whose retry
+ * ladder (`costRollupWatch.process.ts`) is exactly that wait. Returning a
+ * comparison instead would publish a false alarm AND clear the day, because a
+ * comparison that returns is a comparison that happened.
+ *
+ * A plain `Error`, not a `HandledError`: nothing here reaches a customer, and
+ * dressing an internal wait up as a handled fault would promise a reader an
+ * action they do not have. What an operator needs is on the warn line and on
+ * the lag gauge, both written before this is raised.
+ *
+ * If every attempt in the ladder sees the summary still behind, the row dies
+ * in the outbox and the day goes uncompared — reported as lag, which is what a
+ * projection that stopped folding actually is, rather than as drift.
+ */
+export class CostRollupSummaryBehindError extends Error {
+  readonly tenantId: string;
+  readonly day: string;
+  readonly costSource: ComparedCostSource;
+  readonly cells: readonly CostRollupCellBehind[];
+  readonly lagMs: number;
+
+  constructor({
+    tenantId,
+    day,
+    costSource,
+    cells,
+    lagMs,
+  }: {
+    tenantId: string;
+    day: string;
+    costSource: ComparedCostSource;
+    cells: readonly CostRollupCellBehind[];
+    lagMs: number;
+  }) {
+    super(
+      `Governance cost rollup for ${day} is still catching up: ${cells.length} cell(s) behind the events of that day`,
+    );
+    this.name = "CostRollupSummaryBehindError";
+    this.tenantId = tenantId;
+    this.day = day;
+    this.costSource = costSource;
+    this.cells = cells;
+    this.lagMs = lagMs;
+  }
+}
+
+/**
  * The daily cost rollup's watchdog: re-derives one sampled day straight from
  * the event log and holds it against what the summary says.
  *
@@ -129,41 +187,14 @@ export class CostRollupComparatorService {
 
     const derived = this.refold(events);
     const summarizedByKey = new Map(
-      summarized.map((row) => [
-        governanceCostRollupKeyOfRow(row),
-        row.AmountNanoMinor,
-      ]),
+      summarized.map(
+        (row) => [governanceCostRollupKeyOfRow(row), row] as const,
+      ),
     );
 
-    const mismatches: CostRollupCellMismatch[] = [];
-    for (const [key, state] of derived) {
-      const derivedAmount = governanceCostRollupTotals(state).amountNanoMinor;
-      // `?? null` would read a summarized amount of 0 as absent. A cell whose
-      // events sum to zero and a cell that is missing from the summary are
-      // different faults, and only one of them is drift.
-      const summarizedAmount = summarizedByKey.has(key)
-        ? summarizedByKey.get(key)!
-        : null;
-      if (summarizedAmount !== derivedAmount) {
-        mismatches.push({
-          cell: decodeGovernanceCostRollupKey(key),
-          summarizedNanoMinor: summarizedAmount,
-          derivedNanoMinor: derivedAmount,
-        });
-      }
-      summarizedByKey.delete(key);
-    }
-    // Whatever is left is a summary cell the events do not account for — money
-    // on a screen that nothing on the log explains, which is the more alarming
-    // direction of the two and must not be the one the watchdog is blind to.
-    for (const [key, summarizedAmount] of summarizedByKey) {
-      mismatches.push({
-        cell: decodeGovernanceCostRollupKey(key),
-        summarizedNanoMinor: summarizedAmount,
-        derivedNanoMinor: null,
-      });
-    }
-
+    // Stated before the check can either refuse or report, because the lag is
+    // what an operator reads in both cases: it is the gauge that tells a
+    // summary catching up apart from a summary that has stopped.
     const lagMs = computeCostRollupLagMs({
       latestEventOccurredAtMs,
       latestSummarizedOccurredAtMs: latestSummarizedMs,
@@ -175,6 +206,58 @@ export class CostRollupComparatorService {
       seconds: lagMs / 1000,
     });
 
+    // Refusing costs one retry; reporting would cost a false alarm AND clear
+    // the day, because a comparison that returns is a comparison that happened
+    // and nothing marks the day again.
+    const behind = cellsBehindTheirEvents({
+      derived,
+      summarized: summarizedByKey,
+    });
+    if (behind.length > 0) {
+      logger.warn(
+        {
+          tenantId,
+          day,
+          cost_source: costSource,
+          cells_behind: behind.length,
+          lag_ms: lagMs,
+          derived_last_event_occurred_at_ms:
+            behind[0]?.derivedLastEventOccurredAtMs,
+          summarized_last_event_occurred_at_ms:
+            behind[0]?.summarizedLastEventOccurredAtMs,
+        },
+        "Governance cost rollup has not folded every charge of the day being checked; waiting rather than reporting drift",
+      );
+      throw new CostRollupSummaryBehindError({
+        tenantId,
+        day,
+        costSource,
+        cells: behind,
+        lagMs,
+      });
+    }
+
+    const mismatches = collectMismatches({
+      derived,
+      summarized: summarizedByKey,
+    });
+    this.report({ tenantId, day, costSource, mismatches });
+
+    return { day, costSource, mismatches, lagMs };
+  }
+
+  /** Counts each mismatch and names both figures on a line, one cell at a time. */
+  private report({
+    tenantId,
+    day,
+    costSource,
+    mismatches,
+  }: {
+    tenantId: string;
+    day: string;
+    costSource: ComparedCostSource;
+    mismatches: readonly CostRollupCellMismatch[];
+  }): void {
     for (const mismatch of mismatches) {
       incrementGovernanceCostRollupMismatch(costSource);
       logger.error(
@@ -194,8 +277,6 @@ export class CostRollupComparatorService {
         "Governance cost rollup disagrees with the events it was derived from",
       );
     }
-
-    return { day, costSource, mismatches, lagMs };
   }
 
   /**
@@ -222,6 +303,51 @@ export class CostRollupComparatorService {
     }
     return cells;
   }
+}
+
+/**
+ * Every cell where the two sides state different money, in both directions.
+ *
+ * Pure, and it copies the summary map rather than draining the caller's: the
+ * freshness check reads the same map, and a collector that emptied it as it
+ * went would silently depend on running last.
+ */
+function collectMismatches({
+  derived,
+  summarized,
+}: {
+  derived: ReadonlyMap<string, GovernanceCostRollupState>;
+  summarized: ReadonlyMap<string, GovernanceCostRollupRow>;
+}): CostRollupCellMismatch[] {
+  const unaccounted = new Map(summarized);
+  const mismatches: CostRollupCellMismatch[] = [];
+  for (const [key, state] of derived) {
+    const derivedAmount = governanceCostRollupTotals(state).amountNanoMinor;
+    // `?? null` would read a summarized amount of 0 as absent. A cell whose
+    // events sum to zero and a cell that is missing from the summary are
+    // different faults, and only one of them is drift.
+    const row = unaccounted.get(key);
+    const summarizedAmount = row === undefined ? null : row.AmountNanoMinor;
+    if (summarizedAmount !== derivedAmount) {
+      mismatches.push({
+        cell: decodeGovernanceCostRollupKey(key),
+        summarizedNanoMinor: summarizedAmount,
+        derivedNanoMinor: derivedAmount,
+      });
+    }
+    unaccounted.delete(key);
+  }
+  // Whatever is left is a summary cell the events do not account for — money
+  // on a screen that nothing on the log explains, which is the more alarming
+  // direction of the two and must not be the one the watchdog is blind to.
+  for (const [key, row] of unaccounted) {
+    mismatches.push({
+      cell: decodeGovernanceCostRollupKey(key),
+      summarizedNanoMinor: row.AmountNanoMinor,
+      derivedNanoMinor: null,
+    });
+  }
+  return mismatches;
 }
 
 /** The fold key a stored row would have been written under. */

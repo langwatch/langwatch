@@ -35,7 +35,7 @@ describe("recognising a repeat of one check slot", () => {
     it("compares the day once and raises the drift count once", async () => {
       h.compareWith(h.compareForReal);
       await h.appendObserved({ costNanoMinor: 5_000_000_000 });
-      await h.writeSummary(9_999_000_000);
+      await h.writeSummary({ amountNanoMinor: 9_999_000_000 });
       await h.record(h.charge());
       await h.runDueCheck();
       await h.drainOutbox();

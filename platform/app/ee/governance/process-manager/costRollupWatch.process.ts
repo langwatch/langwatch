@@ -211,6 +211,13 @@ export function costRollupWatchPM(
         // Rethrown on failure so the outbox retries. Everything this reports
         // lives inside `compareDay` — the count and the log line — so a
         // swallowed failure is a check that silently did not happen.
+        //
+        // One of those throws is not a failure at all: the comparison refuses
+        // while the rollup summary is still folding the day's charges
+        // (`CostRollupSummaryBehindError`). The ladder below IS the wait for
+        // it, which is why the refusal is expressed as a throw rather than as
+        // a quiet return — a return would clear the day, and nothing marks it
+        // again once the summary catches up.
         await deps.comparator.compareDay({
           tenantId: payload.tenantId,
           day: payload.day,
