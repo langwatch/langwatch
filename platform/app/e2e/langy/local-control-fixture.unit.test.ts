@@ -15,6 +15,7 @@ import {
   pidsRunningIn,
   questionAnswerNote,
   type StoredMessage,
+  shareControlProfile,
   turnFailureMessage,
 } from "./local-control-fixture";
 
@@ -325,6 +326,52 @@ describe("judgeMessages", () => {
   describe("when the turn said nothing at all", () => {
     it("replies with empty text, which is the failure the rubric names", () => {
       expect(lastReply([call("local_bash", "c1")])).toBe("");
+    });
+  });
+});
+
+describe("shareControlProfile", () => {
+  const profile = (pathDirs?: string[]) =>
+    shareControlProfile({
+      root: "/tmp/scenario-repos/acme-notes",
+      configPath: "/tmp/scenario-repos/acme-config.json",
+      binDir: "/tmp/scenario-repos/acme-bin",
+      shimDir: "/tmp/scenario-repos/acme-shims",
+      ceiling: "/tmp/scenario-repos",
+      appBase: "http://localhost:5610",
+      cliEntry: "/checkout/cli.js",
+      ...(pathDirs ? { pathDirs } : {}),
+    });
+
+  describe("the git ceiling", () => {
+    it("stops the repository walk at the folder the scenarios live in", () => {
+      expect(profile()).toContain(
+        'export GIT_CEILING_DIRECTORIES="/tmp/scenario-repos"',
+      );
+    });
+
+    it("is exported before the command line starts, so it inherits it", () => {
+      const lines = profile().split("\n");
+      const ceiling = lines.findIndex((line) =>
+        line.startsWith("export GIT_CEILING_DIRECTORIES="),
+      );
+      const exec = lines.findIndex((line) => line.startsWith("exec node "));
+      expect(ceiling).toBeGreaterThan(-1);
+      expect(exec).toBeGreaterThan(ceiling);
+    });
+  });
+
+  describe("the PATH it builds", () => {
+    it("puts the scenario's own shims first and keeps the machine's after", () => {
+      expect(profile(["/tmp/scenario-repos/acme-python/bin"])).toContain(
+        'export PATH="/tmp/scenario-repos/acme-shims":"/tmp/scenario-repos/acme-bin":"/tmp/scenario-repos/acme-python/bin":"$PATH"',
+      );
+    });
+  });
+
+  describe("the project key", () => {
+    it("is unset, so the terminal acts as the person and not the project", () => {
+      expect(profile()).toContain("unset LANGWATCH_API_KEY");
     });
   });
 });

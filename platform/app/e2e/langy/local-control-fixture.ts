@@ -1076,24 +1076,13 @@ export async function startShareControl({
   // control request is addressed to the person.
   await fs.writeFile(
     script,
-    [
-      "#!/bin/bash",
-      `cd ${JSON.stringify(repo.root)}`,
-      "unset LANGWATCH_API_KEY",
-      `export LANGWATCH_ENDPOINT=${JSON.stringify(APP_BASE)}`,
-      `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
-      // The shims come before the command line's own shim dir, then whatever
-      // the scenario built for itself, then the machine's PATH: a scenario's
-      // stand-in wins, and everything it does not name resolves as it
-      // normally would.
-      `export PATH=${[shimDir, binDir, ...pathDirs]
-        .map((dir) => JSON.stringify(dir))
-        .join(":")}:"$PATH"`,
-      "export FORCE_COLOR=0",
-      "unset TRACEPARENT",
-      `exec node ${JSON.stringify(CLI_ENTRY)} langy --share-control`,
-      "",
-    ].join("\n"),
+    shareControlProfile({
+      root: repo.root,
+      configPath,
+      binDir,
+      shimDir,
+      pathDirs,
+    }),
     { encoding: "utf8", mode: 0o755 },
   );
 
@@ -1562,6 +1551,65 @@ export function judgeMessages(message: {
     content: passages[passages.length - 1] ?? "",
   });
   return messages;
+}
+
+/**
+ * The shell profile the shared terminal starts from.
+ *
+ * The terminal signs in through the login config alone: a project key in its
+ * environment would make the command line act as the project, and a control
+ * request is addressed to the person.
+ */
+export function shareControlProfile({
+  root,
+  configPath,
+  binDir,
+  shimDir,
+  pathDirs = [],
+  ceiling = SCENARIO_REPO_DIR,
+  appBase = APP_BASE,
+  cliEntry = CLI_ENTRY,
+}: {
+  root: string;
+  configPath: string;
+  binDir: string;
+  shimDir: string;
+  pathDirs?: string[];
+  ceiling?: string;
+  appBase?: string;
+  cliEntry?: string;
+}): string {
+  return [
+    "#!/bin/bash",
+    `cd ${JSON.stringify(root)}`,
+    "unset LANGWATCH_API_KEY",
+    `export LANGWATCH_ENDPOINT=${JSON.stringify(appBase)}`,
+    `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
+    // The shims come before the command line's own shim dir, then whatever
+    // the scenario built for itself, then the machine's PATH: a scenario's
+    // stand-in wins, and everything it does not name resolves as it
+    // normally would.
+    `export PATH=${[shimDir, binDir, ...pathDirs]
+      .map((dir) => JSON.stringify(dir))
+      .join(":")}:"$PATH"`,
+    "export FORCE_COLOR=0",
+    "unset TRACEPARENT",
+    // A folder a scenario shares is one of ours, whatever is above it.
+    //
+    // The folders live under the checkout's own `.claude/tmp`, and git looks
+    // for a repository by walking up. A folder a scenario built WITHOUT one
+    // answered every git command from this checkout instead: the no-repo
+    // scenario, whose whole premise is a folder with no repository, ran
+    // `git checkout -b` and created that branch on the lane, moving its HEAD
+    // mid-run. A folder with no repository that sits inside a checkout IS
+    // inside a repository, so the command line reading the parent was right
+    // and the premise was the lie. The ceiling stops the walk at the folder
+    // the scenarios live in: a folder with no repository of its own now has
+    // none, and a folder with one is unaffected.
+    `export GIT_CEILING_DIRECTORIES=${JSON.stringify(ceiling)}`,
+    `exec node ${JSON.stringify(cliEntry)} langy --share-control`,
+    "",
+  ].join("\n");
 }
 
 /**
