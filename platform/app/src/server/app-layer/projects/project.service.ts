@@ -43,6 +43,8 @@ export interface OrgAdminResolution {
    * against the admin can be split by variant. Null before the experiment.
    */
   onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Date | null;
 }
 
 const NULL_RESOLUTION: OrgAdminResolution = {
@@ -50,6 +52,7 @@ const NULL_RESOLUTION: OrgAdminResolution = {
   organizationId: null,
   firstMessage: false,
   onboardingVariant: null,
+  organizationCreatedAt: null,
 };
 
 export class ProjectNotFoundError extends Error {
@@ -522,6 +525,7 @@ export class ProjectService {
         organizationId: result.organizationId,
         firstMessage: result.firstMessage,
         onboardingVariant: result.onboardingVariant,
+        organizationCreatedAt: result.organizationCreatedAt,
       };
     } catch (error) {
       logger.error(

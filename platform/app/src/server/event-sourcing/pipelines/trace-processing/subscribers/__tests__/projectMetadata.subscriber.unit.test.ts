@@ -268,6 +268,59 @@ describe("createProjectMetadataHandler()", () => {
       ).not.toHaveProperty("onboarding_variant");
     });
 
+    /** @scenario "the first application trace of a day tracks the project as active" */
+    it("marks the project's active day before reading the project", async () => {
+      const calls: string[] = [];
+      const trackActiveDay = vi.fn(async () => {
+        calls.push("activeDay");
+      });
+      mockProjects.getById.mockImplementation(async () => {
+        calls.push("getById");
+        return { id: tenantId, firstMessage: true, integrated: true };
+      });
+      const subscriber = createProjectMetadataHandler({
+        ...deps,
+        trackActiveDay,
+      });
+      const event = createEvent(tenantId);
+
+      await subscriber(event, createContext(tenantId, createFoldState()));
+
+      expect(trackActiveDay).toHaveBeenCalledWith({
+        projectId: tenantId,
+        source: "trace",
+        occurredAt: event.occurredAt,
+      });
+      expect(calls).toEqual(["activeDay", "getById"]);
+    });
+
+    /** @scenario "Langy's own turns and sample traces never track the project as active" */
+    it("marks no active day for a Langy turn or a sample trace", async () => {
+      const trackActiveDay = vi.fn(async () => undefined);
+      const subscriber = createProjectMetadataHandler({
+        ...deps,
+        trackActiveDay,
+      });
+
+      await subscriber(
+        createEvent(tenantId),
+        createContext(
+          tenantId,
+          createFoldState({ attributes: { "langwatch.origin": "langy" } }),
+        ),
+      );
+      await subscriber(
+        createEvent(tenantId),
+        createContext(
+          tenantId,
+          createFoldState({ attributes: { "langwatch.origin": "sample" } }),
+        ),
+      );
+
+      expect(trackActiveDay).not.toHaveBeenCalled();
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+    });
+
     /** @scenario "first_trace_integrated carries the experiment property" */
     it("carries the experiment property, control for the classic variant", async () => {
       mockProjects.resolveOrgAdmin.mockResolvedValue({

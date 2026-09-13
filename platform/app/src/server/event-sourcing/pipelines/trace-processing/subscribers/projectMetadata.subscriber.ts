@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { LANGY_TRACE_ORIGIN } from "~/server/app-layer/traces/derive-trace-origin";
 import { onboardingExperimentProperties } from "~/server/onboarding/guided-onboarding.experiment";
+import type { ProjectActiveDayTracker } from "~/server/onboarding/project-active-day";
 import { trackServerEvent } from "~/server/posthog";
 import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
@@ -31,6 +32,12 @@ export interface ProjectMetadataSubscriberDeps {
    * per claim window.
    */
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
+  /**
+   * Marks the project active for the day of this trace, once a day. Runs
+   * before any Postgres read here: it is one Redis read per real ingest once
+   * the day is marked.
+   */
+  trackActiveDay?: ProjectActiveDayTracker;
 }
 
 /**
@@ -125,10 +132,16 @@ export function createProjectMetadataHandler(
   event: TraceProcessingEvent,
   context: TriggerContext<TraceSummaryData>,
 ) => Promise<void> {
-  return async (_event, context) => {
+  return async (event, context) => {
     const { tenantId, state: foldState } = context;
 
     if (!isRealFirstIngest(foldState)) return;
+
+    await deps.trackActiveDay?.({
+      projectId: tenantId,
+      source: "trace",
+      occurredAt: event.occurredAt,
+    });
 
     try {
       await syncProjectMetadata(deps, tenantId, foldState);

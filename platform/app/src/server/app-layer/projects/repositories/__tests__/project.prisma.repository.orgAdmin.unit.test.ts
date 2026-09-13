@@ -30,6 +30,7 @@ describe("PrismaProjectRepository.getWithOrgAdmin()", () => {
         team: {
           organization: {
             id: "org_1",
+            createdAt: new Date("2026-09-01T00:00:00Z"),
             signupData: {
               companyType: "company",
               onboardingVariant: "classic",
@@ -46,6 +47,7 @@ describe("PrismaProjectRepository.getWithOrgAdmin()", () => {
         organizationId: "org_1",
         adminUserId: "admin_1",
         onboardingVariant: "classic",
+        organizationCreatedAt: new Date("2026-09-01T00:00:00Z"),
       });
       expect(
         findUnique.mock.calls[0]![0].select.team.select.organization.select,
@@ -60,6 +62,7 @@ describe("PrismaProjectRepository.getWithOrgAdmin()", () => {
         team: {
           organization: {
             id: "org_1",
+            createdAt: new Date("2026-01-01T00:00:00Z"),
             signupData: { companyType: "company" },
             members: [],
           },
@@ -73,6 +76,7 @@ describe("PrismaProjectRepository.getWithOrgAdmin()", () => {
         organizationId: "org_1",
         adminUserId: null,
         onboardingVariant: null,
+        organizationCreatedAt: new Date("2026-01-01T00:00:00Z"),
       });
     });
   });

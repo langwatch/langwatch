@@ -257,6 +257,10 @@ import {
   type DeferredOriginPayload,
   makeDeferredJobId,
 } from "./pipelines/trace-processing/subscribers/originGate.subscriber";
+import {
+  createProjectActiveDayTracker,
+  type ProjectActiveDayTracker,
+} from "~/server/onboarding/project-active-day";
 import { createProjectMetadataHandler } from "./pipelines/trace-processing/subscribers/projectMetadata.subscriber";
 import { createSimulationMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
 import { createSpanStorageBroadcastHandler } from "./pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
@@ -540,6 +544,8 @@ export class PipelineRegistry {
     (projectId: string) => Promise<void>
   >("bootstrapTopicClustering");
 
+  private activeDayTracker: ProjectActiveDayTracker | null = null;
+
   private cached<State>(
     inner: FoldProjectionStore<State>,
     keyPrefix: string,
@@ -547,6 +553,18 @@ export class PipelineRegistry {
     return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
       keyPrefix,
     });
+  }
+
+  /**
+   * One tracker per registry: the trace pipeline and the simulation pipeline
+   * both mark the project's active day, and they share the Redis key.
+   */
+  private projectActiveDayTracker(): ProjectActiveDayTracker {
+    this.activeDayTracker ??= createProjectActiveDayTracker({
+      redis: this.deps.redis,
+      projects: this.deps.projects,
+    });
+    return this.activeDayTracker;
   }
 
   registerAll() {
@@ -1386,6 +1404,7 @@ export class PipelineRegistry {
       projects: this.deps.projects,
       bootstrapTopicClustering: (projectId) =>
         this.bootstrapTopicClustering.fn(projectId),
+      trackActiveDay: this.projectActiveDayTracker(),
     });
 
     const simulationMetricsSyncHandler = createSimulationMetricsSyncHandler({
@@ -1784,6 +1803,10 @@ export class PipelineRegistry {
         scenarioEvaluations: {
           loadRunAttachments: loadRunEvaluators,
           enqueue: enqueueScenarioEvaluations.fn,
+        },
+        scenarioRunMilestones: {
+          projects: this.deps.projects,
+          trackActiveDay: this.projectActiveDayTracker(),
         },
       }),
     );

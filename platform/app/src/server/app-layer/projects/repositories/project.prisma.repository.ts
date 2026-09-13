@@ -105,6 +105,7 @@ export class PrismaProjectRepository implements ProjectRepository {
             organization: {
               select: {
                 id: true,
+                createdAt: true,
                 signupData: true,
                 members: {
                   where: { role: "ADMIN" },
@@ -127,6 +128,7 @@ export class PrismaProjectRepository implements ProjectRepository {
       organizationId: org?.id ?? null,
       adminUserId: org?.members?.[0]?.userId ?? null,
       onboardingVariant: parseOnboardingVariant(org?.signupData),
+      organizationCreatedAt: org?.createdAt ?? null,
     };
   }
 

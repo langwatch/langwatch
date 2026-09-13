@@ -64,6 +64,8 @@ export interface ProjectWithOrgAdmin {
   adminUserId: string | null;
   /** Which onboarding the organization went through; null before the experiment. */
   onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Date | null;
 }
 
 export interface SearchProjectsResult {
