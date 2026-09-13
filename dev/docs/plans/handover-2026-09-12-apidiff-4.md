@@ -369,6 +369,84 @@ detectors, the gateway-secret substitution and its handover. That session
 commits only when asked. Decide whether to commit them before anything else
 touches those files.
 
+## The composition lane, worked 2026-09-13
+
+Wall 8 turned out not to be a 266-line port, and neither did anything after it.
+Every remaining wall has been the same thing in a new costume: **b383462d96
+moved installation from hand-written per-process compositions to
+`withModules(serverModules)`, and the declarations those compositions used to
+bypass became load-bearing for the first time.** A hand composition called
+`definitions.postgres.create({ ... })` with arguments it built itself, so a
+tier's `requires` list was resolved against nothing and could say anything.
+`withModules` resolves it — against `ProcessMembers`, which has exactly fourteen
+keys — and every entry naming something else had been unsatisfiable all along.
+
+Fixed this session, in the order the boot found them:
+
+    517f15c0ad  model-provider claimed "credentials"          -> built from `encryption`
+    eed90917b9  trace claimed "defaultRetentionDays"          -> resolvePlatformDefaultRetentionDays
+                webhook claimed "ids"/"secrets"/"configuration" -> built in the tier
+    8acde0ff4b  no process passed `moduleConfig` at all       -> the api now maps 10 modules
+    e63a9f3a2b  analytics got a missing block, not an empty one
+
+**`"secrets"` deserves separate attention.** It IS a member name, so it
+resolved — and handed the webhook tier the process's `SecretResolver`
+(`read`/`find`) where an endpoint signing secret codec (`encrypt`/`decrypt`)
+was wanted. That would have passed boot and failed later as customer-visible
+signature-verification failures on deliveries. A name outside the system
+refuses loudly at boot; **a name inside it with the wrong type does not refuse
+at all.** Neither of this drive's detectors can see that, because both ask
+whether a name resolves rather than whether what it resolves to fits.
+
+`moduleConfig` is the same story one layer up: `createProcess` accepts it, boot
+hands each module `config[<name>]`, and **no process — api, worker or tasks —
+was passing it**, so every module declaring a `configSchema` got `undefined`.
+Which modules needed real values was measured, not guessed, by parsing `{}`
+against each installed schema: four refuse it (agent, analytics,
+data-retention, hosted-mcp) and the rest are wholly defaulted.
+
+### Where it stops, and what the rest of this lane looks like
+
+    TypeError: Cannot read properties of undefined (reading 'auditLog')
+      at PrismaAuthzAuditRepository.create (prisma.authz-audit.repository.ts:41)
+      at PostgresAuthzAdapter.build (postgres-authz.build.ts:277)
+      at AuthzApp.create (authz.app.ts:64)
+
+`AuthzApp.create` spreads `setup.members` into its adapter, but the App
+declares no `reads(...)`, so boot hands it `{}` — `membersFor(members, [])` —
+and `database` is `undefined`. Note it reaches the repository through an
+`as unknown as` cast (`postgres-authz.build.ts:197`), which is why no type
+error announced it.
+
+Declaring `reads("prisma", "redis")` and mapping the names is the easy half.
+The hard half is that `PostgresAuthzAdapterOptions` also requires
+`dispatcher: AuthzGrantsCommandDispatcher` and `newBindingId`, and neither is a
+platform member. The composition deleted by b383462d96
+(`git show b383462d96^:apps/api/src/app/api-authz.composition.ts`, 138 lines)
+says exactly what that costs, in its own words: *"What kept this process from
+calling it was never the database — it was the command dispatcher, which needs
+an Eventing registration and which no package implemented."*
+
+So the remaining lane is **per-module App wiring**, not a single port: for each
+module that used to be hand-composed, its App must declare what it reads and
+build its own collaborators from members. authz is the expensive one because
+its dispatcher needs a producer-only eventing registration. Expect others
+behind it — the boot names them one at a time, which has been a reliable and
+cheap loop all session.
+
+### How to run this loop
+
+`-no-haven` boots the branch IN PLACE, so working-tree edits take effect with
+no rebuild. Keep a work root alive and reuse it:
+
+    .bin/apidiff/apidiff run -no-haven -main-ref origin/main -json \
+      -work-root <existing> -reuse-worktrees -report <file>
+
+That skips both installs and reaches boot in about two minutes instead of ten.
+The branch instance's log is `<work-root>/logs/branch.log`; the failure is the
+last `"level":"error"` line, and `apps/api` now reports it rather than exiting
+silently.
+
 ## What is still open
 
 1. **apidiff has still never produced a report**, and now stops at wall 8
