@@ -1,3 +1,4 @@
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   AnalyticsFeedbacksResult,
@@ -61,6 +62,15 @@ export interface AnalyticsApi {
   resolveProtections(input: {
     userId: string;
     projectId: string;
+  }): Promise<LangWatchQLProtections>;
+  /**
+   * What an API key may see of a project's content and spend — the same
+   * question {@link resolveProtections} answers for a signed-in member, asked
+   * of the credential instead of a session.
+   */
+  resolveApiKeyProtections(input: {
+    projectId: string;
+    credential: RestCredentialPrincipal;
   }): Promise<LangWatchQLProtections>;
   /**
    * The restricted tenant identity a member's own statement runs as, together

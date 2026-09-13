@@ -6,9 +6,11 @@
  * rather than built, so a chart and the traces behind it never disagree about
  * which fields a project keeps.
  */
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   isContentVisible,
+  isContentVisibleToPublic,
   type ContentCategory,
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
@@ -93,4 +95,65 @@ export async function resolveWorkbenchRunCaller(input: {
   }
   const protections = await resolveWorkbenchProtections({ ...protectionsInput, projectId });
   return { project: { id: project.id, lwqlKey: project.lwqlKey }, protections };
+}
+
+/**
+ * What an API KEY may see, which is a different question from what a person
+ * may see.
+ *
+ * Content categories resolve as they do for a caller with no session,
+ * because a key is not a member. Costs are the credential's OWN question: a
+ * scoped key holds `cost:view` or it does not, asked here through the same
+ * `hasApiKeyPermission` the route chain enforces a declared permission with.
+ * A legacy project key predates RBAC and carries full project access by
+ * design, so for that credential class alone the answer is yes without a
+ * lookup.
+ *
+ * Fail-closed, the same as {@link resolveWorkbenchProtections}: a
+ * data-privacy read that throws hides captured content rather than
+ * defaulting it open.
+ */
+export async function resolveApiKeyProtections(input: {
+  authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
+  projectId: string;
+  credential: RestCredentialPrincipal;
+}): Promise<LangWatchQLProtections> {
+  const { authz, dataPrivacy, projectId, credential } = input;
+  const canSeeCosts = await keyPermitted({ authz, credential, permission: "cost:view" });
+
+  let policy: ResolvedDataPrivacy;
+  try {
+    policy = await dataPrivacy.getResolvedForProject({ projectId });
+  } catch (error) {
+    logger.error(
+      { error, projectId },
+      "data-privacy policy resolution failed; hiding captured content (fail-closed)",
+    );
+    return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false };
+  }
+
+  return {
+    canSeeCosts,
+    canSeeCapturedInput: isContentVisibleToPublic(policy.categories.input),
+    canSeeCapturedOutput: isContentVisibleToPublic(policy.categories.output),
+  };
+}
+
+/** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
+function keyPermitted(input: {
+  authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  credential: RestCredentialPrincipal;
+  permission: "cost:view";
+}): Promise<boolean> {
+  const { authz, credential, permission } = input;
+  if (credential.kind !== "apiKey") return Promise.resolve(true);
+
+  return authz.hasApiKeyPermission({
+    apiKeyId: credential.apiKeyId,
+    userId: credential.userId,
+    organizationId: credential.organizationId,
+    scope: { type: "project", id: credential.projectId, teamId: credential.teamId },
+    permission,
+  });
 }

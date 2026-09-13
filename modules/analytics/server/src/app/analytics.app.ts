@@ -45,6 +45,7 @@ import type {
   AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
 import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -55,6 +56,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import {
+  resolveApiKeyProtections as resolveApiKeyProtectionsRule,
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
@@ -369,6 +371,23 @@ export class AnalyticsApp implements AnalyticsApiContract {
       dataPrivacy: this.#dependencies.dataPrivacy,
       userId: input.userId,
       projectId: input.projectId,
+    });
+  }
+
+  /**
+   * What an API key may see of a project's content and spend — the same
+   * question {@link resolveProtections} answers for a signed-in member, asked
+   * of the credential instead of a session.
+   */
+  resolveApiKeyProtections(input: {
+    projectId: string;
+    credential: RestCredentialPrincipal;
+  }): Promise<LangWatchQLProtections> {
+    return resolveApiKeyProtectionsRule({
+      authz: this.#dependencies.authz,
+      dataPrivacy: this.#dependencies.dataPrivacy,
+      projectId: input.projectId,
+      credential: input.credential,
     });
   }
 
