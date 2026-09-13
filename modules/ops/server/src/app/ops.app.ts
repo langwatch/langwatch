@@ -31,9 +31,9 @@ import {
   type AuditLogApi as AuditLogApiContract,
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type {
   FeatureFlagRules,
-  FeatureFlagApi,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
 import { listFeatureFlags } from "@langwatch/feature-flag-contract";
@@ -77,6 +77,9 @@ import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickho
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
 import type { OpsEventingIntrospection } from "./ops.app.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { z } from "zod";
+import { buildOpsInfrastructure } from "./ops-composition.build.ts";
 import { timingSafeEqual } from "node:crypto";
 import { type Instant, nowInstant } from "@langwatch/time";
 import {
@@ -354,7 +357,6 @@ export interface OpsGrafanaLinks {
 
 export interface OpsAppInfrastructure {
   createCapability(dependencies: OpsAppDependencies): OpsCapability;
-  featureFlags: FeatureFlagApi;
   /**
    * The live pipeline graph, read for the kill-switch keys an operator may
    * set. Without it every generated key is unsettable.
@@ -408,10 +410,36 @@ type OpsRuntimeDependencies = Readonly<{
   findOpsApiKey(): string | null;
   isProduction: boolean;
 }>;
+
+/**
+ * Config schema: the deployment's operator allow-list (the same
+ * `ADMIN_EMAILS` shape identity reads), the dedicated EXPLAIN account's
+ * connection and secret, whether this deployment is production (the EXPLAIN
+ * service's fail-closed rule), and the SSO connection-projection cutover
+ * flag. Every field defaults to the deleted composition's own absent-config
+ * answer: no operators, EXPLAIN refuses, not production, legacy strings still
+ * writable.
+ */
+const opsAppConfigSchema = z.object({
+  adminEmails: z.array(z.string()).default([]),
+  /** `LANGWATCH_OPS_API_KEY`. Absent refuses every EXPLAIN call. */
+  opsApiKey: z.string().optional(),
+  /** `CLICKHOUSE_OPS_URL`, the dedicated `langwatch_ops` readonly account. */
+  opsClickHouseUrl: z.string().optional(),
+  isProduction: z.boolean().default(false),
+  /** `process.env.SSOCONN_ROUTING === "enforce"` (ADR-117 §5). */
+  legacySsoStringWritesRetired: z.boolean().default(false),
+});
+export type OpsAppConfig = z.infer<typeof opsAppConfigSchema>;
+
+/** {@link OpsAppDependencies} plus the two contract peers only `create()` itself reads. */
+type OpsAppRuntimeDependencies = OpsAppDependencies &
+  Readonly<{ apiKeys: ApiKeyApiContract; featureFlags: FeatureFlagApi }>;
+
 type OpsSetup = FeatureSetup<
   typeof OpsApp.dependencies,
-  OpsAppInfrastructure,
-  undefined,
+  MembersRead<typeof OpsApp.reads>,
+  OpsAppConfig,
   OpsRepositories
 >;
 
@@ -542,26 +570,57 @@ export class OpsApp implements OpsApi {
     projects: ProjectApi,
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,
+    featureFlags: FeatureFlagApi,
   };
-  static readonly configSchema = void 0;
+  static readonly configSchema = opsAppConfigSchema;
+  static readonly reads = reads("prisma", "redis", "clickhouse", "eventing", "logger");
 
+  /**
+   * Builds this process's own {@link OpsAppInfrastructure} from the members
+   * it reads and its own config, then composes over it exactly as
+   * {@link OpsApp.fromInfrastructure} does. What a hand composition (or a
+   * test) still supplies directly.
+   */
   static create(setup: OpsSetup): OpsApp {
-    const { members } = setup;
+    const infrastructure = buildOpsInfrastructure({
+      members: setup.members,
+      config: setup.config,
+      resources: setup.resources,
+    });
 
-    const inbox = BugReportInboxService.create({ reports: setup.repositories.bugReports });
+    return OpsApp.fromInfrastructure({
+      infrastructure,
+      dependencies: setup.dependencies,
+      repositories: setup.repositories,
+    });
+  }
+
+  /**
+   * Composes over an already-built {@link OpsAppInfrastructure}. Kept
+   * because a hand composition (and every unit test's fixture) still builds
+   * one directly rather than reading process members.
+   */
+  static fromInfrastructure(setup: {
+    infrastructure: OpsAppInfrastructure;
+    dependencies: OpsAppRuntimeDependencies;
+    repositories: OpsRepositories;
+  }): OpsApp {
+    const { infrastructure: members, dependencies, repositories } = setup;
+
+    const inbox = BugReportInboxService.create({ reports: repositories.bugReports });
 
     return new OpsApp({
-      ops: members.createCapability(setup.dependencies),
+      ops: members.createCapability(dependencies),
       inbox,
       intake: BugReportIntakeService.create({
-        reports: setup.repositories.bugReports,
+        reports: repositories.bugReports,
         rateLimiter: members.bugReportRateLimiter,
         notifier: members.bugReportNotifier,
       }),
-      apiKeys: setup.dependencies.apiKeys,
-      featureFlags: members.featureFlags,
-      projects: setup.dependencies.projects,
-      auditLog: setup.dependencies.auditLog,
+      apiKeys: dependencies.apiKeys,
+      featureFlags: dependencies.featureFlags,
+      projects: dependencies.projects,
+      auditLog: dependencies.auditLog,
       eventingIntrospection: members.eventingIntrospection,
       pipelines: members.pipelines,
       eventLogWindow: members.eventLogWindow,
@@ -1624,26 +1683,3 @@ export interface UsageStatsErrorReporter {
   capture(input: { instanceId: string; error: unknown }): Promise<void>;
 }
 
-export type QueueControlAction =
-  | "queue_redrive_dlq_groups"
-  | "queue_discard_dlq_groups"
-  | "queue_drain_group"
-  | "queue_drain_tenant"
-  | "queue_move_group_to_dlq"
-  | "queue_move_all_blocked_to_dlq"
-  | "queue_unblock_group"
-  | "queue_unblock_all";
-
-/**
- * Audit sink for GroupQueue operator actions (specs/ops/dead-letter-recovery.feature). The Redis substrate forgets
- * DLQ entries at their TTL, so for a discard THIS row is the retained mark: the queue, the groups, how many jobs
- * they held, and their last errors survive here after the entries themselves are gone.
- */
-export abstract class QueueAuditSink {
-  abstract append(entry: {
-    actorUserId: string;
-    action: QueueControlAction;
-    queueName: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<void>;
-}

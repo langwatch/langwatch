@@ -8,7 +8,6 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -42,6 +41,7 @@ export type OpsTestAppOptions = Readonly<{
   auditLog?: AuditLogApi;
   apiKeys?: ApiKeyApi;
   projects?: ProjectApi;
+  featureFlags?: FeatureFlagApi;
   repositories?: OpsRepositories;
 }>;
 
@@ -59,7 +59,6 @@ export function createOpsTestInfrastructure(
         isAdmin: (identity: { email?: string | null }) => identity.email === OPS_STAFF_ADDRESS,
         ...capability,
       }),
-    featureFlags: createApiFixture<FeatureFlagApi>(),
     eventingIntrospection: new EmptyOpsIntrospection(),
     pipelines: { listRegistrations: () => ({ projections: [], eventSubscribers: [] }) },
     eventLogWindow: {
@@ -84,8 +83,8 @@ export function createOpsTestInfrastructure(
 export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
   const repositories = options.repositories ?? MemoryOpsRepositories.create();
 
-  const app = OpsApp.create({
-    members: createOpsTestInfrastructure(options.members, options.capability),
+  const app = OpsApp.fromInfrastructure({
+    infrastructure: createOpsTestInfrastructure(options.members, options.capability),
     dependencies: {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
@@ -94,10 +93,9 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       auditLog: options.auditLog ?? createApiFixture<AuditLogApi>({ record: async () => {} }),
       apiKeys:
         options.apiKeys ?? createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
+      featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
     },
-    config: undefined,
     repositories,
-    resources: new ResourceScope(),
   });
 
   return { app, repositories };

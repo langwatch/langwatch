@@ -1,5 +1,5 @@
 import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "@langwatch/ops-contract";
-import type { QueueAuditSink } from "../app/ops.app.ts";
+import type { QueueAuditSink } from "./queue-audit-sink.service.ts";
 import { NullQueueAuditSink } from "./null.queue-audit-sink.service.ts";
 import type {
   BlockedSummary,

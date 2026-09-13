@@ -46,8 +46,8 @@ function buildApp(): { app: OpsApp; written: string[] } {
   });
 
   const { app } = createOpsTestApp({
+    featureFlags,
     members: {
-      featureFlags,
       eventingIntrospection: new OneSwitchIntrospection(),
     },
   });

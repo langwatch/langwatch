@@ -113,6 +113,21 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
         .map((email) => email.trim())
         .filter((email) => email.length > 0),
     },
+    /** The operator surface: same ADMIN_EMAILS list, the EXPLAIN account, prod gate. */
+    ops: {
+      adminEmails: (config.deployment.adminEmails ?? "")
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email.length > 0),
+      ...(config.opsApiKey ? { opsApiKey: config.opsApiKey } : {}),
+      ...(config.infrastructure.clickhouse.opsUrl
+        ? { opsClickHouseUrl: config.infrastructure.clickhouse.opsUrl }
+        : {}),
+      isProduction: config.nodeEnvironment === "production",
+      // Verbatim from the deleted ops.composition.ts (ADR-117 §5); not a
+      // classified secret, and no parsed config field carries it yet.
+      legacySsoStringWritesRetired: process.env.SSOCONN_ROUTING === "enforce",
+    },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
     automation: {},
