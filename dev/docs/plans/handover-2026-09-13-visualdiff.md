@@ -10,6 +10,26 @@ it is the most transferable thing either of us produced.
 
 ## The verdict, stated plainly
 
+> **Updated 2026-09-13 (visualdiff/worker session).** The worker's statically
+> findable boot backlog is CLEARED: `64af8f1446` restored the ops usage-stats
+> seam (routingDriver now exported from `@langwatch/clickhouse-client`, the
+> worker composes over the process query client, both `as never`s at the ops
+> call site deleted) and `eddbdfe58d` fixed all 47 worker erased-extends sites.
+> `find-unresolvable-imports.mjs` no longer lists any `apps/worker` file and
+> `find-erased-extends.mjs` reports **4 sites, all in `apps/api`** (named in
+> the apidiff session's queue). A NEW prep wall was also found and fixed:
+> `@langwatch/mail`'s build fails on FRESH worktrees only — `packages/api`'s
+> rest runtime compiles from source there, where `ModuleApiToken`'s private
+> phantom is invariant; every developer checkout masks it via stale built
+> declarations (`78c6e2ca5b` makes the three addressing helpers generic).
+> visualdiff prep now completes through ensure-built on a fresh worktree.
+> Remaining before a report: the api install-order queue (apidiff session,
+> identity composed, loop running), the ksuid workspace migration commit (a
+> third, user-launched session owns it; boots held until it lands), and
+> whatever a REAL worker boot surfaces beyond static detection.
+
+Original verdict (2026-09-13, start of day), kept for the record:
+
 **Neither application process boots on this branch, so visualdiff cannot produce
 a report and apidiff cannot probe.** That is not a tooling problem and no amount
 of work on either tool changes it.
@@ -230,6 +250,24 @@ That file also lists **sixteen addresses that redirect by design** and will
 classify as `changed` in any visualdiff report. Read it before triaging one.
 
 ## Exact next actions
+
+> **Updated 2026-09-13.** Items 1, 2 and 5 below are DONE (`64af8f1446`,
+> `eddbdfe58d`; audit-log-null was already linked — moot). The list now:
+>
+> 1. Wait for the "migrate ksuid package" session to commit its workspace
+>    migration (it owns packages/ksuid, ksuid-python, the ~15 package.json
+>    catalog→workspace changes, pnpm-workspace.yaml, the lockfile and the
+>    deleted ksuid patch — nobody else commits those). Its src imports were
+>    `.js`-specified and killed every boot; the `.ts` rewrite is already in
+>    the working tree.
+> 2. Boot `apps/worker` (and the dev-runtime backend lane) for real; fix what
+>    it names, one wall at a time — static detection is exhausted.
+> 3. The api install-order queue stays with the apidiff session (identity
+>    composed; 4 erased-extends sites in apps/api named in its queue).
+> 4. Then `visualdiff run -keep -agent -boot-timeout 40m`, and triage the
+>    report against `route-surface-parity-2026-09-12.md`'s redirect list.
+
+The original analysis behind the completed items, kept for the record:
 
 1. **The composition lane.** `node dev/scripts/find-unresolvable-imports.mjs`
    gives **26** sites with a proposal each. They are not 26 separate problems:
