@@ -19505,7 +19505,7 @@ if __name__ == "__main__":
 
 The `@langwatch.trace()` decorator creates a parent trace for your graph execution. `get_langchain_callback()` goes in the config of `agent.invoke()`, and the same config argument works for `ainvoke()` and `stream()`. From there LangGraph passes it down: each node becomes a chain span named after the node, model calls become LLM spans, and tool calls become tool spans.
 
-A callback attached only to the model call inside one node produces LLM spans and nothing else. The tool nodes and the plain function nodes never appear, so nothing in the trace shows which step the graph actually ran.
+A callback attached only to the model call inside one node produces LLM spans alone. The tool nodes and the plain function nodes never appear, so the trace does not show which step the graph ran.
 
 ## Related
 
