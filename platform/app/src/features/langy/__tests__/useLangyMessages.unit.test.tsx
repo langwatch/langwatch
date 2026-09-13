@@ -10,11 +10,12 @@
  * @see specs/langy/langy-navigation-persistence.feature
  */
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   langyMessagesPollInterval,
   useLangyMessages,
 } from "../data/useLangyMessages";
+import { useLangyStore } from "../stores/langyStore";
 
 const previousConversation = {
   messages: [{ id: "msg_1", role: "assistant", parts: [] }],
@@ -27,6 +28,19 @@ const previousConversation = {
   lastModel: "openai/gpt-5-mini",
 };
 
+/** What the query seam answers; tests point it at their scenario. */
+const stillShowingPreviousConversation = () => ({
+  data: previousConversation,
+  isLoading: false,
+  isFetching: true,
+  isError: true,
+  isSuccess: false,
+  isPlaceholderData: false,
+  error: new Error("conversation not found") as unknown,
+  refetch: vi.fn(),
+});
+let queryResult: ReturnType<typeof stillShowingPreviousConversation>;
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
 }));
@@ -38,15 +52,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     langy: {
       messages: {
-        useQuery: () => ({
-          data: previousConversation,
-          isLoading: false,
-          isFetching: true,
-          isError: true,
-          isSuccess: false,
-          error: new Error("conversation not found"),
-          refetch: vi.fn(),
-        }),
+        useQuery: () => queryResult,
       },
     },
   },
@@ -59,10 +65,20 @@ vi.mock("../stores/langyStore", () => {
   };
   // The real store is callable-with-selector AND carries getState; the hook
   // uses both (a subscription for the unconfirmed flag, getState in effects).
-  const useLangyStore = (selector: (s: typeof state) => unknown) =>
-    selector(state);
-  useLangyStore.getState = () => state;
-  return { useLangyStore };
+  return {
+    useLangyStore: Object.assign(
+      (selector: (s: typeof state) => unknown) => selector(state),
+      { getState: () => state },
+    ),
+  };
+});
+
+const confirmConversation = () =>
+  vi.mocked(useLangyStore.getState().confirmConversation);
+
+beforeEach(() => {
+  queryResult = stillShowingPreviousConversation();
+  confirmConversation().mockClear();
 });
 
 describe("useLangyMessages", () => {
@@ -89,6 +105,34 @@ describe("useLangyMessages", () => {
       expect(result.current.messages).toHaveLength(1);
       expect(result.current.isTurnInFlight).toBe(true);
       expect(result.current.isError).toBe(true);
+    });
+  });
+
+  describe("when a fresh conversation still shows the previous one's placeholder", () => {
+    // `keepPreviousData` reports success for the conversation just left while
+    // the new one is still fetching. Confirming off that placeholder would
+    // drop the fresh conversation from `unconfirmedConversations` before its
+    // projection was ever read — and with it the poll that retries the 404.
+    it("does not confirm it — placeholder success is not a read of ITS projection", () => {
+      queryResult.isError = false;
+      queryResult.isSuccess = true;
+      queryResult.isPlaceholderData = true;
+      queryResult.error = null;
+
+      renderHook(() => useLangyMessages("langyconv_fresh"));
+
+      expect(confirmConversation()).not.toHaveBeenCalled();
+    });
+
+    it("confirms once a REAL read of it succeeds", () => {
+      queryResult.isError = false;
+      queryResult.isSuccess = true;
+      queryResult.isPlaceholderData = false;
+      queryResult.error = null;
+
+      renderHook(() => useLangyMessages("langyconv_fresh"));
+
+      expect(confirmConversation()).toHaveBeenCalledWith("langyconv_fresh");
     });
   });
 });
