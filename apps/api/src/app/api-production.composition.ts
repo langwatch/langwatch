@@ -43,6 +43,47 @@ const coreAuditLog = serverModules.some((module) => (module.name as string) === 
   ? []
   : [auditLogNullServer];
 
+/**
+ * What each installed module parses as its own configuration.
+ *
+ * `createProcess` takes this as `moduleConfig` and boot hands each module
+ * `config[<module name>]`, which its `configSchema` then parses. **No process
+ * was passing it.** The option existed, nothing supplied it, so every module
+ * declaring a schema received `undefined` and refused at boot with
+ * `FeatureConfigError` — the api could not start for the same reason it could
+ * not start on the three unsatisfiable member claims: a seam that was built
+ * and never connected.
+ *
+ * Every installed module that declares a schema needs an entry, because a
+ * schema parses `{}` into its defaults but refuses `undefined`. The values are
+ * the ones the api already parses for itself — this maps them onto the names
+ * the modules declare, it does not re-read the environment. `automation` and
+ * `log` get an empty object on purpose: their schemas are wholly defaulted and
+ * the api parses nothing for them, so anything else would be inventing
+ * configuration rather than passing it on.
+ */
+function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
+  return {
+    agent: {
+      publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
+      connected: config.infrastructure.connectedAgents,
+    },
+    analytics: { langwatchQl: config.infrastructure.clickhouse.langwatchQl },
+    "api-key": { pepper: config.apiKeyPepper },
+    "data-retention": {
+      platformDefaultRetentionDays: config.platformDefaultRetentionDays,
+    },
+    github: config.infrastructure.github,
+    /** The origin a hosted MCP server advertises is the api's public one. */
+    "hosted-mcp": { baseHost: config.infrastructure.execution.publicBaseUrl },
+    /** The api keeps only the shared secret from its langy block; the rest defaults. */
+    langy: { internalSecret: config.langyInternalSecret },
+    automation: {},
+    log: {},
+    "platform-health": config.platformHealth,
+  };
+}
+
 /** The api process's own rate allowance, until a deployment states one. */
 const DEFAULT_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
@@ -183,6 +224,7 @@ export function bootApiProcess(options: {
   return createProcess({
     role: "api",
     config: apiProcessConfig({ config, secrets: options.secrets }),
+    moduleConfig: apiModuleConfig(config),
     members: options.members,
   })
     .withModules(serverModules)
