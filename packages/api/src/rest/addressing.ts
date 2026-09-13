@@ -300,7 +300,7 @@ export function assertAddressingOptions({
 }
 
 /** Where the family's routes hang, by the way it addresses itself. */
-export function basePathOf(declaration: RestTransportDeclaration<unknown>): string {
+export function basePathOf<Api>(declaration: RestTransportDeclaration<Api>): string {
   switch (declaration.addressing) {
     case "v1-only":
       return `${V1_PREFIX}/${declaration.namespace}`;
@@ -320,7 +320,7 @@ export function basePathOf(declaration: RestTransportDeclaration<unknown>): stri
  * it whole; a literal family claims exactly the addresses it declares, because
  * a wildcard would run ahead of a sibling family sharing the prefix.
  */
-export function middlewareScopesOf(declaration: RestTransportDeclaration<unknown>): string[] {
+export function middlewareScopesOf<Api>(declaration: RestTransportDeclaration<Api>): string[] {
   const basePath = basePathOf(declaration);
 
   if (declaration.addressing !== "literal") {
@@ -343,12 +343,12 @@ export function middlewareScopesOf(declaration: RestTransportDeclaration<unknown
 }
 
 /** The addresses one route answers at, and what each one reports. */
-export function addressesOf({
+export function addressesOf<Api>({
   route,
   declaration,
 }: {
   route: RestTransportRoute<unknown>;
-  declaration: RestTransportDeclaration<unknown>;
+  declaration: RestTransportDeclaration<Api>;
 }): readonly {
   path: string;
   context: { version: string; status: VersionStatus; suffix?: string };
