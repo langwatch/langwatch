@@ -87,6 +87,18 @@ Feature: Langy runs on the model the project chose
     Then it offers the models that provider serves
     And it offers no model from a provider nobody connected
 
+  # The picker locks while a turn runs, and the locked pill collapses to a
+  # provider glyph. That is the moment someone most wants to know which model is
+  # answering, and the greyed glyph was the only thing left to read. Hovering it
+  # now names the model and says the lock ends with the turn.
+  @integration
+  Scenario: The model in use stays visible while Langy is working
+    Given a turn is running and the composer's model picker is locked
+    When the user hovers the model pill
+    Then it names the provider and model the turn is running on
+    And it says the model can be switched once the turn stops
+    And the picker still does not open
+
   # The default model is resolved from the project's configuration, which can
   # name a provider nobody connected here. Seeding it put a model in the pill
   # that the pill's own menu never offered, and every send died at the gateway

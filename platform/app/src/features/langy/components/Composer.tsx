@@ -478,8 +478,10 @@ function ComposerImpl({
                 // The model is locked in the moment a turn starts — it rode
                 // with the send and can't change mid-flight — so the picker
                 // greys out until the turn settles rather than offering a
-                // choice that wouldn't take.
+                // choice that wouldn't take. It still says which model the
+                // running turn is on, which is what the reason is for.
                 disabled={disabled || turnActive}
+                disabledReason={turnActive ? "turn-active" : undefined}
               />
               <SigilButton
                 sigil="#"
