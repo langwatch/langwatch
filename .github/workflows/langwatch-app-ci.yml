@@ -385,6 +385,13 @@ jobs:
             ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-pkg-tsbuildinfo-
 
+      # Every declared REST fact must have a binding, or the process that
+      # mounts the declaring family refuses at boot. This static pass replaces
+      # discovering them one full boot at a time (2026-09-13: 29 accumulated
+      # unseen because nothing enumerated them).
+      - name: Refuse declared-but-unbound REST facts
+        run: node dev/scripts/find-unbound-rest-facts.mjs
+
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
       - name: Run every package typecheck
