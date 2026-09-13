@@ -83,6 +83,22 @@
     background: rgba(255, 255, 255, 0.04);
     color: #dbe2ee;
   }
+  /* ?theme=light: cream background, navy copy, for a light backdrop image. */
+  body.light {
+    --bg: #f5f3ee;
+    --text: #1d293d;
+    --muted: #4b5a70;
+    --orange: #e17100;
+    --line: rgba(29, 41, 61, 0.14);
+  }
+  body.light .veil {
+    background: linear-gradient(90deg,
+      rgba(245, 243, 238, 1) 0%,
+      rgba(245, 243, 238, 0.97) 40%,
+      rgba(245, 243, 238, 0.45) 62%,
+      rgba(245, 243, 238, 0.05) 100%);
+  }
+  body.light .pill { background: rgba(29, 41, 61, 0.04); color: #1d293d; }
 </style>
 </head>
 <body>
@@ -108,13 +124,19 @@
     </div>
   </div>
   <script>
-    // Render with ?bg=<image> to place a backdrop image behind the copy instead of the card grid.
-    const bg = new URLSearchParams(location.search).get("bg");
-    if (bg) {
+    // The backdrop is backdrop.jpg by default. ?bg=<image> swaps it, ?bg=grid uses the
+    // card grid instead, and ?theme=light gives the cream variant with the navy wordmark.
+    const params = new URLSearchParams(location.search);
+    const bg = params.get("bg") || "backdrop.jpg";
+    if (params.get("theme") === "light") {
+      document.body.classList.add("light");
+      document.querySelector(".logo").src = "logo-navy.svg";
+    }
+    if (bg === "grid") {
+      document.getElementById("backdrop").remove();
+    } else {
       document.getElementById("backdrop").style.backgroundImage = `url(${JSON.stringify(bg)})`;
       document.getElementById("grid").remove();
-    } else {
-      document.getElementById("backdrop").remove();
     }
   </script>
 </body>
