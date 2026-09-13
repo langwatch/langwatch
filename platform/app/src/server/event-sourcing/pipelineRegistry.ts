@@ -57,6 +57,11 @@ import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-norma
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { readGuidedOnboardingForProject } from "~/server/onboarding/onboarding-variant";
+import {
+  createProjectActiveDayTracker,
+  type ProjectActiveDayTracker,
+} from "~/server/onboarding/project-active-day";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -85,6 +90,7 @@ import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBu
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
 import {
   createAgentTurnLivenessSubscriber,
+  createGuidedOnboardingTurnFailedSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
 } from "../app-layer/langy/subscribers";
@@ -257,10 +263,6 @@ import {
   type DeferredOriginPayload,
   makeDeferredJobId,
 } from "./pipelines/trace-processing/subscribers/originGate.subscriber";
-import {
-  createProjectActiveDayTracker,
-  type ProjectActiveDayTracker,
-} from "~/server/onboarding/project-active-day";
 import { createProjectMetadataHandler } from "./pipelines/trace-processing/subscribers/projectMetadata.subscriber";
 import { createSimulationMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
 import { createSpanStorageBroadcastHandler } from "./pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
@@ -1010,6 +1012,17 @@ export class PipelineRegistry {
       createLangyTurnAdmissionLifecycleSubscriber({
         admissions: this.deps.repositories.langyTurnAdmission,
       });
+    const guidedOnboardingTurnFailedSubscriber =
+      createGuidedOnboardingTurnFailedSubscriber({
+        guidedOnboarding: {
+          read: ({ projectId }) =>
+            readGuidedOnboardingForProject({
+              prisma: this.deps.prisma,
+              projectId,
+            }),
+        },
+        conversations: conversationReader,
+      });
 
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
@@ -1024,6 +1037,7 @@ export class PipelineRegistry {
           livenessSubscriber,
           broadcastSubscriber,
           admissionLifecycleSubscriber,
+          guidedOnboardingTurnFailedSubscriber,
         ],
       }),
     );
