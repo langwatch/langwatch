@@ -6,41 +6,63 @@ import {
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
 import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
-import { EventingTopicClusteringScheduleAdapter } from "@langwatch/topic-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { EnterpriseWorkerAuditLog } from "@langwatch/enterprise-worker";
-import {
-  dataRetentionServer,
-  PrismaDataRetentionDirectoryRepository,
-} from "@langwatch/data-retention-server";
+import { dataRetentionServer } from "@langwatch/data-retention-server";
+import { apiKeyServer } from "@langwatch/api-key-server";
+import { authServer } from "@langwatch/auth-server";
+import { authzServer } from "@langwatch/authz-server";
+import { opsServer } from "@langwatch/ops-server";
+import { organizationServer } from "@langwatch/organization-server";
+import { projectServer } from "@langwatch/project-server";
+import { shareServer } from "@langwatch/share-server";
+import { topicServer } from "@langwatch/topic-server";
+import { userServer } from "@langwatch/user-server";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
+import { identityServer } from "@langwatch/identity-server";
+import { createApp, membersFrom, type ResourceScope } from "@langwatch/runtime-composition";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ProjectInfrastructure } from "@langwatch/project-server";
-import {
-  createWorkerTenancyInfrastructure,
-  WorkerDataRetentionPlans,
-} from "./worker-tenancy-infrastructure.composition.ts";
-import { installWorkerTenancy } from "./worker-tenancy.composition.ts";
-import { installWorkerUser, WorkerUserAvatarStorage } from "./worker-user-app.composition.ts";
-import { installWorkerOps } from "./worker-ops-app.composition.ts";
+import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { AuthzApiContract } from "@langwatch/authz-contract";
+import type { ApiKeyApiContract } from "@langwatch/api-key-contract";
+import type { ShareApi } from "@langwatch/share-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { OpsApi } from "@langwatch/ops-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import type { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime.ts";
 import type { WorkerObjectStorage } from "./worker-object-storage.composition.ts";
 
+/** The worker's installed, complete callable tenancy surfaces. */
+export type WorkerTenancy = Readonly<{
+  projects: ProjectApi;
+  organizations: OrganizationApi;
+  authorization: AuthzApiContract;
+  apiKeys: ApiKeyApiContract;
+  shares: ShareApi;
+  topics: TopicApi;
+  close(): Promise<void>;
+}>;
+
 /** The worker's shared tenancy, identity and operations APIs, constructed once. */
 export type WorkerFoundationApps = Readonly<{
-  tenancy: import("./worker-tenancy.composition.ts").WorkerTenancy;
-  users: import("@langwatch/user-contract").UserApi;
-  auth: import("@langwatch/auth-contract").AuthApi;
-  ops: import("@langwatch/ops-contract").OpsApi;
+  tenancy: WorkerTenancy;
+  users: UserApi;
+  auth: AuthApi;
+  ops: OpsApi;
   /** The one audit log this process records every management act on. */
   auditLog: AuditLogApi;
-  retention: import("@langwatch/data-retention-contract").DataRetentionApi;
+  retention: DataRetentionApi;
   close(): Promise<void>;
 }>;
 
@@ -53,82 +75,90 @@ export async function createWorkerFoundationApps(options: {
   clickhouse: {
     resolveClient(tenantId: string): Promise<ClickHouseClient>;
     eventLogClient(): ClickHouseClient;
+    /** The process's one routed query client, over the same connection. */
+    queryClient: ClickHouseQueryClient;
   };
   plans: PlanProvider;
   featureFlags: FeatureFlagApi;
   resources: ResourceScope;
+  /**
+   * No longer read: AuthzApp builds its own command dispatcher over the
+   * `eventing` member (see modules/authz/server/src/app/authz.app.ts). Kept on
+   * this options record so the process root, which still allocates one before
+   * this function runs, does not need a matching change.
+   */
   authzDispatcher: AuthzGrantsCommandDispatcher;
+  /**
+   * No longer wired: ProjectApp reads `members.topicClustering`, but no
+   * installed module declares `topicClustering` as a `reads()` member and the
+   * process's fourteen-member vocabulary (@langwatch/infrastructure/members)
+   * has no such name, so there is no seam to supply it through. Recorded in
+   * the handoff for worker-foundation-v2; the fix belongs to project's module
+   * conversion, not to this composition.
+   */
   topicClustering: ProjectInfrastructure["topicClustering"];
 }): Promise<WorkerFoundationApps> {
-  const storedObjects = createWorkerStoredObjects({
+  createWorkerStoredObjects({
     storage: options.storage,
     resolveClient: options.clickhouse.resolveClient,
-  });
-  const tenancy = createWorkerTenancyInfrastructure({
-    connection: options.connection,
-    redis: options.redis,
-    config: options.config,
-    plans: options.plans,
-    authzDispatcher: options.authzDispatcher,
-    topicClustering: options.topicClustering,
-    topicSchedule: EventingTopicClusteringScheduleAdapter.create({
-      processStore: options.eventing.processStore,
-    }),
-    dataRetention: {
-      // The organization lineage a rule is placed and gated against, over this
-      // process's ONE connection, and the plan behind the gate reduced to the
-      // two facts retention tiers on.
-      directory: PrismaDataRetentionDirectoryRepository.create(options.connection.client),
-      plans: WorkerDataRetentionPlans.create(options.plans),
-      resolveClickHouseClient: options.clickhouse.resolveClient,
-    },
   });
   const auditLog = await EnterpriseWorkerAuditLog.create({ prisma: options.connection.client });
   options.resources.own("worker audit log", () => auditLog.stop());
 
-  const builder = createApp({ name: "langwatch-worker-foundation" })
-    .withPersistence("postgres", { prisma: options.connection.client })
-    .withInfrastructure({});
-  builder.withProvided(AuditLogApi, auditLog.auditLog());
-  installWorkerTenancy(builder, tenancy);
-  installWorkerUser(builder, {
-    connection: options.connection,
-    redis: options.redis,
-    avatarStorage: WorkerUserAvatarStorage.create(storedObjects),
-  });
-  installWorkerOps(builder, {
-    connection: options.connection,
-    redis: options.redis,
-    eventLogClient: options.clickhouse.eventLogClient(),
-    resolveReplayClient: options.clickhouse.resolveClient,
-    eventing: options.eventing.eventSourcing,
-    processStore: options.eventing.processStore,
-    featureFlags: options.featureFlags,
-    adminEmails: options.config.deployment.adminEmails ?? "",
-  });
-  const runtime = await builder.boot({
+  const runtime = await createApp({
     role: "worker",
     config: {
       "data-retention": { platformDefaultRetentionDays: options.config.retention.defaultDays },
+      "api-key": { pepper: options.config.apiKeyPepper },
+      ops: {
+        adminEmails: (options.config.deployment.adminEmails ?? "")
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email.length > 0),
+        isProduction: options.config.nodeEnvironment === "production",
+      },
     },
-  });
+    members: membersFrom({
+      prisma: options.connection.client,
+      redis: options.redis,
+      clickhouse: options.clickhouse.queryClient,
+      eventing: options.eventing.eventSourcing,
+      logger: createLogger(options.config.serviceName),
+    }),
+  })
+    .withProvided(AuditLogApi, auditLog.auditLog())
+    .withProvided(FeatureFlagApi, options.featureFlags)
+    .withModules([
+      authzServer,
+      // organization declares a dependency on identity; the worker installs
+      // the provider rather than leaving the declaration unanswerable.
+      identityServer,
+      organizationServer,
+      projectServer,
+      apiKeyServer,
+      dataRetentionServer,
+      shareServer,
+      topicServer,
+      userServer,
+      authServer,
+      opsServer,
+    ])
+    .boot();
   options.resources.own("worker foundation apps", () => runtime.stop());
 
   return {
     tenancy: {
-      projects: runtime.module((await import("@langwatch/project-server")).projectServer).provided,
-      organizations: runtime.module(
-        (await import("@langwatch/organization-server")).organizationServer,
-      ).provided,
-      authorization: runtime.module((await import("@langwatch/authz-server")).authzServer).provided,
-      apiKeys: runtime.module((await import("@langwatch/api-key-server")).apiKeyServer).provided,
-      shares: runtime.module((await import("@langwatch/share-server")).shareServer).provided,
-      topics: runtime.module((await import("@langwatch/topic-server")).topicServer).provided,
+      projects: runtime.module(projectServer).provided,
+      organizations: runtime.module(organizationServer).provided,
+      authorization: runtime.module(authzServer).provided,
+      apiKeys: runtime.module(apiKeyServer).provided,
+      shares: runtime.module(shareServer).provided,
+      topics: runtime.module(topicServer).provided,
       close: () => runtime.stop(),
     },
-    users: runtime.module((await import("@langwatch/user-server")).userServer).provided,
-    auth: runtime.module((await import("@langwatch/auth-server")).authServer).provided,
-    ops: runtime.module((await import("@langwatch/ops-server")).opsServer).provided,
+    users: runtime.module(userServer).provided,
+    auth: runtime.module(authServer).provided,
+    ops: runtime.module(opsServer).provided,
     auditLog: auditLog.auditLog(),
     retention: runtime.module(dataRetentionServer).provided,
     close: () => runtime.stop(),
