@@ -165,6 +165,24 @@ describe("LangyTokenBuffer hybrid flush", () => {
     });
   });
 
+  describe("given a tool call that ran in the developer's shared folder", () => {
+    it("keeps the local marker on the live entry", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      await buffer.appendTool({
+        ...ids,
+        id: "call_1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+        local: true,
+      });
+
+      expect(entries.at(-1)).toMatchObject({ type: "tool", local: true });
+    });
+  });
+
   describe("given a provider streams reasoning token by token", () => {
     it("coalesces the live-only reasoning tail, then drains it before the terminal marker", async () => {
       const { redis, entries } = makeRedis();

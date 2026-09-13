@@ -467,7 +467,13 @@ func (s *streamState) applyToolEnd(ev wireEvent) bool {
 	}
 	delete(s.startedInput, ev.ID)
 	output := toolmap.TruncateToolOutput(ev.Output)
-	f, mErr := frames.ToolEnd(ev.ID, ev.Name, input, ev.IsError, output, 0)
+	var f frames.Frame
+	var mErr error
+	if ev.Local {
+		f, mErr = frames.ToolEndLocal(ev.ID, ev.Name, input, ev.IsError, output, 0)
+	} else {
+		f, mErr = frames.ToolEnd(ev.ID, ev.Name, input, ev.IsError, output, 0)
+	}
 	if mErr != nil {
 		return true
 	}

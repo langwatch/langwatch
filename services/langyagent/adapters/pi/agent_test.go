@@ -123,7 +123,7 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 		`"type":"delta"`, `"text":"Hello"`,
 		`"type":"reasoning"`, `"text":"thinking hard"`,
 		`"id":"call_1|fc_1"`, `"phase":"start"`, `"phase":"end"`,
-		`"output":"file.txt"`,
+		`"output":"file.txt"`, `"local":true`,
 		`"type":"plan"`, `"Scanning traces — 2/4"`,
 		`"type":"progress"`, `"current":2`, `"total":4`,
 	} {

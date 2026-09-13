@@ -63,6 +63,11 @@ export interface LangyToolFrame {
   digest?: CliResultDigest;
   /** Validated polymorphic payload for a successful LangWatch CLI call. */
   result?: CliToolResult;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Absent means the sandbox.
+   */
+  local?: boolean;
 }
 
 /** The worker's shell tools — any of these may be carrying a `langwatch` call. */

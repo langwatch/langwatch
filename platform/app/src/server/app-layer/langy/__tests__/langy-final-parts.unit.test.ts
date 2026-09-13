@@ -39,6 +39,22 @@ describe("buildFinalAssistantParts", () => {
       ]);
     });
 
+    it("records that a call ran in the developer's shared folder", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [{ id: "t1", name: "bash", output: "ok", local: true }],
+      });
+      expect(parts[0]).toMatchObject({ type: "tool-bash", local: true });
+    });
+
+    it("leaves a sandbox call unmarked", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [{ id: "t1", name: "bash", output: "ok" }],
+      });
+      expect(parts[0]).not.toHaveProperty("local");
+    });
+
     it("maps an errored tool call to output-error with errorText from output", () => {
       const parts = buildFinalAssistantParts({
         text: "",

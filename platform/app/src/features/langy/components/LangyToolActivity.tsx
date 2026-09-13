@@ -122,7 +122,32 @@ type ToolPartLike = {
   /** The recorded result digest, on durable parts of CLI calls (additive). */
   digest?: unknown;
   result?: unknown;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Carried on the durable part.
+   */
+  local?: boolean;
+  /** The live edge's carrier for the same fact. See {@link ranInSharedFolder}. */
+  resultProviderMetadata?: unknown;
 };
+
+/**
+ * Whether a settled call ran in the developer's shared folder.
+ *
+ * The durable part carries a plain `local`. The live edge has no such field to
+ * write to: the AI SDK rebuilds a tool part from its own chunks, and
+ * `resultProviderMetadata` is the one slot a settled chunk carries through, so
+ * the transport writes the marker there. Both shapes mean the same thing.
+ */
+function ranInSharedFolder(part: ToolPartLike): boolean | undefined {
+  if (typeof part.local === "boolean") return part.local;
+  const metadata = part.resultProviderMetadata;
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const namespace = (metadata as Record<string, unknown>).langwatch;
+  if (!namespace || typeof namespace !== "object") return undefined;
+  const local = (namespace as Record<string, unknown>).local;
+  return typeof local === "boolean" ? local : undefined;
+}
 
 /**
  * The minimal view every reader here needs — just the ordered parts. Loosened
@@ -553,6 +578,7 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
         title: described.title,
         errorText: part.errorText ?? part.output,
         toolName: name,
+        local: ranInSharedFolder(part),
       }),
       order: index,
     });

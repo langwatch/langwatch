@@ -107,6 +107,28 @@ describe("TurnEventMapper", () => {
       ]);
     });
 
+    it("marks a call that ran in the developer's folder as local, and nothing else", () => {
+      const mapper = new TurnEventMapper("t1");
+      mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: {} });
+      const [local] = mapper.map({
+        type: "tool_execution_end",
+        toolCallId: "c1",
+        toolName: "bash",
+        isError: false,
+        result: { content: [{ type: "text", text: "pushed" }], details: { local: true } },
+      });
+      expect(local).toMatchObject({ type: "tool_end", local: true });
+      mapper.map({ type: "tool_execution_start", toolCallId: "c2", toolName: "bash", args: {} });
+      const [sandbox] = mapper.map({
+        type: "tool_execution_end",
+        toolCallId: "c2",
+        toolName: "bash",
+        isError: false,
+        result: { content: [{ type: "text", text: "ok" }], details: {} },
+      });
+      expect(sandbox).not.toHaveProperty("local");
+    });
+
     it("marks errored tools", () => {
       const mapper = new TurnEventMapper("t1");
       mapper.map({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: {} });

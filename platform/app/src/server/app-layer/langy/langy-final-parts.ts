@@ -27,6 +27,11 @@ export interface LangyFinalToolCall {
   isError?: boolean;
   digest?: CliResultDigest;
   result?: CliToolResult;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Absent means the sandbox.
+   */
+  local?: boolean;
 }
 
 /** The one envelope both finalize paths re-type their tool calls through. */
@@ -95,6 +100,7 @@ export function buildFinalAssistantParts({
       ...(call.input !== undefined ? { input: call.input } : {}),
       ...(call.digest !== undefined ? { digest: call.digest } : {}),
       ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.local === true ? { local: true } : {}),
       ...(call.isError
         ? { errorText: call.output ?? "Tool call failed" }
         : { output: call.output ?? "" }),

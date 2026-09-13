@@ -49,6 +49,10 @@ type wireEvent struct {
 	Input   json.RawMessage `json:"input"`
 	Output  string          `json:"output"`
 	IsError bool            `json:"isError"`
+	// tool_end: the call ran in the developer's shared folder through the
+	// local control path (a local_* tool, or bash while a folder is
+	// connected). Absent, so false, when it ran in the sandbox.
+	Local bool `json:"local"`
 	// plan
 	Items []planItem `json:"items"`
 	// turn_done

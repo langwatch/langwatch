@@ -79,7 +79,11 @@ Event payload shapes follow pi's native session events: `delta` and `reasoning`
 carry `message_update` text/thinking deltas verbatim; `tool_*` carry
 `tool_execution_*` fields (`toolCallId` -> `id`, `toolName` -> `name`,
 `args` -> `input`, result text -> `output`). `tool_end.input` is replayed from
-the matching `tool_start` (pi's end event does not carry args). `plan` is
+the matching `tool_start` (pi's end event does not carry args). `tool_end.local`
+is `true` when the call ran in the developer's shared folder through the local
+control path (a `local_*` tool, or `bash` while a folder is connected), and
+absent when it ran in the sandbox; the manager's GitHub gate and the panel read
+it, since a git push or a gh call there used the developer's own credentials. `plan` is
 emitted on every successful `todowrite` tool call with the full current list;
 `status` is one of `pending`, `in_progress`, `completed`, `cancelled`.
 

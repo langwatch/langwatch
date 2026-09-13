@@ -101,6 +101,11 @@ export type ToolEndEvent = {
   input: unknown;
   isError: boolean;
   output: string;
+  /**
+   * The call ran in the developer's shared folder, on their machine, through
+   * the local control path. Absent when it ran in the sandbox.
+   */
+  local?: boolean;
 };
 export type PlanItem = { content: string; status: string };
 export type PlanEvent = { type: "plan"; turnId: string; items: PlanItem[] };

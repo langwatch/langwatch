@@ -71,6 +71,12 @@ export type LangyStreamEntry =
       isError?: boolean;
       digest?: CliResultDigest;
       result?: CliToolResult;
+      /**
+       * The call ran in the folder the developer shared from their own machine
+       * (ADR-129) rather than in the sandbox. The shell that delegates there is
+       * registered as `bash`, so the name cannot say where a command ran.
+       */
+      local?: boolean;
     }
   // The agent navigating the browser to a resource it surfaced, e.g. "show me
   // the run" → the run's own detail view. `href` is ALWAYS platform-computed
@@ -651,6 +657,7 @@ export class LangyTokenBuffer {
     isError,
     digest,
     result,
+    local,
   }: {
     conversationId: string;
     turnId: string;
@@ -663,6 +670,7 @@ export class LangyTokenBuffer {
     isError?: boolean;
     digest?: CliResultDigest;
     result?: CliToolResult;
+    local?: boolean;
   }): Promise<void> {
     await this.flush({ conversationId, turnId });
     // A line said through the `say` tool is words the reader sees, so the
@@ -681,6 +689,7 @@ export class LangyTokenBuffer {
       ...(isError !== undefined ? { isError } : {}),
       ...(digest !== undefined ? { digest } : {}),
       ...(result !== undefined ? { result } : {}),
+      ...(local !== undefined ? { local } : {}),
     });
   }
 

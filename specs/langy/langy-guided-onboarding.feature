@@ -549,6 +549,7 @@ Feature: Langy guides the first setup after sign-up
       Then the body file is written with local_write before the command that reads it
       And the no-remote line is said only when the push or gh answered that there is no remote or gh is not signed in
       And any other gh error gets one fix of its cause and one retry, and when it still fails the fixed failed-open line names the branch and the one line the command printed
+      And a gh answer that no remote points to a known GitHub host has nothing to fix, so the failed-open line is said at once with that line
       And no reason the output did not name is ever said
 
     # A run printed the env file to the shared terminal, and the provider key

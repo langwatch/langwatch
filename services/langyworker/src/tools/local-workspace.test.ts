@@ -13,8 +13,10 @@ import {
   SANDBOX_FILE_TOOL_NAMES,
   activeToolsFor,
   createLocalWorkspaceExtension,
+  ranInFolder,
   readCodeAccess,
 } from "./local-workspace.js";
+import { TurnEventMapper } from "../events.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
 
 type RegisteredTool = {
@@ -177,6 +179,40 @@ describe("the shell the model gets while a folder is connected", () => {
       tool: "local_bash",
       params: { command: "git status --short", timeout: 30 },
     });
+    expect(ranInFolder(result)).toBe(true);
+  });
+
+  /** @scenario "A push or gh command in the shared folder never raises the GitHub install card" */
+  it("marks a delegated command as run in the folder, so the GitHub gate stands down on it", async () => {
+    const { calls } = fakeApp({
+      "/api/langy/local/workspace": [
+        { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+      ],
+      "/api/langy/local/calls": [{ callId: "call_12" }],
+      "/api/langy/local/calls/call_12": [
+        { callId: "call_12", state: "done", ok: true, text: "branch pushed" },
+      ],
+    });
+    const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+    await startTurn();
+
+    const result = await tools.get(BASH_TOOL_NAME)!.execute("t12", {
+      command: "git push -u origin HEAD && gh pr create --fill",
+    });
+
+    expect(textOf(result)).toBe("branch pushed");
+    expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(true);
+    expect((result as { details?: unknown }).details).toEqual({ local: true });
+    const mapper = new TurnEventMapper("turn_1");
+    mapper.map({ type: "tool_execution_start", toolCallId: "t12", toolName: "bash", args: {} });
+    const [end] = mapper.map({
+      type: "tool_execution_end",
+      toolCallId: "t12",
+      toolName: "bash",
+      isError: false,
+      result,
+    });
+    expect(end).toMatchObject({ type: "tool_end", name: "bash", local: true });
   });
 
   /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
@@ -197,6 +233,7 @@ describe("the shell the model gets while a folder is connected", () => {
 
       expect(textOf(result)).toContain("cli ok: scenario list --format json");
       expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(false);
+      expect(ranInFolder(result)).toBe(false);
     } finally {
       cli.restore();
     }
@@ -213,6 +250,7 @@ describe("the shell the model gets while a folder is connected", () => {
 
     expect(textOf(result)).toContain(sandbox.split("/").at(-1)!);
     expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(false);
+    expect(ranInFolder(result)).toBe(false);
   });
 
   /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */

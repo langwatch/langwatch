@@ -417,6 +417,16 @@ function subscribeTurnStream({
   });
 }
 
+/**
+ * Where a settled call ran, in the one metadata slot a settled AI-SDK tool
+ * chunk carries onto the part (`resultProviderMetadata`). The marker only
+ * exists on the end frame, and the input chunk is long gone by then, so this is
+ * how the live edge learns that a `bash` was really the developer's own shell
+ * in the folder they shared. The durable part carries the same fact as a plain
+ * `local` field; `LangyToolActivity` reads either.
+ */
+const LANGY_TOOL_METADATA_NAMESPACE = "langwatch";
+
 /** Map a live tool entry onto the AI-SDK tool chunks the renderers consume. */
 function enqueueToolChunk(
   controller: ReadableStreamDefaultController<UIMessageChunk>,
@@ -431,11 +441,16 @@ function enqueueToolChunk(
     });
     return;
   }
+  const providerMetadata =
+    entry.local === true
+      ? { [LANGY_TOOL_METADATA_NAMESPACE]: { local: true } }
+      : undefined;
   if (entry.isError) {
     controller.enqueue({
       type: "tool-output-error",
       toolCallId: entry.id,
       errorText: entry.output ?? "Tool call failed",
+      ...(providerMetadata ? { providerMetadata } : {}),
     });
     return;
   }
@@ -443,5 +458,6 @@ function enqueueToolChunk(
     type: "tool-output-available",
     toolCallId: entry.id,
     output: entry.output ?? "",
+    ...(providerMetadata ? { providerMetadata } : {}),
   });
 }

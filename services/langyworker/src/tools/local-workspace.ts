@@ -33,6 +33,24 @@ export const CODE_ACCESS_TOOL_NAME = "code_access";
 export const BASH_TOOL_NAME = "bash";
 
 /**
+ * The result details of a call that ran in the developer's folder. The event
+ * mapper lifts it onto the tool_end event as `local: true`, and it rides the
+ * frame to the manager and the panel: the GitHub gate and the panel's
+ * install card both stand down on it, since a git push or a gh call there
+ * used the developer's own credentials. The tool name cannot say this: the
+ * shell that delegates to the folder is named `bash`.
+ */
+export const LOCAL_RESULT_DETAILS = { local: true } as const;
+
+/** Did this pi tool result come from a call that ran in the developer's folder? */
+export function ranInFolder(result: unknown): boolean {
+  if (typeof result !== "object" || result === null) return false;
+  const details = (result as { details?: unknown }).details;
+  if (typeof details !== "object" || details === null) return false;
+  return (details as { local?: unknown }).local === true;
+}
+
+/**
  * Is this command an invocation of the langwatch CLI? Leading environment
  * assignments are skipped, and `npx langwatch` counts. The CLI runs in the
  * sandbox whatever the folder's state: its cards, its navigate opens and its
@@ -714,6 +732,11 @@ function textResult(text: string) {
   return { content: [{ type: "text" as const, text }], details: {} };
 }
 
+/** Text result of a call that ran in the developer's folder, marked as such. */
+function localTextResult(text: string) {
+  return { content: [{ type: "text" as const, text }], details: LOCAL_RESULT_DETAILS };
+}
+
 export function createLocalWorkspaceExtension({
   turnContext,
   sandboxCwd,
@@ -753,7 +776,9 @@ export function createLocalWorkspaceExtension({
         signal?: AbortSignal;
       }) {
         try {
-          return textResult(await runLocalCall({ tool, params, turnContext, toolCallId, signal }));
+          return localTextResult(
+            await runLocalCall({ tool, params, turnContext, toolCallId, signal }),
+          );
         } catch (error) {
           // A call that did not run is a pushback the model acts on, not a
           // failure. Which pushback depends on the folder, which is read
@@ -762,9 +787,10 @@ export function createLocalWorkspaceExtension({
           if (error instanceof AppUnreachableError) {
             return textResult(await localCallPushback({ signal }));
           }
-          // A refusal names the parameter, so the model corrects the call.
+          // A refusal names the parameter, so the model corrects the call. The
+          // developer's CLI answered it, so the call did reach their machine.
           if (error instanceof CallRejectedError) {
-            return textResult(error.message);
+            return localTextResult(error.message);
           }
           throw error;
         }

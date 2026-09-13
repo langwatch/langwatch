@@ -601,6 +601,9 @@ describe("the guided-onboarding skill", () => {
         "That line is said only when the push or `gh` answered that there is no remote or that `gh` is not signed in: a reason the output did not name is never said.",
       );
       expect(rendered).toContain(
+        "One `gh` answer has nothing to fix and gets no retry: no remote points to a known GitHub host, and the failed-open line is said at once with that line in the brace.",
+      );
+      expect(rendered).toContain(
         "Any other `gh` error, a missing body file, a wrong base, gets one fix of its cause and one retry of the command; when it still fails, this line, verbatim, takes the place of both, with the second brace filled with the one line the command printed, and the step is done:",
       );
       const noRemote = rendered.indexOf(VERBATIM_LINES["the no-remote line"]);

@@ -257,6 +257,20 @@ Feature: Langy works in a folder shared from the developer's machine
       And a langwatch command runs in the sandbox, where the CLI has this conversation's login
       And with no folder connected bash is the sandbox shell
 
+    # The manager's GitHub gate and the panel's install card once stood down
+    # by the tool name starting with local_. The shell that delegates to the
+    # folder is named bash, so a git push there raised the install card, killed
+    # the turn and disconnected the folder. The settled call now carries where
+    # it ran, and both read that instead of the name.
+    @unit
+    Scenario: A push or gh command in the shared folder never raises the GitHub install card
+      Given a folder is connected to the conversation
+      When Langy runs a git push or a gh command through bash
+      Then the settled call is marked as run in the developer's folder
+      And the manager's GitHub gate stands down on that marker, as it does on a local tool
+      And the same command with no marker still trips the gate as a sandbox push
+      And the panel's install card stands down on the same marker
+
     @integration
     Scenario: A local call travels to the CLI and its result comes back
       Given a connected folder

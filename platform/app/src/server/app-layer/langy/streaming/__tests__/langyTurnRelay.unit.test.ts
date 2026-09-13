@@ -399,6 +399,24 @@ describe("LangyTurnRelay", () => {
       );
     });
 
+    it("carries a settled call's local marker onto the live card", async () => {
+      const { relay, buffer } = makeRelay();
+      await relay.handle(
+        frame({
+          type: "tool",
+          id: "tc-local",
+          name: "bash",
+          phase: "end",
+          output: "ok",
+          local: true,
+        }),
+      );
+
+      expect(buffer.appendTool).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "tc-local", name: "bash", local: true }),
+      );
+    });
+
     it("re-types a shell frame running the LangWatch CLI before anything is recorded", async () => {
       const { relay, buffer, conversations } = makeRelay();
       await relay.handle(

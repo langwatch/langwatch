@@ -116,7 +116,7 @@ No remote, or no `gh` login: no pull request was opened, so this line takes the 
 
 No pull request was opened, since the folder has no remote or gh is not signed in: branch {branch} holds the commit.
 
-That line is said only when the push or `gh` answered that there is no remote or that `gh` is not signed in: a reason the output did not name is never said. Any other `gh` error, a missing body file, a wrong base, gets one fix of its cause and one retry of the command; when it still fails, this line, verbatim, takes the place of both, with the second brace filled with the one line the command printed, and the step is done:
+That line is said only when the push or `gh` answered that there is no remote or that `gh` is not signed in: a reason the output did not name is never said. One `gh` answer has nothing to fix and gets no retry: no remote points to a known GitHub host, and the failed-open line is said at once with that line in the brace. Any other `gh` error, a missing body file, a wrong base, gets one fix of its cause and one retry of the command; when it still fails, this line, verbatim, takes the place of both, with the second brace filled with the one line the command printed, and the step is done:
 
 The branch {branch} is pushed; opening the pull request failed with: {error}.
 

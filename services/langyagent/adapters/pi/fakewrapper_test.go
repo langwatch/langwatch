@@ -122,6 +122,7 @@ func fakeWrapperMain(mode string) {
 					"id": "call_1|fc_1", "name": "bash",
 					"input":   map[string]any{"command": "ls"},
 					"isError": false, "output": "file.txt",
+					"local": true,
 				})
 				fakeEmit(map[string]any{
 					"type": "plan", "turnId": cmd.TurnID,
