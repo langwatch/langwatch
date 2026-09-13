@@ -9,7 +9,7 @@
  *    keys, types and descriptions;
  *  - the AST validator, whose `allowedTables` and `gatedColumns` come from
  *    {@link lwqlAllowedTables} and {@link lwqlGatedColumns};
- *  - the provisioning generators in `../views.ts`, which turn an entry into its
+ *  - the provisioning generators in `../provisioning/catalogStatements.ts`, which turn an entry into its
  *    `CREATE VIEW`, its column grants and its row policy.
  *
  * Nothing here holds SQL text or database names. A view's *source database* is
@@ -43,7 +43,7 @@ export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
  *
  * A choice with a measurement behind it rather than a preference, so it is a
  * parameter: the isolation suite measures each against the real tables and the
- * shipped default is whichever won. See `../views.ts` for the measurement, and
+ * shipped default is whichever won. See `../provisioning/catalogStatements.ts` for the measurement, and
  * {@link LangWatchQLViewDedup.strategy} for the entry that pins its own.
  *
  *  - `in-tuple` — the repository pattern from
@@ -60,7 +60,7 @@ export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
  *    which silently doubles aggregates. Here to be measured against, never to
  *    be shipped, and never to be pinned on an entry.
  *
- * @see ../views.ts — how each is rendered, and the measurement that chose the default
+ * @see ../provisioning/catalogStatements.ts — how each is rendered, and the measurement that chose the default
  */
 export type LangWatchQLDedupStrategy = "in-tuple" | "final" | "none";
 
@@ -222,8 +222,8 @@ export interface LangWatchQLViewDedup {
  *     server-side named collection. The row policy sits here.
  *  4. The LangWatchQL view the caller names, over that engine table.
  *
- * @see ../provisioning.ts — the approved view, the engine table and the role
- * @see ../views.ts — the LangWatchQL view and its tenant predicate
+ * @see ../provisioning/accessModel.ts — the approved view, the engine table and the role
+ * @see ../provisioning/catalogStatements.ts — the LangWatchQL view and its tenant predicate
  */
 export interface LangWatchQLPostgresMapping {
   /** Table in the application's PostgreSQL schema. Never granted to the reader. */

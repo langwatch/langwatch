@@ -20,6 +20,7 @@ import {
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
+import { SpanIngestionTally } from "./span-ingestion-tally";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 /**
@@ -119,66 +120,6 @@ export interface TraceRequestCollectionDeps {
 }
 
 /**
- * Per-request tally of span outcomes, and the one place that decides what each
- * outcome means to a caller.
- *
- * It exists as its own unit because two of those decisions are load-bearing and
- * were previously inline: filtered spans are NOT rejections, and drops and
- * dispatch failures are rejections with opposite retry answers (see
- * `TraceRequestCollectionResult`).
- */
-class SpanIngestionTally {
-  private collected = 0;
-  private dropped = 0;
-  private deduped = 0;
-  private filtered = 0;
-  private failed = 0;
-  private readonly errors: string[] = [];
-  private readonly failureErrors: string[] = [];
-
-  record(result: SpanIngestionResult): void {
-    switch (result.status) {
-      case "collected":
-        this.collected++;
-        break;
-      case "dropped":
-        this.dropped++;
-        break;
-      case "deduped":
-        this.deduped++;
-        break;
-      case "filtered":
-        this.filtered++;
-        break;
-      case "failed":
-        this.failed++;
-        if (result.error) this.failureErrors.push(result.error);
-        break;
-    }
-    if (result.error) this.errors.push(result.error);
-  }
-
-  annotate(span: OtelSpan): void {
-    span.setAttribute("spans.ingestion.successes", this.collected);
-    span.setAttribute("spans.ingestion.failures", this.failed);
-    span.setAttribute("spans.ingestion.drops", this.dropped);
-    span.setAttribute("spans.ingestion.deduped", this.deduped);
-    span.setAttribute("spans.ingestion.filtered", this.filtered);
-  }
-
-  toResult(): TraceRequestCollectionResult {
-    return {
-      // Filtered spans are intentionally not stored (coding-agent infra
-      // noise), so they are NOT rejections.
-      rejectedSpans: this.dropped + this.failed,
-      ingestionFailures: this.failed,
-      ingestionFailureMessage: this.failureErrors.join("; "),
-      errorMessage: this.errors.join("; "),
-    };
-  }
-}
-
-/**
  * Service for collecting trace requests into the trace processing pipeline.
  *
  * Normalizes OTLP trace requests and sends each span as a span-received event
@@ -214,7 +155,7 @@ export class TraceRequestCollectionService {
         },
       },
       async (span) => {
-        const tally = new SpanIngestionTally();
+        const tally = SpanIngestionTally.create();
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;

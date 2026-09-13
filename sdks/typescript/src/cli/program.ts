@@ -865,11 +865,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     );
 
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
-  // Hidden: nobody types this, the install path writes it into the agent's
-  // settings. It reads its payload on stdin, writes nothing to stdout (a
-  // SessionStart hook's stdout is injected into the user's session context)
-  // and always exits zero, so a hook can never be why a session broke.
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries and the
+  // Claude Code plugin's launcher run. Hidden: the install path writes it into
+  // the agent's settings and the plugin ships it in its launcher. It reads its
+  // payload on stdin, writes nothing to stdout (a SessionStart hook's stdout
+  // is injected into the user's session context) and always exits zero, so a
+  // hook can never be why a session broke.
+  //
+  // Unknown options and extra arguments are accepted and ignored, here and on
+  // `ingest guidance` below. That is the cross-version contract the plugin
+  // rests on: a plugin hooks.json from any version has to run with a CLI from
+  // any version, and a usage error over an argument this build does not know
+  // would be a non-zero exit with prose on stderr on every session start.
   //
   // Registered as rendering its own result because it renders NO result, in
   // any format. Left unregistered, the auto-detected agent mode a hook always
@@ -881,7 +888,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("hook <tool>", { hidden: true })
       .description(
         "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
-      ),
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
       const { hookCommand } = await import("./commands/ingestion/hook.js");
@@ -924,13 +933,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // `langwatch ingest guidance <tool>`: prints the declare-your-context
   // guidance as SessionStart additionalContext JSON. Hidden: nobody types
   // this, the session-hooks install writes it into claude's settings for
-  // installs without plugin support (the plugin carries its own copy).
+  // installs without plugin support, and the Claude Code plugin's launcher
+  // runs it on every session start. Same cross-version contract as `ingest
+  // hook` above: unknown arguments are ignored, the exit is always zero.
   rendersOwnResult(
     ingestCmd
       .command("guidance <tool>", { hidden: true })
       .description(
         "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
-      ),
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
       if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;
@@ -3457,9 +3470,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     chartCmd
       .command("run <id>")
       .description("Run a saved chart's statement and print the result")
-      .option("--start <datetime>", "Period start for statements declaring {period_start:DateTime}")
-      .option("--end <datetime>", "Period end for statements declaring {period_end:DateTime}")
-      .option("--granularity <seconds>", "Datapoint step for statements declaring {period_granularity_seconds:UInt32}")
+      .option("--start <datetime>", "Period start for statements declaring {dashboard_context_period_start:DateTime}")
+      .option("--end <datetime>", "Period end for statements declaring {dashboard_context_period_end:DateTime}")
+      .option("--granularity <seconds>", "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
@@ -3507,6 +3520,122 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string, options: { project?: string }) => {
       const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
       return impl(id, options);
+    },
+  );
+
+  // Add dashboard-widget command group — custom-chart-playground widgets
+  const dashboardWidgetCmd = program
+    .command("dashboard-widget")
+    .description("Manage dashboard widgets");
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("schema")
+      .description("Discover the LangWatchQL analytics datasets and columns to write a widget's queries against")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { dashboardWidgetSchemaCommand: impl } = await import("./commands/dashboard-widgets/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("list")
+      .description("List the project's dashboard widgets")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetsCommand: impl } = await import("./commands/dashboard-widgets/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("get <id>")
+      .description("Get a dashboard widget by ID — its React source and named queries")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("create")
+      .description("Save a dashboard widget from a React source file and its named LangWatchQL queries")
+      .requiredOption("--name <name>", "Widget name")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      code?: string;
+      codeFile?: string;
+      queriesFile?: string;
+      project?: string;
+    }) => {
+      const { createDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("update <id>")
+      .description("Update a dashboard widget's name or definition")
+      .option("--name <name>", "New widget name")
+      .option("--code <code>", "New React source")
+      .option("--code-file <path>", "Read the new React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        code?: string;
+        codeFile?: string;
+        queriesFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("delete <id>")
+      .description("Delete a dashboard widget")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("pin <widget>")
+      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
+      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      widget: string,
+      options: { dashboard?: string; project?: string },
+    ) => {
+      const { pinDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/pin.js");
+      return impl(widget, options);
     },
   );
 

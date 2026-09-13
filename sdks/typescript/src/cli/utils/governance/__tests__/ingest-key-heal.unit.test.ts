@@ -6,6 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { GovernanceCliError } from "../cli-api";
 import type { GovernanceConfig } from "../config";
 import { type HealDeps, healRevokedIngestKey } from "../ingest-key-heal";
 
@@ -139,13 +140,13 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
-  describe("given a platform that says the cap retired the cached key", () => {
-    /** @scenario "A key the cap retired is re-minted" */
-    it("re-mints as it would for any platform revocation", async () => {
+  describe("given a platform that says the cached key was retired with its session", () => {
+    /** @scenario "A key retired with its session is re-minted under the device's current session" */
+    it("re-mints under the current session and wires the new key", async () => {
       const d = deps({
         describeIngestionKey: vi
           .fn()
-          .mockResolvedValue({ status: "revoked", revocationCause: "cap" }),
+          .mockResolvedValue({ status: "revoked", revocationCause: "session" }),
       });
 
       const healed = await healRevokedIngestKey({
@@ -156,6 +157,70 @@ describe("healRevokedIngestKey", () => {
 
       expect(healed.status).toBe("healed");
       expect(d.resolveLiveIngestionKey).toHaveBeenCalledTimes(1);
+      expect(d.installTelemetryWiring).toHaveBeenCalledWith(
+        expect.objectContaining({ tool: "claude", token: FRESH }),
+      );
+    });
+  });
+
+  describe("given a platform that says the cached key expired with its session", () => {
+    /** @scenario "A key whose session expired is re-minted when the device signed in again" */
+    it("re-mints, since the device holds a live session the platform answered under", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: "expired" }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed.status).toBe("healed");
+      expect(d.resolveLiveIngestionKey).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a platform that says the person was offboarded", () => {
+    /** @scenario "A session whose person left the organization is retired as offboarded" */
+    it("reports the device signed out without spending a mint that would be refused", async () => {
+      const d = deps({
+        describeIngestionKey: vi.fn().mockResolvedValue({
+          status: "revoked",
+          revocationCause: "offboarded",
+        }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed.status).toBe("expired");
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a platform that names any other cause of its own", () => {
+    it("re-mints for a rotation and for an older server's cap alike", async () => {
+      for (const revocationCause of ["rotation", "cap"]) {
+        const d = deps({
+          describeIngestionKey: vi
+            .fn()
+            .mockResolvedValue({ status: "revoked", revocationCause }),
+        });
+
+        const healed = await healRevokedIngestKey({
+          agent: "claude_code",
+          rejectedToken: CACHED,
+          deps: d,
+        });
+
+        expect(healed.status).toBe("healed");
+      }
     });
   });
 
@@ -181,6 +246,30 @@ describe("healRevokedIngestKey", () => {
       // Minting here would replace a key a person may have revoked on
       // purpose, decided on a platform answer that never arrived.
       expect(healed).toEqual({ status: "failed" });
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.saveConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a platform that refuses the device's session", () => {
+    /** @scenario "A signed-out device is told to sign in again" */
+    it("reports the session rather than a failure, so the hook can name the repair", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockRejectedValue(new GovernanceCliError(401, "unauthorized", "signed out")),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      // The mint after the status call would be refused the same way, so
+      // there is nothing to try; only a person signing the machine in again
+      // repairs this.
+      expect(healed).toEqual({ status: "expired" });
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
       expect(d.saveConfig).not.toHaveBeenCalled();
     });

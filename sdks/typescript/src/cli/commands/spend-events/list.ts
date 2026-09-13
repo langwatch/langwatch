@@ -85,6 +85,14 @@ export const listSpendEventsCommand = async (options: {
             "Cache r/w": e.data.usage
               ? `${e.data.usage.cache_read_input_tokens}/${e.data.usage.cache_creation_input_tokens}`
               : chalk.gray("?"),
+            // Image tokens are priced separately from the text buckets, so an
+            // image request shows its quantities here and 0 out under In/Out.
+            "Image in/out": e.data.usage
+              ? `${e.data.usage.input_image_tokens}/${e.data.usage.output_image_tokens}`
+              : chalk.gray("?"),
+            Images: e.data.usage
+              ? `${e.data.usage.image_count}`
+              : chalk.gray("?"),
             "Cost USD": e.data.cost?.total_usd ?? chalk.yellow("unknown"),
             Status:
               e.data.status === "success"
@@ -93,7 +101,7 @@ export const listSpendEventsCommand = async (options: {
                   ? chalk.yellow("settled")
                   : chalk.red(e.data.error?.class ?? "error"),
           })),
-          headers: ["Request id", "Occurred at", "Model", "End user", "In/Out", "Cache r/w", "Cost USD", "Status"],
+          headers: ["Request id", "Occurred at", "Model", "End user", "In/Out", "Cache r/w", "Image in/out", "Images", "Cost USD", "Status"],
           colorMap: { "Request id": chalk.gray, Model: chalk.cyan },
         });
         if (page.next_cursor) {

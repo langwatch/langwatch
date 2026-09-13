@@ -195,6 +195,14 @@ export function createEnvConfig() {
       AUTH0_MGMT_CLIENT_ID: z.string().optional(),
       AUTH0_MGMT_CLIENT_SECRET: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
+      // Pepper for the governance erasure digest (ADR-128 §9). Optional
+      // because erasure is opt-in; a deployment that never erases anybody
+      // never needs it, and one that does refuses to run without it rather
+      // than hashing with an empty secret and producing a list that protects
+      // nothing. NEVER ROTATE IT once anybody has been erased: every stored
+      // digest is a function of this value, and the identifiers needed to
+      // recompute them under a new one are exactly what was erased.
+      GOVERNANCE_ERASURE_PSEUDONYM_SECRET: z.string().min(32).optional(),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
       LW_GATEWAY_INTERNAL_SECRET:
@@ -646,6 +654,8 @@ export function createEnvConfig() {
       LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
       LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
+      GOVERNANCE_ERASURE_PSEUDONYM_SECRET:
+        process.env.GOVERNANCE_ERASURE_PSEUDONYM_SECRET,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,

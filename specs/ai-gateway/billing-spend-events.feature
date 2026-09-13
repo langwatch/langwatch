@@ -525,6 +525,33 @@ Feature: Billing spend events, one durable record per gateway request
       Then the envelope type is admitted with usage, cost, and duration null
       And that type never appears on the push stream
 
+  Rule: Published usage states every quantity the price was rated from
+
+    An image request is priced from image tokens, which the text buckets never
+    hold. A surface that publishes only the text buckets answers with a cost
+    and no quantity behind it, and a customer reconciling spend has nothing to
+    check the charge against.
+
+    @integration
+    Scenario: An image generation publishes its output image tokens
+      Given a confirmed image generation billed on output image tokens
+      When the spend events are pulled
+      Then the usage carries the image token quantities and the image count
+      And the text output total stays zero, because the buckets are disjoint
+
+    @integration
+    Scenario: An image edit publishes its input image tokens and image count
+      Given a confirmed image edit that sent one image beside its text prompt
+      When the spend events are pulled
+      Then the usage carries the input image tokens beside the text input tokens
+      And the image count states how many images the request carried
+
+    @integration
+    Scenario: The rollups sum image quantities beside the text ones
+      Given image and text spend records for one end user in one window
+      When the summaries and the end-user rollup are read
+      Then both sum the image token quantities and the image count
+
   Rule: Summaries are the reconciliation checksum
 
     @integration

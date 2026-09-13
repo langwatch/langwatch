@@ -83,7 +83,7 @@ const startWaitRequestSchema = conversationBodySchema.and(startWaitBodySchema);
 
 /**
  * Authenticate the key and resolve the owning user. Mirrors `langy-api.ts`'s
- * `authorizeTurn`; the permission ceiling is the key's own, which a Langy
+ * `authorizeLangyApiKey`; the permission ceiling is the key's own, which a Langy
  * session key holds by construction.
  */
 async function authorize(c: Context) {

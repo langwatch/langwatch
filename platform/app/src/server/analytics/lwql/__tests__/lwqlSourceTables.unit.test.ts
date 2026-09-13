@@ -9,15 +9,15 @@
  * dedup key can be wrong and every one of them stays green. This file varies
  * the one input that exposes it.
  *
- * @see ../views.ts — the function under test
- * @see ../provisioning.ts — LangWatchQLTable, and the policy built from it
+ * @see ../provisioning/catalogStatements.ts — the function under test
+ * @see ../provisioning/accessModel.ts — LangWatchQLTable, and the policy built from it
  */
 
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import type { LangWatchQLNames } from "../provisioning";
-import { lwqlSourceTables } from "../views";
+import type { LangWatchQLNames } from "../provisioning/accessModel";
+import { lwqlSourceTables } from "../provisioning/catalogStatements";
 
 const NAMES: LangWatchQLNames = {
   database: "lwql_unit",

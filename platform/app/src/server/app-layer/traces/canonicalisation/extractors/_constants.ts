@@ -300,3 +300,22 @@ export const SPAN_TYPE_TO_GEN_AI_OP: Record<string, string> = {
   agent: "agent",
   rag: "retrieval",
 };
+
+/**
+ * The vendor namespaces whose subkeys canonicalise to `metadata.<bareKey>`.
+ *
+ * Both spellings mean the same thing to a sender and are folded to the same
+ * canonical name here, so anything that reasons about a metadata key by its
+ * name has to accept every prefix on this list.
+ *
+ * It matters beyond canonicalisation because redaction runs BEFORE the fold:
+ * the personal-data pass sees the prefixed spelling, and a namespace added here
+ * but not taught to `isReservedIdentifierAttributeKey` is a namespace whose
+ * trace identifiers are handed to the recognizers. That is why this is one
+ * exported constant and not a literal in each place — the copy that gets
+ * forgotten is the one that silently stops protecting anything.
+ */
+export const METADATA_SUBKEY_PREFIXES = [
+  "langwatch.metadata.",
+  "langwatch.trace.",
+] as const;

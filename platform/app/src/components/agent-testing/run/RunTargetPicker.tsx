@@ -8,7 +8,7 @@
  */
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
+import { Check, Code, Globe, Mic, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { notRunnableCopy } from "~/components/scenarios/useFilteredScenarioTargets";
@@ -21,6 +21,7 @@ const AGENT_ICONS = {
   code: Code,
   workflow: Workflow,
   connected: Plug,
+  voice: Mic,
 } as const;
 
 /**
@@ -38,7 +39,7 @@ const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
 export type RunDialogAgent = {
   id: string;
   name: string;
-  type: "http" | "code" | "workflow" | "connected";
+  type: "http" | "code" | "workflow" | "connected" | "voice";
   config?: unknown;
   /** The name with the environment of a connected agent, when it has one. */
   label?: string;

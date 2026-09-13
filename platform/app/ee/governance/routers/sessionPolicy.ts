@@ -16,6 +16,7 @@
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { applySessionCeiling } from "~/server/api-key/cli-login-key-reaper";
 
 export const sessionPolicyRouter = createTRPCRouter({
   get: protectedProcedure
@@ -50,6 +51,15 @@ export const sessionPolicyRouter = createTRPCRouter({
         where: { id: input.organizationId },
         data: { maxSessionDurationDays: input.maxSessionDurationDays },
       });
-      return { ok: true };
+      // The new ceiling applies to the sessions already open, now rather
+      // than at their next refresh: their login keys' expiry is brought
+      // forward and the ones already past it are retired with their ingest
+      // keys.
+      const reaped = await applySessionCeiling({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+        maxSessionDurationDays: input.maxSessionDurationDays,
+      });
+      return { ok: true, reapedSessions: reaped };
     }),
 });

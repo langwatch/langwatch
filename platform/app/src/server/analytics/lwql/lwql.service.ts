@@ -3,7 +3,7 @@
  *
  * Composes four layers that are each proven on their own: the schema catalog
  * (`./catalog/`), the default-deny AST validator (`./validation/`), the
- * database-side access model (`./provisioning.ts`), and the execution seam
+ * database-side access model (`./provisioning/accessModel.ts`), and the execution seam
  * (`./executor.ts`). Nothing here re-decides what any of them decided — the
  * value of this file is the *order*, and the order is load-bearing:
  *
@@ -44,7 +44,7 @@
  * second because it is not in the request shape.
  *
  * @see specs/analytics/lwql-api.feature
- * @see ./provisioning.ts — the isolation this composes over
+ * @see ./provisioning/accessModel.ts — the isolation this composes over
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -253,7 +253,7 @@ export interface LangWatchQLExecuteInput {
   readonly timeWindow?: LangWatchQLTimeWindow;
   /**
    * The datapoint step the surface chose, in seconds, for a statement that
-   * declares `{period_granularity_seconds:UInt32}`. Injected like the window.
+   * declares `{dashboard_context_granularity_seconds:UInt32}`. Injected like the window.
    *
    * Ignored by a statement that does not declare the parameter.
    */

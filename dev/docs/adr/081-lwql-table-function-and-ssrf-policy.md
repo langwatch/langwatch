@@ -11,7 +11,7 @@ accepts native ClickHouse SQL from an authenticated API client and runs it
 against `analytics.*` as a single shared restricted database identity. Tenant
 isolation is carried by row policies keyed on a per-query capability, and
 read-only enforcement by `readonly = 1` in a settings profile — both provisioned
-by `platform/app/src/server/analytics/lwql/provisioning.ts` and proven
+by `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` and proven
 against the deployed ClickHouse image by the isolation suite.
 
 ClickHouse **table functions** sit awkwardly inside that model. They are read
@@ -107,7 +107,7 @@ one-line fix rather than a mystery.
 
 - Issue [#6480](https://github.com/langwatch/langwatch/issues/6480) — LangWatchQL analytics SQL API
 - `specs/analytics/lwql-api.feature` — the behavioural contract
-- `platform/app/src/server/analytics/lwql/provisioning.ts` — the grants, row policies and settings profile
+- `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` — the grants, row policies and settings profile
 - `platform/app/src/server/analytics/lwql/validation/validate.ts` — the default-deny AST walk
 - `platform/app/src/server/ops/explain-core.ts` — `TABLE_FUNCTION_RE`, the ops endpoint's separate name-list pre-check
 - [ADR-045](./045-domain-errors-handled-boundary.md) — how the refusal reaches the caller

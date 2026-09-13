@@ -3,6 +3,9 @@ import { aiToolsRouter } from "@ee/governance/routers/aiTools";
 import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
 import { departmentsRouter } from "@ee/governance/routers/departments";
 import { governanceRouter } from "@ee/governance/routers/governance";
+import { governanceAgentsRouter } from "@ee/governance/routers/governanceAgents";
+import { governanceCostRouter } from "@ee/governance/routers/governanceCost";
+import { governancePeopleRouter } from "@ee/governance/routers/governancePeople";
 import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
 import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
 import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
@@ -22,6 +25,7 @@ import { codingAgentsRouter } from "./routers/codingAgents";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
+import { dashboardWidgetsRouter } from "./routers/dashboardWidgets";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
@@ -115,6 +119,7 @@ const coreRouters = {
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  dashboardWidgets: dashboardWidgetsRouter,
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
@@ -174,6 +179,9 @@ const coreRouters = {
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
+  governanceAgents: governanceAgentsRouter,
+  governanceCost: governanceCostRouter,
+  governancePeople: governancePeopleRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
   gatewayBudgets: gatewayBudgetsRouter,

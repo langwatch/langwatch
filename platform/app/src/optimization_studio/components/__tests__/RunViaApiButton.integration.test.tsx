@@ -4,7 +4,7 @@
  * The evaluations panel's Run via API button opens a dialog with copyable
  * snippets for triggering this workflow's evaluation through the unified
  * evaluations-v3 backend and reading the per-row results back. It offers a
- * language picker (Python default, then TypeScript, then Shell) and a
+ * language picker (Python default, then TypeScript, Go, Shell) and a
  * data-source picker. The examples mirror the entry point's own fields.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -82,6 +82,31 @@ describe("RunViaApiButton", () => {
         expect(snippet).toContain("/api/workflows/workflow_abc123/evaluate");
         expect(snippet).toContain("X-Auth-Token");
         expect(snippet).toContain('"parameters"');
+      });
+    });
+
+    describe("when the Go language is selected", () => {
+      /** @scenario The run-via-API dialog shows a copyable snippet for this workflow */
+      it("shows a net/http snippet posting to this workflow's evaluate endpoint", async () => {
+        render(
+          <RunViaApiButton
+            workflowId="workflow_abc123"
+            entryFields={[{ identifier: "input", type: "str" }]}
+            datasetColumns={["input"]}
+            datasetName="My Dataset"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        await openDialog();
+        await switchLanguage("Go");
+        const dialog = screen.getByRole("dialog");
+        const snippet = dialog.textContent ?? "";
+        expect(snippet).toContain("/api/workflows/workflow_abc123/evaluate");
+        expect(snippet).toContain('"parameters"');
+        // The Go snippet uses bearer auth, never the legacy header.
+        expect(snippet).toContain("Bearer ");
+        expect(snippet).not.toContain("X-Auth-Token");
       });
     });
   });

@@ -16,6 +16,7 @@ import {
   Globe,
   type LucideIcon,
   MessageSquare,
+  Mic,
   MoreVertical,
   Play,
   RefreshCw,
@@ -29,6 +30,7 @@ import type { AgentType, TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
 import { agentHasDevTunnel, LocalTunnelBadge } from "./LocalTunnelBadge";
+import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /**
  * The icon and the label per agent type. Both maps are keyed by the whole
@@ -41,6 +43,7 @@ const agentTypeIcons: Record<AgentType, LucideIcon> = {
   http: Globe,
   workflow: Workflow,
   connected: Bot,
+  voice: Mic,
 };
 
 const agentTypeLabels: Record<AgentType, string> = {
@@ -49,6 +52,7 @@ const agentTypeLabels: Record<AgentType, string> = {
   http: "HTTP",
   workflow: "Workflow",
   connected: "Connected",
+  voice: "Voice agent",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */
@@ -175,6 +179,8 @@ export type AgentCardProps = {
   onViewHistory?: () => void;
   /** Runs one scripted scenario against the agent and opens the run. */
   onTest?: () => void;
+  /** Opens the browser call panel — the voice agent equivalent of Test. */
+  onTalkToIt?: () => void;
 };
 
 export function AgentCard({
@@ -188,8 +194,11 @@ export function AgentCard({
   onSyncFromSource,
   onViewHistory,
   onTest,
+  onTalkToIt,
 }: AgentCardProps) {
   const typeLabel = agentTypeLabels[agent.type];
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const showTalkToIt = voiceAgentsEnabled && !!onTalkToIt;
 
   const isCopiedAgent = !!agent.copiedFromAgentId;
   const hasCopies = (agent._count?.copiedAgents ?? 0) > 0;
@@ -202,7 +211,7 @@ export function AgentCard({
       testId={`agent-card-${agent.id}`}
       leading={<AgentTypeIcon type={agent.type} />}
       menu={
-        (onEdit || onDelete || onTest) && (
+        (onEdit || onDelete || onTest || showTalkToIt) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
             <Menu.Content className={CARD_MENU_CLASS}>
@@ -229,6 +238,19 @@ export function AgentCard({
                 >
                   <Play size={14} />
                   Test agent
+                </Menu.Item>
+              )}
+              {showTalkToIt && (
+                <Menu.Item
+                  value="talk-to-it"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTalkToIt?.();
+                  }}
+                  data-testid={`agent-talk-${agent.id}`}
+                >
+                  <Mic size={14} />
+                  Talk to it
                 </Menu.Item>
               )}
               {agent.type === "workflow" && onOpenWorkflow && (

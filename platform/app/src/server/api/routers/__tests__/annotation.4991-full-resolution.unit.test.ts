@@ -2,9 +2,10 @@
  * #4991 ("2 of 2" of #4888) — AC3 call-site wiring for the annotation router.
  *
  * Annotators label trace content, so the annotation-queue reads must resolve
- * the FULL IO value, not the 64 KB preview. Proves both queue-read sites
- * (getQueueItems inline + getOptimizedAnnotationQueues via the shared enrich
- * helper) construct TraceService WITH blob-resolution deps and pass full:true.
+ * the FULL IO value, not the 64 KB preview. Proves getOptimizedAnnotationQueues
+ * constructs TraceService WITH blob-resolution deps and passes full:true via the
+ * shared enrich helper. The second call site this once covered, getQueueItems,
+ * was removed: it read the whole queue unpaginated and nothing called it.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
@@ -132,40 +133,6 @@ function expectFullResolution() {
 }
 
 describe("annotation router — #4991 AC3 annotation-queue reads", () => {
-  describe("when getQueueItems is called", () => {
-    it("constructs with deps and resolves trace IO full", async () => {
-      await caller.getQueueItems({ projectId: "project_123" });
-      expectFullResolution();
-      expect(mockQueueItemFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            projectId: "project_123",
-            AND: expect.arrayContaining([
-              {
-                OR: [
-                  { annotationQueueId: null },
-                  { annotationQueue: { projectId: "project_123" } },
-                ],
-              },
-              {
-                OR: [
-                  { userId: null },
-                  {
-                    user: {
-                      orgMemberships: {
-                        some: { organizationId: "org_123" },
-                      },
-                    },
-                  },
-                ],
-              },
-            ]),
-          }),
-        }),
-      );
-    });
-  });
-
   describe("when getOptimizedAnnotationQueues is called (shared enrich helper)", () => {
     it("constructs with deps and resolves trace IO full", async () => {
       await caller.getOptimizedAnnotationQueues({

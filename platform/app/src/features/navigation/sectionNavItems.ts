@@ -1,9 +1,10 @@
 import {
-  AlertTriangle,
+  Bot,
   Brain,
   Coins,
   Eye,
   Gauge,
+  Inbox,
   KeyRound,
   LineChart,
   type LucideIcon,
@@ -11,6 +12,7 @@ import {
   ReceiptText,
   Route,
   Shield,
+  Target,
   Users,
   Webhook,
   Zap,
@@ -35,6 +37,12 @@ export interface SectionNavItemData {
    * presentations agree on what exists.
    */
   featureFlag?: FrontendFeatureFlag;
+  /**
+   * Listed under a labelled group in the navigation-v2 sidebar, after
+   * every ungrouped entry. The legacy section rail has no grouping
+   * affordance and lists grouped entries flat, in the same order.
+   */
+  group?: string;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -108,28 +116,52 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     featureFlag: "release_ui_governance_billed_cost_enabled",
   },
   {
-    label: "Billed",
-    href: "/governance/billed",
-    includePath: "/governance/billed",
-    icon: ReceiptText,
-    featureFlag: "release_ui_governance_billed_cost_enabled",
-  },
-  {
     label: "Inventory",
     href: "/governance/inventory",
     includePath: "/governance/inventory",
     icon: PackageOpen,
   },
   {
-    label: "Anomaly Rules",
-    href: "/governance/anomaly-rules",
-    includePath: "/governance/anomaly-rules",
-    icon: AlertTriangle,
+    // Anomaly Rules left the rail for a tab inside Inventory, and Billed
+    // left it for this entry. The /governance/billed page stays reachable
+    // by address behind its flag; it is only no longer listed.
+    label: "Agents",
+    href: "/governance/agents",
+    includePath: "/governance/agents",
+    icon: Bot,
   },
   {
     label: "People",
     href: "/governance/people",
     includePath: "/governance/people",
     icon: Users,
+  },
+  // The Platform group: placeholder screens for the brief, explore and
+  // rule registry that the cost work leads into. They ride the billed-cost
+  // flag so the audience previewing Costs previews these too.
+  // Spec: specs/governance/governance-platform-placeholders.feature
+  {
+    label: "Insights",
+    href: "/governance/insights",
+    includePath: "/governance/insights",
+    icon: Inbox,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
+  },
+  {
+    label: "Analytics",
+    href: "/governance/analytics",
+    includePath: "/governance/analytics",
+    icon: LineChart,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
+  },
+  {
+    label: "Signals & Alerts",
+    href: "/governance/signals",
+    includePath: "/governance/signals",
+    icon: Target,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+    group: "Platform",
   },
 ];

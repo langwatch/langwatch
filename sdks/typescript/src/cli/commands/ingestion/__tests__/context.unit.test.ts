@@ -357,6 +357,26 @@ describe("what the declaration posts", () => {
     expect(attributes["vcs.ref.head.name"]).toBeUndefined();
   });
 
+  /** @scenario "A pinned tool declares to the project it is pinned to" */
+  it("declares with the pinned key, to the endpoint the pin carries", async () => {
+    await runContext({
+      env: { ...CLAUDE_ENV },
+      readCliConfig: () => ({
+        control_plane_url: "https://app.example.com",
+        tool_project_keys: {
+          claude: {
+            secret: "sk-lw-pinned_secret",
+            endpoint: "https://pinned.example.com",
+          },
+        },
+      }),
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.url).toBe("https://pinned.example.com/api/otel/v1/logs");
+    expect(posted[0]!.headers.Authorization).toBe("Bearer sk-lw-pinned_secret");
+  });
+
   /** @scenario "A live traceparent rides the record" */
   it("attaches the trace context from the environment", async () => {
     await runContext({
