@@ -37481,6 +37481,9 @@
                       "gitDirty": {
                         "type": "boolean"
                       },
+                      "gitRepository": {
+                        "type": "boolean"
+                      },
                       "os": {
                         "type": "string",
                         "maxLength": 64
@@ -38247,6 +38250,9 @@
                                 "gitDirty": {
                                   "type": "boolean"
                                 },
+                                "gitRepository": {
+                                  "type": "boolean"
+                                },
                                 "os": {
                                   "type": "string",
                                   "maxLength": 64
@@ -38736,6 +38742,9 @@
                         "maxLength": 2048
                       },
                       "gitDirty": {
+                        "type": "boolean"
+                      },
+                      "gitRepository": {
                         "type": "boolean"
                       },
                       "os": {
