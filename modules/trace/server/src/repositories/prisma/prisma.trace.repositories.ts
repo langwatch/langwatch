@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
@@ -21,20 +22,37 @@ import { ClickHouseTraceEventPayloadRepository } from "../clickhouse/trace-event
  * keeps outside ClickHouse lives in; the three projections need the
  * tenant-keyed ClickHouse connection as well, so both are required inputs of
  * the one tier.
+ *
+ * The retention fallback is RESOLVED here rather than claimed as a member.
+ * `requires` may only name the fourteen keys of `ProcessMembers` — a tier's
+ * requires list is fed to `buildClaimedMembers`, which walks the process's
+ * member order and refuses any name it cannot find — so
+ * `"defaultRetentionDays"` could never be satisfied by any process and stopped
+ * the api booting. It is a leftover from when a hand-written composition called
+ * `traceRepositories.definitions.postgres.create({...})` directly with its own
+ * arguments (`api-trace-read-stack.composition.ts:529`, deleted by b383462d96);
+ * once `withModules` began resolving these against members, the entry became
+ * unsatisfiable.
+ *
+ * `resolvePlatformDefaultRetentionDays` is the one function every process must
+ * use for this: "Both processes stamp rows in one ClickHouse, so both read this
+ * one way: a process that resolved a different default would expire the other's
+ * rows" (data-retention.config.ts). Calling it here reads the same environment
+ * through the same rule the api's own config does, so the two cannot disagree —
+ * which a module-local constant would not guarantee.
  */
 export class PostgresTraceRepositories {
-  static readonly requires = ["prisma", "clickhouse", "defaultRetentionDays"] as const;
+  static readonly requires = ["prisma", "clickhouse"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
       clickhouse: TraceClickHouseWriteResolver;
-      defaultRetentionDays: number;
     }>,
   ): TraceRepositories {
     const storage = {
       resolveClient: members.clickhouse,
-      defaultRetentionDays: members.defaultRetentionDays,
+      defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
     };
 
     return {
