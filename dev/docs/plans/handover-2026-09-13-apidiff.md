@@ -34,14 +34,27 @@ Manifest has the complete recipe (deleted composition at
 `b383462d96^:apps/api/src/features/identity/identity.composition.ts` +
 `api-identity-pipelines.composition.ts`; exemplar authz `9ab4161571`).
 
-## The projected queue after identity (static scan, boot is the authority)
+## The queue after identity (updated through the ops wall)
 
-Module apps using `setup.members.*` with NO `reads(...)` declared:
-automation(21) organization(19) scenario(14) langy(11) stored-object(8)
-analytics(3) feature-flag(3) topic(2) dashboard(1). Some may be false
-positives (builder-level `members` declarations, guarded reads). Install order
-is dependency-driven: fix order so far was model-provider → trace/webhook →
-moduleConfig → authz → identity, NOT alphabetical. Let boot name the next one.
+Progress this session: identity composed and committed (6a7c671691); the api's
+`eventing` member wired producer-only over the group queue + the last four
+erased-extends fixed (c6d115c2db); ksuid migration landed (23cb2058ce, the
+user's third session). Boot now reaches **ops** and stops at
+`members.createCapability is not a function` (ops.app.ts:554) — lane
+`ops-composition-green` is on it (recipe: the deleted 491-line
+ops.composition.ts; exemplar: the identity commit).
+
+**A hazard boot cannot see, measured, not yet audited:** boot sailed PAST
+several module apps that read `setup.members.*` while declaring no
+`reads(...)` — langy(11 uses) dashboard(1) feature-flag(3) topic(2) and
+possibly automation/analytics (behind ops: organization(19) scenario(14)
+stored-object(8) may still fail loudly). An App handed `{}` that only stores
+`setup.members.X` wires `undefined` into its graph and boots green; it fails
+at first use, far from the cause. After boot goes green end-to-end, EVERY
+module in that scan list needs the identity treatment or an explicit
+verdict that its members uses are dead code — apidiff's probe phase will
+catch the ones with documented operations, but worker-only capabilities and
+lazily-hit paths it cannot.
 
 ## Division of labor (agreed over cross-session channel, 2026-09-13)
 
