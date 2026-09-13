@@ -52,7 +52,7 @@ describe("given a stored annotation", () => {
 
 ```
 app/__tests__/annotation.fixture.ts                createAnnotationTestApp({ repositories?, dependencies? })
-app/__tests__/annotation-installation.unit.test.ts createApp(...).withPersistence("memory", {}).withProvided(...).withModule(annotationServer).boot({ role })
+app/__tests__/annotation-installation.unit.test.ts createApp({ role, config: {} }).withProvided(...).withModules([withMemoryRepositories(annotationServer)]).boot()
 app/__tests__/annotation-boundary.unit.test.ts     peer errors propagate; references validated; trace markers best effort
 services/__tests__/annotation-*.service.unit.test.ts
 repositories/memory/__tests__/memory.*.repository.unit.test.ts
@@ -75,9 +75,10 @@ transport/__tests__/annotation.rest.integration.test.ts · annotation.trpc.*.tes
   `vitest.integration.config.ts`, run with `pnpm --filter @langwatch/<f>-server test:integration`.
 - **Transport tests mount the declaration** through the test harness's host and assert on
   status and `code`, not prose.
-- **The process test** `apps/api/src/features/<f>/__tests__/<f>.composition.integration.test.ts`
-  drives `installApi<F>` with recording peers and a recording Prisma client through the real
-  tRPC and REST mounts.
+- **The process pins the wire, not a per-module composition test**: there is no
+  `installApi<F>` any more. `apps/api/src/app-rest/api-rest.addresses.json`, generated
+  from the mounted declarations and compared by a snapshot test, is what catches a
+  conversion that moves a route, drops a version twin or changes a credential door.
 
 ## Levels and files
 

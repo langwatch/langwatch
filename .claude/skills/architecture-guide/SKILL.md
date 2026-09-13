@@ -13,9 +13,16 @@ programs), plus the Go services `services/aigateway`, `services/nlpgo` and
 `services/langyagent`. Applications hold no product code: they boot modules over
 their own database, Redis and ClickHouse handles through `@langwatch/runtime-composition`.
 
+**Authority order.** The ADRs rule; this guide is derived from them and is
+rewritten when they change. For composition the ruling design is
+`dev/docs/adr/144-declarative-process-composition.md` (superseding ADR-133);
+for the file grammar it is `packages/oxlint-rules/grammar/feature-layout-policy.mjs`
+and the architecture-enforcer ADRs. Where this guide and an ADR disagree, the
+ADR wins and the guide is the defect - fix the guide, never code to it.
+
 A **module** is a folder `modules/<name>/` that owns three workspace
 packages. One word throughout: the folder is `modules/`, the identifiers are
-`defineModule`, `withModule`, `moduleApi`, `installApi<Name>`, `<Name>Api` and
+`defineServerModule`, `withModules`, `moduleApi`, `<Name>Api` and
 `ModuleName`, and in conversation and in these skills the word for this shape
 is "module".
 
@@ -31,7 +38,7 @@ and `adrs/`. Enterprise modules mirror this under `enterprise/modules/<name>`;
 web packages install through `apps/ui/src/features/catalogue.json` like any other `*-web`.
 
 **The reference module is `annotation`** (`modules/annotation`, ADR-001 in its
-`adrs/`, shared decision ADR-133). Every other module is being converted to its shape;
+`adrs/`, shared decisions ADR-133 and ADR-144, of which 144 rules composition). Every other module is being converted to its shape;
 `packages/architecture-enforcer/src/feature-shape-baseline.json` is the list of what each
 module still carries from the older shape, and it may only shrink. Copy annotation, not
 the module next to it. Pointed at any other module, the `module` skill's references
@@ -48,7 +55,7 @@ modules/annotation/
 │   ├── annotation.errors.ts · annotation-queue.errors.ts
 │   └── annotation-*.types.ts · index.ts
 ├── server/src/
-│   ├── annotation.server.ts         defineModule("annotation").withRepositories(...).withApp(...).withTransports(...).build()
+│   ├── annotation.server.ts         defineServerModule("annotation").withRepositories(...).withApp(...).withTransports(...) — no .build(); every with* result is installable
 │   ├── index.ts                     exports the installer and the transport declarations, nothing else
 │   ├── app/annotation.app.ts        class AnnotationApp implements AnnotationApi; owns the private services
 │   ├── services/*.service.ts        one class per entity, each over its repository interface
@@ -79,7 +86,7 @@ other half. Another module imports only the owner's contract, names the owner's 
 token in its app's `static dependencies`, and receives the owner's app at boot. Nobody
 imports another module's service or repository. `modules/catalogue.json` maps
 every subject to exactly one owning module; `feature-source-subject` fires when a
-filename claims another module's subject, and `ModuleName` (the type `defineModule`
+filename claims another module's subject, and `ModuleName` (the type `defineServerModule`
 and `moduleApi` accept) is generated from that catalogue.
 
 ## Which reference to read
@@ -94,9 +101,10 @@ Read the one that matches the layer you are about to touch. Each is short.
 - `references/web.md`: the layer order and import matrix, flat entries versus screens
   versus surfaces versus pages, host ports, the api-map, drawers.
 - `references/config-composition.md`: `RuntimeConfig` and `Config.group`, the per-process
-  config modules, the root `.env`, `createApp(...).withPersistence().withProvided().withModule().boot()`,
-  the REST and tRPC mounts in `apps/api/src/features/<f>/`, the worker, producer-only
-  eventing.
+  config modules, the root `.env`,
+  `createApp({ role, config, members }).withModules(serverModules).boot()`, the process
+  transport hosts, the worker, producer-only eventing. `references/composition-by-size.md`
+  shows the root assembled at four sizes.
 - `references/install.md`: the steps that put a screen in front of a user
   (catalogue.json, the private module folder, `WebInstallation`, routes, feature-map.json).
 - `references/testing.md`: specs first, `@scenario` binding, test levels, the annotation
@@ -143,16 +151,22 @@ Read the one that matches the layer you are about to touch. Each is short.
   are deleted; a file still naming one is conversion debt (`legacy-transport-runtime`).
 - `index.ts` of a server package exports the installer and the transport declarations.
   Never a repository, store, projection, service or app (`private-runtime-export`).
-- Technical infrastructure (encryption, object storage, a clock, an audit sink) is a
-  member of `<F>Infrastructure`, a plain interface declared beside the app and supplied by
-  the process in `withInfrastructure`. A finished module has no `ports/` and no
-  `adapters/` folder (`strict-port-module` still tolerates old ones until the lint flips).
-  A peer module is never infrastructure: name its `*Api` token in `static dependencies`.
+- A raw technical client the process owns (Prisma, Redis, a clock, encryption, object
+  storage) is a **member** of the closed, fourteen-key `ProcessMembers` record
+  (`@langwatch/infrastructure`, ADR-144). The App names what it reads in one line -
+  `static readonly reads = reads("clock", "logger")` - and boot supplies exactly that
+  union or refuses by module and member name. There is no per-module
+  `<F>Infrastructure` interface and no `withInfrastructure` call. A finished module has
+  no `ports/` and no `adapters/` folder (`strict-port-module` still tolerates old ones
+  until the lint flips). A peer module is never a member: name its `*Api` token in
+  `static dependencies`.
 - Test builders live in `app/__tests__/<f>.fixture.ts`; there is no `fixtures/` and no
   `testing.ts` in a server package (`feature-shape: fixtures-directory`, `testing-entry`).
 - A module exists to be installed: `<f>.server.ts` is its installer, `app/<f>.app.ts` its
-  one app, and some process boots it with `createApp(...).withModule(<f>Server)`. A
-  server package without them, or an installer no process boots while the root hand-builds
+  one app, and a process boots it through the generated list -
+  `createApp({ role, config, members }).withModules(serverModules).boot()` - so
+  installing a module edits `modules/catalogue.json`, never an app. A server package
+  without installer or app, or an installer no process boots while the root hand-builds
   the app, is conversion debt (`feature-shape: no-installer`, `no-app`,
   `installer-not-booted`). A process installs a module or does not; there is no
   `refusing<F>Feature()` twin (`feature-shape: refusing-composition`).
@@ -179,14 +193,20 @@ Read the one that matches the layer you are about to touch. Each is short.
 ## The `modules` folder name
 
 The tree reads `modules/` and `enterprise/modules/`, and the identifiers read
-`Module*` (`defineModule`, `withModule`, `moduleApi`, `ModuleName`). The words a
+`Module*` (`defineServerModule`, `withModules`, `moduleApi`, `ModuleName`). A number of
+`@langwatch/runtime-composition` exports still spell the older word (`FeatureSetup`,
+`InstallableServerFeature`, `FEATURE_NAMES`, …); they are the real names today, awaiting
+a rename by a code change, not aliases to reach for in new prose. The words a
 lint policy id uses are the exception: `feature-source-layout`, `feature-catalogue`
 and `feature-shape` are baseline keys and keep their names.
 
 ## Where the rules are written down
 
-- `dev/docs/adr/133-composition-spec.md` (the installer, the app factory, transports,
-  repositories, the six requirements) and
+- `dev/docs/adr/144-declarative-process-composition.md` (the ruling composition design:
+  the module declares everything it contributes, a process is a role, a config, one
+  closed member record and the generated module list; supersedes ADR-133),
+  `dev/docs/adr/133-composition-spec.md` (historical: the installer, the app factory,
+  transports, repositories, the six requirements) and
   `modules/annotation/adrs/001-annotation-service-boundary.md` (the reference)
 - `packages/architecture-enforcer/adrs/002-versioned-strict-feature-layout.md` (the grammar),
   `packages/architecture-enforcer/adrs/001-feature-package-boundaries.md`,

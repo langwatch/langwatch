@@ -25,6 +25,7 @@ const EXAMPLE = [
   "eventing/annotation.projection.ts",
   "rules/scoring.rules.ts",
   "tasks/backfill.task.ts",
+  "app/annotation-composition.build.ts",
 ];
 
 const REFUSED = [
@@ -44,6 +45,20 @@ describe("given the closed server allowlist", () => {
     /** @scenario "Only the allowed shape has a home" */
     it("accepts every home the message names", () => {
       expect(EXAMPLE.filter((path) => !hasHome(path))).toEqual([]);
+    });
+  });
+
+  describe("when a converted module still carries its ported process composition", () => {
+    /** @scenario "Only the allowed shape has a home" */
+    it("admits app/<feature>-composition.build.ts and names it in the message", () => {
+      expect(hasHome("app/annotation-composition.build.ts")).toBe(true);
+      expect(SERVER_HOMES).toContain("app/<feature>-composition.build.ts");
+    });
+
+    /** @scenario "Only the allowed shape has a home" */
+    it("keeps the artifact scoped to app/, one per module", () => {
+      expect(hasHome("annotation-composition.build.ts")).toBe(false);
+      expect(hasHome("composition/annotation.build.ts")).toBe(false);
     });
   });
 

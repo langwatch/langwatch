@@ -152,9 +152,13 @@ The root is small because the module says what it needs:
 export const traceServer = defineServerModule("trace")
   .withRepositories(traceRepositories)   // prisma | clickhouse | redis | memory
   .withApp(TraceApp)                     // implements TraceApi
-  .withTransports(traceRest, traceTrpc)  // declarations, inert
-  .build();
+  .withTransports(traceRest, traceTrpc); // declarations, inert
 ```
+
+Every `with*` call already answers something installable, so the chain ends on
+whichever call the module last needed. A trailing `.build()` still compiles - it
+is a deprecated no-op kept for the installers written before that was true - but
+it is a vestigial spelling, not part of the shape.
 
 and on the App itself:
 

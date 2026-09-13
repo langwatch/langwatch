@@ -24,7 +24,7 @@ The reference shape:
 
 ```
 index.ts                                              exports <f>Server and the transport declarations, nothing else
-<f>.server.ts                                         the installer (defineModule)
+<f>.server.ts                                         the installer (defineServerModule)
 app/<f>.app.ts                                        REQUIRED: the one class implementing <F>Api
 app/__tests__/<f>.fixture.ts                          test builders: the app over memory repositories, peer fixtures
 services/<name>.service.ts                            REQUIRED: at least one; one class per entity
@@ -43,16 +43,19 @@ channels/eventing/eventing.<name>.channel.ts          the event bus; redis/, htt
 channels/memory/memory.<name>.channel.ts              the memory twin of every live channel
 transport/<f>.rest.ts                                 defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(…).get(…)….build()
 transport/<f>.trpc.ts · transport/<f>-<part>.trpc.ts  defineTrpcRouter(<F>Api, <f>Trpc).procedure(name).withPermission(…).handle(…)….build(), one file per namespace
-ports/<name>.port.ts                                  abstract class …Port for TECHNICAL infrastructure only
-stores/ · projections/ · subscribers/ · processes/ · intents/    eventing roles, unchanged
+eventing/<f>.pipeline.ts                              the aggregate, its events, projections, subscribers and commands, declared once
+eventing/<f>.<events|commands|schemas|projection|subscriber|process|intent|store>.ts   what the pipeline names
+app/<f>-composition.build.ts                          the ported process composition a converted module still carries; shrinks to nothing as conversion completes
 tasks/<name>.task.ts                                  a one-shot program composed by apps/tasks
 migrations/<name>-import.<name>.migration.ts
 ```
 
-Still parsed by the grammar but inventoried by `feature-shape` and gone when a module
-converts: `testing.ts`, `fixtures/`, `adapters/postgres.*.adapter.ts` (and any other
-persistence adapter), `transport/<surface>/<name>.api.ts` (`api-trpc`, `api-rest`,
-`public-rest`, `api-mcp`, `api-ws`). Do not add new ones.
+Inventoried by `feature-shape` and gone when a module converts: `testing.ts`,
+`fixtures/`, `ports/<name>.port.ts` (members and channels replace technical ports),
+`adapters/postgres.*.adapter.ts` (and any other persistence adapter),
+`transport/<surface>/<name>.api.ts` (`api-trpc`, `api-rest`, `public-rest`, `api-mcp`,
+`api-ws`), and free-standing `stores/`, `projections/`, `subscribers/`, `processes/`
+and `intents/` folders (their roles now live under `eventing/`). Do not add new ones.
 
 There is no `composition/`, `registration/`, `lifecycle/`, `eventing/`, `utils/`,
 `helpers/`, `lib/` or `domain/`. Anything under `__tests__/` at any depth is exempt from
@@ -64,8 +67,12 @@ so internal imports read `import { AnnotationApp } from "#app/annotation.app"`.
 Lower-case kebab. Dots separate architectural qualifiers, hyphens stay inside a name.
 Qualifiers (`SERVER_ARCHITECTURAL_QUALIFIERS`): `clickhouse, eventing, in-memory, ledger,
 memory, postgres, prisma, redis, routed`. Artifacts (`CANONICAL_ARTIFACTS`): `adapter,
-api, app, commands, errors, events, intent, migration, port, process, projection, queries,
-repository, rules, service, store, subscriber, task`, plus `channel`.
+api, app, commands, composition, errors, events, intent, migration, port, process,
+projection, queries, repository, rules, service, store, subscriber, task`, plus
+`channel`. `composition` names the ported process composition a converted module still
+carries (`app/<f>-composition.build.ts`); it is admitted so recovery is not a redline,
+with the explicit expectation it shrinks to nothing as repositories and members
+conversion completes.
 
 Inside `channels/<tier>/` the filename rule is `<tier>.<subject>.channel.ts`, with the
 folder and the first dot-qualifier the same word, over the tiers `CHANNEL_TIERS` lists
@@ -101,14 +108,20 @@ folder and the first dot-qualifier the same word, over the tiers `CHANNEL_TIERS`
 **`<f>.server.ts`, the installer**
 
 ```ts
-export const annotationServer = defineModule("annotation")
+export const annotationServer = defineServerModule("annotation")
   .withRepositories(annotationRepositories)
   .withApp(AnnotationApp)
-  .withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport)
-  .build();
+  .withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport);
 ```
 
-One installer per module, reused by every process role. `defineModule` takes the
+There is no `.build()` on this chain: every `with*` call already answers something
+installable, so a builder cannot be forgotten half-built (ADR-144). A `.build()` still
+compiles - it is a deprecated no-op kept only so older installers keep compiling until
+they drop it - but a chain ending in `.build()` is a vestigial spelling, not a shape to
+copy. (The transport builders `defineRestRouter` and `defineTrpcRouter` are a different
+chain and do terminate with `.build()`.)
+
+One installer per module, reused by every process role. `defineServerModule` takes the
 catalogue name; the framework derives the public namespace (`annotation` becomes
 `annotations` for REST under `/api/v1`, and the tRPC namespace) so the module writes
 neither. A module without persistence omits `.withRepositories`; a module with a worker
@@ -142,10 +155,12 @@ export class AnnotationApp implements AnnotationApi {
 }
 ```
 
-`FeatureSetup<Dependencies, Infrastructure, Config, Repositories>`: peers arrive typed
-from the declared tokens, technical infrastructure (an object storage client, an
-encryption port) as the second parameter, validated module config as the third,
-repositories as the fourth. Peer enrichment (users, traces), reference validation,
+`FeatureSetup<Dependencies, Members, Config, Repositories>`: peers arrive typed from
+the declared tokens, the process members the App claimed with
+`static readonly reads = reads(...)` as the second parameter (`never` for a module
+that reads none, as annotation does), validated module config as the third,
+repositories as the fourth. A module may also hand-write its setup type as a plain
+`Readonly<{ repositories; dependencies }>`, which is what annotation does today. Peer enrichment (users, traces), reference validation,
 authorization decisions through `AuthzApi`, review workflows and side effects across
 entities all live in the app. Thin forwarding methods are intentional: they are the
 public boundary. Nothing on the instance is public except the API's operations
@@ -213,9 +228,12 @@ export class MemoryAnnotationRepositories {
 }
 ```
 
-The process selects a backend once with `.withPersistence("postgres", { prisma })` or
-`.withPersistence("memory", {})`; boot validates the factory's declared infrastructure
-before construction and never falls back to memory. A factory contains construction
+The process never names a backend word: a module installed through `.withModules(...)`
+gets its live registry entry, and the only way to run without a store is explicit -
+`withMemoryRepositories(<f>Server)` swaps the registry onto its memory twin, the one
+seam a test uses and the only place the word memory is written (ADR-144). Boot
+validates each factory's declared requirements before construction and never falls
+back to memory. A factory contains construction
 only. Every Prisma repository has a memory twin with the same observable behaviour, so
 the app's tests run without a database and a test may replace one repository in the
 bundle. Repositories are never exported from `index.ts` (`private-runtime-export`).
@@ -230,12 +248,15 @@ are rejected by `typed-prisma-seam`. Every query on a project-level model includ
 `projectId`. Prisma errors are classified with `@langwatch/prisma-client/errors`
 (`isRecordNotFoundError`) and rethrown as the contract's handled error.
 
-**`ports/`**: technical infrastructure only, an abstract class ending in `Port`
-(`strict-port-module`): encryption, object storage, a clock. It arrives through the
-app's `FeatureSetup` infrastructure parameter, provided by the process with
-`.withInfrastructure({...})`. A peer module is never a port. A port with one
-implementation that production always supplies is over-abstraction; take the concrete
-dependency.
+**Members, not ports.** A raw technical client the process owns (a clock, encryption,
+object storage, Prisma, Redis) is a member of the closed fourteen-key `ProcessMembers`
+record from `@langwatch/infrastructure`; the App claims what it reads with
+`static readonly reads = reads(...)` and receives it in `create({ members })`, and a
+member this process cannot supply refuses at boot naming module and member. `ports/`
+(an abstract `*Port` class arriving through a per-module infrastructure bag) is the
+older spelling, inventoried until each module converts (`strict-port-module`). A peer
+module is never a member or a port. A port with one implementation that production
+always supplies is over-abstraction; take the concrete dependency.
 
 **`channels/`**: messages to or from something the module does not own, in either
 direction, with no owned state. The event bus, Redis pub/sub, a vendor over HTTP, a
@@ -327,7 +348,7 @@ for stays in `apps/api/src/tasks/` instead.
 
 ```
 app/__tests__/<f>.fixture.ts                        createAnnotationTestApp({ repositories?, dependencies? }) over MemoryAnnotationRepositories
-app/__tests__/<f>-installation.unit.test.ts         createApp(...).withPersistence("memory", {}).withProvided(...).withModule(<f>Server).boot({ role })
+app/__tests__/<f>-installation.unit.test.ts         createApp({ role, config: {} }).withProvided(PeerApi, fixture)….withModules([withMemoryRepositories(<f>Server)]).boot()
 app/__tests__/<f>-boundary.unit.test.ts             peer errors propagate, references validated, side effects best-effort
 services/__tests__/<name>.service.unit.test.ts
 repositories/memory/__tests__/memory.<name>.repository.unit.test.ts

@@ -13,6 +13,10 @@ export const CANONICAL_ARTIFACTS = new Set([
   "api",
   "channel",
   "commands",
+  // The ported process composition a converted module still carries; admitted
+  // so recovery is not a redline, expected to shrink to nothing as
+  // repositories and members conversion completes (ADR-144).
+  "composition",
   "errors",
   "events",
   "intent",
@@ -97,13 +101,19 @@ export const SERVER_HOMES =
   "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
   "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
   "eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, " +
-  "tasks/<name>.task.ts, migrations/";
+  "tasks/<name>.task.ts, migrations/, " +
+  "app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks)";
 
 export const SERVER_PATTERNS = [
   /^index\.ts$/,
   new RegExp(`^${NAME}\\.server\\.ts$`),
   // A feature app groups its public services; transport adapters stay outside it.
   new RegExp(`^app/${NAME}\\.app\\.ts$`),
+  // The ported process composition a converted module still carries. A named,
+  // documented artifact rather than a refusal, because redlining it mid-recovery
+  // helps nobody; the expectation is that it shrinks to nothing as repositories
+  // and members conversion completes (ADR-144).
+  new RegExp(`^app/${NAME}-composition\\.build\\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
   // A feature can select a repository bundle by persistence backend.

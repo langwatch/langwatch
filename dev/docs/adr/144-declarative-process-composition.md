@@ -609,3 +609,31 @@ one.
   one process. Nothing is shared between them: two member records, two Prisma
   clients, two Redis connections, as production has.
 - `ServerRole` gains `"tasks"`, replacing `"task"`.
+
+## Amendment (2026-09-13): the decision-3 example, and where `.build()` stands
+
+Decision 1's rule - "There is no `.build()`" - is about the module chain,
+`defineServerModule(...)`. This document's own decision-3 example ends a
+`defineRestRouter(...)` chain with `.build()`, which read as the rule
+contradicting itself. It does not; two clarifications, both describing what has
+since landed:
+
+- On the module chain, every `with*` call answers something installable.
+  `ServerFeatureBuilder.build()` survives only as a deprecated no-op - the
+  identity on the declaration it is called on - so installers written before
+  that was true keep compiling, and it is slated for removal once they drop it.
+  A module chain ending in `.build()` is a vestigial spelling, not a different
+  shape; the no-build form is canonical.
+- The route-family builders (`defineRestRouter`, `defineTrpcRouter`) are a
+  different chain and still terminate with an explicit `.build()`. The
+  decision-3 example is correct as written for that builder; the reference
+  module's own `transport/annotation.rest.ts` ends the same way.
+
+Two of the "where this stands" notes above are also superseded by landed work:
+the process roots now boot the generated list (`apps/api/src/app/api-production.composition.ts`
+and the worker's capability roots call `.withModules(...)`, and
+`api-production.composition.ts` is a few hundred lines, not 4,989), and
+`ApplicationBuilder` has been rewired onto `@langwatch/infrastructure`'s member
+record (`createApp({ role, config, members })`, with `withProvided` retained as
+the test-side peer seam). The decision text stands as written; only its
+implementation-status asides have moved on.

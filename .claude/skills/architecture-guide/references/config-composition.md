@@ -42,8 +42,9 @@ config.value.langy.internalSecret; // typed, deep-frozen
   rule in `superRefine` and reports `path (ENV, custom): message`. Never a post-parse
   `assert<Feature>Config()`.
 - A module declares its config definition in its **contract** (`<f>.config.ts`) and the
-  process spreads it into its own definition; the module receives the parsed value through
-  `FeatureSetup`'s config parameter or `.withModule(x, { config })`.
+  process spreads it into its own definition; the module receives the parsed value
+  through its setup's `config` member, from the slice keyed by module name in
+  `createApp`'s `config` record.
 - Definitions live in `apps/api/src/platform/config/api.config.ts`,
   `apps/worker/src/platform/config/worker.config.ts` and
   `apps/tasks/src/platform/config/tasks.config.ts`. Shared infrastructure shapes have
@@ -70,105 +71,94 @@ peers, a module reading a member, and the whole api - are in
 section is what the pieces are.
 
 
-**This section describes the transitional shape still in use today.**
-[ADR-144](../../../../dev/docs/adr/144-declarative-process-composition.md) and its
-plan, [composition v2](../../../../dev/docs/plans/composition-v2.md), are the design
-that supersedes it: a module declares everything it contributes on its own
-`<m>.server.ts` (`defineServerModule("<m>").withRepositories(...).withApp(...)
-.withTransports(...)`, its App naming any process member it reads with
-`static readonly reads = reads(...)`), and a process boots the generated module
-list directly - `createApp({ role, config }).withModules(serverModules).boot()`
-- with no per-module composition file at all. Read the ADR for that shape; what
-follows is what every module still goes through to reach `apps/api` today,
-`annotation` and `api-key` included; **only their own `<m>.server.ts`
-declarations have converted, not how the process installs them.**
-
-A process does not construct services by hand. Each module is installed into
-the running process's graph through a per-module composition function,
-`installApi<F>`, that supplies the peer APIs the module's App declared in its
-`static dependencies` and hands back its constructed App plus its transports:
+The design is [ADR-144](../../../../dev/docs/adr/144-declarative-process-composition.md)
+(declarative process composition), and it has landed: a module declares everything it
+contributes on its own `<m>.server.ts`
+(`defineServerModule("<m>").withRepositories(...).withApp(...).withTransports(...)`,
+its App naming any process member it reads with `static readonly reads = reads(...)`),
+and a process boots the generated module list directly, with no per-module composition
+file. `installApi<F>`, `.withPersistence`, `.withInfrastructure` and `.withModule`
+(singular) no longer exist; a document or branch still prescribing them is describing
+the deleted shape.
 
 ```ts
-// apps/api/src/features/annotation/annotation.composition.ts (current shape)
-export async function installApiAnnotation(options: {
-  infrastructure: ApiTrpcInfrastructure;
-  peers: AnnotationPeers; // projects, organizations, users, traces, permissions
-}): Promise<ComposedAnnotationFeature> {
-  const runtime = await createApp({ name: "langwatch-api" })
-    .withPersistence("postgres", { prisma: options.infrastructure.prisma })
-    .withProvided(ProjectApi, options.peers.projects)
-    // …one .withProvided(Token, implementation) per peer the module names…
-    .withModule(annotationServer)
-    .boot({ role: "api" });
+// apps/api/src/app/api-production.composition.ts (the shape, abridged)
+const members = createProcessMembers({ config: processConfig, members: options.members });
 
-  const app = runtime.module(annotationServer).provided; // the AnnotationApi
-  return {
-    routers: (mount) => ({ annotation: createAnnotationTrpcRouter(mount), annotationScore: createAnnotationScoreTrpcRouter(mount) }),
-    app,
-    restServices: { annotations: () => app },
-  };
-}
+const runtime = await createApp<ProcessMembers>({
+  role: "api",
+  config: apiModuleConfig(config), // one slice per module name
+  members,
+})
+  .withModules(serverModules)
+  .withTransports((peers: TransportPeers) => ({
+    rest: ApiRestHost.create({ peers, config: restHostConfig }),
+    trpc: ApiTrpcHost.create({ peers, config: trpcHostConfig }),
+  }))
+  .boot();
 ```
 
-- `.withPersistence("postgres", { prisma })` or `"memory", {}` selects every
-  installed module's repository bundle for the whole graph. ADR-144 refuses this:
-  a repository's backend must be chosen per module, per repository, from whether
-  the member it needs is present, never from one process-wide word.
-- `.withProvided(Token, implementation)` supplies a peer this graph does not
-  install itself; `.withModule(installer)` installs a module so its app is
-  provided under its own token.
-- `.boot({ role: "api" | "worker" | "task" })` constructs only that role's
-  contributions. `runtime.module(installer).provided` is the app;
-  `runtime.service(Token)` reads any provided token.
-- **Do not copy this `createApp` call signature into new code without checking
-  it against `@langwatch/runtime-composition/src/application.ts` first.** The
-  package is mid-rewrite for ADR-144 and the two have drifted: confirm which
-  methods `ApplicationBuilder` actually exports before relying on
-  `.withPersistence`, `.withInfrastructure`, `.withProvided` or `.withModule`
-  (singular) existing.
-- The worker boots one graph for several modules (`apps/worker/src/app/worker-observability-apps.composition.ts`:
-  trace, annotation, data-privacy, log and evaluation over one `.withPersistence("postgres", …)`);
-  the API still boots one graph per module. Both call the same installer.
+- `createApp({ role, config, members })` from `@langwatch/runtime-composition` takes
+  the role (`"api" | "worker" | "tasks"`), one config slice per module name and a
+  member source. `createProcess(...)` from `@langwatch/infrastructure` is the
+  real-process wrapper that builds the member record from a `ProcessConfig` first
+  (`createProcessMembers`).
+- `.withModules(serverModules)` installs the generated list
+  (`modules/server-modules.generated.ts`, imported as
+  `@langwatch/installed-modules/server`, written by `pnpm generate:modules` from
+  `modules/catalogue.json`). **Installing a module edits the catalogue, never an
+  app.** Peers resolve each other by `*Api` token; a cycle or a missing peer refuses
+  at boot by name.
+- `.withProvided(Token, implementation)` supplies a peer this graph does not install
+  itself - the seam a test uses to hand in a double without booting the peer's whole
+  module graph.
+- `withMemoryRepositories(<m>Server)` swaps one module's repository registry onto its
+  memory twin. There is no process-wide `"postgres" | "memory"` word: a store's
+  presence is its address (`DATABASE_URL`, `CLICKHOUSE_URL`), and absence refuses at
+  boot rather than downgrading.
+- A member a module `reads(...)` that the process cannot supply is a boot refusal
+  naming both module and member (`MissingMemberError` wrapping
+  `MemberNotConfiguredError`), never a stub that answers 503.
+- `.boot()` constructs exactly the union the installed modules declared, in the fixed
+  `MEMBER_NAMES` order, and returns the runtime; `runtime.service(Token)` reads any
+  provided token.
+- The worker boots one graph per capability
+  (`apps/worker/src/app/worker-observability-apps.composition.ts` installs trace,
+  annotation, data-privacy, log and evaluation through one `.withModules([...])`);
+  both roles install the same module declarations and each role reads only the
+  contributions addressed to it.
 
 ## Mounting transports in apps/api
 
-A module's `transport/*.rest.ts` and `*.trpc.ts` are inert declarations. The process
-binds them to its own credential and context in `apps/api/src/features/<f>/`, exactly
-as it did before ADR-144 - this layer has not converted for any module yet, `annotation`
-and `api-key` included:
+A module's `transport/*.rest.ts` and `*.trpc.ts` are inert declarations. The process's
+transport hosts mount every declaration the installed modules contributed:
+`ApiRestHost` (`apps/api/src/app-rest/api-rest.host.ts`) and `ApiTrpcHost`
+(`apps/api/src/app-trpc/api-trpc.host.ts`), built over `createRestRuntime` and
+`createTrpcRuntime` from `@langwatch/api` and handed their peers by
+`.withTransports((peers) => …)` at boot.
 
-- `<f>.composition.ts`: the `installApi<F>` above. Its return type lives in
-  `<f>.composition.types.ts` (`Composed<F>Feature`: `routers(mount)`, `app`,
-  `restServices`), kept separate so importing the router type pulls in no runtime.
-- `<f>-trpc.mount.ts`: calls `runtime.mount(<f>Trpc, (ctx) => ctx.app.<f>)` where
-  `runtime: TrpcRuntime<HostContext>` from `@langwatch/api/trpc`. Each declaration
-  becomes one namespace, named in `apps/api/src/app-trpc/app-trpc.features.ts`
-  (`annotation: annotationRouters.annotation`), and the composed slot is declared on
-  `ComposedApiFeatures` in `apps/api/src/app-trpc/app-trpc.composed.ts` because the REST
-  family and `ctx.app.<f>` read the same app. The older
-  `createTrpcHandlerBinding`/`createTrpcApiService`/`createTrpcService` chain is deleted;
-  a mount file that still assembles one by hand is conversion debt.
-- `<f>-rest.mount.ts`: builds `createRestRuntime({ identity: { authenticate } })` from
-  `@langwatch/api/rest` and calls `runtime.mount(<f>Rest.router(), { app, credential, onError })`.
-  Historical refusal bodies and 404 shapes are mapped in this file's `onError`, not in
-  the module - and stay there under ADR-144 too: the renderer moves into the module's
-  own transport file (`<f>RestErrors` beside `<f>Rest`) rather than being deleted, because
-  deleting it would silently rewrite a legacy family's wire error shape.
-  `security.createServiceVersionedApp(...)` and `mountProjectTransport(...)`
-  are deleted; a mount file that still names either is conversion debt
-  (`legacy-transport-runtime`).
-- `apps/api/src/app/api-production.composition.ts` calls `installApi<F>` with the peers it
-  holds and registers the returned routers and REST services. Under ADR-144 this file
-  only ever shrinks and is deleted when the last module converts; nothing may add a
-  line to it.
+- There is no per-module mount layer any more: no `installApi<F>`, no
+  `apps/api/src/features/<f>/` composition or mount files, no `api-rest.doors.ts`.
+  The directories still under `apps/api/src/features/` hold process-side adapters and
+  mappings, not module installs. The older `createServiceApp`,
+  `createServiceVersionedApp`, `createTrpcService`, `createProjectVersionedApp` and
+  `mountProjectTransport` builders are deleted; a file still naming one is conversion
+  debt (`legacy-transport-runtime`).
+- A family whose wire error shape predates the house shape keeps its renderer in the
+  module's own transport file, exported beside the declaration
+  (`annotationRestErrors` beside `annotationRest`), so converting a module cannot
+  silently rewrite a legacy family's error bodies.
+- The wire is pinned: `apps/api/src/app-rest/api-rest.addresses.json` is generated
+  from the mounted declarations - every method and path with its credential kind -
+  and a snapshot test compares it with the checked-in file, so a conversion that
+  moves a route or changes a door is a failing diff a reviewer reads in seconds.
 
 ## Absences
 
-Today the API root still answers a missing substrate with `refusing<F>Feature()`: the
-namespace mounts and every call throws `Api<F>UnavailableError` (`service_unavailable`,
-`fault: "platform"`) by name, and a REST family whose service is missing is not mounted
-at all. ADR-133 retires this shape: a required provider missing at boot is a boot failure
-(`MissingProviderError`), not a stub that answers 503. For new work, do not add a
+The older API root answered a missing substrate with `refusing<F>Feature()`: the
+namespace mounted and every call threw `Api<F>UnavailableError` (`service_unavailable`,
+`fault: "platform"`) by name. That shape is retired: a required provider missing at boot
+is a boot failure (`MissingProviderError`), not a stub that answers 503. Do not add a
 `refusing*`, `Unavailable*` or `Logged*Absence`; either the module installs and its
 dependencies are provided, or the process does not install it and says so at boot. An
 optional dependency that production never passes is a wiring bug wearing a type: make it

@@ -114,7 +114,8 @@ export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
   Types come from the contract, never from
   `AppRouter` (ADR-130) and never `any`.
 - The segment names are the tRPC cache key and must equal the namespaces the process
-  mounts (`annotation`, `annotationScore` in `apps/api/src/app-trpc/app-trpc.features.ts`).
+  mounts from the module's own declarations (`annotation`, `annotationScore`; the
+  process side lists them in `apps/api/src/app-trpc/app-trpc.namespaces.ts`).
   A different spelling silently stops sharing a cache with every other call site.
 - Hooks in `behavior/use-<thing>.ts` return state and callbacks, never JSX. Mutation
   errors are read with `readHandledError` and rendered from the code-keyed registry;
