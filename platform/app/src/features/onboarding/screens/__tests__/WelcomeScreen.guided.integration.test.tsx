@@ -265,10 +265,8 @@ describe("WelcomeScreen in the guided variant", () => {
   });
 
   describe("when the tailor step is left", () => {
-    /**
-     * @scenario "Leaving the tailor step creates the organization and the project with the variant recorded"
-     * @scenario "the welcome flow registers the experiment property as soon as the organization is created"
-     */
+    /** @scenario "Leaving the tailor step creates the organization and the project with the variant recorded" */
+    /** @scenario "the welcome flow registers the experiment property as soon as the organization is created" */
     it("creates the organization with the guided variant and hands over to Langy's hello", async () => {
       initializeOrganization.mockImplementation((_input, options) =>
         options.onSuccess?.({

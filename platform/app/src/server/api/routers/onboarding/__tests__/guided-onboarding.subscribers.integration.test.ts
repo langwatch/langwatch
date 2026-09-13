@@ -269,10 +269,8 @@ describe("guided onboarding subscribers reached from procedure writes", () => {
   });
 
   describe("when a scenario is created in the organization's project", () => {
-    /**
-     * @scenario "scenario_created carries the onboarding variant of the organization"
-     * @scenario "scenario_created carries the experiment property"
-     */
+    /** @scenario "scenario_created carries the onboarding variant of the organization" */
+    /** @scenario "scenario_created carries the experiment property" */
     it("captures scenario_created with onboarding_variant guided and the experiment property", async () => {
       await callerFor(owner).scenarios.create({
         projectId,
