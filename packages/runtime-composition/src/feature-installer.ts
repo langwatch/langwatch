@@ -1253,10 +1253,33 @@ class ConfiguredAppBuilder<
     private readonly app: AppDefinition<Dependencies, Members, Config, App>,
   ) {}
 
+  /**
+   * The doors this module declares. Answers a declaration that is already
+   * installable, so there is no half-declared module and no build step to
+   * forget (ADR-144 s1).
+   */
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
-  ): ConfiguredAppWithTransportsBuilder<Name, Dependencies, Members, Config, App, Transports> {
-    return new ConfiguredAppWithTransportsBuilder(this.name, this.app, transports);
+  ): ModuleContributions<
+    ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App>["build"]> & {
+      readonly transports: Transports;
+      readonly namespace: PublicNamespace<Name>;
+    },
+    unknown,
+    App,
+    Dependencies,
+    Members
+  > {
+    return withContributions<
+      ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App>["build"]> & {
+        readonly transports: Transports;
+        readonly namespace: PublicNamespace<Name>;
+      },
+      unknown,
+      App,
+      Dependencies,
+      Members
+    >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
   }
 
   /** Background work this module contributes to the worker role. */
@@ -1321,10 +1344,33 @@ class UnconfiguredAppBuilder<
     private readonly app: AppDefinitionWithoutConfig<Dependencies, Members, App>,
   ) {}
 
+  /**
+   * The doors this module declares. Answers a declaration that is already
+   * installable, so there is no half-declared module and no build step to
+   * forget (ADR-144 s1).
+   */
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
-  ): UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Members, App, Transports> {
-    return new UnconfiguredAppWithTransportsBuilder(this.name, this.app, transports);
+  ): ModuleContributions<
+    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App>["build"]> & {
+      readonly transports: Transports;
+      readonly namespace: PublicNamespace<Name>;
+    },
+    unknown,
+    App,
+    Dependencies,
+    Members
+  > {
+    return withContributions<
+      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App>["build"]> & {
+        readonly transports: Transports;
+        readonly namespace: PublicNamespace<Name>;
+      },
+      unknown,
+      App,
+      Dependencies,
+      Members
+    >({ ...this.build(), transports, namespace: publicNamespace(this.name) }, [], []);
   }
 
   /** Background work this module contributes to the worker role. */
@@ -1378,155 +1424,15 @@ class UnconfiguredAppBuilder<
   }
 }
 
-class ConfiguredAppWithTransportsBuilder<
-  Name extends ModuleName,
-  Dependencies extends TokenMap,
-  Members,
-  Config,
-  App,
-  Transports extends readonly FeatureTransportDescriptor[],
-> {
-  constructor(
-    private readonly name: Name,
-    private readonly app: AppDefinition<Dependencies, Members, Config, App>,
-    private readonly transports: Transports,
-  ) {}
-
-  /**
-   * What this module binds for the facts its own declarations name. Answers a
-   * declaration that is already installable, so there is no half-declared
-   * module and no build step to forget.
-   */
-  withTransportFacts(
-    bind: ModuleTransportFacts<Dependencies, Members, App>,
-  ): ModuleContributions<
-    ReturnType<ConfiguredAppWithTransportsBuilder<Name, Dependencies, Members, Config, App, Transports>["build"]>,
-    unknown,
-    App,
-    Dependencies,
-    Members
-  > {
-    return withContributions<
-      ReturnType<ConfiguredAppWithTransportsBuilder<Name, Dependencies, Members, Config, App, Transports>["build"]>,
-      unknown,
-      App,
-      Dependencies,
-      Members
-    >(bindingTransportFacts(this.build(), bind as ModuleTransportFacts<TokenMap, never, never>), [], []);
-  }
-
-  /** Background work this module contributes to the worker role. */
-  withWorkers(...workers: readonly unknown[]) {
-    return withContributions(this.build(), workers, []);
-  }
-
-  /** One-shot work this module contributes to the tasks role. */
-  withTasks(...tasks: readonly unknown[]) {
-    return withContributions(this.build(), [], tasks);
-  }
-
-  /** This module's event sourcing, built over the app above. */
-  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
-    return withContributions(this.build(), [], [], eventing as FeatureEventing);
-  }
-
-  build(): ServerFeatureDeclaration<
-    Config,
-    Members,
-    Dependencies,
-    Record<never, never>,
-    App,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    Name
-  > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
-    const declaration = new ConfiguredAppBuilder(this.name, this.app).build();
-    return {
-      ...declaration,
-      transports: this.transports,
-      namespace: publicNamespace(this.name),
-    };
-  }
-}
-
-class UnconfiguredAppWithTransportsBuilder<
-  Name extends ModuleName,
-  Dependencies extends TokenMap,
-  Members,
-  App,
-  Transports extends readonly FeatureTransportDescriptor[],
-> {
-  constructor(
-    private readonly name: Name,
-    private readonly app: AppDefinitionWithoutConfig<Dependencies, Members, App>,
-    private readonly transports: Transports,
-  ) {}
-
-  /**
-   * What this module binds for the facts its own declarations name. Answers a
-   * declaration that is already installable, so there is no half-declared
-   * module and no build step to forget.
-   */
-  withTransportFacts(
-    bind: ModuleTransportFacts<Dependencies, Members, App>,
-  ): ModuleContributions<
-    ReturnType<UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Members, App, Transports>["build"]>,
-    unknown,
-    App,
-    Dependencies,
-    Members
-  > {
-    return withContributions<
-      ReturnType<UnconfiguredAppWithTransportsBuilder<Name, Dependencies, Members, App, Transports>["build"]>,
-      unknown,
-      App,
-      Dependencies,
-      Members
-    >(bindingTransportFacts(this.build(), bind as ModuleTransportFacts<TokenMap, never, never>), [], []);
-  }
-
-  /** Background work this module contributes to the worker role. */
-  withWorkers(...workers: readonly unknown[]) {
-    return withContributions(this.build(), workers, []);
-  }
-
-  /** One-shot work this module contributes to the tasks role. */
-  withTasks(...tasks: readonly unknown[]) {
-    return withContributions(this.build(), [], tasks);
-  }
-
-  /** This module's event sourcing, built over the app above. */
-  withEventing<Definition>(eventing: FeatureEventing<undefined, App, unknown, Definition>) {
-    return withContributions(this.build(), [], [], eventing as FeatureEventing);
-  }
-
-  build(): ServerFeatureDeclaration<
-    undefined,
-    Members,
-    Dependencies,
-    Record<never, never>,
-    App,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    Name
-  > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> } {
-    const declaration = new UnconfiguredAppBuilder(this.name, this.app).build();
-    return {
-      ...declaration,
-      transports: this.transports,
-      namespace: publicNamespace(this.name),
-    };
-  }
-}
-
 /**
  * A declaration that is already installable and still accepts the work a role
  * other than the api owns. Every call answers a declaration, so a module can
  * never be left half-declared (ADR-144 s1).
+ *
+ * This is the one termination rule: the moment a module states a contribution
+ * - its doors, its workers, its tasks, its eventing, the facts it binds - it
+ * is installable, and it stays installable through every further call. There
+ * is nothing left to build, which is why `build()` below is the identity.
  */
 export type ModuleContributions<
   Declaration,
@@ -1552,12 +1458,14 @@ export type ModuleContributions<
     withEventing<Definition>(
       eventing: FeatureEventing<Repositories, App, unknown, Definition>,
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
-    build(): Declaration &
-      Readonly<{
-        workers: readonly unknown[];
-        tasks: readonly unknown[];
-        eventing: FeatureEventing | undefined;
-      }>;
+    /**
+     * @deprecated Vestigial. Every `defineServerModule` call already answers
+     * something installable, so this is the identity: it returns the same
+     * declaration it was called on. It survives only so the installers written
+     * before that was true keep compiling, and it will be removed once they
+     * have dropped it.
+     */
+    build(): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
   }>;
 
 /** A built declaration, as the facts wrapper reads the two fields it needs. */
@@ -1610,9 +1518,11 @@ function withContributions<
   tasks: readonly unknown[],
   eventing?: FeatureEventing,
 ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members> {
-  const contributed = { ...declaration, workers, tasks, eventing };
-  return {
-    ...contributed,
+  const contributions = {
+    ...declaration,
+    workers,
+    tasks,
+    eventing,
     withWorkers: (...next: readonly unknown[]) =>
       withContributions(declaration, [...workers, ...next], tasks, eventing),
     withTasks: (...next: readonly unknown[]) =>
@@ -1620,8 +1530,12 @@ function withContributions<
     withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
       withContributions(bindingTransportFacts(declaration, bind), workers, tasks, eventing),
     withEventing: (next: FeatureEventing) => withContributions(declaration, workers, tasks, next),
-    build: () => contributed,
+    // The one termination rule: there is nothing left to build, so `.build()`
+    // hands back what it was called on. See the deprecation on the type.
+    build: () => contributions,
   } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+
+  return contributions;
 }
 
 function parseFeatureConfig<Config>(
