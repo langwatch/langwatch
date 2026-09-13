@@ -14,15 +14,15 @@
  * has no agents" and "the credential was refused" are different facts.
  */
 
-import type { ListingRefusal, ProviderListing } from "./providerListing";
-import { itemsListed, listingRefused } from "./providerListing";
+import type { ListingRefusal, ProviderListing } from "./providerListing.ts";
+import { itemsListed, listingRefused } from "./providerListing.ts";
 
 export {
   type ListingRefusal as AgentListingRefusal,
   type ListingRefusalReason as AgentListingRefusalReason,
   refusalFromStatus,
   refusalFromThrown,
-} from "./providerListing";
+} from "./providerListing.ts";
 
 /** One agent a provider listed, in the shape `DiscoveredAgent` stores. */
 export interface DiscoveredAgentRecord {

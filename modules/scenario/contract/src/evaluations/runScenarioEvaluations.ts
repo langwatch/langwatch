@@ -26,17 +26,17 @@ import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
 import { evaluatorInputSpecsOf } from "~/server/suites/suite-evaluators";
 import type { Span, Trace } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import type { EvaluatorAttachment } from "../evaluator-attachments";
+import type { EvaluatorAttachment } from "../evaluator-attachments.ts";
 import {
   type RunEvaluatorDefinition,
   type RunEvaluators,
   runEvaluatorDefinitionOf,
-} from "../scenario-run-evaluators";
-import type { ScenarioEvaluationResult } from "../schemas/event-schemas";
+} from "../scenario-run-evaluators.ts";
+import type { ScenarioEvaluationResult } from "../schemas/event-schemas.ts";
 import {
   parseScenarioFieldValues,
   type ScenarioFieldValues,
-} from "../suite-fields";
+} from "../suite-fields.ts";
 import {
   attachmentsReadTrace,
   type ConversationMessage,
@@ -45,8 +45,8 @@ import {
   resolveAttachmentInputs,
   type ScenarioInputs,
   storedInputsOf,
-} from "./resolveScenarioMappings";
-import type { ScenarioEvaluationsJobPayload } from "./types";
+} from "./resolveScenarioMappings.ts";
+import type { ScenarioEvaluationsJobPayload } from "./types.ts";
 
 const logger = createLogger("langwatch:scenarios:evaluations");
 

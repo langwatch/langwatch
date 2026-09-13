@@ -22,8 +22,8 @@ import {
 import type {
   GovernanceCostRollupClickHouseRepository,
   GovernanceCostRollupRow,
-} from "./governanceCostRollup.clickhouse.repository";
-import { computeCostRollupLagMs } from "./logic/costRollupLag";
+} from "./governanceCostRollup.clickhouse.repository.ts";
+import { computeCostRollupLagMs } from "./logic/costRollupLag.ts";
 
 const logger = createLogger("langwatch:governance:cost-rollup:comparator");
 

@@ -27,8 +27,8 @@ import { createLogger } from "@langwatch/observability";
 
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { CallRecord, CallTurn } from "./call-record";
-import { HUMAN_CALLER_KIND } from "./voice-run-writer";
+import type { CallRecord, CallTurn } from "./call-record.ts";
+import { HUMAN_CALLER_KIND } from "./voice-run-writer.ts";
 
 const logger = createLogger("langwatch:voice:call-trace-writer");
 

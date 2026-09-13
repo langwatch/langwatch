@@ -7,9 +7,9 @@
 
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
-import type { CallRecord } from "./call-record";
-import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport";
-import { phoneTransport } from "./transports/phone.transport";
+import type { CallRecord } from "./call-record.ts";
+import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport.ts";
+import { phoneTransport } from "./transports/phone.transport.ts";
 
 /**
  * The provider credential a runner reads a conversation back with, or dials a

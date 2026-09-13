@@ -68,12 +68,12 @@ import {
   type LangWatchQLTable,
   lwqlGrantStatement,
   lwqlRowPolicyStatement,
-} from "./accessModel";
+} from "./accessModel.ts";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
-} from "./postgresMapping";
+} from "./postgresMapping.ts";
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its

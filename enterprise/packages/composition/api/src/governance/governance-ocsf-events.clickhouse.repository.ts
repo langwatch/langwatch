@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
-import { GovernanceOcsfEventsReader } from "@langwatch/enterprise-governance-server";
+import { type GovernanceOcsfEventsReader } from "@langwatch/enterprise-governance-server";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE

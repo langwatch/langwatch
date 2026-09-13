@@ -31,7 +31,7 @@ import {
   isWorthScoring,
   nameSimilarity,
   SUGGESTION_THRESHOLD,
-} from "./logic/nameSimilarity";
+} from "./logic/nameSimilarity.ts";
 
 const logger = createLogger("langwatch:governance:identity-suggestions");
 

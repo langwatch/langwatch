@@ -35,12 +35,12 @@ import {
   ErasureSecretMissingError,
   erasureDigest,
   readErasureSecret,
-} from "./logic/erasureDigest";
+} from "./logic/erasureDigest.ts";
 import {
   installSuppressionSnapshot,
   type SuppressionSnapshotData,
   type SuppressionSnapshotLoader,
-} from "./logic/suppressionSnapshot";
+} from "./logic/suppressionSnapshot.ts";
 
 const logger = createLogger("langwatch:governance:erasure-suppression");
 

@@ -19,14 +19,14 @@ import {
   browserTranscriptToCallRecord,
   type CallRecord,
   scenarioRunIdForConversation,
-} from "./call-record";
-import type { VoiceSessionTokenPayload } from "./voice-session-token";
+} from "./call-record.ts";
+import type { VoiceSessionTokenPayload } from "./voice-session-token.ts";
 import {
   type ElevenLabsCredential,
   type VoiceTransportCredential,
   type VoiceTransportRunner,
   voiceTransportRegistry,
-} from "./voice-transport.registry";
+} from "./voice-transport.registry.ts";
 
 /** The project has no key for this transport, so no session can be minted. */
 export class VoiceKeyMissingError extends HandledError {

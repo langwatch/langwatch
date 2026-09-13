@@ -4,7 +4,7 @@ import type {
   PipelineMetadata,
   RegisteredCommand,
   StaticPipelineDefinition,
-} from "..";
+} from "../index.ts";
 import type { CommandHandler } from "../commands/command.ts";
 import type {
   CommandHandlerClass,

@@ -10,9 +10,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "./constants";
-import { TraceDataPendingError } from "./runScenarioEvaluations";
-import type { ScenarioEvaluationsJobPayload } from "./types";
+import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "./constants.ts";
+import { TraceDataPendingError } from "./runScenarioEvaluations.ts";
+import type { ScenarioEvaluationsJobPayload } from "./types.ts";
 
 const logger = createLogger("langwatch:scenarios:evaluations:job");
 

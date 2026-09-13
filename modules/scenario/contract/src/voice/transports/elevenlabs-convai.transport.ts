@@ -10,12 +10,12 @@
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { CallRecord, CallTurn } from "../call-record";
-import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits";
+import type { CallRecord, CallTurn } from "../call-record.ts";
+import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
-} from "../voice-transport.registry";
+} from "../voice-transport.registry.ts";
 
 const logger = createLogger("langwatch:scenarios:voice:elevenlabs");
 

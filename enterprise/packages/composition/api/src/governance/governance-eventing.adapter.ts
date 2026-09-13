@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceEventing,
-  GovernanceDiagnostics,
+  type GovernanceEventingChannel,
+  type GovernanceDiagnosticsSink,
   IngestionPullEventingAdapter,
-  IngestionPullLifecycleCommand,
+  type IngestionPullLifecycleChannel,
   IngestionPullLifecycleService,
-  IngestionPullMetrics,
-  IngestionPullOutcome,
+  type IngestionPullMetricsSink,
+  type IngestionPullOutcomeChannel,
   IngestionPullProcess,
-  IngestionPullRunner,
-  IngestionPullSchedule,
+  type IngestionPullRunner,
+  type IngestionPullScheduler,
   IngestionPullService,
-  IngestionPullTenant,
+  type IngestionPullTenantResolver,
   PrismaIngestionPullLifecycleRepository,
   PrismaIngestionPullRunProjectionRepository,
-  PulledUsageDispatcher,
+  type PulledUsageDispatcher,
   PulledUsageEventingAdapter,
-  PulledUsageLedger,
+  type PulledUsageLedgerRepository,
   PulledUsageLedgerProcess,
   type IngestionPullLifecycleDatabase,
   type IngestionPullRunProjectionDatabase,
@@ -228,10 +228,8 @@ export class AppGovernanceEventingRuntime {
   }
 }
 
-class AppPulledUsageLedger extends PulledUsageLedger {
-  private constructor(private readonly repository: GovernancePulledUsageLedger) {
-    super();
-  }
+class AppPulledUsageLedger implements PulledUsageLedgerRepository {
+  private constructor(private readonly repository: GovernancePulledUsageLedger) {}
 
   static create(repository: GovernancePulledUsageLedger): AppPulledUsageLedger {
     return new AppPulledUsageLedger(repository);
@@ -273,10 +271,8 @@ class AppIngestionPullRun implements IngestionPullRunner {
   }
 }
 
-class AppIngestionPullOutcome extends IngestionPullOutcome {
-  private constructor(private readonly pipeline: AppIngestionPullPipeline) {
-    super();
-  }
+class AppIngestionPullOutcome implements IngestionPullOutcomeChannel {
+  private constructor(private readonly pipeline: AppIngestionPullPipeline) {}
 
   static create(pipeline: AppIngestionPullPipeline): AppIngestionPullOutcome {
     return new AppIngestionPullOutcome(pipeline);
@@ -291,10 +287,8 @@ class AppIngestionPullOutcome extends IngestionPullOutcome {
   }
 }
 
-class AppIngestionPullMetrics extends IngestionPullMetrics {
-  private constructor(private readonly metrics: GovernanceIngestionPullMetrics) {
-    super();
-  }
+class AppIngestionPullMetrics implements IngestionPullMetricsSink {
+  private constructor(private readonly metrics: GovernanceIngestionPullMetrics) {}
 
   static create(metrics: GovernanceIngestionPullMetrics): AppIngestionPullMetrics {
     return new AppIngestionPullMetrics(metrics);
@@ -309,10 +303,8 @@ class AppIngestionPullMetrics extends IngestionPullMetrics {
   }
 }
 
-class UtcIngestionPullSchedule extends IngestionPullSchedule {
-  private constructor(private readonly schedule: GovernanceIngestionPullSchedule) {
-    super();
-  }
+class UtcIngestionPullSchedule implements IngestionPullScheduler {
+  private constructor(private readonly schedule: GovernanceIngestionPullSchedule) {}
 
   static create(schedule: GovernanceIngestionPullSchedule): UtcIngestionPullSchedule {
     return new UtcIngestionPullSchedule(schedule);
@@ -323,10 +315,8 @@ class UtcIngestionPullSchedule extends IngestionPullSchedule {
   }
 }
 
-class AppIngestionPullTenant extends IngestionPullTenant {
-  private constructor(private readonly projects: GovernanceInternalProject) {
-    super();
-  }
+class AppIngestionPullTenant implements IngestionPullTenantResolver {
+  private constructor(private readonly projects: GovernanceInternalProject) {}
 
   static create(projects: GovernanceInternalProject): AppIngestionPullTenant {
     return new AppIngestionPullTenant(projects);
@@ -342,10 +332,8 @@ class AppIngestionPullTenant extends IngestionPullTenant {
   }
 }
 
-class AppIngestionPullLifecycleCommand extends IngestionPullLifecycleCommand {
-  private constructor(private readonly pipeline: AppIngestionPullPipeline) {
-    super();
-  }
+class AppIngestionPullLifecycleCommand implements IngestionPullLifecycleChannel {
+  private constructor(private readonly pipeline: AppIngestionPullPipeline) {}
 
   static create(pipeline: AppIngestionPullPipeline): AppIngestionPullLifecycleCommand {
     return new AppIngestionPullLifecycleCommand(pipeline);
@@ -360,19 +348,17 @@ class AppIngestionPullLifecycleCommand extends IngestionPullLifecycleCommand {
   }
 }
 
-class AppIngestionPullDiagnostics extends GovernanceDiagnostics {
+class AppIngestionPullDiagnostics implements GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-class AppPipelineGovernanceEventing extends GovernanceEventing {
+class AppPipelineGovernanceEventing implements GovernanceEventingChannel {
   private constructor(
     private readonly ingestionPull: AppIngestionPullPipeline,
     private readonly pulledUsage: AppPulledUsagePipeline,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(
     ingestionPull: AppIngestionPullPipeline,
@@ -461,7 +447,7 @@ export class AppGovernanceEventingAdapter {
     return AppPulledUsagePipeline.create(async () => undefined);
   }
 
-  static noopGovernancePort(): GovernanceEventing {
+  static noopGovernancePort(): GovernanceEventingChannel {
     return AppPipelineGovernanceEventing.create(
       this.noopIngestionPullPipeline(),
       this.noopPulledUsagePipeline(),
@@ -471,7 +457,7 @@ export class AppGovernanceEventingAdapter {
   static governancePort(
     ingestionPull: AppIngestionPullPipeline,
     pulledUsage: AppPulledUsagePipeline,
-  ): GovernanceEventing {
+  ): GovernanceEventingChannel {
     return AppPipelineGovernanceEventing.create(ingestionPull, pulledUsage);
   }
 

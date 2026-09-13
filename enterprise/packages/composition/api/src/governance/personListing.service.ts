@@ -41,8 +41,8 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import {
   loadErasureSuppression,
   partitionSuppressedEvents,
-} from "./erasureSuppression.service";
-import { PersonDiscoveryService } from "./personDiscovery.service";
+} from "./erasureSuppression.service.ts";
+import { PersonDiscoveryService } from "./personDiscovery.service.ts";
 import { listAnthropicPeople, listOpenAiPeople } from "../../../../../modules/governance/server/src/services/adminApiUsers.ts";
 import {
   type CopilotStudioDataverseConfig,

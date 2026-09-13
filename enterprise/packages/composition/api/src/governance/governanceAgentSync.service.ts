@@ -28,14 +28,14 @@ import { nanoid } from "nanoid";
 import type { IngestionSource, PrismaClient } from "~/generated/prisma/client";
 
 import { IngestionSourceService } from "./ingestion-source.adapter.ts";
-import { AgentListingUnavailableError } from "./governanceAgentSync.errors";
-import { resolveGovProjectId } from "./govProject";
+import { AgentListingUnavailableError } from "./governanceAgentSync.errors.ts";
+import { resolveGovProjectId } from "./govProject.ts";
 import {
   type AgentListingRequestCommand,
   agentListingRequests,
   listableAgentSources,
-} from "./logic/agentListingRequest";
-import { schedulerWillPull } from "./logic/schedulerWillPull";
+} from "./logic/agentListingRequest.ts";
+import { schedulerWillPull } from "./logic/schedulerWillPull.ts";
 import {
   type AgentsListingOutcome,
   type AgentsListingSummary,

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { evaluatorAttachmentsSchema } from "../evaluator-attachments";
-import { runEvaluatorDefinitionSchema } from "../scenario-run-evaluators";
-import { scenarioFieldValuesSchema } from "../suite-fields";
+import { evaluatorAttachmentsSchema } from "../evaluator-attachments.ts";
+import { runEvaluatorDefinitionSchema } from "../scenario-run-evaluators.ts";
+import { scenarioFieldValuesSchema } from "../suite-fields.ts";
 
 /** What one evaluation job carries: enough to load everything else. */
 export const scenarioEvaluationsJobPayloadSchema = z.object({

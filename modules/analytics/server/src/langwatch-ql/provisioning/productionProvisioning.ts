@@ -27,19 +27,19 @@ import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../__tests__/lwql-views.integration.test.ts";
 import type { LangWatchQLViewDefinition } from "../../../../web/src/model/filters/types.ts";
 import { isPostgresResident } from "../../../../web/src/model/filters/types.ts";
-import type { LangWatchQLConnection } from "../connection";
+import type { LangWatchQLConnection } from "../connection.ts";
 import { postgresLiteral, postgresQuoted } from "../../rules/langwatch-ql-sql-literal.rules.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   qualified,
-} from "./accessModel";
+} from "./accessModel.ts";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
-} from "./catalogStatements";
+} from "./catalogStatements.ts";
 
 /**
  * Literal, hard-coded match for the table name the SaaS row-filter subqueries

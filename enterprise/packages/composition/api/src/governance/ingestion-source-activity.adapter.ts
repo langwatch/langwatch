@@ -16,8 +16,8 @@ import type {
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  GovernanceClickHouseClient,
-  GovernanceClickHouseResolver,
+  type GovernanceClickHouseClient,
+  type GovernanceClickHouseResolver,
 } from "@langwatch/enterprise-governance-server";
 
 type GovernanceClickHouseQuery = {

@@ -33,7 +33,7 @@
 
 import { INGESTION_PULL_LISTING_OUTCOME } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
 import type { IngestionPullRunProjection } from "~/generated/prisma/client";
-import type { ListingRefusalReason } from "./providerListing";
+import type { ListingRefusalReason } from "./providerListing.ts";
 
 /**
  * What a person has to DO about a refusal, which is the only reason a screen

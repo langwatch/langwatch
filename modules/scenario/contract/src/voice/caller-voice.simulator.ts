@@ -13,7 +13,7 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import {
   type CallerVoiceConfig,
   DEFAULT_CALLER_VOICE_MODEL,
-} from "./caller-voice.config";
+} from "./caller-voice.config.ts";
 
 type AudioEffect = (audio: Uint8Array) => Uint8Array;
 

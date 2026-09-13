@@ -30,7 +30,7 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
-import { nextSeatsCursor, seatsReadIsDue } from "./microsoftGraphSeats";
+import { nextSeatsCursor, seatsReadIsDue } from "./microsoftGraphSeats.ts";
 
 /** The verb these events carry, so a reader can tell them from a conversation. */
 export const DIRECTORY_REPORT_ACTION = "directory_report" as const;

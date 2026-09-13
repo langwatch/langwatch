@@ -1,10 +1,10 @@
 import {
   GovernanceBudgetOverview,
-  GovernanceClickHouseResolver,
-  GovernanceEventing,
-  GovernanceSetupActivity,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycle,
+  type GovernanceClickHouseResolver,
+  type GovernanceEventingChannel,
+  type GovernanceSetupActivityReader,
+  type IngestionSourceEntitlements,
+  type IngestionSourceLifecycleChannel,
   PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
 } from "@langwatch/enterprise-governance-server";
@@ -44,10 +44,10 @@ type GovernanceRuntimeOptions = {
   budgetOverview: GovernanceBudgetOverview;
   providers: GovernanceModelProviderCatalog;
   contacts: GovernanceOrganizationContact;
-  eventing: GovernanceEventing;
+  eventing: GovernanceEventingChannel;
   activityClickhouse: GovernanceClickHouseResolver;
   ingestionSourceEntitlements: IngestionSourceEntitlements;
-  ingestionSourceLifecycle: IngestionSourceLifecycle;
+  ingestionSourceLifecycle: IngestionSourceLifecycleChannel;
   ingestionEncryption: GovernanceInstallationOptions["ingestionEncryption"];
   ingestionSecretPepper: string;
   ingestionDiagnostics: GovernanceInstallationOptions["ingestionDiagnostics"];
@@ -60,10 +60,8 @@ type GovernanceRuntimeOptions = {
   };
 };
 
-class AppGovernanceSetupActivity extends GovernanceSetupActivity {
-  private constructor(private readonly activity: AppGovernanceTraceActivityAdapter) {
-    super();
-  }
+class AppGovernanceSetupActivity implements GovernanceSetupActivityReader {
+  private constructor(private readonly activity: AppGovernanceTraceActivityAdapter) {}
 
   static create(activity: AppGovernanceTraceActivityAdapter): AppGovernanceSetupActivity {
     return new AppGovernanceSetupActivity(activity);

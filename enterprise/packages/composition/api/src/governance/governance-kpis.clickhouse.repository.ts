@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import {
-  AnomalySpendReader,
+  type AnomalySpendReader,
   type AnomalySpendSourceFilter,
 } from "@langwatch/enterprise-governance-server";
 /**

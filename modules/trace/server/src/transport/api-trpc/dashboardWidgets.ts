@@ -33,7 +33,7 @@ import {
 } from "~/server/analytics/dashboardWidgetDefinition";
 
 import { createTRPCRouter, protectedProcedure } from "../../../../../../apps/ui/e2e/langy/trpc.ts";
-import { enforceCustomChartPlaygroundEnabled } from "./dashboardWidgetAccessMiddleware";
+import { enforceCustomChartPlaygroundEnabled } from "./dashboardWidgetAccessMiddleware.ts";
 
 // A card's column and span pass their own bounds and still overflow the grid
 // together; refused here rather than clipped by the grid that reads it.

@@ -34,7 +34,7 @@ import {
   postgresLiteral,
   postgresQuoted,
 } from "../../rules/langwatch-ql-sql-literal.rules.ts";
-import { assertNames, type LangWatchQLNames, qualified } from "./accessModel";
+import { assertNames, type LangWatchQLNames, qualified } from "./accessModel.ts";
 
 /** Connection details of the named collection ClickHouse dials PostgreSQL with. */
 export interface PostgresNamedCollection {

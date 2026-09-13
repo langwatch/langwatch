@@ -58,7 +58,7 @@ import {
 import {
   azureBillingNoteFrom,
   type GovernanceAzureBillingNote,
-} from "./azureBillingNote";
+} from "./azureBillingNote.ts";
 import { readStoredCostCursor } from "./pullers/copilotStudioDataverse.puller";
 
 const logger = createLogger("langwatch:governance:cost");

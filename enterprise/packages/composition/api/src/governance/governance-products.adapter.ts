@@ -4,8 +4,8 @@ import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contra
 import {
   AiToolProviderCatalog,
   AiToolSlug,
-  CliAdminContact,
-  PersonalVirtualKeyIssuer,
+  type CliAdminContactReader,
+  type PersonalVirtualKeyIssuer,
 } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
 import type { Instant } from "@langwatch/time";
@@ -123,10 +123,8 @@ export class AppAiToolProviderCatalog extends AiToolProviderCatalog {
   }
 }
 
-export class AppCliAdminContact extends CliAdminContact {
-  private constructor(private readonly contacts: GovernanceOrganizationContact) {
-    super();
-  }
+export class AppCliAdminContact implements CliAdminContactReader {
+  private constructor(private readonly contacts: GovernanceOrganizationContact) {}
 
   static create(contacts: GovernanceOrganizationContact): AppCliAdminContact {
     return new AppCliAdminContact(contacts);

@@ -46,6 +46,7 @@ export { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model
 export { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
 export { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";
 export {
+  CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
   type CodexDeviceCode,
   type CodexPollResult,

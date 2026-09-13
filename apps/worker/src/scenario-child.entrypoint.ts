@@ -14,7 +14,7 @@ import {
   formatScenarioChildError,
   NlpFetchAdapter,
   SCENARIO_EGRESS_POLICY_ENV,
-  ScenarioHttpPort,
+  type ScenarioHttp,
   type ScenarioHttpResponse,
 } from "@langwatch/scenario-server";
 
@@ -25,7 +25,7 @@ const logger = createChildProcessLogger("langwatch:scenarios:child", process.env
  * dialled from inside the cluster, so it goes through the same metadata-and-redirect fence every
  * other outbound request in the product does rather than through native `fetch`.
  */
-class WorkerScenarioChildHttp extends ScenarioHttpPort {
+class WorkerScenarioChildHttp implements ScenarioHttp {
   private readonly validate = createSsrfUrlValidator(
     decodeScenarioEgressPolicy(process.env[SCENARIO_EGRESS_POLICY_ENV]),
   );

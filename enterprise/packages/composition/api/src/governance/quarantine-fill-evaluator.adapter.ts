@@ -3,9 +3,9 @@
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import {
-  GovernanceDiagnostics,
-  QuarantineTenant,
-  QuarantineTraceActivity,
+  type GovernanceDiagnosticsSink,
+  type QuarantineTenantResolver,
+  type QuarantineTraceActivityReader,
 } from "@langwatch/enterprise-governance-server";
 import type { AppGovernanceTraceActivityAdapter } from "./governance-trace-activity.clickhouse.repository.ts";
 
@@ -16,10 +16,8 @@ type QuarantineSpanCountsQuery = {
   sinceMs: number;
 };
 
-export class AppQuarantineTenant extends QuarantineTenant {
-  private constructor(private readonly projects: ProjectApi) {
-    super();
-  }
+export class AppQuarantineTenant implements QuarantineTenantResolver {
+  private constructor(private readonly projects: ProjectApi) {}
 
   static create(projects: ProjectApi): AppQuarantineTenant {
     return new AppQuarantineTenant(projects);
@@ -35,10 +33,8 @@ export class AppQuarantineTenant extends QuarantineTenant {
   }
 }
 
-export class AppQuarantineTraceActivity extends QuarantineTraceActivity {
-  private constructor(private readonly repository: AppGovernanceTraceActivityAdapter) {
-    super();
-  }
+export class AppQuarantineTraceActivity implements QuarantineTraceActivityReader {
+  private constructor(private readonly repository: AppGovernanceTraceActivityAdapter) {}
 
   static create(repository: AppGovernanceTraceActivityAdapter): AppQuarantineTraceActivity {
     return new AppQuarantineTraceActivity(repository);
@@ -49,7 +45,7 @@ export class AppQuarantineTraceActivity extends QuarantineTraceActivity {
   }
 }
 
-export class AppQuarantineDiagnostics extends GovernanceDiagnostics {
+export class AppQuarantineDiagnostics implements GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }

@@ -26,7 +26,7 @@ import {
   type DiscoveredAgentRecord,
   refusalFromStatus,
   refusalFromThrown,
-} from "./agentListing";
+} from "./agentListing.ts";
 
 export const GENIE_SPACES_PATH = "/api/2.0/genie/spaces";
 

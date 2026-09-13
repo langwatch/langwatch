@@ -41,9 +41,9 @@ import { z } from "zod";
 
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
 import { GenieHttpError, genieGet } from "./genieSpaces.ts";
-import type { DiscoveredPersonRecord, PeopleListing } from "./peopleListing";
-import { peopleListed, peopleRefused } from "./peopleListing";
-import { refusalFromStatus, refusalFromThrown } from "./providerListing";
+import type { DiscoveredPersonRecord, PeopleListing } from "./peopleListing.ts";
+import { peopleListed, peopleRefused } from "./peopleListing.ts";
+import { refusalFromStatus, refusalFromThrown } from "./providerListing.ts";
 
 export const DATABRICKS_SCIM_USERS_PATH = "/api/2.0/preview/scim/v2/Users";
 

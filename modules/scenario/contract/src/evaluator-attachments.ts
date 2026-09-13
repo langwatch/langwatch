@@ -24,7 +24,7 @@
 
 import { z } from "zod";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
-import type { SuiteFieldDefinition } from "./suite-fields";
+import type { SuiteFieldDefinition } from "./suite-fields.ts";
 
 /**
  * What the variable mapping picker offers, declared here rather than imported

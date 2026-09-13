@@ -31,11 +31,11 @@ import {
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { recordVoiceCallTraces } from "./voice-call-trace-writer";
-import { writeVoiceCallRun } from "./voice-run-writer";
-import type { VoiceSessionInfrastructure } from "./voice-session.service";
-import { signVoiceSessionToken } from "./voice-session-token";
-import type { VoiceTransportCredential } from "./voice-transport.registry";
+import { recordVoiceCallTraces } from "./voice-call-trace-writer.ts";
+import { writeVoiceCallRun } from "./voice-run-writer.ts";
+import type { VoiceSessionInfrastructure } from "./voice-session.service.ts";
+import { signVoiceSessionToken } from "./voice-session-token.ts";
+import type { VoiceTransportCredential } from "./voice-transport.registry.ts";
 
 /**
  * The narrow slice of `AgentService`/`ScenarioService` the infrastructure

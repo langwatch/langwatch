@@ -2,7 +2,7 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { readClaimedSubscription } from "./azureBillOwnership";
+import { readClaimedSubscription } from "./azureBillOwnership.ts";
 
 const SOURCE_FIELD = "_azureBillSourceId";
 const SUBSCRIPTION_FIELD = "_azureBillSubscriptionId";

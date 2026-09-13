@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceEncryptor } from "@langwatch/enterprise-governance-server";
+import type { GovernanceEncryptor } from "@langwatch/enterprise-governance-server";
 
 /** Encryption remains process members supplied by the API installer. */
 export type GovernanceEncryption = {

@@ -6,7 +6,7 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
-import { LangyTitleModel } from "@langwatch/langy-server";
+import { type LangyTitleModelResolver } from "@langwatch/langy-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
 /**
@@ -37,7 +37,7 @@ export type WorkerLangyTitleModelOptions = Readonly<{
  */
 export function tryCreateWorkerLangyTitleModel(
   options: WorkerLangyTitleModelOptions,
-): LangyTitleModel | undefined {
+): LangyTitleModelResolver | undefined {
   const { modelProviders, projects, nlpServiceUrl } = options;
   if (!modelProviders || !projects || !nlpServiceUrl) return undefined;
   return WorkerLangyTitleModelAdapter.create({
@@ -51,7 +51,7 @@ export function tryCreateWorkerLangyTitleModel(
 }
 
 /** The cascade, then the named fallback, over one gateway instance. */
-class WorkerLangyTitleModelAdapter extends LangyTitleModel {
+class WorkerLangyTitleModelAdapter implements LangyTitleModelResolver {
   static create(options: {
     modelProviders: ModelProviderApi;
     projects: WorkerLangyTitleProjectDirectory;
@@ -66,9 +66,7 @@ class WorkerLangyTitleModelAdapter extends LangyTitleModel {
       projects: WorkerLangyTitleProjectDirectory;
       executionProxyBaseUrl: string;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   async resolveTitleModel(input: {
     projectId: string;

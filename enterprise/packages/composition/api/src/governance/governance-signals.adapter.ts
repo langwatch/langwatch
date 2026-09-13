@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceDiagnostics,
-  GovernanceSignal,
+  type GovernanceDiagnosticsSink,
+  type GovernanceSignalChannel,
   GovernanceSignalService,
   type GatewayBudgetCrossingCandidate,
   type GovernanceBudgetCrossingData,
@@ -34,7 +34,7 @@ export abstract class GovernanceSignalDelivery {
   abstract appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void>;
 }
 
-class AppGovernanceSignalDiagnostics extends GovernanceDiagnostics {
+class AppGovernanceSignalDiagnostics implements GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
@@ -60,13 +60,11 @@ class DisabledGovernanceSignalDelivery extends GovernanceSignalDelivery {
   async appendBudgetCrossing(): Promise<void> {}
 }
 
-class AppGovernanceSignal extends GovernanceSignal {
+class AppGovernanceSignal implements GovernanceSignalChannel {
   private constructor(
     private readonly storage: GovernanceSignalStorage,
     private readonly delivery: GovernanceSignalDelivery,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(
     storage: GovernanceSignalStorage,

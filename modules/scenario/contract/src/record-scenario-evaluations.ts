@@ -1,5 +1,5 @@
 import { getApp } from "~/server/app-layer/app";
-import type { ScenarioEvaluationResult } from "./schemas/event-schemas";
+import type { ScenarioEvaluationResult } from "./schemas/event-schemas.ts";
 
 /**
  * Records the evaluator results of a finished scenario run.

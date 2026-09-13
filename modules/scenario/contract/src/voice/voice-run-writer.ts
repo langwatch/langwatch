@@ -22,7 +22,7 @@ import { AgentRepository } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import type { SimulationMessage } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/shared";
-import type { CallRecord } from "./call-record";
+import type { CallRecord } from "./call-record.ts";
 
 /** How the run records who spoke as the caller: a person, not a simulator. */
 export const HUMAN_CALLER_KIND = "human";

@@ -1,10 +1,10 @@
 import { featureFlagService } from "@langwatch/feature-flag-contract";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
-import { VOICE_AGENTS_FLAG_KEY } from "./voiceAgents.message";
+import { VOICE_AGENTS_FLAG_KEY } from "./voiceAgents.message.ts";
 
 /** Client-reachable code must import from `./voiceAgents.message` directly; this re-export is for server callers already importing from this module. */
-export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voiceAgents.message";
+export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voiceAgents.message.ts";
 
 /**
  * The one server-side read of `release_voice_agents_enabled` (AC29). Every

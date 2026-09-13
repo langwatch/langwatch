@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceDiagnostics,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycle,
+  type GovernanceDiagnosticsSink,
+  type IngestionSourceEntitlements,
+  type IngestionSourceLifecycleChannel,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -29,13 +29,13 @@ class AppIngestionSourceEntitlements implements IngestionSourceEntitlements {
   }
 }
 
-class AppIngestionSourceDiagnostics extends GovernanceDiagnostics {
+class AppIngestionSourceDiagnostics implements GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-class DisabledIngestionSourceLifecycle extends IngestionSourceLifecycle {
+class DisabledIngestionSourceLifecycle implements IngestionSourceLifecycleChannel {
   async sync(): Promise<void> {}
 }
 
@@ -44,7 +44,7 @@ export class AppIngestionSourceAdapter {
   private constructor(
     private readonly options: {
       plans: PlanProvider;
-      lifecycle: IngestionSourceLifecycle;
+      lifecycle: IngestionSourceLifecycleChannel;
       secretPepper: string;
       encryption: GovernanceEncryption;
     },
@@ -52,14 +52,14 @@ export class AppIngestionSourceAdapter {
 
   static create(options: {
     plans: PlanProvider;
-    lifecycle: IngestionSourceLifecycle;
+    lifecycle: IngestionSourceLifecycleChannel;
     secretPepper: string;
     encryption: GovernanceEncryption;
   }): AppIngestionSourceAdapter {
     return new AppIngestionSourceAdapter(options);
   }
 
-  static disabledLifecycle(): IngestionSourceLifecycle {
+  static disabledLifecycle(): IngestionSourceLifecycleChannel {
     return new DisabledIngestionSourceLifecycle();
   }
 
@@ -67,7 +67,7 @@ export class AppIngestionSourceAdapter {
     return AppIngestionSourceEntitlements.create(this.options.plans);
   }
 
-  lifecycle(): IngestionSourceLifecycle {
+  lifecycle(): IngestionSourceLifecycleChannel {
     return this.options.lifecycle;
   }
 
@@ -79,7 +79,7 @@ export class AppIngestionSourceAdapter {
     return this.options.secretPepper;
   }
 
-  diagnostics(): GovernanceDiagnostics {
+  diagnostics(): GovernanceDiagnosticsSink {
     return new AppIngestionSourceDiagnostics();
   }
 }

@@ -47,7 +47,7 @@
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLResourceLimits,
-} from "../limits";
+} from "../limits.ts";
 import { assertIdentifier, clickHouseLiteral } from "../../rules/langwatch-ql-sql-literal.rules.ts";
 
 /**

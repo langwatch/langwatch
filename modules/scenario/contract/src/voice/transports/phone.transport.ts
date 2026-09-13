@@ -27,7 +27,7 @@ import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
-} from "../voice-transport.registry";
+} from "../voice-transport.registry.ts";
 
 const logger = createLogger("langwatch:scenarios:voice:phone");
 

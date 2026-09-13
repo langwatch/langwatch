@@ -5,7 +5,7 @@ import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
 } from "@langwatch/enterprise-governance-contract";
-import { PersonalUsageReader } from "@langwatch/enterprise-governance-server";
+import { type PersonalUsageReader } from "@langwatch/enterprise-governance-server";
 import type {
   AppPersonalUsageReadAdapter,
   PersonalUsageWindow,

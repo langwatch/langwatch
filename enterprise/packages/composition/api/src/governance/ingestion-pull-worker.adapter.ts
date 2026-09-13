@@ -9,16 +9,16 @@ import {
 import type { GovernanceInternalProject } from "@langwatch/project-server";
 import {
   BuiltInPullerRegistryService,
-  GovernanceHttp,
-  GovernanceObjectStorage,
-  GovernanceOcsfEventSink,
+  type GovernanceHttpClient,
+  type GovernanceObjectStore,
+  type GovernanceOcsfEventSink,
   IngestionCredentialsService,
-  IngestionPullDiagnostics,
+  type IngestionPullDiagnosticsSink,
   type IngestionPullSource,
   IngestionPullWorkerService,
-  PulledUsageEntitlement,
+  type PulledUsageEntitlements,
   PulledUsagePricingService,
-  PulledUsageRate,
+  type PulledUsageRateReader,
   PulledUsageRecordService,
   type GovernanceOcsfEventInput,
   type GovernanceHttpResponse,
@@ -98,10 +98,8 @@ export abstract class GovernanceIngestionPullHost {
   abstract readonly encryption: GovernanceEncryption;
 }
 
-class AppGovernanceHttp extends GovernanceHttp {
-  private constructor(private readonly host: GovernanceIngestionPullHost) {
-    super();
-  }
+class AppGovernanceHttp implements GovernanceHttpClient {
+  private constructor(private readonly host: GovernanceIngestionPullHost) {}
 
   static create(host: GovernanceIngestionPullHost): AppGovernanceHttp {
     return new AppGovernanceHttp(host);
@@ -112,10 +110,8 @@ class AppGovernanceHttp extends GovernanceHttp {
   }
 }
 
-export class AppGovernanceObjectStorage extends GovernanceObjectStorage {
-  private constructor(private readonly host: GovernanceIngestionPullHost) {
-    super();
-  }
+export class AppGovernanceObjectStorage implements GovernanceObjectStore {
+  private constructor(private readonly host: GovernanceIngestionPullHost) {}
 
   static create(host: GovernanceIngestionPullHost): AppGovernanceObjectStorage {
     return new AppGovernanceObjectStorage(host);
@@ -237,10 +233,8 @@ class AppGovernanceOcsfEventSink implements GovernanceOcsfEventSink {
   }
 }
 
-class AppPulledUsageEntitlement extends PulledUsageEntitlement {
-  private constructor(private readonly host: GovernanceIngestionPullHost) {
-    super();
-  }
+class AppPulledUsageEntitlement implements PulledUsageEntitlements {
+  private constructor(private readonly host: GovernanceIngestionPullHost) {}
 
   static create(host: GovernanceIngestionPullHost): AppPulledUsageEntitlement {
     return new AppPulledUsageEntitlement(host);
@@ -251,10 +245,8 @@ class AppPulledUsageEntitlement extends PulledUsageEntitlement {
   }
 }
 
-class AppPulledUsageRate extends PulledUsageRate {
-  private constructor(private readonly host: GovernanceIngestionPullHost) {
-    super();
-  }
+class AppPulledUsageRate implements PulledUsageRateReader {
+  private constructor(private readonly host: GovernanceIngestionPullHost) {}
 
   static create(host: GovernanceIngestionPullHost): AppPulledUsageRate {
     return new AppPulledUsageRate(host);
@@ -265,10 +257,8 @@ class AppPulledUsageRate extends PulledUsageRate {
   }
 }
 
-class AppIngestionPullDiagnostics extends IngestionPullDiagnostics {
-  private constructor(private readonly host: GovernanceIngestionPullHost) {
-    super();
-  }
+class AppIngestionPullDiagnostics implements IngestionPullDiagnosticsSink {
+  private constructor(private readonly host: GovernanceIngestionPullHost) {}
 
   static create(host: GovernanceIngestionPullHost): AppIngestionPullDiagnostics {
     return new AppIngestionPullDiagnostics(host);

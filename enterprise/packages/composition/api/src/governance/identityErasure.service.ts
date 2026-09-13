@@ -50,9 +50,9 @@ import type {
   IdentityMatchRepository,
   IdentityMatchSuggestionRepository,
 } from "../repositories/governanceIdentity.repository";
-import type { GovernanceRollupErasureClickHouseRepository } from "./governanceRollupErasure.clickhouse.repository";
-import { erasureDigest, readErasureSecret } from "./logic/erasureDigest";
-import { refreshInstalledSuppressionSnapshot } from "./logic/suppressionSnapshot";
+import type { GovernanceRollupErasureClickHouseRepository } from "./governanceRollupErasure.clickhouse.repository.ts";
+import { erasureDigest, readErasureSecret } from "./logic/erasureDigest.ts";
+import { refreshInstalledSuppressionSnapshot } from "./logic/suppressionSnapshot.ts";
 
 const logger = createLogger("langwatch:governance:identity-erasure");
 

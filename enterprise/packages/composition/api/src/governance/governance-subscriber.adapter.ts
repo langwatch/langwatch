@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceKpiContributionWriter,
+  type GovernanceKpiContributionWriter,
   GovernanceKpisSubscriber,
-  GovernanceOcsfEventWriter,
+  type GovernanceOcsfEventWriter,
   GovernanceOcsfSubscriber,
-  GovernanceSubscriberDiagnostics,
-  TraceAlertMetrics,
-  TraceAlertOriginGuard,
-  TraceAlertTriggerMatch,
+  type GovernanceSubscriberDiagnosticsSink,
+  type TraceAlertMetricsSink,
+  type TraceAlertOriginGuard,
+  type TraceAlertTriggerMatchChannel,
   TraceAlertTriggerMatchSubscriber,
-  TraceAlertTriggerReader,
+  type TraceAlertTriggerReader,
   type GovernanceKpiContribution,
   type GovernanceOcsfEvent,
   type GovernanceTraceContext,
@@ -40,16 +40,14 @@ export abstract class GovernanceSubscriberRuntime {
   abstract countAutomationMatchRecords(count: number): void;
 }
 
-class AppGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnostics {
+class AppGovernanceSubscriberDiagnostics implements GovernanceSubscriberDiagnosticsSink {
   private readonly logger = createLogger("langwatch:trace-processing:governance-subscribers");
 
   warn(input: { code: string; tenantId: string; traceId: string }): void {
     this.logger.warn(input, input.code);
   }
 
-  constructor(private readonly runtime: GovernanceSubscriberRuntime) {
-    super();
-  }
+  constructor(private readonly runtime: GovernanceSubscriberRuntime) {}
 
   capture(error: unknown): void {
     this.logger.error({ error }, "governance subscriber projection failed");
@@ -93,10 +91,8 @@ class AppTraceAlertTrigger implements TraceAlertTriggerReader {
   }
 }
 
-class AppTraceAlertTriggerMatch extends TraceAlertTriggerMatch {
-  private constructor(private readonly matches: TraceAlertTriggerMatch) {
-    super();
-  }
+class AppTraceAlertTriggerMatch implements TraceAlertTriggerMatchChannel {
+  private constructor(private readonly matches: TraceAlertTriggerMatch) {}
 
   static create(matches: TraceAlertTriggerMatch): AppTraceAlertTriggerMatch {
     return new AppTraceAlertTriggerMatch(matches);
@@ -115,10 +111,8 @@ class AppTraceAlertOriginGuard implements TraceAlertOriginGuard {
   }
 }
 
-class AppTraceAlertMetrics extends TraceAlertMetrics {
-  constructor(private readonly runtime: GovernanceSubscriberRuntime) {
-    super();
-  }
+class AppTraceAlertMetrics implements TraceAlertMetricsSink {
+  constructor(private readonly runtime: GovernanceSubscriberRuntime) {}
 
   countRecorded(count: number): void {
     this.runtime.countAutomationMatchRecords(count);
@@ -127,7 +121,7 @@ class AppTraceAlertMetrics extends TraceAlertMetrics {
 
 export class AppGovernanceSubscriberAdapter {
   private constructor(
-    private readonly diagnostics: GovernanceSubscriberDiagnostics,
+    private readonly diagnostics: GovernanceSubscriberDiagnosticsSink,
     private readonly runtime: GovernanceSubscriberRuntime,
   ) {}
 

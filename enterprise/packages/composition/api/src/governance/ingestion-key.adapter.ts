@@ -2,8 +2,8 @@
 
 import type { ApiKeyRevocationCause, ApiKeyApi } from "@langwatch/api-key-contract";
 import {
-  IngestionKeyIssuer,
-  IngestionKeyRepository,
+  type IngestionKeyIssuer,
+  type IngestionKeyRepository,
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
 } from "@langwatch/enterprise-governance-server";
@@ -46,10 +46,8 @@ function storedIngestionKeyOf(key: ApiKeyIngestionRow): StoredIngestionKey {
   };
 }
 
-export class AppIngestionKeyRepository extends IngestionKeyRepository {
-  private constructor(private readonly apiKeys: ApiKeyApi) {
-    super();
-  }
+export class AppIngestionKeyRepository implements IngestionKeyRepository {
+  private constructor(private readonly apiKeys: ApiKeyApi) {}
 
   static create(apiKeys: ApiKeyApi): AppIngestionKeyRepository {
     return new AppIngestionKeyRepository(apiKeys);

@@ -1,4 +1,4 @@
-import { CodingAgentTraceProcessing } from "@langwatch/coding-agent-server";
+import { type CodingAgentTraceProcessor } from "@langwatch/coding-agent-server";
 import type {
   NormalizedSpan,
   OtlpInstrumentationScope,
@@ -16,13 +16,11 @@ import {
  * the port declares them in one. THE READ IS WHY THIS FILE EXISTS.
  * WHAT THE READ IS FOR, because it decides how it must behave. ADR-069 made the
  */
-export class WorkerCodingAgentTraceProcessingAdapter extends CodingAgentTraceProcessing {
+export class WorkerCodingAgentTraceProcessingAdapter implements CodingAgentTraceProcessor {
   private constructor(
     private readonly normalization: SpanNormalizationPipelineService,
     private readonly spans: TraceStoredSpanReaderRepository,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     traceCanonicalisation: TraceCanonicalisationService;

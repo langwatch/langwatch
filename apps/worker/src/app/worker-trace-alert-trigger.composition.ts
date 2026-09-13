@@ -14,7 +14,7 @@ import {
 import type { TriggerContext } from "@langwatch/eventing";
 import {
   OtelTraceAlertMetricsAdapter,
-  TraceAlertTriggerMatch,
+  type TraceAlertTriggerMatchChannel,
   TraceAlertTriggerMatchSubscriber,
   type GovernanceTraceEvent,
   type TraceAlertOriginGuard,
@@ -116,10 +116,8 @@ class WorkerTraceAlertTriggerAdapter implements TraceAlertTriggerReader {
  * so nothing unvalidated enters here; what is restored is the type the value
  * never stopped having.
  */
-class WorkerTraceAlertTriggerMatchAdapter extends TraceAlertTriggerMatch {
-  constructor(private readonly matches: AutomationTriggerMatchRecorder) {
-    super();
-  }
+class WorkerTraceAlertTriggerMatchAdapter implements TraceAlertTriggerMatchChannel {
+  constructor(private readonly matches: AutomationTriggerMatchRecorder) {}
 
   async send(input: {
     tenantId: string;

@@ -1,4 +1,4 @@
-import { OrganizationSettingsSecretPort } from "@langwatch/organization-server";
+import { type OrganizationSettingsSecret } from "@langwatch/organization-server";
 import type { SecretEncryption } from "@langwatch/secret-server";
 
 /**
@@ -16,16 +16,14 @@ import type { SecretEncryption } from "@langwatch/secret-server";
  * decision that they are the same cipher — which is a decision, so it is
  * stated here rather than assumed by an adapter that happens to fit both.
  */
-export class ApiOrganizationSettingsSecretAdapter extends OrganizationSettingsSecretPort {
+export class ApiOrganizationSettingsSecretAdapter implements OrganizationSettingsSecret {
   static create(options: {
     encryption: SecretEncryption;
   }): ApiOrganizationSettingsSecretAdapter {
     return new ApiOrganizationSettingsSecretAdapter(options.encryption);
   }
 
-  private constructor(private readonly encryption: SecretEncryption) {
-    super();
-  }
+  private constructor(private readonly encryption: SecretEncryption) {}
 
   encrypt(value: string): string {
     return this.encryption.encrypt(value);

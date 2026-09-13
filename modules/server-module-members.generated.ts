@@ -14,7 +14,7 @@ export const serverModuleMembers = {
   annotation: [],
   "api-key": [],
   auth: [],
-  authz: [],
+  authz: ["prisma", "redis"],
   automation: [],
   "coding-agent": [],
   dashboard: [],

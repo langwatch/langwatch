@@ -9,8 +9,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  AdminWorkspaceViewOcsf,
-  GovernanceDiagnostics,
+  type AdminWorkspaceViewOcsfChannel,
+  type GovernanceDiagnosticsSink,
 } from "@langwatch/enterprise-governance-server";
 import {
   type AppGovernanceOcsfEventsAdapter,
@@ -30,16 +30,14 @@ export interface AdminWorkspaceViewAuditDeps {
   ocsfRepository?: AppGovernanceOcsfEventsAdapter;
 }
 
-export class AppAdminWorkspaceViewDiagnostics extends GovernanceDiagnostics {
+export class AppAdminWorkspaceViewDiagnostics implements GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }
 }
 
-export class AppAdminWorkspaceViewOcsf extends AdminWorkspaceViewOcsf {
-  constructor(private readonly repository: AppGovernanceOcsfEventsAdapter) {
-    super();
-  }
+export class AppAdminWorkspaceViewOcsf implements AdminWorkspaceViewOcsfChannel {
+  constructor(private readonly repository: AppGovernanceOcsfEventsAdapter) {}
 
   async mirror(input: {
     tenantId: string;

@@ -18,12 +18,12 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";
+export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel.ts";
 export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
-} from "./catalogStatements";
-export { postgresReaderStatementsFor } from "./postgresReaderProvisioning";
+} from "./catalogStatements.ts";
+export { postgresReaderStatementsFor } from "./postgresReaderProvisioning.ts";
 export {
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
@@ -35,7 +35,7 @@ export {
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
   withTenancyOptOut,
-} from "./productionProvisioning";
+} from "./productionProvisioning.ts";
 export {
   type LwqlPostgresReaderMode,
   type LwqlSelfProvisionEnv,
@@ -44,5 +44,5 @@ export {
   lwqlSelfProvisionFromEnv,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
-} from "./selfProvisioning";
-export { withLwqlSelfProvisionLock } from "./selfProvisionLock";
+} from "./selfProvisioning.ts";
+export { withLwqlSelfProvisionLock } from "./selfProvisionLock.ts";

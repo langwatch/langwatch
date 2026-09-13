@@ -1,14 +1,12 @@
 import {
-  AnomalyAlertHttp,
+  type AnomalyAlertHttpClient,
   type AnomalyAlertHttpResponse,
 } from "@langwatch/enterprise-governance-server";
 
 export type SsrfSafeFetch = (url: string, init: RequestInit) => Promise<Response>;
 
-export class SsrfSafeAnomalyAlertHttpAdapter extends AnomalyAlertHttp {
-  private constructor(private readonly fetch: SsrfSafeFetch) {
-    super();
-  }
+export class SsrfSafeAnomalyAlertHttpAdapter implements AnomalyAlertHttpClient {
+  private constructor(private readonly fetch: SsrfSafeFetch) {}
 
   static create(fetch: SsrfSafeFetch): SsrfSafeAnomalyAlertHttpAdapter {
     return new SsrfSafeAnomalyAlertHttpAdapter(fetch);

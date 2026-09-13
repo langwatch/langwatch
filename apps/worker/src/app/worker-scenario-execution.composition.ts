@@ -32,15 +32,15 @@ import {
   PostgresScenarioRepositories,
   RedisCancellationPublisherAdapter,
   RedisCancellationSubscriberAdapter,
-  ScenarioClockPort,
+  type ScenarioClock,
   ScenarioExecutionPoolService,
   ScenarioExecutionPrefetcherService,
   ScenarioExecutionService,
   ScenarioFailureHandlerService,
-  ScenarioIdPort,
+  type ScenarioId,
   ScenarioProcessorService,
-  ScenarioSecretCipherPort,
-  ScenarioTestSuiteIdPort,
+  type ScenarioSecretCipher,
+  type ScenarioTestSuiteId,
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
 import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
@@ -391,14 +391,14 @@ function resolveChildProcessConfig(deps: WorkerScenarioExecutionPrerequisites) {
   };
 }
 
-class KsuidScenarioId extends ScenarioIdPort {
+class KsuidScenarioId implements ScenarioId {
   next(): string {
     return generate(SCENARIO_KSUID_RESOURCE).toString();
   }
 }
 
 /** The folder id, in the `suite_` format the other tier reads. */
-class NanoidScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
+class NanoidScenarioTestSuiteId implements ScenarioTestSuiteId {
   next(): string {
     return `suite_${nanoid()}`;
   }
@@ -415,7 +415,7 @@ class WorkerNanoidWorkflowId implements WorkflowId {
   }
 }
 
-class SystemScenarioClock extends ScenarioClockPort {
+class SystemScenarioClock implements ScenarioClock {
   now() {
     return toDate(nowInstant());
   }
@@ -426,10 +426,8 @@ class SystemScenarioClock extends ScenarioClockPort {
  * tier writes with: a run's secret parameters are encrypted on one tier and decrypted on this one,
  * so a second key here would fail every run that carries one.
  */
-class WorkerScenarioSecretCipher extends ScenarioSecretCipherPort {
-  constructor(private readonly encryption: AesGcmSecretEncryptionAdapter) {
-    super();
-  }
+class WorkerScenarioSecretCipher implements ScenarioSecretCipher {
+  constructor(private readonly encryption: AesGcmSecretEncryptionAdapter) {}
 
   encrypt(plaintext: string): string {
     return this.encryption.encrypt(plaintext);

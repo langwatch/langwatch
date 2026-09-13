@@ -22,7 +22,7 @@
 // From the leaf, not from `agentDiscovery.service`. That import pulled both
 // pullers and the credential seam into a module whose header promises none of
 // it, and every consumer of this logic carried them.
-import { sourceTypeCanListAgents } from "./agentListingProviders";
+import { sourceTypeCanListAgents } from "./agentListingProviders.ts";
 
 /** The columns of an `IngestionSource` this decision actually reads. */
 export interface ListableSourceRecord {

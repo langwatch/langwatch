@@ -10,7 +10,7 @@ import {
   isStringLiteral,
 } from "typescript/unstable/ast";
 
-import { markColourSites } from "./markColourScan";
+import { markColourSites } from "./markColourScan.ts";
 import { parseSourceTexts } from "./tsAst";
 
 /**

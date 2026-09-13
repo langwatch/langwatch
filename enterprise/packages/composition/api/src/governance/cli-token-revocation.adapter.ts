@@ -2,8 +2,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import {
-  CliTokenStore,
-  GovernanceDiagnostics,
+  type CliTokenStore,
+  type GovernanceDiagnosticsSink,
 } from "@langwatch/enterprise-governance-server";
 import type { Cluster, Redis } from "ioredis";
 
@@ -30,7 +30,7 @@ export class RedisCliTokenStoreAdapter implements CliTokenStore {
   }
 }
 
-export class AppCliTokenDiagnostics extends GovernanceDiagnostics {
+export class AppCliTokenDiagnostics implements GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void {
     logger.warn(context, message);
   }

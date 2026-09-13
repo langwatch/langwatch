@@ -16,15 +16,15 @@ import type {
   EvaluatorAttachment,
   EvaluatorInputSpec,
   ScenarioMapping,
-} from "../evaluator-attachments";
+} from "../evaluator-attachments.ts";
 import {
   TOOL_CALL_PARTS,
   TRACE_CONTEXTS_PATH,
   TRACE_SPANS_PATH,
   TRACE_TOOL_CALLS_PATH,
-} from "../evaluator-attachments";
-import { fieldValueIsBlank, type ScenarioFieldValues } from "../suite-fields";
-import { MAX_STORED_INPUT_LENGTH } from "./constants";
+} from "../evaluator-attachments.ts";
+import { fieldValueIsBlank, type ScenarioFieldValues } from "../suite-fields.ts";
+import { MAX_STORED_INPUT_LENGTH } from "./constants.ts";
 
 /** One turn of the run's conversation. */
 export interface ConversationMessage {

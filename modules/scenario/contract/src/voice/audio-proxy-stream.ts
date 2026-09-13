@@ -12,8 +12,8 @@
  * rather than a 500.
  */
 
-import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits";
-import { VoiceRecordingUnavailableError } from "./voice-session.service";
+import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";
+import { VoiceRecordingUnavailableError } from "./voice-session.service.ts";
 
 export async function proxyAudioStream({
   signal,

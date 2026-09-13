@@ -14,7 +14,7 @@
  */
 
 import type { TwilioCredential } from "~/server/gateway/twilioCredential.service";
-import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits";
+import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";
 
 /** The Twilio REST API host. Recording `uri`s come back relative to it. */
 const TWILIO_API_BASE = "https://api.twilio.com";

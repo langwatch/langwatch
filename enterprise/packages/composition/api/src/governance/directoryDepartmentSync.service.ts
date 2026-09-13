@@ -45,11 +45,11 @@ import {
   DiscoveredPersonRepository,
   IdentityMatchRepository,
 } from "../repositories/governanceIdentity.repository";
-import { IdentityMatchService } from "./identityMatch.service";
+import { IdentityMatchService } from "./identityMatch.service.ts";
 import {
   decideMatch,
   type OrganizationAccountIndex,
-} from "./logic/identityEvidence";
+} from "./logic/identityEvidence.ts";
 import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/server/src/services/microsoftGraphDirectory.ts";
 
 const logger = createLogger("langwatch:governance:directory-departments");

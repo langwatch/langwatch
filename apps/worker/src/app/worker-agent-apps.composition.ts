@@ -11,7 +11,7 @@ import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contrac
 import {
   AgentTestService,
   PostgresScenarioRepositories,
-  RedisScenarioTabStoreAdapter,
+  RedisScenarioTabStoreRepository,
   ResultAtomsClickHouseRepository,
   ResultAtomsService,
   RunConfigurationsClickHouseRepository,
@@ -104,7 +104,7 @@ export async function createWorkerAgentApps(options: {
           maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
         }),
         scenarioTabs: ScenarioTabRegistryService.create({
-          store: RedisScenarioTabStoreAdapter.create(prerequisites.redis),
+          store: RedisScenarioTabStoreRepository.create(prerequisites.redis),
           clock: { now: () => toDate(nowInstant()) },
         }),
         broadcast,

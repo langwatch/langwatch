@@ -32,7 +32,7 @@ import { DiscoveredAgentRepository } from "../repositories/governanceIdentity.re
 import {
   type AgentListingSourceType,
   sourceTypeCanListAgents,
-} from "./logic/agentListingProviders";
+} from "./logic/agentListingProviders.ts";
 import {
   type AgentListing,
   type AgentListingRefusal,

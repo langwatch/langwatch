@@ -37,14 +37,14 @@ import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
-} from "./identityMatch.errors";
+} from "./identityMatch.errors.ts";
 import {
   decideMatch,
   MATCH_EVIDENCE_KIND,
   normalizeEmail,
   type OrganizationAccountIndex,
-} from "./logic/identityEvidence";
-import { isUniqueViolation } from "./logic/postgresConstraintErrors";
+} from "./logic/identityEvidence.ts";
+import { isUniqueViolation } from "./logic/postgresConstraintErrors.ts";
 
 const logger = createLogger("langwatch:governance:identity-match");
 

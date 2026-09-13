@@ -10,7 +10,7 @@
  */
 
 import { getApp } from "~/server/app-layer/app";
-import type { WholeCallAudioInfrastructure } from "./whole-call-audio.service";
+import type { WholeCallAudioInfrastructure } from "./whole-call-audio.service.ts";
 
 /** Compose the production infrastructure from the app's read services. */
 export function createWholeCallAudioInfrastructure(): WholeCallAudioInfrastructure {

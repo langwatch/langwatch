@@ -24,8 +24,8 @@ import {
   ErasureSecretMissingError,
   erasureDigest,
   readErasureSecret,
-} from "./erasureDigest";
-import { currentSuppressionSnapshot } from "./suppressionSnapshot";
+} from "./erasureDigest.ts";
+import { currentSuppressionSnapshot } from "./suppressionSnapshot.ts";
 
 /**
  * Raised when this process has erasures to honour and no secret to honour them

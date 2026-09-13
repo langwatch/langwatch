@@ -1,6 +1,6 @@
 import type { DataPrivacyResolution } from "@langwatch/data-privacy-server";
 import {
-  PostgresModelCostCatalogAdapter,
+  PrismaModelCostCatalogRepository,
   type ModelCostCatalogDatabase,
   type ModelCostCatalogService,
 } from "@langwatch/model-provider-server";
@@ -88,7 +88,7 @@ export function createWorkerTraceCapabilityServices(options: {
   return {
     projects,
     dataPrivacy: options.dataPrivacy,
-    modelCosts: PostgresModelCostCatalogAdapter.create({
+    modelCosts: PrismaModelCostCatalogRepository.create({
       database: options.database,
       projects,
     }).build(),

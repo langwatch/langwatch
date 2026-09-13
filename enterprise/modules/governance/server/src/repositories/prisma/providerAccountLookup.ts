@@ -26,7 +26,7 @@
 import { createLogger } from "@langwatch/observability";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { decryptCredentials } from "./ingestionCredentials";
-import type { LookUpProviderAccount } from "./providerAccountOwnership";
+import type { LookUpProviderAccount } from "./providerAccountOwnership.ts";
 
 const logger = createLogger("langwatch:governance:provider-account-lookup");
 
