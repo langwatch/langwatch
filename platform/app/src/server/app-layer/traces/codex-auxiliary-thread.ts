@@ -88,29 +88,32 @@ function stringAttributes(span: OtlpSpan): Record<string, unknown> {
   );
 }
 
-/**
- * The helper thread each temporary structured request span in one export
- * batch was issued for, keyed by the request span's id: the request span
- * carries the mark, its queue child carries the thread id. A request span
- * whose child is not in the batch maps to nothing, and the helper then lists
- * as a session, which is the failure before this module rather than a wrong
- * attribution.
- */
-export function codexHelperThreadMarkersOf({
-  scopeName,
-  spans,
-}: {
+/** The parsed spans of one instrumentation scope entry of an export request. */
+export type ScopedSpans = {
   scopeName: string | null | undefined;
   spans: OtlpSpan[];
+};
+
+/**
+ * The helper thread each temporary structured request span in one export
+ * request was issued for, keyed by the request span's id: the request span
+ * carries the mark, its queue child carries the thread id. The mark is
+ * scope-gated per entry, the child is matched by parent id across every
+ * entry of the request, so a pair the exporter splits over two scope entries
+ * still joins. A request span whose child is not in the request maps to
+ * nothing, and the helper then lists as a session, which is the failure
+ * before this module rather than a wrong attribution.
+ */
+export function codexHelperThreadMarkersOf({
+  scopes,
+}: {
+  scopes: ScopedSpans[];
 }): Map<string, string> {
   const markers = new Map<string, string>();
-  const requestSpanIds = temporaryStructuredRequestSpanIdsOf({
-    scopeName,
-    spans,
-  });
+  const requestSpanIds = temporaryStructuredRequestSpanIdsOf(scopes);
   if (requestSpanIds.size === 0) return markers;
 
-  for (const span of spans) {
+  for (const span of scopes.flatMap((scope) => scope.spans)) {
     if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) continue;
     const parentId = TraceRequestUtils.normalizeOtlpId(span.parentSpanId);
     if (!requestSpanIds.has(parentId)) continue;
@@ -120,24 +123,18 @@ export function codexHelperThreadMarkersOf({
   return markers;
 }
 
-/** The ids of the temporary structured request spans in one export batch. */
-function temporaryStructuredRequestSpanIdsOf({
-  scopeName,
-  spans,
-}: {
-  scopeName: string | null | undefined;
-  spans: OtlpSpan[];
-}): Set<string> {
+/** The ids of the temporary structured request spans in one export request. */
+function temporaryStructuredRequestSpanIdsOf(
+  scopes: ScopedSpans[],
+): Set<string> {
   const ids = new Set<string>();
-  if (!isCodexScope(scopeName)) return ids;
-  for (const span of spans) {
-    if (
-      isCodexTemporaryStructuredRequestSpan({
-        scopeName,
-        attributes: stringAttributes(span),
-      })
-    ) {
-      ids.add(TraceRequestUtils.normalizeOtlpId(span.spanId));
+  for (const { scopeName, spans } of scopes) {
+    if (!isCodexScope(scopeName)) continue;
+    for (const span of spans) {
+      const attributes = stringAttributes(span);
+      if (isCodexTemporaryStructuredRequestSpan({ scopeName, attributes })) {
+        ids.add(TraceRequestUtils.normalizeOtlpId(span.spanId));
+      }
     }
   }
   return ids;
@@ -150,7 +147,6 @@ function queuedThreadIdOf(span: OtlpSpan): string | undefined {
   return QUEUE_KEY_THREAD_ID.exec(key)?.[1];
 }
 
-/** The request span with the helper's thread id on it. */
 export function stampCodexHelperThread({
   span,
   threadId,
@@ -167,10 +163,6 @@ export function stampCodexHelperThread({
   };
 }
 
-/**
- * The auxiliary fact off one span's attributes, for the session contribution:
- * set on a codex temporary structured request span, absent otherwise.
- */
 export function codexAuxiliarySessionFacts({
   scopeName,
   attributes,

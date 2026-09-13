@@ -20,6 +20,7 @@ import {
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
   codexHelperThreadMarkersOf,
+  type ScopedSpans,
   stampCodexHelperThread,
 } from "./codex-auxiliary-thread";
 import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
@@ -161,6 +162,13 @@ export class TraceRequestCollectionService {
       async (span) => {
         const tally = SpanIngestionTally.create();
 
+        // A codex helper thread's request span names its thread only through
+        // a child in the same export (see codex-auxiliary-thread.ts), so the
+        // join runs over the whole request before any span is processed.
+        const helperThreads = codexHelperThreadMarkersOf({
+          scopes: scopedSpansOf(traceRequest),
+        });
+
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
           const resourceParseResult = resourceSchema.safeParse(resource);
@@ -181,14 +189,6 @@ export class TraceRequestCollectionService {
                 "Error parsing OTLP scope",
               );
             }
-
-            // A codex helper thread's request span names its thread only
-            // through a child in the same batch (see codex-auxiliary-thread.ts),
-            // so the join runs over the scope's spans before any is processed.
-            const helperThreads = codexHelperThreadMarkersOf({
-              scopeName: scopeParseResult.data?.name,
-              spans: parsedSpansOf(scopeSpan?.spans ?? []),
-            });
 
             for (const otelSpan of scopeSpan?.spans ?? []) {
               const result = await this.processSpan({
@@ -397,7 +397,22 @@ export class TraceRequestCollectionService {
   }
 }
 
-/** The spans of one scope that parse, for the batch-wide helper-thread join. */
+/** Every scope entry of the request with its parsed spans, for the helper-thread join. */
+function scopedSpansOf(
+  traceRequest: IExportTraceServiceRequest,
+): ScopedSpans[] {
+  const scopes: ScopedSpans[] = [];
+  for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      scopes.push({
+        scopeName: scopeSpan?.scope?.name,
+        spans: parsedSpansOf(scopeSpan?.spans ?? []),
+      });
+    }
+  }
+  return scopes;
+}
+
 function parsedSpansOf(otelSpans: unknown[]): OtlpSpan[] {
   const spans: OtlpSpan[] = [];
   for (const otelSpan of otelSpans) {

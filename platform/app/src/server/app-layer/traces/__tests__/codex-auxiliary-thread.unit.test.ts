@@ -67,14 +67,28 @@ function makeService() {
 
 /** One export batch, as codex's otlp-http exporter posts it. */
 function batch(spans: FixtureSpan[]): IExportTraceServiceRequest {
+  return batchOf([{ scope: fixture.scope, spans }]);
+}
+
+/** One export batch with the spans spread over several scope entries. */
+function batchOf(
+  entries: Array<{ scope: { name: string }; spans: FixtureSpan[] }>,
+): IExportTraceServiceRequest {
   return {
     resourceSpans: [
       {
         resource: fixture.resource,
-        scopeSpans: [{ scope: fixture.scope, spans: spans as OtlpSpan[] }],
+        scopeSpans: entries.map((entry) => ({
+          scope: entry.scope,
+          spans: entry.spans as OtlpSpan[],
+        })),
       },
     ],
   } as unknown as IExportTraceServiceRequest;
+}
+
+function scoped(spans: FixtureSpan[]) {
+  return { scopeName: fixture.scope.name, spans: spans as OtlpSpan[] };
 }
 
 function recordedSpans(
@@ -162,8 +176,7 @@ describe("codexHelperThreadMarkersOf", () => {
     it("maps the request span to the thread its queue child names", () => {
       const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
       const markers = codexHelperThreadMarkersOf({
-        scopeName: fixture.scope.name,
-        spans: spansOf(HELPER_TURN_TRACE) as OtlpSpan[],
+        scopes: [scoped(spansOf(HELPER_TURN_TRACE))],
       });
       expect(markers.get(turnStart!.spanId)).toBe(HELPER_THREAD_ID);
       expect(markers.size).toBe(1);
@@ -171,8 +184,38 @@ describe("codexHelperThreadMarkersOf", () => {
 
     it("maps nothing when the queue child is not in the batch", () => {
       const markers = codexHelperThreadMarkersOf({
-        scopeName: fixture.scope.name,
-        spans: spansOf(HELPER_TURN_TRACE, "turn/start") as OtlpSpan[],
+        scopes: [scoped(spansOf(HELPER_TURN_TRACE, "turn/start"))],
+      });
+      expect(markers.size).toBe(0);
+    });
+  });
+
+  describe("given the request span and its queue child under different scope entries", () => {
+    /** @scenario "A codex helper request and its queue child split across scope entries still join" */
+    it("joins them across the request", () => {
+      const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+      const queued = spansOf(
+        HELPER_TURN_TRACE,
+        "app_server.serialized_request_queue",
+      );
+      const markers = codexHelperThreadMarkersOf({
+        scopes: [
+          scoped([turnStart!]),
+          { scopeName: "codex_app_server", spans: queued as OtlpSpan[] },
+        ],
+      });
+      expect(markers.get(turnStart!.spanId)).toBe(HELPER_THREAD_ID);
+    });
+
+    it("marks nothing when the request span's own scope is not codex", () => {
+      const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+      const markers = codexHelperThreadMarkersOf({
+        scopes: [
+          { scopeName: "some_other_agent", spans: [turnStart as OtlpSpan] },
+          scoped(
+            spansOf(HELPER_TURN_TRACE, "app_server.serialized_request_queue"),
+          ),
+        ],
       });
       expect(markers.size).toBe(0);
     });
@@ -181,8 +224,7 @@ describe("codexHelperThreadMarkersOf", () => {
   describe("given the user's own turn", () => {
     it("maps nothing, whatever the queue child names", () => {
       const markers = codexHelperThreadMarkersOf({
-        scopeName: fixture.scope.name,
-        spans: spansOf(USER_TURN_TRACE) as OtlpSpan[],
+        scopes: [scoped(spansOf(USER_TURN_TRACE))],
       });
       expect(markers.size).toBe(0);
     });
@@ -216,6 +258,30 @@ describe("TraceRequestCollectionService and codex helper threads", () => {
         );
         expect(stored[0]!.attributes["rpc.request_id"]).toMatch(
           /^temporary-structured-turn-/,
+        );
+      });
+
+      it("stamps the request span when the exporter splits the pair over two scope entries", async () => {
+        const { service, recordSpan } = makeService();
+        const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+        const queued = spansOf(
+          HELPER_TURN_TRACE,
+          "app_server.serialized_request_queue",
+        );
+
+        await service.handleOtlpTraceRequest(
+          tenantId,
+          batchOf([
+            { scope: fixture.scope, spans: [turnStart!] },
+            { scope: fixture.scope, spans: queued },
+          ]),
+          piiRedactionLevel,
+        );
+
+        const stored = recordedSpans(recordSpan);
+        expect(stored.map((s) => s.name)).toEqual(["turn/start"]);
+        expect(stored[0]!.attributes[HELPER_THREAD_ID_ATTR]).toBe(
+          HELPER_THREAD_ID,
         );
       });
 

@@ -221,6 +221,13 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     And a request span whose child is not in the batch is mapped to nothing
 
   @unit
+  Scenario: A codex helper request and its queue child split across scope entries still join
+    Given one export request whose codex turn/start span and its queue child sit under different scope entries
+    When the request is read for helper threads
+    Then the request span is mapped to the thread id the child names
+    And a request span under a scope that is not codex is mapped to nothing
+
+  @unit
   Scenario: The codex helper request span is stored with its thread id
     Given a codex helper thread's request span and its queue child in one batch
     When the batch is ingested
