@@ -43,6 +43,7 @@ const opt = (name) => {
 };
 const names = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")));
 const selected = names.length ? names : Object.keys(PAGES);
+if (opt("out") && selected.length !== 1) throw new Error("--out requires exactly one page");
 
 const { chromium } = loadPlaywright();
 const browser = await chromium.launch();
