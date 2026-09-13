@@ -9,27 +9,20 @@ import type {
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
 import type { Instant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicService } from "../services/topic.service.ts";
+import { EventingTopicClusteringScheduleAdapter } from "../services/topic-clustering-schedule.service.ts";
 
 /** Eventing-owned schedule read needed by the Topic status projection. */
 export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-/**
- * The durable schedule the status panel reads its next wake from, and the
- * clock the staleness rules are measured against. Both belong to the process:
- * eventing owns the schedule, and a test owns time.
- */
-export type TopicInfrastructure = Readonly<{
-  schedule: TopicClusteringScheduleReader;
-  now?: (() => number) | undefined;
-}>;
-
 type TopicSetup = FeatureSetup<
   Record<never, never>,
-  TopicInfrastructure,
+  MembersRead<typeof TopicApp.reads>,
   undefined,
   TopicRepositories
 >;
@@ -37,6 +30,18 @@ type TopicSetup = FeatureSetup<
 export class TopicApp implements TopicApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {};
+  /**
+   * The durable clustering wake the status panel reads: a process-manager
+   * instance row, kept in the same Postgres this process already holds.
+   * Built here, over `prisma`, the way identity builds its pipelines over
+   * `eventing` — no separate `schedule` infrastructure member exists, so the
+   * old per-role split (worker builds an eventing-backed reader, the api
+   * process fakes "not scheduled") is gone: every process that installs
+   * Topic now reads the same durable row. The staleness clock (`now`) is not
+   * read here at all — `TopicService` already defaults it to `Date.now`, and
+   * no deleted composition ever overrode it.
+   */
+  static readonly reads = reads("prisma");
 
   readonly #topics: TopicService;
 
@@ -48,8 +53,9 @@ export class TopicApp implements TopicApi {
     return new TopicApp(
       TopicService.create({
         repository: setup.repositories.topics,
-        schedule: setup.members.schedule,
-        now: setup.members.now,
+        schedule: EventingTopicClusteringScheduleAdapter.create({
+          processStore: PrismaProcessStore.create({ database: setup.members.prisma }),
+        }),
       }),
     );
   }

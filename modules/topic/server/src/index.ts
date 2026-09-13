@@ -10,7 +10,7 @@ export {
   type TopicModelData,
 } from "./services/topic-clustering-eventing.service.ts";
 export { TopicClusteringProcessingProducerAdapter } from "./services/topic-clustering-processing-producer.service.ts";
-export { TopicApp, type TopicInfrastructure } from "./app/topic.app.ts";
+export { TopicApp } from "./app/topic.app.ts";
 export { topicServer } from "./topic.server.ts";
 export { topicRepositories } from "./repositories/topic-repositories.registry.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";

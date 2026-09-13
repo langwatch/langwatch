@@ -1,14 +1,17 @@
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 import { topicServer } from "../../topic.server.ts";
-import { topicTestWake, UnscheduledTopicClustering } from "./topic.fixture.ts";
+import { fakeTopicSchedulePrisma, topicTestWake } from "./topic.fixture.ts";
 
 const WAKE = 1_800_000_060_000;
 
-function process(schedule = UnscheduledTopicClustering.create()) {
-  return createApp({ role, config: {} })
-    .withModules([withMemoryRepositories(topicServer)]);
+function process(role: "api" | "worker", nextWakeAt: Date | null = null) {
+  return createApp({
+    role,
+    config: {},
+    members: membersFrom({ prisma: fakeTopicSchedulePrisma(nextWakeAt) }),
+  }).withModules([withMemoryRepositories(topicServer)]);
 }
 
 describe("topic app installation", () => {
@@ -31,14 +34,14 @@ describe("topic app installation", () => {
 
   describe("when the process schedules a clustering wake", () => {
     it("reports it as the next run", async () => {
-      const runtime = await process(UnscheduledTopicClustering.create(topicTestWake(WAKE))).boot();
+      const runtime = await process("worker", new Date(WAKE)).boot();
 
       try {
         const status = await runtime.service(TopicApi).getClusteringStatus({
           projectId: "project-1",
         });
 
-        expect(status.nextRunAt).toBe(WAKE);
+        expect(status.nextRunAt).toBe(topicTestWake(WAKE).epochMilliseconds);
         expect(status.isInProgress).toBe(false);
         expect(status.isRunInFlight).toBe(false);
       } finally {
