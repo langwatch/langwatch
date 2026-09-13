@@ -11,13 +11,9 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { AlertRedaction } from "../dashboard.members.ts";
-import { PlatformUrl } from "../dashboard.members.ts";
-import { WorkbenchAccess } from "../dashboard.members.ts";
-import { WorkbenchCaller } from "../dashboard.members.ts";
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import { DashboardApp, type DashboardInfrastructure } from "../dashboard.app.ts";
+import { DashboardApp } from "../dashboard.app.ts";
 
 /** Everything visible: the caller the gates are measured against. */
 export const FULLY_PERMITTED: LangWatchQLProtections = {
@@ -25,49 +21,6 @@ export const FULLY_PERMITTED: LangWatchQLProtections = {
   canSeeCapturedOutput: true,
   canSeeCosts: true,
 };
-
-/** The workbench switched on, and nothing else. */
-export class TestWorkbenchAccess implements WorkbenchAccess {
-  constructor(private readonly enabled = true) {
-  }
-
-  async isWorkbenchEnabled(): Promise<boolean> {
-    return this.enabled;
-  }
-}
-
-export class TestWorkbenchCaller implements WorkbenchCaller {
-  constructor(private readonly protections: LangWatchQLProtections = FULLY_PERMITTED) {
-  }
-
-  async resolveProtections(): Promise<LangWatchQLProtections> {
-    return this.protections;
-  }
-
-  async resolveRunCaller() {
-    return {
-      project: { id: "project-1", lwqlKey: "restricted-project-key" },
-      protections: this.protections,
-    };
-  }
-}
-
-/** Drops one provider secret, the way the composed redaction drops several. */
-export class TestAlertRedaction implements AlertRedaction {
-  redactActionParams(
-    _action: Trigger["action"],
-    actionParams: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const { slackWebhook: _dropped, ...visible } = actionParams;
-    return visible;
-  }
-}
-
-export class TestPlatformUrl implements PlatformUrl {
-  linkTo(input: { projectSlug: string; path: string }): string {
-    return `https://app.test/${input.projectSlug}${input.path}`;
-  }
-}
 
 export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = {}): AnalyticsApi {
   return createApiFixture<AnalyticsApi>({
@@ -84,6 +37,12 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
         followsTimeWindow: false,
         followsGranularity: false,
       }) as unknown as LangWatchQLQueryResult,
+    isWorkbenchEnabled: async () => true,
+    resolveProtections: async () => FULLY_PERMITTED,
+    resolveRunCaller: async () => ({
+      project: { id: "project-1", lwqlKey: "restricted-project-key" },
+      protections: FULLY_PERMITTED,
+    }),
     ...overrides,
   });
 }
@@ -101,22 +60,10 @@ export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
   });
 }
 
-export function createDashboardTestInfrastructure(
-  overrides: Partial<DashboardInfrastructure> = {},
-): DashboardInfrastructure {
-  return {
-    workbenchAccess: new TestWorkbenchAccess(),
-    workbenchCaller: new TestWorkbenchCaller(),
-    alertRedaction: new TestAlertRedaction(),
-    platformUrl: new TestPlatformUrl(),
-    ...overrides,
-  };
-}
-
 export function createDashboardTestApp(
   input: Readonly<{
     repositories?: DashboardRepositories;
-    members?: Partial<DashboardInfrastructure>;
+    config?: Partial<{ baseHost: string }>;
     dependencies?: Partial<{
       analytics: AnalyticsApi;
       automation: AutomationApi;
@@ -126,13 +73,13 @@ export function createDashboardTestApp(
 ): DashboardApp {
   return DashboardApp.create({
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
-    members: createDashboardTestInfrastructure(input.members ?? {}),
+    members: {},
     dependencies: {
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
     },
-    config: void 0,
+    config: { baseHost: "", ...input.config },
     resources: new ResourceScope(),
   });
 }

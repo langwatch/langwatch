@@ -33,11 +33,13 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/time": "workspace:*"
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/analytics-server": "workspace:*",

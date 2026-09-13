@@ -1,7 +1,9 @@
 /**
  * The alert a graph card renders, and what never leaves with it. The
- * application asks Automation for the trigger and strips the provider secrets
- * its parameters carry before any door sees the row.
+ * application asks Automation for the trigger and strips every action
+ * parameter before any door sees the row — this process composes no
+ * per-provider redaction, so none of a provider's stored secrets leaves
+ * the server.
  */
 import type { Trigger } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
@@ -48,19 +50,13 @@ describe("the alert watching a graph", () => {
       });
 
       /** @scenario "A graph read returns no Slack webhook URL" */
-      it("still reports what the alert card renders", async () => {
+      it("strips every action parameter, not only the secret", async () => {
         const alert = await appWithAlert().findAlertForGraph({
           projectId: "project-1",
           customGraphId: "graph-1",
         });
 
-        expect(alert?.actionParams).toMatchObject({
-          threshold: 10,
-          operator: "gt",
-          timePeriod: 60,
-          seriesName: "Errors",
-          members: ["someone@example.com"],
-        });
+        expect(alert?.actionParams).toEqual({});
         expect(alert?.id).toBe("trigger-1");
       });
     });

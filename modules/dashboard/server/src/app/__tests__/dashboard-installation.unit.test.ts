@@ -9,13 +9,11 @@ import { dashboardServer } from "../../dashboard.server.ts";
 import {
   createDashboardTestAnalytics,
   createDashboardTestAutomation,
-  createDashboardTestInfrastructure,
   createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role, config: {} })
-    .withInfrastructure(createDashboardTestInfrastructure())
     .withProvided(AnalyticsApi, createDashboardTestAnalytics())
     .withProvided(AutomationApi, createDashboardTestAutomation())
     .withProvided(ProjectApi, createDashboardTestProjects())

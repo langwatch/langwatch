@@ -31,26 +31,40 @@ import {
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
 } from "@langwatch/dashboard-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
+import { z } from "zod";
 
-import type { AlertRedaction } from "./dashboard.members.ts";
-import type { PlatformUrl } from "./dashboard.members.ts";
-import type { WorkbenchAccess } from "./dashboard.members.ts";
-import type { WorkbenchCaller } from "./dashboard.members.ts";
+import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";
+import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { DashboardService } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
 
-/** What the deployment answers that Dashboard cannot answer for itself. */
-export type DashboardInfrastructure = Readonly<{
-  workbenchAccess: WorkbenchAccess;
-  workbenchCaller: WorkbenchCaller;
-  alertRedaction: AlertRedaction;
-  platformUrl: PlatformUrl;
-}>;
+/**
+ * `BASE_HOST`, this deployment's public origin, for the address a saved
+ * dashboard opens at. Defaults to none rather than refusing at boot, exactly
+ * as the deleted `createPlatformUrlBuilder` answered an absent origin: with a
+ * relative link, never a refusal.
+ */
+const dashboardAppZodSchema = z.object({
+  baseHost: z.string().default(""),
+});
+export type DashboardAppConfig = z.infer<typeof dashboardAppZodSchema>;
+
+/**
+ * A process that opened no dashboard-specific config slice hands this
+ * module `undefined` rather than `{}` — guarded here the same way
+ * `featureFlagAppConfigSchema` guards it, so an absent slice still resolves
+ * to every field's own default instead of refusing to parse at all.
+ */
+const dashboardAppConfigSchema: FeatureConfigSchema<DashboardAppConfig> = {
+  parse: (value: unknown): DashboardAppConfig =>
+    dashboardAppZodSchema.parse((value ?? {}) as Record<string, unknown>),
+};
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
@@ -60,10 +74,45 @@ type DashboardDependencies = Readonly<{
 
 type DashboardSetup = FeatureSetup<
   DashboardDependencies,
-  DashboardInfrastructure,
-  undefined,
+  MembersRead<typeof DashboardApp.reads>,
+  DashboardAppConfig,
   DashboardRepositories
 >;
+
+/**
+ * Thin calls onto `AnalyticsApi`: the Workbench's rollout gate and its RBAC
+ * plus content-category protections are Analytics' own business logic
+ * (coordinator ruling, 2026-09-13 evening) — Dashboard only adapts its own
+ * `actorId` naming to the peer's `userId` and forwards. A thrown protection
+ * check propagates exactly as `AnalyticsApi` throws it: that surface already
+ * fails closed (a denied read never degrades to "allowed"), so no second
+ * catch is added here to invert it.
+ */
+class AnalyticsWorkbenchAccess implements WorkbenchAccess {
+  constructor(private readonly analytics: AnalyticsApiContract) {}
+
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
+    return this.analytics.isWorkbenchEnabled(input);
+  }
+}
+
+class AnalyticsWorkbenchCaller implements WorkbenchCaller {
+  constructor(private readonly analytics: AnalyticsApiContract) {}
+
+  resolveProtections(input: { actorId: string; projectId: string }) {
+    return this.analytics.resolveProtections({
+      userId: input.actorId,
+      projectId: input.projectId,
+    });
+  }
+
+  resolveRunCaller(input: { actorId: string; projectId: string }) {
+    return this.analytics.resolveRunCaller({
+      userId: input.actorId,
+      projectId: input.projectId,
+    });
+  }
+}
 
 export class DashboardApp implements DashboardApi {
   static readonly contract = DashboardApi;
@@ -72,13 +121,17 @@ export class DashboardApp implements DashboardApi {
     automation: AutomationApi,
     projects: ProjectApi,
   };
+  static readonly configSchema: FeatureConfigSchema<DashboardAppConfig> = dashboardAppConfigSchema;
+  static readonly reads = reads();
 
   #dashboards: DashboardService;
   #charts: SavedWorkbenchChartService;
   #savedViews: SavedViewService;
   #automation: AutomationApiContract;
   #projects: ProjectApiContract;
-  #members: DashboardInfrastructure;
+  #workbenchAccess: WorkbenchAccess;
+  #workbenchCaller: WorkbenchCaller;
+  readonly #publicBaseUrl: string | undefined;
 
   private constructor(
     services: Readonly<{
@@ -87,24 +140,29 @@ export class DashboardApp implements DashboardApi {
       savedViews: SavedViewService;
     }>,
     peers: Readonly<{ automation: AutomationApiContract; projects: ProjectApiContract }>,
-    members: DashboardInfrastructure,
+    workbench: Readonly<{ access: WorkbenchAccess; caller: WorkbenchCaller }>,
+    publicBaseUrl: string | undefined,
   ) {
     this.#dashboards = services.dashboards;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
     this.#automation = peers.automation;
     this.#projects = peers.projects;
-    this.#members = members;
+    this.#workbenchAccess = workbench.access;
+    this.#workbenchCaller = workbench.caller;
+    this.#publicBaseUrl = publicBaseUrl;
   }
 
   static create(setup: DashboardSetup): DashboardApp {
     const analytics: AnalyticsApiContract = setup.dependencies.analytics;
+    const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
+    const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
 
     return new DashboardApp(
       {
         dashboards: DashboardService.create({
           repository: setup.repositories.dashboards,
-          workbenchAccess: setup.members.workbenchAccess,
+          workbenchAccess,
         }),
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
@@ -114,7 +172,8 @@ export class DashboardApp implements DashboardApi {
         savedViews: SavedViewService.create({ repository: setup.repositories.savedViews }),
       },
       { automation: setup.dependencies.automation, projects: setup.dependencies.projects },
-      setup.members,
+      { access: workbenchAccess, caller: workbenchCaller },
+      setup.config.baseHost === "" ? undefined : setup.config.baseHost,
     );
   }
 
@@ -172,7 +231,8 @@ export class DashboardApp implements DashboardApi {
     return Object.fromEntries(
       input.dashboardIds.map((dashboardId) => [
         dashboardId,
-        this.#members.platformUrl.linkTo({
+        dashboardPlatformUrl({
+          publicBaseUrl: this.#publicBaseUrl,
           projectSlug: project.slug,
           path: `/analytics/reports?dashboard=${dashboardId}`,
         }),
@@ -312,7 +372,7 @@ export class DashboardApp implements DashboardApi {
   }): Promise<SavedWorkbenchChart> {
     await this.#requireWorkbench(input.projectId);
 
-    const protections = await this.#members.workbenchCaller.resolveProtections({
+    const protections = await this.#workbenchCaller.resolveProtections({
       actorId: input.actorId,
       projectId: input.projectId,
     });
@@ -344,7 +404,7 @@ export class DashboardApp implements DashboardApi {
         ? undefined
         : {
             definition: input.definition,
-            protections: await this.#members.workbenchCaller.resolveProtections({
+            protections: await this.#workbenchCaller.resolveProtections({
               actorId: input.actorId,
               projectId: input.projectId,
             }),
@@ -402,7 +462,7 @@ export class DashboardApp implements DashboardApi {
   }): Promise<LangWatchQLQueryResult> {
     await this.#requireWorkbench(input.projectId);
 
-    const { project, protections } = await this.#members.workbenchCaller.resolveRunCaller({
+    const { project, protections } = await this.#workbenchCaller.resolveRunCaller({
       actorId: input.actorId,
       projectId: input.projectId,
     });
@@ -512,18 +572,21 @@ export class DashboardApp implements DashboardApi {
    * charts while the feature was off would announce what nobody can use.
    */
   async #requireWorkbench(projectId: string): Promise<void> {
-    const enabled = await this.#members.workbenchAccess.isWorkbenchEnabled({ projectId });
+    const enabled = await this.#workbenchAccess.isWorkbenchEnabled({ projectId });
     if (!enabled) throw new LangWatchQLNotEnabledError();
   }
 
-  /** One trigger with the provider secrets its parameters carry stripped. */
+  /**
+   * One trigger with its action parameters stripped. Empty, exactly as
+   * every real deployment's redaction answered before the composition that
+   * wired it was deleted: this process composes no per-provider redaction
+   * for a card's alert parameters, so none of a provider's stored secrets
+   * leaves the server.
+   */
   #redacted(trigger: Trigger): Trigger {
     return {
       ...trigger,
-      actionParams: this.#members.alertRedaction.redactActionParams(
-        trigger.action,
-        trigger.actionParams ?? {},
-      ),
+      actionParams: {},
     };
   }
 }
