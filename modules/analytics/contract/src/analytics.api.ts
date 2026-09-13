@@ -18,6 +18,7 @@ import type {
   LangWatchQLExecuteInput,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
+  LangWatchQLRunCaller,
   LangWatchQLSchema,
   LangWatchQLValidationInput,
 } from "./analytics.lwql.ts";
@@ -54,6 +55,19 @@ export interface AnalyticsApi {
   describeLangWatchQLSchema(input: { protections: LangWatchQLProtections }): LangWatchQLSchema;
   validateLangWatchQL(input: LangWatchQLValidationInput): unknown;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  /** Whether this project's rollout admits it to the Workbench at all. */
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+  /** What one signed-in member may see of a project's content and spend. */
+  resolveProtections(input: {
+    userId: string;
+    projectId: string;
+  }): Promise<LangWatchQLProtections>;
+  /**
+   * The restricted tenant identity a member's own statement runs as, together
+   * with their protections. Refuses with `project_not_found` when the project
+   * no longer exists.
+   */
+  resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller>;
 }
 
 export const AnalyticsApi = moduleApi<AnalyticsApi>("analytics");

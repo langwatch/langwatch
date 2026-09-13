@@ -38,16 +38,26 @@ import type {
   LangWatchQLExecuteInput,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
+  LangWatchQLRunCaller,
   LangWatchQLSchema,
   LangWatchQLService,
   AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
 import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import {
+  resolveWorkbenchProtections,
+  resolveWorkbenchRunCaller,
+} from "../rules/workbench-protections.rules.ts";
 import { AnalyticsAdapter } from "../services/analytics-composition.service.ts";
 import { FilterOptionsAdapter } from "../services/filter-options-composition.service.ts";
 import { LangWatchQLAdapter } from "../services/langwatch-ql-composition.service.ts";
@@ -94,6 +104,12 @@ export interface AnalyticsAppDependencies {
   /** The host's filter catalogue; see {@link AnalyticsFilterOptionsLookup}. */
   filterOptions: AnalyticsFilterOptionsLookup;
   langWatchQL: LangWatchQLService;
+  /** The Workbench's rollout gate and its two independent protection sources. */
+  featureFlags: FeatureFlagApi;
+  authz: AuthzApi;
+  dataPrivacy: DataPrivacyApi;
+  /** The SAME project peer the rollout gate and the run-caller's identity read. */
+  projects: ProjectApi;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -102,8 +118,16 @@ export type AnalyticsInfrastructure = Readonly<{
   defaultRetentionDays?: number;
 }>;
 
+/** The peer modules the Workbench's access rules read, resolved through their own tokens. */
+type AnalyticsDependencies = Readonly<{
+  featureFlags: typeof FeatureFlagApi;
+  authz: typeof AuthzApi;
+  dataPrivacy: typeof DataPrivacyApi;
+  projects: typeof ProjectApi;
+}>;
+
 type AnalyticsSetup = FeatureSetup<
-  Record<never, never>,
+  AnalyticsDependencies,
   MembersRead<typeof AnalyticsApp.reads>,
   AnalyticsServerConfig
 >;
@@ -168,7 +192,12 @@ class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
 
 export class AnalyticsApp implements AnalyticsApiContract {
   static readonly contract = AnalyticsApiToken;
-  static readonly dependencies = {};
+  static readonly dependencies = {
+    featureFlags: FeatureFlagApi,
+    authz: AuthzApi,
+    dataPrivacy: DataPrivacyApi,
+    projects: ProjectApi,
+  };
   static readonly configSchema = analyticsServerConfigSchema;
   static readonly reads = reads("clickhouse");
 
@@ -201,6 +230,10 @@ export class AnalyticsApp implements AnalyticsApiContract {
       analytics,
       filterOptions: FilterOptionsAdapter.create({ resolveClient }),
       langWatchQL,
+      featureFlags: setup.dependencies.featureFlags,
+      authz: setup.dependencies.authz,
+      dataPrivacy: setup.dependencies.dataPrivacy,
+      projects: setup.dependencies.projects,
     });
   }
 
@@ -315,5 +348,43 @@ export class AnalyticsApp implements AnalyticsApiContract {
 
   validateLangWatchQL(input: Parameters<LangWatchQLService["validate"]>[0]): unknown {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** Whether this project's rollout admits it to the Workbench at all. */
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
+    return lwqlEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projectId: input.projectId,
+      projects: this.#dependencies.projects,
+    });
+  }
+
+  /** What one signed-in member may see of a project's content and spend. */
+  resolveProtections(input: {
+    userId: string;
+    projectId: string;
+  }): Promise<LangWatchQLProtections> {
+    return resolveWorkbenchProtections({
+      authz: this.#dependencies.authz,
+      dataPrivacy: this.#dependencies.dataPrivacy,
+      userId: input.userId,
+      projectId: input.projectId,
+    });
+  }
+
+  /**
+   * The restricted tenant identity a member's own statement runs as, read
+   * through the SAME project peer the rollout gate reads — never a raw
+   * Prisma client in this App. Refuses with `project_not_found` when the
+   * project no longer exists.
+   */
+  resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller> {
+    return resolveWorkbenchRunCaller({
+      authz: this.#dependencies.authz,
+      dataPrivacy: this.#dependencies.dataPrivacy,
+      projects: this.#dependencies.projects,
+      userId: input.userId,
+      projectId: input.projectId,
+    });
   }
 }

@@ -133,6 +133,17 @@ export type LangWatchQLProtections = Readonly<{
   canSeeCapturedOutput?: boolean | null;
 }>;
 
+/**
+ * Who a session-authenticated restricted execution runs as, together with
+ * what that member may see. Dashboard reads both off `AnalyticsApi` rather
+ * than resolving either itself, so a chart and the workbench agree on one
+ * caller's protections.
+ */
+export type LangWatchQLRunCaller = Readonly<{
+  project: LangWatchQLCaller;
+  protections: LangWatchQLProtections;
+}>;
+
 /** How a surface handles a saved chart whose requested period exceeds its bucket budget. */
 export type LangWatchQLBudgetOverflowMode = "refuse" | "coarsen";
 
