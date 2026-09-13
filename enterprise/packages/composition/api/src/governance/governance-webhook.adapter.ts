@@ -8,7 +8,7 @@ import {
 } from "@langwatch/webhook-server";
 import {
   GovernanceEventDeliveryProcess,
-  GovernanceWebhook,
+  type GovernanceWebhookChannel,
   type GovernanceWebhookSendBatch,
 } from "@langwatch/enterprise-governance-server";
 import type { IntentContext } from "@langwatch/eventing";
@@ -18,15 +18,13 @@ type WebhookSendBatch = (
   context: IntentContext,
 ) => Promise<void>;
 
-export class AppGovernanceWebhook extends GovernanceWebhook {
+export class AppGovernanceWebhook implements GovernanceWebhookChannel {
   readonly maxAttempts = WEBHOOK_SEND_MAX_ATTEMPTS;
 
   private constructor(
     private readonly dependencies: WebhookDeliveryProcessDeps,
     private readonly send: WebhookSendBatch,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(dependencies: WebhookDeliveryProcessDeps): AppGovernanceWebhook {
     return new AppGovernanceWebhook(

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GatewayDebit,
   GatewayDebitProcess,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
+  type GatewayBudgetLedger,
   type GatewayResolvedBudget,
   type GovernanceResolvedBudgetCrossing,
 } from "@langwatch/enterprise-governance-server";
@@ -286,13 +286,11 @@ function toBudgetSpendTarget(
   };
 }
 
-class AppGatewayDebit extends GatewayDebit {
+class AppGatewayDebit implements GatewayBudgetLedger {
   private constructor(
     private readonly gateway: GatewayGovernance,
     private readonly signals: AppGovernanceSignalsService,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(
     gateway: GatewayGovernance,

@@ -122,8 +122,8 @@ export { EnterpriseApiAuditLog } from "./audit-log.composition.ts";
 export { EnterpriseApiSso, type EnterpriseApiSsoPeers } from "./sso.composition.ts";
 export {
   ssoConnectionTrpcTransport,
-  SsoConnectionLedger,
-  SsoGateLogger,
+  type SsoConnectionLedger,
+  type SsoGateLogger,
   type SsoInfrastructure,
 } from "@langwatch/enterprise-sso-server";
 export {

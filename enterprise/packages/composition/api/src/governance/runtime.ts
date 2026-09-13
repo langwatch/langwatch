@@ -1,5 +1,5 @@
 import {
-  GovernanceBudgetOverview,
+  type CliBudgetOverviewReader,
   type GovernanceClickHouseResolver,
   type GovernanceEventingChannel,
   type GovernanceSetupActivityReader,
@@ -41,7 +41,7 @@ type GovernanceRuntimeOptions = {
   apiKeys: ApiKeyApi;
   gatewayBaseUrl: string;
   virtualKeys: GovernanceVirtualKey;
-  budgetOverview: GovernanceBudgetOverview;
+  budgetOverview: CliBudgetOverviewReader;
   providers: GovernanceModelProviderCatalog;
   contacts: GovernanceOrganizationContact;
   eventing: GovernanceEventingChannel;
