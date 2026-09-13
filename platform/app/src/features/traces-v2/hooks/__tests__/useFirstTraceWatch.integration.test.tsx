@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * The Trace Explorer's "has this project ever received a trace" read. The
- * project record answers it, but that record is re-read only on focus and
- * on a route change, so the hook polls the small first-trace read while the
- * flag is false and refreshes the record the moment it flips.
+ * The Trace Explorer's watch for the project's first trace. The project
+ * record answers "has this project ever received a trace", but that record
+ * is re-read only on focus and on a route change, so the page polls the
+ * small first-trace read while the flag is false and refreshes the record
+ * the moment it flips.
  *
  * @see specs/traces-v2/onboarding-empty-state.feature
  */
@@ -49,8 +50,8 @@ vi.mock("~/utils/api", () => ({
 
 import {
   firstTracePollInterval,
-  useProjectHasTraces,
-} from "../useProjectHasTraces";
+  useFirstTraceWatch,
+} from "../useFirstTraceWatch";
 
 type QueryOptions = {
   enabled: boolean;
@@ -62,7 +63,7 @@ type QueryOptions = {
 const lastQueryOptions = (): QueryOptions =>
   useQueryMock.mock.calls.at(-1)![1] as QueryOptions;
 
-describe("useProjectHasTraces", () => {
+describe("useFirstTraceWatch", () => {
   beforeEach(() => {
     projectRef.current = { id: "project-1", firstMessage: false };
     firstTraceRef.current = { firstMessage: false };
@@ -71,11 +72,10 @@ describe("useProjectHasTraces", () => {
   });
 
   /** @scenario "The Trace Explorer leaves its empty state when the first trace arrives" */
-  it("polls the first-trace flag while it is false, then flips and refreshes the project record", () => {
-    const { result, rerender } = renderHook(() => useProjectHasTraces());
+  it("polls the first-trace flag while it is false, then refreshes the project record once it flips", () => {
+    const { rerender } = renderHook(() => useFirstTraceWatch());
 
     // Waiting: the flag is read on its own, on a self-stopping interval.
-    expect(result.current.hasAnyTraces).toBe(false);
     expect(useQueryMock).toHaveBeenLastCalledWith(
       { projectId: "project-1" },
       expect.objectContaining({ enabled: true }),
@@ -90,18 +90,15 @@ describe("useProjectHasTraces", () => {
     );
     expect(invalidateMock).not.toHaveBeenCalled();
 
-    // The first trace lands: the page leaves its empty state on this read,
-    // before the project record has caught up, and that record is refreshed
-    // once so every other reader follows.
+    // The first trace lands: the shared project record is refreshed once,
+    // which is what moves every reader of the flag off the empty state.
     firstTraceRef.current = { firstMessage: true };
     rerender();
-    expect(result.current.hasAnyTraces).toBe(true);
     expect(invalidateMock).toHaveBeenCalledTimes(1);
 
     // The record caught up: the poll is off, nothing is refreshed again.
     projectRef.current = { id: "project-1", firstMessage: true };
     rerender();
-    expect(result.current.hasAnyTraces).toBe(true);
     expect(lastQueryOptions().enabled).toBe(false);
     expect(invalidateMock).toHaveBeenCalledTimes(1);
   });
@@ -110,20 +107,19 @@ describe("useProjectHasTraces", () => {
     projectRef.current = { id: "project-1", firstMessage: true };
     firstTraceRef.current = undefined;
 
-    const { result } = renderHook(() => useProjectHasTraces());
+    renderHook(() => useFirstTraceWatch());
 
-    expect(result.current.hasAnyTraces).toBe(true);
     expect(lastQueryOptions().enabled).toBe(false);
     expect(invalidateMock).not.toHaveBeenCalled();
   });
 
-  it("answers nothing while the project context is still loading", () => {
+  it("does nothing while the project context is still loading", () => {
     projectRef.current = null;
 
-    const { result } = renderHook(() => useProjectHasTraces());
+    renderHook(() => useFirstTraceWatch());
 
-    expect(result.current.hasAnyTraces).toBeUndefined();
     expect(lastQueryOptions().enabled).toBe(false);
+    expect(invalidateMock).not.toHaveBeenCalled();
   });
 
   it("stops the poll on its own once the flag is true", () => {
