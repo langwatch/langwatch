@@ -92,12 +92,13 @@ const FORBIDDEN_KEYS = [
 describe("given a config with every secret-shaped field populated", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.spyOn(process, "exit").mockImplementation((code) => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError((code as number) ?? 0);
     });
   });
@@ -182,7 +183,7 @@ describe("given a config with every secret-shaped field populated", () => {
     it("exits 0", async () => {
       await whoamiCommand({ json: true });
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -235,7 +236,7 @@ describe("given a config with every secret-shaped field populated", () => {
     it("exits 0", async () => {
       await whoamiCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 });
