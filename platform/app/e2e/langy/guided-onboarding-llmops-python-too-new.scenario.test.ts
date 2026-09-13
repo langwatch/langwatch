@@ -25,7 +25,6 @@
  *   cd platform/app/e2e/langy && npx vitest run guided-onboarding-llmops-python-too-new.scenario.test.ts --reporter=verbose
  */
 
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -55,6 +54,7 @@ import {
   waitForPendingRequest,
   watchLangyConversation,
 } from "./local-control-fixture";
+import { belowVersion, installedVersion, reachableVersion } from "./pip-index";
 import { runScenarioAndLog } from "./scenario-logger";
 
 const model = guidedHarnessModel();
@@ -111,7 +111,10 @@ describe("Langy asks for a supported Python before writing against an SDK that l
     // Once a release ships that this interpreter accepts, pip installs the
     // current SDK, the check passes and there is no card: the scenario would
     // go green while testing nothing. Ask the index rather than assume.
-    const reachable = reachableSdkVersion(python.python);
+    const reachable = reachableVersion({
+      python: python.python,
+      name: "langwatch",
+    });
     if (!reachable || !belowVersion(reachable, FIRST_SUPPORTED_SDK)) {
       throw new Error(
         `this scenario needs an interpreter pip cannot reach a current SDK on, and python ${python.version} here reaches ${reachable ?? "nothing"}; the published range now covers it, so retire this scenario or pin the interpreter it takes away`,
@@ -258,7 +261,10 @@ describe("Langy asks for a supported Python before writing against an SDK that l
 
         // The install happened, and the interpreter really did get a release
         // without the API: the card is answering the machine, not a guess.
-        const installed = installedSdkVersion(python.python);
+        const installed = installedVersion({
+          python: python.python,
+          name: "langwatch",
+        });
         console.log("[layer2] installed langwatch:", installed ?? "none");
         expect(installed).not.toBeNull();
         expect(belowVersion(installed!, FIRST_SUPPORTED_SDK)).toBe(true);
@@ -280,51 +286,6 @@ describe("Langy asks for a supported Python before writing against an SDK that l
     );
   });
 });
-
-/**
- * The newest `langwatch` the index offers this interpreter, or null.
- *
- * `pip index versions` reports what the resolver would pick, which is the
- * fact this scenario stands on: the interpreter's version number says nothing
- * on its own once a release ships that accepts it.
- */
-function reachableSdkVersion(python: string): string | null {
-  try {
-    const listed = execFileSync(
-      python,
-      ["-m", "pip", "index", "versions", "langwatch"],
-      { encoding: "utf8", timeout: 120_000 },
-    );
-    return /^\s*LATEST:\s*(.+)$/m.exec(listed)?.[1]?.trim() ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** The `langwatch` version an interpreter has, or null when it has none. */
-function installedSdkVersion(python: string): string | null {
-  try {
-    const shown = execFileSync(python, ["-m", "pip", "show", "langwatch"], {
-      encoding: "utf8",
-      timeout: 120_000,
-    });
-    return /^Version:\s*(.+)$/m.exec(shown)?.[1]?.trim() ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** Whether `version` sorts before `floor`, comparing numbers not text. */
-function belowVersion(version: string, floor: string): boolean {
-  const parts = (value: string) => value.split(".").map(Number);
-  const [left, right] = [parts(version), parts(floor)];
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const a = left[index] ?? 0;
-    const b = right[index] ?? 0;
-    if (a !== b) return a < b;
-  }
-  return false;
-}
 
 /** Every command the stored conversation shows Langy ran, in order. */
 function storedCommands(
