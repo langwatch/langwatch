@@ -162,7 +162,16 @@ function definition() {
   });
 }
 
-/** Delegates to the comparator that ships, and keeps what it answered. */
+/**
+ * Delegates to the comparator that ships, and keeps what it answered — for
+ * THIS organization only.
+ *
+ * The dispatcher drains every due row this process owns, and the datastore
+ * lane shares one Postgres, so a comparison still retrying from an earlier
+ * organization becomes due as soon as a later test moves the clock on and is
+ * answered here. Recording it would put another organization's answer in this
+ * test's list, which is the same reason `daysComparedFor` filters.
+ */
 async function compareForReal(params: {
   tenantId: string;
   day: string;
@@ -172,7 +181,7 @@ async function compareForReal(params: {
     day: params.day,
     costSource: GOVERNANCE_COST_SOURCE.PULLED,
   });
-  comparisons.push(comparison);
+  if (params.tenantId === tenant) comparisons.push(comparison);
   return comparison;
 }
 
@@ -305,6 +314,20 @@ function daysComparedFor(tenantId = tenant): string[] {
 
 async function messagesFor(tenantId = tenant) {
   return await store.findMessagesByRef({ ref: refFor(tenantId) });
+}
+
+/**
+ * The outbox key the runtime actually writes for a key the definition authored.
+ *
+ * Outbox uniqueness is on `(processName, projectId, messageKey)`, which says
+ * nothing about which instance of a keyed process asked, so the builder
+ * qualifies every authored key with the process key
+ * (`buildIntentFactories`, src/server/event-sourcing/pipeline/processManagerDefinition.ts).
+ * Asserting the bare key would pass against a build that had quietly stopped
+ * qualifying them and let two organizations collide.
+ */
+function outboxKey(key: string, tenantId = tenant): string {
+  return `process:${encodeURIComponent(refFor(tenantId).processKey)}:${key}`;
 }
 
 /**
@@ -536,8 +559,10 @@ describe("a charge and a check racing each other", () => {
       const result = await service.handleWake({ wake: inFlight, now: clock });
 
       // It stood down without asking for anything — and, crucially, without
-      // clearing the marks it was holding.
-      expect(result.outcome).toBe("revisionConflict");
+      // clearing the marks it was holding. `staleWake` is what the runtime
+      // calls standing down: a wake is only valid at the revision it was
+      // scheduled at, and the charge that landed meanwhile moved it.
+      expect(result.outcome).toBe("staleWake");
       await drainOutbox();
       expect(daysComparedFor()).toEqual([]);
 
@@ -594,7 +619,7 @@ describe("recognising a repeat of one check slot", () => {
       }
       expect(replay.insertedMessageKeys).toEqual([]);
       expect(replay.duplicateMessageKeys).toEqual([
-        `compare:${TODAY}:${TONIGHT}:${marks}`,
+        outboxKey(`compare:${TODAY}:${TONIGHT}:${marks}`),
       ]);
       expect(daysComparedFor()).toEqual([TODAY]);
       // Asserted alongside the run because a second pass of a read-only
@@ -619,15 +644,16 @@ describe("recognising a repeat of one check slot", () => {
       await drainOutbox();
 
       expect(daysComparedFor()).toEqual([TODAY, TODAY]);
-      // The slot is part of what identifies a comparison, so the second one is
-      // a new row rather than a repeat the outbox would suppress.
+      // The slot and the mark counter are both part of what identifies a
+      // comparison, so the second one is a new row rather than a repeat the
+      // outbox would suppress: a new slot, and the day marked a second time.
       const keys = (await messagesFor())
         .map((message) => message.messageKey)
         .sort();
       expect(keys).toEqual(
         [
-          `compare:${TODAY}:${TONIGHT}`,
-          `compare:${TODAY}:${TOMORROW_NIGHT}`,
+          outboxKey(`compare:${TODAY}:${TONIGHT}:1`),
+          outboxKey(`compare:${TODAY}:${TOMORROW_NIGHT}:2`),
         ].sort(),
       );
     });
