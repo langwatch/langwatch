@@ -673,6 +673,150 @@ export async function createDemoRepo({
   };
 }
 
+/**
+ * The folders a scenario can share that are NOT one of the demo applications.
+ *
+ * A demo repository is a working project: installed, committed, with a remote.
+ * These are the opposite, and each one exists for a scenario about the folder
+ * rather than about the code. `acme-notes` is a pip project: its manifest is
+ * `requirements.txt`, there is no lock file and no virtual environment, and
+ * nothing is installed until Langy installs it.
+ */
+export type FixtureFolderName = "acme-notes";
+
+const FIXTURE_FOLDER: Record<FixtureFolderName, string> = {
+  "acme-notes": path.join(REPO_ROOT, "dev", "dogfood", "acme-notes", "python"),
+};
+
+/** A shared folder that is not a demo repository, and what a test reads of it. */
+export interface FixtureFolder {
+  root: string;
+  /** Whether a repository exists in it, which a scenario can be about. */
+  isGitRepo: () => boolean;
+  read: (relativePath: string) => string;
+  exists: (relativePath: string) => boolean;
+  /** Any git command. Answers "" while there is no repository. */
+  git: (args: string[]) => string;
+  /** Every local branch name, empty while there is no repository. */
+  branches: () => string[];
+  /** The subject line of every commit, newest first. */
+  log: () => string[];
+  /** The porcelain status, empty while there is no repository. */
+  status: () => string;
+}
+
+/**
+ * Copy a fixture folder somewhere temporary and hand it to a scenario.
+ *
+ * Nothing is installed: a scenario that shares one of these is about what
+ * Langy does with a project as it finds it, and an install by the fixture
+ * would answer the question the scenario is asking. `git: false` leaves the
+ * copy with no repository at all, which is its own scenario.
+ */
+export async function createFixtureFolder({
+  fixture,
+  name,
+  git: withGit,
+}: {
+  fixture: FixtureFolderName;
+  /** Names the folder, so a failed run is readable on disk. */
+  name: string;
+  git: boolean;
+}): Promise<FixtureFolder> {
+  await pruneDemoRepos();
+  const root = path.join(
+    SCENARIO_REPO_DIR,
+    `${name}-${Date.now().toString(36)}`,
+  );
+  await fs.rm(root, { recursive: true, force: true });
+  await copyTree(FIXTURE_FOLDER[fixture], root);
+
+  const git = (args: string[]): string => {
+    try {
+      return sh("git", args, { cwd: root });
+    } catch {
+      return "";
+    }
+  };
+  if (withGit) {
+    git(["init", "--initial-branch=main"]);
+    git(["config", "user.name", "LangWatch scenario"]);
+    git(["config", "user.email", "scenario@langwatch.localhost"]);
+    git(["config", "commit.gpgsign", "false"]);
+    git(["add", "-A"]);
+    git(["commit", "-m", `chore: the ${fixture} application`]);
+  }
+
+  return {
+    root,
+    isGitRepo: () => existsSync(path.join(root, ".git")),
+    read: (relativePath: string) =>
+      existsSync(path.join(root, relativePath))
+        ? readFileSync(path.join(root, relativePath), "utf8")
+        : "",
+    exists: (relativePath: string) => existsSync(path.join(root, relativePath)),
+    git,
+    branches: () =>
+      git(["for-each-ref", "--format=%(refname:short)", "refs/heads"])
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    log: () =>
+      git(["log", "--all", "--pretty=%s"])
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    status: () => git(["status", "--porcelain"]),
+  };
+}
+
+/** A Python interpreter of a scenario's own, and the ways it uses one. */
+export interface PythonEnv {
+  /** Goes on the terminal's PATH: it carries `python3`, `pip3` and `pip`. */
+  binDir: string;
+  /** The interpreter itself, for a test that asserts on what got installed. */
+  python: string;
+  /** Whether the interpreter can import a module, which an install proves. */
+  canImport: (module: string) => boolean;
+}
+
+/**
+ * Build a Python interpreter beside the shared folder, for the terminal to use.
+ *
+ * A packaged interpreter refuses to install into itself (Homebrew and the
+ * system Python both ship `EXTERNALLY-MANAGED`), so on such a machine every
+ * rung of the install ladder fails for a reason that has nothing to do with
+ * what a scenario is asking. A virtual environment of the scenario's own is
+ * the ordinary machine that scenario assumes: `pip3` installs, `python3`
+ * imports, and the developer's own Python is left alone.
+ *
+ * It sits BESIDE the shared folder, never in it: a `.venv` inside the folder
+ * is a fact about the project that the install ladder reads, and these
+ * scenarios are about a project that has none.
+ */
+export async function createPythonEnv({
+  at,
+}: {
+  at: string;
+}): Promise<PythonEnv> {
+  await fs.rm(at, { recursive: true, force: true });
+  sh("python3", ["-m", "venv", at], { timeoutMs: 300_000 });
+  const binDir = path.join(at, "bin");
+  const python = path.join(binDir, "python3");
+  return {
+    binDir,
+    python,
+    canImport: (module: string) => {
+      try {
+        sh(python, ["-c", `import ${module}`], { timeoutMs: 120_000 });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The command line, in a terminal
 // ---------------------------------------------------------------------------
@@ -727,6 +871,26 @@ export function buildCli(): Promise<void> {
  * a flag the branch just added would read the installed copy's "unknown option"
  * instead.
  */
+/**
+ * A directory of stand-in commands, for the terminal's PATH.
+ *
+ * Each body is run by `/bin/sh` with the call's own arguments, so a stand-in
+ * can refuse (`exit 127`), answer something fixed, or hand the call on.
+ */
+async function shimBinDir(
+  at: string,
+  shims: Record<string, string>,
+): Promise<string> {
+  await fs.mkdir(at, { recursive: true });
+  for (const [name, body] of Object.entries(shims)) {
+    await fs.writeFile(path.join(at, name), `#!/bin/sh\n${body}\n`, {
+      encoding: "utf8",
+      mode: 0o755,
+    });
+  }
+  return at;
+}
+
 async function cliBinDir(at: string): Promise<string> {
   await fs.mkdir(at, { recursive: true });
   const shim = path.join(at, "langwatch");
@@ -815,8 +979,10 @@ export async function startShareControl({
   repo,
   label,
   clearOpenRequests = true,
+  shims = {},
+  pathDirs = [],
 }: {
-  repo: DemoRepo;
+  repo: Pick<DemoRepo, "root">;
   label: string;
   /**
    * Whether to cancel the requests already open on the project first. The
@@ -827,6 +993,19 @@ export async function startShareControl({
    * terminal is about to answer.
    */
   clearOpenRequests?: boolean;
+  /**
+   * Commands to put FIRST on the terminal's PATH, as a name to the shell body
+   * that stands in for it. A scenario about what Langy does when a tool is
+   * missing or broken writes that here, so the absence lives in the terminal
+   * the scenario owns rather than in the machine running it.
+   */
+  shims?: Record<string, string>;
+  /**
+   * Directories to put on the terminal's PATH after the shims, before the
+   * machine's own. A scenario that needs a working interpreter, or any other
+   * tool it built for itself, names its bin directory here.
+   */
+  pathDirs?: string[];
 }): Promise<CliTerminal> {
   await buildCli();
   if (clearOpenRequests) await cancelOpenControlRequests();
@@ -835,6 +1014,10 @@ export async function startShareControl({
   await writeCliLoginConfig({ configPath });
   const binDir = await cliBinDir(
     path.join(repo.root, "..", `${sessionName}-bin`),
+  );
+  const shimDir = await shimBinDir(
+    path.join(repo.root, "..", `${sessionName}-shims`),
+    shims,
   );
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
   // The terminal signs in through the login config alone: a project key in
@@ -848,7 +1031,13 @@ export async function startShareControl({
       "unset LANGWATCH_API_KEY",
       `export LANGWATCH_ENDPOINT=${JSON.stringify(APP_BASE)}`,
       `export LANGWATCH_CLI_CONFIG=${JSON.stringify(configPath)}`,
-      `export PATH=${JSON.stringify(binDir)}:"$PATH"`,
+      // The shims come before the command line's own shim dir, then whatever
+      // the scenario built for itself, then the machine's PATH: a scenario's
+      // stand-in wins, and everything it does not name resolves as it
+      // normally would.
+      `export PATH=${[shimDir, binDir, ...pathDirs]
+        .map((dir) => JSON.stringify(dir))
+        .join(":")}:"$PATH"`,
       "export FORCE_COLOR=0",
       "unset TRACEPARENT",
       `exec node ${JSON.stringify(CLI_ENTRY)} langy --share-control`,
@@ -2278,7 +2467,7 @@ export async function teardown({
   terminal?: CliTerminal;
   watcher?: ConversationWatcher;
   app?: DemoApp;
-  repo?: DemoRepo;
+  repo?: Pick<DemoRepo, "root">;
 }): Promise<void> {
   app?.stop();
   watcher?.stop();

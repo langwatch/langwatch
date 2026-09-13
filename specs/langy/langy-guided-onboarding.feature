@@ -764,6 +764,30 @@ Feature: Langy guides the first setup after sign-up
       Then a refused key and a tracing edit that cannot be applied are among the stops
       And a refused key sends the user to the project's settings page for the variables
 
+    # The two rungs above are read off the skill text. These two run the path
+    # against a real folder that has the problem, because a rule a model can
+    # recite is not yet a rule it follows.
+    @e2e
+    Scenario: A command not found moves the install ladder to the next rung
+      Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
+      And a terminal whose PATH has no pip, while pip3 and python3 -m pip work
+      When Langy runs the llmops path
+      Then Langy tries pip at most once and installs through the next spelling on the ladder
+      And the manifest names langwatch and the interpreter can import it
+      And the question offering to install uv is never asked
+      And nothing Langy says calls the folder unmanaged
+
+    @e2e
+    Scenario: A folder with no repository is asked about, not branched in
+      Given a shared folder with no git repository in it
+      When Langy runs the llmops path
+      Then the turn ends on the question "This folder isn't a git repository yet, so I can't make a branch for the tracing change. Want me to create one?"
+      And its options are "Create a repository for me" and "I'll choose another folder", in that order
+      And no branch was checked out before the answer
+      When the developer picks "Create a repository for me"
+      Then the folder becomes a repository with a first commit and a .gitignore naming .env
+      And the path carries on the langy branch, with the no-remote line in the pull request line's place
+
   # ===========================================================================
   # The skill and its routing
   # ===========================================================================
