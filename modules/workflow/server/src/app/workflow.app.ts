@@ -3,12 +3,13 @@
  * arrives as an argument, never read from a session or a request, so one
  * operation serves a browser session, an API key and a background job alike.
  */
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi, type Evaluator } from "@langwatch/evaluator-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { AgentApi } from "@langwatch/agent-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { reads } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { z } from "zod";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
@@ -49,7 +50,7 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
-import type { WorkflowService } from "../services/workflow.service.ts";
+import { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import { nanoid } from "nanoid";
@@ -64,6 +65,14 @@ import {
 } from "../repositories/workflow-repositories.registry.ts";
 import { ModelProviderWorkflowStudioDslAdapter } from "../adapters/workflow-studio-dsl.adapter.ts";
 import { WorkflowAgentMappingAdapter } from "../adapters/workflow-agent-mapping.adapter.ts";
+import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
+import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
+import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
+import { ContractWorkflowDslMigrationAdapter } from "../services/workflow-dsl-migration.service.ts";
+import {
+  HttpWorkflowNlpRuntimeAdapter,
+  UnconfiguredWorkflowNlpRuntimeAdapter,
+} from "../channels/http/http.workflow-nlp-runtime.channel.ts";
 
 /** Whether one person may act on a project other than the scoped one. */
 export interface WorkflowPermissionProbe {
@@ -285,9 +294,14 @@ export interface WorkflowInfrastructure {
 /**
  * What the process still hands this module directly, now that `evaluators`
  * (an `EvaluatorApi` dependency), `studioDsl` (built over the model-provider
- * dependency), `agentMappings` (built over the agent dependency) and
+ * dependency), `agentMappings` (built over the agent dependency),
  * `workflowRows` (built over this module's own `workflowRepositories`
- * registry) are no longer host-supplied.
+ * registry), `workflows` (the `WorkflowService`, built over this module's own
+ * repositories, the `datasets` dependency, an nlp runtime resolved from
+ * config, and a nanoid id generator - the same shape `apps/worker`'s
+ * `createWorkerEvaluationWorkflows` composed by hand) and `datasets` (a
+ * `DatasetApi` dependency, no longer read off the host bag) are no longer
+ * host-supplied.
  *
  * This is still a bespoke bag rather than `MembersRead<typeof
  * WorkflowApp.reads>` - `lineage`, `publications`, `permissions`,
@@ -296,26 +310,97 @@ export interface WorkflowInfrastructure {
  * workflow.composition.ts` (the deleted authority for this conversion) was
  * written, so there is no precedented "how" to build them from a `reads()`
  * member or a peer dependency yet. Boot's automatic `membersFor(members,
- * app.reads)` only ever produces `{prisma}` for this app and casts the rest
- * away (`application.ts`'s `membersFor(...) as Members`), so a process that
- * wants the fields below MUST still construct `WorkflowApp` directly -
- * exactly what `apps/worker` does today - handing this bag in by hand rather
- * than through `createApp().withModules([workflowServer]).boot()`. Folding
- * them into `reads()`/`dependencies` too is real, separate work: several
- * (`permissions`, `lineage`, `evaluations`) read or write project data with no
- * existing adapter in this package to convert from.
+ * app.reads)` only ever produces `{prisma, encryption}` for this app and casts
+ * the rest away (`application.ts`'s `membersFor(...) as Members`), so a
+ * process that wants the fields below MUST still construct `WorkflowApp`
+ * directly - exactly what `apps/worker` does today - handing this bag in by
+ * hand rather than through `createApp().withModules([workflowServer]).boot()`.
+ * Folding them into `reads()`/`dependencies` too is real, separate work:
+ * several (`permissions`, `lineage`, `evaluations`) read or write project data
+ * with no existing adapter in this package to convert from.
  */
 export type WorkflowHostMembers = Omit<
   WorkflowInfrastructure,
-  "evaluators" | "studioDsl" | "agentMappings" | "workflowRows"
+  | "evaluators"
+  | "studioDsl"
+  | "agentMappings"
+  | "workflowRows"
+  | "workflows"
+  | "datasets"
 >;
+
+/**
+ * `nlpServiceUrl` resolves the module's own NLP runtime, the way
+ * `WorkerEvaluationWorkflowCompositionInput.nlpServiceUrl` did for
+ * `apps/worker`: absent, a run refuses by name rather than dispatching
+ * nowhere (`UnconfiguredWorkflowNlpRuntimeAdapter`).
+ */
+const workflowAppConfigSchema = z.object({
+  nlpServiceUrl: z.string().optional(),
+});
+export type WorkflowAppConfig = z.infer<typeof workflowAppConfigSchema>;
 
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowApp.dependencies,
-  WorkflowHostMembers,
-  undefined,
+  WorkflowHostMembers & MembersRead<typeof WorkflowApp.reads>,
+  WorkflowAppConfig,
   WorkflowRepositories
 >;
+
+/** The module's own id generator - the same nanoid the worker's copy used. */
+class NanoidWorkflowId implements WorkflowId {
+  static create(): NanoidWorkflowId {
+    return new NanoidWorkflowId();
+  }
+
+  private constructor() {}
+
+  next(): string {
+    return nanoid();
+  }
+}
+
+/** Resolves a workflow's LiteLLM parameters over the model-provider dependency. */
+class ModelProviderWorkflowLlmParameters implements WorkflowLlmParameters {
+  static create(input: { modelProviders: ModelProviderApi }): ModelProviderWorkflowLlmParameters {
+    return new ModelProviderWorkflowLlmParameters(input.modelProviders);
+  }
+
+  #modelProviders: ModelProviderApi;
+
+  private constructor(modelProviders: ModelProviderApi) {
+    this.#modelProviders = modelProviders;
+  }
+
+  async resolve(input: {
+    projectId: string;
+    models: readonly LLMConfig["model"][];
+  }): Promise<readonly WorkflowLlmParameterResolution[]> {
+    const providers = await this.#modelProviders.getExecutionProviders({
+      projectId: input.projectId,
+    });
+
+    return await Promise.all(
+      input.models.map(async (model) => {
+        const provider = model.split("/")[0]!;
+        const modelProvider = providers[provider];
+        if (!modelProvider) return { model, provider, configured: false, enabled: false };
+        if (!modelProvider.enabled) return { model, provider, configured: true, enabled: false };
+
+        return {
+          model,
+          provider,
+          configured: true,
+          enabled: true,
+          litellmParams: await this.#modelProviders.prepareExecution({
+            model,
+            projectId: input.projectId,
+          }),
+        };
+      }),
+    );
+  }
+}
 
 /** The comparable text of a graph: local configuration stripped, keys sorted. */
 function comparableDsl(dsl: StudioWorkflow): string {
@@ -339,14 +424,57 @@ export class WorkflowApp implements WorkflowApi {
     modelProviders: ModelProviderApi,
     /** The agent mappings a saved Studio graph refreshes, best effort. */
     agents: AgentApi,
+    /** The dataset copies a Studio graph carries with it into another project. */
+    datasets: DatasetApi,
   };
-  /** For `workflowRows`, via this module's own `workflowRepositories` registry. */
-  static readonly reads = reads("prisma");
+  static readonly configSchema = workflowAppConfigSchema;
+  /**
+   * `prisma` for `workflowRows`/`workflows`/`projectEnvironment`, via this
+   * module's own `workflowRepositories` registry; `encryption` for decrypting
+   * the project secrets `projectEnvironment` reads.
+   */
+  static readonly reads = reads("prisma", "encryption");
   static readonly repositories = workflowRepositories;
 
   static create(setup: WorkflowSetup): WorkflowApp {
+    const datasets = setup.dependencies.datasets;
+    const llmParameters = ModelProviderWorkflowLlmParameters.create({
+      modelProviders: setup.dependencies.modelProviders,
+    });
+    const projectEnvironment = WorkflowProjectEnvironmentService.create({
+      repository: setup.repositories.projectEnvironment,
+      encryption: setup.members.encryption,
+    });
+    const studioEvents = StudioEventPreparerService.create({
+      datasets,
+      projectEnvironment,
+      llmParameters,
+    });
+    const nlpRuntime = setup.config.nlpServiceUrl
+      ? HttpWorkflowNlpRuntimeAdapter.create({
+          serviceUrl: setup.config.nlpServiceUrl,
+          staging: setup.members.nlpPayloadStaging,
+        })
+      : UnconfiguredWorkflowNlpRuntimeAdapter.create();
+    const ids = NanoidWorkflowId.create();
+    const workflows = WorkflowService.create({
+      repository: setup.repositories.workflows,
+      datasets,
+      execution: WorkflowNlpExecutionService.create({
+        ids,
+        modelProviders: setup.dependencies.modelProviders,
+        nlpRuntime,
+        studioEvents,
+      }),
+      studioEvents,
+      dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+      ids,
+    });
+
     return new WorkflowApp({
       ...setup.members,
+      workflows,
+      datasets,
       evaluators: setup.dependencies.evaluators,
       studioDsl: ModelProviderWorkflowStudioDslAdapter.create({
         modelProviders: setup.dependencies.modelProviders,
