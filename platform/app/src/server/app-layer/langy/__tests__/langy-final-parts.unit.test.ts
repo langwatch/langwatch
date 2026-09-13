@@ -492,4 +492,66 @@ describe("buildFinalAssistantParts", () => {
       ]);
     });
   });
+  describe("given a turn that said its lines and then wrote them again", () => {
+    const said =
+      "I opened a pull request with the tracing change: https://example.test/acme/pull/3. You can merge it already.";
+    const branch =
+      "I left branch langy/acme-checkout checked out: the agent you started runs on it.";
+
+    /** @scenario "A line Langy wrote is shown once" */
+    it("records the said lines and a reply emptied of their repeats", () => {
+      const parts = buildFinalAssistantParts({
+        text: `${said}\n${branch}`,
+        toolCalls: [
+          { id: "s1", name: "say", input: { text: said }, output: "Said." },
+          { id: "s2", name: "say", input: { text: branch }, output: "Said." },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "tool-say",
+        "tool-say",
+        "text",
+      ]);
+      expect(parts.at(-1)).toEqual({
+        type: "text",
+        text: "",
+        role: "assistant",
+      });
+    });
+
+    /** @scenario "A line Langy wrote is shown once" */
+    it("keeps a closing sentence the turn had not said yet", () => {
+      const parts = buildFinalAssistantParts({
+        text: `${said}\nAnything else I can help with?`,
+        toolCalls: [
+          { id: "s1", name: "say", input: { text: said }, output: "Said." },
+        ],
+      });
+
+      expect(parts.at(-1)).toMatchObject({
+        text: "Anything else I can help with?",
+      });
+    });
+
+    /** @scenario "A line Langy wrote is shown once" */
+    it("drops a said line that a question card asks as its own question", () => {
+      const proposal =
+        "The first one I'd write is Guest completes checkout, because it is the golden path.";
+      const parts = buildFinalAssistantParts({
+        text: "",
+        toolCalls: [
+          { id: "s1", name: "say", input: { text: proposal }, output: "Said." },
+          {
+            id: "q1",
+            name: "question",
+            input: { questions: [{ question: proposal, bare: true }] },
+            output: "answered",
+          },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual(["tool-question", "text"]);
+    });
+  });
 });

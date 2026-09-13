@@ -8,6 +8,7 @@ import {
   splitLangyCardFences,
 } from "@langwatch/langy";
 import { getLangyBlocksCounter } from "~/server/metrics";
+import { partsShownOnce } from "~/shared/langy/shownOnce";
 import { LangyCliEnvelopeService } from "./execution/langy-cli-envelope.service";
 import type { LangyTurnSegment } from "./streaming/langyTurnOrder";
 
@@ -107,10 +108,18 @@ export function buildFinalAssistantParts({
     });
   };
 
+  // A line is shown once (shownOnce.ts): reply text that repeats a line said
+  // with `say` loses that line, and a `say` that only voices a question card's
+  // own question is dropped. The rule is applied here, on the record both
+  // finalize paths write, so every reader of the turn agrees about what the
+  // turn said rather than each renderer deduplicating on its own.
   if (!order?.length) {
-    return [...toolCalls.map(toolPartOf), ...assistantTextParts(text)];
+    return partsShownOnce([
+      ...toolCalls.map(toolPartOf),
+      ...assistantTextParts(text),
+    ]);
   }
-  return orderedParts({ text, toolCalls, order, toolPartOf });
+  return partsShownOnce(orderedParts({ text, toolCalls, order, toolPartOf }));
 }
 
 /**

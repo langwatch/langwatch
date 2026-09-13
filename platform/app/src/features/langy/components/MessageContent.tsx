@@ -20,6 +20,7 @@ import { guidedKickoffPartOf } from "~/features/guided-onboarding/kickoff";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
+import { partsShownOnce } from "~/shared/langy/shownOnce";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   hasLangyBlockParts,
@@ -96,7 +97,7 @@ export type ProposalHandlers = Record<
 >;
 
 function MessageContentImpl({
-  message,
+  message: recordedMessage,
   organizationId,
   appliedOutcomes,
   discardedProposals,
@@ -198,6 +199,17 @@ function MessageContentImpl({
    */
   liveCodeAccessCallId?: string | null;
 }) {
+  // A line is shown once (shownOnce.ts). The rule is applied to the record when
+  // a turn finalizes, and again here because a tab that WATCHED the turn keeps
+  // the copy it streamed rather than reading the durable one back, and a turn
+  // recorded before the rule existed is read from as it stands.
+  const message = useMemo(
+    () => ({
+      ...recordedMessage,
+      parts: partsShownOnce(recordedMessage.parts),
+    }),
+    [recordedMessage],
+  );
   const isUser = message.role === "user";
   // A notice the platform wrote into the transcript, such as the shared
   // folder disconnecting (ADR-129). Like a message from the developer it is
