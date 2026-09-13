@@ -13,6 +13,7 @@ import type { Actor } from "@langwatch/actor";
 import {
   bindRestMiddleware,
   createRestRuntime,
+  defineRestMiddleware,
   projectRestFacts,
   recordBrowserCaller,
   recordOrganizationCredential,
@@ -36,12 +37,28 @@ import type {
   MountableTransport,
   TransportPeers,
 } from "@langwatch/runtime-composition";
+import { z } from "zod";
+import { apiClientAddress } from "../app/api-client-address.ts";
 import { canonicalErrorResponse } from "../app/api-canonical-error.ts";
 import { ApiRestCredentials } from "./api-rest.credentials.ts";
 import {
   ApiRestDoorUnconfiguredError,
   ApiRestDoorUnverifiedError,
 } from "./api-rest.refusals.ts";
+
+/**
+ * What this process knows about a caller that no module can: the address a
+ * request actually came from, behind the deployment's trusted proxies. Bound
+ * by NAME for every mount, so a module's own same-named declaration is
+ * answered without the process importing the module's token - the same
+ * arrangement the tRPC host documents for its identity facts.
+ */
+const processRestFacts: readonly RestTransportMiddlewareBinding[] = [
+  bindRestMiddleware(
+    defineRestMiddleware("unsubscribeCallerAddress", z.string().nullable()),
+    (context) => apiClientAddress(context) ?? null,
+  ),
+];
 
 /** Every door a REST declaration may name, opened by this process or not. */
 export type ApiRestDoor = RestDoorCredential | "public";
@@ -147,6 +164,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       app,
       onError: familyErrors,
       facts: [
+        ...processRestFacts,
         ...(door === "project" ? [this.projectFacts()] : []),
         ...((options?.facts ?? []) as readonly RestTransportMiddlewareBinding[]),
       ],
