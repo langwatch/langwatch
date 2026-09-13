@@ -111,6 +111,7 @@ import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydratio
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
   createLangyChatTransport,
+  type LangyChatTransportDeps,
   type LangyTurnRequestContext,
   type LangyTurnSignalEntry,
 } from "../logic/langyChatTransport";
@@ -636,6 +637,39 @@ function applyProgressSignal(
   });
 }
 
+/**
+ * ADR-129. A card the turn is waiting on. The durable event is the truth (the
+ * tail folds it onto the tool call); this is the fast path that puts the card
+ * up before the tail lands.
+ */
+function recordLocalWait(
+  entry: Parameters<NonNullable<LangyChatTransportDeps["onLocalWait"]>>[0],
+): void {
+  useLangyLocalControlStore.getState().recordWait({
+    conversationId: useLangyStore.getState().activeConversationId,
+    wait:
+      entry.type === "local_permission"
+        ? { ...entry, kind: "permission" }
+        : { ...entry, kind: "question" },
+  });
+}
+
+/** The shared folder came or went while the turn ran. */
+function recordLocalWorkspace(
+  entry: Parameters<NonNullable<LangyChatTransportDeps["onLocalWorkspace"]>>[0],
+): void {
+  useLangyLocalControlStore.getState().recordWorkspace({
+    conversationId: useLangyStore.getState().activeConversationId,
+    workspace: {
+      state: entry.state,
+      name: entry.name,
+      root: entry.root,
+      hostname: entry.hostname,
+      ...(entry.gitBranch ? { gitBranch: entry.gitBranch } : {}),
+    },
+  });
+}
+
 function LangyPanel({
   proposalHandlersRef,
   actionHandlersRef,
@@ -1020,30 +1054,8 @@ function LangyPanel({
             handlers: actionHandlersRef?.current ?? {},
           });
         },
-        // ADR-129. A card the turn is waiting on. The durable event is the
-        // truth (the tail folds it onto the tool call); this is the fast path
-        // that puts the card up before the tail lands.
-        onLocalWait: (entry) => {
-          useLangyLocalControlStore.getState().recordWait({
-            conversationId: useLangyStore.getState().activeConversationId,
-            wait:
-              entry.type === "local_permission"
-                ? { ...entry, kind: "permission" }
-                : { ...entry, kind: "question" },
-          });
-        },
-        onLocalWorkspace: (entry) => {
-          useLangyLocalControlStore.getState().recordWorkspace({
-            conversationId: useLangyStore.getState().activeConversationId,
-            workspace: {
-              state: entry.state,
-              name: entry.name,
-              root: entry.root,
-              hostname: entry.hostname,
-              ...(entry.gitBranch ? { gitBranch: entry.gitBranch } : {}),
-            },
-          });
-        },
+        onLocalWait: recordLocalWait,
+        onLocalWorkspace: recordLocalWorkspace,
         onSignal: applyTurnSignal,
         // Developer mode's tape (see LangyDevDrawer). A no-op unless the
         // inspector is open and has armed recording, so a normal session pays

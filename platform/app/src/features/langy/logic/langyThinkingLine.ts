@@ -402,6 +402,59 @@ function waitingLine({
   };
 }
 
+/** The line while a card holds the turn for the reader's answer. */
+function awaitingAnswerLine({
+  terminalConnected,
+  awaitingPermission,
+}: {
+  terminalConnected: boolean;
+  awaitingPermission: boolean;
+}): LangyThinkingLine {
+  const text = !terminalConnected
+    ? LANGY_AWAITING_ANSWER_LINE
+    : awaitingPermission
+      ? LANGY_AWAITING_APPROVAL_TERMINAL_LINE
+      : LANGY_ANSWER_HERE_OR_TERMINAL;
+  return { text, tone: "waiting", allowWhimsy: false };
+}
+
+/**
+ * The line for the tool running right now, in the reader's words: it is on
+ * the tool stream with its command in the input, or in the turn's durable
+ * record. Null when nothing is running.
+ */
+function runningToolLine({
+  last,
+  toolCalls,
+}: {
+  last: ReturnType<typeof currentTurnAssistant>;
+  toolCalls: readonly RecordedToolCall[] | null;
+}): LangyThinkingLine | null {
+  const tool = runningTool(last);
+  if (tool?.type) {
+    return {
+      text: customerToolLine({
+        name: tool.type.slice("tool-".length),
+        input: tool.input,
+      }),
+      tone: "working",
+      allowWhimsy: false,
+    };
+  }
+  const recorded = runningRecordedTool(toolCalls);
+  if (recorded) {
+    return {
+      text: customerToolLine({
+        name: recorded.toolName,
+        input: recorded.input ?? { command: recorded.command },
+      }),
+      tone: "working",
+      allowWhimsy: false,
+    };
+  }
+  return null;
+}
+
 /**
  * The line for the current state of a turn, or null when no line should
  * render at all (the streaming answer is on screen and speaks for itself).
@@ -492,12 +545,7 @@ export function langyThinkingLine({
   //    every line below, including the tool that reads as still running: that
   //    tool IS the card.
   if (awaitingAnswer) {
-    const text = !terminalConnected
-      ? LANGY_AWAITING_ANSWER_LINE
-      : awaitingPermission
-        ? LANGY_AWAITING_APPROVAL_TERMINAL_LINE
-        : LANGY_ANSWER_HERE_OR_TERMINAL;
-    return { text, tone: "waiting", allowWhimsy: false };
+    return awaitingAnswerLine({ terminalConnected, awaitingPermission });
   }
 
   // 0b. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
@@ -511,28 +559,8 @@ export function langyThinkingLine({
   // 1. A TOOL IS RUNNING. We know exactly what it is: it is on the tool
   //    stream with its command in the input, or in the turn's durable record.
   //    Say the true thing, in the reader's words.
-  const tool = runningTool(last);
-  if (tool?.type) {
-    return {
-      text: customerToolLine({
-        name: tool.type.slice("tool-".length),
-        input: tool.input,
-      }),
-      tone: "working",
-      allowWhimsy: false,
-    };
-  }
-  const recorded = runningRecordedTool(toolCalls);
-  if (recorded) {
-    return {
-      text: customerToolLine({
-        name: recorded.toolName,
-        input: recorded.input ?? { command: recorded.command },
-      }),
-      tone: "working",
-      allowWhimsy: false,
-    };
-  }
+  const running = runningToolLine({ last, toolCalls });
+  if (running) return running;
 
   // 2. TOKENS ARE ARRIVING. The streaming prose is on screen right above this
   //    line, so the answer itself is the status — a second line under it

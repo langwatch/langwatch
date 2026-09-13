@@ -58,6 +58,21 @@ function partType(part: unknown): string | undefined {
   return typeof type === "string" ? type : undefined;
 }
 
+/** Does this part render nowhere in the transcript, so it splits no run? */
+function isInertPart(part: unknown): boolean {
+  const type = partType(part);
+  return type !== undefined && INERT_PART_TYPES.has(type);
+}
+
+/** Which run a part belongs to: the say tool's lines, the reply, or the work behind it. */
+function runKindOf(part: unknown): LangyTranscriptRun["kind"] {
+  if (isSayToolPart(part)) return "say";
+  const type = partType(part);
+  return type !== undefined && ANSWER_PART_TYPES.has(type)
+    ? "answer"
+    : "activity";
+}
+
 /** The turn's parts, grouped into the runs they are read in. */
 export function langyTranscriptRuns(
   parts: readonly unknown[],
@@ -69,13 +84,8 @@ export function langyTranscriptRuns(
   let closed = false;
 
   for (const part of parts) {
-    const type = partType(part);
-    if (type !== undefined && INERT_PART_TYPES.has(type)) continue;
-    const kind: LangyTranscriptRun["kind"] = isSayToolPart(part)
-      ? "say"
-      : type !== undefined && ANSWER_PART_TYPES.has(type)
-        ? "answer"
-        : "activity";
+    if (isInertPart(part)) continue;
+    const kind = runKindOf(part);
     const open = runs.at(-1);
     if (open?.kind === kind && !closed) {
       open.parts = [...open.parts, part];

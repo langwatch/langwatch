@@ -115,6 +115,33 @@ function branchOf(command: string): string | undefined {
   return WORKTREE_BRANCH.exec(command)?.[1];
 }
 
+/** Every settled shell call in the assistant messages, with what it printed. */
+function settledCommands(
+  messages: readonly MessageLike[],
+): { command: string; output: unknown }[] {
+  return messages
+    .filter((message) => message.role === "assistant")
+    .flatMap((message) => message.parts ?? [])
+    .map(toolPart)
+    .flatMap((part) => {
+      if (!part || !settled(part)) return [];
+      const command = commandOf(part);
+      return command ? [{ command, output: part.output }] : [];
+    });
+}
+
+/** The address and title of the pull request a `gh pr create` call opened. */
+function pullRequestOpenedBy(
+  command: string,
+  output: unknown,
+): Pick<GuidedPullRequest, "url" | "title"> | null {
+  if (!/\bgh\s+pr\s+create\b/.test(command)) return null;
+  const url = firstPullRequestUrlIn(output);
+  if (!url) return null;
+  const title = pullRequestTitleOf(command);
+  return title ? { url, title } : { url };
+}
+
 /**
  * The pull request the conversation opened, read off its tool calls: the
  * branch from the checkout, the title from the `gh pr create` flags, the
@@ -124,22 +151,10 @@ export function guidedPullRequestFromMessages(
   messages: readonly MessageLike[],
 ): GuidedPullRequest | null {
   const found: GuidedPullRequest = {};
-  for (const message of messages) {
-    if (message.role !== "assistant") continue;
-    for (const raw of message.parts ?? []) {
-      const part = toolPart(raw);
-      if (!part || !settled(part)) continue;
-      const command = commandOf(part);
-      if (!command) continue;
-      const branch = branchOf(command);
-      if (branch) found.branch = branch;
-      const url = firstPullRequestUrlIn(part.output);
-      if (url && /\bgh\s+pr\s+create\b/.test(command)) {
-        found.url = url;
-        const title = pullRequestTitleOf(command);
-        if (title) found.title = title;
-      }
-    }
+  for (const { command, output } of settledCommands(messages)) {
+    const branch = branchOf(command);
+    if (branch) found.branch = branch;
+    Object.assign(found, pullRequestOpenedBy(command, output));
   }
   return found.url || found.branch ? found : null;
 }
