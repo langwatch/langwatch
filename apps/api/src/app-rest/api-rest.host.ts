@@ -26,6 +26,7 @@ import {
   type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
 import { ApiKeyApi, type ResolvedApiKeyCredential, type ResolvedOrganizationApiKeyToken } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
