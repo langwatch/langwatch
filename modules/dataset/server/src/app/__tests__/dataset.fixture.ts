@@ -4,7 +4,7 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import type { DatasetInfrastructure } from "../dataset.app.ts";
+import type { DatasetAppConfig, DatasetInfrastructure } from "../dataset.app.ts";
 import { DatasetApp } from "../dataset.app.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
@@ -50,6 +50,7 @@ export function createDatasetTestApp(
     repositories?: DatasetRepositories;
     members?: DatasetInfrastructure;
     dependencies?: Partial<{ experiments: ExperimentApi; permissions: AuthzApi }>;
+    config?: DatasetAppConfig;
   }> = {},
 ): DatasetApp {
   return DatasetApp.create({
@@ -59,7 +60,7 @@ export function createDatasetTestApp(
       permissions: input.dependencies?.permissions ?? createDatasetTestAuthz(),
     },
     members: input.members ?? {},
-    config: void 0,
+    config: input.config ?? {},
     resources: new ResourceScope(),
   });
 }

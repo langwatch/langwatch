@@ -19,7 +19,9 @@
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import { DatasetApi, type DatasetNormalizePayload, type AbortPendingUploadInput, type BatchEvaluationRecord, type BatchEvaluationSummary, type CopyDatasetInput, type CreateDatasetFromUploadInput, type CreateDatasetFromUploadResult, type CreateDatasetRecordsInput, type Dataset, type DatasetColumns, type DatasetEntrySelection, type DatasetHead, type DatasetListResult, type DatasetLookupInput, type DatasetNameInput, type DatasetNameResult, type DatasetPage, type DatasetPageInput, type DatasetRecord, type DatasetRecordMutationResult, type DatasetRecordPage, type DatasetWithRecords, type DeleteDatasetRecordsInput, type FinalizeUploadInput, type ListDatasetsInput, type PendingUploadInput, type PendingUploadResult, type RetryNormalizeInput, type StagedUploadInput, type UpdateDatasetRecordInput, type UploadExistingDatasetInput, type UpsertDatasetInput } from "@langwatch/dataset-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { generate } from "@langwatch/ksuid";
+import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
 
 import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
 import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
@@ -29,12 +31,26 @@ import { DatasetNormalizationService } from "../services/dataset-normalization.s
 import { DatasetService } from "../services/dataset.service.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 
+/** The KSUID resource a new dataset record's id is minted under. */
+const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
+
 /**
  * What the composing process owns and this feature may not build for itself.
  *
  * Every member is optional because a single-node self-hosted deployment has no
  * object storage at all (ADR-032): with no resolver the feature still serves
- * every relational dataset and refuses the direct-upload doors by name.
+ * every relational dataset and refuses the direct-upload doors by name. Each
+ * field is typed by an `abstract class` rather than a plain `interface` — the
+ * idiom langy landed in `a24a63479f`
+ * (`modules/langy/server/src/app/langy.members.ts`): a structural interface
+ * erases at runtime and cannot itself be handed to a composition as a named
+ * value, where an abstract class can be `implements`ed exactly as an
+ * interface is today, and is already the shape a real provided dependency
+ * token needs the day a process wants to wire one through
+ * `.withProvided(...)`. Absence of any of these is never a boot refusal —
+ * the reading code path (inside {@link DatasetService}) refuses BY NAME, at
+ * the moment a caller asks for the one operation only that collaborator can
+ * do.
  */
 export interface DatasetInfrastructure {
   /** Where a project's dataset content is stored, when the deployment has any. */
@@ -45,16 +61,32 @@ export interface DatasetInfrastructure {
   readonly queue?: DatasetNormalizeQueue;
   /** A process-supplied content seam, in place of the resolver-built one. */
   readonly content?: DatasetContent;
-  /** The identifier format a new entry is written under. */
-  readonly generateId?: () => string;
-  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+}
+
+/**
+ * The deployment's own process data, not behavior: the public origin
+ * `platformUrl` builds a link under. Optional, because not every install
+ * serves the REST family at all.
+ */
+export interface DatasetAppConfig {
   readonly publicBaseUrl?: string;
 }
 
+const datasetAppConfigSchema: FeatureConfigSchema<DatasetAppConfig> = {
+  parse: (value: unknown): DatasetAppConfig => {
+    if (value === undefined) return {};
+    const config = value as DatasetAppConfig;
+    if (config.publicBaseUrl !== undefined && typeof config.publicBaseUrl !== "string") {
+      throw new Error('The "dataset" config slice\'s publicBaseUrl must be a string when present.');
+    }
+    return config;
+  },
+};
+
 type DatasetSetup = FeatureSetup<
   typeof DatasetApp.dependencies,
-  DatasetInfrastructure,
-  undefined,
+  MembersRead<typeof DatasetApp.reads> & DatasetInfrastructure,
+  DatasetAppConfig,
   DatasetRepositories
 >;
 
@@ -83,6 +115,13 @@ export interface DatasetUpsertInput {
 export class DatasetApp implements DatasetApi {
   static readonly contract = DatasetApi;
   static readonly dependencies = { experiments: ExperimentApi, permissions: AuthzApi };
+  static readonly configSchema = datasetAppConfigSchema;
+  /**
+   * No ProcessMembers member: everything this feature reads beyond its own
+   * repositories is either a peer API (`dependencies`) or the optional,
+   * process-specific bag in {@link DatasetInfrastructure}.
+   */
+  static readonly reads = reads();
 
   #datasets: DatasetService;
   #normalization: DatasetNormalizationService | null;
@@ -95,6 +134,7 @@ export class DatasetApp implements DatasetApi {
     repositories: DatasetRepositories,
     dependencies: DatasetSetup["dependencies"],
     members: DatasetInfrastructure,
+    config: DatasetAppConfig,
   ) {
     const resolver = members.storageResolver;
 
@@ -130,17 +170,22 @@ export class DatasetApp implements DatasetApi {
             })
           : undefined),
       storageResolver: resolver,
-      generateId: members.generateId,
+      // The identifier format a new entry is written under is this module's
+      // own business, not something a composing process supplies: every real
+      // composition that ever wired this feature left it unset, and the
+      // fallback DatasetService would otherwise reach for (`nanoid`) is not
+      // this feature's own choice to make on its behalf.
+      generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
     });
 
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
-    this.#publicBaseUrl = members.publicBaseUrl;
+    this.#publicBaseUrl = config.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members }: DatasetSetup): DatasetApp {
-    return new DatasetApp(repositories, dependencies, members);
+  static create({ repositories, dependencies, members, config }: DatasetSetup): DatasetApp {
+    return new DatasetApp(repositories, dependencies, members, config);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────
@@ -563,35 +608,41 @@ export interface DatasetStorage {
   }): Promise<void>;
 }
 
-/** Runtime-selected storage. The app supplies this once during composition. */
-export interface DatasetStorageResolver {
-  forProject(projectId: string): Promise<DatasetStorage>;
+/**
+ * Runtime-selected storage. The app supplies this once during composition.
+ *
+ * An `abstract class` rather than a plain `interface` — see
+ * {@link DatasetInfrastructure}'s own doc for why. A concrete resolver still
+ * `implements DatasetStorageResolver`, never `extends` it.
+ */
+export abstract class DatasetStorageResolver {
+  abstract forProject(projectId: string): Promise<DatasetStorage>;
 }
 
-
-export interface DatasetUpload {
-  uploadToExistingDataset(
+/** {@link DatasetInfrastructure}'s process-supplied upload seam. */
+export abstract class DatasetUpload {
+  abstract uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }>;
-  createDatasetFromUpload(
+  abstract createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult>;
-  createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult>;
-  writeStagedUpload(input: StagedUploadInput): Promise<void>;
-  abortPendingUpload(
+  abstract createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult>;
+  abstract writeStagedUpload(input: StagedUploadInput): Promise<void>;
+  abstract abortPendingUpload(
     input: AbortPendingUploadInput,
   ): Promise<{ datasetId: string; aborted: true }>;
-  finalizeUpload(
+  abstract finalizeUpload(
     input: FinalizeUploadInput,
   ): Promise<{ datasetId: string; status: "processing" }>;
-  retryNormalize(
+  abstract retryNormalize(
     input: RetryNormalizeInput,
   ): Promise<{ datasetId: string; status: "processing" }>;
 }
 
 /** Durable queue seam used by normalize/finalize work. */
-export interface DatasetNormalizeQueue {
-  enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
+export abstract class DatasetNormalizeQueue {
+  abstract enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
 }
 
 /**
@@ -603,41 +654,41 @@ export interface DatasetNormalizeQueue {
  * Postgres or object storage, and the service must not reach for a provider
  * or a process-global database client.
  */
-export interface DatasetContent {
-  listRecords(input: {
+export abstract class DatasetContent {
+  abstract listRecords(input: {
     dataset: Dataset;
     input: DatasetPageInput;
   }): Promise<DatasetRecordPage>;
-  getDatasetPage(input: {
+  abstract getDatasetPage(input: {
     dataset: Dataset;
     input: DatasetPageInput;
   }): Promise<DatasetPage>;
-  getDatasetWithRecords(input: {
+  abstract getDatasetWithRecords(input: {
     dataset: Dataset;
     projectId: string;
     entrySelection: DatasetEntrySelection;
     limitMb: number | null;
   }): Promise<DatasetWithRecords>;
-  getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead>;
-  upsertRecord(input: {
+  abstract getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead>;
+  abstract upsertRecord(input: {
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };
   }): Promise<DatasetRecordMutationResult>;
-  batchCreateRecords(input: {
+  abstract batchCreateRecords(input: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]>;
-  deleteRecords(input: {
+  abstract deleteRecords(input: {
     dataset: Dataset;
     input: DeleteDatasetRecordsInput;
   }): Promise<{ count: number }>;
-  copyDataset(input: {
+  abstract copyDataset(input: {
     source: Dataset;
     sourceProjectId: string;
     target: Dataset;
     targetProjectId: string;
   }): Promise<void>;
-  updateColumns(input: {
+  abstract updateColumns(input: {
     dataset: Dataset;
     projectId: string;
     name: string;

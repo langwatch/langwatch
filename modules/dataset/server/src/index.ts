@@ -6,14 +6,14 @@ export { datasetTrpcTransport } from "./transport/dataset.trpc.ts";
 export { createDatasetRest } from "./transport/dataset.rest.ts";
 export { createDatasetErrorHandler } from "./transport/dataset-rest.errors.ts";
 export {
-  type DatasetNormalizeQueue,
-  type DatasetUpload,
-  type DatasetContent,
+  DatasetNormalizeQueue,
+  DatasetUpload,
+  DatasetContent,
 } from "./app/dataset.app.ts";
 export {
   type DatasetAzureConfigResolver,
   type DatasetS3ClientResolver,
-  type DatasetStorageResolver,
+  DatasetStorageResolver,
   type DatasetStorage,
   type DatasetAzureConfig,
   type DatasetS3Client,
