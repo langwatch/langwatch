@@ -29,6 +29,7 @@
  */
 
 import { contentText } from "./events.js";
+import { callsInHistory } from "./history-calls.js";
 import {
   CODE_ACCESS_TOOL_NAME,
   LOCAL_TOOL_NAMES,
@@ -83,6 +84,24 @@ export const ANSWERED_CARD_MESSAGE =
 
 /** Continuations over one turn, all its segments counted; one per segment within it. */
 export const MAX_TURN_CONTINUATIONS = 3;
+
+/** The llmops path's steps, numbered and titled as the skill writes them; the continuation names the one to continue from. */
+export const LLMOPS_STEP_TITLES = {
+  2: "Read the code and wire it",
+  3: "Propose the first scenario, and stop",
+  4: "The checklist, then create, explain, run",
+  5: "From one run to a suite",
+} as const;
+
+/** The path of the llmops steps above; the other paths have no numbered steps and get the plain continuation. */
+const LLMOPS_PATH = "llmops";
+
+/** The kickoff's line naming the path; a later kickoff names the next path, so the last line counts. */
+const PATH_LINE = /^Path to set up now: ([a-z]+)/gm;
+
+/** The runs of steps 4 and 5, as the skill writes the commands. */
+const SCENARIO_RUN_COMMAND = "langwatch scenario run";
+const SUITE_RUN_COMMAND = "langwatch test-suite run";
 
 /** The shell tools, in the worker's names and the CLI's. */
 const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
@@ -284,15 +303,88 @@ function listed(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** The path the kickoff in the history names, off its brief line; the last kickoff's when there are several. */
+export function guidedPathInHistory(messages: readonly unknown[]): string | undefined {
+  let path: string | undefined;
+  for (const message of messages) {
+    if (typeof message !== "object" || message === null) continue;
+    const { role, content } = message as { role?: unknown; content?: unknown };
+    if (role !== "user") continue;
+    const text =
+      typeof content === "string"
+        ? content
+        : Array.isArray(content)
+          ? content.map((block) => (block as { text?: unknown })?.text).filter((t) => typeof t === "string").join("\n")
+          : "";
+    for (const match of text.matchAll(PATH_LINE)) path = match[1] ?? path;
+  }
+  return path;
+}
+
+export type GuidedProgress = {
+  /** What the history evidences done, in the path's order. */
+  done: string[];
+  /** The step to continue from, numbered and titled as the skill writes it. */
+  next: string;
+  /** Complete-path ran: the closing line is all that is left. */
+  closingLineOnly: boolean;
+};
+
+/**
+ * Where the llmops path stands, read off the calls the history carries. A
+ * run counts once its command ran and answered: a failed verdict is a
+ * finding step 5 goes on with, and a run that answered an error stopped the
+ * path as a failed step, so the guard never reads past it.
+ */
+export function readGuidedProgress(calls: readonly TurnCall[]): GuidedProgress {
+  const done: string[] = [];
+  const step2Lines = missingStep2Lines(calls).length === 0;
+  if (step2Lines) done.push("the three step 2 lines said");
+  else if (sayTexts(calls).some((text) => FRAMEWORK_LINE_PATTERN.test(text))) done.push("the framework line said");
+  const cardAnswered = calls.some(answeredInTurn);
+  if (cardAnswered) done.push("the first scenario card answered");
+  const ran = (command: string) =>
+    calls.some((call) => shellCommand(call)?.includes(command) === true && !call.isError);
+  const scenarioRan = ran(SCENARIO_RUN_COMMAND);
+  if (scenarioRan) done.push("the first scenario run");
+  const suiteRan = ran(SUITE_RUN_COMMAND);
+  if (suiteRan) done.push("the suite run");
+  const completed = completePathRan(calls);
+  if (completed) done.push("complete-path run");
+  const step = (number: keyof typeof LLMOPS_STEP_TITLES) => `step ${number} (${LLMOPS_STEP_TITLES[number]})`;
+  const next = completed
+    ? `the closing line of ${step(5)}`
+    : suiteRan
+      ? `item 8 of ${step(5)}, Open the suite run`
+      : scenarioRan
+        ? step(5)
+        : cardAnswered
+          ? step(4)
+          : step2Lines
+            ? step(3)
+            : step(2);
+  return { done, next, closingLineOnly: completed };
+}
+
+/** The continuation on a turn outside step 2, from what the history shows. */
+export function progressMessage({ done, next, closingLineOnly }: GuidedProgress): string {
+  const shows = done.length === 0 ? "The history shows none of the path's steps done." : `The history shows: ${listed(done)}.`;
+  if (closingLineOnly) return `The path is not finished. ${shows} Say ${next}, and stop.`;
+  return `The path is not finished. ${shows} Continue from ${next}, through \`${COMPLETE_PATH_COMMAND}\` and the closing line.`;
+}
+
 /** The message the runner appends, naming exactly what the turn still owes. */
 export function continuationMessage({
   step2,
   missing,
+  progress,
 }: {
   step2: boolean;
   missing: readonly string[];
+  progress?: GuidedProgress;
 }): string {
   if (!step2) {
+    if (progress) return progressMessage(progress);
     return "The path is not finished. Continue with the next step of the guided onboarding skill; end on the question card or the closing line.";
   }
   if (missing.length === 0) {
@@ -313,18 +405,23 @@ export type GuidedContinuation =
  * turn's current segment, the calls since the last card answered inside the
  * turn. `continuations` counts the messages already appended to that
  * segment, one is the limit; `turnContinuations` counts them over the whole
- * turn, MAX_TURN_CONTINUATIONS is the cap.
+ * turn, MAX_TURN_CONTINUATIONS is the cap. `history` is the conversation as
+ * the worker holds it, a resumed conversation's seed included: on the llmops
+ * path a continuation outside step 2 names what it shows done and the step
+ * to continue from, so the model does not start the path over.
  */
 export function decideGuidedContinuation({
   calls,
   guided,
   continuations,
   turnContinuations = 0,
+  history,
 }: {
   calls: readonly TurnCall[];
   guided: boolean;
   continuations: number;
   turnContinuations?: number;
+  history?: readonly unknown[];
 }): GuidedContinuation {
   if (!guided) return { kind: "leave", reason: "not_guided" };
   const segment = guidedSegment(calls);
@@ -341,10 +438,14 @@ export function decideGuidedContinuation({
   if (continuations >= 1 || turnContinuations >= MAX_TURN_CONTINUATIONS) {
     return { kind: "give_up", segment: segment.index, missing };
   }
+  const progress =
+    history !== undefined && guidedPathInHistory(history) === LLMOPS_PATH
+      ? readGuidedProgress([...callsInHistory(history), ...calls])
+      : undefined;
   return {
     kind: "continue",
     segment: segment.index,
     missing,
-    message: afterAnswer ? ANSWERED_CARD_MESSAGE : continuationMessage({ step2, missing: missingLines }),
+    message: afterAnswer ? ANSWERED_CARD_MESSAGE : continuationMessage({ step2, missing: missingLines, progress }),
   };
 }

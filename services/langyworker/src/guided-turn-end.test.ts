@@ -12,6 +12,7 @@ import {
   COMPLETE_PATH_COMMAND,
   completePathRan,
   FRAMEWORK_LINE_SHAPE,
+  LLMOPS_STEP_TITLES,
   MAX_TURN_CONTINUATIONS,
   STEP2_LINE_TEMPLATES,
   STEP2_LINES_ITEM,
@@ -20,7 +21,10 @@ import {
   decideGuidedContinuation,
   guidedSegment,
   guidedTurnEnding,
+  guidedPathInHistory,
   missingStep2Lines,
+  progressMessage,
+  readGuidedProgress,
   templatePattern,
   type TurnCall,
 } from "./guided-turn-end.js";
@@ -176,6 +180,153 @@ describe("the guided turn end guard", () => {
     });
   });
 
+  describe("when the history shows how far the llmops path got", () => {
+    const KICKOFF = { role: "user", content: "Guided onboarding kickoff.\nPath to set up now: llmops (Evals & LLM Ops).\nTour: completed." };
+    const step2 = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(PULL_REQUEST)];
+
+    /** @scenario "The continuation names what the history shows done and the step to continue from" */
+    it("lists what is done and names the step to continue from, by the skill's numbering", () => {
+      expect(readGuidedProgress([])).toEqual({ done: [], next: "step 2 (Read the code and wire it)", closingLineOnly: false });
+      expect(readGuidedProgress([say(FRAMEWORK)])).toMatchObject({
+        done: ["the framework line said"],
+        next: "step 2 (Read the code and wire it)",
+      });
+      expect(readGuidedProgress(step2)).toMatchObject({
+        done: ["the three step 2 lines said"],
+        next: "step 3 (Propose the first scenario, and stop)",
+      });
+      expect(readGuidedProgress([...step2, answered()])).toMatchObject({
+        done: ["the three step 2 lines said", "the first scenario card answered"],
+        next: "step 4 (The checklist, then create, explain, run)",
+      });
+      const ran = [...step2, answered(), shell("langwatch scenario run scenario_1 --wait --format json")];
+      expect(readGuidedProgress(ran)).toMatchObject({
+        done: ["the three step 2 lines said", "the first scenario card answered", "the first scenario run"],
+        next: "step 5 (From one run to a suite)",
+      });
+      const suite = [...ran, shell("langwatch test-suite run suite_1 --wait --format json")];
+      expect(readGuidedProgress(suite)).toMatchObject({
+        done: [
+          "the three step 2 lines said",
+          "the first scenario card answered",
+          "the first scenario run",
+          "the suite run",
+        ],
+        next: "item 8 of step 5 (From one run to a suite), Open the suite run",
+      });
+      expect(readGuidedProgress([...suite, shell(`${COMPLETE_PATH_COMMAND} llmops`)])).toMatchObject({
+        done: expect.arrayContaining(["complete-path run"]),
+        next: "the closing line of step 5 (From one run to a suite)",
+        closingLineOnly: true,
+      });
+      expect(progressMessage(readGuidedProgress([...step2, answered()]))).toBe(
+        "The path is not finished. The history shows: the three step 2 lines said and the first scenario card answered. Continue from step 4 (The checklist, then create, explain, run), through `langwatch onboarding complete-path` and the closing line.",
+      );
+      expect(progressMessage(readGuidedProgress([]))).toBe(
+        "The path is not finished. The history shows none of the path's steps done. Continue from step 2 (Read the code and wire it), through `langwatch onboarding complete-path` and the closing line.",
+      );
+      expect(progressMessage(readGuidedProgress([...suite, shell(`${COMPLETE_PATH_COMMAND} llmops`)]))).toBe(
+        "The path is not finished. The history shows: the three step 2 lines said, the first scenario card answered, the first scenario run, the suite run and complete-path run. Say the closing line of step 5 (From one run to a suite), and stop.",
+      );
+    });
+
+    it("continues from step 4 when the history carries the answered card, live or folded into a seed", () => {
+      const live = [
+        KICKOFF,
+        {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c1", name: "say", arguments: { text: FRAMEWORK } },
+            { type: "toolCall", id: "c2", name: "say", arguments: { text: BRANCH } },
+            { type: "toolCall", id: "c3", name: "say", arguments: { text: PULL_REQUEST } },
+            { type: "toolCall", id: "c4", name: "question", arguments: { questions: [{ header: "Propose the first scenario" }] } },
+          ],
+        },
+        { role: "toolResult", toolCallId: "c1", toolName: "say", content: [{ type: "text", text: "Said." }] },
+        { role: "toolResult", toolCallId: "c2", toolName: "say", content: [{ type: "text", text: "Said." }] },
+        { role: "toolResult", toolCallId: "c3", toolName: "say", content: [{ type: "text", text: "Said." }] },
+        { role: "toolResult", toolCallId: "c4", toolName: "question", content: [{ type: "text", text: `A: Create it\n\n${ANSWERED_CONTINUE_LINE}` }] },
+      ];
+      const seed = [
+        "[Resumed conversation: digest of the previous worker's session. Newest messages last; the oldest may be truncated.]",
+        `user: ${KICKOFF.content}`,
+        `assistant: [tool call: say ${JSON.stringify({ text: FRAMEWORK })}]`,
+        "toolResult(say): Said.",
+        `assistant: [tool call: say ${JSON.stringify({ text: BRANCH })}]`,
+        "toolResult(say): Said.",
+        `assistant: [tool call: say ${JSON.stringify({ text: PULL_REQUEST })}]`,
+        "toolResult(say): Said.",
+        'assistant: [tool call: question {"questions":[{"header":"Propose the first scenario"}]}]',
+        `toolResult(question): A: Create it\n\n${ANSWERED_CONTINUE_LINE}`,
+        "[End of digest. The user's current message follows.]",
+        "",
+        "Go ahead, keep going.",
+      ].join("\n");
+      const turn = [say("Continuing the setup.")];
+      const expected = {
+        kind: "continue",
+        segment: 1,
+        missing: ["the next step"],
+        message:
+          "The path is not finished. The history shows: the three step 2 lines said and the first scenario card answered. Continue from step 4 (The checklist, then create, explain, run), through `langwatch onboarding complete-path` and the closing line.",
+      };
+      expect(decideGuidedContinuation({ calls: turn, guided: true, continuations: 0, history: live })).toEqual(expected);
+      expect(
+        decideGuidedContinuation({
+          calls: turn,
+          guided: true,
+          continuations: 0,
+          history: [{ role: "user", content: [{ type: "text", text: seed }] }],
+        }),
+      ).toEqual(expected);
+    });
+
+    it("continues from step 2 when the history shows nothing done, and reads the turn's own calls with it", () => {
+      expect(
+        decideGuidedContinuation({ calls: [say("Continuing the setup.")], guided: true, continuations: 0, history: [KICKOFF] }),
+      ).toMatchObject({
+        kind: "continue",
+        message:
+          "The path is not finished. The history shows none of the path's steps done. Continue from step 2 (Read the code and wire it), through `langwatch onboarding complete-path` and the closing line.",
+      });
+      expect(
+        decideGuidedContinuation({
+          calls: [shell("langwatch scenario run scenario_1 --wait --format json"), say("Two things.")],
+          guided: true,
+          continuations: 0,
+          history: [KICKOFF],
+        }),
+      ).toMatchObject({
+        message:
+          "The path is not finished. The history shows: the first scenario run. Continue from step 5 (From one run to a suite), through `langwatch onboarding complete-path` and the closing line.",
+      });
+    });
+
+    it("keeps the plain continuation on a path without numbered steps, and the step 2 and answered-card ones as they are", () => {
+      const gateway = { role: "user", content: "Guided onboarding kickoff.\nPath to set up now: gateway (Gateway)." };
+      expect(guidedPathInHistory([KICKOFF])).toBe("llmops");
+      expect(guidedPathInHistory([KICKOFF, { role: "user", content: `Let's set up Gateway then.\n${gateway.content}` }])).toBe("gateway");
+      expect(guidedPathInHistory([{ role: "user", content: "How do I add a trace?" }])).toBeUndefined();
+      expect(
+        decideGuidedContinuation({ calls: [say("Here is the key.")], guided: true, continuations: 0, history: [gateway] }),
+      ).toMatchObject({
+        message:
+          "The path is not finished. Continue with the next step of the guided onboarding skill; end on the question card or the closing line.",
+      });
+      expect(
+        decideGuidedContinuation({
+          calls: [plan("completed"), say(FRAMEWORK), say(PULL_REQUEST)],
+          guided: true,
+          continuations: 0,
+          history: [KICKOFF],
+        }),
+      ).toMatchObject({ missing: ["the branch line", "the first scenario card"] });
+      expect(
+        decideGuidedContinuation({ calls: [...step2, answered()], guided: true, continuations: 0, history: [KICKOFF] }),
+      ).toMatchObject({ segment: 2, message: ANSWERED_CARD_MESSAGE });
+    });
+  });
+
   describe("when a card was answered inside the turn", () => {
     const step2 = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(NO_REMOTE)];
 
@@ -297,6 +448,15 @@ describe("the guided turn end guard", () => {
       expect(skill).toContain(`11. ${STEP2_LINES_ITEM}`);
       expect(skill).toContain(`${COMPLETE_PATH_COMMAND} <path>`);
       expect(skill).toContain(`\n${CLOSING_LINE}\n`);
+    });
+
+    /** @scenario "The continuation names what the history shows done and the step to continue from" */
+    it("numbers and titles the llmops steps the way the continuation names them", () => {
+      for (const [number, title] of Object.entries(LLMOPS_STEP_TITLES)) {
+        expect(skill).toContain(`\n### ${number}. ${title}\n`);
+      }
+      expect(skill).toContain("langwatch scenario run <scenario_id>");
+      expect(skill).toContain("langwatch test-suite run <suite_id>");
     });
 
     it("matches a line with its braces filled and nothing else", () => {

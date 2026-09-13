@@ -323,6 +323,7 @@ export class TurnRunner {
       guided: state.guided,
       continuations: state.continuations,
       turnContinuations: state.turnContinuations,
+      history: this.options.session.agent.state.messages,
     });
     if (decision.kind === "leave") return terminal;
     if (decision.kind === "give_up") {

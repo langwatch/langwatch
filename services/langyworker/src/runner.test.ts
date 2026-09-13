@@ -186,10 +186,21 @@ describe("TurnRunner", () => {
 
   describe("when a resumed conversation reaches a fresh worker", () => {
     const SEED_WITH_KICKOFF = [
-      "User: Guided onboarding kickoff.\nPath to set up now: llmops (Evals & LLM Ops).",
-      "Assistant: Hi Ada! Let's get Evals & LLM Ops set up.",
+      "user: Guided onboarding kickoff.\nPath to set up now: llmops (Evals & LLM Ops).",
+      "assistant: Hi Ada! Let's get Evals & LLM Ops set up.",
     ].join("\n");
-    const SEED_PLAIN = "User: How do I add a trace?\nAssistant: Install the SDK and call setup.";
+    const SEED_PLAIN = "user: How do I add a trace?\nassistant: Install the SDK and call setup.";
+    const SEED_WITH_CARD_ANSWERED = [
+      SEED_WITH_KICKOFF,
+      `assistant: [tool call: say ${JSON.stringify({ text: STEP2_LINES.framework })}]`,
+      "toolResult(say): Said.",
+      `assistant: [tool call: say ${JSON.stringify({ text: STEP2_LINES.branch })}]`,
+      "toolResult(say): Said.",
+      `assistant: [tool call: say ${JSON.stringify({ text: STEP2_LINES.pullRequest })}]`,
+      "toolResult(say): Said.",
+      'assistant: [tool call: question {"questions":[{"header":"Propose the first scenario"}]}]',
+      `toolResult(question): A: Create it\n\n${ANSWERED_CONTINUE_LINE}`,
+    ].join("\n");
 
     /** @scenario "A resumed guided conversation is guided on a fresh worker" */
     it("reads the turn as guided off the seed's kickoff, for the skill tool and the guard alike", async () => {
@@ -220,6 +231,37 @@ describe("TurnRunner", () => {
       fake.finish();
       await done;
       expect(turnContext.guided).toBe(false);
+    });
+
+    /** @scenario "The continuation names what the history shows done and the step to continue from" */
+    it("continues from the step the seed shows the path at, never from the top", async () => {
+      const fake = makeFakeSession();
+      const { runner } = makeRunner({ session: fake.session });
+      // pi holds the composed prompt as the turn's user message once it went out.
+      fake.session.prompt = async (text: string) => {
+        fake.session.agent.state.messages.push({ role: "user", content: text });
+      };
+      await runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: "Go ahead, keep going.",
+        resumeToken: SEED_WITH_CARD_ANSWERED,
+      });
+      const prompts = fake.session.agent.state.messages.map((message) => (message as { content: string }).content);
+      expect(prompts[0]?.startsWith("[Resumed conversation")).toBe(true);
+      expect(prompts[1]).toBe(
+        "The path is not finished. The history shows: the three step 2 lines said and the first scenario card answered. Continue from step 4 (The checklist, then create, explain, run), through `langwatch onboarding complete-path` and the closing line.",
+      );
+      fake.session.agent.state.messages = [];
+      await runner.submitTurn({
+        type: "turn",
+        turnId: "t2",
+        prompt: "Go ahead, keep going.",
+        resumeToken: SEED_WITH_KICKOFF,
+      });
+      expect((fake.session.agent.state.messages[1] as { content: string }).content).toBe(
+        "The path is not finished. The history shows none of the path's steps done. Continue from step 2 (Read the code and wire it), through `langwatch onboarding complete-path` and the closing line.",
+      );
     });
 
     it("reads a plain conversation as not guided, for the skill tool and the guard alike", async () => {

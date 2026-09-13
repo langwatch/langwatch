@@ -1227,6 +1227,19 @@ Feature: Langy guides the first setup after sign-up
       And a step 2 turn that said all three lines but asked no card is told only about the card
       And a step 2 turn that said the lines and asked the card is left alone
 
+    # The continuation on a conversation resumed after a worker restart said
+    # "continue with the next step", and the model picked the first: it read
+    # the code again, said the framework line again and checked the branch
+    # out again, in a conversation whose history showed the tracing wired,
+    # the three lines said and the scenario card answered.
+    @unit
+    Scenario: The continuation names what the history shows done and the step to continue from
+      Given a turn on the llmops path that ended bare outside step 2
+      When the worker reads the conversation's history, the folded seed of a resumed conversation included
+      Then the continuation lists what the history evidences: the step 2 lines said, the first scenario card answered, the first scenario run, the suite run, complete-path run
+      And it names the step to continue from by the skill's own number and title: step 4 after the answered card, step 2 with nothing done
+      And a step 2 turn, a card answered inside the turn and a path without numbered steps keep their own continuations
+
     @unit
     Scenario: A turn that ended on a card, a closing line or a failed step is left alone
       Given a guided turn that ended on the question card, the code access card, the closing line after complete-path, or the one line after a failed command
