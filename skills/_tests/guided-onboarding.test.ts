@@ -602,6 +602,16 @@ describe("the guided-onboarding skill", () => {
       );
       expect(rule).toBeGreaterThan(-1);
       expect(rendered).toContain("a reason the output did not name is never said");
+      // The push and the pull request are two commands, so the push's own
+      // answer is what the rule reads.
+      const twoCommands = rendered.indexOf(
+        "The push and the pull request are two commands, `git push` first and `gh pr create` after it, never joined with `&&` or `;`: each is read on its own exit code and its own output, and a joined command that exits 1 hides which of the two failed.",
+      );
+      expect(twoCommands).toBeGreaterThan(-1);
+      expect(twoCommands).toBeLessThan(rule);
+      expect(rendered).toContain(
+        "whatever `gh` prints afterwards.** That rule is read against the push command's own answer.",
+      );
       expect(rendered).toContain(
         "The no-remote line has exactly two triggers, quoted as git and gh print them: `git push` with no remote, \"fatal: No configured push destination.\" or \"'origin' does not appear to be a git repository\", and `gh` not signed in, \"To get started with GitHub CLI, please run:  gh auth login\" or \"You are not logged into any GitHub hosts\".",
       );

@@ -52,6 +52,9 @@ describe("PrismaLangyConversationRepository.hasAdmittedTurn", () => {
 });
 
 describe("PrismaLangyConversationRepository.findAllForUser", () => {
+  /** @scenario "Listing conversations reads the operational projection, newest activity first" */
+  /** @scenario "Deleting a conversation archives it rather than hard-deleting" */
+  /** @scenario "Every conversation read is scoped to the project" */
   it("keeps project/user visibility predicates on server-side title search", async () => {
     const { findMany, repository } = makeRepository();
 

@@ -547,6 +547,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The pull request body is written before it is read, and the no-remote line waits for its reason
       When the compiled guided-onboarding skill is read
       Then the body file is written with local_write before the command that reads it
+      And the push and the pull request are two commands, never joined, each read on its own exit code and output
       And a push that printed a new branch on a remote means the no-remote line is never said, whatever gh prints afterwards
       And the no-remote line has exactly two triggers, git push with no remote and gh not signed in, matched on the lines git and gh print
       And any other gh error gets one fix of its cause and one retry, and when it still fails the fixed failed-open line names the branch and the one line the command printed

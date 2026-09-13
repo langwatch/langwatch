@@ -271,6 +271,7 @@ describe("LangyTurnService.startConversationTurn", () => {
     });
   });
 
+  /** @scenario "A message and its activity bump are one command, not two writes" */
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
     const result = await LangyTurnService.create(deps).startConversationTurn(
       input(),
@@ -303,6 +304,7 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario "Sending the first message creates the conversation from its events" */
   it("atomically prefixes a new conversation with its owner and run token", async () => {
     mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
 

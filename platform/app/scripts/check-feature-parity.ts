@@ -754,11 +754,6 @@ const LEGACY_PARTIAL: string[] = [
   "specs/langy/langy-deploy-hardening.feature",
   "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-dogfood-scenarios.feature",
-  // Reason: the guided-onboarding branch tagged and bound the scenario for a
-  // first-turn read waiting on the conversation projection. The twenty-one
-  // untagged ones describe the rest of the event-sourced conversation
-  // surface, which that change did not touch.
-  "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-panel-layout.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
   "specs/langy/langy-prompt-optimization-entrypoints.feature",
@@ -806,11 +801,6 @@ const LEGACY_PARTIAL: string[] = [
   "specs/traces-v2/filter-bar-interactions.feature",
   "specs/traces-v2/message-translation.feature",
   "specs/traces-v2/numeric-facet-modes.feature",
-  // Reason: the guided-onboarding branch tagged and bound the four scenarios
-  // for the explorer leaving out Langy's own turns. The three untagged ones
-  // describe the round-5 origin badge click-to-filter behaviour, which ships
-  // today, so parking them @unimplemented would claim it is unbuilt.
-  "specs/traces-v2/origin-badge-filter.feature",
   "specs/traces-v2/search.feature",
   "specs/traces/saved-views.feature",
 ];
