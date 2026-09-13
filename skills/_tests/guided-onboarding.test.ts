@@ -235,7 +235,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "Every path ends by recording its completion" */
     it("runs complete-path before the closing line on every path, so the line is what follows the call", () => {
       expect(rendered).toContain(
-        "It runs right before the closing line, in the same step, with no other tool call beside it, and never before the path's work is done.",
+        "It runs right before the closing line, in the same step, with no other tool call beside it but the plan write that marks its item done, and never before the path's work is done.",
       );
       expect(rendered).toContain(
         "When it returns, say the closing line with `say`, verbatim, as the last thing the turn does, and the turn is over: no reply text after it, and never the line twice.",
@@ -494,6 +494,43 @@ describe("the guided-onboarding skill", () => {
       expect(branch).toBeGreaterThan(positions[10]!);
       expect(rendered).toContain(
         "The bare question of step 3 is asked only when every item of this list is done, never with one open: an item skipped is a step skipped, whatever the lines say.",
+      );
+    });
+
+    /** @scenario "Step 3 begins in the turn that closes step 2" */
+    it("follows the branch line with the bare question in the same turn, and never ends a turn on the lines", () => {
+      expect(rendered).toContain(
+        "The list ends at the lines; the turn does not. The write that marks item 11 done comes right after the three lines and right before the bare question of step 3, in the same turn, and the card is what ends the turn, never the branch line: a turn that ends on the branch line, with no card under it, has skipped step 3, whatever the list says.",
+      );
+      expect(rendered).toContain(
+        "ends with no reply text at all, and with no early end either: the last call of the turn is the bare question of step 3, the closing line of the path, or the one line of a failed step, and the empty reply comes after that call, never in its place.",
+      );
+      const branchLine = rendered.indexOf(
+        "I left branch {branch} checked out: the agent you started runs on it.",
+      );
+      const sameTurn = rendered.indexOf(
+        "The proposal of step 3 comes right after them, in the same turn.",
+      );
+      const proposal = rendered.indexOf("### 3. Propose the first scenario, and stop");
+      expect(branchLine).toBeGreaterThan(-1);
+      expect(sameTurn).toBeGreaterThan(branchLine);
+      expect(proposal).toBeGreaterThan(sameTurn);
+    });
+
+    /** @scenario "The plan card reaches all items done before the closing lines" */
+    it("rewrites the plan after every finished item, and marks the last one done before the card or the closing line", () => {
+      expect(rendered).toContain("**Keep the plan current.**");
+      expect(rendered).toContain(
+        "written again, whole, the moment an item is finished: one write per finished item, never two items ticked in one write, and every call carries the full list, since the tool replaces it.",
+      );
+      expect(rendered).toContain(
+        "The write that marks the last item done comes before the call that ends the turn, the bare question of step 3 or the closing line of the path: the card and the line are read under a list that says all done, never under one with items open.",
+      );
+      expect(rendered).toContain(
+        "The write that marks item 10 done comes between `langwatch onboarding complete-path` and the closing line: the line is said under a list that reads all done, and it stays the last call of the turn.",
+      );
+      expect(rendered).toContain(
+        "with no other tool call beside it but the plan write that marks its item done",
       );
     });
 

@@ -503,6 +503,24 @@ Feature: Langy guides the first setup after sign-up
       And a turn never ends with an open item
       And the bare question of step 3 is asked only when every item is done
 
+    # A film said the three step 2 lines and ended the turn there: no question
+    # card, no scenario, and the plan card frozen at six of eleven, since the
+    # list was last written five items earlier. The list ends at the lines and
+    # the model read that as the turn's end.
+    @unit
+    Scenario: Step 3 begins in the turn that closes step 2
+      When the compiled guided-onboarding skill is read
+      Then the write that marks the last step 2 item done is followed by the bare question, in the same turn
+      And the card is what ends the turn, never the branch line
+      And the rule about a turn with no reply text names the card, the closing line or the failed-step line as the turn's last call
+
+    @unit
+    Scenario: The plan card reaches all items done before the closing lines
+      When the compiled guided-onboarding skill is read
+      Then every list is rewritten whole the moment an item is finished, one write per item
+      And the write that marks the last item done comes before the bare question of step 3 or the closing line of the path
+      And the complete-path command allows that one write beside it
+
     # The same run pasted the fallback sentence into the brace of the pull
     # request line and named a branch no command had made.
     @unit
