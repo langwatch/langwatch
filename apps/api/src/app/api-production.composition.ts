@@ -314,7 +314,7 @@ export type ApiProcessMemberOverrides = {
  * Nothing is constructed until `boot`, and boot builds exactly the union the
  * installed modules declared: a client no module reads is never opened.
  */
-export function bootApiProcess(options: {
+export async function bootApiProcess(options: {
   readonly config: ApiConfig;
   readonly secrets: Readonly<Record<string, string>>;
   readonly members?: ApiProcessMemberOverrides;
