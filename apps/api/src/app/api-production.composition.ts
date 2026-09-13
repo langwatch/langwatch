@@ -68,7 +68,13 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
       connected: config.infrastructure.connectedAgents,
     },
-    analytics: { langwatchQl: config.infrastructure.clickhouse.langwatchQl },
+    /**
+     * The resolution carries all five fields or is absent entirely ("absent
+     * means unprovisioned"), while the module declares the same five each
+     * optional — so an unprovisioned deployment passes an empty object, not
+     * a missing one, and analytics reads every field as unset.
+     */
+    analytics: { langwatchQl: config.infrastructure.clickhouse.langwatchQl ?? {} },
     "api-key": { pepper: config.apiKeyPepper },
     "data-retention": {
       platformDefaultRetentionDays: config.platformDefaultRetentionDays,
