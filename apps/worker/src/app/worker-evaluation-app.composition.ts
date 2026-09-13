@@ -138,7 +138,7 @@ export function createWorkerEvaluationApp(input: {
 }): WorkerEvaluationAppComposition {
   return {
     evaluations: EvaluationApp.create({
-      infrastructure: {
+      members: {
         resolveClickHouse: createWorkerEvaluationClickHouseResolver(input.resolveClickHouseClient),
         retentionFloor: WorkerEvaluationRetentionFloor.create(input.defaultRetentionDays),
         execution: input.execution,

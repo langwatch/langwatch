@@ -98,7 +98,7 @@ export async function createWorkerAgentApps(options: {
     name: "worker agent evaluator application",
   });
   const workflows = WorkflowApp.create({
-    infrastructure: {
+    members: {
       workflows: graph.workflows,
       datasets: graph.datasets,
       evaluators,

@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
+import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
   SUITE_RUN_EVENT_TYPES,
   SUITE_RUN_EVENT_VERSIONS,
-} from "../../schemas/constants";
+} from "@langwatch/suite-contract";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunItemRegradedEvent,
   SuiteRunProcessingEvent,
   SuiteRunStartedEvent,
-} from "../../schemas/events";
+} from "@langwatch/suite-contract";
 import {
   type SuiteRunStateData,
   SuiteRunStateFoldProjection,
-} from "../suiteRunState.foldProjection";
+} from "../suite-run-state.projection.ts";
 
 const noopStore: FoldProjectionStore<SuiteRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
-const projection = new SuiteRunStateFoldProjection({ store: noopStore });
+const projection = SuiteRunStateFoldProjection.create({ store: noopStore });
 
 const TENANT_ID = createTenantId("tenant-1");
 

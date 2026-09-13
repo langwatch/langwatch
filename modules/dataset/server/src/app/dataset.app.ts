@@ -47,9 +47,6 @@ export interface DatasetInfrastructure {
   readonly content?: DatasetContent;
   /** The identifier format a new entry is written under. */
   readonly generateId?: () => string;
-  datasetAzureConfigResolver: DatasetAzureConfigResolver;
-  datasetNormalize: DatasetNormalize;
-  datasetS3ClientResolver: DatasetS3ClientResolver;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   readonly publicBaseUrl?: string;
 }

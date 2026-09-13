@@ -31,6 +31,7 @@ import {
   membersFrom,
   type ResourceScope,
 } from "@langwatch/runtime-composition";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
@@ -99,6 +100,12 @@ export type WorkerScenarioExecutionCompositionInput = Readonly<{
   projects: ProjectApi | undefined;
   redis: RedisConnection | null | undefined;
   resolveClickHouseClient: EventingClickHouseClientResolver | undefined;
+  /**
+   * The process's ONE routed query client, for the suite runtime's member —
+   * NOT the per-tenant resolver above, which answers a different question.
+   * Absent, the suite module refuses its clickhouse member by name at boot.
+   */
+  clickhouse?: ClickHouseQueryClient | undefined;
   defaultRetentionDays: number;
   /** Where an oversized NLP invoke body is parked; the absent one refuses by name. */
   payloadStaging: NlpPayloadStaging;
@@ -113,6 +120,7 @@ export type WorkerScenarioExecutionPrerequisites = Readonly<{
   projects: ProjectApi;
   redis: RedisConnection;
   resolveClickHouseClient: EventingClickHouseClientResolver;
+  clickhouse?: ClickHouseQueryClient | undefined;
   defaultRetentionDays: number;
   langwatchEndpoint: string;
   nlpServiceUrl: string;
@@ -147,6 +155,7 @@ export function resolveWorkerScenarioExecutionPrerequisites(
     projects,
     redis,
     resolveClickHouseClient,
+    ...(options.clickhouse ? { clickhouse: options.clickhouse } : {}),
     defaultRetentionDays: options.defaultRetentionDays,
     langwatchEndpoint,
     nlpServiceUrl,
@@ -270,7 +279,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
   // and the run projection a scenario child reports against.
   const suiteRuntime = await createApp({
     role: "worker",
-    members: membersFrom({ prisma }),
+    members: membersFrom({ prisma, ...(deps.clickhouse ? { clickhouse: deps.clickhouse } : {}) }),
   })
     .withProvided(ScenarioApi, input.scenarioApi)
     .withProvided(AgentApi, agents)

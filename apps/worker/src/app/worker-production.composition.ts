@@ -904,6 +904,9 @@ export class WorkerProductionComposition {
       projects: tenancy?.projects,
       redis: eventingOptions.groupQueue.redis,
       resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      ...(options.featureClickHouse
+        ? { clickhouse: options.featureClickHouse.queryClient }
+        : {}),
       defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
       // The SAME object storage the trace claim check writes through: a staged
       // invoke body belongs in the tenant's own bucket, not a second one.
