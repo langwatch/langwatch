@@ -29,6 +29,7 @@ import {
   readFileSync,
 } from "node:fs";
 import * as net from "node:net";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { APP_BASE, PROJECT_ID } from "./config";
@@ -44,13 +45,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** The repository root of this checkout, from `platform/app/e2e/langy`. */
 export const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
-/** Where a run puts the temporary repositories it shares with Langy. */
-const SCENARIO_REPO_DIR = path.join(
-  REPO_ROOT,
-  ".claude",
-  "tmp",
-  "scenario-repos",
-);
+/**
+ * Where a run puts the temporary folders it shares with Langy.
+ *
+ * Outside every checkout, and that is the whole point. git finds a repository
+ * by walking up, so a folder with no repository of its own that sits inside a
+ * checkout is inside that checkout's repository: the scenario whose premise is
+ * a folder with no repository had Langy run `git checkout -b` there, and the
+ * branch landed on the lane's own checkout while the run was going, moving its
+ * HEAD and firing its hooks. A folder outside every checkout cannot be walked
+ * into one.
+ *
+ * The share-control profile also exports `GIT_CEILING_DIRECTORIES`, which stops
+ * the walk when a command can read it. That is a second belt and not the fix:
+ * the CLI hands each command an allowlisted environment, on purpose, and the
+ * ceiling is not on the list, so it never reaches the command that needs it.
+ */
+export const SCENARIO_REPO_DIR =
+  process.env.LANGY_SCENARIO_REPO_DIR ??
+  path.join(os.homedir(), ".langwatch-scenario-repos");
 
 /**
  * The demo applications a scenario can share: the two ACME support agents,

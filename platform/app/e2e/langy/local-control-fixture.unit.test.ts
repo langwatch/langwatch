@@ -5,6 +5,7 @@
  * so it is only ever exercised by the scenario files.
  */
 
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   answerOfTurn,
@@ -15,7 +16,9 @@ import {
   permissionAnswerNote,
   pidsRunningIn,
   questionAnswerNote,
+  REPO_ROOT,
   type RecordWait,
+  SCENARIO_REPO_DIR,
   type StoredMessage,
   shareControlProfile,
   turnFailureMessage,
@@ -329,6 +332,27 @@ describe("judgeMessages", () => {
     it("replies with empty text, which is the failure the rubric names", () => {
       expect(lastReply([call("local_bash", "c1")])).toBe("");
     });
+  });
+});
+
+describe("SCENARIO_REPO_DIR", () => {
+  /**
+   * The one property that matters: a folder git can walk out of is a folder
+   * Langy can make a branch in, and it made one on the lane's own checkout.
+   */
+  it("is outside this checkout, so no walk up reaches a repository of ours", () => {
+    const inside =
+      SCENARIO_REPO_DIR === REPO_ROOT ||
+      SCENARIO_REPO_DIR.startsWith(`${REPO_ROOT}${path.sep}`);
+    expect(inside).toBe(false);
+  });
+
+  it("is an absolute path, which a cd into it and a git ceiling both need", () => {
+    expect(path.isAbsolute(SCENARIO_REPO_DIR)).toBe(true);
+  });
+
+  it("is not the home directory itself, which the CLI refuses to share", () => {
+    expect(SCENARIO_REPO_DIR).not.toBe(process.env.HOME);
   });
 });
 
