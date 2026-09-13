@@ -185,6 +185,7 @@ function Page() {
         <Spacer />
         <PageLayout.HeaderButton
           onClick={() => openDrawer("agentTypeSelector")}
+          data-testid="agents-new-agent"
         >
           <Plus size={16} /> New Agent
         </PageLayout.HeaderButton>
