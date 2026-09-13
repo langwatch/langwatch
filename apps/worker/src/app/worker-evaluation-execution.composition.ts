@@ -20,19 +20,13 @@ import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/composition/evaluation-cost";
 import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import {
-  monitorServer,
-  type MonitorEvaluator,
-  type MonitorPerformance,
-  type MonitorReplicationReader,
-} from "@langwatch/monitor-server";
-import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
+import { monitorServer } from "@langwatch/monitor-server";
+import { createApp, membersFrom, type ResourceOwnership } from "@langwatch/runtime-composition";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { EvaluationTraceReadInput, Span, TraceApi } from "@langwatch/trace-contract";
 import { TraceReadableSpanService } from "@langwatch/trace-server";
 import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { nanoid } from "nanoid";
 import {
   createWorkerEvaluationInputsOffload,
   type WorkerEvaluationWorkflows,
@@ -122,19 +116,27 @@ export async function createWorkerMonitorApp(options: {
   permissions: AuthzApi;
   resources: ResourceOwnership;
 }): Promise<MonitorApi> {
-  const runtime = await createApp({ name: "langwatch-worker-monitor" })
-    .withPersistence("postgres", { prisma: options.database })
-    .withInfrastructure({})
+  // MonitorApp is not yet converted (its App still declares a bespoke
+  // `FeatureSetup` Members bag — `evaluators`, `performance`, `replication`,
+  // `generateId` — rather than `static readonly reads`), and the v2 builder
+  // has no seam left to hand a per-module infrastructure bag through:
+  // `withModules` takes only the module list, so this does not type-check
+  // (TS2322, naming exactly those four members as missing) until Monitor is
+  // converted. The Uncomposed{Evaluators,Performance,Replication} stand-ins
+  // this used to hand in through `.withModule(monitorServer, {
+  // infrastructure: {...} })` have no home in this shape and are deleted.
+  // Unlike a converted module's `reads`, this is NOT an eager, named boot
+  // refusal: MonitorApp constructs with `evaluators`/`performance`/
+  // `replication`/`generateId` silently `undefined`, and only the first call
+  // that actually reaches one of them fails. That gap is the
+  // module-conversion queue's business, not this composition's.
+  const runtime = await createApp({
+    role: "worker",
+    members: membersFrom({ prisma: options.database }),
+  })
     .withProvided(AuthzApi, options.permissions)
-    .withModule(monitorServer, {
-      infrastructure: {
-        evaluators: new UncomposedMonitorEvaluators(),
-        performance: new UncomposedMonitorPerformance(),
-        replication: new UncomposedMonitorReplication(),
-        generateId: () => `monitor_${nanoid()}`,
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([monitorServer])
+    .boot();
 
   options.resources.own("worker monitor application", () => runtime.stop());
 
@@ -147,39 +149,6 @@ class WorkerEvaluationMonitorLookup implements EvaluationMonitorLookup {
 
   async tryGetMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator | null> {
     return (await this.monitors.findById(input)) ?? null;
-  }
-}
-
-const uncomposedInWorker = (capability: string): Error =>
-  new Error(`The worker composed no ${capability}, so this monitor operation cannot answer.`);
-
-class UncomposedMonitorEvaluators implements MonitorEvaluator {
-  getById(): Promise<never> {
-    return Promise.reject(uncomposedInWorker("evaluator directory"));
-  }
-
-  archive(): Promise<never> {
-    return Promise.reject(uncomposedInWorker("evaluator directory"));
-  }
-}
-
-class UncomposedMonitorPerformance implements MonitorPerformance {
-  getMonitorPerformance(): Promise<never> {
-    return Promise.reject(uncomposedInWorker("online-evaluation trend"));
-  }
-
-  previousPeriodStartMs(): number {
-    throw uncomposedInWorker("online-evaluation trend");
-  }
-}
-
-class UncomposedMonitorReplication implements MonitorReplicationReader {
-  copyEvaluatorToProject(): Promise<never> {
-    return Promise.reject(uncomposedInWorker("evaluator replication"));
-  }
-
-  deleteReplicatedWorkflow(): Promise<never> {
-    return Promise.reject(uncomposedInWorker("evaluator replication"));
   }
 }
 

@@ -9,19 +9,29 @@
 import type { WorkflowService } from "@langwatch/workflow-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import {
-  evaluatorServer,
-  type EvaluatorGraph,
-  type EvaluatorNlpDispatcher,
-} from "@langwatch/evaluator-server";
+import { evaluatorServer, type EvaluatorNlpDispatcher } from "@langwatch/evaluator-server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, type ResourceOwnership } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 
-import { nanoid } from "nanoid";
-
-/** The evaluator application this process reads and runs evaluators through. */
+/**
+ * The evaluator application this process reads and runs evaluators through.
+ *
+ * EvaluatorApp is not yet converted (its App still declares a bespoke
+ * `FeatureSetup` Members bag — `workflows`, `graph`, `nlp`, `modelProviders`,
+ * `generateId` — rather than `static readonly reads`), and the v2 builder has
+ * no seam left to hand a per-module infrastructure bag through: `withModules`
+ * takes only the module list, no second argument, so this does not
+ * type-check (TS2322, naming exactly those five members as missing) until
+ * Evaluator is converted. `workflows`, `nlpRuntime` and `modelProviders`
+ * below are accepted (the call site in worker-production.composition.ts
+ * still passes them) but NOT wired. Unlike a converted module's `reads`,
+ * this is NOT an eager, named boot refusal: EvaluatorApp constructs with
+ * those members silently `undefined`, and only the first call that actually
+ * reaches one of them fails. That gap is the module-conversion queue's
+ * business, not this composition's.
+ */
 export async function installWorkerEvaluator(options: {
   /** The one guarded connection every evaluator row is read on. */
   database: PrismaClient;
@@ -41,60 +51,17 @@ export async function installWorkerEvaluator(options: {
   /** Names this install in the worker's own resource ledger. */
   name: string;
 }) {
-  const runtime = await createApp({ name: "langwatch-worker" })
-    .withPersistence("postgres", { prisma: options.database })
-    .withInfrastructure({})
+  const runtime = await createApp({
+    role: "worker",
+    members: membersFrom({ prisma: options.database }),
+  })
     .withProvided(AuthzApi, options.permissions)
     .withProvided(AuditLogApi, options.auditLog)
     .withProvided(UserApi, options.users)
-    .withModule(evaluatorServer, {
-      infrastructure: {
-        workflows: options.workflows,
-        graph: new UncomposedEvaluatorGraph(),
-        nlp: options.nlpRuntime,
-        modelProviders: options.modelProviders,
-        generateId: () => nanoid(),
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([evaluatorServer])
+    .boot();
 
   options.resources.own(options.name, () => runtime.stop());
 
   return runtime.module(evaluatorServer).provided;
-}
-
-const uncomposedInWorker = (): Error =>
-  new Error(
-    "The worker composes no evaluator administration graph, so this operation cannot answer.",
-  );
-
-/**
- * The workflow and monitor rows an evaluator is entangled with, which only the
- * API process administers. Refused by name rather than answered emptily: an
- * empty answer here would report that an evaluator has no monitors.
- */
-class UncomposedEvaluatorGraph implements EvaluatorGraph {
-  findLinkedWorkflow(): Promise<never> {
-    return Promise.reject(uncomposedInWorker());
-  }
-
-  findMonitorsUsingEvaluator(): Promise<never> {
-    return Promise.reject(uncomposedInWorker());
-  }
-
-  deleteMonitorsUsingEvaluator(): Promise<never> {
-    return Promise.reject(uncomposedInWorker());
-  }
-
-  archiveLinkedWorkflow(): Promise<never> {
-    return Promise.reject(uncomposedInWorker());
-  }
-
-  replicateEvaluatorWorkflow(): Promise<never> {
-    return Promise.reject(uncomposedInWorker());
-  }
-
-  deleteReplicatedWorkflow(): Promise<never> {
-    return Promise.reject(uncomposedInWorker());
-  }
 }
