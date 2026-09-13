@@ -40,6 +40,15 @@ the bug was correct.
 - `grep -cE 'error TS'` over a typecheck run returned **0** while that run was
   exiting 1, because the output is a grouped summary and the pattern never
   matched it.
+- The same grep returned **0** against a direct `tsc` run that reported 477
+  errors, because tsc colours its output: there is an ANSI escape between
+  "error" and "TS", so the literal string never appears. Run output through
+  `sed 's/\x1b\[[0-9;]*m//g'` before counting.
+
+Those last two are the same lesson by two different routes, and it generalises
+past greps: **the output of a tool is a format, not a fact, and a measurement
+taken over that output is a third thing that can be wrong on its own terms.**
+Both times the wrong number was zero, and zero is what you were hoping for.
 
 When a check on this branch says something is fine, ask what it would have to
 see to say otherwise. That question has been worth more this session than any
@@ -123,9 +132,23 @@ The declarations pre-pass fails (those 67), so **the `&&` short-circuits and
 `apps/ui` is currently unchecked and reads as checked, on this branch, in the
 command CLAUDE.md tells every contributor to run and the one CI runs.
 
-Run directly, `tsc --noEmit -p apps/api/tsconfig.test.json` reports **hundreds**
-of errors (71 TS7006, 61 TS2304, 47 TS2741, 40 TS2307, 38 TS2345, ...). That is
-the real state of the application's types.
+Run directly, bypassing the `&&`, the real numbers are:
+
+    pnpm exec tsc --noEmit -p apps/api/tsconfig.test.json      477 errors
+    pnpm exec tsc --noEmit -p apps/worker/tsconfig.test.json   615 errors
+
+**When somebody fixes the declarations pre-pass, the reported count will jump
+from 67 to roughly 1,100, and that jump is not a regression.** It is the
+short-circuit's standing cost becoming visible. This document's other big
+number was misread exactly that way once already, and a correct change was
+reverted over it; do not let it happen twice.
+
+**64 of the worker's errors are TS2689** — `Cannot extend an interface`. That
+is the ERASED class below, named by the compiler, and it settles whether those
+sites are real: a regex found 56, tsc names 64 of the same shape, and neither
+measurement depended on the other. The gap is that the detector only catches
+type-only-BOUND names while tsc also catches interfaces imported in value
+position, so it under-reports by design and now the amount is known.
 
 This is the single most consequential finding of the session, because every
 defect below accumulated behind it.
@@ -405,6 +428,39 @@ Which modules needed real values was measured, not guessed, by parsing `{}`
 against each installed schema: four refuse it (agent, analytics,
 data-retention, hosted-mcp) and the rest are wholly defaulted.
 
+### authz: the dispatcher, and the seam that already existed
+
+`AuthzApp` declared no `reads(...)`, so boot handed it `membersFor(members, [])`
+— an empty object — and `database` arrived `undefined`, surfacing five frames
+away as `Cannot read properties of undefined (reading 'auditLog')`. Nothing
+typed it, because the adapter reaches that repository through an
+`as unknown as` cast (`postgres-authz.build.ts:197`). **A cast is a third way
+for a wiring gap to survive typechecking**, alongside ERASED extends and
+unsatisfiable member claims.
+
+The harder half looked like a cycle: the adapter needs a dispatcher, the
+dispatcher needs senders, and senders only exist once the pipeline has been
+registered — which needs the definition the adapter produces. It is not a
+cycle, because **the runtime already has the two-step seam for exactly this**.
+`installModuleEventing` builds a module's definition, registers it, then calls
+the optional `connect({ app, commands })`. So `AuthzApp.create` builds the
+dispatcher and keeps it beside the pipeline it got back, `authzEventing.build`
+returns that same pipeline (never a second — a forked definition is two
+descriptions of one persisted event stream), and `connect` feeds the senders
+back through `app.connectCommands`.
+
+Same two steps, same order, as the composition deleted by b383462d96, whose own
+comment says why the order is load-bearing: "the ledger's write path opens here
+and nowhere else: until `connect` runs, a grant change waits for the senders
+and then refuses with a ledger-unavailable error rather than silently taking
+the imperative Prisma path."
+
+The design was never missing. It had moved into the runtime, and authz had not
+been reconnected to it — which is this whole lane in one sentence.
+
+`9ab4161571`. authz-server: 574 tests passing, typecheck 4 errors to 2, both
+pre-existing TS2883s.
+
 ### Where it stops, and what the rest of this lane looks like
 
     TypeError: Cannot read properties of undefined (reading 'auditLog')
@@ -412,22 +468,7 @@ data-retention, hosted-mcp) and the rest are wholly defaulted.
       at PostgresAuthzAdapter.build (postgres-authz.build.ts:277)
       at AuthzApp.create (authz.app.ts:64)
 
-`AuthzApp.create` spreads `setup.members` into its adapter, but the App
-declares no `reads(...)`, so boot hands it `{}` — `membersFor(members, [])` —
-and `database` is `undefined`. Note it reaches the repository through an
-`as unknown as` cast (`postgres-authz.build.ts:197`), which is why no type
-error announced it.
-
-Declaring `reads("prisma", "redis")` and mapping the names is the easy half.
-The hard half is that `PostgresAuthzAdapterOptions` also requires
-`dispatcher: AuthzGrantsCommandDispatcher` and `newBindingId`, and neither is a
-platform member. The composition deleted by b383462d96
-(`git show b383462d96^:apps/api/src/app/api-authz.composition.ts`, 138 lines)
-says exactly what that costs, in its own words: *"What kept this process from
-calling it was never the database — it was the command dispatcher, which needs
-an Eventing registration and which no package implemented."*
-
-So the remaining lane is **per-module App wiring**, not a single port: for each
+That wall is fixed; see the section above. The remaining lane is **per-module App wiring**, not a single port: for each
 module that used to be hand-composed, its App must declare what it reads and
 build its own collaborators from members. authz is the expensive one because
 its dispatcher needs a producer-only eventing registration. Expect others
