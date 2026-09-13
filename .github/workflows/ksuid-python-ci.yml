@@ -12,9 +12,17 @@ on:
       - main
     paths:
       - "packages/ksuid-python/**"
+      # The Python uv workspace root (ADR-145): a re-lock or a root
+      # resolution-setting change re-pins this package's dependencies.
+      - "uv.lock"
+      - "pyproject.toml"
+      - ".python-version"
   pull_request:
     paths:
       - "packages/ksuid-python/**"
+      - "uv.lock"
+      - "pyproject.toml"
+      - ".python-version"
   workflow_dispatch:
 
 concurrency:
@@ -29,7 +37,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.13"]
+        python-version: ["3.10", "3.13"]
+    env:
+      # Beats the workspace root's .python-version, which would otherwise pin
+      # every matrix leg to the same interpreter.
+      UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
@@ -37,7 +49,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: "packages/ksuid-python/uv.lock"
+          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install ${{ matrix.python-version }}
@@ -50,4 +62,4 @@ jobs:
 
       - name: Build package
         working-directory: packages/ksuid-python
-        run: uv build
+        run: uv build --out-dir dist

@@ -146,7 +146,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: "sdks/python/uv.lock"
+          cache-dependency-glob: "uv.lock"
       - name: Install the code-block sandbox packages
         run: |
           uv venv "$RUNNER_TEMP/codeblock-venv"

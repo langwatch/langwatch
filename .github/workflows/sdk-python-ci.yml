@@ -71,6 +71,11 @@ jobs:
             relevant:
               - 'sdks/python/**'
               - '.github/workflows/sdk-python-ci.yml'
+              # The Python uv workspace root (ADR-145): a re-lock or a root
+              # resolution-setting change re-pins this SDK's dependencies.
+              - 'uv.lock'
+              - 'pyproject.toml'
+              - '.python-version'
 
   test:
     needs: changes
@@ -89,7 +94,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: "sdks/python/uv.lock"
+          cache-dependency-glob: "uv.lock"
 
       - name: Setup Python UV
         working-directory: sdks/python
@@ -149,7 +154,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: "sdks/python/uv.lock"
+          cache-dependency-glob: "uv.lock"
 
       - name: Setup Python UV
         working-directory: sdks/python

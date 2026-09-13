@@ -193,3 +193,6 @@ packages/prisma-client/src/generated/
 .claude/manifests/*
 !.claude/manifests/README.md
 .claude/coordinator/LANES.md
+
+# The Python uv workspace's shared virtual environment (ADR-145).
+.venv/
