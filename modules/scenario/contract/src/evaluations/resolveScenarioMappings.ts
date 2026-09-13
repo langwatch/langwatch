@@ -9,9 +9,11 @@
  * @see specs/scenarios/scenario-evaluators.feature
  */
 
-import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
-import { stringifySpanIO } from "~/server/tracer/spanIOStringify";
-import type { Span } from "~/server/tracer/types";
+import {
+  extractChunkTextualContent,
+  stringifySpanIO,
+  type Span,
+} from "@langwatch/trace-contract";
 import type {
   EvaluatorAttachment,
   EvaluatorInputSpec,

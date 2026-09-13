@@ -17,15 +17,16 @@
 
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Scenario } from "~/generated/prisma/client";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import type { DataForEvaluation } from "~/server/evaluations/runEvaluation";
-import { CODE_EVALUATOR_CHECK_PREFIX } from "~/server/evaluators/codeEvaluator";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import {
+  CODE_EVALUATOR_CHECK_PREFIX,
+  type EvaluatorWithFields,
+  type SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
+import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
+import { evaluatorInputSpecsOf } from "@langwatch/suite-contract";
+import { type Span, type Trace } from "@langwatch/trace-contract";
+import type { Scenario } from "../scenario.ts";
 import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
-import { evaluatorInputSpecsOf } from "~/server/suites/suite-evaluators";
-import type { Span, Trace } from "~/server/tracer/types";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import type { EvaluatorAttachment } from "../evaluator-attachments.ts";
 import {
   type RunEvaluatorDefinition,
@@ -49,6 +50,15 @@ import {
 import type { ScenarioEvaluationsJobPayload } from "./types.ts";
 
 const logger = createLogger("langwatch:scenarios:evaluations");
+
+/**
+ * What the evaluator dispatch is handed, in the runner's own terms. Mirrors
+ * `@langwatch/evaluation-server`'s internal `DataForEvaluation` shape, which
+ * is not part of that package's public contract.
+ */
+export type DataForEvaluation =
+  | { type: "default"; data: Record<string, unknown> }
+  | { type: "custom"; data: Record<string, unknown> };
 
 /** What the run left in the store that the mappings read. */
 export interface ScenarioRunState {
