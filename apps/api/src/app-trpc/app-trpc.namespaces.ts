@@ -109,39 +109,11 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     module: "langy",
     consequence: "the egress allow-list cannot be edited",
   },
-  {
-    namespace: "modelProvider",
-    module: "model-provider",
-    consequence: "no provider credential is listed or saved",
-  },
-  {
-    namespace: "llmModelCost",
-    module: "model-provider",
-    consequence: "no model cost rule is readable",
-  },
-  { namespace: "translate", module: "model-provider", consequence: "nothing is translated" },
-  { namespace: "ops", module: "ops", consequence: "the operator back office answers nothing" },
-  {
-    namespace: "bugReports",
-    module: "ops",
-    consequence: "the support inbox lists no filed report",
-  },
-  {
-    namespace: "suites",
-    module: "suite",
-    consequence: "no test suite, folder or suite run is listed",
-  },
   { namespace: "tracesV2", module: "trace", consequence: "the discover view lists nothing" },
   {
     namespace: "sharedTrace",
     module: "trace",
     consequence: "a shared trace link opens nothing",
-  },
-  { namespace: "workflow", module: "workflow", consequence: "no workflow is opened or saved" },
-  {
-    namespace: "optimization",
-    module: "workflow",
-    consequence: "the optimization studio answers nothing",
   },
 ] as const satisfies readonly AbsentApiTrpcNamespace[];
 
