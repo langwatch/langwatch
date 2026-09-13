@@ -773,8 +773,9 @@ describe("the local workspace tools", () => {
   });
 
   describe("when code access is asked for", () => {
-    it("gives the folder facts when the folder is connected", async () => {
-      fakeApp({
+    /** @scenario "A folder connected to this conversation answers with its facts, not a card" */
+    it("gives the folder facts when the folder is connected, and records no request", async () => {
+      const { calls } = fakeApp({
         "/api/langy/local/workspace": [
           {
             connected: true,
@@ -804,6 +805,8 @@ describe("the local workspace tools", () => {
       expect(text).toContain("main");
       expect(text).toContain("pnpm");
       expect(text).toContain("local_* tools");
+      expect(calls.map((call) => call.method)).toEqual(["GET"]);
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(false);
     });
 
     it("points at the github skill when the user remembered GitHub", async () => {

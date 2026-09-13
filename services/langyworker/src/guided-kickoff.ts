@@ -61,3 +61,26 @@ export function prependSkillBody({
     prompt,
   ].join("\n");
 }
+
+/**
+ * What the `skill` tool answers when the model loads the guided onboarding
+ * skill in a conversation that is not on the guided path. The skill's own
+ * rule is that nothing but the kickoff brief triggers it; left to the model,
+ * a bare first message in a fresh conversation loaded it and ran the path's
+ * first step, opener and code access card included. The turn's holder says
+ * whether the conversation is guided; anywhere else the load is refused with
+ * the rule and none of the script is returned.
+ */
+export const GUIDED_SKILL_REFUSAL =
+  "The guided-onboarding skill is the script for the kickoff brief the app sends when the sign-up tour ends, and this conversation has no kickoff. Do not set up a path: answer the message as it is.";
+
+export function guidedSkillRefusal({
+  name,
+  guided,
+}: {
+  name: string;
+  guided: boolean;
+}): string | undefined {
+  if (name !== GUIDED_ONBOARDING_SKILL_NAME || guided) return undefined;
+  return GUIDED_SKILL_REFUSAL;
+}

@@ -149,6 +149,39 @@ describe("TurnRunner", () => {
       await done;
       expect(turnContext.turnId).toBeNull();
     });
+
+    /** @scenario "The skill is refused outside a guided conversation" */
+    it("says whether the conversation is on the guided path, and says no between turns", async () => {
+      const fake = makeFakeSession();
+      const turnContext = createTurnContext();
+      const { runner } = makeRunner({ session: fake.session, options: { turnContext } });
+
+      const plain = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "Go ahead." });
+      await until(() => fake.promptCalls.length === 1);
+      expect(turnContext.guided).toBe(false);
+      fake.finish();
+      await plain;
+
+      const kickoff = runner.submitTurn({
+        type: "turn",
+        turnId: "t2",
+        prompt: "Guided onboarding kickoff.\nPath to set up now: llmops.",
+      });
+      await until(() => fake.promptCalls.length === 2);
+      expect(turnContext.guided).toBe(true);
+      endOnCard(runner);
+      fake.finish();
+      await kickoff;
+      expect(turnContext.guided).toBe(false);
+
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const later = runner.submitTurn({ type: "turn", turnId: "t3", prompt: "Go ahead." });
+      await until(() => fake.promptCalls.length === 3);
+      expect(turnContext.guided).toBe(true);
+      endOnCard(runner);
+      fake.finish();
+      await later;
+    });
   });
 
   describe("when a turn completes cleanly", () => {

@@ -212,6 +212,7 @@ export class TurnRunner {
     if (this.options.turnContext) {
       this.options.turnContext.turnId = command.turnId;
       this.options.turnContext.calls = state.calls.calls;
+      this.options.turnContext.guided = this.isGuidedTurn(command);
     }
 
     let terminal: TerminalEvent;
@@ -253,9 +254,18 @@ export class TurnRunner {
     if (this.options.turnContext) {
       this.options.turnContext.turnId = null;
       this.options.turnContext.calls = [];
+      this.options.turnContext.guided = false;
     }
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
+  }
+
+  /** The turn is on the guided path: it carries the kickoff brief, or the transcript does. */
+  private isGuidedTurn(command: TurnCommand): boolean {
+    return (
+      isGuidedKickoffPrompt(command.prompt) ||
+      historyHasGuidedKickoff(this.options.session.agent.state.messages)
+    );
   }
 
   /**
@@ -303,9 +313,7 @@ export class TurnRunner {
     terminal: TerminalEvent;
   }): Promise<TerminalEvent> {
     if (terminal.type !== "turn_done" || terminal.outcome !== "ok") return terminal;
-    const guided =
-      isGuidedKickoffPrompt(command.prompt) ||
-      historyHasGuidedKickoff(this.options.session.agent.state.messages);
+    const guided = this.isGuidedTurn(command);
     const segment = guidedSegment(state.calls.calls).index;
     if (segment !== state.segment) {
       state.segment = segment;

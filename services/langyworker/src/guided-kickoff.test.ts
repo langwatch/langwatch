@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { GUIDED_KICKOFF_OPENER, isGuidedKickoffPrompt, prependSkillBody } from "./guided-kickoff.js";
+import {
+  GUIDED_KICKOFF_OPENER,
+  GUIDED_ONBOARDING_SKILL_NAME,
+  GUIDED_SKILL_REFUSAL,
+  guidedSkillRefusal,
+  isGuidedKickoffPrompt,
+  prependSkillBody,
+} from "./guided-kickoff.js";
 
 // Backs the kickoff-turn rules of specs/langy/langy-guided-onboarding.feature:
 // the worker recognises the brief the app sends and nothing else.
@@ -58,5 +65,16 @@ describe("prependSkillBody", () => {
     expect(lines[0]).toContain('[Skill "guided-onboarding"');
     expect(prompt).toContain("# Skill\n\nDo this.\n[End of skill.");
     expect(prompt.endsWith(`\n\n${BRIEF}`)).toBe(true);
+  });
+});
+
+describe("guidedSkillRefusal", () => {
+  /** @scenario "The skill is refused outside a guided conversation" */
+  it("refuses the guided-onboarding skill in a conversation with no kickoff, and nothing else", () => {
+    expect(guidedSkillRefusal({ name: GUIDED_ONBOARDING_SKILL_NAME, guided: false })).toBe(
+      GUIDED_SKILL_REFUSAL,
+    );
+    expect(guidedSkillRefusal({ name: GUIDED_ONBOARDING_SKILL_NAME, guided: true })).toBeUndefined();
+    expect(guidedSkillRefusal({ name: "tracing", guided: false })).toBeUndefined();
   });
 });

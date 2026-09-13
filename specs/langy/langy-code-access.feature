@@ -259,6 +259,13 @@ Feature: Langy asks how to reach the customer's code, once
 
   Rule: A shared folder belongs to one conversation
 
+    @unit
+    Scenario: A folder connected to this conversation answers with its facts, not a card
+      Given my local folder is connected to this conversation
+      When Langy calls the code access tool
+      Then the tool answers with the folder's facts and says to work with the local tools
+      And no control request is recorded, so no card is drawn
+
     @integration
     Scenario: A folder connected in another conversation does not count
       Given my local folder is connected to a different conversation

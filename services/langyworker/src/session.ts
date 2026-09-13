@@ -35,6 +35,7 @@ import {
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SAY_TOOL_NAME, createSayExtension } from "./tools/say.js";
+import { guidedSkillRefusal } from "./guided-kickoff.js";
 import { closingLineRefusal } from "./guided-turn-end.js";
 import {
   SECRET_SNIPPET_TOOL_NAME,
@@ -170,6 +171,7 @@ export async function createLangySession({
       createSkillExtension({
         skillsDir: config.skillsDir,
         disabledSkills: config.disabledSkills,
+        refuse: (name) => guidedSkillRefusal({ name, guided: turnContext.guided }),
       }),
       createQuestionExtension({ turnContext }),
       createSayExtension({

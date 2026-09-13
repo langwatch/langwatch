@@ -7,7 +7,8 @@
  * the life of the worker and arrives in the environment; the turn changes with
  * each turn command, so the runner writes it into a holder the tools read when
  * they call. The holder also carries the turn's settled calls, for a tool
- * whose answer depends on what ran before it in the same turn.
+ * whose answer depends on what ran before it in the same turn, and whether
+ * the conversation is on the guided path, for the skill tool.
  */
 
 /** A call of the turn that has settled, as the runner records it off pi's events. */
@@ -23,10 +24,15 @@ export type TurnContext = {
   turnId: string | null;
   /** The settled calls of the turn in flight, in order; empty between turns. */
   calls: readonly SettledCall[];
+  /**
+   * The conversation is on the guided path: the turn in flight carries the
+   * kickoff brief, or the transcript does. False between turns.
+   */
+  guided: boolean;
 };
 
 export function createTurnContext(): TurnContext {
-  return { turnId: null, calls: [] };
+  return { turnId: null, calls: [], guided: false };
 }
 
 /** The conversation this worker serves, as the manager named it at spawn. */

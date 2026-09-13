@@ -262,6 +262,16 @@ Feature: Langy guides the first setup after sign-up
       Then the brief reaches the model as it was
       And the worker warns that the skill is missing
 
+    # The skill's own rule is that nothing but the kickoff brief triggers it.
+    # A bare first message in a fresh conversation loaded it anyway and ran
+    # the path's first step, opener and code access card included.
+    @unit
+    Scenario: The skill is refused outside a guided conversation
+      Given the guided-onboarding skill is installed in the worker
+      When the model loads it through the skill tool in a conversation with no kickoff
+      Then the load is refused with the skill's own rule, and none of the script is returned
+      And a kickoff turn, or a later turn of a conversation whose transcript carries the kickoff, loads it
+
   Rule: The kickoff conversation is called Getting started, never after the brief
 
     @unit
