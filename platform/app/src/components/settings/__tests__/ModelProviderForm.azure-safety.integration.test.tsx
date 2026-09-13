@@ -11,7 +11,6 @@
  * (CustomModelInputSection, DefaultProviderSection, Azure API Gateway toggle)
  * must be hidden when the provider's registry `type` is "safety".
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -20,88 +19,20 @@ import type {
   UseModelProviderFormState,
 } from "../../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
-
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-const {
-  mockUseModelProviderForm,
-  mockUseModelProvidersSettings,
-  mockListAllForOrgQuery,
-  mockListAllForProjectQuery,
-} = vi.hoisted(() => ({
-  mockUseModelProviderForm: vi.fn(),
-  mockUseModelProvidersSettings: vi.fn(),
-  mockListAllForOrgQuery: vi.fn(),
-  mockListAllForProjectQuery: vi.fn(),
-}));
-
-vi.mock("../../../hooks/useModelProviderForm", () => ({
-  useModelProviderForm: (...args: unknown[]) =>
-    mockUseModelProviderForm(...args),
-}));
-
-vi.mock("../../../hooks/useModelProvidersSettings", () => ({
-  useModelProvidersSettings: (...args: unknown[]) =>
-    mockUseModelProvidersSettings(...args),
-}));
-
-vi.mock("../../../hooks/useDrawer", () => ({
-  useDrawer: () => ({
-    closeDrawer: vi.fn(),
-    openDrawer: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test-project", defaultModel: null },
-    organization: { id: "org-1" },
-    hasPermission: () => false,
-  }),
-}));
-
-vi.mock("../../../hooks/useModelProviderApiKeyValidation", () => ({
-  useModelProviderApiKeyValidation: () => ({
-    validate: vi.fn().mockResolvedValue(true),
-    validateWithCustomUrl: vi.fn().mockResolvedValue(true),
-    isValidating: false,
-    validationError: undefined,
-    clearError: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
-}));
-
-vi.mock("../../../utils/api", () => ({
-  api: {
-    modelProvider: {
-      isManagedProvider: {
-        useQuery: () => ({ data: { managed: false } }),
-      },
-      // EditModelProviderForm resolves its edit target from the flat
-      // (uncollapsed) provider list via useAllModelProvidersList (#5380).
-      // primeHooksForProvider seeds both with the same fixture the
-      // collapsed-record mock below uses.
-      listAllForOrganizationForFrontend: { useQuery: mockListAllForOrgQuery },
-      listAllForProjectForFrontend: { useQuery: mockListAllForProjectQuery },
-    },
-  },
-}));
-
-// Import after mocks
+import {
+  modelProviderDrawerMocks,
+  resetModelProviderDrawerMocks,
+  Wrapper,
+} from "./modelProviderDrawerHarness";
 import { EditModelProviderForm } from "../ModelProviderForm";
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+const {
+  mockListAllForOrganizationForFrontendQuery: mockListAllForOrgQuery,
+  mockListAllForProjectForFrontendQuery: mockListAllForProjectQuery,
+  mockUseModelProviderForm,
+  mockUseModelProvidersSettings,
+  mockUseOrganizationTeamProject,
+} = modelProviderDrawerMocks;
 
 function buildState(
   overrides: Partial<UseModelProviderFormState> = {},
@@ -183,6 +114,27 @@ function primeHooksForProvider({
   providerKey: string;
   displayKeys: Record<string, z.ZodTypeAny>;
 }) {
+  mockUseOrganizationTeamProject.mockReturnValue({
+    project: {
+      id: "proj-1",
+      name: "Web App",
+      slug: "test-project",
+      defaultModel: null,
+    },
+    team: { id: "team-1", name: "Platform" },
+    organization: {
+      id: "org-1",
+      name: "Acme",
+      teams: [
+        {
+          id: "team-1",
+          name: "Platform",
+          projects: [{ id: "proj-1", name: "Web App" }],
+        },
+      ],
+    },
+    hasPermission: () => false,
+  });
   const provider = buildProvider({ provider: providerKey });
   mockUseModelProvidersSettings.mockReturnValue({
     providers: { [providerKey]: provider },
@@ -214,7 +166,7 @@ function primeHooksForProvider({
 
 describe("Feature: Azure Safety model provider form rendering", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetModelProviderDrawerMocks();
   });
 
   afterEach(() => {
