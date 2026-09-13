@@ -343,6 +343,29 @@ Feature: The daily cost check is driven by the charges, not by a clock
       # The guard on all of the above. Without it, a check that simply reported
       # every disagreement on its last look would satisfy the rest.
 
+    @unit
+    Scenario: A summary row still missing on the last look is counted as drift
+      Given a pulled charge whose rollup cell the summary holds no row for
+      When the check has looked at that day for the last time
+      Then the drift is counted
+      And the comparison is recorded as answered rather than given up
+      # Money the log accounts for and the summary never folded is exactly what
+      # the counter exists for. A cell the fold has not reached yet and a cell
+      # the fold will never reach look identical at the moment of looking, so
+      # this waits out the ladder first — and then reports, rather than letting
+      # the row die in the outbox where the finding is filed as plumbing.
+
+    @unit
+    Scenario: Figures that agree over a summary still folding are looked at again
+      Given a day whose summary has demonstrably not folded every charge it holds
+      And the two figures nevertheless agree
+      When the check compares that day
+      Then the comparison is left to be attempted again
+      # Agreement reached over a summary that is still catching up is a
+      # coincidence, not a verdict: the unfolded charge nets to nothing, or
+      # lands on a cell neither figure covers. Clearing the day on it is
+      # permanent, because nothing marks that day again.
+
     @integration
     Scenario: A charge the summary has not folded yet is waited for rather than counted as drift
       Given a pulled charge landed just before tonight's check

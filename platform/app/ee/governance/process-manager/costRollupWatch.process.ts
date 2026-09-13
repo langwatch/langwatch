@@ -103,9 +103,15 @@ async function lookAtDay({
     costSource: payload.costSource,
   });
 
-  // Agreement is final on sight. Nothing that arrives later can make two
-  // numbers that matched stop matching, so there is no reason to look again.
-  if (comparison.mismatches.length === 0) return;
+  // Two ways a look can be inconclusive, and both buy another one. The figures
+  // differing is the obvious one. The other is the summary being PROVABLY mid-
+  // fold while the figures happen to agree: an unfolded charge that nets to
+  // nothing, or one whose cell the agreeing figures do not cover. Agreement
+  // reached over a summary that is still catching up is a coincidence, not a
+  // verdict, and clearing the day on it is permanent — nothing marks it again.
+  const settled =
+    comparison.mismatches.length === 0 && comparison.behind.length === 0;
+  if (settled) return;
 
   if (attempt < COST_ROLLUP_WATCH_MAX_ATTEMPTS) {
     logger.warn(
@@ -116,13 +122,15 @@ async function lookAtDay({
         attempt,
         of_attempts: COST_ROLLUP_WATCH_MAX_ATTEMPTS,
         mismatched_cells: comparison.mismatches.length,
-        // Non-zero names the reason outright; zero means the watermarks look
-        // level, which proves nothing (see the freshness module) and is
-        // precisely why this waits anyway.
+        // Non-zero names the reason outright; zero alongside a mismatch means
+        // the watermarks look level, which proves nothing (see the freshness
+        // module) and is precisely why this waits anyway.
         cells_behind: comparison.behind.length,
         lag_ms: comparison.lagMs,
       },
-      "Governance cost rollup disagrees with its events; looking again before calling it drift",
+      comparison.mismatches.length > 0
+        ? "Governance cost rollup disagrees with its events; looking again before calling it drift"
+        : "Governance cost rollup agrees with its events but has not folded all of them; looking again before trusting it",
     );
     throw new CostRollupCheckUnsettledError({
       day: payload.day,
@@ -131,12 +139,31 @@ async function lookAtDay({
     });
   }
 
-  // The last look. The disagreement has now outlived the whole ladder, which
-  // is the only evidence available that it is not the fold running behind — so
-  // it is named, counted, and the intent COMPLETES. Throwing here instead
-  // would retire the row as dead and file real drift under "the outbox broke",
-  // where nobody reads it.
+  // The last look, and whatever it found stands. A disagreement has now
+  // outlived the whole ladder, which is the only evidence available that it is
+  // not the fold running behind — including the disagreement that IS a missing
+  // summary row, since money on the log that never folded is exactly what the
+  // counter is for. So it is named, counted, and the intent COMPLETES:
+  // throwing here would retire the row as dead and file a real fault under
+  // "the outbox broke", where nobody reads it.
   reportCostRollupDrift({ tenantId: payload.tenantId, comparison });
+
+  // Waited out the ladder and the figures still agree — so the only thing left
+  // is a fold that has stopped rather than one that is slow. Said once, here,
+  // because this is where the day is cleared and nothing will ask about it
+  // again; the lag gauge alone would not say which day went unjudged.
+  if (comparison.mismatches.length === 0) {
+    logger.warn(
+      {
+        tenantId: payload.tenantId,
+        day: payload.day,
+        cost_source: payload.costSource,
+        cells_behind: comparison.behind.length,
+        lag_ms: comparison.lagMs,
+      },
+      "Governance cost rollup still had not folded every charge of the day on the last look; its figures agreed and the day is being cleared on that",
+    );
+  }
 }
 
 /**

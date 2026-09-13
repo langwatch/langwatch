@@ -80,6 +80,26 @@ const A_MISMATCH: CostRollupCellMismatch = {
 };
 
 /**
+ * A cell the charges describe and the summary holds no row for at all.
+ *
+ * `summarizedNanoMinor: null` is how `collectMismatches` states it, and it is
+ * a mismatch like any other: money on the log that never folded is exactly
+ * what the counter exists for.
+ */
+const A_MISSING_ROW: CostRollupCellMismatch = {
+  cell: A_MISMATCH.cell,
+  summarizedNanoMinor: null,
+  derivedNanoMinor: 3_000_000_000,
+};
+
+/** The cell that goes with it, as the freshness signal names it. */
+const A_CELL_BEHIND = {
+  key: "cost1d:cell",
+  derivedLastEventOccurredAtMs: Date.parse(`${DAY}T23:50:00.000Z`),
+  summarizedLastEventOccurredAtMs: null,
+};
+
+/**
  * What the comparator saw. `behind` defaults to empty — the watermarks level —
  * because that is the case the ladder exists for: the reading that proves
  * nothing and would, taken at face value, publish a false alarm.
@@ -211,6 +231,62 @@ describe("deciding whether a disagreement is drift", () => {
       );
       await expect(deliver(2)).resolves.toBeUndefined();
 
+      expect(incrementMismatch).not.toHaveBeenCalled();
+      expect(driftLines()).toHaveLength(0);
+    });
+  });
+
+  describe("when the summary holds no row for the cell at all", () => {
+    /** @scenario A summary row still missing on the last look is counted as drift */
+    it("looks again first, then counts the missing row and completes", async () => {
+      const deliver = handlerFor(async () =>
+        comparison({
+          mismatches: [A_MISSING_ROW],
+          behind: [A_CELL_BEHIND],
+        }),
+      );
+
+      await expect(deliver(1)).rejects.toBeInstanceOf(
+        CostRollupCheckUnsettledError,
+      );
+      expect(incrementMismatch).not.toHaveBeenCalled();
+
+      await expect(
+        deliver(COST_ROLLUP_WATCH_MAX_ATTEMPTS),
+      ).resolves.toBeUndefined();
+
+      // Money the log accounts for and the summary never folded. Reported as
+      // drift rather than left to die in the outbox: a fold that never ran is
+      // the thing the counter exists to surface, not an outbox failure.
+      expect(incrementMismatch).toHaveBeenCalledTimes(1);
+      expect(driftLines()).toHaveLength(1);
+      expect(driftLines()[0]?.[0]).toMatchObject({
+        summarized_nano_minor: null,
+        derived_nano_minor: 3_000_000_000,
+        cells_behind: 1,
+      });
+    });
+  });
+
+  describe("when the figures agree over a summary that is provably still folding", () => {
+    // Agreement reached while a charge is demonstrably unfolded is a
+    // coincidence — it nets to nothing, or it lands on a cell neither figure
+    // covers. Clearing the day on it is permanent, so it buys a look too.
+    /** @scenario Figures that agree over a summary still folding are looked at again */
+    it("looks again rather than clearing the day on a coincidence", async () => {
+      const deliver = handlerFor(async () =>
+        comparison({ mismatches: [], behind: [A_CELL_BEHIND] }),
+      );
+
+      await expect(deliver(1)).rejects.toBeInstanceOf(
+        CostRollupCheckUnsettledError,
+      );
+
+      // ...and on the last look the day is cleared, with nothing counted:
+      // there is no disagreement to report, only a fold that stayed behind.
+      await expect(
+        deliver(COST_ROLLUP_WATCH_MAX_ATTEMPTS),
+      ).resolves.toBeUndefined();
       expect(incrementMismatch).not.toHaveBeenCalled();
       expect(driftLines()).toHaveLength(0);
     });
