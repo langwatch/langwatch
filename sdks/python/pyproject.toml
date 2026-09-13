@@ -39,7 +39,10 @@ dependencies = [
   "python-liquid>=2.2.0",
   "pydantic>=2",
   "attrs>=26.1.0",
-  "pksuid>=1.1.2",
+  # The house identifier library (packages/ksuid-python in this repository,
+  # resolved from the workspace in development). Same prefix_payload shape the
+  # platform's TypeScript side generates with @langwatch/ksuid.
+  "langwatch-ksuid>=1.0.1",
   "pyyaml>=6.0.2",
   # Progress bars for experiment loop()/aloop(); pure-python and tiny, so a
   # declared dependency rather than an optional (it always runs there).
@@ -118,3 +121,6 @@ tests = ["factory-boy>=3.3.3", "pytest-asyncio>=1.4.0", "python-dotenv==1.2.2"]
 
 # Resolution settings ([tool.uv] exclude-newer, constraint-dependencies) live
 # at the workspace root pyproject.toml — uv ignores them on members.
+
+[tool.uv.sources]
+langwatch-ksuid = { workspace = true }
