@@ -24,6 +24,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
+import { entitlementServer } from "@langwatch/entitlement-server";
 import { identityServer } from "@langwatch/identity-server";
 import { createApp, membersFrom, type ResourceScope } from "@langwatch/runtime-composition";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -42,6 +43,8 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import type { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime.ts";
 import type { WorkerObjectStorage } from "./worker-object-storage.composition.ts";
+import { resolveWorkerStoredSecretCipher } from "./worker-automation-graph.composition.ts";
+import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
 
 /** The worker's installed, complete callable tenancy surfaces. */
 export type WorkerTenancy = Readonly<{
@@ -110,11 +113,13 @@ export async function createWorkerFoundationApps(options: {
     config: {
       "data-retention": { platformDefaultRetentionDays: options.config.retention.defaultDays },
       "api-key": { pepper: options.config.apiKeyPepper },
+      identity: { adminEmails: adminEmails(options.config) },
+      organization: {
+        processName: options.config.serviceName,
+        demoProject: { userId: "", projectId: options.config.authz.demoProjectId ?? "" },
+      },
       ops: {
-        adminEmails: (options.config.deployment.adminEmails ?? "")
-          .split(",")
-          .map((email) => email.trim())
-          .filter((email) => email.length > 0),
+        adminEmails: adminEmails(options.config),
         isProduction: options.config.nodeEnvironment === "production",
       },
     },
@@ -124,15 +129,20 @@ export async function createWorkerFoundationApps(options: {
       clickhouse: options.clickhouse.queryClient,
       eventing: options.eventing.eventSourcing,
       logger: createLogger(options.config.serviceName),
+      // The SAME cipher the automation graph reads stored credentials with —
+      // a second cipher would not fail, it would decrypt to noise.
+      encryption: resolveWorkerStoredSecretCipher(options.config),
     }),
   })
+    .withTransports(workerClosedDoors())
     .withProvided(AuditLogApi, auditLog.auditLog())
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withModules([
       authzServer,
-      // organization declares a dependency on identity; the worker installs
-      // the provider rather than leaving the declaration unanswerable.
+      // organization declares dependencies on identity and entitlement; the
+      // worker installs the providers rather than leaving them unanswerable.
       identityServer,
+      entitlementServer,
       organizationServer,
       projectServer,
       apiKeyServer,
@@ -297,4 +307,12 @@ function clickHouseSettings(
     }
   }
   return settings;
+}
+
+/** The platform operators, as the comma-separated ADMIN_EMAILS this deployment named. */
+function adminEmails(config: WorkerConfig): string[] {
+  return (config.deployment.adminEmails ?? "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter((email) => email.length > 0);
 }
