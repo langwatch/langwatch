@@ -32,14 +32,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleBindingScopeType } from "~/generated/prisma/client";
 
-const { verify, markUsed, projectFindUnique, triggerFindUnique } = vi.hoisted(
-  () => ({
+const { verify, markUsed, projectFindUnique, triggerFindUnique, sendCanary } =
+  vi.hoisted(() => ({
     verify: vi.fn(),
     markUsed: vi.fn(),
     projectFindUnique: vi.fn(),
     triggerFindUnique: vi.fn(),
-  }),
-);
+    sendCanary: vi.fn(),
+  }));
 
 vi.mock("~/server/api-key/api-key.service", () => ({
   ApiKeyService: { create: () => ({ verify, markUsed }) },
@@ -50,6 +50,10 @@ vi.mock("~/server/db", () => ({
     project: { findUnique: projectFindUnique },
     trigger: { findUnique: triggerFindUnique },
   },
+}));
+
+vi.mock("~/server/health-probes/canary.service", () => ({
+  sendCanary,
 }));
 
 /**
@@ -83,6 +87,8 @@ describe("GET /api/health/triggers project scoping", () => {
     markUsed.mockReset();
     projectFindUnique.mockReset();
     triggerFindUnique.mockReset();
+    sendCanary.mockReset();
+    sendCanary.mockResolvedValue({ status: 200, json: async () => ({}) });
     projectFindUnique.mockImplementation(
       async ({ where }: { where: { apiKey?: string } }) =>
         where.apiKey === LEGACY_PROJECT_KEY ? PROJECT : null,
@@ -156,6 +162,41 @@ describe("GET /api/health/triggers project scoping", () => {
       const body = await res.json();
       expect(body.code).toBeUndefined();
       expect(body.message).toBe("Invalid auth token.");
+    });
+  });
+});
+
+describe("GET /api/health/collector downstream project scoping", () => {
+  beforeEach(() => {
+    verify.mockReset();
+    markUsed.mockReset();
+    projectFindUnique.mockReset();
+    sendCanary.mockReset();
+    sendCanary.mockResolvedValue({ status: 200, json: async () => ({}) });
+    projectFindUnique.mockImplementation(
+      async ({ where }: { where: { apiKey?: string } }) =>
+        where.apiKey === LEGACY_PROJECT_KEY ? PROJECT : null,
+    );
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("given a project key resolved by authenticateProject", () => {
+    /** @scenario "Every project-scoped REST app emits project_scope_required for the same condition" */
+    it("forwards X-Project-Id on every downstream canary request", async () => {
+      const app = await getApp();
+
+      await app.request("/api/health/collector", {
+        headers: { "x-auth-token": LEGACY_PROJECT_KEY },
+      });
+
+      expect(sendCanary).toHaveBeenCalledTimes(2);
+      for (const call of sendCanary.mock.calls) {
+        expect(call[0]).toMatchObject({ projectId: PROJECT.id });
+      }
     });
   });
 });

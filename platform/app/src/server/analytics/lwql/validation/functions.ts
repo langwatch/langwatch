@@ -473,7 +473,6 @@ const FUNCTION_NAME_SOURCES: readonly string[] = [
   ...CONVERSION_FUNCTIONS,
 ];
 
-/** Every name a LangWatchQL query may call, lowercased, for matching. */
 const ALLOWED_FUNCTION_NAMES: ReadonlySet<string> = new Set(
   FUNCTION_NAME_SOURCES.map((name) => name.toLowerCase()),
 );

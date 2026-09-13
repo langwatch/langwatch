@@ -31,7 +31,7 @@ describe("docs/api-reference/query/overview.mdx", () => {
     expect(fs.existsSync(DOCS_PATH), DOCS_PATH).toBe(true);
   });
 
-  describe("the Authentication section", () => {
+  describe("when the Authentication section is read", () => {
     const content = readDocs();
 
     /** @scenario "The query docs describe every credential form and the project header rule" */
@@ -63,14 +63,14 @@ describe("docs/api-reference/query/overview.mdx", () => {
     });
   });
 
-  describe("the error table", () => {
+  describe("when the error table is read", () => {
     /** @scenario "The query docs describe every credential form and the project header rule" */
     it("lists project_scope_required", () => {
       expect(readDocs()).toContain("project_scope_required");
     });
   });
 
-  describe("the Supported functions section", () => {
+  describe("when the Supported functions section is read", () => {
     const content = readDocs();
 
     /**
@@ -108,7 +108,7 @@ describe("docs/api-reference/query/overview.mdx", () => {
     });
   });
 
-  describe("the response ceilings", () => {
+  describe("when the response ceilings are documented", () => {
     const content = readDocs();
 
     /** @scenario "The query docs and OpenAPI description state the response ceilings" */

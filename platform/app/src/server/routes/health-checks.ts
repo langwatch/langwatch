@@ -117,7 +117,7 @@ secured
     if ("body" in auth) {
       return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     const restParams: CollectorRESTParams = {
       spans: [
@@ -190,6 +190,7 @@ secured
         transport: "rest",
         url: `${env.BASE_HOST}/api/collector`,
         authToken,
+        projectId: project.id,
         body: restParams,
       }),
       sendCanary({
@@ -197,6 +198,7 @@ secured
         transport: "otlp",
         url: `${env.BASE_HOST}/api/otel/v1/traces`,
         authToken,
+        projectId: project.id,
         body: otelParams,
       }),
     ]);
@@ -217,7 +219,7 @@ secured
     if ("body" in auth) {
       return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     let response: Response | null = null;
     let attempts = 0;
@@ -229,6 +231,7 @@ secured
           method: "POST",
           headers: {
             "X-Auth-Token": authToken,
+            "X-Project-Id": project.id,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -275,7 +278,7 @@ secured
     if ("body" in auth) {
       return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     const restTraceId = `trace_${nanoid()}`;
     const restParams: CollectorRESTParams = {
@@ -357,6 +360,7 @@ secured
         transport: "rest",
         url: `${env.BASE_HOST}/api/collector`,
         authToken,
+        projectId: project.id,
         body: restParams,
       }),
       sendCanary({
@@ -364,6 +368,7 @@ secured
         transport: "otlp",
         url: `${env.BASE_HOST}/api/otel/v1/traces`,
         authToken,
+        projectId: project.id,
         body: otelParams,
       }),
     ]);
@@ -398,7 +403,10 @@ secured
           const traceResponse = await fetch(
             `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
             {
-              headers: { "X-Auth-Token": authToken },
+              headers: {
+                "X-Auth-Token": authToken,
+                "X-Project-Id": project.id,
+              },
             },
           );
           const fetchMs = Date.now() - fetchStart;
@@ -550,6 +558,7 @@ secured
           method: "POST",
           headers: {
             "X-Auth-Token": authToken,
+            "X-Project-Id": project.id,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ input: "\u{1F425}" }),

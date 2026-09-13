@@ -144,7 +144,7 @@ describe("given the generated OpenAPI document", () => {
       }
     });
 
-    describe("the schema door's published response shape", () => {
+    describe("when the schema door's response is inspected", () => {
       /** @scenario "The published OpenAPI schema for the schema endpoint declares the functions field" */
       it("declares a functions field typed as an array of strings", () => {
         const functionsField = responseSchema({
@@ -162,7 +162,7 @@ describe("given the generated OpenAPI document", () => {
       });
     });
 
-    describe("the project header rule, named on both doors", () => {
+    describe("when both doors' descriptions are checked for the project header rule", () => {
       /** @scenario "The OpenAPI descriptions for both query routes name the project header rule" */
       it.each([
         ["POST", RUN, "post"],
@@ -177,7 +177,7 @@ describe("given the generated OpenAPI document", () => {
       });
     });
 
-    describe("the response ceilings, named on the run door", () => {
+    describe("when the run door's description is checked for the response ceilings", () => {
       /** @scenario "The query docs and OpenAPI description state the response ceilings" */
       it("states the 10,000 row and 8,000,000 byte caps, truncated, and RESULT_TRUNCATED/meta.maxRows", () => {
         const description: string = paths[RUN]?.post?.description ?? "";

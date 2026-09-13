@@ -116,7 +116,6 @@ function projectFixture({
   };
 }
 
-/** A prisma stub whose `project.findUnique` answers from a fixed lookup table. */
 function buildPrisma(
   projects: Record<string, ReturnType<typeof projectFixture>>,
 ): PrismaClient {

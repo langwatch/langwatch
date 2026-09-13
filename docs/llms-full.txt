@@ -66964,7 +66964,8 @@ Both endpoints answer with the standard LangWatch error envelope and a real HTTP
 | `400` | `validation_error` | The request body failed validation. |
 | `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
 | `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist. |
-| `401` | `invalid_credentials` | The API key is missing, unknown, or revoked. |
+| `401` | `missing_credentials` | No supported authentication credential was sent. |
+| `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
 | `401` | `project_scope_required` | An organization key was sent with no `X-Project-Id` header and no Basic auth project id. Name a project and retry. |
 | `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission. |
 | `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
