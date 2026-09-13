@@ -244,8 +244,19 @@ const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_forbidden",
 ]);
 
+/**
+ * A rate limit, as the proxy's status fallback names it and as the providers
+ * name it in their own bodies: OpenAI and Azure OpenAI answer a 429 with
+ * `rate_limit_exceeded`, Anthropic with `rate_limit_error`, Google with
+ * `RESOURCE_EXHAUSTED`. The proxy carries the provider's code as the typed
+ * reason when the body has one, so the status fallback alone misses most
+ * real rate limits.
+ */
 const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "upstream_rate_limited",
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "RESOURCE_EXHAUSTED",
 ]);
 
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
@@ -3534,7 +3545,7 @@ const presentations = {
         return "The model provider refused this key or its permissions. Check the credential configured for this model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
-        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+        return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";

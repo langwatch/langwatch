@@ -5,8 +5,9 @@
  *   provider is the mediated gateway, keyed by env reference.
  * - Everything pi persists lives under the worker home: agentDir at
  *   `$HOME/.langy-pi`, the session JSONL under config.sessionDir.
- * - Auto-compaction ON, pi's own transient retry OFF (the manager and the
- *   product's self-retry own retries).
+ * - Auto-compaction ON, pi's own transient retry OFF: the manager's LLM
+ *   proxy retries a burst rate limit with the provider's Retry-After
+ *   (llmretry.go), and the product's self-retry owns the rest.
  * - The resource loader discovers nothing (noExtensions/noSkills/
  *   noContextFiles): the system prompt is wholly owned by the wrapper, and
  *   the only extensions are the inline factories: `todowrite`, `skill`,
