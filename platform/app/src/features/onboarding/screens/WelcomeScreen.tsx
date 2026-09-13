@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { showErrorToast } from "~/features/errors";
+import { guidedPathLanding } from "~/features/guided-onboarding/paths";
 import { GuidedTakeover } from "~/features/guided-onboarding/takeover/GuidedTakeover";
 import { resolveGuidedResume } from "~/features/guided-onboarding/takeover/resume";
 import { TAKEOVER_FADE_MS } from "~/features/guided-onboarding/takeover/TakeoverStage";
@@ -40,11 +41,15 @@ const TAKEOVER_SCREENS = new Set<OnboardingScreenIndex>([
 function welcomeDestination({
   decision,
   returnTo,
+  landing,
 }: {
   decision: Exclude<WelcomeRedirectDecision, { kind: "onboard" }>;
   returnTo: string | null;
+  /** The guided landing a resume with its provider recorded goes to. */
+  landing: string | null;
 }): string {
   if (returnTo) return returnTo;
+  if (landing) return landing;
   return decision.kind === "home" ? "/" : `/${decision.slug}`;
 }
 
@@ -181,11 +186,21 @@ export const WelcomeScreen: React.FC = () => {
 
   // A guided organization whose takeover is unfinished: a reload, a closed
   // tab or a second device resumes it from the durable state instead of
-  // being sent into the product.
+  // being sent into the product. With the provider already recorded, the
+  // resume is the landing the provider screen makes, on the path being
+  // guided, where the tour continues.
   const resume = useMemo(
     () => resolveGuidedResume({ organizations }),
     [organizations],
   );
+  const takeover = resume?.phase === "landing" ? null : resume;
+  const landing =
+    resume?.phase === "landing"
+      ? guidedPathLanding({
+          path: resume.landingPath,
+          projectSlug: resume.projectSlug,
+        })
+      : null;
 
   // Same-origin continuation (e.g. the CLI device-approval page sends a
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
@@ -204,7 +219,7 @@ export const WelcomeScreen: React.FC = () => {
     // running on it, so the list catching up must not send the user away.
     if (organizationIsLoading || created) return;
 
-    const decision: WelcomeRedirectDecision = resume
+    const decision: WelcomeRedirectDecision = takeover
       ? { kind: "onboard" }
       : resolveWelcomeRedirect({
           organizations,
@@ -216,14 +231,15 @@ export const WelcomeScreen: React.FC = () => {
       return;
     }
     setOnboardingNeeded(false);
-    void router.push(welcomeDestination({ decision, returnTo }));
+    void router.push(welcomeDestination({ decision, returnTo, landing }));
   }, [
     organizationIsLoading,
     organizations,
     project?.slug,
     returnTo,
     created,
-    resume,
+    takeover,
+    landing,
   ]);
 
   function handleFinalizeSubmit() {
@@ -326,17 +342,17 @@ export const WelcomeScreen: React.FC = () => {
       />
     );
   }
-  if (!created && resume) {
+  if (!created && takeover) {
     return (
       <GuidedTakeover
-        organizationId={resume.organizationId}
-        organizationName={resume.organizationName}
-        projectId={resume.projectId}
-        projectSlug={resume.projectSlug}
+        organizationId={takeover.organizationId}
+        organizationName={takeover.organizationName}
+        projectId={takeover.projectId}
+        projectSlug={takeover.projectSlug}
         userName={session.user?.name}
-        usageStyle={resume.usageStyle}
-        initialPhase={resume.phase}
-        initialPaths={resume.paths}
+        usageStyle={takeover.usageStyle}
+        initialPhase={takeover.phase}
+        initialPaths={takeover.paths}
         returnTo={returnTo}
       />
     );

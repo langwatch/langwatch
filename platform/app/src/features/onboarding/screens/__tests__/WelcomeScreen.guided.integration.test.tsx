@@ -379,22 +379,41 @@ describe("WelcomeScreen in the guided variant", () => {
       expect(push).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A reload after the provider step leaves the welcome page" */
-    it("sends the user into the product once the provider step is done", async () => {
+    /** @scenario "An organization that already has a provider skips only the provider step" */
+    it("lands on the guided path's page when the provider is recorded and the tour has not ended", async () => {
       orgState.organizations = [
         guidedOrganization({
-          paths: ["gateway"],
+          paths: ["llmops", "gateway"],
+          currentPath: "llmops",
           donePaths: [],
           provider: "openai",
           providerModel: "gpt-5.2",
         }),
       ];
       renderWelcome();
-      await waitFor(() => expect(push).toHaveBeenCalledWith("/acme-proj"));
+      await waitFor(() =>
+        expect(push).toHaveBeenCalledWith("/acme-proj/traces"),
+      );
       expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
 
       cleanup();
       push.mockReset();
+      orgState.organizations = [
+        guidedOrganization({
+          paths: ["gateway"],
+          currentPath: "gateway",
+          donePaths: [],
+          provider: "openai",
+          providerModel: "gpt-5.2",
+        }),
+      ];
+      renderWelcome();
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/gateway"));
+      expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A reload after the guide ended leaves the welcome page" */
+    it("sends the user into the product once the provider step is skipped or the tour has ended", async () => {
       orgState.organizations = [
         guidedOrganization({
           paths: ["gateway"],
@@ -405,6 +424,27 @@ describe("WelcomeScreen in the guided variant", () => {
       renderWelcome();
       await waitFor(() => expect(push).toHaveBeenCalledWith("/acme-proj"));
       expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
+
+      for (const ended of [
+        { tourCompletedAt: "2026-09-05T10:05:00.000Z" },
+        { tourSkippedAt: "2026-09-05T10:05:00.000Z" },
+      ]) {
+        cleanup();
+        push.mockReset();
+        orgState.organizations = [
+          guidedOrganization({
+            paths: ["llmops"],
+            currentPath: "llmops",
+            donePaths: [],
+            provider: "openai",
+            providerModel: "gpt-5.2",
+            ...ended,
+          }),
+        ];
+        renderWelcome();
+        await waitFor(() => expect(push).toHaveBeenCalledWith("/acme-proj"));
+        expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
+      }
     });
 
     /** @scenario "A classic organization is never shown the takeover" */

@@ -330,8 +330,16 @@ Feature: Guided welcome flow and takeover screens
     Then the provider screen opens
 
   @integration
-  Scenario: A reload after the provider step leaves the welcome page
-    Given my organization has a provider recorded or the provider step skipped
+  Scenario: An organization that already has a provider skips only the provider step
+    Given my organization has the paths recorded and a provider recorded
+    And the tour has not completed or been skipped
+    When I open the welcome page again
+    Then the provider screen is not shown
+    And I am sent to the page of the path being guided, where the tour continues
+
+  @integration
+  Scenario: A reload after the guide ended leaves the welcome page
+    Given my organization has the provider step skipped, or a provider recorded and the tour completed or skipped
     When I open the welcome page again
     Then I am sent into the product
 

@@ -10,23 +10,38 @@ import type { GuidedPath } from "../paths";
  * or the user belongs in the product and the classic redirect applies.
  *
  * The takeover is unfinished while the organization is in the guided variant
- * and the provider step has neither connected nor been skipped. A reload, a
- * closed tab or a second device all land here and continue from the durable
- * state: no picks yet means the hello screen, picks without a provider means
- * the provider screen.
+ * and the guide it starts has not ended: the provider step was not skipped,
+ * and no tour completed or was skipped. A reload, a closed tab or a second
+ * device all land here and continue from the durable state: no picks yet
+ * means the hello screen, picks without a provider means the provider
+ * screen, and a provider already recorded means the landing the provider
+ * screen would have made, on the path being guided.
  */
 
 export type TakeoverPhase = "hello" | "value" | "provider";
 
-export interface GuidedResume {
+interface ResumedOrganization {
   organizationId: string;
   organizationName: string;
   projectId: string;
   projectSlug: string;
   usageStyle: string | null;
   paths: GuidedPath[];
+}
+
+/** The takeover screen to draw again. */
+export interface TakeoverResume extends ResumedOrganization {
   phase: TakeoverPhase;
 }
+
+/** The landing that follows the provider step, with the provider recorded. */
+export interface LandingResume extends ResumedOrganization {
+  phase: "landing";
+  /** The path the landing opens: the one being guided, else the first pick. */
+  landingPath: GuidedPath;
+}
+
+export type GuidedResume = TakeoverResume | LandingResume;
 
 interface ResumableOrganization {
   id: string;
@@ -51,22 +66,32 @@ function resumeForOrganization(
 ): GuidedResume | null {
   if (parseOnboardingVariant(organization.signupData) !== "guided") return null;
   const state = parseGuidedOnboardingState(organization.signupData);
-  if (state.provider || state.providerSkippedAt) return null;
+  if (state.providerSkippedAt) return null;
+  if (state.provider && (state.tourCompletedAt || state.tourSkippedAt)) {
+    return null;
+  }
 
   const project = organization.teams
     .filter((team) => !team.isPersonal)
     .flatMap((team) => team.projects)[0];
   if (!project) return null;
 
-  return {
+  const resumed: ResumedOrganization = {
     organizationId: organization.id,
     organizationName: organization.name,
     projectId: project.id,
     projectSlug: project.slug,
     usageStyle: usageStyleOf(organization.signupData),
     paths: state.paths,
-    phase: state.paths.length > 0 ? "provider" : "hello",
   };
+  if (state.provider) {
+    return {
+      ...resumed,
+      phase: "landing",
+      landingPath: state.currentPath ?? state.paths[0] ?? "llmops",
+    };
+  }
+  return { ...resumed, phase: state.paths.length > 0 ? "provider" : "hello" };
 }
 
 export function resolveGuidedResume({
