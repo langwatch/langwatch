@@ -1,4 +1,4 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
@@ -38,7 +38,7 @@ import { EvaluatorExecutionService } from "./evaluator-execution.service.ts";
 
 export type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   /** The trail one evaluator's change history is read off. */
   history: EvaluatorHistoryService;
   fallbackModels?: { defaultModel: string; embeddingsModel: string };

@@ -8,21 +8,21 @@
  * keeps private. Everything the case does not name refuses by name rather
  * than answering undefined.
  */
-import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   ModelProviderResolution,
   ModelProviderApi,
 } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { vi } from "vitest";
 
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
-import type { EvaluatorNlpDispatcher } from "../../services/evaluator-code-execution.service.ts";
 import { EvaluatorApp, type EvaluatorGraph } from "../evaluator.app.ts";
 
 /** The workflow and monitor rows, as recording doubles. */
@@ -89,23 +89,22 @@ export function createEvaluatorTestApp(
     ...input.modelProviders,
   });
 
-  const app = EvaluatorApp.create({
-    repositories: { evaluators: repository },
-    dependencies: {
-      permissions,
-      auditLog: createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
-      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+  const app = EvaluatorApp.createWithGraph(
+    {
+      repositories: { evaluators: repository },
+      dependencies: {
+        permissions,
+        auditLog: createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
+        users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+        workflows: createApiFixture<WorkflowApi>({ assertInProject: async () => void 0 }),
+        modelProviders,
+      },
+      members: { prisma: createApiFixture<PrismaClient>() },
+      config: {},
+      resources: new ResourceScope(),
     },
-    members: {
-      workflows: createApiFixture<WorkflowService>({ assertInProject: async () => void 0 }),
-      graph,
-      nlp: createApiFixture<EvaluatorNlpDispatcher>(),
-      modelProviders,
-      generateId: () => "evaluator-test",
-    },
-    config: void 0,
-    resources: new ResourceScope(),
-  });
+    graph,
+  );
 
   return { app, repository, modelProviders, permissions, graph };
 }

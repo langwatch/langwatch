@@ -4,9 +4,9 @@
  * rule either door used to hold is a method here, and a caller arrives as
  * `actorId`, never read from a session or a request.
  */
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
@@ -34,23 +34,23 @@ import {
   type ResolvedEvaluatorExecution,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import {
-  ModelNotConfiguredError,
-  type ModelProviderApi,
-} from "@langwatch/model-provider-contract";
+import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
-
+import { WorkflowApi } from "@langwatch/workflow-contract";
+import { nanoid } from "nanoid";
+import { z } from "zod";
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
-import {
-  EvaluatorCodeExecutionService,
-  type EvaluatorNlpDispatcher,
-} from "../services/evaluator-code-execution.service.ts";
+import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
+import {
+  EvaluatorGraphAdapter,
+  refusingEvaluatorNlpDispatcher,
+} from "./evaluator-composition.build.ts";
 
 /**
  * The workflow and monitor rows an evaluator is entangled with. Both belong to
@@ -90,38 +90,24 @@ export interface EvaluatorGraph {
 }
 
 /**
- * Ports the process supplies. `workflows` and `modelProviders` still carry a
- * peer module's own service rather than its API token, because `WorkflowApi`
- * publishes neither `getFields` nor `enrichStudioEvent` and `ModelProviderApi`
- * is a strict superset of the service the api composes. `graph` is a row no
- * module's api publishes yet. Narrowing the three onto tokens is the
- * peer-narrowing wave, not this one.
+ * Config: the models a deployment falls back to when a project configured
+ * none, and the platform's own public origin for `platformUrl`. Both default
+ * to `undefined` — the deleted composition never set either, so a deployment
+ * that configures nothing keeps its exact absence: no fallback models, and
+ * `platformUrl` refuses by name.
  */
-export interface EvaluatorAppInfrastructure {
-  /** The workflow rows an evaluator's fields, its guard and its run read. */
-  workflows: WorkflowService;
-  /** The workflow and monitor rows an evaluator is entangled with. */
-  graph: EvaluatorGraph;
-  /** Where a code evaluator's one-node Studio graph runs. */
-  nlp: EvaluatorNlpDispatcher;
-  /**
-   * Resolves the project's default and embeddings models. Only the REST door
-   * creates an evaluator without naming them, but the rule for what happens
-   * then belongs to the module, not to that door.
-   */
-  modelProviders: ModelProviderApi;
-  /** The models a deployment falls back to when a project configured none. */
-  fallbackModels?: Readonly<{ defaultModel: string; embeddingsModel: string }> | undefined;
-  /** Mints the ephemeral studio ids a code evaluator's run is traced under. */
-  generateId: () => string;
-  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
-  publicBaseUrl?: string;
-}
+const evaluatorAppConfigSchema = z.object({
+  fallbackModels: z
+    .object({ defaultModel: z.string(), embeddingsModel: z.string() })
+    .optional(),
+  publicBaseUrl: z.string().optional(),
+});
+export type EvaluatorAppConfig = z.infer<typeof evaluatorAppConfigSchema>;
 
 type EvaluatorSetup = FeatureSetup<
   typeof EvaluatorApp.dependencies,
-  EvaluatorAppInfrastructure,
-  undefined,
+  MembersRead<typeof EvaluatorApp.reads>,
+  EvaluatorAppConfig,
   EvaluatorRepositories
 >;
 
@@ -143,29 +129,47 @@ export class EvaluatorApp implements EvaluatorApi {
     auditLog: AuditLogApi,
     /** Names the person behind each row of that history. */
     users: UserApi,
+    /** The workflow rows an evaluator's fields, its guard, its run and its replication read. */
+    workflows: WorkflowApi,
+    /** Resolves the project's default and embeddings models. */
+    modelProviders: ModelProviderApi,
   };
+  static readonly configSchema = evaluatorAppConfigSchema;
+  static readonly reads = reads("prisma");
 
   static create(setup: EvaluatorSetup): EvaluatorApp {
-    const { dependencies, members, repositories } = setup;
+    const graph = EvaluatorGraphAdapter.create({
+      prisma: setup.members.prisma,
+      workflows: setup.dependencies.workflows,
+    });
+
+    return EvaluatorApp.createWithGraph(setup, graph);
+  }
+
+  /**
+   * Split from {@link create} so a test can substitute a recording double for
+   * the workflow/monitor graph without a real database — the graph interface
+   * is this module's own seam, not a process member.
+   */
+  static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorApp {
+    const { dependencies, repositories, config } = setup;
 
     return new EvaluatorApp({
       evaluators: EvaluatorRuntimeService.create({
         repository: repositories.evaluators,
-        workflows: members.workflows,
+        workflows: dependencies.workflows,
         history: EvaluatorHistoryService.create({
           auditLog: dependencies.auditLog,
           users: dependencies.users,
         }),
-        ...(members.fallbackModels
-          ? { fallbackModels: members.fallbackModels }
-          : {}),
-        codeExecution: EvaluatorCodeExecutionService.create(members.nlp),
-        generateId: members.generateId,
+        ...(config.fallbackModels ? { fallbackModels: config.fallbackModels } : {}),
+        codeExecution: EvaluatorCodeExecutionService.create(refusingEvaluatorNlpDispatcher()),
+        generateId: () => nanoid(),
       }),
-      modelProviders: members.modelProviders,
+      modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
-      graph: members.graph,
-      publicBaseUrl: members.publicBaseUrl,
+      graph,
+      publicBaseUrl: config.publicBaseUrl,
     });
   }
 

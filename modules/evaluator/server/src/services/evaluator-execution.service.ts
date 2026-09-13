@@ -1,4 +1,4 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   CODE_EVALUATOR_CHECK_PREFIX,
   codeEvaluatorConfigSchema,
@@ -16,7 +16,7 @@ import type { EvaluatorRepository } from "../repositories/evaluator.repository.t
 export class EvaluatorExecutionService {
   static create(options: {
     repository: EvaluatorRepository;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
   }): EvaluatorExecutionService {
     return new EvaluatorExecutionService(options);
   }
@@ -24,7 +24,7 @@ export class EvaluatorExecutionService {
   private constructor(
     private readonly options: {
       repository: EvaluatorRepository;
-      workflows: WorkflowService;
+      workflows: WorkflowApi;
     },
   ) {}
 

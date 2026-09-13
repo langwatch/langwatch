@@ -1,4 +1,4 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   codeEvaluatorConfigSchema,
   codeEvaluatorOutputFields,
@@ -25,7 +25,7 @@ const stripValues = (fields: CodeEvaluatorConfig["inputs"]): Field[] =>
 export class EvaluatorCodeService {
   static create(options: {
     repository: EvaluatorRepository;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
     codeExecution: EvaluatorCodeExecution;
     generateId: () => string;
   }): EvaluatorCodeService {
@@ -35,7 +35,7 @@ export class EvaluatorCodeService {
   private constructor(
     private readonly options: {
       repository: EvaluatorRepository;
-      workflows: WorkflowService;
+      workflows: WorkflowApi;
       codeExecution: EvaluatorCodeExecution;
       generateId: () => string;
     },
