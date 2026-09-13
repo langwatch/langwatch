@@ -162,19 +162,19 @@ const usageSchema = z.object({
     .number()
     .int()
     .describe(
-      "Image tokens billed on the input side, 0 when the request carried no image. Disjoint from input_tokens: the two never overlap, so cost is the sum across buckets and input_tokens alone undercounts an image request.",
+      "Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.",
     ),
   output_image_tokens: z
     .number()
     .int()
     .describe(
-      "Image tokens the answer was billed for, 0 when the answer held no image. Disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so summing output_tokens alone undercounts image traffic.",
+      "Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.",
     ),
   image_count: z
     .number()
     .int()
     .describe(
-      "Images the request carried, for models priced per image instead of per token. 0 on a request that carried none.",
+      "Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.",
     ),
 });
 

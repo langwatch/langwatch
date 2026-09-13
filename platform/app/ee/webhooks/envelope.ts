@@ -107,9 +107,12 @@ function envelopeIdentity(row: SpendEventRow): Record<string, unknown> {
  * used neither. Consumers sum these fields to reconcile a period, and an
  * omitted field turns that sum into NaN where a 0 does not.
  *
- * The buckets are disjoint. An image generation reports output_tokens 0 with
- * its render under output_image_tokens, so a consumer summing output_tokens
- * alone undercounts image traffic; cost is the sum across all buckets.
+ * The token buckets are disjoint. An image generation reports output_tokens 0
+ * with its render under output_image_tokens, so a consumer reading
+ * output_tokens alone sees none of the image traffic. Each priced quantity is
+ * charged once at its own rate; reasoning_tokens is a subset of output_tokens
+ * and image_count is a count, so neither is priced and neither belongs in a
+ * cost sum.
  */
 function envelopeQuantities(row: SpendEventRow): {
   usage: Record<string, number>;

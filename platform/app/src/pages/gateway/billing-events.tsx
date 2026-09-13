@@ -367,7 +367,7 @@ function BillingEventRow({
         </HStack>
       </Table.Cell>
       <Table.Cell whiteSpace="nowrap">
-        <UITooltip content="input / output / cache read / cache write / reasoning / image in / image out / images">
+        <UITooltip content="input / output / cache read / cache write / reasoning / image in / image out / image count">
           <Text fontSize="xs">{tokensSummary(row)}</Text>
         </UITooltip>
       </Table.Cell>

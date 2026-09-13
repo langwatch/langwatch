@@ -127,8 +127,7 @@ describe("SpendEventsApiService cursor paging", () => {
    * A self-hosted server one release behind sends the five text quantities
    * and nothing else. The whole page still has to read.
    */
-  describe("a payload from a server that predates the image quantities", () => {
-    /** The same envelope with the three image fields stripped off usage. */
+  describe("given a payload from a server that predates the image quantities", () => {
     const legacyEventsPage = (id: string): unknown => {
       const event = spendEvent(id);
       const {
@@ -143,60 +142,68 @@ describe("SpendEventsApiService cursor paging", () => {
       };
     };
 
-    it("reads the missing image quantities as zero on a listed event", async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse(legacyEventsPage("req_old")));
+    describe("when a spend page is read", () => {
+      it("reads the missing image quantities as zero on a listed event", async () => {
+        mockFetch.mockResolvedValueOnce(
+          jsonResponse(legacyEventsPage("req_old")),
+        );
 
-      const page = await new SpendEventsApiService().listPage(WINDOW);
+        const page = await new SpendEventsApiService().listPage(WINDOW);
 
-      expect(page.data[0]!.data.usage).toEqual({
-        input_tokens: 10,
-        output_tokens: 5,
-        cache_read_input_tokens: 0,
-        cache_creation_input_tokens: 0,
-        reasoning_tokens: 0,
-        input_image_tokens: 0,
-        output_image_tokens: 0,
-        image_count: 0,
-      });
-    });
-
-    it("reads them as zero on a summary row", async () => {
-      const row = summaryRow("vk_1");
-      const {
-        input_image_tokens: _in,
-        output_image_tokens: _out,
-        image_count: _count,
-        ...textOnly
-      } = row.usage;
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({
-          data: [{ ...row, usage: textOnly }],
-          next_cursor: null,
-        }),
-      );
-
-      const page = await new SpendEventsApiService().summariesPage({
-        ...WINDOW,
-        groupBy: ["virtual_key"],
+        expect(page.data[0]!.data.usage).toEqual({
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          reasoning_tokens: 0,
+          input_image_tokens: 0,
+          output_image_tokens: 0,
+          image_count: 0,
+        });
       });
 
-      expect(page.data[0]!.usage.input_image_tokens).toBe(0);
-      expect(page.data[0]!.usage.output_image_tokens).toBe(0);
-      expect(page.data[0]!.usage.image_count).toBe(0);
+      it("reads them as zero on a summary row", async () => {
+        const row = summaryRow("vk_1");
+        const {
+          input_image_tokens: _in,
+          output_image_tokens: _out,
+          image_count: _count,
+          ...textOnly
+        } = row.usage;
+        mockFetch.mockResolvedValueOnce(
+          jsonResponse({
+            data: [{ ...row, usage: textOnly }],
+            next_cursor: null,
+          }),
+        );
+
+        const page = await new SpendEventsApiService().summariesPage({
+          ...WINDOW,
+          groupBy: ["virtual_key"],
+        });
+
+        expect(page.data[0]!.usage.input_image_tokens).toBe(0);
+        expect(page.data[0]!.usage.output_image_tokens).toBe(0);
+        expect(page.data[0]!.usage.image_count).toBe(0);
+      });
     });
+  });
 
-    it("leaves a settled event's null usage null rather than inventing zeros", async () => {
-      const event = spendEvent("req_settled");
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({
-          data: [{ ...event, data: { ...event.data, usage: null } }],
-          next_cursor: null,
-        }),
-      );
+  describe("given a settled event, whose usage is unknown rather than zero", () => {
+    describe("when the page is read", () => {
+      it("leaves the null usage null instead of inventing zeros", async () => {
+        const event = spendEvent("req_settled");
+        mockFetch.mockResolvedValueOnce(
+          jsonResponse({
+            data: [{ ...event, data: { ...event.data, usage: null } }],
+            next_cursor: null,
+          }),
+        );
 
-      const page = await new SpendEventsApiService().listPage(WINDOW);
+        const page = await new SpendEventsApiService().listPage(WINDOW);
 
-      expect(page.data[0]!.data.usage).toBeNull();
+        expect(page.data[0]!.data.usage).toBeNull();
+      });
     });
   });
 

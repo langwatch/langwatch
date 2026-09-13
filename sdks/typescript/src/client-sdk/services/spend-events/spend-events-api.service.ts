@@ -16,10 +16,13 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
  * The quantities one priced request or rollup carries. Every field is always
  * present; a bucket the request never used reports 0.
  *
- * The buckets are disjoint, not nested. An image generation reports its
- * render under `output_image_tokens` with `output_tokens` at 0, so summing
- * `output_tokens` alone undercounts image traffic, and cost is the sum across
- * every bucket.
+ * The token buckets are disjoint, not nested. An image generation reports its
+ * render under `output_image_tokens` with `output_tokens` at 0, so reading
+ * `output_tokens` alone sees none of the image traffic.
+ *
+ * Every priced quantity is charged once at its own rate. `reasoning_tokens`
+ * is a subset of `output_tokens` and `image_count` is a count of images, so
+ * no rate prices either and neither belongs in a cost sum.
  */
 export interface SpendUsage {
   input_tokens: number;
