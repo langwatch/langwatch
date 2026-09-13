@@ -488,9 +488,21 @@ function MessageContentImpl({
   // reading "No content" under a card the reader can see is worse than saying
   // nothing.
   const hasBlocks = !isPlainText && hasLangyBlockParts(message.parts);
+  // A line said with the `say` tool is the reply's own prose, and on a turn
+  // that says everything through the tool it is the ONLY prose: `displayText`
+  // reads the text parts, which such a turn leaves empty. The code access card
+  // is the same case one card further on. Neither counts as tool activity, on
+  // purpose (each has its own place in the transcript), so both are named here
+  // or a turn made of the two of them reads as empty and the card goes down
+  // with it. That turn is the guided opener, one `say` and one `code_access`.
+  const saidLines = isPlainText
+    ? false
+    : message.parts.some((part) => sayToolText(part) !== null);
   const hasContent = Boolean(
     displayText ||
       hasBlocks ||
+      saidLines ||
+      codeAccessCall ||
       proposals.length > 0 ||
       prs.length > 0 ||
       progressEvents.length > 0 ||
