@@ -23,6 +23,11 @@ import {
   type LangyServerConfig,
 } from "@langwatch/langy-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import {
+  PresenceBroadcastFabric,
+  type PresenceTenantEmitter,
+} from "@langwatch/presence-contract";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
@@ -33,11 +38,9 @@ import {
   SETTLEMENT_CONFIRM_POLLS,
   SETTLEMENT_POLL_MS,
 } from "../services/langy-turn-tail.service.ts";
-import {
-  PostgresLangyAdapter,
-  type LangyServiceCompositionOptions,
-  type PostgresLangyAdapterOptions,
-} from "../services/langy-postgres.service.ts";
+import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
+import { buildLangyInfrastructure } from "./langy-composition.build.ts";
+import { LangyConversationCommands } from "./langy.members.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -50,20 +53,6 @@ export type LangyRedis = Readonly<{
   duplicate(): { disconnect(): void };
 }>;
 
-export type LangyInfrastructure = Readonly<
-  PostgresLangyAdapterOptions &
-    LangyServiceCompositionOptions & {
-      redis: LangyRedis | null;
-      broadcast: LangyBroadcast;
-    }
->;
-
-/** The read side of the process's broadcast fabric. */
-export type LangyBroadcast = Readonly<{
-  getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
-  cleanupTenantEmitter(tenantId: string): void;
-}>;
-
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
   langy: LangyApiContract;
@@ -71,7 +60,12 @@ type LangyAppDependencies = {
   repositories: LangyRepositories;
   /** Absent in a deployment without Redis; the live edge degrades to the fold. */
   redis: LangyRedis | null;
-  broadcast: LangyBroadcast;
+  /**
+   * The SAME per-tenant fabric presence publishes on, reached through its
+   * narrow peer token: both live channels ride one emitter per tenant rather
+   * than a second of their own.
+   */
+  broadcast: PresenceBroadcastFabric;
 };
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
@@ -103,34 +97,46 @@ export interface LangyTurnRequest {
 }
 
 type LangySetup = FeatureSetup<
-  Record<never, never>,
-  LangyInfrastructure,
+  typeof LangyApp.dependencies,
+  MembersRead<typeof LangyApp.reads>,
   LangyServerConfig,
   LangyRepositories
 >;
 
 export class LangyApp implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
-  static readonly dependencies: Record<never, never> = {};
+  /**
+   * `commands` is the agent-pipeline dispatcher shared with the `scenario`
+   * feature; its composition root keeps building it, exactly as the deleted
+   * hand composition did (`composedAgentPipelines.langyConversations`) —
+   * this only names the shape Langy takes it in. `broadcast` is the SAME
+   * per-tenant fabric presence publishes on, reached through its narrow peer
+   * token rather than a second fabric of Langy's own.
+   */
+  static readonly dependencies = {
+    commands: LangyConversationCommands,
+    broadcast: PresenceBroadcastFabric,
+  };
   static readonly configSchema = langyServerConfigSchema;
+  /** Everything else this application needs is built from these two, in `create`. */
+  static readonly reads = reads("prisma", "redis");
 
   static create(setup: LangySetup): LangyApp {
-    const adapter = PostgresLangyAdapter.create({ database: setup.members.database });
+    const built = buildLangyInfrastructure({
+      redis: setup.members.redis,
+      config: setup.config,
+      repositories: setup.repositories,
+    });
+    const adapter = PostgresLangyAdapter.create({ database: setup.members.prisma });
     const langy = adapter.build({
-      turns: setup.members.turns,
-      credentials: setup.members.credentials,
-      commands: setup.members.commands,
-      events: setup.members.events,
-      runtime: setup.members.runtime,
-      relay: setup.members.relay,
-      feedbackPromptRedis: setup.members.feedbackPromptRedis,
-      blockMetrics: setup.members.blockMetrics,
+      ...built,
+      commands: setup.dependencies.commands,
     });
     return new LangyApp({
       langy,
       repositories: setup.repositories,
       redis: setup.members.redis,
-      broadcast: setup.members.broadcast,
+      broadcast: setup.dependencies.broadcast,
     });
   }
 
@@ -453,7 +459,7 @@ export class LangyApp implements LangyApiContract {
   // -- the live edge ---------------------------------------------------------
 
   /** The tenant's conversation-update signals. */
-  conversationUpdates(projectId: string): NodeJS.EventEmitter {
+  conversationUpdates(projectId: string): PresenceTenantEmitter {
     return this.dependencies.broadcast.getTenantEmitter(projectId);
   }
 

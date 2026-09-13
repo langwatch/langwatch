@@ -17,10 +17,10 @@ import {
 import {
   LangyConversationService,
   ADOPTABLE_CONVERSATION_ID,
-  type LangyConversationCommands,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
+import { LangyConversationCommands } from "../app/langy.members.ts";
 import type {
   ConversationDetail,
   ConversationListItem,

@@ -1,5 +1,31 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { LangyCredentialSession, LangyTitleSource } from "@langwatch/langy-contract";
+import type { CommandEnvelope } from "@langwatch/eventing";
+import type {
+  LangyAgentRespondedEventData,
+  LangyAgentResponseFailedEventData,
+  LangyAgentTurnAcceptedEventData,
+  LangyConversationArchivedEventData,
+  LangyConversationForkedEventData,
+  LangyConversationHandoffConsumedEventData,
+  LangyConversationHandoffPendingEventData,
+  LangyConversationMetadataUpdatedEventData,
+  LangyConversationStartedEventData,
+  LangyConversationTitleGeneratedEventData,
+  LangyCredentialSession,
+  LangyLocalControlRequestedEventData,
+  LangyLocalPolicyChangedEventData,
+  LangyLocalWorkspaceConnectedEventData,
+  LangyLocalWorkspaceDisconnectedEventData,
+  LangyMessageImportedEventData,
+  LangyMessageRecordedEventData,
+  LangyPlanUpdatedEventData,
+  LangyTitleSource,
+  LangyToolCallFailedEventData,
+  LangyToolCallInitiatedEventData,
+  LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
+} from "@langwatch/langy-contract";
 import type { LanguageModel } from "ai";
 import type { z } from "zod";
 import {
@@ -467,4 +493,52 @@ export abstract class LangyModel {
 export abstract class LangyFeedbackPromptRedis {
   abstract get(key: string): Promise<string | null>;
   abstract set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
+}
+
+/** Command dispatchers injected from the event-sourcing pipeline registry. */
+type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
+
+/**
+ * All sixteen conversation writes, as the process's agent-pipeline dispatcher
+ * produces them. A dependency token rather than a process member: the
+ * pipeline is shared with the `scenario` feature, so the composition root
+ * that builds it today keeps owning it (`composedAgentPipelines.langyConversations`
+ * in the deleted hand composition) — this class only names the shape Langy
+ * takes it in. Declared with `abstract` PROPERTIES rather than methods, like
+ * {@link LangyHarness}: method parameters are bivariant, and a dispatcher
+ * built with the wrong envelope shape would still compile under a method
+ * signature. A property is contravariant, so it cannot.
+ */
+export abstract class LangyConversationCommands {
+  abstract createConversation: Dispatch<LangyConversationStartedEventData>;
+  abstract forkConversation: Dispatch<LangyConversationForkedEventData>;
+  abstract recordMessage: Dispatch<LangyMessageRecordedEventData>;
+  abstract importMessage: Dispatch<LangyMessageImportedEventData>;
+  abstract acceptAgentTurn: Dispatch<
+    LangyAgentTurnAcceptedEventData & {
+      conversationStart?: Omit<LangyConversationStartedEventData, "conversationId">;
+      userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
+      consumeHandoffTurnId?: string;
+    }
+  >;
+  abstract initiateToolCall: Dispatch<LangyToolCallInitiatedEventData>;
+  abstract succeedToolCall: Dispatch<LangyToolCallSucceededEventData>;
+  abstract failToolCall: Dispatch<LangyToolCallFailedEventData>;
+  abstract updatePlan: Dispatch<LangyPlanUpdatedEventData>;
+  abstract failAgentResponse: Dispatch<LangyAgentResponseFailedEventData>;
+  abstract recordAgentResponse: Dispatch<LangyAgentRespondedEventData>;
+  abstract archiveConversation: Dispatch<LangyConversationArchivedEventData>;
+  abstract updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
+  abstract recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
+  abstract consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
+  abstract generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
+  // ADR-129 local control: the shared folder and the cards that wait for the
+  // developer. Written by the local control services, folded by the spine and
+  // the turn document.
+  abstract requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
+  abstract connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
+  abstract disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
+  abstract changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
+  abstract startUserWait: Dispatch<LangyUserWaitStartedEventData>;
+  abstract endUserWait: Dispatch<LangyUserWaitEndedEventData>;
 }

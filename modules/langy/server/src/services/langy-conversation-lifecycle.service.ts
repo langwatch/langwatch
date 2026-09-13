@@ -26,10 +26,8 @@ import {
   adoptConversationId,
   type ConversationDetail,
 } from "../rules/langy-conversation-shape.rules.ts";
-import type {
-  LangyConversationCommands,
-  LangyConversationRuntime,
-} from "./langy-conversation.service.ts";
+import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
+import { LangyConversationCommands } from "../app/langy.members.ts";
 import { Temporal } from "@langwatch/time";
 
 /**

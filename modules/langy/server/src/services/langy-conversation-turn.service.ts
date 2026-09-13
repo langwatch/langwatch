@@ -21,10 +21,8 @@ import {} from "../repositories/langy-message.repository.ts";
 import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 import { turnMessageId } from "../rules/langy-conversation-shape.rules.ts";
-import type {
-  LangyConversationCommands,
-  LangyConversationRuntime,
-} from "./langy-conversation.service.ts";
+import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
+import { LangyConversationCommands } from "../app/langy.members.ts";
 
 /**
  * Everything one turn writes to the log: the user's message, the acceptance, each tool call,

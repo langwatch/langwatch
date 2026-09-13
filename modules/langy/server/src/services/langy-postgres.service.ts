@@ -9,13 +9,12 @@ import type {
 } from "@langwatch/langy-contract";
 import {
   LangyService,
-  type LangyConversationCommands,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy.service.ts";
 import { RedisLangyTurnRelayRepository, type LangyRelayRedis } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
-import type { LangyFeedbackPromptRedis } from "../app/langy.members.ts";
+import { LangyConversationCommands, type LangyFeedbackPromptRedis } from "../app/langy.members.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
 import { LangyFinalPartsService } from "./langy-final-parts.service.ts";

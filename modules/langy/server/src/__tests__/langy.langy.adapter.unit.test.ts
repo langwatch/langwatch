@@ -15,6 +15,7 @@ import {
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { describe, expect, it, vi } from "vitest";
 
 const COMMAND_NAMES = [
@@ -221,17 +222,12 @@ function compositionOptions() {
 }
 
 function createApp(): LangyApp {
-  const members = {
-    database: undefined!,
-    ...compositionOptions(),
-    redis: null,
-    broadcast: testBroadcast(),
-  };
   return LangyApp.create({
-    dependencies: {},
-    members,
+    dependencies: { commands: commands(), broadcast: testBroadcast() },
+    members: { prisma: undefined!, redis: null },
     config: { agentUrl: undefined, internalSecret: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
+    repositories: {} as LangyRepositories,
   });
 }
 

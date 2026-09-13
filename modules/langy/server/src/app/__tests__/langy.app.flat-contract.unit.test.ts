@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
-import type { LangyConversationCommands, LangyTurnTechnicalMembers } from "@langwatch/langy-server";
+import type { LangyConversationCommands } from "@langwatch/langy-server";
+import type { LangyRepositories } from "../../repositories/langy-repositories.registry.ts";
 import { LangyApp } from "../langy.app.ts";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,43 +61,15 @@ function createApp(): LangyApp {
     startUserWait: vi.fn(),
     endUserWait: vi.fn(),
   } satisfies LangyConversationCommands;
-  const turns: LangyTurnTechnicalMembers = {
-    models: { resolve: vi.fn() },
-    worker: null,
-    tokenBuffer: null,
-    accessStore: null,
-    handoffStore: null,
-    permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
-    perDayPrCap: 0,
-    sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
-    context: { tryRender: vi.fn(() => null) },
-    uiActionSurface: { resolve: vi.fn(async () => true) },
-    metrics: { count: vi.fn() },
+  const broadcast = {
+    getTenantEmitter: () => new EventEmitter(),
+    cleanupTenantEmitter: () => void 0,
   };
   return LangyApp.create({
-    dependencies: {},
-    members: {
-      database: undefined!,
-      commands,
-      turns,
-      credentials: {
-        sessionKeys: { mint: vi.fn(), revokeManaged: vi.fn() },
-        virtualKeys: { provision: vi.fn() },
-        github: { enabled: false, mintTurnToken: vi.fn() },
-        runtime: {
-          workerCallbackUrl: "https://langwatch.test/callback",
-          workerGatewayBaseUrl: "https://langwatch.test/gateway",
-          mirrorProjectId: undefined,
-        },
-      },
-      redis: null,
-      broadcast: {
-        getTenantEmitter: () => new EventEmitter(),
-        cleanupTenantEmitter: () => void 0,
-      },
-      feedbackPromptRedis: null,
-    },
+    dependencies: { commands, broadcast },
+    members: { prisma: undefined!, redis: null },
     config: { agentUrl: undefined, internalSecret: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
+    repositories: {} as LangyRepositories,
   });
 }

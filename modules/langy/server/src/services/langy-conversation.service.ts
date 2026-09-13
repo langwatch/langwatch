@@ -1,7 +1,7 @@
-import type { CommandEnvelope } from "@langwatch/eventing";
 import { type TenantId } from "@langwatch/eventing";
 import type { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
+import { LangyConversationCommands } from "../app/langy.members.ts";
 import type {
   LangyAgentRespondedEventData,
   LangyAgentResponseFailedEventData,
@@ -61,43 +61,6 @@ export interface LangyConversationEventsReader {
     aggregateType: "langy_conversation",
     occurredAtFromMs: number,
   ): Promise<readonly LangyConversationProcessingEvent[]>;
-}
-
-/** Command dispatchers injected from the event-sourcing pipeline registry. */
-type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
-
-export interface LangyConversationCommands {
-  createConversation: Dispatch<LangyConversationStartedEventData>;
-  forkConversation: Dispatch<LangyConversationForkedEventData>;
-  recordMessage: Dispatch<LangyMessageRecordedEventData>;
-  importMessage: Dispatch<LangyMessageImportedEventData>;
-  acceptAgentTurn: Dispatch<
-    LangyAgentTurnAcceptedEventData & {
-      conversationStart?: Omit<LangyConversationStartedEventData, "conversationId">;
-      userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
-      consumeHandoffTurnId?: string;
-    }
-  >;
-  initiateToolCall: Dispatch<LangyToolCallInitiatedEventData>;
-  succeedToolCall: Dispatch<LangyToolCallSucceededEventData>;
-  failToolCall: Dispatch<LangyToolCallFailedEventData>;
-  updatePlan: Dispatch<LangyPlanUpdatedEventData>;
-  failAgentResponse: Dispatch<LangyAgentResponseFailedEventData>;
-  recordAgentResponse: Dispatch<LangyAgentRespondedEventData>;
-  archiveConversation: Dispatch<LangyConversationArchivedEventData>;
-  updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
-  recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
-  consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
-  generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
-  // ADR-129 local control: the shared folder and the cards that wait for the
-  // developer. Written by the local control services, folded by the spine and
-  // the turn document.
-  requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
-  connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
-  disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
-  changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
-  startUserWait: Dispatch<LangyUserWaitStartedEventData>;
-  endUserWait: Dispatch<LangyUserWaitEndedEventData>;
 }
 
 export interface LangyConversationRuntime {

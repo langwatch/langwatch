@@ -1,5 +1,6 @@
 import {
   PresenceApi,
+  PresenceBroadcastFabric,
   type PresenceApi as PresenceApiContract,
   type PresenceCursorSubscription,
   type PresenceCursorTickInput,
@@ -7,6 +8,7 @@ import {
   type PresenceLeaveInput,
   type PresenceProjectInput,
   type PresenceSession,
+  type PresenceTenantEmitter,
   type PresenceUser,
 } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -56,18 +58,26 @@ type PresenceSetup = FeatureSetup<
   PresenceRepositories
 >;
 
-export class PresenceApp implements PresenceApiContract {
+export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
   static readonly dependencies = { projects: ProjectApi, users: UserApi };
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;
   readonly #users: UserApi;
+  /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
+  readonly #emitters: PresenceEmitter;
 
-  private constructor(presence: PresenceService, stream: PresenceStreamService, users: UserApi) {
+  private constructor(
+    presence: PresenceService,
+    stream: PresenceStreamService,
+    users: UserApi,
+    emitters: PresenceEmitter,
+  ) {
     this.#presence = presence;
     this.#stream = stream;
     this.#users = users;
+    this.#emitters = emitters;
   }
 
   static create({ repositories, members, dependencies }: PresenceSetup): PresenceApp {
@@ -82,7 +92,18 @@ export class PresenceApp implements PresenceApiContract {
       presence,
       PresenceStreamService.create({ presence, emitters: members.emitters }),
       dependencies.users,
+      members.emitters,
     );
+  }
+
+  /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
+  getTenantEmitter(tenantId: string): PresenceTenantEmitter {
+    return this.#emitters.getTenantEmitter(tenantId);
+  }
+
+  /** {@link PresenceBroadcastFabric}: releases the tenant emitter a subscription borrowed. */
+  cleanupTenantEmitter(tenantId: string): void {
+    this.#emitters.cleanupTenantEmitter(tenantId);
   }
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {

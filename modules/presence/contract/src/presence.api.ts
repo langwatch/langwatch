@@ -30,3 +30,30 @@ export interface PresenceApi {
 }
 
 export const PresenceApi = moduleApi<PresenceApi>("presence");
+
+/**
+ * A tenant's live-update signal, named structurally rather than as Node's
+ * `EventEmitter` so this portable contract package stays free of a Node
+ * dependency. Node's own `EventEmitter` (and anything test doubles build)
+ * satisfies it as-is.
+ */
+export type PresenceTenantEmitter = Readonly<{
+  on(event: string, listener: (...args: unknown[]) => void): unknown;
+  off(event: string, listener: (...args: unknown[]) => void): unknown;
+}>;
+
+/**
+ * The read side of the process's per-tenant broadcast fabric, exposed as a
+ * narrow peer token: exactly the two methods a live subscription outside
+ * presence needs, never the rest of {@link PresenceApi}'s surface. Serves
+ * every peer that watches a tenant's live updates — today `langy`'s
+ * conversation broadcast and `trace`'s live-update subscriptions — because
+ * one emitter per tenant is deliberately shared rather than each peer opening
+ * a second fabric of its own, exactly as the deleted hand composition it
+ * replaces did. Kept generic on purpose: no langy- or trace-specific shape
+ * belongs on this token, only `getTenantEmitter`/`cleanupTenantEmitter`.
+ */
+export abstract class PresenceBroadcastFabric {
+  abstract getTenantEmitter(tenantId: string): PresenceTenantEmitter;
+  abstract cleanupTenantEmitter(tenantId: string): void;
+}
