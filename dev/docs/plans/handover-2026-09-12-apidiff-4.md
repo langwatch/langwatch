@@ -258,7 +258,7 @@ trees that are bundled (`sdks/typescript` by tsup, `apps/ui` by Vite) or
 resolved by vitest. Filtered to code that boots under Node ESM: **110
 specifiers across 51 files**, concentrated in `modules/scenario/contract` (41),
 `enterprise/packages/composition/api` (26), `enterprise/modules/governance/server`
-(25) and `modules/analytics/server` (13).
+(25) and `modules/analytics/server` (13). All fixed by the visualdiff session.
 
 The worker dies on one of these before it reaches any of the 56, which is why
 the 56 are invisible even to a real boot: there is an earlier wall in front of
@@ -305,9 +305,31 @@ document's wall list:
     4. 35 f054ab2baf renames, each now an interface, each needing three coupled
        edits: rename + `import type` + `extends` -> `implements` with `super()` dropped
 
-Then the 163, of which **none has a single unambiguous rename candidate** —
-which is why that session stopped rather than guessing. Behind those sit the 56
-ERASED, unreachable until link time succeeds.
+Then the unresolvable value imports, of which none has a single unambiguous
+rename candidate — which is why that session stopped rather than guessing.
+Behind those sit the 56 ERASED, unreachable until link time succeeds.
+
+**CORRECTION: that figure was first reported as 163 and the real number is
+about two dozen** — 24 when re-measured from this session after the detector's
+own bugs were fixed. The 163 was the detector describing itself, not the tree:
+it judged `@langwatch/*` catalog dependencies resolved from node_modules as
+ABSENT (~111 of them), its declaration pattern did not allow
+`export async function`, and a stem heuristic proposed hundreds of candidates
+for two-word names. Both false-positive classes are now fixtures in its
+self-test.
+
+Note the direction: every other entry in this document's pattern list is a
+measurement that read HEALTHY while the tree was not. This one read UNHEALTHY,
+and would have sent a lane through 137 phantom defects. An over-reporting tool
+burns the same time as an under-reporting one — a number is not evidence until
+something has checked the tool against the thing it measures.
+
+The real ones, re-measured: **24 specifiers**, and they are one cluster plus a
+tail rather than a sweep — 17 in `enterprise/packages/composition` (14 of them
+`*TrpcApi` symbols across three trpc compositions, so almost certainly one
+cause), then `createTrpcService` x2, `featureFlagService` x2, and single sites
+in `modules/trace/server`, `apps/worker/src`, `tools/dev-runtime/src`,
+`modules/langy/server` and `modules/feature-flag/contract`.
 
 Two detectors are left in the tree, both self-testing before every scan, both
 verified from this session independently:
