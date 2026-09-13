@@ -315,6 +315,12 @@ Rule: A tool pinned to a project reports with the pinned key
     Then it is authorized with the personal ingest key
 
   @unit
+  Scenario: A pin to a loopback endpoint over http still reports
+    Given a tool pinned to a key with a loopback endpoint over plain http
+    When the hook runs
+    Then the record is posted to that loopback endpoint
+
+  @unit
   Scenario: A pin on a CLI that names no control plane sends nothing
     Given a tool pinned to a project key with no endpoint of its own
     And a CLI that names no control plane

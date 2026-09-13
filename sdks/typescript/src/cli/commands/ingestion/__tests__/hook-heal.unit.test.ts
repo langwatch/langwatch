@@ -127,7 +127,7 @@ describe("the session context hook's self-heal", () => {
         fetchImpl: hook.collector(401),
         healRevokedKey,
         readCliConfig: () => ({
-          control_plane_url: "http://app.example.com",
+          control_plane_url: "https://app.example.com",
           tool_project_keys: { claude: { secret: "sk-lw-pinned_secret" } },
         }),
       });

@@ -131,7 +131,7 @@ describe("the session context hook's telemetry target", () => {
       await hook.runHook({
         shouldOmitExporterEnv: true,
         readCliConfig: () => ({
-          control_plane_url: "http://app.example.com",
+          control_plane_url: "https://app.example.com",
           tool_project_keys: {
             claude: { secret: PINNED_KEY, project_id: "project-abc" },
           },
@@ -139,7 +139,7 @@ describe("the session context hook's telemetry target", () => {
       });
 
       expect(posted).toHaveLength(1);
-      expect(posted[0]!.url).toBe("http://app.example.com/api/otel/v1/logs");
+      expect(posted[0]!.url).toBe("https://app.example.com/api/otel/v1/logs");
       expect(posted[0]!.headers.Authorization).toBe(`Bearer ${PINNED_KEY}`);
       expect(attributesOf(posted[0]!)["vcs.repository.name"]).toBe("langwatch");
     });
@@ -149,14 +149,14 @@ describe("the session context hook's telemetry target", () => {
       await hook.runHook({
         shouldOmitExporterEnv: true,
         readCliConfig: () => ({
-          control_plane_url: "http://app.example.com",
+          control_plane_url: "https://app.example.com",
           tool_project_keys: {
-            claude: { secret: PINNED_KEY, endpoint: "http://pinned.example.com/" },
+            claude: { secret: PINNED_KEY, endpoint: "https://pinned.example.com/" },
           },
         }),
       });
 
-      expect(posted[0]!.url).toBe("http://pinned.example.com/api/otel/v1/logs");
+      expect(posted[0]!.url).toBe("https://pinned.example.com/api/otel/v1/logs");
     });
 
     /** @scenario "A tool with both a pin and a personal key uses the pin" */
@@ -164,7 +164,7 @@ describe("the session context hook's telemetry target", () => {
       await hook.runHook({
         shouldOmitExporterEnv: true,
         readCliConfig: () => ({
-          control_plane_url: "http://app.example.com",
+          control_plane_url: "https://app.example.com",
           default_personal_ingest_keys: {
             claude_code: { secret: "ik-lw-personal" },
           },
@@ -180,7 +180,7 @@ describe("the session context hook's telemetry target", () => {
       await hook.runHook({
         shouldOmitExporterEnv: true,
         readCliConfig: () => ({
-          control_plane_url: "http://app.example.com",
+          control_plane_url: "https://app.example.com",
           default_personal_ingest_keys: {
             claude_code: { secret: "ik-lw-personal" },
           },
@@ -189,6 +189,22 @@ describe("the session context hook's telemetry target", () => {
       });
 
       expect(posted[0]!.headers.Authorization).toBe("Bearer ik-lw-personal");
+    });
+
+    /** @scenario "A pin to a loopback endpoint over http still reports" */
+    it("posts to a loopback pin over plain http, which local development runs on", async () => {
+      await hook.runHook({
+        shouldOmitExporterEnv: true,
+        readCliConfig: () => ({
+          control_plane_url: "https://app.example.com",
+          tool_project_keys: {
+            claude: { secret: PINNED_KEY, endpoint: "http://localhost:5570" },
+          },
+        }),
+      });
+
+      expect(posted[0]!.url).toBe("http://localhost:5570/api/otel/v1/logs");
+      expect(posted[0]!.headers.Authorization).toBe(`Bearer ${PINNED_KEY}`);
     });
 
     /** @scenario "A pin on a CLI that names no control plane sends nothing" */

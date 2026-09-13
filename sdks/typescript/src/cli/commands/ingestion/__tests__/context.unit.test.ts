@@ -362,18 +362,18 @@ describe("what the declaration posts", () => {
     await runContext({
       env: { ...CLAUDE_ENV },
       readCliConfig: () => ({
-        control_plane_url: "http://app.example.com",
+        control_plane_url: "https://app.example.com",
         tool_project_keys: {
           claude: {
             secret: "sk-lw-pinned_secret",
-            endpoint: "http://pinned.example.com",
+            endpoint: "https://pinned.example.com",
           },
         },
       }),
     });
 
     expect(posted).toHaveLength(1);
-    expect(posted[0]!.url).toBe("http://pinned.example.com/api/otel/v1/logs");
+    expect(posted[0]!.url).toBe("https://pinned.example.com/api/otel/v1/logs");
     expect(posted[0]!.headers.Authorization).toBe("Bearer sk-lw-pinned_secret");
   });
 
