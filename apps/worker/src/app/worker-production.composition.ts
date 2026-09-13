@@ -1302,6 +1302,7 @@ export class WorkerProductionComposition {
               retention: foundation.retention,
               shares: foundation.tenancy.shares,
               topics: foundation.tenancy.topics,
+              auditLog: foundation.auditLog,
             },
             models: modelProviders,
             githubSigningKey: options.config.githubSigningKey,

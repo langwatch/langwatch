@@ -1,8 +1,8 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -37,12 +37,8 @@ export type WorkerEvaluationInfrastructure = Readonly<{
   database: PrismaClient;
   /** The ONE workflow graph this process installed, and the engine behind it. */
   workflows: WorkerEvaluationWorkflows;
-  /** The ONE evaluator runtime this process installed. */
-  evaluators: EvaluatorApi;
   /** The ONE dataset application this process installed. */
   datasets: DatasetApi;
-  /** The ONE monitor application this process installed. */
-  monitors: MonitorApi;
   modelProviders: ModelProviderApi;
   models: WorkerModelProviders;
   secretDecryptor: WorkflowEnvironmentDecryptor;
@@ -85,13 +81,13 @@ export class WorkerEvaluationProcessingResult {
  */
 const workerEvaluationApp = {
   contract: EvaluationApi,
-  dependencies: { traces: TraceApi },
+  dependencies: { traces: TraceApi, monitors: MonitorApi, evaluators: EvaluatorApi },
   create({
     dependencies,
     infrastructure,
     resources,
   }: FeatureSetup<
-    Readonly<{ traces: typeof TraceApi }>,
+    Readonly<{ traces: typeof TraceApi; monitors: typeof MonitorApi; evaluators: typeof EvaluatorApi }>,
     WorkerEvaluationInfrastructure,
     undefined
   >) {
@@ -99,8 +95,8 @@ const workerEvaluationApp = {
     const execution = createWorkerEvaluationExecutionCollaborators({
       database: infrastructure.database,
       traces: dependencies.traces,
-      monitors: infrastructure.monitors,
-      evaluators: infrastructure.evaluators,
+      monitors: dependencies.monitors,
+      evaluators: dependencies.evaluators,
       workflows,
       models: infrastructure.models,
       featureFlags: infrastructure.featureFlags,

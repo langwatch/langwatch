@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { annotationServer } from "@langwatch/annotation-server";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { type CodingAgentBillingPolicy } from "@langwatch/coding-agent-server";
@@ -13,11 +14,15 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { evaluatorServer } from "@langwatch/evaluator-server";
 import type { EventSourcing, FoldProjectionStore } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { logServer } from "@langwatch/log-server";
 import { metricServer } from "@langwatch/metric-server";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { monitorServer } from "@langwatch/monitor-server";
 import { modelProviderServer } from "@langwatch/model-provider-server";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
@@ -55,6 +60,7 @@ export type WorkerObservabilityFoundation = Readonly<{
   retention: DataRetentionApi;
   shares: ShareApi;
   topics: TopicApi;
+  auditLog: AuditLogApi;
 }>;
 
 export type WorkerObservabilityAppsOptions = Readonly<{
@@ -90,6 +96,8 @@ export type WorkerObservabilityApps = Readonly<{
   traces: TraceApi;
   dataPrivacy: DataPrivacyApi;
   logs: LogApi;
+  monitors: MonitorApi;
+  evaluators: EvaluatorApi;
   evaluationProcessing: WorkerEvaluationProcessing;
   start(): Promise<void>;
 }>;
@@ -129,7 +137,7 @@ export async function createWorkerObservabilityApps(
   });
   const runtime = await createApp({
     role: "worker",
-    config: { log: telemetry.logConfig },
+    config: { log: telemetry.logConfig, evaluator: {} },
     members: membersFrom({
       prisma: options.connection.client,
       logger: createLogger(options.config.serviceName),
@@ -147,6 +155,7 @@ export async function createWorkerObservabilityApps(
     .withProvided(EntitlementApi, options.plans)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withProvided(CodingAgentApi, codingAgents.app)
+    .withProvided(AuditLogApi, foundation.auditLog)
     .withModules([
       modelProviderServer,
       traceServer,
@@ -157,6 +166,14 @@ export async function createWorkerObservabilityApps(
       // by the one Data Privacy application this runtime already provides.
       metricServer,
       workerEvaluationServer,
+      // Monitor asks this runtime's own evaluator and evaluation peers for its
+      // evaluator port and its seven-day trend; evaluator asks this runtime's
+      // permissions/audit log/users/model providers. Both still name workflows
+      // (WorkflowApi), unresolved on this runtime today - boot refuses naming
+      // it, which is the correct intermediate wall until a later lane installs
+      // workflowServer beside these.
+      monitorServer,
+      evaluatorServer,
     ])
     .withService({
       name: "worker trace broadcast",
@@ -176,6 +193,8 @@ export async function createWorkerObservabilityApps(
     traces: runtime.module(traceServer).provided,
     dataPrivacy: runtime.module(dataPrivacyServer).provided,
     logs: runtime.module(logServer).provided,
+    monitors: runtime.module(monitorServer).provided,
+    evaluators: runtime.module(evaluatorServer).provided,
     evaluationProcessing: processing,
     start: async () => {
       await runtime.start();
