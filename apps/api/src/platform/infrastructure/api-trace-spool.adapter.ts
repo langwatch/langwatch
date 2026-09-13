@@ -15,14 +15,12 @@ export type ApiTraceSpoolStorageOptions = {
  * project so a BYOC tenant writes into its own bucket. The worker's twin.
  */
 // NO v1 TRANSPORT: this process is the WRITE side, and only ever mints v2.
-export class ApiTraceSpoolStorageAdapter extends TraceSpoolStorage {
+export class ApiTraceSpoolStorageAdapter implements TraceSpoolStorage {
   static create(options: ApiTraceSpoolStorageOptions): ApiTraceSpoolStorageAdapter {
     return new ApiTraceSpoolStorageAdapter(options);
   }
 
-  private constructor(private readonly options: ApiTraceSpoolStorageOptions) {
-    super();
-  }
+  private constructor(private readonly options: ApiTraceSpoolStorageOptions) {}
 
   get azureRetentionConfirmed(): boolean {
     return this.options.azureRetentionConfirmed;

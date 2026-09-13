@@ -3,15 +3,15 @@
  */
 import { type JoinRequestNotificationMail } from "@langwatch/identity-server";
 
-export abstract class ApiPersonMail extends JoinRequestNotificationMail {
+export interface ApiPersonMail extends JoinRequestNotificationMail {
   /** The sign-up confirmation link. Asking twice sends twice. */
-  abstract sendSignUpVerificationLink(input: {
+  sendSignUpVerificationLink(input: {
     email: string;
     verificationUrl: string;
   }): Promise<unknown>;
 
   /** A member asking their administrator for more budget. */
-  abstract sendBudgetIncreaseRequest(input: {
+  sendBudgetIncreaseRequest(input: {
     to: string;
     requesterEmail: string;
     requesterName?: string;

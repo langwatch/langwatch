@@ -19,9 +19,11 @@ import {
 import type { MountableRestApp } from "@langwatch/api/rest";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { serverModules } from "@langwatch/installed-modules/server";
-import type { BootedRuntime } from "@langwatch/runtime-composition";
+import { ResourceScope, type BootedRuntime } from "@langwatch/runtime-composition";
 import { apiRestHosts, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
 import type { ApiConfig } from "../platform/config/api.config.ts";
+import { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.members.ts";
+import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.members.ts";
 
 /**
  * The null audit log, installed where no tier provides a real one.
@@ -104,6 +106,13 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     github: stated(config.infrastructure.github),
     /** The origin a hosted MCP server advertises is the api's public one. */
     "hosted-mcp": { baseHost: config.infrastructure.execution.publicBaseUrl },
+    /** `ADMIN_EMAILS`, for the SSO platform-operator check (D05 tier 1). */
+    identity: {
+      adminEmails: (config.deployment.adminEmails ?? "")
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email.length > 0),
+    },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
     automation: {},
@@ -249,14 +258,43 @@ export function bootApiProcess(options: {
 }): Promise<BootedRuntime<ProcessMembers, MountableRestApp, never>> {
   const config = options.config;
 
+  // The api's `eventing` member: a producer, and only ever a producer (the
+  // three structural decisions are api-eventing.members.ts's docblock). Built
+  // here rather than from the config slice because which log a role appends
+  // to and whether it claims the queue are role decisions, and this role's
+  // answer is objects, not addresses: a producer-only store and a factory
+  // over the process's one Group Queue. No Redis means no queue and no
+  // eventing member, and a module reading it then refuses by name at boot —
+  // the honest answer for a process that cannot enqueue. `createProcess`
+  // never closes a member the caller built, so the runtime service below
+  // drains the producer and its connection after the feature graph stops.
+  const producerResources = new ResourceScope();
+  const queue = ApiQueueInfrastructure.tryCreate({
+    resources: producerResources,
+    redis: config.infrastructure.redis,
+  });
+  const eventing = ApiEventingInfrastructure.tryCreate({
+    resources: producerResources,
+    queue,
+    processName: config.serviceName,
+  });
+
   return createProcess({
     role: "api",
     config: apiProcessConfig({ config, secrets: options.secrets }),
     moduleConfig: apiModuleConfig(config),
-    members: options.members,
+    members: {
+      ...(eventing ? { eventing: eventing.eventSourcing } : {}),
+      ...options.members,
+    },
   })
     .withModules(serverModules)
     .withModules(coreAuditLog)
+    .withService({
+      name: "api eventing producer",
+      start: () => void 0,
+      stop: () => producerResources.close(),
+    })
     .withTransports(
       apiRestHosts({
         config: {

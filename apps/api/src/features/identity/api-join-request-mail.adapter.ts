@@ -8,14 +8,12 @@ import type { ApiPersonMail } from "../../app/api-person-mail.port.ts";
  * person-shaped mail port serves six join-request messages and this port
  * serves only the two the wake timers own.
  */
-export class ApiJoinRequestMailAdapter extends JoinRequestMail {
+export class ApiJoinRequestMailAdapter implements JoinRequestMail {
   static create(mail: ApiPersonMail): ApiJoinRequestMailAdapter {
     return new ApiJoinRequestMailAdapter(mail);
   }
 
-  private constructor(private readonly mail: ApiPersonMail) {
-    super();
-  }
+  private constructor(private readonly mail: ApiPersonMail) {}
 
   async sendStillWaiting(input: {
     adminEmail: string;

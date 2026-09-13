@@ -3,14 +3,12 @@ import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provid
 import type { SecretEncryption } from "@langwatch/secret-server";
 
 /** Reads gateway provider keys through the model-provider feature's cipher. */
-export class ApiGatewayModelProviderCredentials extends GatewayModelProviderCredentials {
+export class ApiGatewayModelProviderCredentials implements GatewayModelProviderCredentials {
   static create(encryption: SecretEncryption): ApiGatewayModelProviderCredentials {
     return new ApiGatewayModelProviderCredentials(encryption);
   }
 
-  private constructor(private readonly encryption: SecretEncryption) {
-    super();
-  }
+  private constructor(private readonly encryption: SecretEncryption) {}
 
   readCustomKeys(stored: unknown): Record<string, unknown> {
     const read = EncryptedModelProviderCredentialAdapter.readCustomKeys(stored, this.encryption);
