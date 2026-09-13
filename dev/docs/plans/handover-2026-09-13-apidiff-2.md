@@ -3,10 +3,14 @@
 Written 2026-09-13 ~18:30, coordinator handing off mid-run. Two live items
 need picking up within minutes of reading this; they are first.
 
-## LIVE ITEM 1 — a clean apidiff run is IN FLIGHT
+## LIVE ITEM 1 — a clean apidiff run is IN FLIGHT (attempt 4, relaunched ~18:45)
 
-    work root:  .apidiff/20260913-182700
-    output:     /private/tmp/claude-502/-Users-lw-Source-github-com-langwatch-langwatch/8d4b2972-b4c3-4e41-91f1-23d460ef2057/tasks/bye4jzydp.output
+Attempt 3 (`.apidiff/20260913-182700`) died at branch boot health: the
+handover commit's tRPC-door change left `bootApiProcess` non-async around its
+own `await` - a module-load SyntaxError. Fixed in `277d5d6529` (one word,
+link probe clean). Attempt 4:
+
+    output:     /private/tmp/claude-502/-Users-lw-Source-github-com-langwatch-langwatch/8d4b2972-b4c3-4e41-91f1-23d460ef2057/tasks/b46gkmyzt.output
     report (if it prints): /Users/lw/.claude/jobs/cbbfd403/tmp/apidiff-report.json
 
 Full clean run (no -keep, no reuse): install both sides ~4 min, migrate,
@@ -24,15 +28,14 @@ seed, boot both, probe, compare. Read the output file's tail. Verdicts:
 
     .bin/apidiff/apidiff run -no-haven -main-ref origin/main -json -report <file>
 
-## LIVE ITEM 2 — a cross-session package.json FREEZE is ACTIVE
+## LIVE ITEM 2 — the package.json freeze is LIFTED (all-clear sent ~18:45)
 
-The sibling session ("visualdiff", reachable via SendMessage to
-`uds:/tmp/cc-socks/50792.sock`) froze all package.json edits in its lanes at
-our request, until we confirm the run is past its install phase (~4-5 min
-in, the output prints `migrate branch:`). **Send them the all-clear as soon
-as install passes or the run dies** — they are holding work on it, and their
-worker solo boot launches on your ping. Failing to send this strands their
-drive.
+Attempt 3 got through install before dying, so the lockfile window closed;
+the all-clear went to the sibling ("visualdiff" in ListAgents) with the boot
+failure named as ours. Their lanes may edit package.json again, which means
+**attempt 4 can die at `ERR_PNPM_OUTDATED_LOCKFILE` in install** - if it
+does, announce a `pnpm install` on the channel, run it, relaunch the same
+command. Their worker solo boot was told to launch.
 
 ## What today established (do not re-derive)
 
