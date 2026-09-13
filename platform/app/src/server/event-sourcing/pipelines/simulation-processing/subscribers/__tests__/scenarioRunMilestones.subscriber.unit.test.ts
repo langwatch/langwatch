@@ -163,7 +163,10 @@ describe("createScenarioRunMilestonesSubscriber()", () => {
       ).toBe(false);
       expect(
         isConnectedAgentRunSucceeded(
-          finishedEvent({ results: { verdict: "inconclusive" }, status: undefined }),
+          finishedEvent({
+            results: { verdict: "inconclusive" },
+            status: undefined,
+          }),
         ),
       ).toBe(false);
     });
@@ -189,7 +192,9 @@ describe("createScenarioRunMilestonesSubscriber()", () => {
   describe("when the project has no admin", () => {
     it("tracks nothing", async () => {
       const deps = createDeps();
-      (deps.projects.resolveOrgAdmin as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (
+        deps.projects.resolveOrgAdmin as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
         userId: null,
         organizationId: null,
         firstMessage: false,

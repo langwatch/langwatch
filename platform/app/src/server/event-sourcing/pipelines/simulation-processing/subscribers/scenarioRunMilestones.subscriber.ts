@@ -57,7 +57,10 @@ export function createScenarioRunMilestonesSubscriber(
 
     async handler(event: SimulationProcessingEvent): Promise<void> {
       if (!isConnectedAgentRunSucceeded(event)) return;
-      await trackScenarioRunSucceeded(deps, event as SimulationRunFinishedEvent);
+      await trackScenarioRunSucceeded(
+        deps,
+        event as SimulationRunFinishedEvent,
+      );
     },
   };
 }

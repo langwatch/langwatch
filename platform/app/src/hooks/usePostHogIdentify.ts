@@ -10,9 +10,7 @@ export function usePostHogIdentify({
   planType,
 }: {
   session: { user?: { id: string; email?: string | null } } | null;
-  organization:
-    | { id: string; name: string; signupData?: unknown }
-    | undefined;
+  organization: { id: string; name: string; signupData?: unknown } | undefined;
   planType: string | undefined;
 }) {
   const prevUserIdRef = useRef<string | null>(null);

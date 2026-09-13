@@ -33,13 +33,13 @@ import {
   createCustomerIoSimulationSyncSubscriber,
 } from "./subscribers/customerIoSimulationSync.subscriber";
 import {
-  createScenarioRunMilestonesSubscriber,
-  type ScenarioRunMilestonesSubscriberDeps,
-} from "./subscribers/scenarioRunMilestones.subscriber";
-import {
   createScenarioEvaluationsSubscriber,
   type ScenarioEvaluationsSubscriberDeps,
 } from "./subscribers/scenarioEvaluations.subscriber";
+import {
+  createScenarioRunMilestonesSubscriber,
+  type ScenarioRunMilestonesSubscriberDeps,
+} from "./subscribers/scenarioRunMilestones.subscriber";
 import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,

@@ -31,7 +31,9 @@ vi.mock("@langwatch/observability", () => ({
 const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
 const THREE_DAYS_AGO = new Date(NOW - 3 * 24 * 60 * 60 * 1000 - 60_000);
 
-function createDeps(overrides: { marked?: boolean; variant?: string | null } = {}) {
+function createDeps(
+  overrides: { marked?: boolean; variant?: string | null } = {},
+) {
   const redis = {
     get: vi.fn().mockResolvedValue(overrides.marked ? "1" : null),
     set: vi.fn().mockResolvedValue("OK"),
@@ -41,7 +43,8 @@ function createDeps(overrides: { marked?: boolean; variant?: string | null } = {
       userId: "admin_1",
       organizationId: "org_1",
       firstMessage: true,
-      onboardingVariant: overrides.variant === undefined ? "guided" : overrides.variant,
+      onboardingVariant:
+        overrides.variant === undefined ? "guided" : overrides.variant,
       organizationCreatedAt: THREE_DAYS_AGO,
     }),
   };
@@ -168,7 +171,9 @@ describe("the day arithmetic", () => {
   it("counts whole days since signup and never goes below zero", () => {
     const createdAt = new Date(NOW);
     expect(daysSinceSignup({ createdAt, at: NOW })).toBe(0);
-    expect(daysSinceSignup({ createdAt, at: NOW + 47 * 60 * 60 * 1000 })).toBe(1);
+    expect(daysSinceSignup({ createdAt, at: NOW + 47 * 60 * 60 * 1000 })).toBe(
+      1,
+    );
     expect(daysSinceSignup({ createdAt, at: NOW - 1000 })).toBe(0);
   });
 });

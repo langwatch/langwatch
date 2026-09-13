@@ -15,17 +15,20 @@
  */
 import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 
-export const ONBOARDING_EXPERIMENT_FLAG_KEY = "experiment_onboarding_langy_guided";
+export const ONBOARDING_EXPERIMENT_FLAG_KEY =
+  "experiment_onboarding_langy_guided";
 
 export const ONBOARDING_EXPERIMENT_PROPERTY = `$feature/${ONBOARDING_EXPERIMENT_FLAG_KEY}`;
 
 export type OnboardingExperimentVariant = "control" | "guided";
 
-const EXPERIMENT_VARIANT: Record<OnboardingVariant, OnboardingExperimentVariant> =
-  {
-    guided: "guided",
-    classic: "control",
-  };
+const EXPERIMENT_VARIANT: Record<
+  OnboardingVariant,
+  OnboardingExperimentVariant
+> = {
+  guided: "guided",
+  classic: "control",
+};
 
 /** The PostHog variant name of an assignment, or null when there is none. */
 export function onboardingExperimentVariant(
