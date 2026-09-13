@@ -455,7 +455,7 @@ describe("the guided-onboarding skill", () => {
       );
       const sentence = rendered.indexOf(VERBATIM_LINES["the pull request line"]);
       const noRemote = rendered.indexOf(
-        "No remote, or no `gh` login: no pull request was opened, so this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:",
+        "On one of those, and only then, this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:",
       );
       const proposal = rendered.indexOf("### 3. Propose the first scenario, and stop");
       expect(commit).toBeGreaterThan(-1);
@@ -539,7 +539,7 @@ describe("the guided-onboarding skill", () => {
         "The item is done when the manifest (`pyproject.toml` or `package.json`) names the package.",
       );
       expect(rendered).toContain(
-        "the manifest and the lockfile the install of item 1 changed, the tracing edit, the connect adapter",
+        "the manifest and the lockfile the install of item 1 changed, unless the repository ignores it, the tracing edit, the connect adapter",
       );
     });
 
@@ -597,15 +597,24 @@ describe("the guided-onboarding skill", () => {
       const branch = rendered.indexOf("Then run `git branch --show-current`: its output is the name the lines below carry.");
       expect(body).toBeGreaterThan(-1);
       expect(branch).toBeGreaterThan(body);
+      const rule = rendered.indexOf(
+        "**A push that printed a new branch on a remote (`* [new branch] ... -> ...`) means the no-remote line is never said, whatever `gh` prints afterwards.**",
+      );
+      expect(rule).toBeGreaterThan(-1);
+      expect(rendered).toContain("a reason the output did not name is never said");
       expect(rendered).toContain(
-        "That line is said only when the push or `gh` answered that there is no remote or that `gh` is not signed in: a reason the output did not name is never said.",
+        "The no-remote line has exactly two triggers, quoted as git and gh print them: `git push` with no remote, \"fatal: No configured push destination.\" or \"'origin' does not appear to be a git repository\", and `gh` not signed in, \"To get started with GitHub CLI, please run:  gh auth login\" or \"You are not logged into any GitHub hosts\".",
       );
       expect(rendered).toContain(
-        "One `gh` answer has nothing to fix and gets no retry: no remote points to a known GitHub host, and the failed-open line is said at once with that line in the brace.",
+        "After a push that worked, a `gh` failure is the failed-open line. \"none of the git remotes configured for this repository point to a known GitHub host\" has nothing to fix and gets no retry: the line is said at once with that sentence in the brace.",
       );
       expect(rendered).toContain(
         "Any other `gh` error, a missing body file, a wrong base, gets one fix of its cause and one retry of the command; when it still fails, this line, verbatim, takes the place of both, with the second brace filled with the one line the command printed, and the step is done:",
       );
+      // The rule comes before both lines it decides between.
+      expect(rendered.indexOf(VERBATIM_LINES["the no-remote line"])).toBeGreaterThan(rule);
+      expect(rendered).not.toContain("No remote, or no `gh` login:");
+      expect(rendered).not.toContain("answered that there is no remote");
       const noRemote = rendered.indexOf(VERBATIM_LINES["the no-remote line"]);
       const failedOpen = rendered.indexOf(VERBATIM_LINES["the failed-open line"]);
       const branchLine = rendered.indexOf(VERBATIM_LINES["the branch line"]);
@@ -621,6 +630,16 @@ describe("the guided-onboarding skill", () => {
       );
       expect(rendered).toContain(
         "read them alone with a command that prints keys and no values, such as `sed 's/=.*//' .env`.",
+      );
+    });
+
+    /** @scenario "The connect adapter wraps the existing entry point and leaves its callers working" */
+    it("adds the adapter as a new decorated function around the entry point, never by changing a function other code calls", () => {
+      expect(rendered).toContain(
+        "The adapter is a new function, decorated with the one connect call, that calls the existing entry point and returns the reply text. Functions the repository already has keep their signature and their return value: instrumentation is added around them, never by changing them. One connect call per agent, so exactly one decorated function.",
+      );
+      expect(rendered).toContain(
+        "Before the commit, read every caller of each function you touched (grep its name across the repository) and, when the repository has tests, run them: a caller that reads a shape the edit changed is the edit being wrong, not the caller.",
       );
     });
 
@@ -721,9 +740,9 @@ describe("the guided-onboarding skill", () => {
         "A missing remote, a missing `gh` login and a failed verdict are not errors: the step is done with its line, and the next one starts.",
       );
       expect(rendered).toContain(
-        "No remote, or no `gh` login: no pull request was opened, so this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:",
+        "On one of those, and only then, this line takes the pull request line's place, verbatim, with the brace filled with the branch name, and the step is done:",
       );
-      const noRemote = rendered.indexOf("No remote, or no `gh` login:");
+      const noRemote = rendered.indexOf("The no-remote line has exactly two triggers");
       const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);
       expect(closing).toBeGreaterThan(noRemote);
     });
@@ -744,6 +763,9 @@ describe("the guided-onboarding skill", () => {
       const branch = rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`");
       expect(report).toBeGreaterThan(-1);
       expect(branch).toBeGreaterThan(report);
+      expect(rendered).toContain(
+        "It is said there and nowhere earlier: not when the code is read, and not again after a repair; a line said twice is a line said wrong.",
+      );
     });
 
     /** @scenario "The proposal is the gate of step 4" */

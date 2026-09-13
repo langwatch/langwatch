@@ -470,8 +470,8 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: Langy names the framework it found
       When the compiled guided-onboarding skill is read
-      Then after reading the code Langy says one line naming the framework and the file it found it in
-      And that line comes before the branch and the first edit
+      Then after reading the code Langy keeps one line naming the framework and the file it found it in
+      And that line is said once, right before the proposal with the other step 2 lines, never when the code is read and never again after a repair
 
     @unit
     Scenario: The instrumentation is committed once the agent is online
@@ -547,10 +547,23 @@ Feature: Langy guides the first setup after sign-up
     Scenario: The pull request body is written before it is read, and the no-remote line waits for its reason
       When the compiled guided-onboarding skill is read
       Then the body file is written with local_write before the command that reads it
-      And the no-remote line is said only when the push or gh answered that there is no remote or gh is not signed in
+      And a push that printed a new branch on a remote means the no-remote line is never said, whatever gh prints afterwards
+      And the no-remote line has exactly two triggers, git push with no remote and gh not signed in, matched on the lines git and gh print
       And any other gh error gets one fix of its cause and one retry, and when it still fails the fixed failed-open line names the branch and the one line the command printed
       And a gh answer that no remote points to a known GitHub host has nothing to fix, so the failed-open line is said at once with that line
       And no reason the output did not name is ever said
+
+    # A run decorated the repository's own entry point and changed its return
+    # from a dict to a string, so the app's POST /chat, its only caller, raised
+    # on the result; it also registered the same agent name on a second
+    # decorated function. The diff is what the pull request shows.
+    @unit
+    Scenario: The connect adapter wraps the existing entry point and leaves its callers working
+      When the compiled guided-onboarding skill is read
+      Then the adapter is a new function, decorated with the one connect call, that calls the existing entry point and returns the reply text
+      And functions the repository already has keep their signature and their return value: instrumentation is added around them, never by changing them
+      And exactly one function is decorated, one connect call per agent
+      And before the commit Langy reads every caller of each function it touched and runs the repository's tests when it has them
 
     # A run printed the env file to the shared terminal, and the provider key
     # appeared in full on the film.
