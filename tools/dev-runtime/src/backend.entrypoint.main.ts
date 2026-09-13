@@ -40,7 +40,7 @@ const stop = (code: number): Promise<void> => {
       process.exitCode = code;
     } catch (error) {
       write(processFailureLine({ service: BACKEND_SERVICE, event: "shutdown failed", error }));
-      process.exitCode = 1;
+      process.exit(1);
     } finally {
       clearTimeout(deadline);
     }
@@ -86,6 +86,7 @@ export function bootBackendEntry(): Promise<void> {
       halves = started;
     })
     .catch(() => {
-      process.exitCode = 1;
+      // Exit outright: a failed boot's own pollers would hold the loop open.
+      process.exit(1);
     });
 }

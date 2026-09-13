@@ -80,7 +80,9 @@ export async function bootApi(): Promise<void> {
     await main.start();
   } catch (error) {
     createLogger("langwatch:api").error({ error }, "api process failed to boot");
-    process.exitCode = 1;
+    // Exit outright: pollers a half-built graph already started would
+    // otherwise hold the event loop open, spinning on closed clients.
+    process.exit(1);
   }
 }
 

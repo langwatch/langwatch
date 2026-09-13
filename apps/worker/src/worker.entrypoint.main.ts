@@ -12,6 +12,8 @@ import { startStandaloneWorker } from "./app/worker-standalone.executable.ts";
  */
 export function bootWorkerEntry(): Promise<void> {
   return startStandaloneWorker().catch(() => {
-    process.exitCode = 1;
+    // Exit outright: pollers a half-built graph already started would
+    // otherwise hold the event loop open, spinning on closed clients.
+    process.exit(1);
   });
 }

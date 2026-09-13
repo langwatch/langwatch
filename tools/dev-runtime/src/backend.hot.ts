@@ -167,5 +167,5 @@ async function main(): Promise<void> {
 
 void main().catch((error) => {
   write(`fatal: ${String(error)}`);
-  process.exitCode = 1;
+  process.exit(1);
 });
