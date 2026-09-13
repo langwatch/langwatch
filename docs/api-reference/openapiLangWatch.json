@@ -3073,7 +3073,8 @@
                               "code",
                               "workflow",
                               "http",
-                              "connected"
+                              "connected",
+                              "voice"
                             ],
                             "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                           },
@@ -3410,7 +3411,8 @@
                         "code",
                         "workflow",
                         "http",
-                        "connected"
+                        "connected",
+                        "voice"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -3686,7 +3688,8 @@
                       "code",
                       "workflow",
                       "http",
-                      "connected"
+                      "connected",
+                      "voice"
                     ],
                     "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
                   },
@@ -3738,7 +3741,8 @@
                         "code",
                         "workflow",
                         "http",
-                        "connected"
+                        "connected",
+                        "voice"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -4036,7 +4040,8 @@
                         "code",
                         "workflow",
                         "http",
-                        "connected"
+                        "connected",
+                        "voice"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -4324,7 +4329,8 @@
                       "code",
                       "workflow",
                       "http",
-                      "connected"
+                      "connected",
+                      "voice"
                     ],
                     "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
                   },
@@ -4372,7 +4378,8 @@
                         "code",
                         "workflow",
                         "http",
-                        "connected"
+                        "connected",
+                        "voice"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -4660,7 +4667,8 @@
                       "code",
                       "workflow",
                       "http",
-                      "connected"
+                      "connected",
+                      "voice"
                     ],
                     "description": "The kind of agent to write. A connected agent is registered from code by the SDK, so \"connected\" is refused with agent_register_only."
                   },
@@ -4708,7 +4716,8 @@
                         "code",
                         "workflow",
                         "http",
-                        "connected"
+                        "connected",
+                        "voice"
                       ]
                     },
                     "archivedAt": {
@@ -12203,7 +12212,7 @@
       "post": {
         "operationId": "postApiV1Query",
         "summary": "Run a LangWatchQL query",
-        "description": "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nThe project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
+        "description": "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs scoped to the authenticated project.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nAn organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.\n\nA response carries at most 10,000 rows and about 8,000,000 bytes. When a result reaches either ceiling it is cut off there, the top-level `truncated` field is `true`, and a `RESULT_TRUNCATED` diagnostic reports the applied row cap in its `meta.maxRows`.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
         "tags": [
           "Query"
         ],
@@ -12645,7 +12654,7 @@
       "get": {
         "operationId": "getApiV1QuerySchema",
         "summary": "Discover the queryable LangWatchQL schema",
-        "description": "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\nScoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.",
+        "description": "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\nScoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\nAn organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.",
         "tags": [
           "Query"
         ],
@@ -12753,11 +12762,18 @@
                           "exampleSql"
                         ]
                       }
+                    },
+                    "functions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": [
                     "database",
-                    "datasets"
+                    "datasets",
+                    "functions"
                   ]
                 }
               }
@@ -53688,7 +53704,8 @@
                                   "http",
                                   "code",
                                   "workflow",
-                                  "connected"
+                                  "connected",
+                                  "voice"
                                 ]
                               },
                               "targetKey": {
@@ -53757,6 +53774,35 @@
                                   "hostname",
                                   "label"
                                 ]
+                              },
+                              "callerKind": {
+                                "type": "string",
+                                "enum": [
+                                  "simulated",
+                                  "human"
+                                ]
+                              },
+                              "caller": {
+                                "type": "object",
+                                "properties": {
+                                  "voice": {
+                                    "type": "string"
+                                  },
+                                  "interruptProbability": {
+                                    "type": "number"
+                                  },
+                                  "effects": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "voice",
+                                  "interruptProbability",
+                                  "effects"
+                                ]
+                              },
+                              "isCutAtLimit": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -53812,7 +53858,8 @@
                           "FAILED",
                           "STALLED",
                           "QUEUED",
-                          "RUNNING"
+                          "RUNNING",
+                          "PENDING_EVALUATION"
                         ]
                       },
                       "results": {
@@ -59903,7 +59950,8 @@
                             ]
                           },
                           "status": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final."
                           },
                           "results": {
                             "type": [
@@ -60261,7 +60309,8 @@
                       ]
                     },
                     "status": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final."
                     },
                     "results": {
                       "type": [
@@ -61113,7 +61162,8 @@
                                 "http",
                                 "code",
                                 "workflow",
-                                "connected"
+                                "connected",
+                                "voice"
                               ],
                               "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                             },
@@ -61413,7 +61463,8 @@
                               "http",
                               "code",
                               "workflow",
-                              "connected"
+                              "connected",
+                              "voice"
                             ],
                             "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
@@ -61677,7 +61728,8 @@
                             "http",
                             "code",
                             "workflow",
-                            "connected"
+                            "connected",
+                            "voice"
                           ],
                           "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
@@ -61863,7 +61915,8 @@
                               "http",
                               "code",
                               "workflow",
-                              "connected"
+                              "connected",
+                              "voice"
                             ],
                             "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
@@ -62182,7 +62235,8 @@
                               "http",
                               "code",
                               "workflow",
-                              "connected"
+                              "connected",
+                              "voice"
                             ],
                             "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
@@ -62465,7 +62519,8 @@
                             "http",
                             "code",
                             "workflow",
-                            "connected"
+                            "connected",
+                            "voice"
                           ],
                           "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
@@ -62809,7 +62864,8 @@
                               "http",
                               "code",
                               "workflow",
-                              "connected"
+                              "connected",
+                              "voice"
                             ],
                             "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
@@ -63073,7 +63129,8 @@
                                   "http",
                                   "code",
                                   "workflow",
-                                  "connected"
+                                  "connected",
+                                  "voice"
                                 ],
                                 "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
@@ -63271,7 +63328,8 @@
                             "http",
                             "code",
                             "workflow",
-                            "connected"
+                            "connected",
+                            "voice"
                           ],
                           "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },
@@ -63481,7 +63539,8 @@
                                 "http",
                                 "code",
                                 "workflow",
-                                "connected"
+                                "connected",
+                                "voice"
                               ],
                               "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                             },
@@ -63548,17 +63607,14 @@
                             "id": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The attachment id. Stable across edits of the attachment."
+                              "maxLength": 64
                             },
                             "evaluatorId": {
                               "type": "string",
-                              "minLength": 1,
-                              "description": "The id of the saved evaluator this attachment runs."
+                              "minLength": 1
                             },
                             "required": {
-                              "type": "boolean",
-                              "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                              "type": "boolean"
                             },
                             "mappings": {
                               "type": "object",
@@ -63618,8 +63674,7 @@
                                       "value"
                                     ]
                                   }
-                                ],
-                                "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                                ]
                               },
                               "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                             }
@@ -63774,7 +63829,8 @@
                                   "http",
                                   "code",
                                   "workflow",
-                                  "connected"
+                                  "connected",
+                                  "voice"
                                 ],
                                 "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
@@ -63958,7 +64014,8 @@
                                 "http",
                                 "code",
                                 "workflow",
-                                "connected"
+                                "connected",
+                                "voice"
                               ],
                               "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                             },
@@ -64031,17 +64088,14 @@
                             "id": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The attachment id. Stable across edits of the attachment."
+                              "maxLength": 64
                             },
                             "evaluatorId": {
                               "type": "string",
-                              "minLength": 1,
-                              "description": "The id of the saved evaluator this attachment runs."
+                              "minLength": 1
                             },
                             "required": {
-                              "type": "boolean",
-                              "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                              "type": "boolean"
                             },
                             "mappings": {
                               "type": "object",
@@ -64101,8 +64155,7 @@
                                       "value"
                                     ]
                                   }
-                                ],
-                                "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                                ]
                               },
                               "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                             }
@@ -64276,7 +64329,8 @@
                               "http",
                               "code",
                               "workflow",
-                              "connected"
+                              "connected",
+                              "voice"
                             ],
                             "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                           },
@@ -64343,17 +64397,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -64413,8 +64464,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -64620,7 +64670,8 @@
                                   "http",
                                   "code",
                                   "workflow",
-                                  "connected"
+                                  "connected",
+                                  "voice"
                                 ],
                                 "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
@@ -64813,8 +64864,7 @@
                               "type": "string",
                               "pattern": "^[a-z][a-z0-9_]*$",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                              "maxLength": 64
                             },
                             "type": {
                               "type": "string",
@@ -64822,15 +64872,13 @@
                                 "text",
                                 "number",
                                 "boolean"
-                              ],
-                              "description": "The value type every scenario carries for this field."
+                              ]
                             }
                           },
                           "required": [
                             "identifier",
                             "type"
-                          ],
-                          "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                          ]
                         },
                         "maxItems": 30,
                         "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -64843,17 +64891,14 @@
                             "id": {
                               "type": "string",
                               "minLength": 1,
-                              "maxLength": 64,
-                              "description": "The attachment id. Stable across edits of the attachment."
+                              "maxLength": 64
                             },
                             "evaluatorId": {
                               "type": "string",
-                              "minLength": 1,
-                              "description": "The id of the saved evaluator this attachment runs."
+                              "minLength": 1
                             },
                             "required": {
-                              "type": "boolean",
-                              "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                              "type": "boolean"
                             },
                             "mappings": {
                               "type": "object",
@@ -64913,8 +64958,7 @@
                                       "value"
                                     ]
                                   }
-                                ],
-                                "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                                ]
                               },
                               "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                             }
@@ -65031,8 +65075,7 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9_]*$",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                            "maxLength": 64
                           },
                           "type": {
                             "type": "string",
@@ -65040,15 +65083,13 @@
                               "text",
                               "number",
                               "boolean"
-                            ],
-                            "description": "The value type every scenario carries for this field."
+                            ]
                           }
                         },
                         "required": [
                           "identifier",
                           "type"
-                        ],
-                        "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                        ]
                       },
                       "maxItems": 30,
                       "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -65061,17 +65102,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -65131,8 +65169,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -65211,8 +65248,7 @@
                           "type": "string",
                           "pattern": "^[a-z][a-z0-9_]*$",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                          "maxLength": 64
                         },
                         "type": {
                           "type": "string",
@@ -65220,15 +65256,13 @@
                             "text",
                             "number",
                             "boolean"
-                          ],
-                          "description": "The value type every scenario carries for this field."
+                          ]
                         }
                       },
                       "required": [
                         "identifier",
                         "type"
-                      ],
-                      "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                      ]
                     },
                     "maxItems": 30,
                     "description": "The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean."
@@ -65241,17 +65275,14 @@
                         "id": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The attachment id. Stable across edits of the attachment."
+                          "maxLength": 64
                         },
                         "evaluatorId": {
                           "type": "string",
-                          "minLength": 1,
-                          "description": "The id of the saved evaluator this attachment runs."
+                          "minLength": 1
                         },
                         "required": {
-                          "type": "boolean",
-                          "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                          "type": "boolean"
                         },
                         "mappings": {
                           "type": "object",
@@ -65311,8 +65342,7 @@
                                   "value"
                                 ]
                               }
-                            ],
-                            "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                            ]
                           },
                           "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                         }
@@ -65386,8 +65416,7 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9_]*$",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                            "maxLength": 64
                           },
                           "type": {
                             "type": "string",
@@ -65395,15 +65424,13 @@
                               "text",
                               "number",
                               "boolean"
-                            ],
-                            "description": "The value type every scenario carries for this field."
+                            ]
                           }
                         },
                         "required": [
                           "identifier",
                           "type"
-                        ],
-                        "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                        ]
                       },
                       "maxItems": 30,
                       "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -65416,17 +65443,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -65486,8 +65510,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -65627,8 +65650,7 @@
                             "type": "string",
                             "pattern": "^[a-z][a-z0-9_]*$",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                            "maxLength": 64
                           },
                           "type": {
                             "type": "string",
@@ -65636,15 +65658,13 @@
                               "text",
                               "number",
                               "boolean"
-                            ],
-                            "description": "The value type every scenario carries for this field."
+                            ]
                           }
                         },
                         "required": [
                           "identifier",
                           "type"
-                        ],
-                        "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                        ]
                       },
                       "maxItems": 30,
                       "description": "The fields the test suite declares. Absent on servers that predate fields on this family."
@@ -65657,17 +65677,14 @@
                           "id": {
                             "type": "string",
                             "minLength": 1,
-                            "maxLength": 64,
-                            "description": "The attachment id. Stable across edits of the attachment."
+                            "maxLength": 64
                           },
                           "evaluatorId": {
                             "type": "string",
-                            "minLength": 1,
-                            "description": "The id of the saved evaluator this attachment runs."
+                            "minLength": 1
                           },
                           "required": {
-                            "type": "boolean",
-                            "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                            "type": "boolean"
                           },
                           "mappings": {
                             "type": "object",
@@ -65727,8 +65744,7 @@
                                     "value"
                                   ]
                                 }
-                              ],
-                              "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                              ]
                             },
                             "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                           }
@@ -65819,8 +65835,7 @@
                           "type": "string",
                           "pattern": "^[a-z][a-z0-9_]*$",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter."
+                          "maxLength": 64
                         },
                         "type": {
                           "type": "string",
@@ -65828,15 +65843,13 @@
                             "text",
                             "number",
                             "boolean"
-                          ],
-                          "description": "The value type every scenario carries for this field."
+                          ]
                         }
                       },
                       "required": [
                         "identifier",
                         "type"
-                      ],
-                      "description": "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it."
+                      ]
                     },
                     "maxItems": 30,
                     "description": "The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use."
@@ -65849,17 +65862,14 @@
                         "id": {
                           "type": "string",
                           "minLength": 1,
-                          "maxLength": 64,
-                          "description": "The attachment id. Stable across edits of the attachment."
+                          "maxLength": 64
                         },
                         "evaluatorId": {
                           "type": "string",
-                          "minLength": 1,
-                          "description": "The id of the saved evaluator this attachment runs."
+                          "minLength": 1
                         },
                         "required": {
-                          "type": "boolean",
-                          "description": "Whether a failing result fails the scenario. A score-only evaluator reports and never gates."
+                          "type": "boolean"
                         },
                         "mappings": {
                           "type": "object",
@@ -65919,8 +65929,7 @@
                                   "value"
                                 ]
                               }
-                            ],
-                            "description": "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal."
+                            ]
                           },
                           "description": "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run."
                         }
@@ -66073,7 +66082,8 @@
                                   "http",
                                   "code",
                                   "workflow",
-                                  "connected"
+                                  "connected",
+                                  "voice"
                                 ],
                                 "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                               },
@@ -66194,7 +66204,8 @@
                             "http",
                             "code",
                             "workflow",
-                            "connected"
+                            "connected",
+                            "voice"
                           ],
                           "description": "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK."
                         },

@@ -1044,11 +1044,13 @@ export interface paths {
         put?: never;
         /**
          * Run a LangWatchQL query
-         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.
+         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs scoped to the authenticated project.
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.
+         *     An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.
+         *
+         *     A response carries at most 10,000 rows and about 8,000,000 bytes. When a result reaches either ceiling it is cut off there, the top-level `truncated` field is `true`, and a `RESULT_TRUNCATED` diagnostic reports the applied row cap in its `meta.maxRows`.
          *
          *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
          */
@@ -1068,9 +1070,11 @@ export interface paths {
         };
         /**
          * Discover the queryable LangWatchQL schema
-         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.
          *
          *     Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         *
+         *     An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.
          */
         get: operations["getApiV1QuerySchema"];
         put?: never;
@@ -5515,7 +5519,7 @@ export interface operations {
                              * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                              * @enum {string}
                              */
-                            type: "signature" | "code" | "workflow" | "http" | "connected";
+                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                             config: {
                                 [key: string]: unknown;
                             } | null;
@@ -5602,7 +5606,7 @@ export interface operations {
                      * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
                      * @enum {string}
                      */
-                    type: "signature" | "code" | "workflow" | "http" | "connected";
+                    type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                     config: {
                         [key: string]: unknown;
                     };
@@ -5624,7 +5628,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5714,7 +5718,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5797,7 +5801,7 @@ export interface operations {
                      * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
                      * @enum {string}
                      */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5819,7 +5823,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -5906,7 +5910,7 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         archivedAt: string | null;
                     };
                 };
@@ -5931,7 +5935,7 @@ export interface operations {
                      * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
                      * @enum {string}
                      */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5953,7 +5957,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -6062,6 +6066,13 @@ export interface operations {
             };
             /** @description The agent cannot be tested as it is set up */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No process is holding the connected agent right now */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9048,6 +9059,7 @@ export interface operations {
                             }[];
                             exampleSql: string;
                         }[];
+                        functions: string[];
                     };
                 };
             };
@@ -24941,7 +24953,7 @@ export interface operations {
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
-                            targetType: "prompt" | "http" | "code" | "workflow" | "connected";
+                            targetType: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             targetKey?: string;
                             targetParameters?: {
                                 [key: string]: string | number | boolean;
@@ -24959,6 +24971,14 @@ export interface operations {
                                 hostname: string;
                                 label: string | null;
                             };
+                            /** @enum {string} */
+                            callerKind?: "simulated" | "human";
+                            caller?: {
+                                voice: string;
+                                interruptProbability: number;
+                                effects: string;
+                            };
+                            isCutAtLimit?: boolean;
                         };
                     } & {
                         [key: string]: unknown;
@@ -24974,7 +24994,7 @@ export interface operations {
                     /** @default default */
                     scenarioSetId?: string;
                     /** @enum {string} */
-                    status: "SUCCESS" | "ERROR" | "CANCELLED" | "IN_PROGRESS" | "PENDING" | "FAILED" | "STALLED" | "QUEUED" | "RUNNING";
+                    status: "SUCCESS" | "ERROR" | "CANCELLED" | "IN_PROGRESS" | "PENDING" | "FAILED" | "STALLED" | "QUEUED" | "RUNNING" | "PENDING_EVALUATION";
                     results?: {
                         /** @enum {string} */
                         verdict: "success" | "failure" | "inconclusive";
@@ -27447,6 +27467,7 @@ export interface operations {
                             scenarioRunId: string;
                             name: string | null;
                             description: string | null;
+                            /** @description Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final. */
                             status: string;
                             results: {
                                 verdict?: string | null;
@@ -27569,6 +27590,7 @@ export interface operations {
                         scenarioRunId: string;
                         name: string | null;
                         description: string | null;
+                        /** @description Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final. */
                         status: string;
                         results: {
                             verdict?: string | null;
@@ -27925,7 +27947,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28034,7 +28056,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28088,7 +28110,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28204,7 +28226,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28408,7 +28430,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28460,7 +28482,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28590,7 +28612,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28692,7 +28714,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28739,7 +28761,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28865,7 +28887,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28883,11 +28905,8 @@ export interface operations {
                         labels: string[];
                         /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -28956,7 +28975,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -28974,11 +28993,8 @@ export interface operations {
                         scenarioIds?: string[];
                         /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -29042,7 +29058,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -29118,7 +29134,7 @@ export interface operations {
                              * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                             /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -29136,11 +29152,8 @@ export interface operations {
                         labels: string[];
                         /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -29263,7 +29276,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -29321,21 +29334,14 @@ export interface operations {
                         scenarioCount: number;
                         /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
                         fields?: {
-                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
                             identifier: string;
-                            /**
-                             * @description The value type every scenario carries for this field.
-                             * @enum {string}
-                             */
+                            /** @enum {string} */
                             type: "text" | "number" | "boolean";
                         }[];
                         /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -29382,21 +29388,14 @@ export interface operations {
                     name: string;
                     /** @description The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean. */
                     fields?: {
-                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
                         identifier: string;
-                        /**
-                         * @description The value type every scenario carries for this field.
-                         * @enum {string}
-                         */
+                        /** @enum {string} */
                         type: "text" | "number" | "boolean";
                     }[];
                     /** @description The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates. */
                     evaluators?: {
-                        /** @description The attachment id. Stable across edits of the attachment. */
                         id: string;
-                        /** @description The id of the saved evaluator this attachment runs. */
                         evaluatorId: string;
-                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                         required: boolean;
                         /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                         mappings: {
@@ -29436,21 +29435,14 @@ export interface operations {
                         scenarioCount: number;
                         /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
                         fields?: {
-                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
                             identifier: string;
-                            /**
-                             * @description The value type every scenario carries for this field.
-                             * @enum {string}
-                             */
+                            /** @enum {string} */
                             type: "text" | "number" | "boolean";
                         }[];
                         /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -29514,21 +29506,14 @@ export interface operations {
                         scenarioCount: number;
                         /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
                         fields?: {
-                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
                             identifier: string;
-                            /**
-                             * @description The value type every scenario carries for this field.
-                             * @enum {string}
-                             */
+                            /** @enum {string} */
                             type: "text" | "number" | "boolean";
                         }[];
                         /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -29616,21 +29601,14 @@ export interface operations {
                     name?: string;
                     /** @description The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use. */
                     fields?: {
-                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
                         identifier: string;
-                        /**
-                         * @description The value type every scenario carries for this field.
-                         * @enum {string}
-                         */
+                        /** @enum {string} */
                         type: "text" | "number" | "boolean";
                     }[];
                     /** @description The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid. */
                     evaluators?: {
-                        /** @description The attachment id. Stable across edits of the attachment. */
                         id: string;
-                        /** @description The id of the saved evaluator this attachment runs. */
                         evaluatorId: string;
-                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                         required: boolean;
                         /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                         mappings: {
@@ -29670,21 +29648,14 @@ export interface operations {
                         scenarioCount: number;
                         /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
                         fields?: {
-                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
                             identifier: string;
-                            /**
-                             * @description The value type every scenario carries for this field.
-                             * @enum {string}
-                             */
+                            /** @enum {string} */
                             type: "text" | "number" | "boolean";
                         }[];
                         /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
                         evaluators?: {
-                            /** @description The attachment id. Stable across edits of the attachment. */
                             id: string;
-                            /** @description The id of the saved evaluator this attachment runs. */
                             evaluatorId: string;
-                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
                             required: boolean;
                             /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
                             mappings: {
@@ -29736,7 +29707,7 @@ export interface operations {
                          * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                         /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
@@ -29798,7 +29769,7 @@ export interface operations {
                                  * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
                                 /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */

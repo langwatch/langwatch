@@ -135,4 +135,7 @@ export const lwqlSchemaSchema = z.object({
       exampleSql: z.string(),
     }),
   ),
+  // The function names a query may call, equal to the validator's allowlist.
+  // Permission-independent, so it is the same for every caller.
+  functions: z.array(z.string()),
 });

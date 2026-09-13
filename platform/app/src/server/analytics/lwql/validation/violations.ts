@@ -95,6 +95,13 @@ export interface LangWatchQLViolation {
   readonly message: string;
   /** Where in the submitted SQL, when the parser reported a position. */
   readonly at?: SqlSourcePosition;
+  /**
+   * The complete function allowlist a query may call. Set ONLY on
+   * `FUNCTION_NOT_ALLOWED`, so a refused caller — usually an agent with no UI —
+   * can recover from what it should have called without a second round trip to
+   * `GET /api/v1/query/schema`.
+   */
+  readonly allowedFunctions?: readonly string[];
 }
 
 /**

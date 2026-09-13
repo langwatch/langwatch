@@ -53,6 +53,7 @@ import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 
 import {
+  DEFAULT_LWQL_RESULT_LIMITS,
   getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
 } from "~/server/analytics/lwql";
@@ -116,15 +117,34 @@ async function callerContext(c: Context) {
   };
 }
 
+/**
+ * How a caller names the project it is querying.
+ *
+ * Shared by both doors so the two cannot describe the rule differently. An
+ * organization key reaches many projects, so it has to say which one; a project
+ * key already names its own, so it needs no header and any it sends is ignored.
+ */
+const HEADER_RULE =
+  "An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.";
+
+/**
+ * The response ceilings, read off the executor's own limits so this copy and
+ * the enforced caps cannot drift. Formatted with thousands separators for a
+ * reader.
+ */
+const RESULT_CEILINGS = `A response carries at most ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows and about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes. When a result reaches either ceiling it is cut off there, the top-level \`truncated\` field is \`true\`, and a \`RESULT_TRUNCATED\` diagnostic reports the applied row cap in its \`meta.maxRows\`.`;
+
 const RUN_DESCRIPTION =
-  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\n" +
+  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs scoped to the authenticated project.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
-  "The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.\n\n" +
+  `${HEADER_RULE}\n\n` +
+  `${RESULT_CEILINGS}\n\n` +
   "Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.";
 
 const SCHEMA_DESCRIPTION =
-  "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\n" +
-  "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.";
+  "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\n" +
+  "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
+  `${HEADER_RULE}`;
 
 /**
  * `POST /api/v1/query` — execute one statement.

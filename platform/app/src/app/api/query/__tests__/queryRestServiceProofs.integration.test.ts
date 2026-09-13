@@ -1489,6 +1489,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
      * under test is that overflow is *marked* rather than silently dropped.
      */
     /** @scenario "Truncation diagnostic fires when results are cut off" */
+    /** @scenario "A result over the row cap is still truncated with a diagnostic" */
     it("cuts the result at the ceiling and says so, in the body and in a diagnostic", async () => {
       // Bounded on the time column, so the only diagnostic either run can earn
       // is the truncation one this case is about.
@@ -1575,6 +1576,29 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         `SELECT now() AS value FROM ${database}.traces LIMIT 1`,
       );
       expect(body.rows).toHaveLength(1);
+    });
+
+    /**
+     * Issue #8085 (AC7): a coding agent refused for calling a function it
+     * should not have carries the full allowlist back, so it can recover
+     * without a second round trip to `GET /api/v1/query/schema`.
+     */
+    /** @scenario "The REST caller receives allowedFunctions on a function violation" */
+    it("carries allowedFunctions on the FUNCTION_NOT_ALLOWED violation", async () => {
+      const body = await refuse(
+        openProject,
+        `SELECT currentUser() AS value FROM ${database}.traces`,
+      );
+
+      const violation = body.meta.violations.find(
+        (entry: any) => entry.code === "FUNCTION_NOT_ALLOWED",
+      );
+      expect(violation, JSON.stringify(body.meta.violations)).toBeDefined();
+      expect(
+        Array.isArray(violation.allowedFunctions) &&
+          violation.allowedFunctions.length > 0,
+        `expected a non-empty allowedFunctions list, got: ${JSON.stringify(violation.allowedFunctions)}`,
+      ).toBe(true);
     });
   });
 

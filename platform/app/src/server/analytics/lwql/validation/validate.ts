@@ -71,6 +71,7 @@
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
+  LWQL_ALLOWED_FUNCTION_NAMES,
 } from "./functions";
 import {
   clickHouseSqlParser,
@@ -352,12 +353,15 @@ function report({
   code,
   message,
   node,
+  allowedFunctions,
 }: {
   ctx: WalkContext;
   frame: Frame;
   code: LangWatchQLViolationCode;
   message: string;
   node?: SqlAstNode;
+  /** Only `FUNCTION_NOT_ALLOWED` sets it — see {@link reportRefusedFunction}. */
+  allowedFunctions?: readonly string[];
 }): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
   const at = node ? positionOf(node) : undefined;
@@ -366,6 +370,7 @@ function report({
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
     ...(at ? { at } : {}),
+    ...(allowedFunctions ? { allowedFunctions } : {}),
   });
 }
 
@@ -952,8 +957,11 @@ function reportRefusedFunction({
     ctx,
     frame,
     code: "FUNCTION_NOT_ALLOWED",
-    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using the functions this API supports.`,
+    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using one of the supported functions, listed under \`functions\` on GET /api/v1/query/schema and carried on this violation as \`allowedFunctions\`.`,
     node,
+    // The complete list travels with the refusal so the caller — usually an
+    // agent with no UI — recovers without a second round trip to the schema.
+    allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES,
   });
 }
 

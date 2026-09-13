@@ -49,6 +49,7 @@ import {
   lwqlGatedColumns,
   lwqlVisibleViews,
 } from "./catalog/types";
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "./validation/functions";
 
 /** How many columns an example query names. Enough to be a template, not a dump. */
 const EXAMPLE_COLUMN_COUNT = 3;
@@ -112,6 +113,13 @@ export interface LangWatchQLSchema {
   /** Database every dataset name is qualified with. */
   readonly database: string;
   readonly datasets: readonly LangWatchQLSchemaDataset[];
+  /**
+   * Every function name a query may call. Permission-independent — the
+   * functions a query may call do not vary by what a key can see — and equal to
+   * the validator's own allowlist, so what the schema publishes and what the
+   * validator enforces cannot drift.
+   */
+  readonly functions: readonly string[];
 }
 
 /**
@@ -178,6 +186,7 @@ export function describeLangWatchQLSchema({
   const withheld = new Set(lwqlGatedColumns({ protections, views }));
   return {
     database,
+    functions: LWQL_ALLOWED_FUNCTION_NAMES,
     datasets: lwqlVisibleViews({ protections, views }).map((view) => ({
       name: `${database}.${view.name}`,
       description: view.description,

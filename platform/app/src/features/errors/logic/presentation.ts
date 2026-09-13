@@ -1824,6 +1824,14 @@ const presentations = {
         : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
     },
   },
+  project_scope_required: {
+    // The key works — it just reaches more than one project and named none, so
+    // the fix is to say which project, not to swap the key. Both ways to say it
+    // are named because a caller with no UI needs the exact mechanism.
+    title: "This request did not say which project to query",
+    describe: () =>
+      "This organization key reaches several projects. Name the one you want with an X-Project-Id header, or send Basic auth as base64(projectId:token).",
+  },
   // ---- scenario run parameters ----
   scenario_parameter_unknown: {
     // The lists and the target are our own names, not free text: the run

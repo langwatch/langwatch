@@ -68,6 +68,7 @@ import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "~/server/analytics/lwql/provisioning";
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "~/server/analytics/lwql/validation/functions";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -411,6 +412,19 @@ describe("given the /api/v1/query REST family", () => {
       });
       const result = await succeed(response, "GET /api/v1/query/schema");
       expect(result.database).toBe(database);
+    });
+
+    /**
+     * Issue #8085 (AC8): the allowed function names, through the real HTTP
+     * door — `./lwqlSchemaFunctions.unit.test.ts` proves the same claim at
+     * the pure `describeLangWatchQLSchema` level; this proves the REST
+     * response actually carries it.
+     */
+    /** @scenario "The schema endpoint publishes the allowed function names" */
+    it("publishes functions as a sorted array equal to the function allowlist", async () => {
+      const result = await readSchema(projectA);
+
+      expect(result.functions).toEqual([...LWQL_ALLOWED_FUNCTION_NAMES]);
     });
   });
 
