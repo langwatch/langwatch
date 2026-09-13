@@ -27,7 +27,9 @@ import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { z } from "zod";
 import type { PromptService } from "../services/prompt.service.ts";
+import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 
 /**
  * The credential a tag write arrived on. A tag definition is one organization
@@ -79,7 +81,18 @@ type PromptDependencies = Readonly<{
   permissions: typeof AuthzApi;
 }>;
 
-type PromptSetup = FeatureSetup<PromptDependencies, PromptInfrastructure, undefined>;
+/**
+ * The one thing this application needs from the deployment rather than from a
+ * peer: its own public origin, which every REST answer's `platformUrl` deep
+ * link into the prompt library is built on.
+ */
+const promptAppConfigSchema = z.object({ publicBaseUrl: z.url() });
+
+type PromptSetup = FeatureSetup<
+  PromptDependencies,
+  PromptInfrastructure,
+  z.infer<typeof promptAppConfigSchema>
+>;
 
 /** A tag name the organization's catalog does not accept. */
 export class PromptTagInvalidError extends HandledError {
@@ -179,6 +192,11 @@ type PromptAppDependencies = Readonly<{
   projects: ProjectApi;
   permissions: AuthzApi;
   members: PromptInfrastructure;
+  /**
+   * Absent only on the read-only twin, which serves no REST family and so is
+   * never asked for a deep link.
+   */
+  publicBaseUrl: string | undefined;
 }>;
 
 export class PromptApp implements PromptApi {
@@ -187,13 +205,15 @@ export class PromptApp implements PromptApi {
     projects: ProjectApi,
     permissions: AuthzApi,
   };
+  static readonly configSchema = promptAppConfigSchema;
 
-  static create({ dependencies, members }: PromptSetup): PromptApp {
+  static create({ config, dependencies, members }: PromptSetup): PromptApp {
     return new PromptApp({
       prompts: members.prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
       members,
+      publicBaseUrl: config.publicBaseUrl,
     });
   }
 
@@ -215,7 +235,24 @@ export class PromptApp implements PromptApi {
       projects: input.projects,
       permissions,
       members: { prompts: input.prompts, afterPromptCreated: () => undefined },
+      publicBaseUrl: undefined,
     });
+  }
+
+  /**
+   * The library's own address for one project, as every REST answer's
+   * `platformUrl` states it. Refuses by name on the read-only twin, which
+   * holds no public origin because it serves no door that publishes one.
+   */
+  promptsPlatformUrl(input: { projectSlug: string }): string {
+    const publicBaseUrl = this.#dependencies.publicBaseUrl;
+    if (!publicBaseUrl) {
+      throw new Error(
+        "The prompt reader holds no public base url: promptsPlatformUrl is not available on this process",
+      );
+    }
+
+    return promptsPlatformUrl({ publicBaseUrl, projectSlug: input.projectSlug });
   }
 
   #dependencies: PromptAppDependencies;

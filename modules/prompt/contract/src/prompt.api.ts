@@ -53,6 +53,8 @@ export type PromptUpdateInput = {
 
 /** Callable prompt operations shared by process peers after composition. */
 export interface PromptApi {
+  /** The deep link back into the prompt library for this project. */
+  promptsPlatformUrl(input: { projectSlug: string }): string;
   getAllPrompts(input: {
     projectId: string;
     organizationId?: string;

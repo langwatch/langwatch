@@ -96,6 +96,7 @@
     "hono": "catalog:",
     "langwatch": "workspace:*",
     "nanoid": "catalog:",
+    "prom-client": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"
   },

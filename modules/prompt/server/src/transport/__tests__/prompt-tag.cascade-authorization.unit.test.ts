@@ -39,7 +39,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
       prompts: {} as unknown as PromptService,
       afterPromptCreated: () => undefined,
     },
-    config: undefined,
+    config: { publicBaseUrl: "https://app.langwatch.test" },
     resources: { own: () => {}, ownService: () => {} },
   });
 

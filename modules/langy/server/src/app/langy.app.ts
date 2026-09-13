@@ -2,6 +2,7 @@
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   LangyConversationNotFoundError,
@@ -105,9 +106,17 @@ export class LangyApp implements LangyApiContract {
   /**
    * `presence` is the SAME per-tenant fabric presence publishes on, reached
    * through its module API rather than a second fabric of Langy's own.
+   *
+   * `featureFlags` is this deployment's rollout store. Langy's own application
+   * never asks it anything — the public REST doors do, for the per-project
+   * rollout gate and the identity bridge (`LangyRestCallerService`) — and it is
+   * declared HERE so a process that composed no flag store refuses at boot
+   * naming it, rather than mounting a turn surface that answers every project
+   * as dark.
    */
   static readonly dependencies = {
     presence: PresenceApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly configSchema = langyServerConfigSchema;
   /**

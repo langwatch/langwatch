@@ -7200,6 +7200,9 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
+      prom-client:
+        specifier: 'catalog:'
+        version: 15.1.3
       ws:
         specifier: 'catalog:'
         version: 8.21.3(bufferutil@4.1.0)
@@ -7817,6 +7820,12 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@clickhouse/client':
+        specifier: 'catalog:'
+        version: 1.23.0
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-client
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -10112,6 +10121,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

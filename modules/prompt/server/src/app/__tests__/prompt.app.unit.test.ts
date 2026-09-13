@@ -63,7 +63,7 @@ function harness() {
       prompts: prompts as PromptService,
       afterPromptCreated: () => {},
     },
-    config: undefined,
+    config: { publicBaseUrl: "https://app.langwatch.test" },
     resources: { own: () => {}, ownService: () => {} },
   });
 
