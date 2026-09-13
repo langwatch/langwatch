@@ -10,17 +10,24 @@
  * api's own parsed config onto the members every process states the same way.
  */
 import {
-  createProcess,
+  createProcessMembers,
   type MailConfig,
   type MemberName,
   type ProcessConfig,
+  type ProcessMemberSource,
   type ProcessMembers,
 } from "@langwatch/infrastructure";
+import { IdempotencyLedger, type IdempotentRunner } from "@langwatch/api/rest";
 import type { MountableRestApp } from "@langwatch/api/rest";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createLogger } from "@langwatch/observability";
 import { serverModules } from "@langwatch/installed-modules/server";
-import { ResourceScope, type BootedRuntime, type TransportPeers } from "@langwatch/runtime-composition";
+import {
+  createApp,
+  ResourceScope,
+  type BootedRuntime,
+  type TransportPeers,
+} from "@langwatch/runtime-composition";
 import { ApiRestHost, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
 import {
   ApiTrpcHost,
@@ -197,6 +204,24 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
 const DEFAULT_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
 /**
+ * The one ledger every create declared replayable keeps its receipts in: a
+ * receipt is an encrypted row in this application's database, so a family
+ * cannot hold one of its own. A deployment with no database has nowhere to
+ * keep one, and a route declaring the behaviour is refused at mount instead.
+ */
+function apiIdempotencyLedger(options: {
+  readonly config: ProcessConfig;
+  readonly members: ProcessMemberSource;
+}): IdempotentRunner | undefined {
+  if (!options.config.database?.url) return undefined;
+
+  return IdempotencyLedger.create({
+    receipts: options.members.read("prisma"),
+    cipher: options.members.read("encryption"),
+  }).run;
+}
+
+/**
  * The api's parsed config, as every process states itself.
  *
  * A datastore this deployment did not name is left out rather than defaulted:
@@ -343,7 +368,7 @@ export async function bootApiProcess(options: {
   // answer is objects, not addresses: a producer-only store and a factory
   // over the process's one Group Queue. No Redis means no queue and no
   // eventing member, and a module reading it then refuses by name at boot —
-  // the honest answer for a process that cannot enqueue. `createProcess`
+  // the honest answer for a process that cannot enqueue. The member source
   // never closes a member the caller built, so the runtime service below
   // drains the producer and its connection after the feature graph stops.
   const producerResources = new ResourceScope();
@@ -362,14 +387,26 @@ export async function bootApiProcess(options: {
   // holds the peers its authorization port reads.
   let trpc: ApiTrpcHost | undefined;
 
-  const runtime = await createProcess({
-    role: "api",
-    config: apiProcessConfig({ config, secrets: options.secrets }),
-    moduleConfig: apiModuleConfig(config),
+  // The members are built here rather than inside `createProcess` because the
+  // REST door needs two of them - the client a receipt row is written to and
+  // the cipher it is written under - before a single family is mounted. Read
+  // through the one source either way, so the process still opens exactly one
+  // client per member.
+  const processConfig = apiProcessConfig({ config, secrets: options.secrets });
+  const members = createProcessMembers({
+    config: processConfig,
     members: {
       ...(eventing ? { eventing: eventing.eventSourcing } : {}),
       ...options.members,
     },
+  });
+
+  const idempotency = apiIdempotencyLedger({ config: processConfig, members });
+
+  const runtime = await createApp<ProcessMembers>({
+    role: "api",
+    config: apiModuleConfig(config),
+    members,
   })
     .withModules(serverModules)
     .withModules(coreAuditLog)
@@ -389,6 +426,7 @@ export async function bootApiProcess(options: {
             "langy-internal": config.langyInternalSecret,
           },
           instanceAdminKey: config.instanceAdminApiKey,
+          ...(idempotency ? { idempotency } : {}),
           ...(options.browserSession ? { browserSession: options.browserSession } : {}),
         },
       }),

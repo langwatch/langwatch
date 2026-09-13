@@ -22,6 +22,7 @@ import {
   type RestCaller,
   type RestDoorCredential,
   type RestErrorHandler,
+  type IdempotentRunner,
   type RestIdentity,
   type RestTransportDeclaration,
   type RestTransportMiddlewareBinding,
@@ -86,6 +87,13 @@ export type ApiRestDoorConfig = Readonly<{
    * rather than letting an unverified caller through.
    */
   browserSession?: ((request: Request) => Promise<ApiRestBrowserCaller | null>) | undefined;
+  /**
+   * The process's ONE receipt ledger, behind every create a route declared
+   * replayable. Absent on a deployment with no database, where a route
+   * declaring the behaviour is refused at mount rather than answering as
+   * though a retry were protected.
+   */
+  idempotency?: IdempotentRunner | undefined;
 }>;
 
 /** Builds this process's door table once, and mounts declared families on it. */
@@ -142,6 +150,10 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     return createRestRuntime({
       identity: door === "public" ? this.publicDoor() : doors[door],
       doors,
+      // Every replayable create keeps its receipts in the ONE ledger this
+      // process composed: two ledgers over the same table would run two
+      // takeover clocks against each other's claims.
+      ...(this.config.idempotency ? { idempotency: this.config.idempotency } : {}),
       // Every route-declared trail lands on the ONE audit application this
       // process installed; a caller no door named is recorded as anonymous.
       audit: {
