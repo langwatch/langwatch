@@ -84,6 +84,10 @@ export const SCHEMA_RESPONSE: LangWatchQLSchema = {
         "SELECT evaluator_id, score\nFROM analytics.evaluations_daily\nWHERE occurred_on >= subtractDays(now(), 7)\nLIMIT 100",
     },
   ],
+  // A short, representative slice rather than the full allowlist: the workbench
+  // suites assert the surface shows what the response carried, so a handful of
+  // names is enough to prove the field is threaded through.
+  functions: ["avg", "count", "toStartOfHour"],
 };
 
 /** Every dataset name the response carries. */

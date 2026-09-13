@@ -96,10 +96,14 @@ export interface LangWatchQLViolation {
   /** Where in the submitted SQL, when the parser reported a position. */
   readonly at?: SqlSourcePosition;
   /**
-   * The complete function allowlist a query may call. Set ONLY on
-   * `FUNCTION_NOT_ALLOWED`, so a refused caller — usually an agent with no UI —
-   * can recover from what it should have called without a second round trip to
-   * `GET /api/v1/query/schema`.
+   * The complete function allowlist a query may call.
+   *
+   * The validator attaches it structurally to `FUNCTION_NOT_ALLOWED` and to no
+   * other code (see `report` in `./validate.ts`, which derives it from the code
+   * rather than taking it as an argument), so it is present on exactly the
+   * refusal it helps and absent everywhere else. A refused caller — usually an
+   * agent with no UI — recovers from what it should have called without a
+   * second round trip to `GET /api/v1/query/schema`.
    */
   readonly allowedFunctions?: readonly string[];
 }

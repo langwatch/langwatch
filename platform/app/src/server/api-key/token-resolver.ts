@@ -107,6 +107,9 @@ export class TokenResolver {
    * X-Project-Id header, or URL). Ingestion keys are ordinary API keys —
    * the caller still supplies the project, and the key carries the
    * ingestSourceType the receiver stamps as provenance.
+   *
+   * @deprecated Use resolveProject(); remaining callers tracked in
+   * https://github.com/langwatch/langwatch/issues/8114
    */
   async resolve({
     token,

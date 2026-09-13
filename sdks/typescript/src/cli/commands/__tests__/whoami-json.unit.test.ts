@@ -1,36 +1,39 @@
 /**
- * `langwatch whoami --json`: a secret-free machine-readable snapshot of the
- * persisted login (~/.langwatch/config.json), alongside the existing
- * human-readable output which must stay unchanged.
+ * `langwatch whoami` on the CLI output port: `-o json` (and `-o yaml`, `--jq`)
+ * project a secret-free machine-readable snapshot from the persisted login
+ * (~/.langwatch/config.json), while the bare command keeps its human-readable
+ * output. Driven through the REAL command tree (`buildProgram`) so the port's
+ * own resolution and serialization are exercised, not stubbed.
  *
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
- * Rule: whoami --json prints a secret-free machine-readable snapshot
+ * Rule: whoami -o json prints a secret-free machine-readable snapshot
+ *
+ * Only `loadConfig` is mocked — the persisted config. `isLoggedIn` is the real
+ * pure function (it reads `access_token`), so the logged-in / logged-out split
+ * is the shipped rule, not a test double of it.
  *
  * gitleaks:allow — test fixture keys only (not real secrets)
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as GovernanceConfigModule from "@/cli/utils/governance/config";
 
-// loadConfig is the persisted ~/.langwatch/config.json. Each test supplies a
-// config carrying every secret-shaped field the command must never leak, so
-// the secret-free assertions are load-bearing rather than vacuous.
 const loadConfig = vi.fn();
-vi.mock("@/cli/utils/governance/config", () => ({
-  loadConfig: () => loadConfig(),
-  isLoggedIn: (cfg: { access_token?: string } | undefined) =>
-    !!cfg?.access_token,
-}));
+vi.mock("@/cli/utils/governance/config", async (importActual) => {
+  const actual = await importActual<typeof GovernanceConfigModule>();
+  return { ...actual, loadConfig: () => loadConfig() };
+});
 
-import { whoamiCommand } from "../whoami";
+// buildProgram() reads the tsup-injected __CLI_VERSION__ build constant, which
+// no test runner defines (see program-error-contract.unit.test.ts).
+(globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-class ProcessExitError extends Error {
-  constructor(public code: number) {
-    super(`process.exit(${code})`);
-  }
-}
+// Agent-mode env would flip the resolved format to "agents"; clear it so an
+// explicit `-o json` is what the port sees.
+const AGENT_ENV = ["CLAUDECODE", "CLAUDE_CODE", "CURSOR_TRACE_ID"];
 
 /** A logged-in config with every secret-shaped field populated, so a test
- * that asserts those fields are absent from --json output is actually
- * proving something got filtered rather than never having been there. */
+ * that asserts those fields are absent from the output is actually proving
+ * something got filtered rather than never having been there. */
 const LOGGED_IN_CONFIG_WITH_SECRETS = {
   access_token: "fake-access-token",
   gateway_url: "https://gateway.langwatch.ai",
@@ -89,46 +92,77 @@ const FORBIDDEN_KEYS = [
   "default_personal_vk",
 ];
 
+let stdout: string[] = [];
+let stderr: string[] = [];
+let exited: number[] = [];
+let savedEnv: Record<string, string | undefined> = {};
+
+beforeEach(() => {
+  savedEnv = Object.fromEntries(AGENT_ENV.map((n) => [n, process.env[n]]));
+  for (const name of AGENT_ENV) delete process.env[name];
+  stdout = [];
+  stderr = [];
+  exited = [];
+  vi.clearAllMocks();
+  vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+    stdout.push(String(line));
+  });
+  vi.spyOn(console, "error").mockImplementation((line: unknown) => {
+    stderr.push(String(line));
+  });
+  vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+    stderr.push(String(chunk));
+    return true;
+  });
+  vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+    exited.push(code ?? 0);
+    return undefined as never;
+  }) as never);
+});
+
+afterEach(() => {
+  for (const name of AGENT_ENV) {
+    const value = savedEnv[name];
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  vi.restoreAllMocks();
+});
+
+const runWhoami = async (argv: string[]): Promise<void> => {
+  const { buildProgram } = await import("../../program.js");
+  const program = buildProgram();
+  program.exitOverride();
+  await program.parseAsync(["whoami", ...argv], { from: "user" });
+};
+
 describe("given a config with every secret-shaped field populated", () => {
-  let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let exitSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
-      throw new ProcessExitError((code as number) ?? 0);
-    });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  describe("when the user is logged in and runs whoami --json", () => {
+  describe("when the user is logged in and runs whoami -o json", () => {
     beforeEach(() => {
       loadConfig.mockReturnValue(LOGGED_IN_CONFIG_WITH_SECRETS);
     });
 
-    /** @scenario "whoami --json prints one secret-free JSON object and exits 0" */
+    /** @scenario "whoami -o json prints one secret-free JSON object and exits 0" */
     it("prints exactly one JSON object to stdout", async () => {
-      await whoamiCommand({ json: true });
+      await runWhoami(["-o", "json"]);
 
-      expect(consoleLogSpy).toHaveBeenCalledTimes(1);
-      expect(() => JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string)).not.toThrow();
+      expect(stdout).toHaveLength(1);
+      expect(() => JSON.parse(stdout[0]!)).not.toThrow();
     });
 
-    /** @scenario "whoami --json prints one secret-free JSON object and exits 0" */
+    /** @scenario "whoami -o json prints one secret-free JSON object and exits 0" */
     it("shapes the object with user, organization, personal_project, cli_api_key_scope, gateway_url and control_plane_url", async () => {
-      await whoamiCommand({ json: true });
+      await runWhoami(["-o", "json"]);
 
-      const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
+      const doc = JSON.parse(stdout[0]!);
       expect(doc).toMatchObject({
         user: { id: "user_1", email: "dev@acme.test", name: "Dev User" },
         organization: { id: "org_1", slug: "acme", name: "Acme" },
-        personal_project: { id: "proj_personal", slug: "personal-dev", name: "Personal Workspace" },
+        personal_project: {
+          id: "proj_personal",
+          slug: "personal-dev",
+          name: "Personal Workspace",
+        },
         cli_api_key_scope: {
           kind: "organization",
           project_ids: [],
@@ -139,7 +173,7 @@ describe("given a config with every secret-shaped field populated", () => {
       });
     });
 
-    /** @scenario "whoami --json prints one secret-free JSON object and exits 0" */
+    /** @scenario "whoami -o json prints one secret-free JSON object and exits 0" */
     it("omits a field the config does not hold rather than printing it null", async () => {
       loadConfig.mockReturnValue({
         access_token: "fake-access-token",
@@ -148,29 +182,29 @@ describe("given a config with every secret-shaped field populated", () => {
         // No organization, no cli_api_key_scope on this login.
       });
 
-      await whoamiCommand({ json: true });
+      await runWhoami(["-o", "json"]);
 
-      const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
+      const doc = JSON.parse(stdout[0]!);
       expect(doc).not.toHaveProperty("organization");
       expect(doc).not.toHaveProperty("cli_api_key_scope");
     });
 
-    /** @scenario "whoami --json prints one secret-free JSON object and exits 0" */
+    /** @scenario "whoami -o json prints one secret-free JSON object and exits 0" */
     it("contains none of the forbidden secret keys at any depth", async () => {
-      await whoamiCommand({ json: true });
+      await runWhoami(["-o", "json"]);
 
-      const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
+      const doc = JSON.parse(stdout[0]!);
       const { keys } = collectKeysAndStrings(doc);
       for (const forbidden of FORBIDDEN_KEYS) {
         expect(keys).not.toContain(forbidden);
       }
     });
 
-    /** @scenario "whoami --json prints one secret-free JSON object and exits 0" */
+    /** @scenario "whoami -o json prints one secret-free JSON object and exits 0" */
     it("contains no string value starting with a secret prefix", async () => {
-      await whoamiCommand({ json: true });
+      await runWhoami(["-o", "json"]);
 
-      const doc = JSON.parse(consoleLogSpy.mock.calls[0]?.[0] as string);
+      const doc = JSON.parse(stdout[0]!);
       const { strings } = collectKeysAndStrings(doc);
       for (const value of strings) {
         for (const prefix of SECRET_PREFIXES) {
@@ -179,50 +213,82 @@ describe("given a config with every secret-shaped field populated", () => {
       }
     });
 
-    /** @scenario "whoami --json prints one secret-free JSON object and exits 0" */
+    /** @scenario "whoami -o json prints one secret-free JSON object and exits 0" */
     it("exits 0", async () => {
-      await whoamiCommand({ json: true });
+      await runWhoami(["-o", "json"]);
 
-      expect(exitSpy).not.toHaveBeenCalled();
+      expect(exited).toEqual([]);
     });
   });
 
-  describe("when the user is not logged in and runs whoami --json", () => {
-    beforeEach(() => {
-      loadConfig.mockReturnValue({});
-    });
-
-    /** @scenario "whoami --json when logged out fails on stderr with nothing on stdout" */
-    it("exits 1", async () => {
-      await expect(whoamiCommand({ json: true })).rejects.toMatchObject({ code: 1 });
-    });
-
-    /** @scenario "whoami --json when logged out fails on stderr with nothing on stdout" */
-    it("prints the existing Not logged in message on stderr", async () => {
-      await expect(whoamiCommand({ json: true })).rejects.toThrow(ProcessExitError);
-
-      const errOut = consoleErrorSpy.mock.calls.flat().join("\n");
-      expect(errOut).toContain("Not logged in");
-    });
-
-    /** @scenario "whoami --json when logged out fails on stderr with nothing on stdout" */
-    it("prints nothing on stdout", async () => {
-      await expect(whoamiCommand({ json: true })).rejects.toThrow(ProcessExitError);
-
-      expect(consoleLogSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the user is logged in and runs whoami without --json", () => {
+  describe("when the user is logged in and asks for other machine formats", () => {
     beforeEach(() => {
       loadConfig.mockReturnValue(LOGGED_IN_CONFIG_WITH_SECRETS);
     });
 
-    /** @scenario "whoami without --json keeps its existing human-readable output" */
-    it("prints the existing human-readable lines unchanged", async () => {
-      await whoamiCommand();
+    // The port refuses nothing now that whoami is output-aware: -o yaml and
+    // --jq both project from the same `data`, no "does not emit structured
+    // output" refusal.
+    it("accepts -o yaml and projects the same data", async () => {
+      await runWhoami(["-o", "yaml"]);
 
-      const out = consoleLogSpy.mock.calls.flat().join("\n");
+      const out = stdout.join("\n");
+      expect(out).toContain("org_1");
+      expect(out).not.toMatch(/does not emit structured output/i);
+      expect(exited).toEqual([]);
+    });
+
+    it("accepts a --jq dot-path expression", async () => {
+      await runWhoami(["--jq", ".organization.id"]);
+
+      expect(stdout.join("\n")).toContain("org_1");
+      expect(exited).toEqual([]);
+    });
+  });
+
+  describe("when the user is not logged in and runs whoami -o json", () => {
+    beforeEach(() => {
+      loadConfig.mockReturnValue({});
+    });
+
+    /** @scenario "whoami -o json when logged out emits a structured error and exits 1" */
+    it("prints a structured error document on stdout, not chalk prose", async () => {
+      await runWhoami(["-o", "json"]);
+
+      expect(stdout).toHaveLength(1);
+      const document = JSON.parse(stdout[0]!) as {
+        ok: boolean;
+        error: { message: string };
+      };
+      expect(document.ok).toBe(false);
+      expect(document.error.message).toContain("Not logged in");
+    });
+
+    /** @scenario "whoami -o json when logged out emits a structured error and exits 1" */
+    it("prints the existing Not logged in message on stderr", async () => {
+      await runWhoami(["-o", "json"]);
+
+      expect(stderr.join("\n")).toContain("Not logged in");
+    });
+
+    /** @scenario "whoami -o json when logged out emits a structured error and exits 1" */
+    it("exits 1", async () => {
+      await runWhoami(["-o", "json"]);
+
+      expect(exited).toContain(1);
+    });
+  });
+
+  describe("when the user is logged in and runs whoami without a format flag", () => {
+    beforeEach(() => {
+      loadConfig.mockReturnValue(LOGGED_IN_CONFIG_WITH_SECRETS);
+    });
+
+    /** @scenario "whoami without a format flag keeps its existing human-readable output" */
+    it("prints the existing human-readable lines unchanged", async () => {
+      await runWhoami([]);
+
+      const out = stdout.join("\n");
       expect(out).toContain("User:         dev@acme.test");
       expect(out).toContain("Name:         Dev User");
       expect(out).toContain("Organization: Acme");
@@ -232,11 +298,11 @@ describe("given a config with every secret-shaped field populated", () => {
       expect(out).toContain("Dashboard:    https://app.langwatch.ai");
     });
 
-    /** @scenario "whoami without --json keeps its existing human-readable output" */
+    /** @scenario "whoami without a format flag keeps its existing human-readable output" */
     it("exits 0", async () => {
-      await whoamiCommand();
+      await runWhoami([]);
 
-      expect(exitSpy).not.toHaveBeenCalled();
+      expect(exited).toEqual([]);
     });
   });
 });

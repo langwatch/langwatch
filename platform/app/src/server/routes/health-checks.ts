@@ -24,6 +24,8 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { refusalForUnresolvedProject } from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { authorizeLangyApiKey } from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
@@ -41,6 +43,26 @@ const sleep = (ms: number): Promise<void> =>
 
 // ── shared auth helper ───────────────────────────────────────────────
 
+const tokenResolver = TokenResolver.create(prisma);
+
+/**
+ * Resolves the project credential behind a health probe, or the refusal body to
+ * answer with.
+ *
+ * Routed through {@link TokenResolver.resolveProject} rather than a bespoke
+ * `prisma.project.findUnique({ where: { apiKey } })`, so an organization key
+ * that verifies but names no single project is refused with the same
+ * self-describing `project_scope_required` body the query door and the shared
+ * project-auth middleware answer with — built from
+ * {@link refusalForUnresolvedProject}, the one source they all share, never a
+ * second copy. Legacy project keys still resolve exactly as before (the
+ * resolver's legacy path is an exact `Project.apiKey` match), and an unknown or
+ * revoked key keeps the existing vague refusal. `authToken` is the raw token the
+ * caller sent, which the probes forward to their downstream canary requests.
+ *
+ * Returns either a refusal carrying the `status` and JSON `body` to answer with,
+ * or the resolved project plus that raw token.
+ */
 async function authenticateProject(c: {
   req: { header: (name: string) => string | undefined };
 }) {
@@ -52,22 +74,38 @@ async function authenticateProject(c: {
 
   if (!authToken) {
     return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
       status: 401 as const,
+      body: {
+        message:
+          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+      } as Record<string, unknown>,
     };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
+  const resolution = await tokenResolver.resolveProject({
+    token: authToken,
+    projectId: c.req.header("x-project-id") ?? null,
   });
 
-  if (!project) {
-    return { error: "Invalid auth token.", status: 401 as const };
+  if (!resolution.ok) {
+    if (resolution.reason === "project_scope_required") {
+      const refusal = refusalForUnresolvedProject("project_scope_required");
+      return {
+        status: 401 as const,
+        body: {
+          code: refusal.code,
+          message: refusal.message,
+          ...(refusal.meta ? { meta: refusal.meta } : {}),
+        } as Record<string, unknown>,
+      };
+    }
+    return {
+      status: 401 as const,
+      body: { message: "Invalid auth token." } as Record<string, unknown>,
+    };
   }
 
-  return { project, authToken };
+  return { project: resolution.resolved.project, authToken };
 }
 
 // ── GET /collector ───────────────────────────────────────────────────
@@ -76,8 +114,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/collector", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { authToken } = auth;
 
@@ -176,8 +214,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/evaluations", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { authToken } = auth;
 
@@ -234,8 +272,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/processor", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { authToken } = auth;
 
@@ -441,8 +479,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/triggers", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project } = auth;
 
@@ -487,8 +525,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/workflows", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project, authToken } = auth;
 
@@ -614,8 +652,8 @@ secured
     c.header("Cache-Control", "no-store");
 
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project } = auth;
 

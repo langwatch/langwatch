@@ -353,15 +353,12 @@ function report({
   code,
   message,
   node,
-  allowedFunctions,
 }: {
   ctx: WalkContext;
   frame: Frame;
   code: LangWatchQLViolationCode;
   message: string;
   node?: SqlAstNode;
-  /** Only `FUNCTION_NOT_ALLOWED` sets it — see {@link reportRefusedFunction}. */
-  allowedFunctions?: readonly string[];
 }): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
   const at = node ? positionOf(node) : undefined;
@@ -370,7 +367,12 @@ function report({
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
     ...(at ? { at } : {}),
-    ...(allowedFunctions ? { allowedFunctions } : {}),
+    // The allowlist rides on exactly the one code that means "you called
+    // something off it", derived from the code here rather than passed in — so
+    // it cannot be attached to another code, nor forgotten on this one.
+    ...(code === "FUNCTION_NOT_ALLOWED"
+      ? { allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES }
+      : {}),
   });
 }
 
@@ -959,9 +961,9 @@ function reportRefusedFunction({
     code: "FUNCTION_NOT_ALLOWED",
     message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using one of the supported functions, listed under \`functions\` on GET /api/v1/query/schema and carried on this violation as \`allowedFunctions\`.`,
     node,
-    // The complete list travels with the refusal so the caller — usually an
-    // agent with no UI — recovers without a second round trip to the schema.
-    allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES,
+    // The complete list travels with the refusal — see {@link report}, which
+    // attaches it structurally to this code so the caller (usually an agent
+    // with no UI) recovers without a second round trip to the schema.
   });
 }
 

@@ -55,17 +55,13 @@ describe("the LangWatchQL function allowlist the validator enforces", () => {
 
     /** @scenario "A FUNCTION_NOT_ALLOWED violation carries the complete allowlist" */
     it("carries allowedFunctions as the complete, sorted, deduplicated allowlist", () => {
-      expect(
-        (violation as { allowedFunctions?: string[] }).allowedFunctions,
-      ).toEqual(LWQL_ALLOWED_FUNCTION_NAMES);
-      const asList = (violation as { allowedFunctions?: string[] })
-        .allowedFunctions!;
+      expect(violation.allowedFunctions).toEqual(LWQL_ALLOWED_FUNCTION_NAMES);
+      const asList = violation.allowedFunctions!;
       expect(new Set(asList).size).toBe(asList.length);
     });
 
     it("has allowedFunctions equal to the validator's own enforced set", () => {
-      const asList = (violation as { allowedFunctions?: string[] })
-        .allowedFunctions!;
+      const asList = violation.allowedFunctions!;
       for (const name of asList) {
         expect(isAllowedLangWatchQLFunction(name)).toBe(true);
       }

@@ -19,14 +19,19 @@ import type { HandledErrorShape } from "../readHandledError";
 
 describe("the application error code registry", () => {
   describe("given project_scope_required", () => {
+    /** @scenario project_scope_required is registered as an application error code with customer-facing copy */
     it("is listed in APP_ERROR_CODES", () => {
       expect(APP_ERROR_CODES).toContain("project_scope_required");
     });
 
+    /** @scenario project_scope_required is registered as an application error code with customer-facing copy */
     it("has a customer-facing presentation entry, not the degraded fallback", () => {
       const wire: HandledErrorShape = {
         code: "project_scope_required" as const,
-        meta: { required: "project_scope", accepted: ["X-Project-Id", "basic_auth_project_id"] },
+        meta: {
+          required: "project_scope",
+          accepted: ["X-Project-Id", "basic_auth_project_id"],
+        },
         httpStatus: 401,
         fault: "customer",
         tips: [],

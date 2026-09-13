@@ -93,12 +93,12 @@ Feature: CLI cross-project access with the user-scoped login key
       When the user runs `langwatch whoami`
       Then no permissions line is printed
 
-  Rule: whoami --json prints a secret-free machine-readable snapshot
+  Rule: whoami -o json prints a secret-free machine-readable snapshot
 
     @unit
-    Scenario: whoami --json prints one secret-free JSON object and exits 0
+    Scenario: whoami -o json prints one secret-free JSON object and exits 0
       Given the user is logged in
-      When the user runs `langwatch whoami --json`
+      When the user runs `langwatch whoami -o json`
       Then stdout is exactly one JSON object with user, organization,
         personal_project, cli_api_key_scope, gateway_url, and control_plane_url
       And a field present only when the config holds it is omitted otherwise
@@ -108,21 +108,21 @@ Feature: CLI cross-project access with the user-scoped login key
       And the command exits 0
 
     @unit
-    Scenario: whoami --json when logged out fails on stderr with nothing on stdout
+    Scenario: whoami -o json when logged out emits a structured error and exits 1
       Given the user is not logged in
-      When the user runs `langwatch whoami --json`
-      Then the command exits 1
+      When the user runs `langwatch whoami -o json`
+      Then a structured error document is printed on stdout, not chalk prose
       And the existing "Not logged in" message is printed on stderr
-      And nothing is printed on stdout
+      And the command exits 1
 
     @unit
-    Scenario: whoami without --json keeps its existing human-readable output
+    Scenario: whoami without a format flag keeps its existing human-readable output
       Given the user is logged in
       When the user runs `langwatch whoami`
       Then the existing human-readable lines are printed unchanged
       And the command exits 0
 
 # --- AC Coverage Map ---
-# AC12 "whoami --json secret-free shape, exit 0" → Scenario: whoami --json prints one secret-free JSON object and exits 0
-# AC13 "whoami --json when not logged in exits 1, stderr only" → Scenario: whoami --json when logged out fails on stderr with nothing on stdout
-# AC14 "whoami without --json unchanged, exits 0" → Scenario: whoami without --json keeps its existing human-readable output
+# AC12 "whoami -o json secret-free shape, exit 0" → Scenario: whoami -o json prints one secret-free JSON object and exits 0
+# AC13 "whoami -o json when not logged in exits 1, structured error on stdout" → Scenario: whoami -o json when logged out emits a structured error and exits 1
+# AC14 "whoami without a format flag unchanged, exits 0" → Scenario: whoami without a format flag keeps its existing human-readable output

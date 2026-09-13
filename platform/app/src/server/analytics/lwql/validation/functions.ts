@@ -488,8 +488,8 @@ const ALLOWED_FUNCTION_NAMES: ReadonlySet<string> = new Set(
  * {@link ALLOWED_FUNCTION_NAMES} reads, so the list a `FUNCTION_NOT_ALLOWED`
  * refusal and the schema endpoint publish can never drift from the set
  * actually enforced. Deduplicated case-insensitively (the first spelling seen
- * wins) and sorted case-insensitively with a stable, case-sensitive tiebreak.
- * Combinator forms (`countIf`) are admitted by {@link aggregateBaseOf} and are
+ * wins) and sorted case-insensitively. Combinator forms (`countIf`) are
+ * admitted by {@link aggregateBaseOf} and are
  * deliberately not enumerated here — this is the base allowlist a caller
  * writes against.
  */
@@ -502,10 +502,12 @@ export const LWQL_ALLOWED_FUNCTION_NAMES: readonly string[] = (() => {
     seenLowercased.add(lowercased);
     canonicalNames.push(name);
   }
-  return canonicalNames.sort((a, b) => {
-    const byLowercase = a.toLowerCase().localeCompare(b.toLowerCase());
-    return byLowercase !== 0 ? byLowercase : a.localeCompare(b);
-  });
+  // The dedup above is case-insensitive, so no two survivors share a
+  // lowercased spelling and the lowercased comparison is already total — a
+  // case-sensitive tiebreak could never run.
+  return canonicalNames.sort((a, b) =>
+    a.toLowerCase().localeCompare(b.toLowerCase()),
+  );
 })();
 
 /** The aggregates a combinator suffix may be appended to, lowercased. */

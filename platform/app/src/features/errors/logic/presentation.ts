@@ -1828,7 +1828,7 @@ const presentations = {
     // The key works — it just reaches more than one project and named none, so
     // the fix is to say which project, not to swap the key. Both ways to say it
     // are named because a caller with no UI needs the exact mechanism.
-    title: "This request did not say which project to query",
+    title: "This request did not say which project to use",
     describe: () =>
       "This organization key reaches several projects. Name the one you want with an X-Project-Id header, or send Basic auth as base64(projectId:token).",
   },

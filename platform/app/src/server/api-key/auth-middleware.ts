@@ -284,7 +284,7 @@ function refusalForUnresolvedProject(
   };
 }
 
-export { extractCredentials };
+export { extractCredentials, refusalForUnresolvedProject };
 
 /**
  * Variables set by the org-level auth middleware.
@@ -421,8 +421,12 @@ type AuthRefusal = {
    * the credential class a route needs against the one that arrived is the
    * difference between swapping a key and hunting a typo, and the scoping
    * mechanisms a `project_scope_required` refusal will accept.
+   *
+   * Narrowed to the two value shapes these fields actually carry — a single
+   * token, or a list of them — rather than `unknown`, so a refusal cannot
+   * smuggle an arbitrary object into a body a caller parses.
    */
-  meta?: Record<string, unknown>;
+  meta?: Record<string, string | readonly string[]>;
 };
 
 /**

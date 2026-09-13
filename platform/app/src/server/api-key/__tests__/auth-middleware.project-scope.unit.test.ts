@@ -22,8 +22,11 @@
  * AC5 ("every project-scoped REST app emits the same code") is proved by
  * mounting the middleware on a SECOND, independent app below — the query
  * door is not the only consumer of `createUnifiedAuthMiddleware`, and this
- * is what stands in for another one (e.g. the Langy health-check door in
- * `~/server/routes/misc.ts`, which installs the identical middleware).
+ * is what stands in for another one. The health-probe family in
+ * `~/server/routes/health-checks.ts` reaches the same refusal through the same
+ * `TokenResolver.resolveProject` from its `authenticateProject` helper (not the
+ * middleware); that door is proved in
+ * `~/server/routes/__tests__/health-checks.project-scope.unit.test.ts`.
  *
  * @see specs/analytics/lwql-query-door-self-describing.feature
  * @see ../auth-middleware.ts

@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "~/server/analytics/lwql";
 import { LWQL_ALLOWED_FUNCTION_NAMES } from "~/server/analytics/lwql/validation/functions";
 
 // src/app/api/query/__tests__ -> platform/app (5 levels) -> repo root (2 levels)
@@ -72,6 +73,27 @@ describe("docs/api-reference/query/overview.mdx", () => {
   describe("the Supported functions section", () => {
     const content = readDocs();
 
+    /**
+     * The backtick-delimited names on the section's BULLET lines only — never
+     * the intro paragraph, whose backticks name `functions`,
+     * `FUNCTION_NOT_ALLOWED` and the schema endpoint. Parsing the whole file
+     * with `toContain` would pass vacuously for short names like `and`, `or`,
+     * `in` and `if`, which appear in ordinary prose; a set built from the list
+     * itself asserts set-equality — no extras, none missing.
+     */
+    const documentedFunctionNames = (): Set<string> => {
+      const afterHeading = content.split(/^## Supported functions$/m)[1] ?? "";
+      const section = afterHeading.split(/^## /m)[0] ?? "";
+      const names = new Set<string>();
+      for (const line of section.split("\n")) {
+        if (!line.trimStart().startsWith("-")) continue;
+        for (const match of line.matchAll(/`([^`]+)`/g)) {
+          names.add(match[1]!);
+        }
+      }
+      return names;
+    };
+
     /** @scenario "The docs list every allowed function name, kept equal to the validator's allowlist" */
     it("states the list is served by GET /api/v1/query/schema", () => {
       expect(content).toMatch(/Supported functions/i);
@@ -79,10 +101,10 @@ describe("docs/api-reference/query/overview.mdx", () => {
     });
 
     /** @scenario "The docs list every allowed function name, kept equal to the validator's allowlist" */
-    it("lists every function name the validator allows", () => {
-      for (const name of LWQL_ALLOWED_FUNCTION_NAMES) {
-        expect(content, `missing function "${name}"`).toContain(name);
-      }
+    it("lists exactly the names the validator allows — no extras, none missing", () => {
+      expect(documentedFunctionNames()).toEqual(
+        new Set(LWQL_ALLOWED_FUNCTION_NAMES),
+      );
     });
   });
 
@@ -90,12 +112,16 @@ describe("docs/api-reference/query/overview.mdx", () => {
     const content = readDocs();
 
     /** @scenario "The query docs and OpenAPI description state the response ceilings" */
-    it("states the 10,000 row cap", () => {
-      expect(content).toMatch(/10,?000\s*rows?/i);
+    it("states the row cap derived from DEFAULT_LWQL_RESULT_LIMITS", () => {
+      expect(content).toContain(
+        `${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows`,
+      );
     });
 
-    it("states the 8,000,000 byte cap", () => {
-      expect(content).toMatch(/8,?000,?000\s*bytes?/i);
+    it("states the byte cap derived from DEFAULT_LWQL_RESULT_LIMITS", () => {
+      expect(content).toContain(
+        `${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes`,
+      );
     });
 
     it("describes the top-level truncated field", () => {

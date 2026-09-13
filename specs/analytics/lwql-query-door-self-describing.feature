@@ -78,9 +78,15 @@ Feature: LangWatchQL query door is self-describing and scoped safely for coding-
     And it has a customer-facing presentation entry
     And the codes unit test and pnpm typecheck both pass
 
+  # The shared project-auth middleware and the query door emit project_scope_required,
+  # and so does the health-probe family (collector, processor, triggers, workflows,
+  # scenarios), whose shared authenticateProject helper now resolves through the same
+  # TokenResolver.resolveProject. Routes still on the deprecated resolve() — including
+  # the Langy turn and health-check doors via authorizeLangyApiKey — do not yet emit it
+  # and are tracked in https://github.com/langwatch/langwatch/issues/8114.
   @integration
   Scenario: Every project-scoped REST app emits project_scope_required for the same condition
-    Given a project-scoped REST app other than the query door, such as the Langy health-check door
+    Given a project-scoped REST app other than the query door, such as a health-probe endpoint sharing the project-auth resolver
     When it is called by a key that verifies but binds to no single project, with no scoping hint
     Then it answers 401 with code "project_scope_required", matching the query door's behavior
 
