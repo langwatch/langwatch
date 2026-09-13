@@ -9,7 +9,7 @@ export interface TestLogLine {
 
 export interface TestLogLines extends Array<TestLogLine> {
   /** The first line at `levelName` whose `msg` contains `msgIncludes`. */
-  find(levelName: string, msgIncludes: string): TestLogLine | undefined;
+  findLine(levelName: string, msgIncludes: string): TestLogLine | undefined;
 }
 
 const LEVEL_NUMBERS: Record<string, number> = {
@@ -37,7 +37,7 @@ export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } 
     }) as TestLogLine | undefined;
   };
   const lines = Object.assign(backing, {
-    find: findByLevelAndMessage,
+    findLine: findByLevelAndMessage,
   }) as unknown as TestLogLines;
 
   const destination = {

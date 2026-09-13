@@ -11,7 +11,7 @@ import {
 } from "typescript/unstable/ast";
 
 import { markColourSites } from "./markColourScan.ts";
-import { parseSourceTexts } from "./tsAst";
+import { parseSourceTexts } from "./ts-ast.ts";
 
 /**
  * Finding pressable controls that are FILLED with the brand accent.

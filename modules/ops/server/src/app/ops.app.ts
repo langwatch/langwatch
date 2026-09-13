@@ -75,7 +75,6 @@ import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
-import type { OpsEventingIntrospection } from "./ops.app.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
