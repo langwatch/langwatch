@@ -52,7 +52,7 @@ Only Node.js required. For production, see [Self-hosting LangWatch](https://lang
 
 1. Create [simulation tests](https://langwatch.ai/docs/agent-testing/overview) for evaluating or benchmarking your agents and [voice agents](https://langwatch.ai/docs/agent-testing/voice-agents)
 2. Measure the [cost per PR](https://langwatch.ai/docs/coding-agents/pull-requests) and [optimize your Claude Code usage](https://langwatch.ai/docs/coding-agents/find-your-context-sweet-spot) to get your weekly limits to last twice as long
-3. Create [virtual keys with budgets](https://langwatch.ai/docs/ai-gateway/virtual-keys) to give your customers or employees
+3. Create [virtual keys with budgets](https://langwatch.ai/docs/ai-gateway/virtual-keys) to hand out to your customers or employees
 4. Find out that 40% of the [Copilot Studio subscriptions](https://langwatch.ai/docs/ai-governance/overview) are not actually being used at your company and cancel them
 
 ## Integrations
