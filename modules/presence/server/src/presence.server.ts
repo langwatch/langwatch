@@ -6,5 +6,4 @@ import { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 export const presenceServer = defineServerModule("presence")
   .withRepositories(presenceRepositories)
   .withApp(PresenceApp)
-  .withTransports(presenceTrpcTransport)
-  .build();
+  .withTransports(presenceTrpcTransport);

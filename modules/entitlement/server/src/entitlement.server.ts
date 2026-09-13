@@ -10,5 +10,4 @@ export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
 export const entitlementServer = defineServerModule("entitlement")
   .withRepositories(entitlementRepositories)
   .withApp(EntitlementApp)
-  .withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport)
-  .build();
+  .withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport);

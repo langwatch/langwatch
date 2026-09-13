@@ -31,5 +31,4 @@ export const gatewayServer = defineServerModule("gateway")
     bindRestMiddleware(elevenLabsSignature, (context) => ({
       signature: context.req.header("elevenlabs-signature"),
     })),
-  ])
-  .build();
+  ]);

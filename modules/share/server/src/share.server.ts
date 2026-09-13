@@ -7,5 +7,4 @@ import { shareTrpcTransport } from "./transport/share.trpc.ts";
 export const shareServer = defineServerModule("share")
   .withRepositories(shareRepositories)
   .withApp(ShareApp)
-  .withTransports(shareTrpcTransport, pinnedTraceTrpcTransport)
-  .build();
+  .withTransports(shareTrpcTransport, pinnedTraceTrpcTransport);

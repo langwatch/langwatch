@@ -10,5 +10,4 @@ export const platformHealthServer = defineServerModule("platform-health")
   .withTransports(platformHealthRest)
   // The monitoring key is checked by the application against its own config,
   // so the header reaches it whole rather than through a door.
-  .withTransportFacts(() => [bindRestHeader(platformHealthAuthorization, "authorization")])
-  .build();
+  .withTransportFacts(() => [bindRestHeader(platformHealthAuthorization, "authorization")]);

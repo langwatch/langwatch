@@ -55,5 +55,4 @@ export const analyticsServer = defineServerModule("analytics")
         projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
       }),
     ),
-  ])
-  .build();
+  ]);

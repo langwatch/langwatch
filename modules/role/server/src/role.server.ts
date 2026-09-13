@@ -14,5 +14,4 @@ export const roleServer = defineServerModule("role")
     bindRestMiddleware(roleRestFacts, (context) => ({
       organizationId: organizationCredentialOfRequest(context.req.raw).organizationId,
     })),
-  ])
-  .build();
+  ]);

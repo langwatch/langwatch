@@ -6,5 +6,4 @@ import { topicTrpcTransport } from "./transport/topic.trpc.ts";
 export const topicServer = defineServerModule("topic")
   .withRepositories(topicRepositories)
   .withApp(TopicApp)
-  .withTransports(topicTrpcTransport)
-  .build();
+  .withTransports(topicTrpcTransport);

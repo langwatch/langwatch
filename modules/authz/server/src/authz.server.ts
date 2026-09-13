@@ -26,5 +26,4 @@ export const authzServer = defineServerModule("authz")
       };
     }),
   ])
-  .withEventing(authzEventing)
-  .build();
+  .withEventing(authzEventing);

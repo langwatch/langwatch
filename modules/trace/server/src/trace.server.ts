@@ -39,5 +39,4 @@ export const traceServer = defineServerModule("trace")
         userId: credential.type === "apiKey" ? credential.userId : null,
       };
     }),
-  ])
-  .build();
+  ]);

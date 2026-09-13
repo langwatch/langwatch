@@ -19,5 +19,4 @@ export const dashboardServer = defineServerModule("dashboard")
     graphTrpcTransport,
     savedViewTrpcTransport,
     savedWorkbenchChartTrpcTransport,
-  )
-  .build();
+  );

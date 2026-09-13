@@ -31,5 +31,4 @@ export const scimServer = defineServerModule("scim")
 
       return { actorId: credential.userId ?? `apikey:${credential.apiKeyId}` };
     }),
-  ])
-  .build();
+  ]);

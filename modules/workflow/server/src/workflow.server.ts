@@ -51,5 +51,4 @@ export const workflowServer = defineServerModule("workflow")
         permission: "evaluations:view",
       });
     }),
-  ])
-  .build();
+  ]);

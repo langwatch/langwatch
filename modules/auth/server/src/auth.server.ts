@@ -12,5 +12,4 @@ import { frontDoorTrpcTransport } from "./transport/front-door.trpc.ts";
 export const authServer = defineServerModule("auth")
   .withRepositories(authRepositories)
   .withApp(AuthApp)
-  .withTransports(frontDoorTrpcTransport)
-  .build();
+  .withTransports(frontDoorTrpcTransport);

@@ -7,5 +7,4 @@ import { secretTrpcTransport } from "./transport/secret.trpc.ts";
 export const secretServer = defineServerModule("secret")
   .withRepositories(secretRepositories)
   .withApp(SecretApp)
-  .withTransports(secretRest, secretsAliasRest, secretTrpcTransport)
-  .build();
+  .withTransports(secretRest, secretsAliasRest, secretTrpcTransport);

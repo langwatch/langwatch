@@ -7,5 +7,4 @@ export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.
 
 export const licensingServer = defineServerModule("licensing")
   .withApp(LicensingApp)
-  .withTransports(licenseTrpcTransport, licenseEnforcementTrpcTransport)
-  .build();
+  .withTransports(licenseTrpcTransport, licenseEnforcementTrpcTransport);

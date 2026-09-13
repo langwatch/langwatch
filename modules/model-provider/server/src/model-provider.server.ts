@@ -50,5 +50,4 @@ export const modelProviderServer = defineServerModule("model-provider")
     bindRestHeader(playgroundRestModel, "x-model"),
     bindRestHeader(playgroundRestProject, "x-project-id"),
     bindRestHeader(playgroundRestSystemPrompt, "x-system-prompt"),
-  ])
-  .build();
+  ]);

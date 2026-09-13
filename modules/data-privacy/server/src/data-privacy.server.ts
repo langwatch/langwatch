@@ -6,5 +6,4 @@ import { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
 export const dataPrivacyServer = defineServerModule("data-privacy")
   .withRepositories(dataPrivacyRepositories)
   .withApp(DataPrivacyApp)
-  .withTransports(dataPrivacyTrpcTransport)
-  .build();
+  .withTransports(dataPrivacyTrpcTransport);

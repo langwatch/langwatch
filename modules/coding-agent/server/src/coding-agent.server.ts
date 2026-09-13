@@ -49,5 +49,4 @@ export const codingAgentServer = defineServerModule("coding-agent")
         actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
       };
     }),
-  ])
-  .build();
+  ]);

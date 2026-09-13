@@ -10,5 +10,4 @@ export type { EvaluationInfrastructure } from "./app/evaluation.app.ts";
 export const evaluationServer = defineServerModule("evaluation")
   .withRepositories(evaluationRepositories)
   .withApp(EvaluationApp)
-  .withTransports(evaluationTrpcTransport, evaluationsLegacyRest)
-  .build();
+  .withTransports(evaluationTrpcTransport, evaluationsLegacyRest);

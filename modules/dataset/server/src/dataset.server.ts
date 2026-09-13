@@ -14,5 +14,4 @@ export const datasetServer = defineServerModule("dataset")
     datasetTrpcTransport,
     datasetRecordTrpcTransport,
     batchRecordTrpcTransport,
-  )
-  .build();
+  );

@@ -7,5 +7,4 @@ import { evaluatorTrpcTransport } from "./transport/evaluator.trpc.ts";
 export const evaluatorServer = defineServerModule("evaluator")
   .withRepositories(evaluatorRepositories)
   .withApp(EvaluatorApp)
-  .withTransports(createEvaluatorRest(), evaluatorTrpcTransport)
-  .build();
+  .withTransports(createEvaluatorRest(), evaluatorTrpcTransport);

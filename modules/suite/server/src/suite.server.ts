@@ -22,5 +22,4 @@ export const suiteServer = defineServerModule("suite")
   // Which surface started a run, off `X-LangWatch-Surface` - all three suite
   // families record it on the runs they queue, and nothing a process
   // collaborator need answer.
-  .withTransportFacts(() => [bindRestHeader(suiteSurfaceFact, "x-langwatch-surface")])
-  .build();
+  .withTransportFacts(() => [bindRestHeader(suiteSurfaceFact, "x-langwatch-surface")]);

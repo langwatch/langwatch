@@ -52,5 +52,4 @@ export const organizationServer = defineServerModule("organization")
       bindRestMiddleware(groupsRestEnterpriseGate, requireEnterprise),
       bindRestMiddleware(organizationManagementEnterpriseGate, requireEnterprise),
     ];
-  })
-  .build();
+  });

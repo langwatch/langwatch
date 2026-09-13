@@ -36,8 +36,7 @@ export const opsServer = defineServerModule("ops")
     bindRestMiddleware(bugReportCredential, (context) =>
       apiKeyRequestCredentialOf(context.req.raw),
     ),
-  ])
-  .build();
+  ]);
 
 /** One request's presented project credential, unverified, or none at all. */
 function apiKeyRequestCredentialOf(

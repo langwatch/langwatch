@@ -76,5 +76,4 @@ export const experimentServer = defineServerModule("experiment")
     bindRestMiddleware(experimentWorkbenchCaller, (context) => ({
       userId: browserCallerOfRequest(context.req.raw)?.userId ?? null,
     })),
-  ])
-  .build();
+  ]);

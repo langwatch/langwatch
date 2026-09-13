@@ -18,5 +18,4 @@ export const scenarioServer = defineServerModule("scenario")
   .withTransports(createScenarioRest(), createSimulationRunsRest(), scenarioTrpcTransport)
   // Which surface a write declares itself through, off the caller's own
   // `X-LangWatch-Surface` header - nothing a process collaborator answers.
-  .withTransportFacts(() => [bindRestHeader(scenarioRestSurface, "x-langwatch-surface")])
-  .build();
+  .withTransportFacts(() => [bindRestHeader(scenarioRestSurface, "x-langwatch-surface")]);

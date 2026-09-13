@@ -10,5 +10,4 @@ export type { WebhookAppDependencies, WebhookTestDispatch } from "./app/webhook.
 export const webhookServer = defineServerModule("webhook")
   .withRepositories(webhookRepositories)
   .withApp(WebhookApp)
-  .withTransports(webhookEndpointTrpcTransport, webhookRest)
-  .build();
+  .withTransports(webhookEndpointTrpcTransport, webhookRest);

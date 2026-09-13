@@ -6,5 +6,4 @@ import { ssoConnectionTrpcTransport } from "./transport/sso-connection.trpc.ts";
 
 export const ssoServer = defineServerModule("sso")
   .withApp(SsoApp)
-  .withTransports(ssoConnectionTrpcTransport)
-  .build();
+  .withTransports(ssoConnectionTrpcTransport);

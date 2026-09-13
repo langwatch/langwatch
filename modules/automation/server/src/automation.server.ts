@@ -19,5 +19,4 @@ export const automationServer = defineServerModule("automation")
     emailSuppressionTrpcTransport,
     slackAutomationRest,
     unsubscribeRest,
-  )
-  .build();
+  );

@@ -49,5 +49,4 @@ export const userServer = defineServerModule("user")
         organizationId: credential.organizationId,
       };
     }),
-  ])
-  .build();
+  ]);

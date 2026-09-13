@@ -9,5 +9,4 @@ export type { GithubInfrastructure } from "./app/github.app.ts";
 export const githubServer = defineServerModule("github")
   .withRepositories(githubRepositories)
   .withApp(GithubApp)
-  .withTransports(githubInstallRest, githubTrpcTransport)
-  .build();
+  .withTransports(githubInstallRest, githubTrpcTransport);

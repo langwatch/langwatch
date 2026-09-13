@@ -6,5 +6,4 @@ import { dataRetentionTrpcTransport } from "./transport/data-retention.trpc.ts";
 export const dataRetentionServer = defineServerModule("data-retention")
   .withRepositories(dataRetentionRepositories)
   .withApp(DataRetentionApp)
-  .withTransports(dataRetentionTrpcTransport)
-  .build();
+  .withTransports(dataRetentionTrpcTransport);

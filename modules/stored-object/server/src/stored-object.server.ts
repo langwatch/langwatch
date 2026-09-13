@@ -8,5 +8,4 @@ import { storedObjectTrpcTransport } from "#transport/stored-object.trpc";
 export const storedObjectServer = defineServerModule("stored-object")
   .withRepositories(storedObjectRepositories)
   .withApp(StoredObjectApp)
-  .withTransports(storedObjectRest, storedObjectFileRest, storedObjectTrpcTransport)
-  .build();
+  .withTransports(storedObjectRest, storedObjectFileRest, storedObjectTrpcTransport);

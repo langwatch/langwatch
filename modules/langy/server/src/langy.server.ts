@@ -68,5 +68,4 @@ export const langyServer = defineServerModule("langy")
       // is mounted over a buffer that does not exist.
       bindRestMiddleware(langyRelayLiveBuffer, () => true),
     ];
-  })
-  .build();
+  });

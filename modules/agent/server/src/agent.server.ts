@@ -28,5 +28,4 @@ export const agentServer = defineServerModule("agent")
       projectId: context.req.header("x-project-id"),
       instanceToken: context.req.header("x-agent-instance-token"),
     })),
-  ])
-  .build();
+  ]);

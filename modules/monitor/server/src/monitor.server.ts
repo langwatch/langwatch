@@ -7,5 +7,4 @@ import { monitorTrpcTransport } from "./transport/monitor.trpc.ts";
 export const monitorServer = defineServerModule("monitor")
   .withRepositories(monitorRepositories)
   .withApp(MonitorApp)
-  .withTransports(createMonitorsRest(), monitorTrpcTransport)
-  .build();
+  .withTransports(createMonitorsRest(), monitorTrpcTransport);

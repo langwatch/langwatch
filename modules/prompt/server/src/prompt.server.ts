@@ -42,5 +42,4 @@ export const promptServer = defineServerModule("prompt")
             organizationId: credential.organizationId,
           };
     }),
-  ])
-  .build();
+  ]);

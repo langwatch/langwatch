@@ -22,5 +22,4 @@ export const projectServer = defineServerModule("project")
 
       return { apiKeyId: credential.apiKeyId, userId: credential.userId };
     }),
-  ])
-  .build();
+  ]);
