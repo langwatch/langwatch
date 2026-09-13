@@ -17,11 +17,8 @@ import {
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
-import { AuthzApi } from "@langwatch/authz-contract";
 import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/composition/evaluation-cost";
 import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import { monitorServer } from "@langwatch/monitor-server";
-import { createApp, membersFrom, type ResourceOwnership } from "@langwatch/runtime-composition";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { EvaluationTraceReadInput, Span, TraceApi } from "@langwatch/trace-contract";
 import { TraceReadableSpanService } from "@langwatch/trace-server";
@@ -101,46 +98,6 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
       telemetry,
     },
   };
-}
-
-/**
- * The monitor application, installed for the ONE read Evaluation's execution
- * makes: the monitor a queued command names.
- *
- * The worker composes no evaluator directory, no seven-day trend and no
- * replication, so the operations that read them refuse by name. `findById`,
- * which is the only one this process calls, answers from the monitor rows.
- */
-export async function createWorkerMonitorApp(options: {
-  database: PrismaClient;
-  permissions: AuthzApi;
-  resources: ResourceOwnership;
-}): Promise<MonitorApi> {
-  // MonitorApp is not yet converted (its App still declares a bespoke
-  // `FeatureSetup` Members bag — `evaluators`, `performance`, `replication`,
-  // `generateId` — rather than `static readonly reads`), and the v2 builder
-  // has no seam left to hand a per-module infrastructure bag through:
-  // `withModules` takes only the module list, so this does not type-check
-  // (TS2322, naming exactly those four members as missing) until Monitor is
-  // converted. The Uncomposed{Evaluators,Performance,Replication} stand-ins
-  // this used to hand in through `.withModule(monitorServer, {
-  // infrastructure: {...} })` have no home in this shape and are deleted.
-  // Unlike a converted module's `reads`, this is NOT an eager, named boot
-  // refusal: MonitorApp constructs with `evaluators`/`performance`/
-  // `replication`/`generateId` silently `undefined`, and only the first call
-  // that actually reaches one of them fails. That gap is the
-  // module-conversion queue's business, not this composition's.
-  const runtime = await createApp({
-    role: "worker",
-    members: membersFrom({ prisma: options.database }),
-  })
-    .withProvided(AuthzApi, options.permissions)
-    .withModules([monitorServer])
-    .boot();
-
-  options.resources.own("worker monitor application", () => runtime.stop());
-
-  return runtime.module(monitorServer).provided;
 }
 
 /** A monitor read this process makes, over the one monitor application. */

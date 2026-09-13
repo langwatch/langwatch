@@ -209,7 +209,6 @@ import {
   createWorkerDatasetNormalization,
 } from "./worker-dataset-normalization.composition.ts";
 import { MonitorApi } from "@langwatch/monitor-contract";
-import { createWorkerMonitorApp } from "./worker-evaluation-execution.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { installWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
@@ -264,7 +263,6 @@ import {
 } from "./worker-scenario-execution.composition.ts";
 import { createWorkerAgentApps } from "./worker-agent-apps.composition.ts";
 import { createWorkerEvaluationWorkflows } from "./worker-evaluation-app.composition.ts";
-import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
 import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReport,
@@ -1066,20 +1064,6 @@ export class WorkerProductionComposition {
           })
         : undefined;
     const automationDatasets = traceRecords ? datasets : undefined;
-    // The ONE monitor application this process installs, for the monitor a
-    // queued evaluation command names.
-    const monitors =
-      options.connection && options.resources && tenancy
-        ? await createWorkerMonitorApp({
-            database: options.connection.client,
-            permissions: tenancy.authorization,
-            resources: options.resources,
-          })
-        : undefined;
-    if (monitors) {
-      monitorApis.bind(MonitorApi, monitors);
-      monitorApis.ready();
-    }
     // Boot connects annotation dispatch before settlement consumes jobs.
     const annotationQueueDispatch = new Deferred<
       (input: QueueAnnotationTracesInput) => Promise<void>
@@ -1260,20 +1244,6 @@ export class WorkerProductionComposition {
             payloadStaging: objectStorage.payloadStaging,
           })
         : void 0;
-    const evaluationEvaluators =
-      foundation && options.connection && modelProviders && options.resources && evaluationWorkflows
-        ? await installWorkerEvaluator({
-            database: options.connection.client,
-            permissions: foundation.tenancy.authorization,
-            auditLog: foundation.auditLog,
-            users: foundation.users,
-            workflows: evaluationWorkflows.workflows,
-            nlpRuntime: evaluationWorkflows.nlpRuntime,
-            modelProviders: modelProviders.modelProviders,
-            resources: options.resources,
-            name: "worker evaluation evaluator application",
-          })
-        : void 0;
     const observabilityApps =
       foundation &&
       options.connection &&
@@ -1283,9 +1253,7 @@ export class WorkerProductionComposition {
       options.resources &&
       evaluationAnalytics &&
       datasets &&
-      monitors &&
-      evaluationWorkflows &&
-      evaluationEvaluators
+      evaluationWorkflows
         ? await createWorkerObservabilityApps({
             connection: options.connection,
             config: options.config,
@@ -1315,9 +1283,7 @@ export class WorkerProductionComposition {
             evaluation: {
               database: options.connection.client,
               workflows: evaluationWorkflows,
-              evaluators: evaluationEvaluators,
               datasets,
-              monitors,
               modelProviders: modelProviders.modelProviders,
               models: modelProviders,
               secretDecryptor: resolveWorkerStoredSecretCipher(options.config),
@@ -1343,6 +1309,8 @@ export class WorkerProductionComposition {
       agentTracePeers.ready();
       dataPrivacyApis.bind(DataPrivacyApi, observabilityApps.dataPrivacy);
       dataPrivacyApis.ready();
+      monitorApis.bind(MonitorApi, observabilityApps.monitors);
+      monitorApis.ready();
       annotationQueueDispatch.resolve(async (input) => {
         await observabilityApps.annotations.queueTraces(input);
       });
