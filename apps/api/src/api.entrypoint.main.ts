@@ -6,6 +6,7 @@ import {
   ApiRuntimeBootstrap,
   ApiRuntimeComposition,
   ApiRuntimeProcess,
+  type ApiRuntimeBootstrapOptions,
   type ApiRuntimeCompositionOptions,
 } from "./api.main.ts";
 import { bootApiProcess } from "./app/api-production.composition.ts";
@@ -78,4 +79,51 @@ export async function bootApi(): Promise<void> {
     createLogger("langwatch:api").error({ error }, "api process failed to boot");
     process.exitCode = 1;
   }
+}
+
+/**
+ * The process surface an EMBEDDED api needs: its environment, and nothing else.
+ *
+ * The standalone process reads `process.env` and owns its own signals. A
+ * launcher hosting this application beside another (`tools/dev-runtime`) owns
+ * both — the first of two applications to hear a SIGTERM would otherwise end
+ * the process while the other was still draining — so the embedded seam is
+ * narrower than the executable's used to be: environment in, runtime out.
+ */
+export type ApiExecutableHost = Readonly<{
+  env: Readonly<Record<string, unknown>>;
+}>;
+
+export type StartStandaloneApiOptions = Readonly<{
+  host?: ApiExecutableHost;
+  /**
+   * Reuses an observability graph another application in this process already
+   * built. Setting the SDK up a second time in one process is what prints
+   * "OpenTelemetry is already set up"; a standalone deployment never sets this.
+   */
+  observability?: ApiRuntimeBootstrapOptions["observability"];
+}>;
+
+/**
+ * Starts this application inside a process it does not own, and hands back the
+ * runtime so the owner can close it.
+ *
+ * The SAME composition the standalone entry point uses. b383462d96 replaced the
+ * hand-written per-process composition with `bootApiProcess` over the generated
+ * module list, so there is no second graph to keep in step: one composition,
+ * two entry points, and the only difference between them is who owns the
+ * process — signals and the exit status stay with the launcher, which is why
+ * this asks for none of them.
+ */
+export async function startStandaloneApi(
+  options: StartStandaloneApiOptions = {},
+): Promise<ApiRuntimeBootstrap> {
+  const main = await ApiRuntimeBootstrap.create({
+    source: options.host?.env ?? process.env,
+    composition: new ApiProductionComposition(),
+    ...(options.observability ? { observability: options.observability } : {}),
+    signals: false,
+  });
+  await main.start();
+  return main;
 }
