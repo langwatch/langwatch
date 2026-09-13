@@ -6,6 +6,9 @@
  */
 import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { z } from "zod";
+import { buildIdentityInfrastructure } from "./identity-composition.build.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
@@ -26,16 +29,36 @@ import { SsoConnectionGuardsService } from "../services/sso-connection-guards.se
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
-import type { IdentityInfrastructure } from "./identity-members.ts";
+/**
+ * Config schema: `ADMIN_EMAILS`, the deployment's platform-operator list, for
+ * the SSO connection guards' D05 tier-1 check. Defaults to none rather than
+ * refusing at boot, because a process that composes no operators still
+ * composes every other identity capability.
+ */
+const identityAppConfigSchema = z.object({
+  adminEmails: z.array(z.string()).default([]),
+});
+export type IdentityAppConfig = z.infer<typeof identityAppConfigSchema>;
 
-type IdentitySetup = FeatureSetup<Record<string, never>, IdentityInfrastructure, never> &
+type IdentitySetup = FeatureSetup<
+  Record<string, never>,
+  MembersRead<typeof IdentityApp.reads>,
+  IdentityAppConfig
+> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 export class IdentityApp implements IdentityApi {
   static readonly contract = IdentityApi;
   static readonly dependencies = {};
+  static readonly configSchema = identityAppConfigSchema;
+  static readonly reads = reads("prisma", "eventing");
 
   static create(setup: IdentitySetup): IdentityApp {
+    const infrastructure = buildIdentityInfrastructure({
+      prisma: setup.members.prisma,
+      eventing: setup.members.eventing,
+      config: setup.config,
+    });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create(
       setup.repositories.heads,
@@ -48,18 +71,18 @@ export class IdentityApp implements IdentityApi {
       setup.repositories.heads,
       CachedIdentityLatch.create({
         repository: setup.repositories.latch,
-        ttlMs: setup.members.latch.ttlMs,
-        maxUsers: setup.members.latch.maxUsers,
-        now: setup.members.latch.now,
+        ttlMs: infrastructure.latch.ttlMs,
+        maxUsers: infrastructure.latch.maxUsers,
+        now: infrastructure.latch.now,
       }).gate(),
     );
-    const identity = IdentityService.create(identityGuards, setup.members.ledger);
+    const identity = IdentityService.create(identityGuards, infrastructure.ledger);
     const newbornSweep = IdentityNewbornReconciliationService.create({
       newborns: setup.repositories.newborn,
       identity,
       reservations,
     });
-    const secrets = IdentitySecretCarryService.create(setup.members.secrets);
+    const secrets = IdentitySecretCarryService.create(infrastructure.secrets);
     const backfill = IdentityBackfillService.create(
       setup.repositories.backfill,
       setup.repositories.users,
@@ -70,22 +93,22 @@ export class IdentityApp implements IdentityApi {
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
     });
-    const joinRequestNotifications = setup.members.mail
+    const joinRequestNotifications = infrastructure.mail
       ? JoinRequestNotificationService.create({
-          audience: setup.members.joinRequestAudience,
-          mail: setup.members.mail,
+          audience: infrastructure.joinRequestAudience,
+          mail: infrastructure.mail,
         })
       : null;
     const ssoConnectionGuards = SsoConnectionGuardsService.create({
       connections: setup.repositories.ssoConnections,
       breakGlass: LocalDoorBreakGlassBindingAdapter.create(),
       stranding: setup.repositories.ssoStranding,
-      platformOperators: setup.members.ssoPlatformOperators,
+      platformOperators: infrastructure.ssoPlatformOperators,
     });
     // Q3(c): the ledger is nullable exactly like `mail`; without it neither
     // capability has a store to write through, so both refuse by name.
-    const ssoConnections = setup.members.ssoConnectionLedger
-      ? SsoConnectionService.create(ssoConnectionGuards, setup.members.ssoConnectionLedger)
+    const ssoConnections = infrastructure.ssoConnectionLedger
+      ? SsoConnectionService.create(ssoConnectionGuards, infrastructure.ssoConnectionLedger)
       : null;
     const ssoBackoffice = ssoConnections
       ? SsoConnectionBackofficeService.create({
@@ -93,7 +116,7 @@ export class IdentityApp implements IdentityApi {
           connections: () => ssoConnections,
         })
       : null;
-    const scimSyncGuards = ScimSyncGuardsService.create({ syncs: setup.members.scimSyncs });
+    const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
 
     return new IdentityApp({
       emails,
