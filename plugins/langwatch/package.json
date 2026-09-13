@@ -4,11 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
-    "test:integration": "vitest run __tests__/hook-bundle.integration.test.ts"
+    "test:integration": "vitest run __tests__/launcher.integration.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
