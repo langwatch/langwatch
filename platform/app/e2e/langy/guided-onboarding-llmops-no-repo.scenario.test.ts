@@ -79,7 +79,9 @@ describe("Langy asks before making a repository in a folder that has none", () =
       name: "guided-no-repo",
       git: false,
     });
-    expect(folder.isGitRepo()).toBe(false);
+    if (folder.isGitRepo()) {
+      throw new Error("the fixture folder was created with a repository in it");
+    }
     python = await createPythonEnv({
       at: path.join(folder.root, "..", "guided-no-repo-python"),
     });
