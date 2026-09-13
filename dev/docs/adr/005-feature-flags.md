@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
 
-**Status:** Accepted — amended 2026-08-20, 2026-08-31, 2026-09-07 and 2026-09-13, see below
+**Status:** Accepted, amended 2026-08-20, 2026-08-31, 2026-09-07 and 2026-09-13, see below
 
 ## Amendment (2026-08-20): PostHog removed from the resolver
 
