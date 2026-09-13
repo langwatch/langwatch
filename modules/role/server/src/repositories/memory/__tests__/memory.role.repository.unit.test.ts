@@ -17,7 +17,7 @@ describe("given the memory-backed role repositories", () => {
   describe("when saving a role", () => {
     it("reads back the role it just saved", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -47,7 +47,7 @@ describe("given the memory-backed role repositories", () => {
 
     it("finds a role by name within an organization", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -73,7 +73,7 @@ describe("given the memory-backed role repositories", () => {
 
     it("finds custom roles assigned to an organization", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -101,7 +101,7 @@ describe("given the memory-backed role repositories", () => {
 
     it("counts assigned users for a role", async () => {
       const repositories = instantiateRepositories(roleRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 

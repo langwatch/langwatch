@@ -17,7 +17,7 @@ describe("given the memory-backed presence repositories", () => {
   describe("when upserting a presence session", () => {
     it("reads back the session it just wrote", async () => {
       const repositories = instantiateRepositories(presenceRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -52,7 +52,7 @@ describe("given the memory-backed presence repositories", () => {
 
     it("lists all sessions in a project", async () => {
       const repositories = instantiateRepositories(presenceRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -86,7 +86,7 @@ describe("given the memory-backed presence repositories", () => {
 
     it("removes a session", async () => {
       const repositories = instantiateRepositories(presenceRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 

@@ -349,8 +349,8 @@ describe.skipIf(!databaseUrl)(
           studioDsl: createApiFixture<WorkflowStudioDsl>(),
           agentMappings: createApiFixture<WorkflowAgentMapping>(),
           workflowRows: instantiateRepositories(workflowRepositories, {
-            backend: "live",
-            infrastructure: { prisma: db },
+            tier: "live",
+            members: { prisma: db },
           }).workflowRows,
         },
         config: void 0,

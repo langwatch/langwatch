@@ -17,7 +17,7 @@ describe("given the memory-backed audit log repositories", () => {
   describe("when writing an audit log entry", () => {
     it("reads back the entry it just wrote", async () => {
       const repositories = instantiateRepositories(auditLogRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -44,7 +44,7 @@ describe("given the memory-backed audit log repositories", () => {
 
     it("sorts history by creation date descending", async () => {
       const repositories = instantiateRepositories(auditLogRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 
@@ -78,7 +78,7 @@ describe("given the memory-backed audit log repositories", () => {
 
     it("respects the limit parameter", async () => {
       const repositories = instantiateRepositories(auditLogRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 

@@ -15,8 +15,6 @@ import {
   HttpWebhookDestinationAdapter,
   WebhookDeliveryService,
   WebhookDestinationAdapter,
-  WebhookEndpointConfiguration,
-  type WebhookId,
   type WebhookSecret,
   webhookRepositories,
   type AwsClientConfigResolver,
@@ -44,7 +42,6 @@ import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/webhook-server";
 import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProcessStore } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -299,16 +296,11 @@ function createWebhookDeliveryDeps(
   return {
     processStore: options.processStore,
     endpoints: instantiateRepositories(webhookRepositories, {
-      backend: "live",
-      infrastructure: {
+      tier: "live",
+      members: {
         prisma: options.database,
-        ids: new WorkerWebhookIds(),
-        secrets: resolveWebhookSecrets(options),
         clickhouse: options.resolveClickHouseClient,
-        configuration: WebhookEndpointConfiguration.create({
-          allowInsecureLocalUrls: options.config.webhooks.allowInsecureLocalUrls,
-          allowAmbientAwsCredentials: options.config.webhooks.allowAmbientAwsCredentials,
-        }),
+        encryption: resolveWebhookSecrets(options),
       },
     }).endpoints,
     pruneExpiredIdempotencyReceipts: (now) => pruneExpiredIdempotencyReceipts(options, now),
@@ -355,13 +347,6 @@ function pruneExpiredIdempotencyReceipts(
     WHERE "expiresAt" < ${now}
     -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)
   `;
-}
-
-/** The endpoint id format, as the resource prefix the App already mints. */
-class WorkerWebhookIds implements WebhookId {
-  newEndpointId(): string {
-    return generate("webhookendpoint").toString();
-  }
 }
 
 /**

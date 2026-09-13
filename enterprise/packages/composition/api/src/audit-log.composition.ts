@@ -16,12 +16,12 @@ export class EnterpriseApiAuditLog {
     prisma: PrismaClient;
     maxArgsBytes?: number;
   }): Promise<EnterpriseApiAuditLog> {
-    const runtime = await createApp({ role: "api", config: {} })
+    const runtime = await createApp({
+      role: "api",
+      config: { "audit-log": { maxArgsBytes: options.maxArgsBytes ?? DEFAULT_MAX_ARGS_BYTES } },
+    })
       .withModules([withMemoryRepositories(auditLogServer)])
-      .boot({
-        role: "api",
-        config: { "audit-log": { maxArgsBytes: options.maxArgsBytes ?? DEFAULT_MAX_ARGS_BYTES } },
-      });
+      .boot();
 
     return new EnterpriseApiAuditLog(runtime.service(AuditLogApi), () => runtime.stop());
   }

@@ -207,7 +207,7 @@ describe("given the langy repository registry", () => {
       expect(langyRepositories.definitions.memory.requires).toEqual([]);
 
       const repositories = instantiateRepositories(langyRepositories, {
-        backend: "memory",
+        tier: "memory",
         members: {},
       });
 

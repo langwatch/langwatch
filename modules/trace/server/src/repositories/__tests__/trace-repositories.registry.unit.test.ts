@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { traceRepositories } from "../trace-repositories.registry.ts";
 
 function memoryTier() {
-  return instantiateRepositories(traceRepositories, { backend: "memory", members: {} });
+  return instantiateRepositories(traceRepositories, { tier: "memory", members: {} });
 }
 
 function memorySpan() {
@@ -109,7 +109,7 @@ describe("given the memory-backed trace repositories", () => {
   describe("when the postgres tier is selected without its stores", () => {
     it("refuses the selection by naming the members it needs", () => {
       expect(() =>
-        instantiateRepositories(traceRepositories, { backend: "live", members: {} }),
+        instantiateRepositories(traceRepositories, { tier: "live", members: {} }),
       ).toThrow(/clickhouse|prisma/);
     });
   });

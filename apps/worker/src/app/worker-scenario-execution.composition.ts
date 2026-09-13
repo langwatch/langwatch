@@ -288,8 +288,8 @@ export async function createWorkerScenarioExecutionGraph(input: {
     staging: deps.payloadStaging,
   });
   const workflowRepos = instantiateRepositories(workflowRepositories, {
-    backend: "live",
-    infrastructure: { prisma },
+    tier: "live",
+    members: { prisma },
   });
   const workflowLlmParameters = WorkerWorkflowLlmParameters.create({
     modelProviders: deps.modelProviders,
