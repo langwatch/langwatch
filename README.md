@@ -21,8 +21,7 @@ LangWatch is the open-source platform for AI in production: trace, test, route a
 ### Track your coding agents
 
 ```bash
-npx langwatch claude
-# or codex, copilot, opencode, ...
+npx langwatch claude  # or codex, copilot, opencode, ...
 ```
 
 ### Self-host
