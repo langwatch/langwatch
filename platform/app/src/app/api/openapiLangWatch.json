@@ -74480,6 +74480,18 @@
                               },
                               "reasoning_tokens": {
                                 "type": "integer"
+                              },
+                              "input_image_tokens": {
+                                "type": "integer",
+                                "description": "Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it."
+                              },
+                              "output_image_tokens": {
+                                "type": "integer",
+                                "description": "Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic."
+                              },
+                              "image_count": {
+                                "type": "integer",
+                                "description": "Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum."
                               }
                             },
                             "required": [
@@ -74487,7 +74499,10 @@
                               "output_tokens",
                               "cache_read_input_tokens",
                               "cache_creation_input_tokens",
-                              "reasoning_tokens"
+                              "reasoning_tokens",
+                              "input_image_tokens",
+                              "output_image_tokens",
+                              "image_count"
                             ]
                           },
                           "cost": {
@@ -75135,6 +75150,18 @@
                                   },
                                   "reasoning_tokens": {
                                     "type": "integer"
+                                  },
+                                  "input_image_tokens": {
+                                    "type": "integer",
+                                    "description": "Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it."
+                                  },
+                                  "output_image_tokens": {
+                                    "type": "integer",
+                                    "description": "Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic."
+                                  },
+                                  "image_count": {
+                                    "type": "integer",
+                                    "description": "Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum."
                                   }
                                 },
                                 "required": [
@@ -75142,7 +75169,10 @@
                                   "output_tokens",
                                   "cache_read_input_tokens",
                                   "cache_creation_input_tokens",
-                                  "reasoning_tokens"
+                                  "reasoning_tokens",
+                                  "input_image_tokens",
+                                  "output_image_tokens",
+                                  "image_count"
                                 ]
                               },
                               "cost": {
@@ -75813,6 +75843,18 @@
                             },
                             "reasoning_tokens": {
                               "type": "integer"
+                            },
+                            "input_image_tokens": {
+                              "type": "integer",
+                              "description": "Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it."
+                            },
+                            "output_image_tokens": {
+                              "type": "integer",
+                              "description": "Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic."
+                            },
+                            "image_count": {
+                              "type": "integer",
+                              "description": "Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum."
                             }
                           },
                           "required": [
@@ -75820,7 +75862,10 @@
                             "output_tokens",
                             "cache_read_input_tokens",
                             "cache_creation_input_tokens",
-                            "reasoning_tokens"
+                            "reasoning_tokens",
+                            "input_image_tokens",
+                            "output_image_tokens",
+                            "image_count"
                           ]
                         },
                         "caps": {

@@ -19873,9 +19873,18 @@ type GetApiGatewayV1SpendEvents200JSONResponseBody_Data_Data struct {
 	Usage               *struct {
 		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-		InputTokens              int `json:"input_tokens"`
-		OutputTokens             int `json:"output_tokens"`
-		ReasoningTokens          int `json:"reasoning_tokens"`
+
+		// ImageCount Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.
+		ImageCount int `json:"image_count"`
+
+		// InputImageTokens Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.
+		InputImageTokens int `json:"input_image_tokens"`
+		InputTokens      int `json:"input_tokens"`
+
+		// OutputImageTokens Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.
+		OutputImageTokens int `json:"output_image_tokens"`
+		OutputTokens      int `json:"output_tokens"`
+		ReasoningTokens   int `json:"reasoning_tokens"`
 	} `json:"usage"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
@@ -93427,9 +93436,18 @@ type GetApiGatewayV1EndUsersByIdSpendResponse struct {
 			Usage        struct {
 				CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 				CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-				InputTokens              int `json:"input_tokens"`
-				OutputTokens             int `json:"output_tokens"`
-				ReasoningTokens          int `json:"reasoning_tokens"`
+
+				// ImageCount Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.
+				ImageCount int `json:"image_count"`
+
+				// InputImageTokens Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.
+				InputImageTokens int `json:"input_image_tokens"`
+				InputTokens      int `json:"input_tokens"`
+
+				// OutputImageTokens Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.
+				OutputImageTokens int `json:"output_image_tokens"`
+				OutputTokens      int `json:"output_tokens"`
+				ReasoningTokens   int `json:"reasoning_tokens"`
 			} `json:"usage"`
 			Window string `json:"window"`
 		} `json:"data"`
@@ -93995,9 +94013,18 @@ type GetApiGatewayV1SpendSummariesResponse struct {
 			Usage        struct {
 				CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 				CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-				InputTokens              int `json:"input_tokens"`
-				OutputTokens             int `json:"output_tokens"`
-				ReasoningTokens          int `json:"reasoning_tokens"`
+
+				// ImageCount Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.
+				ImageCount int `json:"image_count"`
+
+				// InputImageTokens Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.
+				InputImageTokens int `json:"input_image_tokens"`
+				InputTokens      int `json:"input_tokens"`
+
+				// OutputImageTokens Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.
+				OutputImageTokens int `json:"output_image_tokens"`
+				OutputTokens      int `json:"output_tokens"`
+				ReasoningTokens   int `json:"reasoning_tokens"`
 			} `json:"usage"`
 		} `json:"data"`
 		NextCursor *string `json:"next_cursor"`
@@ -117193,9 +117220,18 @@ func ParseGetApiGatewayV1EndUsersByIdSpendResponse(rsp *http.Response) (*GetApiG
 				Usage        struct {
 					CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 					CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-					InputTokens              int `json:"input_tokens"`
-					OutputTokens             int `json:"output_tokens"`
-					ReasoningTokens          int `json:"reasoning_tokens"`
+
+					// ImageCount Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.
+					ImageCount int `json:"image_count"`
+
+					// InputImageTokens Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.
+					InputImageTokens int `json:"input_image_tokens"`
+					InputTokens      int `json:"input_tokens"`
+
+					// OutputImageTokens Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.
+					OutputImageTokens int `json:"output_image_tokens"`
+					OutputTokens      int `json:"output_tokens"`
+					ReasoningTokens   int `json:"reasoning_tokens"`
 				} `json:"usage"`
 				Window string `json:"window"`
 			} `json:"data"`
@@ -117901,9 +117937,18 @@ func ParseGetApiGatewayV1SpendSummariesResponse(rsp *http.Response) (*GetApiGate
 				Usage        struct {
 					CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 					CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-					InputTokens              int `json:"input_tokens"`
-					OutputTokens             int `json:"output_tokens"`
-					ReasoningTokens          int `json:"reasoning_tokens"`
+
+					// ImageCount Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.
+					ImageCount int `json:"image_count"`
+
+					// InputImageTokens Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.
+					InputImageTokens int `json:"input_image_tokens"`
+					InputTokens      int `json:"input_tokens"`
+
+					// OutputImageTokens Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.
+					OutputImageTokens int `json:"output_image_tokens"`
+					OutputTokens      int `json:"output_tokens"`
+					ReasoningTokens   int `json:"reasoning_tokens"`
 				} `json:"usage"`
 			} `json:"data"`
 			NextCursor *string `json:"next_cursor"`
