@@ -488,6 +488,14 @@ The branch instance's log is `<work-root>/logs/branch.log`; the failure is the
 last `"level":"error"` line, and `apps/api` now reports it rather than exiting
 silently.
 
+**The reuse only survives a run that ended on its own.** Killing one mid-flight
+leaves its main worktree half torn down, and the next run refuses it with
+`unrecognized layout (no apps/api @langwatch/platform-api, no platform/app
+@langwatch/web)` rather than reinstalling. Delete the work root and run fresh.
+Reading the branch log while the run is still inside its five-minute health
+wait is also ambiguous when the work root is reused, because the previous run's
+lines are still in the same file — compare timestamps, not just the last error.
+
 ## What is still open
 
 1. **apidiff has still never produced a report**, and now stops at wall 8
