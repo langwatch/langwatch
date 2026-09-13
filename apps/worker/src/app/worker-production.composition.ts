@@ -12,7 +12,11 @@ import type { ProcessObservability } from "@langwatch/observability/node";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
+import {
+  instantiateRepositories,
+  LocalFeatureApis,
+  ResourceScope,
+} from "@langwatch/runtime-composition";
 import { TraceApi } from "@langwatch/trace-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { Deferred } from "@langwatch/eventing";
@@ -1087,10 +1091,12 @@ export class WorkerProductionComposition {
     // The trace module's own rows, from the tier this process's substrates satisfy. Built here
     // rather than inside the report calendar, so a second reader of a trace row asks the same
     // registry rather than opening its own ClickHouse repository.
-    const traceRepositoryRows = traceRepositories.definitions.postgres.create({
-      prisma: traceDatabase,
-      clickhouse: options.eventing.resolveClickHouseClient,
-      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+    const traceRepositoryRows = instantiateRepositories(traceRepositories, {
+      tier: "live",
+      members: {
+        prisma: traceDatabase,
+        clickhouse: options.eventing.resolveClickHouseClient,
+      },
     });
     // Composed exactly when this process holds the typed client the calendar row lives in AND can
     // send: a report that came due on a process with no mail would claim its slot, render its data
@@ -1262,6 +1268,7 @@ export class WorkerProductionComposition {
             resolveClickHouseClient: options.featureClickHouse.resolveClient,
             clickhouse: options.featureClickHouse.queryClient,
             eventing: eventing.eventSourcing,
+            ...(agentApps ? { workflows: agentApps.workflows } : {}),
             foundation: {
               projects: foundation.tenancy.projects,
               organizations: foundation.tenancy.organizations,

@@ -1,9 +1,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AgentApi } from "@langwatch/agent-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
+import { evaluatorServer } from "@langwatch/evaluator-server";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
 import {
   createApp,
-  instantiateRepositories,
   LocalFeatureApis,
   membersFrom,
   type ResourceScope,
@@ -12,15 +16,9 @@ import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contrac
 import { scenarioServer, type ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
-import {
-  ModelProviderWorkflowStudioDslAdapter,
-  WorkflowAgentMappingAdapter,
-  WorkflowApp,
-  workflowRepositories,
-} from "@langwatch/workflow-server";
+import { workflowServer } from "@langwatch/workflow-server";
 import { installWorkerAgent } from "./worker-agent.composition.ts";
 import { resolveWorkerStoredSecretCipher } from "./worker-automation-graph.composition.ts";
-import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
 import type { WorkerFoundationApps } from "./worker-foundation-apps.composition.ts";
 import {
   createWorkerScenarioExecution,
@@ -86,35 +84,33 @@ export async function createWorkerAgentApps(options: {
     .boot();
   resources.own("worker scenario module", () => scenarioRuntime.stop());
   const scenarios = scenarioRuntime.module(scenarioServer).provided;
-  const evaluators = await installWorkerEvaluator({
-    database,
-    permissions: foundation.tenancy.authorization,
-    auditLog: foundation.auditLog,
-    users: foundation.users,
-    workflows: graph.workflows,
-    nlpRuntime: graph.nlpRuntime,
-    modelProviders: prerequisites.modelProviders,
-    resources,
-    name: "worker agent evaluator application",
-  });
-  const workflows = WorkflowApp.create({
-    members: {
-      workflows: graph.workflows,
-      datasets: graph.datasets,
-      evaluators,
-      studioDsl: ModelProviderWorkflowStudioDslAdapter.create({
-        modelProviders: prerequisites.modelProviders,
-      }),
-      agentMappings: WorkflowAgentMappingAdapter.create({ agents }),
-      workflowRows: instantiateRepositories(workflowRepositories, {
-        tier: "live",
-        members: { prisma: database },
-      }).workflowRows,
+  // Workflow and evaluator name each other, so they install in ONE app and
+  // boot's preallocated API clients resolve the cycle. `agents` is the lazy
+  // peer reference declared above - the agent runtime binds it before any
+  // call reaches it.
+  const studioRuntime = await createApp({
+    role: "worker",
+    config: {
+      evaluator: {},
+      workflow: {
+        nlpServiceUrl: prerequisites.config.infrastructure.modelProvider.nlpServiceUrl,
+      },
     },
-    dependencies: {},
-    config: void 0,
-    resources,
-  });
+    members: membersFrom({
+      prisma: database,
+      encryption: resolveWorkerStoredSecretCipher(prerequisites.config),
+    }),
+  })
+    .withProvided(AuthzApi, foundation.tenancy.authorization)
+    .withProvided(AuditLogApi, foundation.auditLog)
+    .withProvided(UserApi, foundation.users)
+    .withProvided(ModelProviderApi, prerequisites.modelProviders)
+    .withProvided(DatasetApi, graph.datasets)
+    .withProvided(AgentApi, agents)
+    .withModules([workflowServer, evaluatorServer])
+    .boot();
+  resources.own("worker studio module runtime", () => studioRuntime.stop());
+  const workflows = studioRuntime.module(workflowServer).provided;
   const agent = await installWorkerAgent({
     connection: prerequisites.connection,
     redis: prerequisites.redis,
@@ -140,6 +136,8 @@ export async function createWorkerAgentApps(options: {
 
   return {
     processor: execution.processor,
+    /** The studio runtime's workflow app, for peers installed later in boot. */
+    workflows,
     async start() {
       await broadcast.start();
       await agent.runtime.start();

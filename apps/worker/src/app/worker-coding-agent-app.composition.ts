@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { codingAgentServer, type CodingAgentBillingPolicy } from "@langwatch/coding-agent-server";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -7,7 +7,7 @@ import { GithubApi, type GithubServerConfig } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, membersFrom } from "@langwatch/runtime-composition";
 
 /** Minimal Redis surface owned by GitHub's private adapter. */
 export type WorkerGithubRedisConnection = {
@@ -47,15 +47,8 @@ export async function createWorkerCodingAgentApp(options: {
    */
   authorization: AuthzApi;
   billing: CodingAgentBillingPolicy;
-  /**
-   * No longer wired: the module's live tier now reads a "clickhouse" process
-   * member typed `ClickHouseQueryClient` (see
-   * `modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts`),
-   * not the per-tenant `resolve` this process holds. Left unsupplied so the
-   * live tier refuses by name at boot rather than being silently downgraded
-   * to memory.
-   */
-  clickHouse: { resolve(tenantId: string): Promise<ClickHouseClient> } | null;
+  /** The process's routed query client the module's live tier reads. */
+  clickhouse?: ClickHouseQueryClient;
   /**
    * No longer wired: the live tier now hardcodes its retention default (see
    * the same repositories file) — a member vocabulary may only name process
@@ -81,7 +74,13 @@ export async function createWorkerCodingAgentApp(options: {
     ...(options.github.host === undefined ? {} : { hostConfig: { host: options.github.host } }),
   });
 
-  const runtime = await createApp({ role: "worker" })
+  const runtime = await createApp({
+    role: "worker",
+    members: membersFrom({
+      prisma: options.database,
+      ...(options.clickhouse ? { clickhouse: options.clickhouse } : {}),
+    }),
+  })
     .withProvided(ProjectApi, options.projects)
     .withProvided(GithubApi, github)
     .withModules([codingAgentServer])

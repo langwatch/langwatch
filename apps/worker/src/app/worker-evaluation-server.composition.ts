@@ -76,19 +76,22 @@ export class WorkerEvaluationProcessingResult {
 }
 
 /**
- * The worker's Evaluation declaration. Trace and Evaluation can name one
- * another because boot preallocates their API clients before either setup runs.
+ * The worker's Evaluation declaration, built over the process-specific bag the
+ * composition root closes in. The v2 builder supplies no bespoke bag, so the
+ * factory carries it by closure; peers still arrive as declared dependencies,
+ * and Trace and Evaluation can name one another because boot preallocates
+ * their API clients before either setup runs.
  */
-const workerEvaluationApp = {
+function workerEvaluationApp(infrastructure: WorkerEvaluationInfrastructure) {
+  return {
   contract: EvaluationApi,
   dependencies: { traces: TraceApi, monitors: MonitorApi, evaluators: EvaluatorApi },
   create({
     dependencies,
-    infrastructure,
     resources,
   }: FeatureSetup<
     Readonly<{ traces: typeof TraceApi; monitors: typeof MonitorApi; evaluators: typeof EvaluatorApi }>,
-    WorkerEvaluationInfrastructure,
+    never,
     undefined
   >) {
     const workflows = infrastructure.workflows;
@@ -128,8 +131,10 @@ const workerEvaluationApp = {
     infrastructure.processing.resolve(processing);
     return composed.evaluations;
   },
-};
+  };
+}
 
-export const workerEvaluationServer = defineServerModule("evaluation")
-  .withApp(workerEvaluationApp)
-  .build();
+/** One evaluation module per composed bag; install the SAME instance you read. */
+export function createWorkerEvaluationServer(infrastructure: WorkerEvaluationInfrastructure) {
+  return defineServerModule("evaluation").withApp(workerEvaluationApp(infrastructure)).build();
+}

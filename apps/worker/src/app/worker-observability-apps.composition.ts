@@ -40,10 +40,12 @@ import {
 } from "@langwatch/trace-contract";
 import { traceServer, type TraceProcessingCommands } from "@langwatch/trace-server";
 import { UserApi } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import { resolveWorkerStoredSecretCipher } from "./worker-automation-graph.composition.ts";
 import { createWorkerCodingAgentApp } from "./worker-coding-agent-app.composition.ts";
 import {
-  workerEvaluationServer,
+  createWorkerEvaluationServer,
   type WorkerEvaluationInfrastructure,
 } from "./worker-evaluation-server.composition.ts";
 import type { WorkerEvaluationProcessing } from "./worker-evaluation-processing.composition.ts";
@@ -79,6 +81,11 @@ export type WorkerObservabilityAppsOptions = Readonly<{
   clickhouse?: ClickHouseQueryClient;
   /** The trace module's command pipeline. Absent, trace refuses at boot naming "eventing". */
   eventing?: EventSourcing;
+  /**
+   * The agent graph's workflow app, for the evaluator installed here. Absent,
+   * evaluator refuses at boot naming workflow.
+   */
+  workflows?: WorkflowApi;
   foundation: WorkerObservabilityFoundation;
   models: WorkerModelProviders;
   plans: EntitlementApi;
@@ -123,7 +130,7 @@ export async function createWorkerObservabilityApps(
     projects: foundation.projects,
     authorization: foundation.authorization,
     billing: new WorkerCodingAgentBilling(policy),
-    clickHouse: { resolve: options.resolveClickHouseClient },
+    ...(options.clickhouse ? { clickhouse: options.clickhouse } : {}),
     defaultTraceRetentionDays: options.config.retention.defaultDays,
     redis: options.redis ? createWorkerGithubRedis(options.redis) : null,
     github: {
@@ -135,12 +142,14 @@ export async function createWorkerObservabilityApps(
     },
     signingKey: options.githubSigningKey,
   });
-  const runtime = await createApp({
+  const workerEvaluationServer = createWorkerEvaluationServer(options.evaluation);
+  const builder = createApp({
     role: "worker",
     config: { log: telemetry.logConfig, evaluator: {} },
     members: membersFrom({
       prisma: options.connection.client,
       logger: createLogger(options.config.serviceName),
+      encryption: resolveWorkerStoredSecretCipher(options.config),
       ...(options.clickhouse ? { clickhouse: options.clickhouse } : {}),
       ...(options.eventing ? { eventing: options.eventing } : {}),
     }),
@@ -155,7 +164,9 @@ export async function createWorkerObservabilityApps(
     .withProvided(EntitlementApi, options.plans)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withProvided(CodingAgentApi, codingAgents.app)
-    .withProvided(AuditLogApi, foundation.auditLog)
+    .withProvided(AuditLogApi, foundation.auditLog);
+  if (options.workflows) builder.withProvided(WorkflowApi, options.workflows);
+  const runtime = await builder
     .withModules([
       modelProviderServer,
       traceServer,
