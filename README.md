@@ -14,7 +14,7 @@
 <img src="https://img.shields.io/badge/license-Apache%202.0%20%2B%20Enterprise-blue" alt="Open-core: Apache 2.0 core + Enterprise extension">
 </p>
 
-<video src="https://github.com/user-attachments/assets/ff49882d-4e9d-4b7c-819b-be690fba9387" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
+<video src="https://github.com/user-attachments/assets/b0dee97b-b5be-43f8-9d08-18ae1201d017" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
 
 LangWatch is the open-source platform for AI in production. It traces, tests, routes and governs every LLM call in your company, from the agents you build to the coding assistants your engineers use. The Apache 2.0 core is what runs [LangWatch Cloud](https://app.langwatch.ai), and you can self-host the same codebase.
 
