@@ -113,7 +113,11 @@ export async function createWorkerFoundationApps(options: {
     config: {
       "data-retention": { platformDefaultRetentionDays: options.config.retention.defaultDays },
       "api-key": { pepper: options.config.apiKeyPepper },
-      identity: { adminEmails: adminEmails(options.config) },
+      // `registersPipelines: false`: this process DRAINS the four identity
+      // ledgers, and its install phase registers their complete Postgres
+      // definitions. Identity's producer registration beside them would be a
+      // second registration of each name, which the runtime refuses.
+      identity: { adminEmails: adminEmails(options.config), registersPipelines: false },
       organization: {
         processName: options.config.serviceName,
         demoProject: { userId: "", projectId: options.config.authz.demoProjectId ?? "" },

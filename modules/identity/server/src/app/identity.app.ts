@@ -37,6 +37,16 @@ import { IdentitySecretHealMigrationAdapter } from "../services/system-migration
  */
 const identityAppConfigSchema = z.object({
   adminEmails: z.array(z.string()).default([]),
+  /**
+   * Whether this process registers the four identity pipelines while composing
+   * Identity, which is the producer role and the default. A process that ALSO
+   * DRAINS them states `false`: its install phase registers the complete
+   * Postgres definitions (real heads, real projection stores, the join and
+   * teardown process managers), and one runtime holds one registration per
+   * pipeline name. The senders this module publishes then resolve off that
+   * registration at the first send instead of at composition.
+   */
+  registersPipelines: z.boolean().default(true),
 });
 export type IdentityAppConfig = z.infer<typeof identityAppConfigSchema>;
 

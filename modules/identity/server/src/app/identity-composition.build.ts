@@ -180,6 +180,58 @@ class RegisteredIdentityEventing implements IdentityEventing {
   }
 }
 
+/** The four pipelines and the verbs each one is expected to publish. */
+const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map([
+  [IDENTITY_PIPELINE_NAME, IDENTITY_COMMAND_NAMES],
+  [JOIN_REQUEST_PIPELINE_NAME, JOIN_REQUEST_COMMAND_NAMES],
+  [SSO_CONNECTION_PIPELINE_NAME, SSO_CONNECTION_COMMAND_NAMES],
+  [SCIM_SYNC_PIPELINE_NAME, SCIM_SYNC_COMMAND_NAMES],
+]);
+
+/**
+ * The senders of the four identity registrations a process makes SOMEWHERE
+ * ELSE, resolved at the first send rather than at composition.
+ *
+ * A process that drains the ledgers composes Identity's read graph BEFORE its
+ * install phase runs, and the install phase is what registers the complete
+ * Postgres definitions. So there is nothing to resolve yet when this is built,
+ * and there is no second registration to make: one runtime holds one pipeline
+ * per name, and a producer-only definition registered beside the full one
+ * would either be refused — which is what killed the combined backend boot —
+ * or win the name and answer every guard read with a stand-in that refuses.
+ *
+ * The verb lists still gate: a command outside them answers `null` exactly as
+ * the registering shape does, and a listed command missing from the process's
+ * own registration THROWS by name, which is the late equivalent of that
+ * shape's boot-time refusal.
+ */
+class ProcessRegisteredIdentityEventing implements IdentityEventing {
+  static create(eventing: EventSourcing): ProcessRegisteredIdentityEventing {
+    return new ProcessRegisteredIdentityEventing(eventing);
+  }
+
+  private constructor(private readonly eventing: EventSourcing) {}
+
+  async tryPipelineCommand(input: {
+    pipeline: string;
+    command: string;
+  }): Promise<IdentityStagedSender | null> {
+    const expected = EXPECTED_COMMANDS.get(input.pipeline);
+    if (!expected?.includes(input.command)) return null;
+    // Throws by name when nothing has registered the pipeline yet — a caller
+    // that reaches identity before the install phase is a composition-order
+    // bug and says so, rather than dropping the command.
+    const registered = this.eventing.getPipeline(input.pipeline);
+    const sender = (registered.commands as Record<string, unknown>)[input.command];
+    if (!isSender(sender)) {
+      throw new Error(
+        `The ${input.pipeline} registration on this process produced no "${input.command}" command sender; the pipeline was registered incompletely.`,
+      );
+    }
+    return sender;
+  }
+}
+
 /**
  * Lifted verbatim (Step 8's rule) from `postgres.sso-connection-pipeline.adapter.ts`'s
  * ledger writer, over this process's own `eventing`. Every command not
@@ -226,7 +278,9 @@ export function buildIdentityInfrastructure(input: {
   config: IdentityAppConfig;
 }): IdentityInfrastructure {
   const { prisma, eventing, config } = input;
-  const identityEventing = RegisteredIdentityEventing.create(eventing);
+  const identityEventing = config.registersPipelines
+    ? RegisteredIdentityEventing.create(eventing)
+    : ProcessRegisteredIdentityEventing.create(eventing);
   const operators: PlatformOperator = {
     isPlatformOperatorEmail: ({ email }) => {
       if (email == null) return false;
