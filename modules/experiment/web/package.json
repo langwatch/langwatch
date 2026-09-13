@@ -106,7 +106,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-web": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",

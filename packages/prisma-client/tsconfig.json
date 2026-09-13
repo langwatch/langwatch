@@ -33,6 +33,9 @@
       "path": "../../modules/api-key/server/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/licensing/server/tsconfig.build.json"
     },
     {

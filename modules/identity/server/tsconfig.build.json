@@ -47,6 +47,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
@@ -54,6 +57,9 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../packages/system-migrations/tsconfig.build.json"

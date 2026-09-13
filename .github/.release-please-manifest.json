@@ -5,6 +5,8 @@
   "sdks/typescript": "1.13.0",
   "sdks/python": "1.4.0",
   "mcp/typescript": "2.0.0",
+  "packages/ksuid": "2.0.2",
+  "packages/ksuid-python": "1.0.1",
   "services/langevals": "3.0.0",
   ".": "3.17.0",
   "skills": "1.4.0",

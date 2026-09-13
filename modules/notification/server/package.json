@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "catalog:",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

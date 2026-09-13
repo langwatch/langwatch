@@ -26,6 +26,12 @@
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {

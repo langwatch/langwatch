@@ -301,6 +301,80 @@
         }
       ]
     },
+    "packages/ksuid": {
+      "release-type": "node",
+      "package-name": "@langwatch/ksuid",
+      "prerelease": false,
+      "component": "ksuid",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
+      ],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
+    "packages/ksuid-python": {
+      "release-type": "python",
+      "package-name": "langwatch-ksuid",
+      "prerelease": false,
+      "component": "ksuid-python",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
+      ],
+      "extra-files": ["ksuid/__init__.py"]
+    },
     ".": {
       "release-type": "simple",
       "package-name": "langwatch",
@@ -318,6 +392,8 @@
         "sdks/python",
         "skills",
         "plugins/langwatch",
+        "packages/ksuid",
+        "packages/ksuid-python",
         ".github",
         ".cursor"
       ],

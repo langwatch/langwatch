@@ -28,7 +28,7 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/infrastructure": "workspace:*",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

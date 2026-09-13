@@ -51,6 +51,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
@@ -76,6 +79,9 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/server/tsconfig.build.json"
     }
   ]
 }

@@ -27,7 +27,7 @@
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

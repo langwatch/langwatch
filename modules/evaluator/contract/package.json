@@ -24,7 +24,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "zod": "catalog:"
   },

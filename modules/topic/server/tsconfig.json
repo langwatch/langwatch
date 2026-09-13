@@ -28,6 +28,9 @@
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {

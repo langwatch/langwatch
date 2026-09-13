@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@langwatch/audit-log-contract": "workspace:*",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",

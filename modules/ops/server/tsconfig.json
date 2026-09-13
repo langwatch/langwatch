@@ -31,6 +31,9 @@
       "path": "../../auth/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -44,6 +47,9 @@
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

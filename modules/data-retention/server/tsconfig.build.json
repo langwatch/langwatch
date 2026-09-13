@@ -33,7 +33,16 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

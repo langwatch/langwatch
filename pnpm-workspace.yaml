@@ -73,7 +73,6 @@ catalog:
   '@emotion/react': ^11.14.0
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
-  '@langwatch/ksuid': ^2.0.2
   # The vendored voice build. A catalog entry may NOT use the `file:` protocol
   # (ERR_PNPM_CATALOG_ENTRY_INVALID_SPEC), so the version the tarball declares
   # is named here and the override below is what actually resolves it.
@@ -574,9 +573,6 @@ packageExtensions:
   "@google-cloud/dlp":
     dependencies:
       protobufjs: "^7.5.4"
-
-patchedDependencies:
-  "@langwatch/ksuid@2.0.2": dev/patches/@langwatch__ksuid@2.0.2.patch
 
 # Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
 # the rest came from platform/app/.

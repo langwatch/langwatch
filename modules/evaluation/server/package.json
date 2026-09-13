@@ -42,7 +42,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/ksuid": "catalog:",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",

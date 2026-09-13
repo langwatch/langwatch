@@ -194,6 +194,12 @@
       "path": "../../modules/identity/server/tsconfig.build.json"
     },
     {
+      "path": "../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/langy/contract/tsconfig.build.json"
     },
     {
