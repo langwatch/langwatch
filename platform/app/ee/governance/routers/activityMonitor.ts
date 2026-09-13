@@ -156,10 +156,10 @@ export const activityMonitorRouter = createTRPCRouter({
 
   /**
    * Spend-over-time daily buckets, grouped by team / user / model.
-   * Powers the bird's-eye `<SpendOverTimeChart>` (Recharts stacked
-   * area). Bucket-major envelope so the chart can iterate days
-   * directly; `points: []` is emitted for empty days so the X axis
-   * is dense (no Recharts stack-id rendering gaps).
+   * Powers the bird's-eye spend chart (Recharts stacked area).
+   * Bucket-major envelope so the chart can iterate days directly;
+   * `points: []` is emitted for empty days so the X axis is dense
+   * (no Recharts stack-id rendering gaps).
    *
    * Spec: specs/ai-gateway/governance/birds-eye-dashboard-v2.feature
    */

@@ -68,6 +68,7 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../types";
+import { connectedTargetFields } from "../utils/connectedAgentTarget";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -437,6 +438,24 @@ export function EvaluationsV3Table({
   const handleSelectSavedAgent = useCallback(
     (savedAgent: AgentWithFields) => {
       const config = savedAgent.config as Record<string, unknown>;
+
+      // A connected agent runs in the customer's own process, so the column
+      // reads the turn to send and the parameters the function declares
+      // rather than the fields of a node.
+      if (savedAgent.type === "connected") {
+        const { inputs, outputs } = connectedTargetFields(savedAgent.config);
+        addOrReplaceTarget({
+          id: newTargetId(),
+          type: "agent",
+          agentType: "connected",
+          dbAgentId: savedAgent.id,
+          inputs,
+          outputs,
+          mappings: {},
+        });
+        closeDrawer();
+        return;
+      }
 
       // Check if this is an HTTP agent by looking at savedAgent.type or config structure
       const isHttpAgent =

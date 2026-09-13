@@ -12,6 +12,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -28,6 +29,7 @@ import { RunDialog, type RunDialogSubject } from "../run/RunDialog";
 import { LOCKED_IN_ROWS_MESSAGE } from "../run/RunParametersSection";
 import { configurationKeyOf } from "../run/run-configuration";
 import { targetColor } from "../shared/target-colors";
+import { useSuiteEditorStore } from "../suite/suiteEditorStore";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
@@ -43,6 +45,7 @@ const mockSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockRunConfigurations = vi.hoisted(() => vi.fn());
 const mockSuitesCreate = vi.hoisted(() => vi.fn());
 const mockHasProviders = vi.hoisted(() => ({ value: true }));
+const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());
 
 const emptyQuery = vi.hoisted(() => () => ({
   data: undefined,
@@ -51,6 +54,8 @@ const emptyQuery = vi.hoisted(() => () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The run dialog reads the saved evaluators for the ones a run carries.
+    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
@@ -128,9 +133,24 @@ vi.mock("~/hooks/useCan", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
+const mockGoBack = vi.hoisted(() => vi.fn());
+const mockCloseDrawer = vi.hoisted(() => vi.fn());
+const flowCallbacksStore = vi.hoisted(
+  () => ({}) as Record<string, Record<string, unknown>>,
+);
+
 vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: mockOpenDrawer, setFlowCallbacks: vi.fn() }),
+  useDrawer: () => ({
+    openDrawer: mockOpenDrawer,
+    closeDrawer: mockCloseDrawer,
+    goBack: mockGoBack,
+    setFlowCallbacks: vi.fn(),
+  }),
   useDrawerParams: () => ({}),
+  setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+    flowCallbacksStore[drawer] = callbacks;
+  },
+  getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -139,6 +159,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     organization: { id: "org_1" },
     projectId: "proj_1",
   }),
+}));
+
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
@@ -165,6 +191,26 @@ const OFFLINE_AGENT = {
   name: "staging-agent",
   type: "http" as const,
   config: {},
+};
+/** A saved voice agent, the only target that offers "Call it myself". */
+const VOICE_AGENT = {
+  id: "agent_voice",
+  name: "support-line",
+  type: "voice" as const,
+  config: { transport: "elevenlabs_convai", agentId: "el_agent_1" },
+};
+/** A connected agent whose own function declares two parameters. */
+const CONNECTED_AGENT = {
+  id: "agent_connected",
+  name: "support-agent",
+  type: "connected" as const,
+  config: {},
+  environment: "production",
+  status: "online" as const,
+  parameters: [
+    { name: "model", defaultValue: "gpt-5-mini" },
+    { name: "plan", defaultValue: "free" },
+  ],
 };
 
 const suiteSubject = (
@@ -271,11 +317,13 @@ describe("<RunDialog/>", () => {
     mockTestSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
+    mockEvaluatorsGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesRunPlan.mockResolvedValue({
       batchRunId: "batch_new",
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
     mockSuitesUpdate.mockResolvedValue({});
@@ -468,6 +516,190 @@ describe("<RunDialog/>", () => {
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
     expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
       parameters: { model: "gpt-5", locale: "de" },
+    });
+  });
+
+  describe("given an agent that declares its parameters", () => {
+    /** A connected agent that declares "model" with a closed list of options. */
+    const CONNECTED_AGENT = {
+      id: "agent_connected",
+      name: "support-agent",
+      type: "connected" as const,
+      config: {},
+      environment: "production",
+      owner: null,
+      parameters: [
+        {
+          name: "model",
+          type: "string" as const,
+          description: "The model the agent answers with",
+          options: ["gpt-5-mini", "gpt-5"],
+          defaultValue: "gpt-5-mini",
+        },
+        { name: "seats", type: "number" as const, defaultValue: 1 },
+      ],
+    };
+
+    describe("when the dialog opens on that agent", () => {
+      /** @scenario "Key mode lists every declared parameter with its description, default and source" */
+      it("offers the parameters the chosen agent declares, marked with its label", async () => {
+        const user = userEvent.setup();
+        mockAgentsGetAll.mockReturnValue({
+          data: [ONLINE_AGENT, CONNECTED_AGENT],
+        });
+        mockScenariosGetAll.mockReturnValue(
+          casesDeclaring([{ name: "locale", defaultValue: "de" }]),
+        );
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-params"));
+        const line = screen.getByTestId("run-dialog-parameter-line");
+        // The line opens on every declared default, the agent's included.
+        expect(line).toHaveValue("locale=de, model=gpt-5-mini, seats=1");
+
+        await user.clear(line);
+        await user.click(line);
+        const list = await screen.findByTestId(
+          "run-dialog-parameter-line-suggestions",
+        );
+        expect(
+          within(list).getByTestId("parameter-suggestion-key-locale"),
+        ).toHaveTextContent("scenario");
+        expect(
+          within(list).getByTestId("parameter-suggestion-key-model"),
+        ).toHaveTextContent("support-agent · production");
+
+        await user.type(line, "model=");
+        expect(
+          within(
+            await screen.findByTestId("run-dialog-parameter-line-suggestions"),
+          )
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["gpt-5-mini", "gpt-5"]);
+      });
+    });
+
+    describe("when the run is started", () => {
+      /** @scenario "A typed value reaches the run as the declared type" */
+      it("sends a value as the type the agent declares for it", async () => {
+        const user = userEvent.setup();
+        mockAgentsGetAll.mockReturnValue({
+          data: [ONLINE_AGENT, CONNECTED_AGENT],
+        });
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-params"));
+        const line = screen.getByTestId("run-dialog-parameter-line");
+        await user.clear(line);
+        await user.type(line, "model=007, seats=5");
+
+        await user.click(screen.getByTestId("run-dialog-run"));
+        await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+        expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+          parameters: { model: "007", seats: 5 },
+        });
+      });
+    });
+
+    describe("when two rows are compared", () => {
+      /** @scenario "A compare row offers the options of its own agent" */
+      it("offers each compare row the options of the agent it names", async () => {
+        const user = userEvent.setup();
+        const otherAgent = {
+          ...CONNECTED_AGENT,
+          id: "agent_other",
+          name: "other-agent",
+          parameters: [
+            { name: "model", type: "string" as const, options: ["claude-4"] },
+          ],
+        };
+        mockAgentsGetAll.mockReturnValue({
+          data: [CONNECTED_AGENT, otherAgent],
+        });
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-compare"));
+        expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
+          "agent_other",
+        );
+
+        const second = screen.getByTestId("run-dialog-compare-parameters-1");
+        await user.type(second, "model=");
+        expect(
+          within(
+            await screen.findByTestId(
+              "run-dialog-compare-parameters-1-suggestions",
+            ),
+          )
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["claude-4"]);
+
+        const first = screen.getByTestId("run-dialog-compare-parameters-0");
+        await user.type(first, "model=");
+        expect(
+          within(
+            await screen.findByTestId(
+              "run-dialog-compare-parameters-0-suggestions",
+            ),
+          )
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["gpt-5-mini", "gpt-5"]);
+      });
+    });
+
+    describe("when a value outside the closed list is typed", () => {
+      /** @scenario "A value outside a closed list is refused on the field" */
+      it("reads a refused option under the parameter line, not in the alert", async () => {
+        const user = userEvent.setup();
+        mockAgentsGetAll.mockReturnValue({
+          data: [ONLINE_AGENT, CONNECTED_AGENT],
+        });
+        mockSuitesRunPlan.mockRejectedValue(
+          handledRejection("scenario_parameter_option_invalid", {
+            name: "model",
+            value: "claude",
+            options: ["gpt-5-mini", "gpt-5"],
+          }),
+        );
+        renderDialog(
+          suiteSubject({
+            initialTarget: { type: "connected", id: "agent_connected" },
+          }),
+        );
+
+        await user.click(screen.getByTestId("customize-chip-params"));
+        const line = screen.getByTestId("run-dialog-parameter-line");
+        await user.clear(line);
+        await user.type(line, "model=claude");
+        await user.click(screen.getByTestId("run-dialog-run"));
+
+        const block = screen.getByTestId("run-dialog-parameters");
+        await waitFor(() => expect(block).toHaveTextContent("gpt-5-mini"));
+        expect(block).toHaveTextContent("model");
+        expect(line).toHaveAttribute("aria-invalid", "true");
+        expect(
+          screen.queryByTestId("run-dialog-error"),
+        ).not.toBeInTheDocument();
+
+        // Editing the line takes the refusal away.
+        await user.type(line, "x");
+        expect(line).not.toHaveAttribute("aria-invalid");
+      });
     });
   });
 
@@ -707,6 +939,7 @@ describe("<RunDialog/>", () => {
       "Run against a prompt",
       "Custom simulation models",
       "Run multiple times",
+      "Add evaluators",
     ]);
   });
 
@@ -776,6 +1009,43 @@ describe("<RunDialog/>", () => {
     expect(screen.getAllByText(/2 scenarios/)).toHaveLength(1);
   });
 
+  // --- The "Call it myself" action ---
+
+  describe("when the target is a voice agent", () => {
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("offers Call it myself when exactly one scenario is in scope", () => {
+      mockAgentsGetAll.mockReturnValue({ data: [VOICE_AGENT] });
+      renderDialog(
+        suiteSubject({
+          scenarioIds: ["case_1"],
+          initialTarget: { type: "voice", id: "agent_voice" },
+        }),
+      );
+
+      expect(
+        screen.getByTestId("run-dialog-call-it-myself"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("hides Call it myself when more than one scenario is in scope", () => {
+      mockAgentsGetAll.mockReturnValue({ data: [VOICE_AGENT] });
+      // A voice target is still selected, so the action would show if it were
+      // gated on the target alone; it is gated on the single scenario the call
+      // is scored under (#8019 AC9), which a two-scenario scope lacks.
+      renderDialog(
+        suiteSubject({
+          scenarioIds: ["case_1", "case_2"],
+          initialTarget: { type: "voice", id: "agent_voice" },
+        }),
+      );
+
+      expect(
+        screen.queryByTestId("run-dialog-call-it-myself"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   /** @scenario "Confirming a run remembers the target for next time" */
   /** @scenario "The run carries the name the dialog holds" */
   it("sends the name and the whole configuration, and writes no test suite", async () => {
@@ -797,7 +1067,13 @@ describe("<RunDialog/>", () => {
     });
     // A test suite is only a grouping: no run option is written onto it.
     expect(mockSuitesUpdate).not.toHaveBeenCalled();
-    expect(onRunStarted).toHaveBeenCalled();
+    // The caller hears where the run landed: the plan's address segment and
+    // the batch, which is what the Results tab opens on.
+    expect(onRunStarted).toHaveBeenCalledWith({
+      batchRunId: "batch_new",
+      scenarioSetId: "__internal__plan_1__suite",
+      planSlug: "refunds-prod-agent",
+    });
   });
 
   /** @scenario "A suite remembers the parameter overrides of its last run" */
@@ -1084,6 +1360,100 @@ describe("<RunDialog/>", () => {
     expect(mockSuitesRunPlan).not.toHaveBeenCalled();
   });
 
+  describe("when a run is queued", () => {
+    /** @scenario "The dialog is gone before the run drawer opens" */
+    it("closes the dialog before it says the run started", async () => {
+      const user = userEvent.setup();
+      const order: string[] = [];
+      const onClose = vi.fn(() => order.push("close"));
+      const onRunStarted = vi.fn(() => order.push("started"));
+      render(
+        <RunDialog
+          subject={suiteSubject({
+            initialTarget: { type: "http", id: "agent_1" },
+          })}
+          onClose={onClose}
+          onRunStarted={onRunStarted}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("run-dialog-run"));
+
+      await waitFor(() => expect(onRunStarted).toHaveBeenCalled());
+      expect(order).toEqual(["close", "started"]);
+    });
+  });
+
+  // --- Parameters the chosen agent cannot read ---
+
+  describe("when the run remembers values of a run against another agent", () => {
+    const rememberedOn = (referenceId: string) =>
+      suiteSubject({
+        initialTarget: {
+          type: referenceId === "agent_1" ? "http" : "connected",
+          id: referenceId,
+        },
+        persistedTarget: {
+          type: referenceId === "agent_1" ? "http" : "connected",
+          referenceId,
+          runParameters: { model: "gpt-5-mini", plan: "free" },
+        },
+      });
+
+    /** @scenario "A remembered value the chosen agent cannot read is dropped" */
+    it("drops them and folds the block away when the agent declares none", async () => {
+      mockAgentsGetAll.mockReturnValue({
+        data: [ONLINE_AGENT, CONNECTED_AGENT],
+      });
+      renderDialog(rememberedOn("agent_1"));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("run-dialog-parameters"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
+    });
+
+    /** @scenario "A value the chosen agent declares is kept" */
+    it("keeps them when the agent that declares them is the one chosen", async () => {
+      mockAgentsGetAll.mockReturnValue({
+        data: [ONLINE_AGENT, CONNECTED_AGENT],
+      });
+      renderDialog(rememberedOn("agent_connected"));
+
+      const line = await screen.findByTestId("run-dialog-parameter-line");
+      expect(line).toHaveValue("model=gpt-5-mini, plan=free");
+      expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
+    });
+  });
+
+  describe("when a name nothing in the run declares is typed", () => {
+    /** @scenario "A typed value nothing in the run declares is read back" */
+    it("says so under the field, and keeps the value", async () => {
+      const user = userEvent.setup();
+      mockScenariosGetAll.mockReturnValue(
+        casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+      );
+      renderDialog(
+        suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+      );
+
+      await user.click(screen.getByTestId("customize-chip-params"));
+      const line = screen.getByTestId("run-dialog-parameter-line");
+      await user.click(line);
+      await user.paste(", seats=12");
+
+      expect(
+        await screen.findByText(
+          /seats is not declared by any scenario in this run, and not by prod-agent/,
+        ),
+      ).toBeInTheDocument();
+      expect(line).toHaveValue("model=gpt-5, seats=12");
+    });
+  });
+
   // --- Failure paths ---
 
   /** @scenario "A parameter value the scenarios do not declare is refused by name" */
@@ -1093,6 +1463,7 @@ describe("<RunDialog/>", () => {
       handledRejection("scenario_parameter_unknown", {
         unknownKeys: ["modle"],
         declaredNames: ["model"],
+        targetLabel: "support-agent · production",
       }),
     );
     renderDialog(
@@ -1103,10 +1474,11 @@ describe("<RunDialog/>", () => {
 
     const error = await screen.findByTestId("run-dialog-error");
     expect(error).toHaveTextContent(
-      "No scenario in this run has a parameter by that name",
+      "Nothing in this run declares a parameter by that name",
     );
     expect(error).toHaveTextContent("modle");
     expect(error).toHaveTextContent("model");
+    expect(error).toHaveTextContent("support-agent · production");
   });
 
   /** @scenario "A run refused because every scenario is archived says so in the dialog" */
@@ -1174,6 +1546,7 @@ describe("run entries on the Scenarios tab", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -1220,8 +1593,8 @@ describe("run entries on the Scenarios tab", () => {
     expect(mockOpenDrawer).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A run started from the rail appears in the sidebar without a page change" */
-  it("starts a suite run from the rail without changing the address, holding a place for it", async () => {
+  /** @scenario "A run started from the rail opens on the run it started" */
+  it("starts a suite run from the rail, opens its results and holds a place for it", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
 
@@ -1237,9 +1610,14 @@ describe("run entries on the Scenarios tab", () => {
     await user.click(within(dialog).getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
-    // No navigation: the placeholder is what announces the run. The runs rail
-    // renders it from this same store value (see the run plan detail tests).
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    // The page opens the Results tab on the plan the run joined and on the
+    // run itself. The placeholder announces the run there until the first
+    // result lands: the runs rail renders it from this same store value (see
+    // the run plan detail tests).
+    await waitFor(() => expect(mockRouterPush).toHaveBeenCalled());
+    expect(mockRouterPush.mock.calls[0]![1]).toBe(
+      "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
+    );
     expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe(
       "batch_new",
     );
@@ -1323,6 +1701,7 @@ describe("the run name", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -1737,6 +2116,7 @@ describe("what the run covers", () => {
       jobCount: 2,
       suiteId: "plan_1",
       planName: "2 scenarios prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
     mockScenariosGetAll.mockReturnValue({
@@ -1962,6 +2342,7 @@ describe("the chips that add a run option", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -2060,6 +2441,7 @@ describe("the comparison", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -2474,5 +2856,283 @@ describe("the comparison", () => {
     expect(screen.getByTestId("run-dialog-run")).toHaveTextContent(
       "Run 3 scenarios × 2 targets",
     );
+  });
+});
+
+describe("the evaluators of a run", () => {
+  const SQL_EVALUATOR = {
+    id: "eval_sql",
+    name: "SQL Query Equivalence",
+    type: "evaluator",
+    config: { evaluatorType: "ragas/sql_query_equivalence", settings: {} },
+    fields: [
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" },
+      { identifier: "expected_contexts", type: "str" },
+    ],
+    outputFields: [{ identifier: "passed", type: "bool" }],
+  };
+  const PII_EVALUATOR = {
+    id: "eval_pii",
+    name: "PII Leak Scanner",
+    type: "evaluator",
+    config: { evaluatorType: "presidio/pii_detection", settings: {} },
+    fields: [
+      { identifier: "input", type: "str", optional: true },
+      { identifier: "output", type: "str", optional: true },
+    ],
+    outputFields: [{ identifier: "passed", type: "bool" }],
+  };
+  const lastAgentMessage = {
+    type: "source" as const,
+    sourceId: "conversation" as const,
+    path: ["last_agent_message"],
+  };
+  const goldenSql = {
+    type: "source" as const,
+    sourceId: "scenario" as const,
+    path: ["fields", "golden_sql"],
+  };
+  /** The Refunds suite with the SQL evaluator, every input mapped or not. */
+  const refundsWith = (mappings: Record<string, unknown>) => ({
+    id: "suite_refunds",
+    name: "Refunds",
+    slug: "refunds",
+    kind: "test_suite",
+    scenarioIds: ["case_1"],
+    fields: [{ identifier: "golden_sql", type: "text" }],
+    evaluators: [
+      { id: "att_sql", evaluatorId: "eval_sql", required: true, mappings },
+    ],
+  });
+  const fullyMapped = {
+    output: lastAgentMessage,
+    expected_output: goldenSql,
+    expected_contexts: goldenSql,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    for (const key of Object.keys(flowCallbacksStore)) {
+      delete flowCallbacksStore[key];
+    }
+    mockHasProviders.value = true;
+    useAgentTestingStore.setState({ lastRunTarget: null, pendingRun: null });
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    mockPromptsGetAll.mockReturnValue({ data: [] });
+    mockScenariosGetAll.mockReturnValue(casesDeclaring(null));
+    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
+    mockEvaluatorsGetAll.mockReturnValue({
+      data: [SQL_EVALUATOR, PII_EVALUATOR],
+      isLoading: false,
+    });
+    mockTestSuitesGetAll.mockReturnValue({
+      data: [refundsWith(fullyMapped)],
+      isLoading: false,
+    });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 1,
+      suiteId: "plan_1",
+      planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
+      created: true,
+    });
+  });
+
+  afterEach(cleanup);
+
+  /** @scenario "The evaluators of the suites in scope read as inherited pills" */
+  it("opens the Evaluators block on the suite's evaluators, inherited and not removable", () => {
+    renderDialog(suiteSubject());
+
+    const block = screen.getByTestId("run-dialog-evaluators");
+    expect(
+      within(block).getByTestId("run-dialog-inherited-suite_refunds"),
+    ).toHaveTextContent("Inherited from Refunds · edit in the suite");
+    const pill = within(block).getByTestId("evaluator-pill-att_sql");
+    expect(pill).toHaveTextContent("SQL Query Equivalence");
+    expect(pill).toHaveAttribute("data-inherited", "true");
+    expect(pill).not.toHaveAttribute("data-missing");
+    expect(
+      within(block).queryByRole("button", { name: "Remove the evaluators" }),
+    ).not.toBeInTheDocument();
+    // The block stands on its own, so no chip offers it.
+    expect(
+      screen.queryByText("Add evaluators", { selector: "button" }),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "An inherited pill opens the suite editor on that evaluator" */
+  it("opens the suite editor on the evaluator behind an inherited pill", async () => {
+    const user = userEvent.setup();
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("evaluator-pill-att_sql"));
+
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
+    });
+  });
+
+  /** @scenario "The evaluators chip adds the plan's own evaluators" */
+  /** @scenario "A picked evaluator becomes a pill on this run" */
+  it("adds the plan's own evaluator from the list, without the ones that expect a golden value, and sends it with the run", async () => {
+    const user = userEvent.setup();
+    mockTestSuitesGetAll.mockReturnValue({
+      data: [{ ...refundsWith({}), evaluators: [] }],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-evaluators"));
+
+    expect(screen.getByTestId("run-dialog-evaluators")).toBeInTheDocument();
+    expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorList", {
+      hiddenEvaluatorIds: ["eval_sql"],
+    });
+
+    act(() => {
+      (
+        flowCallbacksStore.evaluatorList!.onSelect as (
+          evaluator: unknown,
+        ) => void
+      )(PII_EVALUATOR);
+    });
+
+    const pill = await screen.findByText("PII Leak Scanner");
+    expect(pill).toBeInTheDocument();
+    expect(mockGoBack).toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0].config.evaluators).toEqual([
+      expect.objectContaining({
+        evaluatorId: "eval_pii",
+        required: true,
+        mappings: {
+          input: {
+            type: "source",
+            sourceId: "conversation",
+            path: ["first_user_message"],
+          },
+          output: lastAgentMessage,
+        },
+      }),
+    ]);
+  });
+
+  /** @scenario "The plan's own evaluator is edited in the evaluator editor with the run sources" */
+  /** @scenario "A stored run plan opens on the evaluators it carries" */
+  it("opens a stored plan on its own evaluators and edits one with the run sources", async () => {
+    const user = userEvent.setup();
+    mockTestSuitesGetAll.mockReturnValue({
+      data: [{ ...refundsWith({}), evaluators: [] }],
+      isLoading: false,
+    });
+    renderDialog(
+      suiteSubject({
+        suiteId: "plan_1",
+        name: "Nightly",
+        planName: "Nightly",
+        scope: { mode: "all" },
+        evaluators: [
+          {
+            id: "att_pii",
+            evaluatorId: "eval_pii",
+            required: false,
+            mappings: { output: lastAgentMessage },
+          },
+        ],
+      }),
+    );
+
+    const pill = screen.getByTestId("evaluator-pill-att_pii");
+    expect(pill).toHaveTextContent("PII Leak Scanner");
+    await user.click(pill);
+
+    const [drawer, props] = mockOpenDrawer.mock.calls.at(-1)!;
+    expect(drawer).toBe("evaluatorEditor");
+    expect(props).toMatchObject({
+      evaluatorId: "eval_pii",
+      gate: { required: false, canRequire: true },
+    });
+    const sources = (
+      props as {
+        mappingsConfig: {
+          availableSources: { id: string; fields: { name: string }[] }[];
+        };
+      }
+    ).mappingsConfig.availableSources;
+    expect(sources.map((source) => source.id)).toEqual([
+      "conversation",
+      "scenario",
+      "trace",
+    ]);
+    // A plan covers scenarios of several suites, so no field is offered.
+    const scenario = sources.find((source) => source.id === "scenario");
+    expect(scenario?.fields.map((field) => field.name)).toEqual([
+      "situation",
+      "criteria",
+    ]);
+  });
+
+  /** @scenario "Run opens the evaluator that still reads nothing instead of running" */
+  it("sends Run to the suite evaluator whose input reads nothing, and queues no run", async () => {
+    const user = userEvent.setup();
+    mockTestSuitesGetAll.mockReturnValue({
+      data: [refundsWith({ output: lastAgentMessage })],
+      isLoading: false,
+    });
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    const pill = screen.getByTestId("evaluator-pill-att_sql");
+    expect(pill).toHaveAttribute("data-missing", "true");
+    const run = screen.getByTestId("run-dialog-run");
+    expect(run).not.toBeDisabled();
+    expect(run).toHaveAttribute(
+      "data-warning",
+      "Configure missing mappings for evaluator",
+    );
+
+    await user.click(run);
+
+    expect(mockSuitesRunPlan).not.toHaveBeenCalled();
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
+    });
+    expect(useSuiteEditorStore.getState().pendingAttachmentId).toBe("att_sql");
+  });
+
+  /** @scenario "A run the server refuses for a missing mapping says which evaluator and offers the way to it" */
+  it("reads a refusal for a missing mapping inside the dialog and offers the way to the evaluator", async () => {
+    const user = userEvent.setup();
+    mockSuitesRunPlan.mockRejectedValue(
+      handledRejection("suite_evaluator_mappings_missing", {
+        evaluatorId: "eval_sql",
+        suiteId: "suite_refunds",
+        inputs: ["expected_contexts"],
+      }),
+    );
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    const alert = await screen.findByTestId("run-dialog-error");
+    expect(alert).toHaveTextContent("missing required mappings");
+    await user.click(
+      within(alert).getByRole("button", { name: "Configure the evaluator" }),
+    );
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
+    });
+    expect(useSuiteEditorStore.getState().pendingAttachmentId).toBe("att_sql");
   });
 });

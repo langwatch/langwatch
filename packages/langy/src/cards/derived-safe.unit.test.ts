@@ -5,7 +5,9 @@ import {
   isDerivedSafeCardKind,
   langyDerivedCardSchema,
   langyDerivedChoicesCardSchema,
-  type DerivedSafeCardKind,
+  langyModelEmittedCardSchema,
+  RENDERED_CARD_KINDS,
+  type RenderedCardKind,
 } from "./derived-safe.js";
 import { CARD_KINDS, CARD_SHAPE } from "./schemas.js";
 
@@ -59,12 +61,11 @@ const choices = {
 };
 
 /**
- * One valid sample per allowlisted kind. Typed as a total record so that
- * adding a kind to the allowlist without a sample fails to compile — the
- * tests below walk the allowlist, and a missing sample would otherwise skip
- * the new kind silently.
+ * One valid sample per rendered kind. Typed as a total record so that adding a
+ * kind without a sample fails to compile — the tests below walk the kind
+ * lists, and a missing sample would otherwise skip the new kind silently.
  */
-const SAMPLE_BY_KIND: Record<DerivedSafeCardKind, unknown> = {
+const SAMPLE_BY_KIND: Record<RenderedCardKind, unknown> = {
   timeseries,
   table,
   stats,
@@ -115,9 +116,24 @@ describe("langyDerivedCardSchema", () => {
     });
   });
 
-  describe("given the allowlist itself", () => {
+  describe("given the fence allowlist itself", () => {
+    it("leaves choices to the question tool", () => {
+      // The model asks through its `question` tool; the panel stamps the card.
+      // A choices fence is therefore a kind the fence channel does not know.
+      expect(DERIVED_SAFE_CARD_KINDS as readonly string[]).not.toContain(
+        "choices",
+      );
+      expect(isDerivedSafeCardKind("choices")).toBe(false);
+      expect(langyModelEmittedCardSchema.safeParse(choices).success).toBe(false);
+    });
+
+    it("keeps choices on the part channel, so the tool's card renders", () => {
+      expect(RENDERED_CARD_KINDS as readonly string[]).toContain("choices");
+      expect(langyDerivedCardSchema.safeParse(choices).success).toBe(true);
+    });
+
     it("names only kinds the shared vocabulary knows", () => {
-      for (const kind of DERIVED_SAFE_CARD_KINDS) {
+      for (const kind of RENDERED_CARD_KINDS) {
         expect(CARD_KINDS as readonly string[]).toContain(kind);
       }
     });
@@ -127,7 +143,7 @@ describe("langyDerivedCardSchema", () => {
     });
 
     it("names only presentation-shaped kinds", () => {
-      for (const kind of DERIVED_SAFE_CARD_KINDS) {
+      for (const kind of RENDERED_CARD_KINDS) {
         expect(CARD_SHAPE[kind]).toBe("presentation");
       }
     });
@@ -149,7 +165,7 @@ describe("langyDerivedCardSchema", () => {
       // Gate 3 at runtime: an allowlisted kind with no strict schema would
       // fall through the discriminated union and refuse everything, which
       // reads as "the model emitted nothing" rather than as a missing schema.
-      for (const kind of DERIVED_SAFE_CARD_KINDS) {
+      for (const kind of RENDERED_CARD_KINDS) {
         const sample = SAMPLE_BY_KIND[kind];
         expect(langyDerivedCardSchema.safeParse(sample).success).toBe(true);
       }

@@ -10,6 +10,12 @@ import {
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import {
+  QueryApiService,
+  type QueryRunParams,
+  type QueryRunResult,
+  type QuerySchemaResult,
+} from "@/client-sdk/services/query/query-api.service";
 
 /** A saved workbench chart, exactly as the REST surface answers it. */
 export type SavedChart =
@@ -26,24 +32,23 @@ export interface SavedChartDefinitionInput {
   vegaLiteSpec?: Record<string, unknown>;
 }
 
-/** The LangWatchQL analytics schema, as the discovery endpoint answers it. */
-export type AnalyticsSchema =
-  paths["/api/v1/projects/{projectId}/analytics/schema"]["get"]["responses"]["200"]["content"]["application/json"];
-
-/** The result of running a chart's statement through the LangWatchQL query door. */
-export type ChartRunResult =
-  paths["/api/v1/projects/{projectId}/analytics/query/clickhouse"]["post"]["responses"]["200"]["content"]["application/json"];
+/**
+ * The LangWatchQL analytics schema, as `GET /api/v1/query/schema` on the query
+ * door answers it — the discovery endpoint this used to derive from
+ * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in favor
+ * of that door (issue #7565). Re-exported under this family's own name so
+ * existing imports keep working.
+ */
+export type AnalyticsSchema = QuerySchemaResult;
 
 /**
- * The datapoint step `runQuery` may request — one of the offered steps, as
- * the route itself restricts it (server-side: `lwqlGranularityStepSchema`,
- * built from `LWQL_GRANULARITY_STEPS`). Derived from the generated request
- * body rather than a hand-written `1 | 60 | 3600` copy, so a step the API
- * adds or removes changes what this method accepts without a second edit.
+ * The result of running a chart's statement through the LangWatchQL query
+ * door. Re-exported from `QueryApiService`, which is what this now delegates
+ * to — the dedicated REST endpoint this used to derive from
+ * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
+ * removed in favor of the shared query door (issue #7565).
  */
-export type ChartRunGranularitySeconds = NonNullable<
-  paths["/api/v1/projects/{projectId}/analytics/query/clickhouse"]["post"]["requestBody"]["content"]["application/json"]["granularitySeconds"]
->;
+export type ChartRunResult = QueryRunResult;
 
 export class ChartsApiError extends Error {
   constructor(
@@ -74,14 +79,36 @@ export class ChartsApiError extends Error {
 export class ChartsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
+  /**
+   * `schema()` and `runQuery()` delegate to the shared query door rather
+   * than a dedicated chart-family route (issue #7565). That door is
+   * project-implicit (no path/body slot — see `QueryApiService`'s own doc
+   * comment), so it only learns this family's project from the client it is
+   * given: when the caller supplied their own `langwatchApiClient`, this
+   * reuses it verbatim (that client's auth is the caller's to own);
+   * otherwise a client is built fresh, scoped to the same
+   * `configuredProjectId` CRUD resolves through `projectId()`, so a
+   * `ChartsApiService` configured for one project cannot leak a chart's
+   * query to a different project via ambient scope (issue #7565 follow-up).
+   */
+  private readonly queryApi: QueryApiService;
 
   constructor(
-    config?: Pick<InternalConfig, "langwatchApiClient"> & {
+    config?: Partial<Pick<InternalConfig, "langwatchApiClient">> & {
       projectId?: string;
     },
   ) {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
     this.configuredProjectId = config?.projectId;
+    this.queryApi = new QueryApiService({
+      langwatchApiClient:
+        config?.langwatchApiClient ??
+        createLangWatchApiClient(
+          undefined,
+          undefined,
+          this.resolvedProjectId(),
+        ),
+    });
   }
 
   private handleApiError(
@@ -102,11 +129,24 @@ export class ChartsApiService {
     throw new ChartsApiError(message, operation, error, status);
   }
 
-  private projectId(operation: string): string {
-    const projectId =
+  /**
+   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain
+   * `projectId()` throws on, without the throw — for the one caller that
+   * must tolerate "no project" rather than refuse on it: the query-door
+   * client build in the constructor above, which has to keep working for
+   * legacy project-scoped keys that carry no project in any of those three
+   * places (see `QueryApiService`'s own doc comment).
+   */
+  private resolvedProjectId(): string | undefined {
+    return (
       this.configuredProjectId ??
       scopedProjectId() ??
-      process.env.LANGWATCH_PROJECT_ID;
+      process.env.LANGWATCH_PROJECT_ID
+    );
+  }
+
+  private projectId(operation: string): string {
+    const projectId = this.resolvedProjectId();
     if (!projectId) {
       throw new ChartsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",
@@ -200,15 +240,18 @@ export class ChartsApiService {
     if (error) this.handleApiError(`unplace chart "${id}"`, error, response);
   }
 
-  /** The datasets and columns this key may write chart SQL against. */
+  /**
+   * The datasets and columns this key may write chart SQL against.
+   *
+   * Delegates to the shared query door's `GET /api/v1/query/schema` — the
+   * dedicated discovery route this used to call
+   * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in
+   * favor of it (issue #7565). That door is project-implicit (the project is
+   * resolved into the underlying api client's auth, not a path segment), so
+   * this family's own `projectId()` resolution does not apply here.
+   */
   async schema(): Promise<AnalyticsSchema> {
-    const projectId = this.projectId("discover analytics schema");
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/schema",
-      { params: { path: { projectId } } },
-    );
-    if (error) this.handleApiError("discover analytics schema", error, response);
-    return data as unknown as AnalyticsSchema;
+    return this.queryApi.schema();
   }
 
   /**
@@ -217,29 +260,23 @@ export class ChartsApiService {
    * chart's own SQL and stored parameter values (from `get`), plus the
    * surface's time window and granularity for statements that declare the
    * reserved `period_*` parameters.
+   *
+   * Delegates to the shared query door's `POST /api/v1/query` — the
+   * dedicated execution route this used to call
+   * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
+   * removed in favor of it (issue #7565).
    */
   async runQuery(params: {
     sql: string;
     parameters?: Record<string, ChartParameterValue>;
     timeWindow?: { start: string; end: string };
-    granularitySeconds?: ChartRunGranularitySeconds;
+    /**
+     * Narrowed to the steps the door actually offers, straight from the
+     * generated request body — an off-list number is a compile error here
+     * rather than a `validation_error` from the platform at run time.
+     */
+    granularitySeconds?: QueryRunParams["granularitySeconds"];
   }): Promise<ChartRunResult> {
-    const projectId = this.projectId("run chart");
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/projects/{projectId}/analytics/query/clickhouse",
-      {
-        params: { path: { projectId } },
-        body: {
-          sql: params.sql,
-          ...(params.parameters ? { parameters: params.parameters } : {}),
-          ...(params.timeWindow ? { timeWindow: params.timeWindow } : {}),
-          ...(params.granularitySeconds === undefined
-            ? {}
-            : { granularitySeconds: params.granularitySeconds }),
-        },
-      },
-    );
-    if (error) this.handleApiError("run chart", error, response);
-    return data as unknown as ChartRunResult;
+    return this.queryApi.query(params);
   }
 }

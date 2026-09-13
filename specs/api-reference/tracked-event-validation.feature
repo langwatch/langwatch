@@ -51,3 +51,13 @@ Feature: Tracked-event validation answers the caller
     Then the response status is 400
     And the response names the "vote" field
     And the event is not recorded
+
+  # A metric key survives into the event drilldown's composite-key encoding
+  # (`<key>\x1F<value>`). A key carrying that separator itself makes the
+  # split ambiguous, so the value silently disappears from the explorer
+  # instead of failing loudly. Reject it here instead.
+  @unit
+  Scenario: Ingest rejects a metric key carrying the unit separator
+    Given an event whose metric key contains the ASCII unit separator
+    When the payload is validated
+    Then the event is rejected

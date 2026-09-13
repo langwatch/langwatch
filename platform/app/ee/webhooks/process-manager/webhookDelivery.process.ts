@@ -168,6 +168,9 @@ const spendUsagePayloadSchema = z.object({
   output_audio_tokens: z.number().int().min(0).default(0),
   input_chars: z.number().int().min(0).default(0),
   audio_ms: z.number().int().min(0).default(0),
+  input_image_tokens: z.number().int().min(0).default(0),
+  output_image_tokens: z.number().int().min(0).default(0),
+  image_count: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and

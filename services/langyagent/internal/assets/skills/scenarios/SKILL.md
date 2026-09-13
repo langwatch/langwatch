@@ -1,7 +1,7 @@
 ---
 name: scenarios
 user-prompt: "Add scenario tests for my agent"
-description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
+description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI against a connected agent, reading the run parameters that agent declares so the scenarios and comparison runs turn its real levers, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
 license: MIT
 compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations.
 ---
@@ -17,8 +17,9 @@ If the user's request is **general** ("add scenarios", "test my agent"):
 - Read the codebase to understand the agent's architecture
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
+- When the agent is connected to the platform, read the run parameters it declares before you propose anything (`langwatch agent get <id> --format json`, under `parameters`). Each one is a lever the team built into the agent: cover it with one scenario per value that changes the expected behavior, and offer a comparison run across an option list (see Read the agent's levers in the Platform Approach)
 - For conversational agents, include multi-turn scenarios, because that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
+- ALWAYS run the tests after writing them, and report the result in the same answer. With the Code approach, that means waiting: run `pytest` or `vitest` in the foreground with a timeout that covers every simulation, and never hand it to a background task or end the answer with "I will report when it finishes". A code run you did not wait for is not a run: the turn ends, the report never arrives, and the user is left with test files nobody has seen pass. With the Platform approach, a run is scheduled rather than executed in your process, so do not block on `--wait` in an interactive turn: trigger it, hand over the link, and say what the page will show (see step 5 of the Platform Approach). Report the result: how many scenarios ran, which passed, and what the failures said. Stop after two rounds of fixes and report what still fails, with what you tried. A loop that keeps rerunning the suite spends the time of the user and tells them nothing until it ends. If they fail, first decide which side is wrong. Change the test only when you have evidence that its criteria or its fixture are wrong; otherwise the agent is what needs the fix (see Improving the Agent When a Scenario Fails below). A scenario that goes green because its assertions got weaker has tested nothing.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
 If the user's request is **specific** ("test the refund flow"):
@@ -35,7 +36,11 @@ If the user's request is about **voice** ("add voice testing", "test my voice ag
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
+Check two things before you pick an approach: whether you are in a codebase (`package.json`, `pyproject.toml`, etc.), and whether the agent is already connected to the platform. It is connected when the code carries `@langwatch.connect_agent` (Python) or `connectAgent` (TypeScript), or when `langwatch agent list --format json` lists a row with `type: "connected"`.
+
+- **Connected agent**, with or without a codebase → the **Platform approach** against that agent. The scenarios live on the platform, every run reaches the real process, the judge reads its traces, and the run parameters the agent declares are the levers the scenarios turn. Write code scenarios as well only when the user asks for test files in the repository.
+- **Codebase, agent not connected** → the **Code approach** (Scenario SDK): test files beside the code, run with `pytest` or `vitest`. Write them, run them, and then say in the same answer that connecting the agent is the other route. Connecting is one decorator on the function that runs the agent (the `connect-agent` skill, prompt "Connect my agent to LangWatch simulations"), and it is what the team wants when the scenarios must run from the platform, or from CI, without the repository's test suite. Both can coexist: the code scenarios call the same decorated function. Ask which route first, and wait, only when the request names neither: "add tests", "test my agent in the repo" or a `pytest`/`vitest` word all point at the Code approach, so build it rather than open a question.
+- **No codebase, no agent** → the **Platform approach**; the agent has to be connected before a run can start (step 3 of the flow).
 
 ## The Agent Testing Pyramid
 
@@ -59,6 +64,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -90,7 +97,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: `pip install langwatch-scenario pytest pytest-asyncio` (or `uv add ...`).
-For TypeScript: `npm install @langwatch/scenario@^0.4.12 vitest` (or `pnpm add ...`).
+For TypeScript: `npm install @langwatch/scenario vitest` (or `pnpm add ...`).
 
 ### Step 3: Configure the Default Model
 
@@ -115,6 +122,8 @@ export default defineConfig({
 ### Step 4: Write the Scenario Test
 
 Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
+
+When the function that runs the agent is decorated with `@langwatch.connect_agent` (Python) or wrapped with `connectAgent` (TypeScript), the adapter calls that same function: it stays directly callable, so the platform runs and the code scenarios exercise one code path. Pass every turn field the function declares, because a declared field with no default is a required argument on a direct call. In Python, `support_agent(messages=input.messages, thread_id=input.thread_id, session=None)` returns what the function returns (a string or `langwatch.AgentReply`, whose `.output` is the reply); in TypeScript, `(await supportAgent({ messages: input.messages, threadId: input.threadId })).output`. Do not write a second entry point for the tests.
 
 **Python:**
 
@@ -433,6 +442,7 @@ async def test_angry_customer_billing_error():
             "The agent must acknowledge the frustration before pivoting to "
             "logistics, stay calm, and queue a refund."
         ),
+
         agents=[
             scenario.PipecatAgentAdapter(
                 url=BOT_WS_URL,
@@ -454,6 +464,7 @@ async def test_angry_customer_billing_error():
                     scenario.effects.phone_quality(),
                 ],
             ),
+
             scenario.JudgeAgent(criteria=[
                 "The agent acknowledged the customer's frustration before asking for account info",
                 "The agent stayed calm and did not match the customer's hostility",
@@ -537,6 +548,7 @@ describe("Voice agent: angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // The adapter drives an OpenAI Realtime session with the same
         // config your production agent uses. Importing from production
         // source keeps the test aligned with what is actually deployed.
@@ -545,6 +557,7 @@ describe("Voice agent: angry billing", () => {
           instructions: AGENT_INSTRUCTIONS,
           tools: AGENT_TOOLS,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -557,6 +570,7 @@ describe("Voice agent: angry billing", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -598,12 +612,14 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // Connects to the user's ALREADY-RUNNING bot over WebSocket.
         scenario.pipecatAgent({
           url: BOT_WS_URL,
           audioFormat: "mulaw",
           sampleRate: 8000,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -616,6 +632,7 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -714,7 +731,7 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 | Noun | What it is | Commands |
 | --- | --- | --- |
 | **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
+| **test suite** | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
@@ -744,6 +761,7 @@ langwatch scenario create "Angry refund request" \
 - `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+- `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -760,9 +778,33 @@ Filing a scenario into a test suite is `langwatch scenario update <id> --test-su
 #### 3. List what can be tested
 
 ```bash
-langwatch agent list --format json     # -> { data: [{ id, name, type }], pagination }
+langwatch agent list --format json     # -> { data: [{ id, name, type, environment, status }], pagination }
 langwatch prompt list --format json    # -> [{ id, handle, name, version, model }]
 ```
+
+A `connected` agent carries an `environment` and a `status`. `status: "offline"` means the customer's process is not connected, and a run against it is refused, so say so before you offer it as a target. One agent name with two environments is two rows and two targets.
+
+If the project holds no agent at all, the user's agent is not connected yet. Use the `connect-agent` skill, whose prompt is "Connect my agent to LangWatch simulations": it decorates the function that runs the agent with `langwatch.connect_agent` (Python) or `connectAgent` (TypeScript), and the running process becomes the target. If it is not installed, use `npx skills add langwatch/skills/connect-agent`.
+
+#### 3b. Read the agent's levers
+
+A connected agent declares its run parameters from its code. Read them before you propose a single scenario:
+
+```bash
+langwatch agent get <agentId> --format json
+# -> { id, name, environment, status, instances: [...],
+#      parameters: [{ name, type, options, defaultValue, description }] }
+```
+
+Each entry is a lever the team built into the agent: a model, a customer plan, a tenant, a feature switch. Use the list three ways:
+
+- **One scenario per value that changes the expected behavior.** A `plan` parameter with the default `free` means the agent answers a paying customer differently. Write the scenario whose outcome depends on the plan, and make the criteria name the behavior that has to change ("The agent does not promise a benefit the plan does not include"). The situation describes the customer and the question; the value is supplied at run time with `--param plan=pro`, never written into the situation text, so the agent really runs with it. Wrong: a scenario titled "Express shipping on the free plan" with the criterion "does not promise free next-day delivery". It hard-codes one value, and it turns false the moment the run sets `plan=pro`. Right: "Express shipping question" with the criterion "The agent states the shipping terms of the customer's plan and promises no benefit of another plan", run with `--param plan=free` and again with `--param plan=pro`.
+- **One comparison run across an option list.** `options` is a closed list, so the same test suite runs once per value and the results page shows one column per value: `--target 'connected:support-agent@development?model=gpt-5' --target 'connected:support-agent@development?model=gpt-5-mini'`. Name this comparison in your proposal and again in your summary, with the command, for every parameter that declares `options`: it is the run the team connected the agent for. When the user asks for one run, make that run the comparison: `?plan=free` and `?plan=pro` on the same agent is still one run, with one column per value, and it shows which criteria flip with the lever.
+- **The defaults as the baseline.** A run with no `--param` uses every `defaultValue`. Say which values a run used when you report it.
+
+Put the levers in the proposal itself: "The agent declares `model` (gpt-5-mini, gpt-5) and `plan` (default free). I wrote one plan-aware scenario, and the test suite can run on both models in one comparison." A name that neither the scenario nor the target agent declares is refused before anything is scheduled, and so is a value outside `options`, so read the names from `scenario get` and `agent get` rather than from memory.
+
+One agent name with two environments is two rows, and they compare the same way: `connected:support-agent@development` on a laptop against `connected:support-agent@production` on a server, one `--target` each.
 
 #### 4. ASK: which agent(s) or prompt(s)?
 
@@ -773,23 +815,24 @@ Never invent a target and never quietly default to the first row.
 #### 5. Run one scenario
 
 ```bash
-langwatch scenario run <scenarioId> --target http:<agentId> --format json
+langwatch scenario run <scenarioId> --target connected:support-agent@development --format json
 
-# With values for the parameters the scenario declares
-langwatch scenario run <scenarioId> --target http:<agentId> \
-  --param account_tier=platinum --param region=eu-central --format json
+# With values for the parameters the target agent or the scenario declares
+langwatch scenario run <scenarioId> --target connected:support-agent@development \
+  --param plan=pro --param model=gpt-5 --format json
 ```
 
-Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code`, `workflow`.
+Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
-- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
+- For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
 - Add `--wait` only when the caller can afford to block: it polls and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
 - With `--format json` (or `-o json`) the run commands print one final document on stdout. Under `--wait` it comes after the poll and carries `outcome` (`scheduled`, `passed`, `failed`, `timeout` or `poll_failure`), `tallies` and the per-run `results`.
-- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **or a target agent declares** (`langwatch scenario get <id> --format json` and `langwatch agent get <id> --format json` list them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name nothing in the run declares is rejected before anything is scheduled, and so is a value outside a declared option list, so do not invent either. `true` and `false` read as booleans and a plain number reads as a number; all other values stay text, so `007` stays the id `007`.
 - `--note "<text>"` keeps one line, up to 200 characters, saying what this run was testing. It travels with the run and never with the plan.
 
 #### 6. Run a test suite
@@ -848,6 +891,57 @@ langwatch simulation-run get <scenarioRunId> --format json      # messages, verd
 Hand over the link instead of narrating what the run is doing. Every run answer carries `platformUrl`, the page of the plan the run belongs to. Use that value rather than assembling a path by hand.
 
 If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
+
+### Fields and evaluators on a test suite
+
+A test suite reads like a dataset. It declares **fields** (typed columns beyond the situation and the criteria) and every scenario in it carries one value per field. **Evaluators** attach to the suite with **mappings** from each evaluator input to a source: the conversation, the scenario (situation, criteria, a field) or the trace (a tool call's input or output, the retrieved contexts). After a scenario run finishes, the platform runs the evaluators and stores one result per evaluator on the run. A **required** pass/fail evaluator that fails fails the scenario. A score-only evaluator reports beside the verdict and never gates.
+
+Use this when a criterion is really a comparison against a known answer (a golden SQL query, a reference reply, the tables an answer had to be written against) or a check an existing evaluator already does well (PII, toxicity, faithfulness). Keep the judge criteria for behavior.
+
+```bash
+# The suite declares the fields, then the evaluators that read them
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required \
+  --evaluator answer-quality-judge --not-required --format json
+
+# Every scenario carries a value per field
+langwatch scenario create "Chargebacks by quarter" \
+  --situation "A fraud analyst asks for chargebacks per quarter for merchant ACME Travel" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT quarter, SUM(amount) FROM chargebacks WHERE merchant = 'ACME Travel' GROUP BY quarter" \
+  --field table_schema="CREATE TABLE chargebacks (merchant TEXT, quarter TEXT, amount NUMERIC)" \
+  --format json
+
+# Later: replace the field list or the evaluator list. Each list is the whole of what the suite declares.
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --evaluator pii-leak-scanner --not-required
+```
+
+- `--field identifier:type` on the suite. Types: `text`, `number`, `boolean`. An identifier is lowercase letters, digits and underscores, starting with a letter; `situation`, `criteria`, `name`, `input` and `output` are reserved. A field an attached evaluator still reads cannot be removed.
+- `--evaluator <id|slug>` names a saved evaluator (`langwatch evaluator list --format json`; create one with `langwatch evaluator create`). Its mappings are **inferred** the way the suite editor infers them: `input`-like inputs read the first user message, `output`-like ones the last agent message, `contexts` the retrieved contexts of the trace, and `expected_*` inputs a field of the suite by name (`expected_output` matches `golden_sql`, `expected_contexts` matches `table_schema`). `--required` / `--not-required` apply to the `--evaluator` written just before them; the default is required for an evaluator that produces a pass/fail verdict and reports-only for a score.
+- A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
+
+```json
+[{
+  "evaluatorId": "<id from evaluator list>",
+  "required": true,
+  "mappings": {
+    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
+
+- A required input with no mapping is accepted on the suite and reported on stderr; the platform refuses a **run** until it is set. `langwatch test-suite get <suite> --format json` shows every attachment and its mappings.
+- A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason.
+- `run-plan run --evaluator <id|slug>` adds a plan-level evaluator beside the suite's, for checks that read only the conversation or the trace (a PII scanner across every suite). A plan evaluator never maps to a scenario field.
+- Results: `langwatch simulation-run get <scenarioRunId> --format json` carries `results.evaluations`, one entry per evaluator with `status` (`passed`, `failed`, `scored`, `skipped`, `error`), `required`, `score`, `passed` and `details` (the reason). The verdict of a run with a failed required evaluator is `failed`, and the reasoning names it.
+
+Through MCP the same surface is `platform_create_test_suite` and `platform_update_test_suite` (`fields`, `evaluators`), `platform_create_scenario` and `platform_update_scenario` (`fields`), `platform_run_plan` (`evaluators`) and `platform_get_simulation_run` (`results.evaluations`); `discover_schema({ category: "scenarios" })` lists the field rules and the mapping paths.
 
 ### Iterating
 
@@ -915,10 +1009,17 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
+- Do NOT guess a tool call mapping. `--evaluator` never infers one; write it with `--evaluators-json` and the tool's real name from the agent's traces
+- Do NOT pass `--field` a name the test suite does not declare, or a value that does not read as the field's type. Both are refused before anything is written; declare the field on the suite first
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
-- Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
+- Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
+- Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
 - Do NOT pass `--test-suite` a test suite that does not exist. The command refuses it. Create the test suite with `langwatch test-suite create "<name>"` first, or leave the flag out and let the scenario land in `Default`
 - Do NOT mix scope flags on `run-plan run`. Exactly one of `--all`, `--test-suite`, `--label` or `--scenario` per run
+- Do NOT propose scenarios for a connected agent before reading `langwatch agent get <id> --format json`. Its `parameters` are the levers the scenarios turn, and a proposal that ignores them tests one configuration by accident
+- Do NOT write a parameter value into the situation text ("the customer is on the pro plan") when the target declares that parameter. Supply it with `--param plan=pro`, or a `?plan=pro` suffix on the target, so the agent really runs with it
+- Do NOT pass `--param` a name that no scenario and no target in the run declares, or a value outside a declared option list. Both are refused before anything is scheduled
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between one scenario and the whole test suite. Ask one short question and wait
 - Do NOT `--wait` inside an interactive turn. Trigger, hand over the link, and let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point

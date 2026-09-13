@@ -1,9 +1,14 @@
 import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
+import type { PulledUsageRetractedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
+import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
+import { createAgentListingPort } from "@ee/governance/services/pullers/agentListingPort";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
+import { createPeopleListingPort } from "@ee/governance/services/pullers/peopleListingPort";
 import {
+  type DiscoveredPeopleMatcher,
   type PulledUsageDispatcher,
   runIngestionPull,
 } from "@ee/governance/services/pullers/pullerWorker";
@@ -12,6 +17,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { mapCommands } from "~/server/event-sourcing/mapCommands";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
 const logger = createLogger("langwatch:enterprise:event-sourcing");
 
@@ -22,8 +28,30 @@ export interface EnterprisePipelineSetConfig {
   /**
    * The pulled-usage ledger writer. Absent without ClickHouse — the pipeline
    * still records every observation, only the ledger row is skipped.
+   *
+   * Missing its withdrawal dispatcher, and that is the type saying so. The
+   * command it sends belongs to the pipeline this dep is being passed INTO, so
+   * the composition root cannot hold it; `registerPulledUsagePipeline`
+   * completes the object once the pipeline it closes over exists.
    */
-  pulledUsageLedger?: PulledUsageLedgerProcessDeps;
+  pulledUsageLedger?: Omit<
+    PulledUsageLedgerProcessDeps,
+    "sendRetractPulledUsage"
+  >;
+  /**
+   * ADR-128's daily cost rollup store. Absent without ClickHouse — the
+   * pipeline still records every observation, only the summary is skipped.
+   */
+  governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+  /**
+   * ADR-128 §12's identity-match engine, composed by the root on the worker
+   * role only. A type, never an import: this module is statically reachable
+   * from request routers, and the scorer behind the engine is gated off every
+   * request path by the engine's import-graph guard. Absent on request-serving
+   * roles — discovery still records people, the review queue just waits for a
+   * process that composes the engine.
+   */
+  identityMatch?: DiscoveredPeopleMatcher;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
@@ -46,9 +74,23 @@ function registerIngestionPullPipeline(
       ),
       dispatch: {
         runPort: {
-          run: (params) =>
-            runIngestionPull({ ...params, pulledUsage: deps.pulledUsage }),
+          run: async (params) => {
+            const outcome = await runIngestionPull({
+              ...params,
+              pulledUsage: deps.pulledUsage,
+              identityMatch: deps.identityMatch,
+            });
+            return {
+              ...outcome,
+              // The durable log carries instants as epoch milliseconds, so
+              // the conversion happens once, here at the seam, rather than
+              // giving the worker a second money-shaped date type to hold.
+              readThroughAt: outcome.readThroughAt?.getTime() ?? null,
+            };
+          },
         },
+        agentListingPort: createAgentListingPort({ prisma: deps.prisma }),
+        peopleListingPort: createPeopleListingPort({ prisma: deps.prisma }),
         commands: () => {
           if (!outcomeCommands) {
             throw new Error(
@@ -66,6 +108,14 @@ function registerIngestionPullPipeline(
       ingestionPullCommands.recordRunCompleted(args as never),
     recordRunFailed: (args) =>
       ingestionPullCommands.recordRunFailed(args as never),
+    recordAgentsListed: (args) =>
+      ingestionPullCommands.recordAgentsListed(args as never),
+    recordAgentsListingRefused: (args) =>
+      ingestionPullCommands.recordAgentsListingRefused(args as never),
+    recordPeopleListed: (args) =>
+      ingestionPullCommands.recordPeopleListed(args as never),
+    recordPeopleListingRefused: (args) =>
+      ingestionPullCommands.recordPeopleListingRefused(args as never),
   };
 
   if (deps.runsWorkers) {
@@ -99,12 +149,46 @@ function registerIngestionPullPipeline(
  * is per-source and per-run, this one is per usage item, and a per-run stream
  * cannot carry a per-item price. The puller effect dispatches
  * `recordPulledUsage` in the same loop that writes the OCSF audit row.
+ *
+ * Its process manager also dispatches back INTO this pipeline, which is the
+ * knot the holder below unties: the withdrawal command exists only once the
+ * pipeline is registered, and registering it needs the process manager that
+ * sends it. The same shape `spendSettlement` uses, for the same reason.
  */
 function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
+  let sendRetract:
+    | ((data: PulledUsageRetractedEventData) => Promise<void>)
+    | null = null;
+  const ledger = deps.pulledUsageLedger
+    ? {
+        ...deps.pulledUsageLedger,
+        sendRetractPulledUsage: async (
+          data: PulledUsageRetractedEventData,
+        ): Promise<void> => {
+          if (!sendRetract) {
+            // Unreachable in composition order, and thrown rather than
+            // swallowed because the outbox retries a throw. Dropping the
+            // withdrawal would leave two live versions of one charge, which
+            // is money reported twice.
+            throw new Error(
+              "pulled usage retraction dispatched before its pipeline was registered",
+            );
+          }
+          await sendRetract(data);
+        },
+      }
+    : undefined;
   const pipeline = deps.eventSourcing.register(
-    createPulledUsageProcessingPipeline({ ledger: deps.pulledUsageLedger }),
+    createPulledUsageProcessingPipeline({
+      ledger,
+      costRollupStore: deps.governanceCostRollupStore,
+    }),
   );
-  return { commands: mapCommands(pipeline.commands) };
+  const commands = mapCommands(pipeline.commands);
+  sendRetract = async (data) => {
+    await commands.retractPulledUsage(data as never);
+  };
+  return { commands };
 }
 
 /**
@@ -150,9 +234,16 @@ export function createNoopEnterprisePipelineCommands(): EnterprisePipelineComman
       disable: noop,
       recordRunCompleted: noop,
       recordRunFailed: noop,
+      requestAgentsListing: noop,
+      recordAgentsListed: noop,
+      recordAgentsListingRefused: noop,
+      requestPeopleListing: noop,
+      recordPeopleListed: noop,
+      recordPeopleListingRefused: noop,
     },
     pulledUsage: {
       recordPulledUsage: noop,
+      retractPulledUsage: noop,
     },
   } satisfies EnterprisePipelineCommands;
 }

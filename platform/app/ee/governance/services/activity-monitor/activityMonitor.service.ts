@@ -31,6 +31,11 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
+import {
+  deriveSourceHealth,
+  isDayCoveredByPull,
+  type SourceHealth,
+} from "@ee/governance/services/pullers/sourceHealth";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
@@ -42,7 +47,7 @@ import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
-import { PROJECT_KIND } from "../governanceProject.service";
+import { resolveGovProjectId } from "../govProject";
 import type { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 import type {
   PulledEventChRow,
@@ -204,6 +209,25 @@ export interface SourceHealthMetrics {
   events7d: number;
   events30d: number;
   lastSuccessIso: string | null;
+}
+
+/** One UTC day, and whether a successful pull ever reached into it. */
+export interface SourceCoverageDay {
+  dayStartIso: string;
+  /**
+   * False means unknown, and unknown carries no number on purpose: the whole
+   * defect this shape exists to prevent is an unpulled day being rendered as
+   * zero dollars.
+   */
+  covered: boolean;
+}
+
+export interface SourceDataCoverage {
+  health: SourceHealth;
+  consecutiveFailures: number;
+  lastSuccessfulPullIso: string | null;
+  /** Oldest first, one entry per UTC day in the requested window. */
+  days: SourceCoverageDay[];
 }
 
 // ---------------------------------------------------------------------------
@@ -423,15 +447,7 @@ export class ActivityMonitorService {
   private async resolveGovProjectId(
     organizationId: string,
   ): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        team: { organizationId },
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    return project?.id ?? null;
+    return await resolveGovProjectId({ prisma: this.prisma, organizationId });
   }
 
   // -----------------------------------------------------------------------
@@ -467,6 +483,7 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: thisWindowStart,
       prevStart: previousWindowStart,
+      windowEnd: now,
     });
 
     return {
@@ -522,6 +539,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByUser({
       tenantId: govProjectId,
       windowStart: now - windowMs,
+      windowEnd: now,
       sortBy: input.sortBy ?? "spend",
       sortDir: input.sortDir ?? "desc",
       limit: input.limit ?? 50,
@@ -596,6 +614,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByDepartment({
       tenantIds,
       windowStart,
+      windowEnd: now,
     });
 
     return assembleDepartmentRows({
@@ -713,6 +732,7 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: now - windowMs,
       prevStart: previousWindowStart,
+      windowEnd: now,
     });
     if (sourceRows.length === 0) return [];
 
@@ -738,7 +758,7 @@ export class ActivityMonitorService {
   // -----------------------------------------------------------------------
 
   /**
-   * Time-series spend rollup for the bird's-eye `<SpendOverTimeChart>`.
+   * Time-series spend rollup for the bird's-eye spend chart.
    * Bucketed daily, grouped by team / user / model. The wire shape is
    * bucket-major (one entry per day with all non-zero groups inside)
    * which round-trips exactly the cross-product the chart legend
@@ -783,6 +803,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendOverTime({
       tenantId: govProjectId,
       windowStart,
+      windowEnd: now,
       groupBy: input.groupBy,
     });
 
@@ -997,6 +1018,58 @@ export class ActivityMonitorService {
       events7d: total((r) => r.c7),
       events30d: total((r) => r.c30),
       lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
+    };
+  }
+
+  /**
+   * Puller health, and which days of the window a successful pull reached.
+   *
+   * Prisma only: both inputs live on the source row, mirrored there by the
+   * ingestionPullRunStatus projection. That matters beyond speed -- a
+   * deployment without ClickHouse still has to be able to say a puller is
+   * broken, and the health question is not a spend question.
+   *
+   * Spec: specs/governance/ingestion-source-health.feature
+   */
+  async sourceDataCoverage(input: {
+    organizationId: string;
+    sourceId: string;
+    windowDays: number;
+  }): Promise<SourceDataCoverage> {
+    const windowDays = Math.max(1, Math.floor(input.windowDays));
+    const dayMs = 24 * 60 * 60 * 1000;
+    const windowStart = startOfUtcDay(Date.now()) - (windowDays - 1) * dayMs;
+
+    const source = await this.prisma.ingestionSource.findFirst({
+      where: { id: input.sourceId, organizationId: input.organizationId },
+      select: {
+        errorCount: true,
+        lastSuccessAt: true,
+        // How far the run actually READ. A day the run never reached is not
+        // a day it collected, and reasoning from the run clock instead marks
+        // the whole window covered the moment any run finishes.
+        lastReadThroughAt: true,
+      },
+    });
+    const consecutiveFailures = source?.errorCount ?? 0;
+    const lastSuccessfulPullMs = source?.lastSuccessAt?.getTime() ?? null;
+    const readThroughMs = source?.lastReadThroughAt?.getTime() ?? null;
+
+    return {
+      health: deriveSourceHealth({ consecutiveFailures }),
+      consecutiveFailures,
+      lastSuccessfulPullIso: source?.lastSuccessAt?.toISOString() ?? null,
+      days: Array.from({ length: windowDays }, (_, i) => {
+        const dayStartMs = windowStart + i * dayMs;
+        return {
+          dayStartIso: new Date(dayStartMs).toISOString(),
+          covered: isDayCoveredByPull({
+            dayStartMs,
+            lastSuccessfulPullMs,
+            readThroughMs,
+          }),
+        };
+      }),
     };
   }
 

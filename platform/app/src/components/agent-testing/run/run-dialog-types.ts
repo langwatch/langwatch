@@ -6,6 +6,7 @@
  */
 
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { SuiteTarget } from "~/server/suites/types";
 import type { RunScope } from "./run-configuration";
@@ -59,6 +60,11 @@ export type RunDialogSubject =
        * repeat run is one click for everyone on the team.
        */
       persistedTarget?: SuiteTarget | null;
+      /**
+       * The evaluators a stored run plan carries beside the ones its suites
+       * attach. The dialog opens on them, so a repeat run keeps its checks.
+       */
+      evaluators?: EvaluatorAttachment[];
     }
   | {
       kind: "case";
@@ -72,6 +78,8 @@ export type RunStartedInfo = {
   batchRunId: string;
   /** The run set of the plan the batch landed in, known at queue time. */
   scenarioSetId: string;
+  /** The address segment of the plan the batch landed in. */
+  planSlug: string;
   /** Set when the run covers one scenario: the case whose run to watch. */
   scenarioId?: string;
   /** Set when the run covers one scenario: the agent it went against. */

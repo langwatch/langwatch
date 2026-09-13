@@ -5,6 +5,7 @@ export {
   type RunPlanScope,
   type RunPlanTarget,
   type RunPlanConfig,
+  type RunPlanEvaluator,
   type RunPlanRunBody,
   type RunPlanRerunBody,
   type RunPlanRunResult,

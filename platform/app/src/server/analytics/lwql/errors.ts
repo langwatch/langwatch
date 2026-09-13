@@ -61,10 +61,14 @@ export class LangWatchQLNotEnabledError extends HandledError {
  *
  * Two ways to arrive here, one condition: the deployment configured no
  * restricted identity at all (no executor is built), or it configured one but
- * the database objects the catalog promises — the views, the grants — are not
- * there for it (the server answers UNKNOWN_TABLE / UNKNOWN_DATABASE /
- * ACCESS_DENIED for a name the validator already approved, so it cannot be
- * the caller's SQL; see `executor.ts`).
+ * the database objects the catalog promises are not there at all for it (the
+ * server answers UNKNOWN_TABLE / UNKNOWN_DATABASE for a name the validator
+ * already approved, so it cannot be the caller's SQL; see `executor.ts`).
+ *
+ * An ACCESS_DENIED refusal is deliberately NOT one of the two — that means
+ * the objects exist but this identity's grants on one are incomplete, a
+ * narrower condition than "not provisioned" that gets its own code and copy:
+ * {@link LangWatchQLProvisioningIncompleteError}.
  *
  * Fail-closed, and the reason this is an error rather than a fallback: without
  * the restricted identity there is no identity to run a customer's SQL as
@@ -89,6 +93,95 @@ export class LangWatchQLUnavailableError extends HandledError {
       },
     );
     this.name = "LangWatchQLUnavailableError";
+  }
+}
+
+/**
+ * A name in the query resolves to no column.
+ *
+ * ClickHouse answers this with UNKNOWN_IDENTIFIER (47), which reached the
+ * caller as an unknown 500: the dashboard widget rendered "Something went
+ * wrong" and `langwatch chart run` said "An unknown error occurred", for a
+ * typo the author fixes in one edit. It cannot be caught earlier than run
+ * time, because whether a column exists is not knowable when the chart is
+ * saved.
+ *
+ * `customer` fault and a 400: the SQL is the member's own, and so is the name.
+ *
+ * The identifier is optional on purpose. It is lifted out of the server's
+ * message by a deliberately narrow extractor that fails closed
+ * (`unknownIdentifierFromError`), because that message also echoes the
+ * submitted query and names internal objects. When it cannot be read with
+ * confidence the refusal still arrives coded and actionable, just without the
+ * name.
+ */
+export class LangWatchQLUnknownIdentifierError extends HandledError {
+  declare readonly code: "lwql_unknown_identifier";
+
+  constructor({
+    identifier,
+    ...options
+  }: {
+    /** The unresolvable name, when it could be read from the server's refusal. */
+    identifier: string | undefined;
+    reasons?: readonly Error[];
+  }) {
+    super(
+      "lwql_unknown_identifier",
+      identifier === undefined
+        ? "The query names a column that does not exist."
+        : `The query names a column that does not exist: ${identifier}.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the workbench, which highlights the offending name,
+        // and the CLI, which prints it. Omitted rather than sent as null when
+        // it could not be read, so a client can tell "no name" from "the name
+        // is the string null".
+        ...(identifier === undefined ? {} : { meta: { identifier } }),
+        ...remediation("lwql_unknown_identifier"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLUnknownIdentifierError";
+  }
+}
+
+/**
+ * The execution path IS provisioned — the restricted identity connects, and
+ * the catalog's views and tables mostly exist for it — but this query hit a
+ * ClickHouse access refusal (`ACCESS_DENIED`) rather than a missing object
+ * (`UNKNOWN_TABLE` / `UNKNOWN_DATABASE`).
+ *
+ * Split from {@link LangWatchQLUnavailableError} on purpose: that code's copy
+ * tells the caller to ask their *own* workspace administrator, which is
+ * correct for a self-hosted deployment that never provisioned LangWatchQL at
+ * all, but wrong here — an access refusal on an otherwise-working deployment
+ * means our own grants are incomplete for one catalog object, something no
+ * customer's administrator can act on. Sending them to their admin anyway
+ * both wastes their time and hides a real provisioning gap behind "config the
+ * customer owns."
+ *
+ * Still `platform` fault, 503, and still fail-closed for the same reason:
+ * ACCESS_DENIED for a name the validator already approved cannot be the
+ * caller's SQL (see `executor.ts`), and it is not safe to retry as a
+ * different identity.
+ */
+export class LangWatchQLProvisioningIncompleteError extends HandledError {
+  declare readonly code: "lwql_provisioning_incomplete";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_provisioning_incomplete",
+      "The LangWatchQL analytics SQL API could not read one of the datasets this query needs.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_provisioning_incomplete"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLProvisioningIncompleteError";
   }
 }
 
@@ -124,7 +217,7 @@ export class LangWatchQLParameterMissingError extends HandledError {
 
 /**
  * The refusal sentence for exactly the names the request carried, agreeing in
- * number so a single supplied name does not read as "values for period_start".
+ * number so a single supplied name does not read as "values for dashboard_context_period_start".
  *
  * Built from the supplied names rather than a fixed phrase because the same
  * code covers the two window bounds and the granularity step, and naming the
@@ -145,7 +238,7 @@ function suppliedParameterSentence(supplied: readonly string[]): string {
 /**
  * The request carried a value for a parameter the surface owns.
  *
- * `period_start`, `period_end` and `period_granularity_seconds` are supplied by
+ * `dashboard_context_period_start`, `dashboard_context_period_end` and `dashboard_context_granularity_seconds` are supplied by
  * whatever is showing the chart — the dashboard's period and step, the
  * workbench's page period — and a caller that sets one is pinning something
  * that will then ignore the surface it sits on. Refused rather than
@@ -254,7 +347,7 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
       "lwql_granularity_parameter_type",
       fault === "step-value"
         ? "The datapoint granularity must be one of the offered steps: 1 second, 1 minute, or 1 hour."
-        : "The query declares period_granularity_seconds with a type that is not UInt32.",
+        : "The query declares dashboard_context_granularity_seconds with a type that is not UInt32.",
       {
         httpStatus: 400,
         fault: "customer",
@@ -308,7 +401,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
 }
 
 /**
- * A statement declared `period_granularity_seconds` without a usable period
+ * A statement declared `dashboard_context_granularity_seconds` without a usable period
  * window for the bucket budget to be computed against -- either bound absent,
  * or present but declared as something other than a date-time.
  *
@@ -319,7 +412,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
  * the fix, and the schema browser spells them.
  *
  * The two causes get different copy. Telling an author to declare
- * `period_start` when it is on screen, declared `String`, sends them looking
+ * `dashboard_context_period_start` when it is on screen, declared `String`, sends them looking
  * for a line that is already there.
  */
 export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
@@ -337,8 +430,8 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
     super(
       "lwql_granularity_requires_window",
       mistyped.length > 0 && absent.length === 0
-        ? "A chart declaring period_granularity_seconds must declare period_start and period_end as DateTime."
-        : "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
+        ? "A chart declaring dashboard_context_granularity_seconds must declare dashboard_context_period_start and dashboard_context_period_end as DateTime."
+        : "A chart declaring dashboard_context_granularity_seconds must also declare dashboard_context_period_start and dashboard_context_period_end.",
       {
         httpStatus: 400,
         fault: "customer",

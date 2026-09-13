@@ -69,15 +69,24 @@ export function AgentTestingHeader({
         gap={4}
       >
         <GridItem minWidth={0}>
+          {/* The title stays on one line and gives space back with an
+              ellipsis; the note beside it reads in full, since it is the
+              shorter of the two and the one a person cannot guess. */}
           <HStack gap={2} minWidth={0} alignItems="baseline">
-            <PageLayout.Heading>
+            <PageLayout.Heading
+              truncate
+              minWidth={0}
+              title={openPlan?.name}
+              data-testid="agent-testing-title"
+            >
               {openPlan?.name ?? "Agent Testing"}
             </PageLayout.Heading>
             {openPlan ? (
               <Text
                 fontSize="11.5px"
                 color={FG_MUTED}
-                truncate
+                flexShrink={0}
+                whiteSpace="nowrap"
                 data-testid="agent-testing-title-note"
               >
                 {openPlan.note}

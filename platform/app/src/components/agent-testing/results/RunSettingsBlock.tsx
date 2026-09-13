@@ -36,7 +36,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { FG_MUTED } from "../shared/design";
-import { TargetDot } from "../shared/TargetDot";
+import { TargetMark } from "../shared/TargetMark";
 import type { RunSettingParameter, RunSettings } from "./run-settings";
 import type { BatchTarget } from "./useBatchTargets";
 
@@ -149,15 +149,25 @@ function overridesOf(target: BatchTarget): RunSettingParameter[] {
 }
 
 /**
- * The targets the run went against, one line each: the dot the target reads
- * in everywhere on the page, its name, and its parameters as chips.
+ * The targets the run went against, one line each: the mark of the kind of
+ * agent behind it, its name, and its parameters as chips.
+ *
+ * The mark takes the colour of the target only in a comparison, where the
+ * colour is what tells one column and one line of the page from another. A
+ * run against one target has nothing to tell apart.
  */
 function TargetsRow({
   targets,
+  isComparison,
   parametersOf,
+  instanceOf,
 }: {
   targets: BatchTarget[];
+  /** Whether the run went against more than one target. */
+  isComparison: boolean;
   parametersOf: (target: BatchTarget) => RunSettingParameter[];
+  /** The connected agent instance that served the target, when one did. */
+  instanceOf: (target: BatchTarget) => string | undefined;
 }) {
   return (
     <SettingRow label="Targets" testId="run-settings-targets">
@@ -170,8 +180,30 @@ function TargetsRow({
             minHeight={ROW_HEIGHT}
             data-testid={`run-settings-target-${target.key}`}
           >
-            <TargetDot color={target.color} />
+            <TargetMark
+              kind={target.kind}
+              color={isComparison ? target.color : undefined}
+              testId={`run-settings-mark-${target.key}`}
+            />
             <Text fontSize="12px">{target.name}</Text>
+            {target.environmentLabel ? (
+              <Text
+                fontSize="11.5px"
+                color={FG_MUTED}
+                data-testid={`run-settings-target-environment-${target.key}`}
+              >
+                {target.environmentLabel}
+              </Text>
+            ) : null}
+            {instanceOf(target) ? (
+              <Text
+                fontSize="11.5px"
+                color={FG_MUTED}
+                data-testid={`run-settings-target-instance-${target.key}`}
+              >
+                {`served by ${instanceOf(target)}`}
+              </Text>
+            ) : null}
             {parametersOf(target).map((parameter) => (
               <ParameterChip
                 key={parameter.name}
@@ -234,7 +266,12 @@ export function RunSettingsBlock({
       ) : null}
 
       {targets.length > 0 ? (
-        <TargetsRow targets={targets} parametersOf={parametersOf} />
+        <TargetsRow
+          targets={targets}
+          isComparison={isComparison}
+          parametersOf={parametersOf}
+          instanceOf={(target) => settings.instanceByTarget.get(target.key)}
+        />
       ) : null}
 
       {!isComparison && settings.parameters.length > 0 ? (

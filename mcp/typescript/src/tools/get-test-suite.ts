@@ -1,4 +1,8 @@
 import { getTestSuite as apiGetTestSuite } from "../langwatch-api-test-suites.js";
+import {
+  formatEvaluatorAttachments,
+  formatSuiteFields,
+} from "./format-suite-details.js";
 
 /**
  * Handles the platform_get_test_suite MCP tool invocation.
@@ -23,6 +27,9 @@ export async function handleGetTestSuite(params: {
   }
   lines.push(`**Created**: ${suite.createdAt}`);
   lines.push(`**Updated**: ${suite.updatedAt}`);
+
+  lines.push(...formatSuiteFields(suite.fields));
+  lines.push(...formatEvaluatorAttachments(suite.evaluators));
 
   lines.push("\n## Scenarios");
   if (suite.scenarios.length === 0) {

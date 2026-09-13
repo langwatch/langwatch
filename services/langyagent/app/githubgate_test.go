@@ -20,6 +20,21 @@ func toolEndFrame(t *testing.T, command string, isError bool, output string) fra
 	return f
 }
 
+// The same settled command, run by a `local_*` tool: it ran in the developer's
+// own folder, on their own machine, with their own git and gh credentials.
+func localToolEndFrame(t *testing.T, name, command string) frames.Frame {
+	t.Helper()
+	input, err := json.Marshal(map[string]string{"command": command})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := frames.ToolEnd("call-1", name, input, false, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
 func toolStartFrameFor(t *testing.T, command string) frames.Frame {
 	t.Helper()
 	input, err := json.Marshal(map[string]string{"command": command})
@@ -31,6 +46,29 @@ func toolStartFrameFor(t *testing.T, command string) frames.Frame {
 		t.Fatal(err)
 	}
 	return f
+}
+
+// A command that ran in the folder the developer shared reaches GitHub with
+// THEIR credentials, so the GitHub App has no part in it and the gate must
+// stand down. Without this a plain `git fetch origin` on the local-control path
+// kills the turn with an install card nobody can act on.
+func TestGithubGate_LocalToolNeverTrips(t *testing.T) {
+	t.Run("when the command ran on the developer's own machine", func(t *testing.T) {
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
+
+		gate.Observe(localToolEndFrame(t, "local_bash",
+			"git fetch origin && git checkout -b langy/tracing origin/main"))
+		gate.Observe(localToolEndFrame(t, "local_bash",
+			"gh pr create --base main --title tracing --body adds tracing"))
+
+		if _, _, tripped := gate.Tripped(); tripped {
+			t.Fatal("the gate tripped on a command that ran in the developer's own folder")
+		}
+		if canceled {
+			t.Error("the gate canceled a stream it had no business stopping")
+		}
+	})
 }
 
 // A settled GitHub-reaching command on a turn with NO credential trips the gate

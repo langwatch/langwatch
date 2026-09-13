@@ -746,4 +746,138 @@ describe("SerializedHttpAgentAdapter", () => {
       });
     });
   });
+
+  describe("given a target with a session path", () => {
+    const sessionConfig: HttpAgentData = {
+      ...defaultConfig,
+      url: "https://api.example.com/chat/{{ session }}",
+      headers: [{ key: "X-Session", value: "{{ session }}" }],
+      bodyTemplate: '{"session": "{{ session }}", "input": "{{ input }}"}',
+      outputPath: "$.reply",
+      sessionPath: "$.conversation_id",
+    };
+
+    const reply = (body: Record<string, unknown>) =>
+      ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: vi.fn().mockResolvedValue(body),
+        text: vi.fn().mockResolvedValue(JSON.stringify(body)),
+      }) as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>;
+
+    const turn = (threadId: string, text: string): AgentInput => ({
+      ...defaultInput,
+      threadId,
+      messages: [{ role: "user", content: text }],
+      newMessages: [{ role: "user", content: text }],
+    });
+
+    /** What the nth request carried: its url, its headers and its parsed body. */
+    const sent = (call: number) => {
+      const [url, init] = mockSsrfSafeFetch.mock.calls[call] as [
+        string,
+        { headers: Record<string, string>; body: string },
+      ];
+      return { url, headers: init.headers, body: JSON.parse(init.body) };
+    };
+
+    describe("when the response carries a value at the session path", () => {
+      /** @scenario "An HTTP agent receives the session it returned in the url, the headers and the body" */
+      /** @scenario "An HTTP agent renders an empty session on the first turn" */
+      /** @scenario "Two threads of one HTTP agent run do not share a session" */
+      it("renders it empty on the first turn, then in the url, a header and the body, and not for another thread", async () => {
+        mockSsrfSafeFetch
+          .mockResolvedValueOnce(
+            reply({ reply: "one", conversation_id: "conv_1" }),
+          )
+          .mockResolvedValueOnce(
+            reply({ reply: "two", conversation_id: "conv_1" }),
+          )
+          .mockResolvedValueOnce(reply({ reply: "other" }));
+        const adapter = new SerializedHttpAgentAdapter({
+          config: sessionConfig,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).resolves.toBe(
+          "one",
+        );
+        await expect(adapter.call(turn("thread_a", "second"))).resolves.toBe(
+          "two",
+        );
+        await expect(adapter.call(turn("thread_b", "hello"))).resolves.toBe(
+          "other",
+        );
+
+        expect(sent(0).url).toBe("https://api.example.com/chat/");
+        expect(sent(0).headers["X-Session"]).toBe("");
+        expect(sent(0).body.session).toBe("");
+
+        expect(sent(1).url).toBe("https://api.example.com/chat/conv_1");
+        expect(sent(1).headers["X-Session"]).toBe("conv_1");
+        expect(sent(1).body.session).toBe("conv_1");
+
+        expect(sent(2).url).toBe("https://api.example.com/chat/");
+        expect(sent(2).body.session).toBe("");
+      });
+
+      /** @scenario "A response with no match at the session path leaves the held value unchanged" */
+      it("keeps the held value when a later response has nothing at the path", async () => {
+        mockSsrfSafeFetch
+          .mockResolvedValueOnce(
+            reply({ reply: "one", conversation_id: "conv_1" }),
+          )
+          .mockResolvedValueOnce(reply({ reply: "two" }))
+          .mockResolvedValueOnce(reply({ reply: "three" }));
+        const adapter = new SerializedHttpAgentAdapter({
+          config: sessionConfig,
+        });
+
+        await adapter.call(turn("thread_a", "first"));
+        await adapter.call(turn("thread_a", "second"));
+        await adapter.call(turn("thread_a", "third"));
+
+        expect(sent(2).body.session).toBe("conv_1");
+      });
+
+      /** @scenario "A structured session renders as raw JSON in the body" */
+      it("renders an object session as raw JSON in the body", async () => {
+        mockSsrfSafeFetch
+          .mockResolvedValueOnce(
+            reply({ reply: "one", state: { step: 2, seen: ["a"] } }),
+          )
+          .mockResolvedValueOnce(reply({ reply: "two" }));
+        const adapter = new SerializedHttpAgentAdapter({
+          config: {
+            ...sessionConfig,
+            url: "https://api.example.com/chat",
+            headers: [],
+            bodyTemplate: '{"state": {{ session }}}',
+            sessionPath: "$.state",
+          },
+        });
+
+        await adapter.call(turn("thread_a", "first"));
+        await adapter.call(turn("thread_a", "second"));
+
+        expect(sent(1).body.state).toEqual({ step: 2, seen: ["a"] });
+      });
+    });
+
+    describe("when the response carries a session above the cap", () => {
+      /** @scenario "An HTTP agent session above the cap fails the turn" */
+      it("fails the turn with the payload code", async () => {
+        mockSsrfSafeFetch.mockResolvedValueOnce(
+          reply({ reply: "one", conversation_id: "x".repeat(70_000) }),
+        );
+        const adapter = new SerializedHttpAgentAdapter({
+          config: sessionConfig,
+        });
+
+        await expect(adapter.call(turn("thread_a", "first"))).rejects.toThrow(
+          /agent_payload_too_large/,
+        );
+      });
+    });
+  });
 });

@@ -62,6 +62,12 @@ function makeCommands(
     recordTurnHandoff: vi.fn(async () => {}),
     consumeTurnHandoff: vi.fn(async () => {}),
     generateConversationTitle: vi.fn(async () => {}),
+    requestLocalControl: vi.fn(async () => {}),
+    connectLocalWorkspace: vi.fn(async () => {}),
+    disconnectLocalWorkspace: vi.fn(async () => {}),
+    changeLocalPolicy: vi.fn(async () => {}),
+    startUserWait: vi.fn(async () => {}),
+    endUserWait: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -1132,6 +1138,213 @@ describe("LangyConversationService", () => {
         "tool-write",
         "text:Done.",
       ]);
+    });
+  });
+  describe("getLocalRecord — the cards the developer's machine put up (ADR-129)", () => {
+    const waitEvent = (o: {
+      id: string;
+      type: string;
+      data: Record<string, unknown>;
+      at?: number;
+    }) => ({
+      id: o.id,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: o.at ?? 100,
+      occurredAt: o.at ?? 100,
+      type: o.type,
+      version: "2026-09-02",
+      data: o.data,
+    });
+
+    const started = (o: {
+      id: string;
+      waitId: string;
+      turnId?: string;
+      summary?: string;
+      at?: number;
+    }) =>
+      waitEvent({
+        id: o.id,
+        ...(o.at !== undefined ? { at: o.at } : {}),
+        type: "lw.langy_conversation.user_wait_started",
+        data: {
+          conversationId: "c1",
+          turnId: o.turnId ?? "t1",
+          waitId: o.waitId,
+          kind: "permission",
+          toolCallId: `tc-${o.waitId}`,
+          expiresAt: 9_000,
+          permission: {
+            callId: `lcc-${o.waitId}`,
+            summary: o.summary ?? "pnpm typecheck",
+            pattern: "pnpm *",
+            reason: "not on the read-only list",
+            skipOffered: true,
+            workspaceName: "acme-app",
+            hostname: "rogerio-mbp",
+          },
+        },
+      });
+
+    const ended = (o: {
+      id: string;
+      waitId: string;
+      outcome: string;
+      decision?: string;
+      turnId?: string;
+      at?: number;
+    }) =>
+      waitEvent({
+        id: o.id,
+        ...(o.at !== undefined ? { at: o.at } : {}),
+        type: "lw.langy_conversation.user_wait_ended",
+        data: {
+          conversationId: "c1",
+          turnId: o.turnId ?? "t1",
+          waitId: o.waitId,
+          kind: "permission",
+          toolCallId: `tc-${o.waitId}`,
+          outcome: o.outcome,
+          ...(o.decision ? { decision: o.decision } : {}),
+        },
+      });
+
+    const workspaceEvent = (o: { id: string; type: string; at: number }) =>
+      waitEvent({
+        id: o.id,
+        at: o.at,
+        type: o.type,
+        data: { conversationId: "c1", instanceId: "lci_1", reason: "cli_exit" },
+      });
+
+    const serviceOver = (events: readonly unknown[]) =>
+      new LangyConversationService(
+        makeRepo({ findVisibleById: vi.fn().mockResolvedValue(row()) }),
+        makeCommands(),
+        undefined,
+        { getEventsOccurredSince: vi.fn(async () => events as never) },
+      );
+
+    describe("when the conversation is not visible to the caller", () => {
+      it("reports not-found rather than the cards", async () => {
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          { getEventsOccurredSince: vi.fn(async () => [] as never) },
+        );
+
+        await expect(
+          svc.getLocalRecord({
+            projectId: "p1",
+            conversationId: "c1",
+            userId: "alice",
+          }),
+        ).rejects.toThrow(LangyConversationNotFoundError);
+      });
+    });
+
+    /** @scenario "Every card of the conversation is on screen again after a reload" */
+    it("hands back every card of every turn with the answer it ended on", async () => {
+      const svc = serviceOver([
+        started({ id: "e1", waitId: "w1", at: 100 }),
+        ended({
+          id: "e2",
+          waitId: "w1",
+          outcome: "answered",
+          decision: "allow_pattern",
+          at: 110,
+        }),
+        started({
+          id: "e3",
+          waitId: "w2",
+          turnId: "t2",
+          summary: "rm -rf build",
+          at: 200,
+        }),
+        ended({
+          id: "e4",
+          waitId: "w2",
+          outcome: "expired",
+          turnId: "t2",
+          at: 210,
+        }),
+      ]);
+
+      const { waits } = await svc.getLocalRecord({
+        projectId: "p1",
+        conversationId: "c1",
+        userId: "alice",
+      });
+
+      expect(waits).toHaveLength(2);
+      expect(waits[0]).toMatchObject({
+        waitId: "w1",
+        turnId: "t1",
+        status: "answered",
+        decision: "allow_pattern",
+        pattern: "pnpm *",
+        summary: "pnpm typecheck",
+      });
+      expect(waits[1]).toMatchObject({
+        waitId: "w2",
+        turnId: "t2",
+        status: "expired",
+        summary: "rm -rf build",
+      });
+    });
+
+    /** @scenario "A card raised before this tab was watching still appears" */
+    it("hands back a card still waiting, so a tab that adopted the turn shows it", async () => {
+      const svc = serviceOver([started({ id: "e1", waitId: "w1" })]);
+
+      const { waits } = await svc.getLocalRecord({
+        projectId: "p1",
+        conversationId: "c1",
+        userId: "alice",
+      });
+
+      expect(waits[0]).toMatchObject({
+        waitId: "w1",
+        status: "pending",
+        toolCallId: "tc-w1",
+        hostname: "rogerio-mbp",
+      });
+    });
+
+    /** @scenario "The card reads the connection off the record, not only off the stream" */
+    it("says whether the folder is connected, from the record's last word", async () => {
+      const connected = serviceOver([
+        workspaceEvent({
+          id: "e1",
+          type: "lw.langy_conversation.local_workspace_connected",
+          at: 100,
+        }),
+      ]);
+      const gone = serviceOver([
+        workspaceEvent({
+          id: "e1",
+          type: "lw.langy_conversation.local_workspace_connected",
+          at: 100,
+        }),
+        workspaceEvent({
+          id: "e2",
+          type: "lw.langy_conversation.local_workspace_disconnected",
+          at: 200,
+        }),
+      ]);
+      const read = {
+        projectId: "p1",
+        conversationId: "c1",
+        userId: "alice",
+      };
+
+      expect((await connected.getLocalRecord(read)).workspaceConnected).toBe(
+        true,
+      );
+      expect((await gone.getLocalRecord(read)).workspaceConnected).toBe(false);
     });
   });
 });

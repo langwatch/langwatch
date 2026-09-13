@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
 
-**Status:** Accepted — amended 2026-08-20, see below
+**Status:** Accepted — amended 2026-08-20 and 2026-08-31, see below
 
 ## Amendment (2026-08-20): PostHog removed from the resolver
 
@@ -19,6 +19,36 @@ Three consequences the rest of this document predates:
 - **A SYSTEM-scoped flag exposed to the frontend is a legitimate shape.** `FeatureFlagKey` is the union of all registered keys regardless of scope, so the `featureFlag.isEnabled` router's cast is safe either way. The Langy family relies on this: internal levers that gate a product surface. A guard added in #7357 asserted the opposite — that every frontend-exposed flag must be PRODUCT — and went red on `main` when #7424 landed a SYSTEM flag in `FRONTEND_FEATURE_FLAGS` (issue #7511); it was removed rather than extended, because the premise was inherited from this ADR after the code beneath it had changed.
 
 Sections below describing a PostHog path (Resolution order, Architecture Flow, Targeting via personProperties, PostHog local evaluation) are retained as history of the 2026-05 design and are **not** the current behaviour. `POSTHOG_FEATURE_FLAGS_KEY` no longer affects flag resolution; PostHog remains in the product for analytics and error capture only.
+
+## Amendment (2026-08-31): targeting by organization age ("New users")
+
+A rollout aimed at new signups cannot be written as a list of organization ids
+— the organizations it is for do not exist yet, and re-editing the list on
+every signup is not a rollout. A rule may therefore name a date instead:
+
+```json
+{ "match": { "organizationCreatedAfter": "2026-06-01" }, "enabled": true }
+```
+
+It matches every organization created **on or after** that instant, and nobody
+else: organizations created before it are left on whatever the rest of the
+rules and the flag's own value already said. `/ops/feature-flags`
+writes it as the **New users** scope in the targeting-rules dialog, where the
+field beside the picker becomes a date.
+
+Two properties are load-bearing:
+
+- **It fails closed.** A read whose organization creation date is unknown — an
+  opted-out organization scope, a failed lookup — matches no age rule, and
+  neither does a stored date that cannot be parsed. Treating an unreadable
+  condition as *no* condition would turn one bad rule into a fleet-wide
+  switch, since a rule with no conditions matches everyone.
+- **No call site carries the date.** `FeatureFlagStorePostgres` resolves the
+  organization's `createdAt` itself, lazily, and only for a flag whose own
+  rules ask for it (`rulesTargetOrganizationAge`), memoised per organization
+  for ten minutes. A creation date never changes, and a flag with no age rule
+  — every kill switch on the per-event hot path — reads exactly what it read
+  before, with no extra query.
 
 ## Context
 
@@ -104,7 +134,9 @@ FeatureFlagService                                 env override
 
 ## Targeting
 
-Rules on a flag row name a project or an organization. The read states both, so a rule written for either one can match:
+Rules on a flag row name a project, an organization, or an organization
+creation date (see the 2026-08-31 amendment). The read states both ids, so a
+rule written for either one can match:
 
 ```typescript
 await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {

@@ -12,6 +12,8 @@
 import { useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { parseEvaluatorAttachments } from "~/server/scenarios/evaluator-attachments";
+import { parseSuiteFieldDefinitions } from "~/server/scenarios/suite-fields";
 import { api, type RouterOutputs } from "~/utils/api";
 import type { CaseLastResult } from "./CasesTable";
 import {
@@ -140,6 +142,8 @@ function useSuiteEntries({
         name: testSuite.name,
         slug: testSuite.slug,
         caseCount: countByTestSuite.get(testSuite.id) ?? 0,
+        fields: parseSuiteFieldDefinitions(testSuite.fields),
+        evaluators: parseEvaluatorAttachments(testSuite.evaluators),
       })),
     );
   }, [testSuites, cases]);

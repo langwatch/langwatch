@@ -154,6 +154,20 @@ type entry struct {
 	// Empty means we have no token to revalidate with, and the next refresh
 	// goes out unconditional.
 	configETag string
+	// budgetRollAckedFor is the budget boundary whose spend this entry already
+	// carries, set once at construction and never after. It is deliberately not
+	// configFetchedAt: that one is stamped on every refresh outcome, failures
+	// included, so keying the roll on it would let a control plane that could
+	// not be reached count as the re-read and hand the entry back to
+	// conditional revalidation still holding the dead period's spend.
+	//
+	// Only a config the gateway actually received clears a roll, and that
+	// arrives as a new entry through storeL1 rather than a mutation here — so
+	// there is no ack on the refresh path at all. A 304 must not clear one: it
+	// carries no spend, and a 304 taken while the period was still running
+	// would ack a boundary the entry has not reached yet and suppress the roll
+	// when it does.
+	budgetRollAckedFor time.Time
 }
 
 // currentConfigETag reports the ETag of the config this entry is carrying.
@@ -163,15 +177,88 @@ func (e *entry) currentConfigETag() string {
 	return e.configETag
 }
 
-// configStale reports whether the entry's config is older than ttl.
-// ttl <= 0 disables staleness (never stale).
-func (e *entry) configStale(ttl time.Duration) bool {
-	if ttl <= 0 {
-		return false
-	}
+// refreshConfigETag is the If-None-Match a staleness refresh of this entry
+// should send: the carried token normally, and none once the budget period has
+// rolled.
+//
+// Dropping the token there is the whole point of the roll. The token is built
+// from the key's revision and its provider set, and a period ending moves
+// neither, so a conditional refresh of a bundle whose spend figures expired at
+// midnight comes back 304 and leaves those figures in place. Unconditional
+// costs one materialization per key per period.
+func (e *entry) refreshConfigETag() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.budgetPeriodRolled() {
+		return ""
+	}
+	return e.configETag
+}
+
+// configStale reports whether the entry's config needs refreshing: its budget
+// period has rolled, or it is older than ttl. ttl <= 0 disables the age half
+// only — a rolled period is stale whatever the ttl, because the figures it
+// leaves behind are not merely old, they belong to a period that has ended.
+func (e *entry) configStale(ttl time.Duration) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	rolled := e.budgetPeriodRolled()
+	if rolled && e.configFetchedAt.Before(e.bundle.Config.Budget.ValidUntil) {
+		// First look past the boundary: the figures are known dead, go now.
+		return true
+	}
+	if ttl <= 0 {
+		// No staleness clock configured. A period that ended still has to keep
+		// asking, because with the roll unanswered nothing else will replace
+		// spend belonging to a period that is over.
+		return rolled
+	}
+	// A refresh that failed has stamped configFetchedAt, so the retries of an
+	// unanswered roll are paced by the ordinary clock rather than fired on
+	// every request. They stay unconditional until one of them is answered.
 	return time.Since(e.configFetchedAt) > ttl
+}
+
+// budgetPeriodRolled reports whether this entry's spend figures were read in a
+// budget period that has since ended and the control plane has not answered for
+// the new one yet. Caller holds e.mu.
+//
+// Only a config the gateway actually received clears it, which arrives as a new
+// entry. A failed fetch, and a 304 answering the unconditional refresh this
+// forces, both leave the roll standing so the next attempt goes out
+// unconditional too — offering the token instead would be answered 304 and
+// leave the entry enforcing the dead period's spend, the exact deadlock this is
+// here to break.
+//
+// The permanently-past boundary — a MANUAL budget carrying an old stored
+// instant, a clock skewed forward — is handled at construction rather than
+// here: an entry built from a config read after the boundary starts already
+// acked, so it never asks. See ackedBoundaryAtBuild.
+func (e *entry) budgetPeriodRolled() bool {
+	validUntil := e.bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() {
+		return false
+	}
+	if time.Now().Before(validUntil) {
+		return false
+	}
+	return !e.budgetRollAckedFor.Equal(validUntil)
+}
+
+// ackedBoundaryAtBuild is the boundary a freshly built entry should count as
+// already answered: one that had passed by the time this config was read, so
+// the spend it carries was materialized after it. Zero otherwise, which leaves
+// the next roll to be detected normally.
+//
+// Without this a boundary that never moves would re-arm on every entry the
+// refresh creates, turning each staleness refresh into a full materialization
+// forever.
+func ackedBoundaryAtBuild(bundle *domain.Bundle, now time.Time) time.Time {
+	validUntil := bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() || now.Before(validUntil) {
+		return time.Time{}
+	}
+	return validUntil
 }
 
 // tryBeginConfigRefresh claims the per-entry config-refresh slot.
@@ -678,12 +765,14 @@ func (s *Service) Stop() {
 // config outright rather than revalidating against a token we do not have.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
 	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
+	now := time.Now()
 	s.l1.Add(h, &entry{
-		bundle:          bundle,
-		softExpiresAt:   softExpiresAt,
-		hardExpiresAt:   hardExpiresAt,
-		configFetchedAt: time.Now(),
-		configETag:      configETag,
+		bundle:             bundle,
+		softExpiresAt:      softExpiresAt,
+		hardExpiresAt:      hardExpiresAt,
+		configFetchedAt:    now,
+		configETag:         configETag,
+		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -977,6 +1066,10 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // changed, and the conditional request turns a full config materialization
 // into a 304 the control plane answers from the key's revision.
 //
+// The exception is a rolled budget period, where refreshConfigETag drops the
+// token so the fetch cannot come back 304 — nothing the token is built from
+// moves when a period ends, and the spend figures have to move.
+//
 // It bounds the staleness of the key's own expiration date by the same TTL. The
 // date arrives on the config response as well as on the token, so an admin who
 // shortens it is followed within one TTL even while the change feed is
@@ -991,7 +1084,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
-	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.currentConfigETag())
+	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
 			zap.String("vk_id", stale.VirtualKeyID),

@@ -35,6 +35,13 @@ type Request struct {
 	// materialized bytes like every other request type. Nil otherwise.
 	Transcription *TranscriptionUpload
 
+	// ImageEdit carries the parsed multipart upload for
+	// RequestTypeImageEdit: the source images, the optional mask, and the
+	// OpenAI-wire text parameters. The router parses the form, like it does
+	// for transcription, so the rest of the pipeline works on materialized
+	// bytes. Nil otherwise.
+	ImageEdit *ImageEditUpload
+
 	// RealtimeSession carries the mint parameters for
 	// RequestTypeRealtimeSession. Nil otherwise.
 	RealtimeSession *RealtimeSessionRequest
@@ -91,6 +98,25 @@ type TranscriptionUpload struct {
 	// (language, prompt, response_format, temperature). The dispatcher maps
 	// them onto the provider request; unknown fields are dropped by the
 	// router rather than forwarded blind.
+	Params map[string]string
+}
+
+// ImageEditUpload is the normalized content of a /v1/images/edits multipart
+// form: the source images, the optional mask, and the OpenAI-wire optional
+// parameters.
+type ImageEditUpload struct {
+	// Images are the source image files, in the order the caller sent them.
+	// The OpenAI SDK posts them under the form field "image[]"; a single
+	// image also arrives under "image".
+	Images [][]byte
+	// Mask is the optional transparency mask that says which pixels the model
+	// may change. Nil when the caller sent none.
+	Mask []byte
+	// Params holds the optional string form fields exactly as received
+	// (prompt, n, size, quality, background, input_fidelity, output_format,
+	// output_compression, response_format, user). The dispatcher maps them
+	// onto the provider request; unknown fields are dropped by the router
+	// rather than forwarded blind.
 	Params map[string]string
 }
 
@@ -154,6 +180,12 @@ const (
 	// RequestTypeTranscription is POST /v1/audio/transcriptions
 	// (OpenAI-wire multipart STT).
 	RequestTypeTranscription RequestType = "transcription"
+	// RequestTypeImageGeneration is POST /v1/images/generations
+	// (OpenAI-wire image generation). Non-streaming only.
+	RequestTypeImageGeneration RequestType = "image_generation"
+	// RequestTypeImageEdit is POST /v1/images/edits (OpenAI-wire multipart
+	// image edit). Non-streaming only.
+	RequestTypeImageEdit RequestType = "image_edit"
 	// RequestTypeRealtimeSession mints a vendor session credential for a
 	// realtime voice socket the gateway does not carry (ADR-097). Its spend
 	// record is admitted here and closed later, by the vendor's own report.

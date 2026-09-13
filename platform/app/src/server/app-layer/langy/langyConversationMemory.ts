@@ -13,7 +13,7 @@
  * run THAT scenario with the id from turn 1. It could not, because the id was
  * not there to use.
  *
- * The agent's memory of a conversation lives in exactly one place: the opencode
+ * The agent's memory of a conversation lives in exactly one place: the agent
  * session inside its live worker process (`app/workerpool/pool.go` — one
  * `OpenSession` per spawn). That process is reaped after `LANGY_WORKER_IDLE_MS`
  * of quiet (10 min by default), killed outright when the turn's credential

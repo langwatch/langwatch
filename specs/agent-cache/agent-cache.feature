@@ -327,3 +327,11 @@ Feature: The agent cache
       Given the platform refuses a write because the value is not text
       When the agent reads the exception
       Then it names the field and what was expected of it
+
+    # The platform gives the same refusal in more than one form. Every form
+    # must reach the caller with the reason, not with the bare code.
+    @unit
+    Scenario: A write refused for a bad time to live names that field too
+      Given the platform refuses a write because the time to live is too small
+      When the agent reads the exception
+      Then it names the field and what was expected of it

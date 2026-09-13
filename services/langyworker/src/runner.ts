@@ -24,6 +24,7 @@ import {
   type TurnCommand,
 } from "./protocol.js";
 import { prependResumeSeed } from "./system-prompt.js";
+import type { TurnContext } from "./tools/turn-context.js";
 import type { ProtocolWriter } from "./writer.js";
 
 /** The slice of pi's AgentSession the runner drives (injectable for tests). */
@@ -57,6 +58,12 @@ export type TurnRunnerOptions = {
    */
   applySystemPrompt: (systemPrompt: string) => void;
   warn?: (message: string) => void;
+  /**
+   * The holder the local tools read to name the turn they belong to. It carries
+   * the turn in flight and goes back to null at the terminal, so a tool that
+   * somehow runs between turns names no turn instead of a stale one.
+   */
+  turnContext?: TurnContext;
   /**
    * True when the session continued a persisted transcript at boot. A turn's
    * `resumeToken` (the shutdown-handoff digest) is then skipped: the session's
@@ -169,6 +176,7 @@ export class TurnRunner {
       mapper: new TurnEventMapper(command.turnId),
     };
     this.current = state;
+    if (this.options.turnContext) this.options.turnContext.turnId = command.turnId;
 
     let terminal: TerminalEvent;
     try {
@@ -204,6 +212,7 @@ export class TurnRunner {
 
     state.terminalEmitted = true;
     this.current = null;
+    if (this.options.turnContext) this.options.turnContext.turnId = null;
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
   }

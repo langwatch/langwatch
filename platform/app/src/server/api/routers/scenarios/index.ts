@@ -7,7 +7,7 @@ import { scenarioEventsRouter } from "./scenario-events.router";
 import { scenarioVersionRouter } from "./scenario-version.router";
 import { simulationRunnerRouter } from "./simulation-runner.router";
 
-export { type SimulationTarget } from "./simulation-runner.router";
+export { type SimulationTarget } from "~/server/scenarios/simulation-target";
 
 /**
  * Combined scenarios router.

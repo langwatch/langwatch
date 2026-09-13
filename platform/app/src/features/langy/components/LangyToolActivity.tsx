@@ -41,7 +41,13 @@ import {
   readCliErrorDocument,
 } from "@langwatch/langy";
 import type { UIMessage } from "ai";
-import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
+import {
+  AlertCircle,
+  Braces,
+  Check,
+  ChevronRight,
+  Layers3,
+} from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -50,6 +56,7 @@ import {
   type CapabilityCommand,
   commandOfToolCall,
 } from "../logic/langyCapabilityDigest";
+import { isCodeAccessToolPart } from "../logic/langyCodeAccessTool";
 import { isPlanToolPart } from "../logic/langyPlan";
 import {
   isQuestionToolPart,
@@ -92,7 +99,7 @@ const dotPulse = keyframes`
  * The old label table lived here. It is gone.
  *
  * It mapped a tool's NAME to a word — `bash` → "Coding", and anything unmapped
- * to a humanised version of its own name, which is how opencode's `skill` tool
+ * to a humanised version of its own name, which is how the `skill` tool
  * produced a card reading "SKILL / Skill". Both were the same mistake: naming
  * the mechanism where the act belongs. A `bash` running `langwatch trace search`
  * is not "Coding"; it is searching traces, and the command said so all along.
@@ -543,6 +550,7 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
       presentation: presentLangyToolError({
         title: described.title,
         errorText: part.errorText ?? part.output,
+        toolName: name,
       }),
       order: index,
     });
@@ -575,6 +583,10 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     if (isQuestionToolPart(part) && questionToolCardParts(part).length > 0) {
       return;
     }
+    // The `code_access` tool is the code access card (ADR-129), for the same
+    // reason: it speaks to the person, not to the model, and the card carries
+    // its whole life.
+    if (isCodeAccessToolPart(part)) return;
     const name = partToolName(part);
     if (!name) return;
 
@@ -640,6 +652,7 @@ export function LangyToolActivity({
   message,
   reasoningTitles,
   live = true,
+  answeredAfter = false,
 }: {
   message: UIMessage;
   /**
@@ -651,12 +664,15 @@ export function LangyToolActivity({
   reasoningTitles?: string[];
   /** @see LangyActivityParts */
   live?: boolean;
+  /** @see LangyActivityParts */
+  answeredAfter?: boolean;
 }) {
   return (
     <LangyActivityParts
       parts={message.parts}
       reasoningTitles={reasoningTitles}
       live={live}
+      answeredAfter={answeredAfter}
     />
   );
 }
@@ -678,7 +694,17 @@ export function LangyActivityParts({
   parts,
   reasoningTitles = [],
   live = true,
-}: PartsView & { reasoningTitles?: string[]; live?: boolean }) {
+  answeredAfter = false,
+}: PartsView & {
+  reasoningTitles?: string[];
+  live?: boolean;
+  /**
+   * The turn wrote its reply in a LATER run than this one. A run holds only
+   * its own parts, so it cannot see the answer that followed it; the caller
+   * can. See the recovered-failure fold below.
+   */
+  answeredAfter?: boolean;
+}) {
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
   const turnProgressSample = useLangyStore((state) => state.turnProgressSample);
@@ -728,6 +754,14 @@ export function LangyActivityParts({
   // knows the part it came from, so the render is a stable sort on that: a
   // failure lands exactly where it happened, and the receipt for the steps
   // before it stays before it. See {@link Sequenced}.
+  // A step that failed and was then followed by the turn's own reply is a step
+  // the turn RECOVERED from. A filmed run left three red cards standing for
+  // three self-corrected probes — a flag the command did not take, then the same
+  // command without it — beside a reply that had gone on to open a pull request.
+  // Nothing is hidden: a recovered failure folds to one line that opens into the
+  // same card. A turn that is still running, or one that never got to a reply,
+  // keeps its failures where they are.
+  const answerIndex = lastAnswerTextIndex(view);
   const rows: Array<{ key: string; order: number; node: ReactNode }> = [
     ...failures.map(({ id, call, presentation, order }) => ({
       key: `failure:${id}`,
@@ -737,6 +771,7 @@ export function LangyActivityParts({
           call={call}
           presentation={presentation}
           devMode={devMode}
+          recovered={!live && (answeredAfter || answerIndex > order)}
         />
       ),
     })),
@@ -1397,12 +1432,24 @@ function FailedToolCallRow({
   call,
   presentation,
   devMode,
+  recovered = false,
 }: {
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
   devMode: boolean;
+  /**
+   * The turn went on to answer after this step failed. The card folds to one
+   * line, which opens into the same card — a recovered step is process record,
+   * and the turn's own reply is the account of what happened.
+   */
+  recovered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // A plan limit is never folded: it is not a step that failed, it is a
+  // decision the reader can change, and its card is the way to change it.
+  if (recovered && !presentation.limit) {
+    return <RecoveredToolFailureRow presentation={presentation} />;
+  }
   return (
     <VStack align="stretch" gap={1}>
       <Box position="relative">
@@ -1416,25 +1463,59 @@ function FailedToolCallRow({
         )}
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
-            <Tooltip
-              content={open ? "Hide raw data" : "Show raw data"}
-              showArrow
-            >
-              <IconButton
-                size="2xs"
-                variant="ghost"
-                color={open ? "orange.solid" : "fg.subtle"}
-                aria-label={open ? "Hide raw data" : "Show raw data"}
-                aria-expanded={open}
-                onClick={() => setOpen((value) => !value)}
-              >
-                <Braces size={12} />
-              </IconButton>
-            </Tooltip>
+            <RawDataToggle
+              isOpen={open}
+              onToggle={() => setOpen((value) => !value)}
+            />
           </Box>
         ) : null}
       </Box>
       {devMode && open ? <RawCallJson call={call} /> : null}
+    </VStack>
+  );
+}
+
+/**
+ * A step that failed and that the turn then recovered from, as one line.
+ *
+ * Quiet, not gone. The same card is one click away, and the failure keeps its
+ * place in the transcript — it just stops competing with the answer the turn
+ * went on to give.
+ */
+function RecoveredToolFailureRow({
+  presentation,
+}: {
+  presentation: LangyToolErrorPresentation;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <VStack align="stretch" gap={2}>
+      <chakra.button
+        type="button"
+        width="full"
+        textAlign="left"
+        cursor="pointer"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <HStack gap={2}>
+          <Box color="fg.subtle" display="flex" flexShrink={0}>
+            <AlertCircle size={11} aria-hidden="true" />
+          </Box>
+          <Text textStyle="xs" color="fg.subtle" flex={1} truncate>
+            {presentation.title}, and Langy carried on
+          </Text>
+          <Box
+            color="fg.subtle"
+            display="flex"
+            transform={open ? "rotate(90deg)" : undefined}
+            transition="transform 150ms ease"
+          >
+            <ChevronRight size={12} />
+          </Box>
+        </HStack>
+      </chakra.button>
+      {open ? <LangyToolErrorCard presentation={presentation} /> : null}
     </VStack>
   );
 }

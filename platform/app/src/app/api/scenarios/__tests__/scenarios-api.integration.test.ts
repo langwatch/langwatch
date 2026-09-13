@@ -373,6 +373,86 @@ describe("Scenarios API", () => {
     });
   });
 
+  describe("given the suite declares fields", () => {
+    async function createTestSuiteWithFields() {
+      return prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Case lookups",
+          slug: `case-lookups-${nanoid(6)}`,
+          kind: "test_suite",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "max_rows", type: "number" },
+          ],
+        },
+      });
+    }
+
+    describe("when the values match the declared fields", () => {
+      /** @scenario "The scenario API accepts and returns field values" */
+      it("stores the values on create and returns them on read", async () => {
+        const testSuite = await createTestSuiteWithFields();
+
+        const created = await helpers.api.post("/api/scenarios", {
+          name: "Chargebacks by quarter",
+          situation: "An analyst asks for chargebacks per quarter",
+          testSuiteId: testSuite.id,
+          fields: { golden_sql: "SELECT 1", max_rows: "12" },
+        });
+
+        expect(created.status).toBe(201);
+        const body = await created.json();
+        expect(body.fields).toEqual({ golden_sql: "SELECT 1", max_rows: 12 });
+
+        const read = await helpers.api.get(`/api/scenarios/${body.id}`);
+        expect((await read.json()).fields).toEqual({
+          golden_sql: "SELECT 1",
+          max_rows: 12,
+        });
+      });
+    });
+
+    describe("when a value names a field the suite does not declare", () => {
+      /** @scenario "A value for a field the suite does not declare is refused" */
+      it("answers 422 scenario_field_unknown for an undeclared field", async () => {
+        const testSuite = await createTestSuiteWithFields();
+
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Chargebacks by quarter",
+          situation: "An analyst asks for chargebacks per quarter",
+          testSuiteId: testSuite.id,
+          fields: { table_schema: "CREATE TABLE ..." },
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error).toBe("scenario_field_unknown");
+      });
+    });
+
+    describe("when a value has the wrong type for its field", () => {
+      /** @scenario "A value of the wrong type is refused" */
+      it("answers 422 scenario_field_type_invalid for text in a number field", async () => {
+        const testSuite = await createTestSuiteWithFields();
+
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Chargebacks by quarter",
+          situation: "An analyst asks for chargebacks per quarter",
+          testSuiteId: testSuite.id,
+          fields: { max_rows: "twelve" },
+        });
+
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toBe("scenario_field_type_invalid");
+      });
+    });
+  });
+
   describe("PUT /api/scenarios/:id", () => {
     describe("when the scenario exists", () => {
       let scenario: Scenario;
@@ -752,7 +832,7 @@ describe("Scenarios API", () => {
       expect(body).toMatchObject({
         version: 1,
         authorLabel: "api",
-        schemaVersion: 1,
+        schemaVersion: 2,
         isSynthesized: false,
       });
       expect(body.snapshot).toMatchObject({

@@ -115,6 +115,7 @@ describe("Feature: Test Suites REST API", () => {
       ["simulationSuite", { projectId: testProjectId }],
       ["scenario", { projectId: testProjectId }],
       ["agent", { projectId: testProjectId }],
+      ["evaluator", { projectId: testProjectId }],
     ]);
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
@@ -294,6 +295,127 @@ describe("Feature: Test Suites REST API", () => {
       const body = await res.json();
       expect(body.name).toBe("Returns");
       expect(body.slug).toBe(testSuite.slug);
+    });
+  });
+
+  describe("given a test suite that declares fields and attaches an evaluator", () => {
+    async function createExactMatchEvaluator() {
+      return prisma.evaluator.create({
+        data: {
+          projectId: testProjectId,
+          name: "Exact match",
+          slug: `exact-match-${nanoid(6)}`,
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match", settings: {} },
+        },
+      });
+    }
+
+    /** @scenario "A test suite declares fields and reads them back" */
+    it("creates it with its fields and evaluators and returns them on every read", async () => {
+      const evaluator = await createExactMatchEvaluator();
+      const attachment = {
+        id: "att_1",
+        evaluatorId: evaluator.id,
+        required: true,
+        mappings: {
+          output: {
+            type: "source",
+            sourceId: "conversation",
+            path: ["last_agent_message"],
+          },
+          expected_output: {
+            type: "source",
+            sourceId: "scenario",
+            path: ["fields", "golden_sql"],
+          },
+        },
+      };
+
+      const created = await api.post(BASE, {
+        name: "Case lookups",
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+        ],
+        evaluators: [attachment],
+      });
+
+      expect(created.status).toBe(201);
+      const body = await created.json();
+      expect(body.fields).toEqual([
+        { identifier: "golden_sql", type: "text" },
+        { identifier: "table_schema", type: "text" },
+      ]);
+      expect(body.evaluators).toEqual([attachment]);
+
+      const read = await api.get(`${BASE}/${body.id}`);
+      expect(read.status).toBe(200);
+      const detail = await read.json();
+      expect(detail.fields).toEqual(body.fields);
+      expect(detail.evaluators).toEqual([attachment]);
+
+      const patched = await api.patch(`${BASE}/${body.id}`, {
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+          { identifier: "max_rows", type: "number" },
+        ],
+      });
+      expect(patched.status).toBe(200);
+      expect((await patched.json()).fields).toHaveLength(3);
+    });
+
+    /** @scenario "A field an evaluator reads cannot be removed" */
+    it("answers 422 suite_field_in_use when a mapped field is removed", async () => {
+      const evaluator = await createExactMatchEvaluator();
+      const created = await api.post(BASE, {
+        name: "Case lookups",
+        fields: [{ identifier: "golden_sql", type: "text" }],
+        evaluators: [
+          {
+            id: "att_1",
+            evaluatorId: evaluator.id,
+            required: true,
+            mappings: {
+              output: {
+                type: "source",
+                sourceId: "conversation",
+                path: ["last_agent_message"],
+              },
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ],
+      });
+      const { id } = await created.json();
+
+      const res = await api.patch(`${BASE}/${id}`, { fields: [] });
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).code).toBe("suite_field_in_use");
+    });
+
+    /** @scenario "An attachment naming an evaluator the project does not have is refused" */
+    it("answers 422 suite_evaluator_not_found for an unknown evaluator id", async () => {
+      const res = await api.post(BASE, {
+        name: "Case lookups",
+        evaluators: [
+          {
+            id: "att_1",
+            evaluatorId: "evaluator_missing",
+            required: true,
+            mappings: {},
+          },
+        ],
+      });
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).code).toBe("suite_evaluator_not_found");
     });
   });
 

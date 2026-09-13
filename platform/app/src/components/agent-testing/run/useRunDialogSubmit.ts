@@ -1,11 +1,17 @@
 import { useCallback } from "react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { readHandledError, showErrorToast } from "~/features/errors";
+import {
+  describeError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
+import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
 import type { SuiteTarget } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import type { toLineRunParameters } from "./parameter-line";
+import type { ParameterFieldError } from "./parameter-suggestions";
 import type { RunScope } from "./run-configuration";
 import type {
   RunDialogSubject,
@@ -97,9 +103,13 @@ export type RunDialogSubmitInput = {
   storableRunParameters: RunParameters;
   /** The keys of the secret rows, which is all the suite may remember of them. */
   storableSecretNames: string[] | undefined;
+  /** The plan's own evaluators, beside the ones the suites in scope attach. */
+  evaluators: EvaluatorAttachment[];
   onRunStarted: (info: RunStartedInfo) => void;
   onClose: () => void;
   setInlineError: (error: unknown) => void;
+  /** A refusal that names one parameter reads under the field that holds it. */
+  setParameterError: (error: ParameterFieldError | null) => void;
   setMissingProvider: (missing: boolean) => void;
 };
 
@@ -118,17 +128,46 @@ function useHasAnyTarget(subject: RunDialogSubject | null) {
   return hasAgent || hasPublishedPrompt;
 }
 
-/** Shows a coded refusal inside the dialog; anything else becomes a toast. */
-function useSurfaceRunError(setInlineError: (error: unknown) => void) {
+/** The one parameter a refusal names, read off its payload. */
+function parameterErrorOf(error: unknown): ParameterFieldError | null {
+  const handled = readHandledError(error);
+  if (handled?.code !== "scenario_parameter_option_invalid") return null;
+  const name = handled.meta.name;
+  if (typeof name !== "string" || name === "") return null;
+  return {
+    name,
+    value: handled.meta.value,
+    message: describeError({ error }),
+  };
+}
+
+/**
+ * Shows a coded refusal inside the dialog; anything else becomes a toast.
+ *
+ * A refusal that names one parameter goes under the field that holds it,
+ * where the person is looking, rather than into the alert at the foot.
+ */
+function useSurfaceRunError({
+  setInlineError,
+  setParameterError,
+}: {
+  setInlineError: (error: unknown) => void;
+  setParameterError: (error: ParameterFieldError | null) => void;
+}) {
   return useCallback(
     (error: unknown) => {
+      const parameterError = parameterErrorOf(error);
+      if (parameterError) {
+        setParameterError(parameterError);
+        return;
+      }
       if (readHandledError(error)) {
         setInlineError(error);
         return;
       }
       showErrorToast({ error, fallbackTitle: "Couldn't start the run" });
     },
-    [setInlineError],
+    [setInlineError, setParameterError],
   );
 }
 
@@ -144,7 +183,10 @@ export function useRunDialogSubmit(input: RunDialogSubmitInput) {
   });
   const noteInput = toNoteInput(input.note);
   const hasAnyTarget = useHasAnyTarget(input.subject);
-  const surfaceError = useSurfaceRunError(input.setInlineError);
+  const surfaceError = useSurfaceRunError({
+    setInlineError: input.setInlineError,
+    setParameterError: input.setParameterError,
+  });
 
   const batch = useBatchRun({
     ...input,

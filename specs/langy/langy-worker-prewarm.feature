@@ -7,9 +7,8 @@ Feature: Langy worker pre-warm on panel open
   worker, and the first message finds it already running.
 
   The warm resolves the SAME credential surface a turn would, configured or
-  picked model, GitHub capability under the daily PR cap, egress allow-list,
-  mirror tier, harness, because the worker signature is made of exactly those
-  parts. A warm under a different signature boots a worker the first turn
+  picked model, GitHub capability under the daily PR cap, egress allow-list and
+  mirror tier, because the worker signature is made of exactly those parts. A warm under a different signature boots a worker the first turn
   cannot reuse, which is worse than no warm at all.
 
   A warm is an optimisation, never a promise. Every failure on the warm path

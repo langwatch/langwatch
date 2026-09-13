@@ -63,6 +63,28 @@ def test_create_without_a_test_suite_sends_no_test_suite_id():
     assert "testSuiteId" not in (calls[0][2] or {})
 
 
+# @scenario "Creating a scenario with field values sends them under fields"
+def test_create_sends_the_field_values():
+    facade, calls = recorder(payload=SCENARIO, status=201)
+
+    facade.create(
+        name="Chargebacks by quarter",
+        test_suite_id="suite_1",
+        fields={"golden_sql": "SELECT 1", "row_limit": 10},
+    )
+
+    assert (calls[0][2] or {})["fields"] == {"golden_sql": "SELECT 1", "row_limit": 10}
+
+
+# @scenario "Updating a scenario with an empty field map clears its values"
+def test_update_with_an_empty_field_map_sends_an_empty_object():
+    facade, calls = recorder()
+
+    facade.update("scenario_1", fields={})
+
+    assert (calls[0][2] or {}) == {"fields": {}}
+
+
 # @scenario "Updating a scenario moves it to the test suite the caller named"
 def test_update_sends_the_test_suite_id_the_caller_named():
     facade, calls = recorder()

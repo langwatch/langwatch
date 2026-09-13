@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for dev/scripts/dogfood/langy-local.sh, the Langy local dogfood
 # doctor. The script under test runs for real against a sandboxed repo
-# layout: a temp platform/app/.env, fake opencode/go shims on PATH, and real
+# layout: a temp platform/app/.env, a fake go shim on PATH, and real
 # loopback listeners standing in for the app / gateway / langyagent.
 #
 # Spec: specs/setup/langy-local-dogfood.feature
@@ -16,10 +16,17 @@ setup() {
   ENV_FILE="$TEST_DIR/platform/app/.env"
   : >"$ENV_FILE"
 
-  # Binaries the doctor requires: fake shims are enough — it only checks PATH.
-  printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/opencode"
+  # Binaries the doctor requires: a fake shim is enough — it only checks PATH.
   printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/go"
-  chmod +x "$TEST_DIR/bin/opencode" "$TEST_DIR/bin/go"
+  chmod +x "$TEST_DIR/bin/go"
+
+  # langwatch defaults to a fake shim INSIDE $TEST_DIR (which stands in for
+  # the worktree root, since the doctor is copied to $TEST_DIR/dev/scripts/dogfood)
+  # so the base fixture passes the "resolves inside this worktree" check.
+  # A test that wants the opposite overrides this after setup.
+  mkdir -p "$TEST_DIR/inside-bin"
+  printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/inside-bin/langwatch"
+  chmod +x "$TEST_DIR/inside-bin/langwatch"
 
   # A base port slot unlikely to collide; the doctor derives gateway = base+3.
   BASE_PORT=$((20000 + (RANDOM % 20000)))
@@ -45,7 +52,7 @@ listen_on() {
 write_full_env() {
   mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
   cat >"$ENV_FILE" <<EOF
-OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
+LANGY_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="test-secret"
 LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
 SESSIONS_ROOT="$TEST_DIR/sessions"
@@ -55,7 +62,7 @@ EOF
 }
 
 run_doctor() {
-  PATH="$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR" "$@"
+  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR" "$@"
 }
 
 # @scenario "A fully wired setup passes every check"
@@ -77,7 +84,7 @@ run_doctor() {
   run_doctor
   [ "$status" -ne 0 ]
   [[ "$output" == *"LANGY_INTERNAL_SECRET missing"* ]]
-  [[ "$output" == *"OPENCODE_AGENT_URL missing"* ]]
+  [[ "$output" == *"LANGY_AGENT_URL missing"* ]]
   [[ "$output" == *'LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true'* ]]
   [[ "$output" == *"LANGY_INTERNAL_SECRET=\""* ]]
 }
@@ -92,6 +99,42 @@ run_doctor() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"langyagent not listening on :${AGENT_PORT}"* ]]
   [[ "$output" == *"service svc=langyagent"* ]]
+}
+
+# @scenario "A langwatch CLI outside this worktree fails the check with the link command"
+@test "a langwatch outside the worktree fails naming the resolved path and the link fix" {
+  write_full_env
+  listen_on "$BASE_PORT"
+  listen_on $((BASE_PORT + 3))
+  listen_on "$AGENT_PORT"
+
+  # A shim living OUTSIDE $TEST_DIR (which stands in for the worktree root),
+  # placed ahead of the default inside-bin shim so it wins PATH resolution —
+  # the same shape as an npx-cached or globally-installed langwatch beating a
+  # freshly built worktree copy.
+  OUTSIDE_DIR="$(mktemp -d)"
+  printf '#!/bin/sh\nexit 0\n' >"$OUTSIDE_DIR/langwatch"
+  chmod +x "$OUTSIDE_DIR/langwatch"
+
+  PATH="$OUTSIDE_DIR:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
+    LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR"
+  rm -rf "$OUTSIDE_DIR"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"langwatch CLI on PATH resolves outside this worktree"* ]]
+  [[ "$output" == *"sdks/typescript\" && pnpm build && npm link"* ]]
+}
+
+# @scenario "A langwatch CLI built from this worktree passes the check"
+@test "a langwatch built from this worktree reports ok" {
+  write_full_env
+  listen_on "$BASE_PORT"
+  listen_on $((BASE_PORT + 3))
+  listen_on "$AGENT_PORT"
+
+  run_doctor
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"langwatch CLI on PATH resolves inside this worktree"* ]]
 }
 
 # @scenario "A provider key that the provider rejects is caught before a turn wastes time on it"
@@ -118,7 +161,7 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
     sleep 0.1
   done
 
-  PATH="$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
+  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://127.0.0.1:${REJECT_PORT}/v1/models" \
     run "$DOCTOR"
   [ "$status" -eq 0 ]
@@ -137,7 +180,7 @@ cat >/dev/null
 printf '000'
 STUB
   chmod +x "$TEST_DIR/curlstub/curl"
-  PATH="$TEST_DIR/curlstub:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
+  PATH="$TEST_DIR/curlstub:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://localhost:${REJECT_PORT}@attacker.example/v1/models" \
     run "$DOCTOR"
   [[ "$output" == *"ignoring non-loopback endpoint override"* ]]

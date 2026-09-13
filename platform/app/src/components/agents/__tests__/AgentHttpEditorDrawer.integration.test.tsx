@@ -54,6 +54,13 @@ vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
   CodeEditorModal: () => null,
 }));
 
+/** What `agents.getById` answers with, so a test can open a saved agent. */
+let mockAgentById: {
+  id: string;
+  name: string;
+  config: Record<string, unknown>;
+} | null = null;
+
 const mockCloseDrawer = vi.fn();
 const mockGoBack = vi.fn();
 
@@ -75,7 +82,7 @@ vi.mock("~/utils/api", () => ({
     agents: {
       getById: {
         useQuery: () => ({
-          data: null,
+          data: mockAgentById,
           isLoading: false,
           error: null,
         }),
@@ -92,6 +99,20 @@ vi.mock("~/utils/api", () => ({
       update: {
         useMutation: () => ({
           mutate: vi.fn(),
+          isPending: false,
+        }),
+      },
+      testTurn: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+        }),
+      },
+      testRun: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
           isPending: false,
         }),
       },
@@ -130,7 +151,10 @@ function renderHttpDrawer(
 // -- Tests --
 
 describe("AgentHttpEditorDrawer", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAgentById = null;
+  });
   afterEach(cleanup);
 
   // ==========================================================================
@@ -153,6 +177,68 @@ describe("AgentHttpEditorDrawer", () => {
 
         await waitFor(() => {
           expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+        });
+      });
+
+      /** @scenario "The HTTP agent editor offers a session path" */
+      it("renders the session path field beside the output path", async () => {
+        renderHttpDrawer();
+
+        await waitFor(() => {
+          expect(
+            screen.getByText("Output Path (JSONPath)"),
+          ).toBeInTheDocument();
+        });
+        expect(screen.getByText("Session path")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("$.conversation_id"),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario "The HTTP agent editor offers a session path" */
+      it("opens the session path guidance from a focusable control", async () => {
+        renderHttpDrawer();
+
+        await waitFor(() => {
+          expect(screen.getByText("Session path")).toBeInTheDocument();
+        });
+        const help = screen.getByRole("button", {
+          name: "More about the session path",
+        });
+        help.focus();
+        expect(help).toHaveFocus();
+      });
+    });
+
+    describe("when a saved agent is followed by a new draft", () => {
+      /** @scenario "The HTTP agent editor offers a session path" */
+      it("clears the session path the saved agent carried", async () => {
+        mockAgentById = {
+          id: "agent_1",
+          name: "Saved agent",
+          config: {
+            url: "https://example.com/agent",
+            sessionPath: "$.conversation_id",
+          },
+        };
+        const { rerender } = render(
+          <AgentHttpEditorDrawer open={true} agentId="agent_1" />,
+          { wrapper: Wrapper },
+        );
+
+        await waitFor(() => {
+          expect(screen.getByPlaceholderText("$.conversation_id")).toHaveValue(
+            "$.conversation_id",
+          );
+        });
+
+        mockAgentById = null;
+        rerender(<AgentHttpEditorDrawer open={true} />);
+
+        await waitFor(() => {
+          expect(screen.getByPlaceholderText("$.conversation_id")).toHaveValue(
+            "",
+          );
         });
       });
     });

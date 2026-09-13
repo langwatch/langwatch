@@ -66,6 +66,11 @@ export interface ExchangePersonalProject {
 export interface ExchangeCliApiKeyScope {
   kind: "organization" | "projects";
   project_ids: string[];
+  /**
+   * The permission slugs the key was minted with. Absent on servers that
+   * predate the field; `whoami` then reports only the reach.
+   */
+  permissions?: string[];
 }
 
 /**

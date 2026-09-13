@@ -176,6 +176,13 @@ Feature: Comparison mode
     And no row carries a menu
 
   @integration
+  Scenario: A long target name keeps its own column
+    Given a run against two targets whose names carry their environment and parameters
+    When the run is opened
+    Then every column header reads its whole label
+    And no label runs over the column beside it
+
+  @integration
   Scenario: Each target column carries its own summary
     Given a run against "dev-agent" and "prod-agent" where "dev-agent" passed one of two and "prod-agent" passed two of two
     When the run is opened
@@ -229,6 +236,17 @@ Feature: Comparison mode
     Then its entry in the runs rail reads "62% vs 81% · 2 targets"
     And each rate reads in its own pass-rate colour
     And the entry carries no "passed" count
+
+  # The mark of a target is the icon of the kind of agent behind it, the same
+  # icon the agents page draws. The colour is what tells the targets of a
+  # comparison apart, so a run against one target wears none.
+
+  @integration
+  Scenario: The mark of a target carries its colour only in a comparison
+    Given a comparison run against a connected agent and an HTTP agent
+    Then each target of the run settings is marked with the kind of its agent
+    And each mark carries the colour of that target
+    But the mark of a run against one target carries no colour
 
   @integration
   Scenario: The run settings of a comparison read one layer of parameters

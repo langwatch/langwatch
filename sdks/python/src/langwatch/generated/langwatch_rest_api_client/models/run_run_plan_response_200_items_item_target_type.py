@@ -3,6 +3,7 @@ from enum import Enum
 
 class RunRunPlanResponse200ItemsItemTargetType(str, Enum):
     CODE = "code"
+    CONNECTED = "connected"
     HTTP = "http"
     PROMPT = "prompt"
     WORKFLOW = "workflow"

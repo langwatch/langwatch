@@ -35,6 +35,13 @@ const PERMANENT_ERROR_CODES = new Set<AppErrorCode>([
   // "Close this and open it again." A replay sends the same stale quote and
   // gets the same refusal — the fix is a new quote, not another attempt.
   "billing_quote_expired",
+  // "Page through the rows, or split the dataset into smaller ones." The
+  // dataset does not shrink between attempts, so the row count that produced
+  // the refusal is the same one every replay reads. Retrying also does active
+  // harm here: it holds the query in `pending`, and a caller serving
+  // placeholder data shows the pre-search rows as the search result for the
+  // whole backoff.
+  "dataset_too_large_to_search",
 ]);
 
 /**

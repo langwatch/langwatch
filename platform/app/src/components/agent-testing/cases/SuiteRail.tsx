@@ -10,15 +10,15 @@
  * @see specs/suites/test-suites.feature
  */
 
-import { VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
+import { NewSimulationsCallout } from "~/components/suites/NewSimulationsCallout";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
-import { VoiceAgentsCallout } from "~/components/suites/VoiceAgentsCallout";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { SuiteRailFooter } from "./SuiteRailFooter";
 import { SuiteRailSections } from "./SuiteRailSections";
@@ -58,7 +58,8 @@ export type SuiteRailProps = {
   onNewSuite: () => void;
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
-  onRenameSuite: (suiteId: string) => void;
+  /** Opens the suite editor on one suite. */
+  onEditSuite: (suiteId: string) => void;
   onArchiveSuite: (suiteId: string) => void;
   isArchiving?: boolean;
   period: Period;
@@ -90,7 +91,11 @@ export function SuiteRail(props: SuiteRailProps) {
     >
       <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
 
-      {!collapsed && <VoiceAgentsCallout />}
+      {!collapsed && (
+        <Box paddingX={3}>
+          <NewSimulationsCallout target="scenarios" />
+        </Box>
+      )}
 
       <SuiteRailFooter {...props} />
 

@@ -238,6 +238,7 @@ export class PrismaProjectRepository implements ProjectRepository {
     const where = {
       archivedAt: null,
       team: { organizationId },
+      kind: { not: "internal_governance" },
       ...(projectIds ? { id: { in: projectIds } } : {}),
     };
     const [data, total] = await Promise.all([
@@ -250,6 +251,20 @@ export class PrismaProjectRepository implements ProjectRepository {
       this.prisma.project.count({ where }),
     ]);
     return { data, pagination: { page, limit, total } };
+  }
+
+  async findAllIdsByOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    // No `archivedAt` or `kind` filter on purpose — see the interface doc.
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return projects.map((project) => project.id);
   }
 
   async findBySlugInTeam({

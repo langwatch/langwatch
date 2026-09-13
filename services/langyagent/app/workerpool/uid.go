@@ -1,9 +1,7 @@
 // Package workerpool is the driven adapter that owns worker lifecycle for the
 // langyagent manager. It is the re-home of the ADR-033 isolation model:
-// per-worker UID, 0700 chown-before-secrets home, per-worker
-// OPENCODE_SERVER_PASSWORD, the authProxy bearer→Basic swap, the sensitive-env
-// denylist, Setpgid process-group kill, the orphan reaper, and the fail-closed
-// opencode auth guard all live here, unchanged in behavior and wrapped in
+// per-worker UID, 0700 chown-before-secrets home, the sensitive-env denylist,
+// Setpgid process-group kill, and the orphan reaper all live here, wrapped in
 // herr + OpenTelemetry.
 package workerpool
 

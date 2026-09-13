@@ -94,6 +94,12 @@ Feature: Canonical OTLP metric ingestion
   # window by design, because folding it would trade a single-row index seek
   # for a scan of the whole retention window. What every scenario here holds to
   # is a stated ceiling the batch cannot push a request past.
+  #
+  # A bounded request is not yet a bounded read. Those seeks still read the
+  # whole retention span looking backwards, and fetched every stored column to
+  # do it, so a request that never grew could still read millions of rows to
+  # return a hundred — and storage ran out of memory doing it. The last two
+  # scenarios bound the read as well: what a seek looks at, and how far.
   Rule: Rebuilding summaries sends a request bounded independently of the batch
 
     @unit
@@ -139,6 +145,23 @@ Feature: Canonical OTLP metric ingestion
       Then the request carries the window size and the retention span once,
         not once per window
       And a full request of window seeks still fits the size a request may be
+
+    @unit
+    Scenario: A rollup bucket read asks only for the columns a rollup uses
+      Given a summary window has to be recomputed
+      When the platform reads the points that window covers
+      Then it asks for the values and identity a summary is built from
+      And it asks for none of the attributes, labels or descriptions it never
+        reads
+
+    @unit
+    Scenario: A rollup bucket read looks close before it looks far
+      Given a summary window has to be recomputed
+      When the platform looks for the sample preceding that window
+      Then it first looks back a short way
+      And it searches the rest of the retention span only for the windows the
+        short look left unanswered
+      And the two searches together cover the same span as one wide search
 
     @integration
     Scenario: A batch folds to the summaries a point-at-a-time rebuild produces

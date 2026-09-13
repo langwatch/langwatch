@@ -1,7 +1,7 @@
 /**
- * The `todowrite` tool: the plan channel. Schema-compatible with opencode's
- * tool of the same name ({ todos: [{content, status}] }; a bare array is
- * tolerated) because the panel checklist and the X/Y progress protocol depend
+ * The `todowrite` tool: the plan channel. It takes the wrapper shape
+ * ({ todos: [{content, status}] }; a bare array is tolerated)
+ * because the panel checklist and the X/Y progress protocol depend
  * on that shape, but built on pi's official extension pattern
  * (pi.registerTool + session-entry state reconstruction, adapted from
  * examples/extensions/todo.ts).
@@ -30,9 +30,50 @@ const todowriteParams = Type.Object({
 });
 
 /**
+ * Every status word that means one of the four this tool promised.
+ *
+ * The status is a free string, so a model that writes "done", "Completed" or
+ * "in-progress" instead used to have every one of its steps recorded as
+ * `pending`, and the panel's checklist then read "0 of 5 done" for a turn in
+ * which all five steps had finished. The word is lower-cased, and spaces and
+ * dashes fold to `_`, before the lookup.
+ *
+ * Kept identical to `normalisePlanStatus` in the panel
+ * (platform/app/src/features/langy/logic/langyPlan.ts). This package compiles
+ * to its own binary and does not depend on the app's workspace packages, so
+ * the two copies are pinned by tests on both sides rather than shared.
+ */
+const TODO_STATUS_BY_WORD: Record<string, TodoStatus> = {
+  pending: "pending",
+  todo: "pending",
+  not_started: "pending",
+  in_progress: "in_progress",
+  active: "in_progress",
+  doing: "in_progress",
+  completed: "completed",
+  complete: "completed",
+  done: "completed",
+  finished: "completed",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+  skipped: "cancelled",
+  wont_do: "cancelled",
+};
+
+/**
+ * The status a wire value means. An unknown word stays `pending`: a step is
+ * only ever ticked from a status the model actually wrote.
+ */
+export function normalizeTodoStatus(status: unknown): TodoStatus {
+  if (typeof status !== "string") return "pending";
+  const word = status.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  return TODO_STATUS_BY_WORD[word] ?? "pending";
+}
+
+/**
  * Normalize whatever the model sent into the canonical list. Tolerates the
- * `{ todos: [...] }` wrapper AND a bare array, unknown statuses (mapped to
- * `pending`), and drops empty-content rows.
+ * `{ todos: [...] }` wrapper AND a bare array, the status synonyms above, and
+ * drops empty-content rows.
  */
 export function normalizeTodos(params: unknown): TodoItem[] {
   const rows: unknown[] = Array.isArray(params)
@@ -45,11 +86,7 @@ export function normalizeTodos(params: unknown): TodoItem[] {
     if (typeof row !== "object" || row === null) continue;
     const { content, status } = row as { content?: unknown; status?: unknown };
     if (typeof content !== "string" || content.trim().length === 0) continue;
-    const normalizedStatus =
-      typeof status === "string" && (TODO_STATUSES as readonly string[]).includes(status)
-        ? (status as TodoStatus)
-        : "pending";
-    items.push({ content: content.trim(), status: normalizedStatus });
+    items.push({ content: content.trim(), status: normalizeTodoStatus(status) });
   }
   return items;
 }

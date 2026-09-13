@@ -22,6 +22,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import type { FeatureFlagRules } from "~/server/featureFlag";
 import { api } from "~/utils/api";
 import { FeatureFlagRulesDialog } from "./FeatureFlagRulesDialog";
+import { summarizeTargeting, targetingLabel } from "./targetingSummary";
 
 interface FlagRow {
   key: string;
@@ -95,16 +96,20 @@ export function FeatureFlagsContent() {
         <Text fontSize="sm" color="fg.muted">
           Every flag is served from this LangWatch postgres database, whichever
           scope it carries, so flipping one is fast and free. Scope says who the
-          flag is for: system-scoped flags are kill switches and pipeline
-          toggles, product-scoped flags are customer-facing features. Targeting
+          flag is for: product-scoped flags are customer-facing features,
+          system-scoped flags are kill switches and pipeline toggles. Targeting
           rules work the same for both.
         </Text>
       </Box>
 
       <ScopeSection
-        heading="System"
-        description="Backend kill switches and pipeline toggles. Resolved from env, this postgres store, then the registry default."
-        rows={grouped.system}
+        heading="Product"
+        description={
+          isSaas
+            ? "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured; set a targeting rule to reach a subset of organizations."
+            : "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured."
+        }
+        rows={grouped.product}
         canManage={canManage}
         isSaas={isSaas}
         onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
@@ -116,13 +121,9 @@ export function FeatureFlagsContent() {
       />
 
       <ScopeSection
-        heading="Product"
-        description={
-          isSaas
-            ? "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured; set a targeting rule to reach a subset of organizations."
-            : "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured."
-        }
-        rows={grouped.product}
+        heading="System"
+        description="Backend kill switches and pipeline toggles. Resolved from env, this postgres store, then the registry default."
+        rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
         onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
@@ -278,58 +279,12 @@ function FlagRowView({
         ? "postgres"
         : "registry default";
 
-  // Walk rules honoring first-match-wins, so a disabled rule earlier in
-  // the list correctly shadows a later enabled rule for the same scope.
-  // An empty-match rule matches every context, so once one is seen, no
-  // later rule can ever fire and we stop.
-  let everyoneViaRule: boolean | null = null;
-  const orgDecisions = new Map<string, boolean>();
-  const projectDecisions = new Map<string, boolean>();
-  for (const r of row.rules) {
-    const isEveryone = !r.match.organizationId && !r.match.projectId;
-    if (isEveryone) {
-      everyoneViaRule = r.enabled;
-      break;
-    }
-    if (r.match.organizationId && !orgDecisions.has(r.match.organizationId)) {
-      orgDecisions.set(r.match.organizationId, r.enabled);
-    }
-    if (r.match.projectId && !projectDecisions.has(r.match.projectId)) {
-      projectDecisions.set(r.match.projectId, r.enabled);
-    }
-  }
-  const enabledOrgIds = new Set(
-    Array.from(orgDecisions.entries())
-      .filter(([, v]) => v)
-      .map(([k]) => k),
-  );
-  const enabledProjectIds = new Set(
-    Array.from(projectDecisions.entries())
-      .filter(([, v]) => v)
-      .map(([k]) => k),
-  );
-  const enabledEveryoneViaRule = everyoneViaRule === true;
-  const partialEnabled =
-    !effective &&
-    (enabledEveryoneViaRule ||
-      enabledOrgIds.size > 0 ||
-      enabledProjectIds.size > 0);
-  const targetingSummary = enabledEveryoneViaRule
-    ? "Enabled for everyone via rule"
-    : [
-        enabledOrgIds.size > 0 &&
-          `${enabledOrgIds.size} organization${enabledOrgIds.size === 1 ? "" : "s"}`,
-        enabledProjectIds.size > 0 &&
-          `${enabledProjectIds.size} project${enabledProjectIds.size === 1 ? "" : "s"}`,
-      ]
-        .filter(Boolean)
-        .join(", ");
-  const targetingLabel =
-    !effective && targetingSummary
-      ? enabledEveryoneViaRule
-        ? targetingSummary
-        : `Enabled for ${targetingSummary}`
-      : null;
+  const summary = summarizeTargeting(row.rules);
+  const ruleTargetingLabel = targetingLabel(summary);
+  // The toggle reads off but a rule has switched the flag on for someone:
+  // paint it as on so the row does not read as "nobody has this".
+  const partialEnabled = !effective && ruleTargetingLabel !== null;
+  const targetingNote = effective ? null : ruleTargetingLabel;
 
   const onChange = async (next: boolean) => {
     setOptimistic(next);
@@ -413,9 +368,9 @@ function FlagRowView({
               </Tooltip>
             )}
           </HStack>
-          {targetingLabel && (
+          {targetingNote && (
             <Text fontSize="xs" color="fg.muted">
-              {targetingLabel}
+              {targetingNote}
             </Text>
           )}
         </VStack>

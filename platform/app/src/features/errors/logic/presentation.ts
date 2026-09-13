@@ -6,6 +6,8 @@ import type {
   SerializedReason,
 } from "@langwatch/handled-error";
 
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
+
 import type { AppErrorCode } from "./codes";
 import {
   type HandledErrorShape,
@@ -74,6 +76,13 @@ const strList = (error: HandledErrorShape, key: string): string[] => {
     .filter((entry): entry is string => typeof entry === "string")
     .filter((entry) => entry.length > 0 && entry.length <= 64)
     .slice(0, 10);
+};
+
+/** What the reader answered on a permission card, in the words they clicked. */
+const LANGY_WAIT_ANSWERS: Record<string, string | undefined> = {
+  allow_once: "allowed this command once",
+  allow_pattern: "allowed this pattern for the session",
+  deny: "denied this command",
 };
 
 /**
@@ -326,6 +335,19 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  lwql_unknown_identifier: {
+    title: "This query names a column that doesn't exist",
+    // The name is the whole value of this message, so it is quoted back when
+    // the server's refusal carried it. It may not: the extractor that reads it
+    // fails closed rather than relaying the raw refusal, so the fallback has
+    // to stand on its own and still tell the reader what to do.
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `There's no column called "${identifier}". Check the spelling against the dataset's columns.`
+        : "Check the column names against the dataset's columns.";
+    },
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
@@ -359,7 +381,7 @@ const presentations = {
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
-      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+      "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -372,7 +394,7 @@ const presentations = {
   lwql_granularity_parameter_type: {
     title: "The granularity has to be declared as UInt32",
     describe: () =>
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}, and run the query again.",
   },
   lwql_granularity_too_fine: {
     title: "That granularity would return too many datapoints",
@@ -382,7 +404,7 @@ const presentations = {
   lwql_granularity_requires_window: {
     title: "Granularity needs the period parameters",
     describe: () =>
-      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
+      "A query declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
   },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
@@ -414,6 +436,21 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
   },
+  saved_workbench_charts_disabled_for_playground: {
+    title: "Saved charts are off while the playground is on",
+    describe: () =>
+      "This project has the custom chart playground enabled, which turns off saved workbench charts. Use the playground to build a chart instead.",
+  },
+  dashboard_widget_not_found: {
+    title: "That dashboard widget isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of dashboard widgets.",
+  },
+  dashboard_widget_definition_invalid: {
+    title: "This dashboard widget can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the widget and save it again.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
@@ -421,6 +458,15 @@ const presentations = {
     title: "Analytics SQL isn't available here",
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
+  },
+  lwql_provisioning_incomplete: {
+    // Deliberately does NOT name the workspace administrator: unlike
+    // lwql_unavailable, this fires on a deployment where the feature IS
+    // provisioned and working — one dataset behind it is not fully readable
+    // yet, which is entirely on us, not something a customer's admin can fix.
+    title: "This query couldn't read one of its datasets",
+    describe: () =>
+      "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
   cli_key_selection_invalid: {
     title: "Check the access selection",
@@ -438,7 +484,11 @@ const presentations = {
     },
   },
   clickhouse_unavailable: {
-    title: "Search is temporarily unavailable",
+    // Every surface that reads the analytics store raises this code: a trace
+    // search, an analytics graph, and a Langy conversation, whose messages
+    // live there too. The words have to be true on all of them, so they name
+    // the failure rather than one surface's name for it.
+    title: "This could not be loaded right now",
     describe: () => "We're on it. Try again in a moment.",
   },
   clickhouse_overloaded: {
@@ -473,6 +523,117 @@ const presentations = {
     title: "The agent's local tunnel is not responding",
     describe: () =>
       "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
+  },
+
+  // ---- connected agents ----
+  agent_register_only: {
+    title: "This agent is registered from code",
+    describe: () =>
+      "Its name, environment and parameters come from the process that runs it. Change the code and start the process again.",
+  },
+  agent_test_refused: {
+    title: "This agent cannot be tested as it is set up",
+    describe: (error) => {
+      const reason = safeProse(str(error, "reason", ""));
+      return reason
+        ? `${reason}. Fix the agent and test it again.`
+        : "Check the agent's configuration and test it again.";
+    },
+  },
+  agent_environment_unresolved: {
+    title: "Name the environment of this agent",
+    describe: (error) => {
+      const name = str(error, "agentName", "the agent");
+      const online = strList(error, "onlineEnvironments");
+      const registered = strList(error, "registeredEnvironments");
+      if (online.length > 1) {
+        return `${name} is online in ${online.join(", ")}. Name one of them, as connected:${name}@${online[0]}.`;
+      }
+      const where =
+        registered.length > 0
+          ? ` It is registered in ${registered.join(", ")}.`
+          : "";
+      return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
+    },
+  },
+  agent_not_found: {
+    title: "Agent not found",
+    describe: () =>
+      "No agent with that id is in this project. It may have been archived, or the id belongs to another project.",
+  },
+  agent_offline: {
+    title: "This agent is not running",
+    describe: (error) => {
+      const name = str(error, "agentName", "the agent");
+      const environment = str(error, "environment", "");
+      const where = environment ? ` in ${environment}` : "";
+      return `No process running ${name}${where} is connected. Start the process that runs it, then run again.`;
+    },
+  },
+  agent_owner_only: {
+    title: "This development agent belongs to someone else",
+    describe: (error) => {
+      const owner = str(error, "ownerName", "its owner");
+      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+    },
+  },
+  agent_call_timeout: {
+    title: "The agent did not answer in time",
+    describe: () =>
+      "The agent took longer than its call budget to answer a turn. Check it for slow work, or raise its timeout.",
+  },
+  agent_call_failed: {
+    title: "The agent raised an error",
+    // The function's own error text rides on `meta.message` for the CLI and
+    // the run drawer's envelope; relayed prose is never rendered here.
+    describe: () =>
+      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+  },
+  agent_disconnected: {
+    title: "The agent disconnected mid-call",
+    describe: () =>
+      "The process working on this turn disconnected before it answered. The turn was not sent again, since the function may have run. Check the process, then run again.",
+  },
+  agent_instance_lost: {
+    title: "The pinned instance is gone",
+    describe: () =>
+      "This agent pins each conversation to one instance, and that instance disconnected. Start the process again, then run again.",
+  },
+  agent_busy: {
+    title: "Every instance of this agent is busy",
+    describe: () =>
+      "The connected instances are at their concurrency. Wait a moment and try again, or raise the concurrency on the decorated function.",
+  },
+  agent_parameter_invalid: {
+    title: "A declared parameter cannot be used",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const reason = safeProse(str(error, "reason", ""));
+      const subject = name ? `The parameter "${name}"` : "A parameter";
+      return reason
+        ? `${subject} cannot be declared: ${reason}.`
+        : `${subject} cannot be declared. Check its name, its type and its options.`;
+    },
+  },
+  agent_register_refused: {
+    title: "The agent could not be registered",
+    describe: () =>
+      "Check the API key, the project and the permissions the process connects with. The process prints the reason at startup.",
+  },
+  agent_session_unknown: {
+    title: "The agent process needs to register again",
+    describe: () =>
+      "The platform no longer knows this instance. The SDK registers again on its own; restart the process if it does not.",
+  },
+  agent_payload_too_large: {
+    title: "This turn is too large",
+    describe: (error) => {
+      const what = str(error, "what", "payload");
+      if (what === "session") {
+        return "The session value the agent returned is above the size limit. Return a small value, such as a conversation id or a token, not the conversation itself.";
+      }
+      return `The ${what} is above the size limit. Trim the conversation or the attachments, or raise the limit on a self-hosted deployment.`;
+    },
   },
 
   // ---- agent-submitted reports ----
@@ -753,6 +914,18 @@ const presentations = {
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
   },
+  model_provider_skip_permissions_pattern_invalid: {
+    // The field takes one pattern per line, so the reader needs the line
+    // number to find the one that failed. `meta.line` is one-based, matching
+    // what the textarea shows.
+    title: "One of the allowed model patterns can't be read",
+    describe: (error) => {
+      const line = error.meta.line;
+      const where =
+        typeof line === "number" && line > 0 ? `Line ${line}` : "One line";
+      return `${where} of the allowed models list is not a valid pattern. Correct it and save again. Nothing was saved.`;
+    },
+  },
   model_provider_credentials_unreadable: {
     title: "This provider needs its credentials again",
     describe: () =>
@@ -977,6 +1150,16 @@ const presentations = {
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
     describe: () => "Edit the role and save it again.",
+  },
+  custom_chart_playground_not_enabled: {
+    title: "Custom chart playground isn't switched on here",
+    describe: () =>
+      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
+  },
+  custom_graph_writes_disabled_for_playground: {
+    title: "Dashboard graph editing is off while the playground is on",
+    describe: () =>
+      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
   },
   custom_role_not_found: {
     title: "Custom role not found",
@@ -1421,6 +1604,11 @@ const presentations = {
     describe: () =>
       "It may have been removed already. Reload to see the current bindings.",
   },
+  authz_grant_not_confirmed: {
+    title: "Access could not be confirmed",
+    describe: () =>
+      "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -1638,26 +1826,36 @@ const presentations = {
   },
   // ---- scenario run parameters ----
   scenario_parameter_unknown: {
-    // Both lists are our own names, not free text: the run dialog needs to
-    // show the rejected one so the typo is visible, and the declared ones so
-    // the customer can see what they meant to write.
-    title: "No scenario in this run has a parameter by that name",
+    // The lists and the target are our own names, not free text: the run
+    // dialog needs to show the rejected name so the typo is visible, the
+    // declared ones so the customer can see what they meant to write, and the
+    // target because a run against another agent can accept the same name.
+    title: "Nothing in this run declares a parameter by that name",
     describe: (error) => {
       const unknown = strList(error, "unknownKeys");
       const declared = strList(error, "declaredNames");
+      const target = str(error, "targetLabel", "");
+      const source = target
+        ? `by any scenario in this run, and not by ${target}`
+        : "by any scenario in this run, and not by the agent it runs against";
       const rejected =
         unknown.length > 0
-          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
-          : "One of the values supplied isn't declared by any scenario in this run.";
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared ${source}.`
+          : `One of the values supplied isn't declared ${source}.`;
       return declared.length > 0
         ? `${rejected} You can set ${listLabels(declared)}.`
-        : `${rejected} None of its scenarios declare parameters.`;
+        : `${rejected} This run declares no parameters at all.`;
     },
   },
   scenario_test_suite_not_found: {
     title: "That test suite isn't available",
     describe: () =>
       "It may have been archived or removed. Reload, then pick a test suite again.",
+  },
+  scenario_not_found: {
+    title: "That scenario isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a scenario again.",
   },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
@@ -1672,6 +1870,33 @@ const presentations = {
         ? "Set values for this run, or give each parameter a default on the scenario."
         : "Set a value for this run, or give the parameter a default on the scenario.";
       return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
+    },
+  },
+  scenario_parameter_option_invalid: {
+    // The name and the options are declared configuration, not free text:
+    // the dialog shows what the parameter accepts next to the refused value.
+    title: "This value is not one of the parameter's options",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const options = strList(error, "options");
+      const subject = name
+        ? `The value supplied for ${name} is not one it accepts.`
+        : "The value supplied is not one the parameter accepts.";
+      return options.length > 0
+        ? `${subject} Choose one of ${listLabels(options)}.`
+        : `${subject} Choose one of its declared options.`;
+    },
+  },
+  scenario_parameter_required: {
+    title: "This run is missing a required parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are required and have no values" : "is required and has no value"}.`
+          : "A required parameter has no value.";
+      return `${subject} Set ${plural ? "values" : "a value"} for this run, or give ${plural ? "them" : "it"} a default where the parameter is declared.`;
     },
   },
   scenario_parameter_template_invalid: {
@@ -1728,6 +1953,36 @@ const presentations = {
           ? `${scenarioFieldLabel(error)} reads ${listLabels(names)}, which ${names.length > 1 ? "are secret parameters" : "is a secret parameter"}.`
           : `${scenarioFieldLabel(error)} reads a secret parameter.`;
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
+    },
+  },
+  scenario_field_unknown: {
+    // The names are our own identifiers, not free text: the editor shows the
+    // refused name beside the ones the suite declares so the typo is visible.
+    title:
+      "This scenario carries a value for a field its test suite does not declare",
+    describe: (error) => {
+      const unknown = strList(error, "identifiers");
+      const declared = strList(error, "declared");
+      const subject =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length > 1 ? "are" : "is"} not declared by the test suite.`
+          : "The value names a field the test suite does not declare.";
+      const hint =
+        declared.length > 0
+          ? ` It declares ${listLabels(declared)}.`
+          : " It declares no fields.";
+      return `${subject}${hint} Add the field to the test suite, or remove the value.`;
+    },
+  },
+  scenario_field_type_invalid: {
+    title: "A field value does not match the type its test suite declares",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      const type = str(error, "type", "");
+      const subject = identifier
+        ? `The value of ${identifier} cannot be read as ${type || "its declared type"}.`
+        : "One value cannot be read as the type the test suite declares.";
+      return `${subject} Enter a value of that type, or leave the field empty.`;
     },
   },
   scenario_stale_version: {
@@ -1849,6 +2104,23 @@ const presentations = {
     title: "That sign-in method can't be verified right now",
     describe: () =>
       "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  // ADR-128 §12. Both are races rather than mistakes: a review queue is read
+  // by people, and the world moves between reading it and clicking.
+  identity_match_suggestion_not_found: {
+    title: "That match suggestion is no longer there",
+    describe: () =>
+      "Somebody may have confirmed it already, or it stopped being suggested. Reload to see the current list.",
+  },
+  identity_already_linked: {
+    title: "This person is already linked to an account",
+    describe: () =>
+      "Someone linked them while this list was open. Reload to see who they are linked to.",
+  },
+  identity_erased: {
+    title: "This person has been erased",
+    describe: () =>
+      "Their details were removed at their request, so they can no longer be linked to an account. Reload to see the current list.",
   },
   identity_primary_must_demote_first: {
     title: "Your primary sign-in method can't be removed",
@@ -2002,10 +2274,60 @@ const presentations = {
     describe: () =>
       "It may have been archived. Reload to see the current list.",
   },
+  ingestion_key_not_found: {
+    title: "Ingestion key not found",
+    describe: () =>
+      "That key is not one of yours, or it was already removed. Refresh the list and try again.",
+  },
+  ingestion_key_revoke_incomplete: {
+    title: "Some keys could not be revoked",
+    describe: (error) => {
+      const survivors = error.meta.survivors;
+      const named =
+        Array.isArray(survivors) && survivors.length > 0
+          ? ` Still live: ${survivors.map((label) => String(label)).join(", ")}.`
+          : "";
+      return `No new key was minted because the previous keys for this source could not all be revoked.${named} Try again; keys already revoked stay revoked.`;
+    },
+  },
+  ingestion_key_session_revoked: {
+    title: "This device is signed out",
+    describe: () =>
+      "The CLI session on this machine was signed out, so it cannot mint an ingestion key. Run `langwatch login --device` and try again.",
+  },
+  ingestion_key_source_not_allowed: {
+    title: "This source is set up from the CLI",
+    describe: (error) => {
+      const sourceType = error.meta.sourceType;
+      const tool = typeof sourceType === "string" ? sourceType : "this tool";
+      return `A key for ${tool} is minted on the machine that runs it. Run \`langwatch instrument\` there, or connect a source a template names.`;
+    },
+  },
+  ingestion_key_workspace_missing: {
+    title: "Finish setting up your workspace",
+    describe: () =>
+      "Your personal workspace is not ready yet. Sign in again and retry the connection.",
+  },
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () =>
       "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
+  agent_listing_unavailable: {
+    // fault: platform, and the copy is written to match. Nothing reached a
+    // provider here — the ask could not be recorded at all — so there is no
+    // outcome landing later, no half-finished sync, and nothing already on
+    // the page is affected.
+    //
+    // It deliberately does not say "try again". Both causes are settings of
+    // the install rather than moments: this deployment does not run the
+    // pipeline that carries listings, or the organization has no governance
+    // project for the request to be tenanted to. Pressing the button a second
+    // time changes neither, and copy that implied otherwise would send an
+    // admin round a loop that cannot end.
+    title: "Agent sync isn't switched on for this organization",
+    describe: () =>
+      "Your providers weren't asked, so no agent list is on the way. Ask your administrator to switch it on, or contact support — trying again won't help until they do.",
   },
 
   // ---- datasets ----
@@ -2030,6 +2352,15 @@ const presentations = {
     title: "This dataset's columns have changed",
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
+  },
+  dataset_too_large_to_search: {
+    // A limit, not a breakage: the search would have had to read more of the
+    // dataset than one search reads. Saying so beats returning the matches
+    // found before giving up, which reads as a complete answer and is not one.
+    // Paging still works, so the copy points at the way through.
+    title: "This dataset is too large to search",
+    describe: () =>
+      "Page through the rows, or split the dataset into smaller ones.",
   },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
@@ -2130,6 +2461,56 @@ const presentations = {
     title: "Choose an agent to run against",
     describe: () =>
       "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
+  },
+  suite_field_identifier_invalid: {
+    title: "That field name cannot be used",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      const lead = identifier ? `${identifier} is not a usable name.` : "";
+      return `${lead} Field names start with a lowercase letter and use only lowercase letters, digits and underscores, and cannot be situation, criteria, name, input or output.`.trim();
+    },
+  },
+  suite_field_identifier_duplicate: {
+    title: "Two fields share a name",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `${identifier} is declared more than once. Give each field its own name.`
+        : "Give each field its own name.";
+    },
+  },
+  suite_field_in_use: {
+    title: "An evaluator still reads this field",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "this field");
+      return `Change the evaluator mappings that read ${identifier} first, then remove the field.`;
+    },
+  },
+  suite_evaluator_not_found: {
+    title: "That evaluator is not in this project",
+    describe: () =>
+      "It may have been deleted. Pick an evaluator from the list, then save again.",
+  },
+  suite_evaluator_mapping_invalid: {
+    title: "An evaluator mapping points at something the run cannot read",
+    describe: (error) => {
+      const input = str(error, "input", "");
+      const lead = input ? `The mapping of ${input} ` : "One mapping ";
+      return `${lead}names a source the run does not provide, or a field the test suite does not declare. Open the evaluator and pick another source.`;
+    },
+  },
+  suite_evaluator_mappings_missing: {
+    // The run is refused before anything is queued, so the copy can send the
+    // customer to the evaluator instead of warning about a half-started run.
+    title: "An evaluator is missing required mappings",
+    describe: (error) => {
+      const inputs = strList(error, "inputs");
+      const subject =
+        inputs.length > 0
+          ? `${listLabels(inputs)} ${inputs.length > 1 ? "have" : "has"} no source yet.`
+          : "A required input has no source yet.";
+      return `${subject} Configure the missing mappings on the evaluator, then run again.`;
+    },
   },
 
   // ---- automations & notifications ----
@@ -2260,6 +2641,15 @@ const presentations = {
     title: "That request couldn't be understood",
     describe: () => "Rephrase and try again.",
   },
+  langy_skill_not_available: {
+    title: "That capability isn't turned on yet",
+    describe: (error) => {
+      const skillId = str(error, "skillId", "");
+      return skillId
+        ? `The "${skillId}" capability isn't enabled for this project. Try describing what you want a different way.`
+        : "That capability isn't enabled for this project.";
+    },
+  },
   langy_rate_limited: {
     // Raised when someone sends faster than their own Langy allowance. The
     // message never reached Langy, so the copy says so and gives the one
@@ -2267,6 +2657,51 @@ const presentations = {
     title: "Too many messages just now",
     describe: () =>
       "That one wasn't sent. Wait a few seconds, then send it again.",
+  },
+  // ADR-129, the developer's own folder. Every one of these is something the
+  // person reading it can act on in the terminal or in the panel, which is
+  // why they are named rather than left as an unknown failure.
+  langy_local_workspace_offline: {
+    title: "No folder is connected",
+    describe: () =>
+      "Langy has no folder to work in. Run `npx langwatch@latest langy --share-control` in the folder you want it to change, then approve the request in the terminal.",
+  },
+  langy_local_request_invalid: {
+    title: "That request is not open",
+    describe: () =>
+      "The request to share a folder is not one you can approve. Ask Langy for the code change again to get a new one.",
+  },
+  langy_local_request_expired: {
+    title: "That request expired",
+    describe: () =>
+      "A request to share a folder lasts fifteen minutes. Ask Langy for the code change again to get a new one.",
+  },
+  langy_local_permission_timeout: {
+    title: "Nobody answered the permission card",
+    describe: () =>
+      "The command did not run. Send Langy a message and it will ask again.",
+  },
+  langy_local_skip_model_not_allowed: {
+    title: "This model cannot skip permission checks",
+    describe: () =>
+      "Check the allowed models list in the provider settings, or answer each card as it comes.",
+  },
+  langy_wait_expired: {
+    title: "That card is not waiting any more",
+    describe: (error) => {
+      const outcome = str(error, "outcome", "");
+      if (outcome === "answered") {
+        const decision = str(error, "decision", "");
+        const answer = LANGY_WAIT_ANSWERS[decision];
+        return answer
+          ? `You already ${answer}, and Langy carried on with that answer.`
+          : "You already answered this card, and Langy carried on with that answer.";
+      }
+      if (outcome === "cancelled") {
+        return "The turn was stopped before anyone answered. Send Langy a message to pick it up again.";
+      }
+      return "Langy stopped waiting for an answer. Send your answer as a message and it will pick it up.";
+    },
   },
   langy_turn_in_progress: {
     title: "Langy is still replying",
@@ -2819,6 +3254,45 @@ const presentations = {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  voice_agents_disabled: {
+    // voiceAgents.message has zero imports of its own, so pulling it in here
+    // never drags server-only Prisma code into this client-bundled registry.
+    title: VOICE_AGENTS_DISABLED_MESSAGE,
+    describe: () => "Ask an admin to turn the feature on for this project.",
+  },
+  voice_key_missing: {
+    title: "No key configured for this voice provider",
+    describe: () => "Add a provider key for this project, then try again.",
+  },
+  voice_mint_failed: {
+    title: "Could not start the call",
+    describe: () => "The voice provider refused the request. Try again.",
+  },
+  voice_name_required: {
+    title: "A name is required to save the agent",
+    describe: () => "",
+  },
+  voice_phone_transport_unavailable: {
+    title: "Phone targets have no browser call",
+    describe: () =>
+      "A phone target has no browser call. Run a scenario against the phone number instead.",
+  },
+  voice_recording_unavailable: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_recording_key_missing: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_conversation_mismatch: {
+    title: "This conversation does not belong to the minted session",
+    describe: () => "",
+  },
+  voice_session_invalid: {
+    title: "The session is invalid or has expired",
+    describe: () => "Start the call again.",
+  },
   gateway_budget_cycle_anchor_invalid: {
     // Names the window back, because the fix is to change one of the two:
     // drop the anchor, or pick a window that rolls.
@@ -3073,13 +3547,9 @@ const presentations = {
     describe: () =>
       "This conversation link isn't one we can open. Start a new chat to keep going.",
   },
-  opencode_session_not_found: {
+  agent_session_not_found: {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
-  },
-  opencode_auth_not_enforced: {
-    title: "Temporarily unavailable",
-    describe: () => "We're on it. Try again shortly.",
   },
   max_workers_reached: {
     title: "Busy right now",

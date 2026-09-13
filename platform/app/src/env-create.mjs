@@ -195,6 +195,14 @@ export function createEnvConfig() {
       AUTH0_MGMT_CLIENT_ID: z.string().optional(),
       AUTH0_MGMT_CLIENT_SECRET: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
+      // Pepper for the governance erasure digest (ADR-128 §9). Optional
+      // because erasure is opt-in; a deployment that never erases anybody
+      // never needs it, and one that does refuses to run without it rather
+      // than hashing with an empty secret and producing a list that protects
+      // nothing. NEVER ROTATE IT once anybody has been erased: every stored
+      // digest is a function of this value, and the identifiers needed to
+      // recompute them under a new one are exactly what was erased.
+      GOVERNANCE_ERASURE_PSEUDONYM_SECRET: z.string().min(32).optional(),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
       LW_GATEWAY_INTERNAL_SECRET:
@@ -580,6 +588,18 @@ export function createEnvConfig() {
       ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
+      // Connected agents (ADR-128). The relay payload cap, in mebibytes, for
+      // self-hosted deployments whose turns carry large attachments; and the
+      // app replica count, which decides whether connected agents can run
+      // without Redis (one replica only). Empty strings read as unset.
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().positive().optional(),
+      ),
+      LANGWATCH_APP_REPLICAS: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().default(1),
+      ),
 
       // Observability
       OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
@@ -634,6 +654,8 @@ export function createEnvConfig() {
       LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
       LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
+      GOVERNANCE_ERASURE_PSEUDONYM_SECRET:
+        process.env.GOVERNANCE_ERASURE_PSEUDONYM_SECRET,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,
@@ -653,6 +675,9 @@ export function createEnvConfig() {
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
       LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
+      LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB:
+        process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,
+      LANGWATCH_APP_REPLICAS: process.env.LANGWATCH_APP_REPLICAS,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,

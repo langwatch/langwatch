@@ -17,7 +17,7 @@ If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kuber
 
 The langwatch chart needs two operator-managed Secrets in your target namespace before the first sync:
 
-- `langwatch-app-secrets` holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
+- `langwatch-app-secrets` holds the app keys + the AI Gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
 
 This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
@@ -40,7 +40,7 @@ kubectl -n langwatch create secret generic langwatch-clickhouse-creds \
   --from-literal=clusterSecret="$(openssl rand -hex 24)"
 ```
 
-If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional because only replicated ClickHouse uses it for Keeper inter-node auth. Creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
+If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional because only replicated ClickHouse uses it for Keeper inter-node auth. Creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
 
 Then apply the Application manifest:
 
@@ -129,7 +129,9 @@ Topic-specific configuration pages:
 
 ## Operator-managed Secrets via External Secrets / Sealed Secrets / Vault
 
-Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`). The preflight Job runs as an ArgoCD `PreSync` hook (mapped automatically from Helm's `pre-install` + `pre-upgrade` hooks, see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)) so a Secret that has not landed in time fails the sync with a clear missing-keys error.
+Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
+
+The preflight Job runs as an ArgoCD `PreSync` hook, mapped automatically from Helm's `pre-install` and `pre-upgrade` hooks (see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)). A Secret that has not landed in time fails the sync with a clear missing-keys error.
 
 The preflight Job runs during ArgoCD's `PreSync` phase, which Argo completes in full before any `Sync` phase manifest is applied. A regular `ExternalSecret` / `SealedSecret` / `vaultauth` resource is a `Sync`-phase manifest by default, so a `sync-wave` annotation on it cannot pull it ahead of the preflight, even at wave `-1000`. Pick one of:
 
@@ -164,7 +166,9 @@ The two `resourceVersion` values should be identical because the chart no longer
 
 ## Legacy: autogen.enabled=true under ArgoCD
 
-If you set `autogen.enabled=true` in your Argo Application values, the chart materialises the Secret itself using helm's `lookup`-or-`randAlphaNum` pattern. Under direct `helm upgrade` that pattern is idempotent: the lookup reads existing values from the live cluster and the manifest reuses them verbatim. Under ArgoCD it is NOT idempotent: the argocd-repo-server has no cluster access (by design, it is a sandboxed renderer), so `lookup` returns nil on every sync and the chart emits a fresh random pair every render. Without mitigation, every Argo sync rotates the credentials and rolls both app + gateway pods.
+If you set `autogen.enabled=true` in your Argo Application values, the chart materialises the Secret itself using helm's `lookup`-or-`randAlphaNum` pattern. Under direct `helm upgrade` that pattern is idempotent: the lookup reads existing values from the live cluster and the manifest reuses them verbatim.
+
+Under ArgoCD it is not idempotent. The argocd-repo-server has no cluster access, by design, because it is a sandboxed renderer, so `lookup` returns nil on every sync and the chart emits a fresh random pair every render. Without mitigation, every Argo sync rotates the credentials and rolls both the app and the gateway pods.
 
 The mitigation is the same trio that earlier chart versions required from the start: `ignoreDifferences` on the Secret's `/data` (Argo excludes it from the diff), `RespectIgnoreDifferences=true` in `syncOptions` (the sync operation itself omits the ignored field), and `ServerSideApply=true` (server-side apply honors `RespectIgnoreDifferences` reliably; client-side apply does not). Drop any one of the three and an ordinary sync rotates the live Secret. `argocd app sync --force` and `replace: true` bypass `RespectIgnoreDifferences` and rotate regardless.
 

@@ -15,6 +15,7 @@ import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/re
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 /** The grants an API key carries, as the request states them. */
 export type ApiKeyBindingInput = {
@@ -67,6 +68,7 @@ export class ApiKeyRepository {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     startsDisabled = false,
   }: {
     name: string;
@@ -81,6 +83,7 @@ export class ApiKeyRepository {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    parentApiKeyId?: string | null;
     /**
      * Born revoked, to be activated once the key's grants are facts (see
      * {@link activate}). The row and its grants cannot share a transaction —
@@ -103,6 +106,7 @@ export class ApiKeyRepository {
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
         createdByDeviceLabel: createdByDeviceLabel ?? null,
+        parentApiKeyId: parentApiKeyId ?? null,
         ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
     });
@@ -117,35 +121,6 @@ export class ApiKeyRepository {
     return this.prisma.apiKey.update({
       where: { id },
       data: { revokedAt: null },
-    });
-  }
-
-  /**
-   * Finds the live ingestion key for a (project, sourceType) pair: a non-revoked
-   * ApiKey carrying that ingestSourceType whose role binding is project-scoped to
-   * `projectId`. Used by the ingest-key service to rotate-in-place rather than
-   * accumulate keys.
-   */
-  async findIngestKey({
-    organizationId,
-    projectId,
-    sourceType,
-  }: {
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-  }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findFirst({
-      where: {
-        organizationId,
-        ingestSourceType: sourceType,
-        revokedAt: null,
-        roleBindings: {
-          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-        },
-      },
-      include: { roleBindings: true },
-      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -176,6 +151,32 @@ export class ApiKeyRepository {
     });
   }
 
+  /**
+   * Lists every live ingestion key one person owns in an organization,
+   * newest first. This is the set a session cascade, a source rotation and
+   * the devices tab read: it filters by the indexed `userId` and the callers
+   * match parent, source type or template in memory over a person's few live
+   * keys, which is why `parentApiKeyId` needs no index of its own.
+   */
+  async findIngestKeysForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    return this.prisma.apiKey.findMany({
+      where: {
+        organizationId,
+        userId,
+        ingestSourceType: { not: null },
+        revokedAt: null,
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   async findByLookupId({
     lookupId,
   }: {
@@ -192,6 +193,44 @@ export class ApiKeyRepository {
         OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
       include: { roleBindings: true },
+    });
+  }
+
+  /**
+   * The live keys minted under one key, inside its organization.
+   *
+   * Bounded by `organizationId` so it goes through the ordinary tenancy
+   * guard rather than a cross-tenant hatch: a cascade always knows whose
+   * organization it is retiring keys in.
+   */
+  async findLiveChildren({
+    parentApiKeyId,
+    organizationId,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>> {
+    return this.prisma.apiKey.findMany({
+      where: { organizationId, parentApiKeyId, revokedAt: null },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Whether one key is still usable, by id, without its bindings.
+   *
+   * The auth path asks this about a key's parent on every request that
+   * presents a session-minted key, so it reads the two columns that decide it
+   * and nothing else.
+   */
+  async findLivenessById({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ revokedAt: Date | null; expiresAt: Date | null } | null> {
+    return this.prisma.apiKey.findUnique({
+      where: { id },
+      select: { revokedAt: true, expiresAt: true },
     });
   }
 
@@ -353,11 +392,31 @@ export class ApiKeyRepository {
     });
   }
 
-  async revoke({ id }: { id: string }): Promise<ApiKey> {
-    return this.prisma.apiKey.update({
-      where: { id },
-      data: { revokedAt: new Date() },
+  /**
+   * Marks a key revoked, recording why, and never overwrites a cause already
+   * on the row.
+   *
+   * The fence on `revokedAt` is what makes the cause the FIRST revocation's,
+   * not the last writer's. A person revoking a key from the API-keys page and
+   * the personal ingest-key cap retiring the same key can reach here at the
+   * same moment: both read a live row, and without the fence the later update
+   * decides the cause. A `"cap"` written over a `"user"` is the one that
+   * matters, because the CLI re-mints a key the cap retired and leaves a key
+   * a person revoked dead. Losing the race returns the row that stands, so
+   * the key is dead either way and the first decision is the one recorded.
+   */
+  async revoke({
+    id,
+    cause,
+  }: {
+    id: string;
+    cause: ApiKeyRevocationCause;
+  }): Promise<ApiKey> {
+    await this.prisma.apiKey.updateMany({
+      where: { id, revokedAt: null },
+      data: { revokedAt: new Date(), revocationCause: cause },
     });
+    return this.prisma.apiKey.findUniqueOrThrow({ where: { id } });
   }
 
   async updateLastUsedAt({ id }: { id: string }): Promise<void> {
@@ -553,7 +612,11 @@ export class ApiKeyRepository {
 
   async findProjectsInOrg({ organizationId }: { organizationId: string }) {
     return this.prisma.project.findMany({
-      where: { team: { organizationId }, archivedAt: null },
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: "internal_governance" },
+      },
       select: { id: true, name: true, teamId: true },
       orderBy: { name: "asc" },
     });
@@ -604,6 +667,12 @@ export class ApiKeyRepository {
    * The attach itself, with the outcome intact: which ids were written and
    * which identical rows were already there. `replaceRoleBindings` needs both
    * to know what its revoke must spare.
+   *
+   * `requireProjection` because both callers act on these rows next: a create
+   * activates the credential, and a replace revokes whatever the attach did
+   * not keep. An append that is durable but not yet readable is fine for a
+   * caller that only writes; here it would hand out a token the resolver
+   * refuses, or drop the grants the key already had.
    */
   private async attachRoleBindings({
     apiKeyId,
@@ -630,6 +699,7 @@ export class ApiKeyRepository {
       })),
       actor,
       onDuplicate: "skip",
+      requireProjection: true,
     });
   }
 }

@@ -61,3 +61,16 @@ Feature: Langy's cards read at the right attention weight
     Then the error reads as a calm change-weight card in Langy's own skin
     And the trouble is carried by a calm rust tone, not a loud alert box
     And the retry is offered as a clear action
+
+  @integration
+  Scenario: A step the turn recovered from folds to one line
+    Given a step that failed and a reply Langy wrote after it
+    When I read the finished turn
+    Then that failure is one quiet line, not a card
+    And opening the line shows the card it always showed
+
+  @integration
+  Scenario: A step the turn never recovered from keeps its card
+    Given a step that failed and no reply after it
+    When I read the turn
+    Then that failure keeps its card

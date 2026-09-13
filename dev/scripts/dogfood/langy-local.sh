@@ -16,7 +16,10 @@
 # Spec: specs/setup/langy-local-dogfood.feature
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+# Physical path (`-P`): LW_REAL below is resolved with `pwd -P`, so a logical
+# ROOT would fail the in-worktree `case` test whenever a symlinked ancestor
+# sits above the checkout, reporting an in-worktree CLI as outside it.
+ROOT="$(cd -P "$(dirname "$0")/../../.." && pwd -P)"
 ENV_FILE="$ROOT/platform/app/.env"
 APP_PORT="${PORT:-5560}"
 GATEWAY_PORT=$((APP_PORT + 3))
@@ -47,7 +50,7 @@ echo "Langy local dogfood doctor ($ENV_FILE)"
 # --- env block -------------------------------------------------------------
 echo "env:"
 missing_env=()
-for key in OPENCODE_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
+for key in LANGY_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
   if [[ -n "$(env_value "$key")" ]]; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
 done
 # The isolation flag must literally be true: set-but-false still spawns the
@@ -75,7 +78,7 @@ if [[ ${#missing_env[@]} -gt 0 ]]; then
     BLOCK=$(cat <<BLOCK
 
 # Langy local dev (agent runs without gVisor via the unsafe-dev runner)
-OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
+LANGY_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="${SECRET}"
 LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
 SESSIONS_ROOT="\$HOME/.langwatch-langy/sessions"
@@ -108,16 +111,56 @@ fi
 
 # --- binaries --------------------------------------------------------------
 echo "binaries:"
-if command -v opencode >/dev/null 2>&1; then
-  ok "opencode ($(command -v opencode))"
-else
-  bad "opencode not on PATH (the langyagent spawns it per conversation)"
-  hint "npm install -g opencode-ai"
-fi
 if command -v go >/dev/null 2>&1; then
   ok "go toolchain"
 else
   bad "go not on PATH (langyagent and the gateway are Go services)"
+fi
+# resolve_symlink_chain canonicalizes by hand (no readlink -f / realpath):
+# BSD readlink on macOS has neither, and this doctor has to run there too.
+# `npm link`'s bin shim is itself a symlink into a symlinked package
+# directory (lib/node_modules/<pkg> -> the worktree), so a leaf-only resolve
+# is not enough — every hop re-resolves its DIRECTORY physically (`cd -P`,
+# which follows symlinked ancestors) before checking whether the leaf itself
+# is another symlink to follow.
+resolve_symlink_chain() {
+  local target="$1" dir base link
+  dir="$(cd -P "$(dirname "$target")" 2>/dev/null && pwd -P)" || { printf '%s' "$target"; return; }
+  base="$(basename "$target")"
+  target="$dir/$base"
+  while [ -L "$target" ]; do
+    link="$(readlink "$target")"
+    case "$link" in
+      /*) target="$link" ;;
+      *) target="$dir/$link" ;;
+    esac
+    dir="$(cd -P "$(dirname "$target")" 2>/dev/null && pwd -P)" || break
+    base="$(basename "$target")"
+    target="$dir/$base"
+  done
+  printf '%s' "$target"
+}
+# The local-unsafe runner hands a worker the manager's own PATH verbatim
+# (services/langyagent/internal/workerenv) — there is no per-worker image
+# rebuilding the CLI from this checkout the way the production Dockerfile
+# does. A stale globally- or npx-cached `langwatch` earlier on PATH silently
+# hides any CLI command added on this branch: it fails as
+# `error: unknown command`, which reads to Langy as "this doesn't exist" and
+# sends it toward a different, already-shipped command instead — a distant,
+# silent product regression rather than a loud one.
+if command -v langwatch >/dev/null 2>&1; then
+  LW_BIN="$(command -v langwatch)"
+  LW_REAL="$(resolve_symlink_chain "$LW_BIN")"
+  case "$LW_REAL" in
+    "$ROOT"/*) ok "langwatch CLI on PATH resolves inside this worktree ($LW_BIN)" ;;
+    *)
+      bad "langwatch CLI on PATH resolves outside this worktree ($LW_BIN -> $LW_REAL)"
+      hint "cd \"$ROOT/sdks/typescript\" && pnpm build && npm link   (relinks langwatch/lw on PATH to this worktree's build)"
+      ;;
+  esac
+else
+  bad "langwatch CLI not on PATH (langyagent's turns run it)"
+  hint "cd \"$ROOT/sdks/typescript\" && pnpm build && npm link"
 fi
 
 # --- services --------------------------------------------------------------

@@ -10,6 +10,9 @@
 
 export const CASE_EDITOR_DRAWER = "agentTestingCaseEditor" as const;
 
+/** The drawer that edits a test suite: its name, its fields, its evaluators. */
+export const SUITE_EDITOR_DRAWER = "agentTestingSuiteEditor" as const;
+
 /** The drawer that connects the agent to be tested, opened on day zero. */
 export const AGENT_TYPE_SELECTOR_DRAWER = "agentTypeSelector" as const;
 

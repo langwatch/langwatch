@@ -65,6 +65,10 @@ const emptyQuery = vi.hoisted(() => () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The run dialog reads the saved evaluators for the ones a run carries.
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
@@ -236,6 +240,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
@@ -383,6 +393,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   });
 
   /** @scenario "The run detail drawer opens as soon as the run is queued" */
+  /** @scenario "A queued run draws the whole drawer" */
   it("opens the drawer at queue time, naming the scenario and the target", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
@@ -414,12 +425,18 @@ describe("starting a run of one scenario from the scenario table", () => {
     mockGetBatchRunData.mockReturnValue({ data: { runs: [] } });
     render(<AgentTestingRunDrawer open />, { wrapper: Wrapper });
 
-    const queued = screen.getByTestId("wide-drawer-queued");
+    // The whole drawer is drawn, not a bare queued line: the queued read sits
+    // where the messages will be, and the results column waits beside it.
+    expect(screen.getByTestId("wide-drawer-queued")).toHaveTextContent(
+      "Queued",
+    );
+    expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "Waiting for the run to start",
+    );
     expect(
-      within(queued).getByText("Angry refund request"),
+      screen.getByText(/prod-agent: Angry refund request/),
     ).toBeInTheDocument();
-    expect(within(queued).getByText(/prod-agent/)).toBeInTheDocument();
-    expect(within(queued).getByText("Queued")).toBeInTheDocument();
   });
 
   /** @scenario "The run goes out under a plan named after the scenario and the agent" */

@@ -15,6 +15,10 @@ import time
 from typing import Sequence
 from unittest.mock import MagicMock, patch
 
+import httpx
+
+from langwatch.http_client import create_client
+
 import pandas as pd
 import pytest
 from opentelemetry import trace as trace_api
@@ -178,6 +182,17 @@ class TestTraceParentage:
         )
 
 
+def _capturing_client_factory(bucket):
+    """A create_client stand-in whose transport records every JSON body sent
+    and answers 200."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bucket.append(json.loads(request.content))
+        return httpx.Response(200)
+
+    return lambda **kwargs: create_client(transport=httpx.MockTransport(handler))
+
+
 class TestThreadingAsyncParity:
     """Running the same workload through `loop`/`submit` and `aloop`/`asubmit`
     must produce equivalent batch output. No drift, no regression."""
@@ -186,21 +201,15 @@ class TestThreadingAsyncParity:
         captured_threading = []
         captured_async = []
 
-        def mock_post_factory(bucket):
-            def mock_post(*args, **kwargs):
-                bucket.append(json.loads(kwargs.get("data", "{}")))
-                response = MagicMock()
-                response.status_code = 200
-                response.raise_for_status = MagicMock()
-                return response
-            return mock_post
-
         df = pd.DataFrame([{"q": f"Q{i}"} for i in range(6)])
 
         # Threading path
         ev_t = Experiment("parity-threading")
         ev_t.initialized = True
-        with patch("httpx.post", side_effect=mock_post_factory(captured_threading)):
+        with patch(
+            "langwatch.experiment.experiment.create_client",
+            _capturing_client_factory(captured_threading),
+        ):
             for index, row in ev_t.loop(df.iterrows(), threads=3):
                 def task_t(index, row):
                     time.sleep(0.005)
@@ -214,7 +223,10 @@ class TestThreadingAsyncParity:
             async def task_a(row):
                 await asyncio.sleep(0.005)
 
-            with patch("httpx.post", side_effect=mock_post_factory(captured_async)):
+            with patch(
+                "langwatch.experiment.experiment.create_client",
+                _capturing_client_factory(captured_async),
+            ):
                 async for _index, row in ev_a.aloop(df.iterrows(), concurrency=3, total=6):
                     ev_a.asubmit(task_a, row)
 

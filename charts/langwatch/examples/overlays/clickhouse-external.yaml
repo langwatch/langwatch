@@ -14,3 +14,11 @@ clickhouse:
       value: "http://<username>:<password>@my-clickhouse:8123/langwatch"
     # Set cluster name if your external ClickHouse is replicated:
     # cluster: "my_cluster"
+
+# LangWatchQL (lwql.enabled, default true) self-provisions its access model
+# via app SQL DDL on this path — the chart cannot render config into a server
+# it does not own. Your ClickHouse must already have: custom_settings_prefixes
+# including "custom_", and the app's administrative user granted
+# access_management + named_collection_control. See "LangWatchQL (LWQL) — BYO
+# ClickHouse prerequisites" in ../../README.md, and ADR-101
+# (../../../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md).

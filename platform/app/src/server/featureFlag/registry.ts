@@ -170,6 +170,21 @@ export const FEATURE_FLAGS = [
     family: "Governance",
   },
 
+  // Deliberately its own key rather than a reuse of the one above, and it
+  // gates strictly less. That one decides whether pulled cost is RECORDED at
+  // all; this one decides whether a version of a charge that a later pull
+  // superseded is WITHDRAWN. Turning the recording off to stop bad
+  // withdrawals would also stop every good record, so the two need separate
+  // switches or the only available remedy is far too blunt.
+  {
+    key: "release_pulled_usage_retraction_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Withdraws the superseded version of a pulled charge when a provider reissues it under a different currency, agent or spender, so a day does not total the same bill twice (ADR-088/ADR-128). Off by default; enable per organization via the operator store or a PostHog rule. With it off the reissue is still detected and logged, but nothing is withdrawn and the day keeps double-counting. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_retraction_enabled.",
+    family: "Governance",
+  },
+
   // ----- PRODUCT -----
   {
     key: "release_lwql_workbench",
@@ -184,6 +199,13 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
+  },
+  {
+    key: "release_voice_agents_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
   },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
@@ -265,7 +287,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Reveals the Costs and Billed governance placeholder pages and their sidebar items (spec: specs/ai-gateway/governance/governance-home-routing.feature). Composed ON TOP of release_ui_ai_governance_enabled, never instead of it: the section flag off still hides everything. Default off — the pages are empty shells shipped ahead of the spend views. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled.",
+      "Reveals Costs and the Platform preview pages (Insights, Analytics, Signals & Alerts) and their sidebar items. Composed ON TOP of release_ui_ai_governance_enabled: the section flag off still hides everything. Default off. Costs renders billed/gateway amounts and seat counts; the unfinished Billed address stays unavailable. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled. Specs: specs/ai-gateway/governance/governance-home-routing.feature, specs/governance/governance-cost-screen.feature.",
     family: "Governance",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
@@ -318,15 +340,6 @@ export const FEATURE_FLAGS = [
       "Lets a project API key start and continue Langy turns over the public REST surface (spec: specs/langy/langy-api-key-turns.feature). Strictly narrower than release_langy_enabled and ANDed with it: this flag opens a new way in for an actor who already has Langy, and never grants Langy itself. Off = the REST surface 404s and only the browser can start a turn, which is the rollback position — turning it off cannot break the in-product assistant. Internal flag store only, so the /ops/feature-flags toggle is the one lever.",
   },
   {
-    key: "release_langy_pi_harness",
-    scope: "SYSTEM",
-    defaultValue: true,
-    envOverridable: false,
-    family: "Langy",
-    description:
-      "Runs Langy turns on the pi worker harness instead of opencode. Evaluated once per turn and rides the worker credential signature, so flipping it re-warms the conversation's worker on the next message rather than mutating a running one. Default ON = pi everywhere; the flag is the per-project rollback lever to opencode. Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
-  },
-  {
     key: "release_langy_ui_actions",
     scope: "SYSTEM",
     defaultValue: true,
@@ -341,6 +354,15 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
+  {
+    key: "release_custom_chart_playground",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Custom Chart Playground",
+    description:
+      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
   },
   {
     key: "release_ui_home_signal_focused_enabled",
@@ -367,9 +389,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_agent_testing_v2_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the current Simulations pages and menu group exactly as they are; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled.",
+      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the Simulations pages and menu group exactly as they were; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default on, so a self-hosted installation reads Agent Testing with no rule; a rule keeps a project or an organization on the Simulations pages. Every simulations address redirects to Agent Testing while the flag is on.",
   },
   {
     // D12 (ADR-117). Named `join_requests` rather than the usual

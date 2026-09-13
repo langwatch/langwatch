@@ -7,6 +7,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
@@ -24,7 +25,7 @@ export const deleteSecretCommand = async (
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

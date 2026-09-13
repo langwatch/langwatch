@@ -239,7 +239,7 @@ func TestRelayDropsNonTraceSignals(t *testing.T) {
 	}
 }
 
-// opencode's native exporter ships OTLP/HTTP JSON and ignores
+// A native exporter ships OTLP/HTTP JSON and ignores
 // OTEL_EXPORTER_OTLP_PROTOCOL — the relay must accept it, and everything it
 // forwards must still be protobuf.
 func TestRelayTraces_JSONEncodedExport(t *testing.T) {
@@ -415,7 +415,7 @@ func TestForwardTurnSpanFailure(t *testing.T) {
 //
 // @scenario "Codex-plan usage appears as bundled cost"
 func TestRelayTracesCodexNonBillable(t *testing.T) {
-	// A model-call span (carries gen_ai.provider.name, as opencode's Responses
+	// A model-call span (carries gen_ai.provider.name, as a worker's Responses
 	// spans do) plus a tool span that must never receive a cost stamp.
 	codexBatch := func(forgeFlag bool) []byte {
 		td := ptrace.NewTraces()
@@ -510,11 +510,11 @@ func TestRelayTracesCodexNonBillable(t *testing.T) {
 		}
 	})
 
-	// The REAL wire shape: opencode's Vercel AI SDK spans carry ai.model.id /
+	// The REAL wire shape: a worker's Vercel AI SDK spans carry ai.model.id /
 	// ai.model.provider, never the gen_ai.* names (those appear only after
 	// ingest canonicalisation). A key list matching only gen_ai.* silently
 	// no-ops on every real batch, verified live before this fixture existed.
-	t.Run("matches the ai.model wire shape opencode actually exports", func(t *testing.T) {
+	t.Run("matches the ai.model wire shape a worker actually exports", func(t *testing.T) {
 		td := ptrace.NewTraces()
 		ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
 		model := ss.Spans().AppendEmpty()

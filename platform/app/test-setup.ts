@@ -181,6 +181,7 @@ vi.mock("recharts", () => {
     ZAxis: MockComponent,
     ReferenceLine: MockComponent,
     ReferenceArea: MockComponent,
+    Rectangle: MockComponent,
     Brush: MockComponent,
     Scatter: MockComponent,
     ScatterChart: MockComponent,

@@ -92,6 +92,34 @@ describe("the spend quantity vocabulary", () => {
           output_audio_tokens: 0,
           input_chars: 0,
           audio_ms: 0,
+          input_image_tokens: 0,
+          output_image_tokens: 0,
+          image_count: 0,
+        });
+      });
+    });
+  });
+
+  describe("given a confirmation recorded before the image quantities existed", () => {
+    describe("when it is read back", () => {
+      /** @scenario A quantity added to the vocabulary defaults on records written before it */
+      it("defaults the image quantities to zero", () => {
+        const parsed = confirmSpendWireSchema.parse({
+          ...wireConfirmationBeforeAudio,
+          usage: {
+            input_tokens: 200,
+            output_tokens: 50,
+            input_audio_tokens: 800,
+            output_audio_tokens: 250,
+            input_chars: 4000,
+            audio_ms: 1234,
+          },
+        });
+
+        expect(parsed.usage).toMatchObject({
+          input_image_tokens: 0,
+          output_image_tokens: 0,
+          image_count: 0,
         });
       });
     });
@@ -111,6 +139,9 @@ describe("the spend quantity vocabulary", () => {
             input_chars: 4000,
             audio_ms: 1234,
             cache_creation_1h_tokens: 17,
+            input_image_tokens: 323,
+            output_image_tokens: 1600,
+            image_count: 1,
           },
         });
 
@@ -120,6 +151,9 @@ describe("the spend quantity vocabulary", () => {
           input_chars: 4000,
           audio_ms: 1234,
           cache_creation_1h_tokens: 17,
+          input_image_tokens: 323,
+          output_image_tokens: 1600,
+          image_count: 1,
         });
       });
     });

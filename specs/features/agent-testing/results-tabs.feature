@@ -51,6 +51,21 @@ Feature: The Results tab
     When the Test Runs list is read
     Then its row carries the pass rate of that last run
 
+  @integration
+  Scenario: A window that holds runs of no plan still reads the whole tab
+    Given a project with no run plan and runs inside the window
+    When the Results tab is opened
+    Then the filter row and the period picker read
+    And the "No runs yet" state does not read
+    And the count in the header of the list matches the runs the window holds
+
+  @integration
+  Scenario: The plan table says when the runs of the window belong to no plan
+    Given a project with no run plan and runs inside the window
+    When the Test Runs list is read
+    Then the table says those runs were started outside a run plan
+    And it points at the scenario and target groupings, which list them
+
   # --- The columns of the plan table ---
 
   @integration
@@ -315,6 +330,17 @@ Feature: The Results tab
     Then one row reads "dev-agent" and one row reads "prod-agent"
     And each row reads the pass rate of that agent alone
 
+  # The mark is the icon the agents page draws for the same agent, so a target
+  # reads as the agent a person knows from that page. It carries a colour only
+  # in a comparison, where the colour is what tells one target from another.
+
+  @integration
+  Scenario: A target row is marked with the kind of agent behind it
+    Given runs against a connected agent and against an HTTP agent
+    When "Target" is chosen in Group by
+    Then each row is marked with the kind of its own agent
+    And the marks carry no colour
+
   @integration
   Scenario: Grouping by none reads the flat list
     Given a filter has already narrowed the question
@@ -389,9 +415,12 @@ Feature: The Results tab
     And the pass block reads after it
     And the note reads last
 
-  # Evaluators on the run plan are not built yet. The two scenarios below state
-  # how they must read once they are, and bind nothing until then.
-  @unimplemented
+  # --- Evaluators on a run ---
+  # A test suite or a run plan attaches evaluators to its scenarios. Every
+  # scenario run then carries one result per evaluator, and the header, the
+  # rows and the run drawer read them.
+
+  @integration
   Scenario: The evaluator pills read after the pass block
     Given a run of a plan that carries evaluators
     When the run header is read
@@ -399,14 +428,98 @@ Feature: The Results tab
     And they are drawn at the size of the pass block
     And the note still reads last
 
-  @unimplemented
+  @integration
   Scenario: A score evaluator carries no threshold and no colour
     Given a run whose evaluators are one pass or fail check and one score
     When the evaluator pills are read
-    Then the pass or fail pill is coloured by its verdict
+    Then the pass or fail pill is coloured by its pass rate
     And the score pill reads its number with no colour
     And no threshold is shown for the score
 
+  @integration
+  Scenario: A pass or fail evaluator reads its pass rate over the run
+    Given a run of three scenarios on which one evaluator passed twice and failed once
+    When the evaluator pills of the run header are read
+    Then the pill of that evaluator reads "67%"
+    And a scenario on which the evaluator was skipped is left out of the rate
+
+  @integration
+  Scenario: A run without evaluators shows no evaluator pills
+    Given a run of a plan that carries no evaluators
+    When the run header is read
+    Then no evaluator pill is drawn after the pass block
+
+  @integration
+  Scenario: A result row carries one pill per evaluator
+    Given a finished run whose scenarios ran two evaluators
+    When the results table is read
+    Then the Evaluators cell of a row holds one pill per evaluator
+    And a pass or fail pill reads "Pass" or "Fail" with a dot in the colour of its verdict
+    And a score pill reads its number with no dot
+
+  @integration
+  Scenario: A skipped evaluator reads muted on its row
+    Given a run in which one scenario left an evaluator nothing to read
+    When the Evaluators cell of that row is read
+    Then the pill of that evaluator reads "Skipped"
+    And it reads muted
+
+  # The Evaluators column exists only on a run that has evaluators: results
+  # already recorded, or results still owed. A run that will never receive any
+  # shows no column and no header, so the table does not jump when grading
+  # lands and an empty column never takes the width the scenario name needs.
+
+  @integration
+  Scenario: A run without evaluators shows no evaluators column
+    Given a finished run whose scenarios ran no evaluator
+    When the results table is read
+    Then no "Evaluators" heading is drawn
+    And no row carries an Evaluators cell
+    And the scenario column takes the width the column would have taken
+
+  @integration
+  Scenario: A run owed evaluations shows the column from the start
+    Given a run whose scenarios finished and are still waiting for their evaluators
+    When the results table is read
+    Then the "Evaluators" heading is drawn
+    And the Evaluators cell of a waiting row reads "Grading" in muted text
+    And a row of the same run that carries no evaluators has an empty cell
+
+  @integration
+  Scenario: A graded run shows the column with its pills
+    Given a finished run whose evaluators reported
+    When the results table is read
+    Then the "Evaluators" heading is drawn
+    And the Evaluators cell of each row holds its pills
+
+  @integration
+  Scenario: The scenario name stays readable on a narrow table
+    Given a finished run whose evaluators reported
+    When the table is drawn narrower than its columns would like
+    Then the scenario column keeps a readable minimum width
+    And the evaluators column shares the free width and wraps its pills
+    And the evaluators column claims no fixed width of its own
+
+  @integration
+  Scenario: A failed required evaluator names itself beside the verdict of a row
+    Given a run in which one scenario met every criterion and failed a required evaluator
+    When the result cell of that row is read
+    Then it reads "Failed" with the criteria count
+    And hovering it names the evaluator that failed the scenario
+
+  @integration
+  Scenario: The evaluator results land after the run finished without a reload
+    Given a finished run whose evaluators have not reported yet
+    When the evaluator results arrive
+    Then the Evaluators cell of each row fills in
+    And the header pills appear
+    And no manual reload is needed
+
+  @integration
+  Scenario: A simulation update makes the results read again
+    Given the results page with its live stream connected, so it does not poll
+    When a simulation update arrives, the one the evaluators send after the last run finished included
+    Then the results overview and the result atoms are read again
 
   @integration
   Scenario: A sidebar entry shows the number, the note, the age and the pass rate
@@ -679,10 +792,10 @@ Feature: The Results tab
     And no manual reload is needed
 
   @integration
-  Scenario: A run started from the rail appears in the sidebar without a page change
+  Scenario: A run started from the rail opens on the run it started
     Given a run plan is open
     When "Run suite" is chosen on another plan in the rail
-    Then the address does not change
+    Then the address moves to that other plan, on the new run
     And a placeholder entry for the new run appears in that other plan
 
   @integration
@@ -739,6 +852,15 @@ Feature: The Results tab
     Then an empty state says there is no run in this period
     And it offers to widen the period
 
+  @integration
+  Scenario: A run opened before its first scenario reports reads as waiting
+    Given a URL that names a run of the plan the window does not hold yet
+    When the plan is opened
+    Then the results column says it is waiting for the first result
+    And it does not say there is no run in this period
+    And the runs rail shows the run as starting
+    And it still offers to widen the period, for an old link
+
   # --- Loading and gating ---
 
   @integration
@@ -754,6 +876,13 @@ Feature: The Results tab
     When the Results tab loads
     Then the skeleton reads no more
     And the empty "no runs yet" state reads on the tab
+
+  @integration
+  Scenario: The empty state of the tab offers a wider period
+    Given a project with no run plan and no run inside the window
+    When the Results tab is opened
+    Then the "No runs yet" state offers the next wider period
+    And choosing it widens the window
 
   # --- Stalled runs ---
 

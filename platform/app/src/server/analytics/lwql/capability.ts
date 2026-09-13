@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — the per-query tenant capability.
  *
  * The database resolves a caller's tenant by looking the value produced here up
- * in the key map (`provisioning.ts`), so this function and whatever populates
+ * in the key map (`provisioning/accessModel.ts`), so this function and whatever populates
  * that table must agree byte for byte. They agree because they are the same
  * function: a second implementation of "hash the key" is a second thing to keep
  * in sync, and the failure mode when they drift is silent — the query succeeds
@@ -40,7 +40,7 @@
  * `system.*`, and the validator refuses a `SETTINGS` clause, so a caller cannot
  * present someone else's digest as its own.
  *
- * @see ./provisioning.ts — the key map this value is looked up in
+ * @see ./provisioning/accessModel.ts — the key map this value is looked up in
  * @see ./validation/validate.ts — the `SETTINGS` refusal that clause depends on
  * @see specs/analytics/lwql-api.feature
  */

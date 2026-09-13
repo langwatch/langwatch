@@ -8,8 +8,13 @@ import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 import {
+  type EvaluatorFlagRef,
+  readEvaluators,
+} from "../test-suites/evaluatorFlags";
+import {
   buildScope,
   parseRepeat,
+  parseWait,
   parseTargets,
   type ScopeOptions,
 } from "./scopeFlags";
@@ -24,7 +29,11 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   param?: string[];
   note?: string;
   idempotencyKey?: string;
-  wait?: boolean;
+  wait?: boolean | string;
+  /** `--evaluator <id|slug>`, in the order written, each with its gate flag. */
+  evaluators?: EvaluatorFlagRef[];
+  /** `--evaluators-json <file|json>`: the plan's full attachment list. */
+  evaluatorsJson?: string;
 }
 
 /**
@@ -47,10 +56,18 @@ export const runRunPlanCommand = async (
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
+  const wait = parseWait(options.wait);
   const { scope, scenarioIds } = await buildScope(
     options,
     createCliTestSuitesService(),
   );
+  // A plan evaluator reads the conversation and the trace, never a scenario
+  // field: the plan may cover scenarios from suites with different fields.
+  const evaluators = await readEvaluators({
+    options,
+    fields: [],
+    isPlanLevel: true,
+  });
 
   const service = createCliRunPlansService();
   const spinner = createSpinner("Scheduling run...").start();
@@ -67,6 +84,7 @@ export const runRunPlanCommand = async (
           ? { simulatorModel: options.simulatorModel }
           : {}),
         ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
+        ...(evaluators !== undefined ? { evaluators } : {}),
       },
       ...(options.idempotencyKey
         ? { idempotencyKey: options.idempotencyKey }
@@ -81,7 +99,7 @@ export const runRunPlanCommand = async (
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    await emitRunResult({ result, note, options, subject: "run" });
+    await emitRunResult({ result, note, options, wait, subject: "run" });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the plan" });
     process.exit(1);

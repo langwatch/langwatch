@@ -99,7 +99,9 @@ describe("useFacetSearch", () => {
   // values, it does not search them).
   describe("given useAttributeValues delegates to useFacetSearch", () => {
     it("queries facetValues with the attribute-prefixed key, limit 30, no prefix", () => {
-      renderHook(() => useAttributeValues("langwatch.user_id", true));
+      renderHook(() =>
+        useAttributeValues({ attrKey: "langwatch.user_id", enabled: true }),
+      );
 
       const call = callFor("attribute.langwatch.user_id");
       expect(call).toBeDefined();
@@ -112,9 +114,40 @@ describe("useFacetSearch", () => {
     // useFacetSearch's own `!!facetKey` guard would not catch it —
     // useAttributeValues must additionally gate on a non-empty attribute key.
     it("disables the query when the attribute key is empty", () => {
-      renderHook(() => useAttributeValues("", true));
+      renderHook(() => useAttributeValues({ attrKey: "", enabled: true }));
 
       expect(lastOpts()?.enabled).toBe(false);
+    });
+
+    // Sidebar sections write filters as `${filterPrefix}.${attrKey}` — the
+    // value lookup must query the SAME facet key, or event/span attribute
+    // rows list values from trace_summaries.Attributes (i.e. none).
+    describe("when the section carries a filterPrefix", () => {
+      /** @scenario "Expanding an event-attribute key lists values observed on events" */
+      it("builds the facetKey from the section's filterPrefix", () => {
+        renderHook(() =>
+          useAttributeValues({
+            attrKey: "event.metrics.vote",
+            enabled: true,
+            filterPrefix: "event.attribute",
+          }),
+        );
+
+        expect(callFor("event.attribute.event.metrics.vote")).toBeDefined();
+      });
+
+      /** @scenario "Expanding a span-attribute key lists values observed on spans" */
+      it("supports the span-attribute prefix the same way", () => {
+        renderHook(() =>
+          useAttributeValues({
+            attrKey: "gen_ai.request.model",
+            enabled: true,
+            filterPrefix: "span.attribute",
+          }),
+        );
+
+        expect(callFor("span.attribute.gen_ai.request.model")).toBeDefined();
+      });
     });
   });
 });

@@ -221,7 +221,7 @@ func ReapOrphans(dirs []string) {
 }
 
 func knownDevRuntime(command string) bool {
-	for _, token := range []string{"tsgo", "vite", "tsx", "pnpm", "node", "opencode", "go run", "service", "uv", "python"} {
+	for _, token := range []string{"tsgo", "vite", "tsx", "pnpm", "node", "go run", "service", "uv", "python"} {
 		if strings.Contains(command, token) {
 			return true
 		}

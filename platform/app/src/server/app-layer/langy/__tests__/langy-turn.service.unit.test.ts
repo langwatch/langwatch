@@ -6,6 +6,7 @@ import {
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "../errors";
@@ -1254,38 +1255,31 @@ describe("when no prompt project is configured", () => {
   });
 });
 
-describe("when the harness flag resolves for the turn", () => {
-  it("rides the harness on the probe, the handoff stash and the dispatch", async () => {
-    const { deps, mocks } = makeDeps({
-      resolveHarness: vi.fn(async () => "pi" as const),
-    });
-
-    await LangyTurnService.create(deps).startConversationTurn(input());
-
-    expect(mocks.probe).toHaveBeenCalledWith(
-      expect.objectContaining({ harness: "pi" }),
-    );
-    expect(mocks.stash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentials: expect.objectContaining({ harness: "pi" }),
-      }),
-    );
-    expect(mocks.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentials: expect.objectContaining({ harness: "pi" }),
-      }),
-    );
+describe("when a turn requests a skill gated off for the caller", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("leaves the harness unset when no resolver is composed", async () => {
+  it("rejects with LangySkillNotAvailableError and never dispatches the turn", async () => {
+    // Flag off => the `dashboard-widgets` skill (its `featureFlag`) is gated
+    // off; a turn that explicitly asks for it is refused.
+    vi.spyOn(featureFlagService, "isEnabled").mockResolvedValue(false);
     const { deps, mocks } = makeDeps();
 
-    await LangyTurnService.create(deps).startConversationTurn(input());
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(
+        input({
+          turnContext: {
+            pageContext: undefined,
+            skills: [{ id: "dashboard-widgets" }],
+          } as StartConversationTurnInput["turnContext"],
+        }),
+      ),
+    ).rejects.toBeInstanceOf(LangySkillNotAvailableError);
 
-    const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
-      harness?: string;
-    };
-    expect(probeArgs.harness).toBeUndefined();
+    // The rejected turn is classified once — as `rejected` in the outer catch,
+    // never also as an `error` — and it must not reach dispatch.
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 });
 

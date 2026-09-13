@@ -81,11 +81,6 @@ import {
   lwqlPostgresViews,
 } from "../catalog/types";
 import {
-  DEFAULT_POSTGRES_READER_LIMITS,
-  postgresNamedCollectionStatements,
-  postgresReaderRoleStatements,
-} from "../postgresMapping";
-import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
@@ -94,13 +89,18 @@ import {
   type LangWatchQLTable,
   lwqlClickHouseSetupStatements,
   lwqlRowPolicyStatement,
-} from "../provisioning";
+} from "../provisioning/accessModel";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
-} from "../views";
+} from "../provisioning/catalogStatements";
+import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  postgresNamedCollectionStatements,
+  postgresReaderRoleStatements,
+} from "../provisioning/postgresMapping";
 
 /** PostgreSQL image the PG-engine half of the proof runs against. */
 export const TEST_POSTGRES_IMAGE = "postgres:17";
@@ -396,14 +396,19 @@ export async function startLangWatchQLClickHouse({
   }
 
   await applyAsAdmin(
+    // sourceDatabase mirrors provisionLwql.ts: production passes one
+    // sourceDatabase to both the setup and the view statements, so the key
+    // map (and its row policies) live in the facts database, not always
+    // names.database.
     lwqlClickHouseSetupStatements({
       names,
       password: RESTRICTED_PASSWORD,
       lwqlTables,
+      sourceDatabase: factDatabase,
     }),
   );
 
-  await seedKeyMap({ admin, names });
+  await seedKeyMap({ admin, names, keyMapDatabase: factDatabase });
   if (facts === "migrated") {
     await seedRealFactRows({ admin, database: factDatabase });
   } else {
@@ -453,12 +458,15 @@ export async function startLangWatchQLClickHouse({
 async function seedKeyMap({
   admin,
   names,
+  keyMapDatabase,
 }: {
   admin: ClickHouseClient;
   names: LangWatchQLNames;
+  /** Where the key map table was provisioned; see the sourceDatabase comment above. */
+  keyMapDatabase: string;
 }): Promise<void> {
   await admin.insert({
-    table: `${names.database}.${names.keyMapTable}`,
+    table: `${keyMapDatabase}.${names.keyMapTable}`,
     format: "JSONEachRow",
     values: [TENANT_A, TENANT_B].map((tenant) => ({
       KeyHash: tenant.keyHash,
@@ -1807,7 +1815,7 @@ const PG_BASE_TABLE_DDL: Record<string, string> = {
     '"evaluation" text not null, "status" text not null, "score" double precision not null, ' +
     '"label" text, "passed" boolean not null, "cost" double precision not null, ' +
     '"datasetId" text not null, "datasetSlug" text not null, "details" text not null, ' +
-    '"data" jsonb not null, "createdAt" timestamptz not null)',
+    '"data" jsonb not null, "createdAt" timestamptz not null, "updatedAt" timestamptz not null)',
   LlmPromptConfig:
     '("id" text primary key, "projectId" text not null, "name" text not null, ' +
     '"handle" text, "createdAt" timestamptz not null, "deletedAt" timestamptz)',
@@ -1942,7 +1950,7 @@ export function postgresTenantSeedStatements({
           `('${tenantId}-run-${index + 1}', '${tenantId}', '${tenantId}-experiment', ` +
           `'exact_match', 'finished', ${score}, 'label-${index + 1}', ` +
           `${score >= 0.8}, ${index + 1}.25, 'dataset-${index + 1}', 'dataset-slug-${index + 1}', ` +
-          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at})`,
+          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at}, ${at})`,
       ),
     ),
     rows("LlmPromptConfig", [

@@ -9,6 +9,8 @@ import type {
   BatchSummary,
   ScenarioRunData,
 } from "~/server/scenarios/scenario-event.types";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
+import { readTestingInterface } from "~/server/suites/platform-path";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
@@ -23,7 +25,11 @@ const scenarioRunResponseSchema = z.object({
   scenarioRunId: z.string(),
   name: z.string().nullable(),
   description: z.string().nullable(),
-  status: z.string(),
+  status: z
+    .string()
+    .describe(
+      "Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.",
+    ),
   results: z
     .object({
       verdict: z.string().nullable().optional(),
@@ -31,6 +37,12 @@ const scenarioRunResponseSchema = z.object({
       metCriteria: z.array(z.string()).optional(),
       unmetCriteria: z.array(z.string()).optional(),
       error: z.string().nullable().optional(),
+      evaluations: z
+        .array(scenarioEvaluationResultSchema)
+        .optional()
+        .describe(
+          "One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators.",
+        ),
     })
     .nullable(),
   messages: z.array(
@@ -202,6 +214,10 @@ secured.access(requires("scenarios:view")).get(
       { projectId: project.id, scenarioSetId, batchRunId },
       "Listing simulation runs",
     );
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
 
     const simulationRuns = getApp().simulations.runs;
 
@@ -226,6 +242,7 @@ secured.access(requires("scenarios:view")).get(
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
+            ui,
           }),
         })),
         hasMore: false,
@@ -248,6 +265,7 @@ secured.access(requires("scenarios:view")).get(
           platformUrl: scenarioRunPlatformUrl({
             projectSlug: project.slug,
             scenarioRunId: r.scenarioRunId,
+            ui,
           }),
         })),
         hasMore: result.hasMore,
@@ -273,6 +291,7 @@ secured.access(requires("scenarios:view")).get(
         platformUrl: scenarioRunPlatformUrl({
           projectSlug: project.slug,
           scenarioRunId: r.scenarioRunId,
+          ui,
         }),
       })),
       hasMore: result.hasMore,
@@ -311,6 +330,10 @@ secured.access(requires("scenarios:view")).get(
       { projectId: project.id, scenarioRunId },
       "Getting simulation run",
     );
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
 
     const simulationRuns = getApp().simulations.runs;
     const run = await simulationRuns.getScenarioRunData({
@@ -327,6 +350,7 @@ secured.access(requires("scenarios:view")).get(
       platformUrl: scenarioRunPlatformUrl({
         projectSlug: project.slug,
         scenarioRunId: run.scenarioRunId,
+        ui,
       }),
     });
   },

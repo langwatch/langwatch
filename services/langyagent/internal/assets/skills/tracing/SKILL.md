@@ -24,17 +24,22 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -75,8 +80,9 @@ Do NOT consider the work complete without verifying. In order:
 
 1. Confirm dependencies installed cleanly.
 2. Run the agent with a test input that produces at least one trace (study how the framework starts; only give up if it requires infrastructure you cannot spin up).
-3. Check traces arrived: `langwatch trace search --limit 5 --format json`.
-4. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
+3. Check traces arrived: `langwatch trace search --limit 5 --format json`. A trace is not searchable the moment the run ends: the export leaves the process first and ingestion adds a few seconds more, so an empty first answer means "not yet", not "not working". Wait and ask again, up to three times, about twenty seconds apart, and stop there. Do not change the command between tries: the search already covers the last twenty four hours, so a trace that is in is in.
+4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
+5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
 ## Common Mistakes
 

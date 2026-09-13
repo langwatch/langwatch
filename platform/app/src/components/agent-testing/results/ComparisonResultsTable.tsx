@@ -8,10 +8,10 @@
  * the summary of that target's runs alone, so the two pills sit side by side
  * where the single run reads one pill in its header line.
  *
- * The rows and the cells live in `ComparisonResultsRow`; this file owns the
- * grid: which scenarios are rows, which targets are columns, and how wide
- * either is. The matrix scrolls sideways inside its own card once the columns
- * do not fit, so the page itself never does.
+ * The rows and the cells live in `ComparisonResultsRow` and the column widths
+ * in `comparison-columns`; this file owns the grid: which scenarios are rows
+ * and which targets are columns. The matrix scrolls sideways inside its own
+ * card once the columns do not fit, so the page itself never does.
  *
  * @see specs/features/agent-testing/comparison-mode.feature
  */
@@ -26,10 +26,8 @@ import {
   type RunLineHandlers,
   type ScenarioLine,
 } from "./ComparisonResultsRow";
+import { comparisonColumns } from "./comparison-columns";
 import { type BatchTarget, summaryOfTarget } from "./useBatchTargets";
-
-const SCENARIO_COLUMN_WIDTH = 200;
-const TARGET_COLUMN_WIDTH = 220;
 
 export type ComparisonResultsTableProps = RunLineHandlers & {
   scenarioRuns: ScenarioRunData[];
@@ -74,6 +72,7 @@ function TargetColumnHeader({
         color={target.color}
         label={target.label}
         fontSize="11.5px"
+        isWrapped
       />
       <RunMetricsSummary summary={summary} size="sm" />
     </Box>
@@ -124,8 +123,7 @@ function MatrixHeader({
 export function ComparisonResultsTable(props: ComparisonResultsTableProps) {
   const { scenarioRuns, targets } = props;
   const scenarios = scenariosOf(scenarioRuns);
-  const columns = `minmax(${SCENARIO_COLUMN_WIDTH}px, 1.2fr) repeat(${targets.length}, minmax(${TARGET_COLUMN_WIDTH}px, 1fr))`;
-  const minWidth = `${SCENARIO_COLUMN_WIDTH + targets.length * TARGET_COLUMN_WIDTH}px`;
+  const { template: columns, minWidth } = comparisonColumns(targets);
 
   return (
     <Box

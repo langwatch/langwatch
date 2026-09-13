@@ -54,11 +54,11 @@ func TestOverlayLangyWorkerOverrides(t *testing.T) {
 		})
 	})
 
-	t.Run("still advertises OPENCODE_AGENT_URL and the internal secret in every tier", func(t *testing.T) {
+	t.Run("still advertises LANGY_AGENT_URL and the internal secret in every tier", func(t *testing.T) {
 		for _, tier := range []LangyTier{LangyTierSandboxed, LangyTierContainerUnsafe, LangyTierHostUnsafe} {
 			env := langyStack(tier).OverlayEnv()
-			if got := valueOf(env, "OPENCODE_AGENT_URL"); got != "http://127.0.0.1:46000" {
-				t.Fatalf("[%s] OPENCODE_AGENT_URL = %q, want the langyagent loopback port", tier, got)
+			if got := valueOf(env, "LANGY_AGENT_URL"); got != "http://127.0.0.1:46000" {
+				t.Fatalf("[%s] LANGY_AGENT_URL = %q, want the langyagent loopback port", tier, got)
 			}
 			if valueOf(env, "LANGY_INTERNAL_SECRET") != DefaultLangyInternalSecret {
 				t.Fatalf("[%s] LANGY_INTERNAL_SECRET missing", tier)

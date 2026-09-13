@@ -38,6 +38,11 @@ export interface UseLangWatchQLWidgetRunInput {
   readonly end: number;
   /** The datapoint step to request — one of the offered steps. */
   readonly granularitySeconds: LangWatchQLGranularityStep;
+  /**
+   * The dashboard's last scheduled refresh (epoch ms). A new value re-runs
+   * the chart even though nothing about the request itself changed.
+   */
+  readonly refreshedAt?: number;
 }
 
 export function useLangWatchQLWidgetRun({
@@ -47,6 +52,7 @@ export function useLangWatchQLWidgetRun({
   start,
   end,
   granularitySeconds,
+  refreshedAt,
 }: UseLangWatchQLWidgetRunInput) {
   const run = api.analytics.savedWorkbenchCharts.run.useMutation();
   const { mutate } = run;
@@ -62,7 +68,7 @@ export function useLangWatchQLWidgetRun({
   const issuedRequests = useRef(0);
   const [settled, setSettled] = useState<Settled | null>(null);
 
-  const requestKey = `${chartId}:${projectId}:${start}:${end}:${granularitySeconds}`;
+  const requestKey = `${chartId}:${projectId}:${start}:${end}:${granularitySeconds}:${refreshedAt ?? ""}`;
 
   useEffect(() => {
     if (!isChartLoaded) return;

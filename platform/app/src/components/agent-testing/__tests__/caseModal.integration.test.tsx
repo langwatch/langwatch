@@ -5,6 +5,7 @@
  * footer holds, what its chips open, and what Save and Run does.
  *
  * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -24,6 +25,7 @@ import { NO_RUN_YET_HINT } from "../cases/CaseRecentRunsButton";
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockGetById = vi.hoisted(() => vi.fn());
+const mockAgentsGetAll = vi.hoisted(() => vi.fn());
 const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockListVersions = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
@@ -52,6 +54,10 @@ const onSuccessOf = vi.hoisted(
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The run dialog reads the saved evaluators for the ones a run carries.
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
@@ -94,7 +100,7 @@ vi.mock("~/utils/api", () => ({
       run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    agents: { getAll: { useQuery: mockAgentsGetAll } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     modelProvider: {
       listAllForProjectForFrontend: { useQuery: emptyQuery },
@@ -149,6 +155,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// The caller-voice block is flag-gated (release_voice_agents_enabled).
+// Default on, so its own behavior tests are unaffected by the gate.
+let mockVoiceAgentsEnabled = true;
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
@@ -194,6 +207,7 @@ function openDrawerAs(params: {
 describe("the scenario dialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockVoiceAgentsEnabled = true;
     mockDrawerParams.current = {};
     mockDrawerOpenFor.current = "";
     mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
@@ -203,6 +217,7 @@ describe("the scenario dialog", () => {
       refetch: vi.fn(),
     });
     mockLastResults.mockReturnValue({ data: [], isLoading: false });
+    mockAgentsGetAll.mockReturnValue({ data: [] });
   });
 
   afterEach(cleanup);
@@ -418,6 +433,64 @@ describe("the scenario dialog", () => {
       ).toBeInTheDocument();
     });
 
+    /** @scenario "The case editor offers the parameters the agents declare" */
+    it("offers the parameters the agents of the project declare", async () => {
+      const user = userEvent.setup();
+      mockAgentsGetAll.mockReturnValue({
+        data: [
+          {
+            id: "agent_connected",
+            name: "support-agent",
+            type: "connected",
+            config: {},
+            environment: "production",
+            owner: null,
+            parameters: [
+              {
+                name: "model",
+                type: "string",
+                options: ["gpt-5-mini", "gpt-5"],
+                defaultValue: "gpt-5-mini",
+              },
+            ],
+          },
+        ],
+      });
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          parameters: [{ name: "customer_plan", defaultValue: "free" }],
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const line = await screen.findByLabelText("Parameters");
+      await user.click(line);
+      await user.type(line, ", mo");
+      const list = await screen.findByTestId(
+        "case-parameters-line-suggestions",
+      );
+      expect(
+        within(list).getByTestId("parameter-suggestion-key-model"),
+      ).toHaveTextContent("support-agent · production");
+
+      await user.keyboard("{Enter}");
+      expect(line).toHaveValue("customer_plan=free, model=");
+      expect(
+        within(await screen.findByTestId("case-parameters-line-suggestions"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["gpt-5-mini", "gpt-5"]);
+    });
+
     /** @scenario "The editor turns the recent runs off on a scenario that never ran" */
     it("turns the recent runs off, and says why, on a scenario that never ran", async () => {
       const user = userEvent.setup();
@@ -526,6 +599,318 @@ describe("the scenario dialog", () => {
       expect(screen.getByTestId("version-row-4")).toBeInTheDocument();
       expect(screen.getByTestId("case-modal")).toBeInTheDocument();
       expect(mockOpenDrawer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the caller voice block", () => {
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("offers a Caller voice chip alongside parameters, turns and models", async () => {
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      const chips = screen.getByTestId("customize-case-chips");
+      expect(
+        within(chips).getByTestId("customize-chip-case-caller-voice"),
+      ).toHaveTextContent("Caller voice");
+    });
+
+    describe("given the release_voice_agents_enabled flag is off", () => {
+      /** @scenario "The Caller voice chip is hidden while the project's flag is off" */
+      it("does not offer the Caller voice chip", async () => {
+        mockVoiceAgentsEnabled = false;
+        openNew();
+        await screen.findByTestId("case-modal");
+
+        const chips = screen.getByTestId("customize-case-chips");
+        expect(
+          within(chips).queryByTestId("customize-chip-case-caller-voice"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("opens the Voice picker, the Interrupts slider and Effects on the chip", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      await user.click(screen.getByTestId("customize-chip-case-caller-voice"));
+
+      const block = await screen.findByTestId("case-caller-voice-block");
+      expect(within(block).getByText("Voice")).toBeInTheDocument();
+      expect(within(block).getByLabelText("Interrupts")).toBeInTheDocument();
+      expect(within(block).getByLabelText("Effects")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("customize-chip-case-caller-voice"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("opens with the saved caller voice values on a stored scenario", async () => {
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          callerVoice: {
+            voiceModel: "openai/nova",
+            interruptProbability: 0.2,
+            effects: "phone_line",
+          },
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const block = await screen.findByTestId("case-caller-voice-block");
+      expect(within(block).getByText("Interrupts: 20%")).toBeInTheDocument();
+      expect(within(block).getByLabelText("Effects")).toHaveValue("phone_line");
+      expect(
+        screen.queryByTestId("customize-chip-case-caller-voice"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("clears the draft's caller voice back to the project default on remove", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          callerVoice: {
+            voiceModel: "openai/nova",
+            interruptProbability: 0.2,
+            effects: "phone_line",
+          },
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      await screen.findByTestId("case-caller-voice-block");
+      await user.click(
+        screen.getByRole("button", { name: "Remove the caller voice" }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("case-caller-voice-block"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(
+        screen.getByTestId("customize-chip-case-caller-voice"),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("case-modal-save"));
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          callerVoice: {
+            voiceModel: null,
+            interruptProbability: 0,
+            effects: "none",
+          },
+        }),
+      );
+    });
+  });
+
+  describe("given the suite declares fields", () => {
+    const CASE_LOOKUPS = {
+      id: "suite_lookups",
+      name: "Case lookups",
+      slug: "case-lookups",
+      fields: [
+        { identifier: "golden_sql", type: "text" },
+        { identifier: "attempts", type: "number" },
+        { identifier: "strict", type: "boolean" },
+      ],
+    };
+
+    beforeEach(() => {
+      mockTestSuitesGetAll.mockReturnValue({
+        data: [REFUNDS, CASE_LOOKUPS],
+        isLoading: false,
+      });
+    });
+
+    const openInLookups = () => {
+      openDrawerAs({ testSuiteId: CASE_LOOKUPS.id });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+    };
+
+    describe("when the modal renders the suite's fields", () => {
+      /** @scenario "The scenario editor asks for each suite field after the criteria" */
+      it("asks for each field after the criteria, with the control its type takes", async () => {
+        openInLookups();
+        await screen.findByTestId("case-modal");
+
+        const criteria = screen.getByLabelText("Criteria");
+        const golden = screen.getByLabelText("golden_sql");
+        expect(golden.tagName).toBe("TEXTAREA");
+        expect(golden).toHaveAttribute("rows", "2");
+        expect(window.getComputedStyle(golden).resize).toBe("none");
+        expect(
+          criteria.compareDocumentPosition(golden) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+
+        const attempts = screen.getByLabelText("attempts");
+        expect(attempts).toHaveAttribute("type", "number");
+
+        expect(screen.getByTestId("case-field-strict-switch")).toHaveAttribute(
+          "type",
+          "checkbox",
+        );
+        const chips = screen.getByTestId("customize-case-chips");
+        expect(
+          attempts.compareDocumentPosition(chips) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      });
+    });
+
+    describe("when the case is saved", () => {
+      /** @scenario "The field values are saved with the scenario" */
+      it("saves the values typed, each as its own type, and a blank one as no value", async () => {
+        const user = userEvent.setup();
+        openInLookups();
+        await screen.findByTestId("case-modal");
+
+        await user.type(screen.getByLabelText("Title"), "Chargeback totals");
+        await user.type(screen.getByLabelText("Criteria"), "Sums per quarter");
+        await user.type(screen.getByLabelText("golden_sql"), "SELECT 1");
+        await user.type(screen.getByLabelText("attempts"), "3");
+        await user.click(screen.getByTestId("case-field-strict-switch"));
+        await user.click(screen.getByTestId("case-modal-save"));
+
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            testSuiteId: CASE_LOOKUPS.id,
+            fields: { golden_sql: "SELECT 1", attempts: 3, strict: true },
+          }),
+        );
+      });
+
+      /** @scenario "The field values are saved with the scenario" */
+      it("saves no key for a field left blank", async () => {
+        const user = userEvent.setup();
+        openInLookups();
+        await screen.findByTestId("case-modal");
+
+        await user.type(screen.getByLabelText("Title"), "Chargeback totals");
+        await user.type(screen.getByLabelText("Criteria"), "Sums per quarter");
+        await user.click(screen.getByTestId("case-modal-save"));
+
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ fields: {} }),
+        );
+      });
+    });
+
+    describe("when the case already carries field values", () => {
+      /** @scenario "Editing a scenario shows the values it already carries" */
+      /** @scenario "Values of fields the suite no longer declares are listed and can be removed" */
+      it("shows the stored values, lists a value of a field the suite dropped, and drops it on remove", async () => {
+        const user = userEvent.setup();
+        mockGetById.mockReturnValue({
+          data: storedCase({
+            testSuiteId: CASE_LOOKUPS.id,
+            fields: { golden_sql: "SELECT 1", legacy_note: "kept from before" },
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+        openDrawerAs({ scenarioId: "case_1" });
+        render(
+          <>
+            <AgentTestingCaseEditor />
+            <AgentTestingCaseEditorDrawer />
+          </>,
+          { wrapper: Wrapper },
+        );
+
+        expect(await screen.findByLabelText("golden_sql")).toHaveValue(
+          "SELECT 1",
+        );
+        const strays = screen.getByTestId("case-stray-fields");
+        expect(strays).toHaveTextContent("Not in this suite");
+        expect(strays).toHaveTextContent("legacy_note");
+        expect(strays).toHaveTextContent("kept from before");
+
+        await user.click(
+          within(strays).getByRole("button", { name: "Remove legacy_note" }),
+        );
+        expect(
+          screen.queryByTestId("case-stray-fields"),
+        ).not.toBeInTheDocument();
+
+        await user.click(screen.getByTestId("case-modal-save"));
+        expect(mockUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "case_1",
+            fields: { golden_sql: "SELECT 1" },
+          }),
+        );
+      });
+
+      /** @scenario "A boolean field that is true shows the switch checked" */
+      it("reads a boolean field stored as the word yes as checked", async () => {
+        mockGetById.mockReturnValue({
+          data: storedCase({
+            testSuiteId: CASE_LOOKUPS.id,
+            fields: { strict: "yes" },
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+        openDrawerAs({ scenarioId: "case_1" });
+        render(
+          <>
+            <AgentTestingCaseEditor />
+            <AgentTestingCaseEditorDrawer />
+          </>,
+          { wrapper: Wrapper },
+        );
+
+        expect(
+          await screen.findByTestId("case-field-strict-switch"),
+        ).toBeChecked();
+      });
+    });
+
+    describe("when the suite selection changes", () => {
+      /** @scenario "Moving a scenario to another suite asks for that suite's fields" */
+      it("asks for the fields of the suite the scenario is moved to", async () => {
+        const user = userEvent.setup();
+        openNew();
+        await screen.findByTestId("case-modal");
+        expect(screen.queryByLabelText("golden_sql")).not.toBeInTheDocument();
+
+        await user.selectOptions(
+          screen.getByLabelText("Test suite"),
+          CASE_LOOKUPS.id,
+        );
+
+        expect(screen.getByLabelText("golden_sql")).toBeInTheDocument();
+        expect(screen.getByLabelText("attempts")).toBeInTheDocument();
+      });
     });
   });
 });

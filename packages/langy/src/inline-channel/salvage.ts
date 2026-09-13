@@ -18,7 +18,10 @@
  * The relay stamps and the client previews through this same module, so the
  * two runtimes repair identically.
  */
-import { langyDerivedCardSchema, type LangyDerivedCard } from "../cards/derived-safe.js";
+import {
+  langyModelEmittedCardSchema,
+  type LangyModelEmittedCard,
+} from "../cards/derived-safe.js";
 
 export type LangySalvageResult =
   | { ok: true; value: unknown }
@@ -242,7 +245,7 @@ export function salvageJsonText(raw: string): LangySalvageResult {
 }
 
 export type LangyDerivedCardParseResult =
-  | { ok: true; card: LangyDerivedCard }
+  | { ok: true; card: LangyModelEmittedCard }
   | { ok: false; reason: "unsalvageable" | "invalid" };
 
 /**
@@ -254,7 +257,7 @@ export type LangyDerivedCardParseResult =
 export function salvageLangyDerivedCard(raw: string): LangyDerivedCardParseResult {
   const salvaged = salvageJsonText(raw);
   if (!salvaged.ok) return { ok: false, reason: "unsalvageable" };
-  const parsed = langyDerivedCardSchema.safeParse(salvaged.value);
+  const parsed = langyModelEmittedCardSchema.safeParse(salvaged.value);
   if (!parsed.success) return { ok: false, reason: "invalid" };
   return { ok: true, card: parsed.data };
 }

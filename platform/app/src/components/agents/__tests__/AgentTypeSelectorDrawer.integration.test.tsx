@@ -1,0 +1,209 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AgentTypeSelectorDrawer } from "../AgentTypeSelectorDrawer";
+
+// Mock dependencies
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    query: {},
+    asPath: "/test",
+  }),
+}));
+
+const mockOpenDrawer = vi.fn();
+const mockCloseDrawer = vi.fn();
+const mockGoBack = vi.fn();
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    closeDrawer: mockCloseDrawer,
+    openDrawer: mockOpenDrawer,
+    drawerOpen: vi.fn(() => false),
+    canGoBack: false,
+    goBack: mockGoBack,
+  }),
+  getComplexProps: () => ({}),
+}));
+
+// The Voice option is flag-gated (release_voice_agents_enabled). Default on,
+// so type-selection tests are unaffected; the gate itself has its own test.
+let mockVoiceAgentsEnabled = true;
+vi.mock("../voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
+}));
+
+// Wrapper with Chakra provider
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+describe("AgentTypeSelectorDrawer", () => {
+  const mockOnSelect = vi.fn();
+  const mockOnClose = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockVoiceAgentsEnabled = true;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  const renderDrawer = (props = {}) => {
+    return render(
+      <AgentTypeSelectorDrawer
+        open={true}
+        onClose={mockOnClose}
+        onSelect={mockOnSelect}
+        {...props}
+      />,
+      { wrapper: Wrapper },
+    );
+  };
+
+  describe("given the drawer is open", () => {
+    describe("when it renders", () => {
+      it("shows the Choose Agent Connection Type header", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(
+            screen.getByText("Choose Agent Connection Type"),
+          ).toBeInTheDocument();
+        });
+      });
+
+      /** @scenario AgentTypeSelectorDrawer shows two options */
+      /** @scenario Agent types available */
+      it("shows only code and workflow agent type options", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(screen.getByText("Code Agent")).toBeInTheDocument();
+          expect(screen.getByText("Workflow Agent")).toBeInTheDocument();
+        });
+        expect(screen.queryByText("Prompt Agent")).not.toBeInTheDocument();
+      });
+
+      it("shows the Voice Agent option", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(screen.getByText("Voice Agent")).toBeInTheDocument();
+        });
+        expect(screen.getByTestId("agent-type-voice")).toBeInTheDocument();
+      });
+
+      it("shows descriptions for each type", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(
+            screen.getByText(
+              "Write custom Python code to process inputs and generate outputs",
+            ),
+          ).toBeInTheDocument();
+          expect(
+            screen.getByText("Create a new workflow for custom agent logic"),
+          ).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("given the release_voice_agents_enabled flag is off", () => {
+      /** @scenario "The Voice Agent option is hidden while the project's flag is off" */
+      it("hides the Voice Agent option", async () => {
+        mockVoiceAgentsEnabled = false;
+        renderDrawer();
+        await waitFor(() => {
+          expect(screen.getByText("Code Agent")).toBeInTheDocument();
+        });
+        expect(screen.queryByText("Voice Agent")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("agent-type-voice"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the connect-from-code choice leads the list", () => {
+    /** @scenario "Connect from code is the first choice of the new agent flow" */
+    it("draws Connect from Code first, with the green dot before the words", async () => {
+      renderDrawer();
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-connected")).toBeInTheDocument();
+      });
+
+      const cards = screen.getAllByTestId(/^agent-type-/);
+      expect(cards[0]).toHaveAttribute("data-testid", "agent-type-connected");
+      expect(
+        screen.getByTestId("agent-type-connected-dot"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Connect from Code")).toBeInTheDocument();
+    });
+
+    /** @scenario "Connect from code opens the connect drawer" */
+    it("opens the connect drawer when clicked, without selecting a stored type", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-connected")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("agent-type-connected"));
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentConnectFromCode");
+      expect(mockOnSelect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Type selection", () => {
+    /** @scenario Selecting type navigates to appropriate editor */
+    it("calls onSelect with 'code' and opens code editor when clicking Code Agent", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-code")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("agent-type-code"));
+
+      expect(mockOnSelect).toHaveBeenCalledWith("code");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentCodeEditor");
+    });
+
+    it("calls onSelect with 'workflow' and opens workflow selector when clicking Workflow Agent", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-workflow")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("agent-type-workflow"));
+
+      expect(mockOnSelect).toHaveBeenCalledWith("workflow");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("workflowSelector");
+    });
+
+    it("calls onSelect with 'voice' and opens the voice editor when clicking Voice Agent", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("agent-type-voice")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("agent-type-voice"));
+
+      expect(mockOnSelect).toHaveBeenCalledWith("voice");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentVoiceEditor");
+    });
+  });
+});

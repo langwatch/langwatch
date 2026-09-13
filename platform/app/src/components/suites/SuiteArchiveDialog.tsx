@@ -57,7 +57,6 @@ export function SuiteArchiveDialog({
         <Dialog.Footer>
           <Button
             variant="outline"
-            mr={3}
             onClick={(e) => {
               e.stopPropagation();
               onClose();

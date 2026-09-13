@@ -1,6 +1,7 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
   LangyChoiceSelection,
+  LangyChoicesLockState,
   LangyChoicesTimelineEntry,
   LangyDerivedCard,
   LangyDerivedChoicesCard,
@@ -21,11 +22,21 @@ import {
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
 } from "../logic/langyAnswerSegments";
+import { codeAccessCallId } from "../logic/langyCodeAccessTool";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
 } from "../logic/langyFeedbackDirective";
+import {
+  type LangyQuestionCardData,
+  langyAnsweredOptionIds,
+  toolCallIdOfQuestionBlock,
+} from "../logic/langyLocalWaits";
 import { langyPlan } from "../logic/langyPlan";
+import {
+  linkPullRequestReferences,
+  pullRequestLinksFromToolParts,
+} from "../logic/langyPullRequestLinks";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
 import {
   foldReasoningTitles,
@@ -35,6 +46,7 @@ import { stripToolNarration } from "../logic/langyToolNarration";
 import { langyRunText, langyTranscriptRuns } from "../logic/langyTranscript";
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
+import { LangyCodeAccessCard } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
@@ -83,6 +95,9 @@ function MessageContentImpl({
   choicesTimeline,
   onChoiceSelect,
   onVerifyDerivedCard,
+  onAskCodeAccessAgain,
+  liveCodeAccessCallId,
+  questionWaits,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -127,8 +142,37 @@ function MessageContentImpl({
   }) => void;
   /** Bind a derived card's verify hint. Absent = chip hidden. */
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
+  /**
+   * The question waits of this conversation, keyed by the tool call that
+   * asked (ADR-129).
+   *
+   * A question asked mid-turn is answered back to its WAIT, and that answer
+   * writes no selection into the transcript, so the timeline the lock state
+   * derives from knows nothing about it: the card came back on screen after
+   * the turn with both options empty and a click on it started a second turn
+   * for a question that was already settled. The wait is what knows, so it is
+   * what the card reads.
+   */
+  questionWaits?: ReadonlyMap<string, LangyQuestionCardData>;
+  /**
+   * Stop whatever is running and ask Langy the code access question again —
+   * what the code access card's Change and Ask again controls do. Absent =
+   * the card renders read-only.
+   */
+  onAskCodeAccessAgain?: () => void;
+  /**
+   * The `code_access` call the whole conversation is asking on right now
+   * (`latestCodeAccessCallId`). A card hanging on an older call renders
+   * closed. Absent = this message is read on its own, so its card is live.
+   */
+  liveCodeAccessCallId?: string | null;
 }) {
   const isUser = message.role === "user";
+  // A notice the platform wrote into the transcript, such as the shared
+  // folder disconnecting (ADR-129). Like a message from the developer it is
+  // plain text, so none of the assistant reading below applies to it.
+  const isNotice = message.role === "system";
+  const isPlainText = isUser || isNotice;
   const { project } = useOrganizationTeamProject();
   // Distinct text parts are distinct blocks of the reply, so they join with a
   // paragraph break — joined bare, a part boundary glued the last word of one
@@ -158,11 +202,17 @@ function MessageContentImpl({
   // LangyActivityParts spine that used to render the message's tool parts all
   // at once.
   const runs = useMemo(
-    () => (isUser ? [] : langyTranscriptRuns(message.parts)),
-    [isUser, message.parts],
+    () => (isPlainText ? [] : langyTranscriptRuns(message.parts)),
+    [isPlainText, message.parts],
   );
   const lastActivityRunIndex = runs.findLastIndex(
     (run) => run.kind === "activity",
+  );
+  // The run that carries the turn's reply. An activity run before it is work
+  // the turn went on to answer after, which is what makes a failure in it a
+  // step the turn RECOVERED from rather than the story of the turn.
+  const lastAnswerRunIndex = runs.findLastIndex(
+    (run) => run.kind === "answer" && langyRunText(run.parts).trim().length > 0,
   );
 
   // The agent's `question` TOOL call, mapped onto the choices contract
@@ -173,10 +223,19 @@ function MessageContentImpl({
   // would hide the very thing the turn is waiting for.
   const questionCards = useMemo(
     () =>
-      isUser
+      isPlainText
         ? []
         : message.parts.flatMap((part) => questionToolCardParts(part)),
-    [isUser, message.parts],
+    [isPlainText, message.parts],
+  );
+
+  // The `code_access` TOOL call, which is where the code access card hangs
+  // (ADR-129). The call says the question was asked; the card reads its own
+  // state from `langy.getLocalWorkspace`, because the folder can connect long
+  // after this turn ended.
+  const codeAccessCall = useMemo(
+    () => (isPlainText ? null : codeAccessCallId(message.parts)),
+    [isPlainText, message.parts],
   );
 
   // The connect card is NOT sniffed out of the assistant's prose any more. A
@@ -194,14 +253,14 @@ function MessageContentImpl({
   // complete (a rejected push has not pushed), and the card SURVIVES A REFRESH —
   // the sentinels were stripped before the message was persisted, so it never
   // used to.
-  const progressEvents = isUser
+  const progressEvents = isPlainText
     ? []
     : githubProgressFromToolParts(message.parts);
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
   // for feedback at a high-signal moment — surface the affordance regardless of
   // the default throttle, tailored by the sentiment it classified.
-  const feedbackDirective = isUser
+  const feedbackDirective = isPlainText
     ? {
         requested: false,
         sentiment: undefined,
@@ -224,13 +283,24 @@ function MessageContentImpl({
   // from `gh pr create`'s own stdout, is persisted with the message (so the card
   // survives a refresh), and skips a `gh pr create` that FAILED — a PR that did
   // not open must never render as one that did.
-  const prs = isUser ? [] : githubPrsFromToolParts(message.parts);
+  const prs = isPlainText ? [] : githubPrsFromToolParts(message.parts);
+  // "Opened pull request #1" is how Langy names a pull request, and the reader
+  // had the number and no way through to it. The URLs come from the same tool
+  // parts the card reads — the sandbox's `github.open_pr` receipt, or the
+  // stdout of the developer's own `gh pr create` on the local path.
+  const pullRequestLinks = useMemo(
+    () =>
+      isPlainText
+        ? new Map<number, string>()
+        : pullRequestLinksFromToolParts(message.parts),
+    [isPlainText, message.parts],
+  );
   // Tool-call activity for the assistant turn: activity cards, each labelled by
   // what the call is DOING ("Searching traces", "Using the GitHub skill"), plus
   // the in-flight and settled domain-capability cards. Counts toward "has
   // something to render" so a turn whose only output is a running tool or a
   // settled card (no prose yet) still surfaces it.
-  const showsActivity = isUser ? false : hasLangyActivity(message);
+  const showsActivity = isPlainText ? false : hasLangyActivity(message);
   // The plan checklist, folded from the turn's `todowrite` tool parts. It is
   // the steps only — the work itself is in the transcript, where it happened.
   // On the LIVE streaming turn the manager's typed snapshot (store) is
@@ -241,7 +311,7 @@ function MessageContentImpl({
   // snapshot. Keeping that subscription on every historical answer made one
   // plan tick reconcile the full transcript.
   const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
-  const plan = isUser
+  const plan = isPlainText
     ? null
     : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
   const hasActivityRecord = showsActivity || Boolean(plan);
@@ -252,7 +322,7 @@ function MessageContentImpl({
   // word). Live turns keep streaming untouched; the fold happens at settle,
   // the same moment the rest of the process record collapses.
   const reasoningFold =
-    isUser || isStreaming
+    isPlainText || isStreaming
       ? { titles: [], text }
       : foldReasoningTitles({
           parts: message.parts,
@@ -263,7 +333,7 @@ function MessageContentImpl({
   // line that says it again is the same fact three times before the answer.
   // Dropped here, at the point of display — see logic/langyToolNarration.ts for
   // why this is presentation, not the prose-sniffing this file deleted.
-  const displayText = isUser
+  const displayText = isPlainText
     ? text
     : stripToolNarration({
         text: reasoningFold.text,
@@ -272,7 +342,7 @@ function MessageContentImpl({
   // A turn whose only output is a stamped card block has no prose at all, and
   // reading "No content" under a card the reader can see is worse than saying
   // nothing.
-  const hasBlocks = !isUser && hasLangyBlockParts(message.parts);
+  const hasBlocks = !isPlainText && hasLangyBlockParts(message.parts);
   const hasContent = Boolean(
     displayText ||
       hasBlocks ||
@@ -284,7 +354,7 @@ function MessageContentImpl({
       plan,
   );
   if (!hasContent) {
-    if (isUser) return null;
+    if (isPlainText) return null;
     // Streaming with nothing visible yet: render no box at all. The message
     // shell arrives before its first content, and an empty row would still
     // claim a slot in the column's gap, pushing the status line down mid
@@ -306,6 +376,25 @@ function MessageContentImpl({
         color="fg.muted"
       >
         {interrupted ? "Interrupted" : "No content"}
+      </Text>
+    );
+  }
+
+  if (isNotice) {
+    // A notice is something that HAPPENED to the conversation, so it reads as
+    // a quiet line down the middle: no bubble, which would claim the reader
+    // sent it, and no avatar, which would claim Langy said it.
+    return (
+      <Text
+        data-testid="langy-transcript-notice"
+        alignSelf="center"
+        maxWidth="85%"
+        textAlign="center"
+        textStyle="xs"
+        color="fg.muted"
+        whiteSpace="pre-wrap"
+      >
+        {text}
       </Text>
     );
   }
@@ -377,6 +466,9 @@ function MessageContentImpl({
                 // dead turn leaves its open calls looking like they still run.
                 // Off the streaming turn, an open call is an interrupted one.
                 live={isStreaming}
+                // The turn answered after this run, so a failure inside it is
+                // one the turn recovered from.
+                answeredAfter={index < lastAnswerRunIndex}
               />
             </LangyCardBoundary>
           ) : (
@@ -387,6 +479,7 @@ function MessageContentImpl({
               isRecorded={isRecorded}
               hasActivity={hasActivityRecord}
               projectSlug={project?.slug ?? null}
+              pullRequestLinks={pullRequestLinks}
               choicesTimeline={choicesTimeline}
               onChoiceSelect={onChoiceSelect}
               onVerifyDerivedCard={onVerifyDerivedCard}
@@ -395,7 +488,10 @@ function MessageContentImpl({
         )}
         {progressEvents.length > 0 && (
           <LangyCardBoundary scope="the progress card">
-            <LangyGitHubProgressCard events={progressEvents} />
+            <LangyGitHubProgressCard
+              events={progressEvents}
+              live={isStreaming}
+            />
           </LangyCardBoundary>
         )}
         {prs.map((pr) => (
@@ -428,14 +524,41 @@ function MessageContentImpl({
             <LangyDerivedCardView
               card={part.card}
               projectSlug={project?.slug ?? null}
-              choicesLockState={deriveLangyChoicesLockState({
-                blockId: part.blockId,
-                timeline: choicesTimeline ?? [],
-              })}
+              choicesLockState={
+                questionWaitLockState({
+                  blockId: part.blockId,
+                  card: part.card,
+                  waits: questionWaits,
+                }) ??
+                deriveLangyChoicesLockState({
+                  blockId: part.blockId,
+                  timeline: choicesTimeline ?? [],
+                })
+              }
               onChoiceSelect={onChoiceSelect}
             />
           </LangyCardBoundary>
         ))}
+        {/* How Langy reaches this person's code (ADR-129). Asked once per
+            conversation, by the tool, and answered here. */}
+        {codeAccessCall && conversationId && project?.id ? (
+          <LangyCardBoundary scope="the code access card">
+            <LangyCodeAccessCard
+              projectId={project.id}
+              conversationId={conversationId}
+              callId={codeAccessCall}
+              organizationId={organizationId ?? null}
+              superseded={
+                liveCodeAccessCallId != null &&
+                liveCodeAccessCallId !== codeAccessCall
+              }
+              {...(onChoiceSelect ? { onChoiceSelect } : {})}
+              {...(onAskCodeAccessAgain
+                ? { onAskAgain: onAskCodeAccessAgain }
+                : {})}
+            />
+          </LangyCardBoundary>
+        ) : null}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user
@@ -493,6 +616,8 @@ interface AnswerBlockContext {
   hasActivity: boolean;
   firstTextIndex: number;
   projectSlug: string | null;
+  /** Pull-request number → URL, from this message's own tool calls. */
+  pullRequestLinks: Map<number, string>;
   choicesTimeline?: LangyChoicesTimelineEntry[];
   onChoiceSelect?: (a: {
     selection: LangyChoiceSelection;
@@ -534,14 +659,17 @@ function AnswerRun({
     return isRecorded ? null : langyAnswerSegmentsFromText(text);
   }, [isStreaming, isRecorded, parts, text]);
   const cleaned = parseLangyFeedbackDirective(text).cleanedText;
-  const display = stripToolNarration({
-    text: isStreaming
-      ? cleaned
-      : stripReasoningTitles({
-          text: cleaned,
-          hasActivity: context.hasActivity,
-        }),
-    hasActivity: context.hasActivity,
+  const display = linkPullRequestReferences({
+    text: stripToolNarration({
+      text: isStreaming
+        ? cleaned
+        : stripReasoningTitles({
+            text: cleaned,
+            hasActivity: context.hasActivity,
+          }),
+      hasActivity: context.hasActivity,
+    }),
+    links: context.pullRequestLinks,
   });
 
   if (segments) {
@@ -641,6 +769,7 @@ function AnswerSegment({
           text={segment.text}
           isFirst={index === context.firstTextIndex}
           hasActivity={context.hasActivity}
+          pullRequestLinks={context.pullRequestLinks}
         />
       );
     case "card":
@@ -681,22 +810,27 @@ function ProseSegment({
   text,
   isFirst,
   hasActivity,
+  pullRequestLinks,
 }: {
   text: string;
   isFirst: boolean;
   hasActivity: boolean;
+  pullRequestLinks: Map<number, string>;
 }) {
   const cleaned = parseLangyFeedbackDirective(text).cleanedText;
-  const display = isFirst
-    ? stripToolNarration({
-        // The reply's leading reasoning headlines fold into the receipt (the
-        // message-level fold already collected them from the full text); the
-        // first prose segment starts with the same leading edge, so it peels
-        // the same headlines before rendering.
-        text: stripReasoningTitles({ text: cleaned, hasActivity }),
-        hasActivity,
-      })
-    : cleaned;
+  const display = linkPullRequestReferences({
+    text: isFirst
+      ? stripToolNarration({
+          // The reply's leading reasoning headlines fold into the receipt (the
+          // message-level fold already collected them from the full text); the
+          // first prose segment starts with the same leading edge, so it peels
+          // the same headlines before rendering.
+          text: stripReasoningTitles({ text: cleaned, hasActivity }),
+          hasActivity,
+        })
+      : cleaned,
+    links: pullRequestLinks,
+  });
   if (!display) return null;
   return (
     <Box
@@ -953,4 +1087,33 @@ function isLangyProposal(value: unknown): value is LangyProposal {
     typeof v.kind === "string" &&
     typeof v.summary === "string"
   );
+}
+
+/**
+ * What a settled question WAIT says about one choices card, or null when the
+ * wait knows nothing and the timeline should answer instead.
+ *
+ * A wait that is still pending leaves the card open; a wait that ended locks
+ * it, on the option the answer names when the answer can be matched to one.
+ */
+function questionWaitLockState({
+  blockId,
+  card,
+  waits,
+}: {
+  blockId: string;
+  card: LangyDerivedCard;
+  waits: ReadonlyMap<string, LangyQuestionCardData> | undefined;
+}): LangyChoicesLockState | null {
+  if (!waits || card.kind !== "choices") return null;
+  const toolCallId = toolCallIdOfQuestionBlock(blockId);
+  const wait = toolCallId ? waits.get(toolCallId) : undefined;
+  if (!wait || wait.status === "pending") return null;
+  const answered = langyAnsweredOptionIds({
+    answers: wait.answers,
+    options: card.options,
+  });
+  return answered
+    ? { status: "answered", ...answered }
+    : { status: "superseded" };
 }

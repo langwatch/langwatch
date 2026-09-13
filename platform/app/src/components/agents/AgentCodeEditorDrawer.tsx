@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Field,
   Heading,
   HStack,
@@ -9,8 +10,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
+import { AgentTestPanel } from "~/components/agents/AgentTestPanel";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import {
   CODE_OUTPUT_TYPES,
@@ -23,6 +26,7 @@ import {
   ScenarioInputMappingSection,
 } from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -441,7 +445,23 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 {/* Code editor */}
                 <Box>
                   <Field.Root>
-                    <Field.Label>Python Code</Field.Label>
+                    <HStack gap={1}>
+                      <Field.Label>Python Code</Field.Label>
+                      <Tooltip
+                        content="Return a session key beside the outputs to keep a value for the conversation, such as a conversation id. Map an input to the scenario session to receive it on the next turn of the same conversation; it is None on the first turn."
+                        positioning={{ placement: "top" }}
+                        showArrow
+                      >
+                        <chakra.button
+                          type="button"
+                          aria-label="More about session keys"
+                          display="flex"
+                          color="fg.muted"
+                        >
+                          <HelpCircle width="14px" />
+                        </chakra.button>
+                      </Tooltip>
+                    </HStack>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
                       Define a Python class with a `__call__` method that takes
                       inputs and returns outputs.
@@ -495,6 +515,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                     onOutputFieldChange={handleScenarioOutputFieldChange}
                   />
                 </Box>
+
+                {agentId && project?.id ? (
+                  <Box paddingTop={4} borderTopWidth="1px" borderColor="border">
+                    <AgentTestPanel agentId={agentId} projectId={project.id} />
+                  </Box>
+                ) : null}
               </VStack>
             )}
           </Drawer.Body>

@@ -45,6 +45,20 @@ Everything above is outbound. The one inbound path GitHub uses is the webhook, d
 
 It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
 
+## Local control connections
+
+[Local development](/langy/local-development) lets a developer share a folder on their machine with Langy. The `langwatch langy --share-control` command opens one outbound connection from the developer's machine to the LangWatch app, not to the agent pod. The agent pod needs no new egress: the worker reaches the app in-cluster, on the path it already uses.
+
+| Route | Direction | Purpose |
+|---|---|---|
+| `<BASE_URL>/api/v1/langy/control/connect` | Developer machine to app, WebSocket upgrade | The live relay for file and command calls |
+| `<BASE_URL>/api/v1/langy/control/connect/*` | Developer machine to app, HTTPS | Long-poll fallback when the upgrade is refused |
+| `<BASE_URL>/api/v1/langy/control/requests` | Developer machine to app, HTTPS | List, approve and cancel control requests |
+
+An ingress that does not pass WebSocket upgrades still works: the CLI falls back to long-polling on its own. Each poll holds for up to 20 seconds, so keep the ingress read timeout at 30 seconds or more. The same timeout already applies to [connected agents](/agent-testing/connect-your-agent).
+
+The developer authenticates with their device session to approve a request, and the CLI then holds a Langy session key scoped to one conversation. The key stops working when the CLI disconnects or the conversation's workspace is disconnected from the chat.
+
 ## Enable outbound egress
 
 The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on:

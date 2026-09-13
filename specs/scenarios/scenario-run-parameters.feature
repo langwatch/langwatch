@@ -190,6 +190,13 @@ Feature: Scenario run parameters
     And nothing is scheduled
 
   @unit
+  Scenario: The refusal names the target it was resolved for
+    Given a run against two connected agents that declare different parameters
+    When one of them is given a value only the other one declares
+    Then the refusal carries the name and the environment of that target
+    And the customer reads that this target does not declare the name
+
+  @unit
   Scenario: A target override naming a secret parameter is refused
     Given a scenario declaring the secret parameter "api_token"
     When a run is started with a target carrying the override "api_token=..."

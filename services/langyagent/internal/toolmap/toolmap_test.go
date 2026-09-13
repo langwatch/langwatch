@@ -205,6 +205,36 @@ func TestHasToolInput(t *testing.T) {
 	}
 }
 
+// The local tools and the two tools that talk to the person carry a title of
+// ours, because pi sends none: without it the panel row reads "Local_bash"
+// instead of saying the call runs on the developer's machine. Every other tool
+// keeps the empty title and the card falls back to the tool name.
+func TestToolTitle(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{"code_access", "Code access"},
+		{"question", "Question"},
+		{"local_read", "Read on your machine"},
+		{"local_write", "Write on your machine"},
+		{"local_edit", "Edit on your machine"},
+		{"local_bash", "Run on your machine"},
+		{"local_grep", "Search on your machine"},
+		{"local_find", "Find on your machine"},
+		{"local_ls", "List on your machine"},
+		{"LOCAL_LS", "List on your machine"},
+		{" local_ls ", "List on your machine"},
+		{"bash", ""},
+		{"todowrite", ""},
+		{"", ""},
+	} {
+		if got := ToolTitle(tc.name); got != tc.want {
+			t.Errorf("ToolTitle(%q) = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // The tracker guarantees exactly one start and one end per call id, and the
 // settle of a non-plan call feeds the measured-progress batch timing.
 func TestToolCallTracker_DeDupeAndMeasuredTiming(t *testing.T) {

@@ -1,11 +1,13 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
+import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { LangyMessageDto } from "../data/langy.dtos";
 import type { createLangyChatTransport } from "../logic/langyChatTransport";
+import { isLangyTranscriptMessage } from "../logic/langyTranscript";
 
 /**
  * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus
@@ -60,6 +62,24 @@ export function useLangyChatEngine({
     },
   });
 
+  // Langy can mutate server-side state (e.g. dashboard widgets) mid-turn.
+  // Nothing else observes a turn's completion, so invalidate here, once,
+  // on the submitted/streaming -> ready/error transition — a ref (not
+  // state) tracks the previous status so this doesn't re-fire every render.
+  // Invalidating on a page with no dashboard mounted is a harmless no-op.
+  const utils = api.useUtils();
+  const previousStatusRef = useRef(status);
+  useEffect(() => {
+    const wasInFlight =
+      previousStatusRef.current === "submitted" ||
+      previousStatusRef.current === "streaming";
+    const isSettled = status === "ready" || status === "error";
+    if (wasInFlight && isSettled) {
+      void utils.dashboardWidgets.list.invalidate();
+    }
+    previousStatusRef.current = status;
+  }, [status, utils]);
+
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
   // conversation-id transition) without re-firing every render — which would
@@ -69,7 +89,7 @@ export function useLangyChatEngine({
 
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
     const uiMessages = history
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter(isLangyTranscriptMessage)
       // `recorded` marks a message that came from the durable fold rather than
       // from this browser's own stream. The relay stamped its card fences into
       // typed parts already, so a fence still sitting in its TEXT is one the

@@ -29,6 +29,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED } from "../shared/design";
 import { FromCodeBadge } from "../shared/FromCodeBadge";
 import { PassRateText } from "../shared/PassRateText";
+import { type TargetKind, TargetMark } from "../shared/TargetMark";
 import { TrendSparkline } from "../shared/TrendSparkline";
 import {
   ResultsTableBody,
@@ -53,6 +54,37 @@ const SCOPE_ICONS: Record<RunPlanScopeKind, typeof Layers> = {
   scenarios: Crosshair,
   external: FolderCode,
 };
+
+/**
+ * The targets a plan runs against, behind one mark.
+ *
+ * A plan that compares carries no one kind, so the row reads the target mark
+ * instead of the mark of an agent, the same way the run detail marks a
+ * comparison.
+ */
+function TargetsCell({
+  targetKeys,
+  resolveTargetName,
+  resolveTargetKind,
+}: {
+  targetKeys: string[];
+  resolveTargetName: (targetKey: string) => string;
+  resolveTargetKind: (targetKey: string) => TargetKind;
+}) {
+  const label = targetsLabel(targetKeys.map((key) => resolveTargetName(key)));
+  const first = targetKeys[0];
+  const kind: TargetKind =
+    targetKeys.length > 1 || !first ? "several" : resolveTargetKind(first);
+
+  return (
+    <HStack gap={1.5} minWidth={0} data-testid="plan-targets">
+      {label ? <TargetMark kind={kind} testId="plan-targets-mark" /> : null}
+      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+        {label}
+      </Text>
+    </HStack>
+  );
+}
 
 function ScopeCell({ plan }: { plan: RunPlan }) {
   return (
@@ -237,7 +269,15 @@ export type PlanRowsTableProps = {
   rows: PlanRowModel[];
   /** The window, in days, for the row that says nothing ran inside it. */
   days: number;
+  /**
+   * True while the window holds runs that no row of this table accounts for:
+   * a single scenario or a test suite run from the platform belongs to no run
+   * plan. The table then says where those runs are read instead of reporting
+   * a filter that matched nothing.
+   */
+  hasRunsOutsidePlans?: boolean;
   resolveTargetName: (targetKey: string) => string;
+  resolveTargetKind: (targetKey: string) => TargetKind;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
   onArchivePlan: (plan: RunPlan) => void;
@@ -248,7 +288,9 @@ export type PlanRowsTableProps = {
 export function PlanRowsTable({
   rows,
   days,
+  hasRunsOutsidePlans = false,
   resolveTargetName,
+  resolveTargetKind,
   onSelectPlan,
   onEditPlan,
   onArchivePlan,
@@ -286,16 +328,11 @@ export function PlanRowsTable({
 
             <ScopeCell plan={plan} />
 
-            <Text
-              fontSize="11.5px"
-              color={FG_MUTED}
-              truncate
-              data-testid="plan-targets"
-            >
-              {targetsLabel(
-                (group?.targetKeys ?? []).map((key) => resolveTargetName(key)),
-              )}
-            </Text>
+            <TargetsCell
+              targetKeys={group?.targetKeys ?? []}
+              resolveTargetName={resolveTargetName}
+              resolveTargetKind={resolveTargetKind}
+            />
 
             <PassRateText passRate={group?.passRate ?? null} />
 
@@ -323,7 +360,13 @@ export function PlanRowsTable({
         ))}
 
         {rows.length === 0 ? (
-          <ResultsTableEmptyLine text="No run plans match these filters." />
+          <ResultsTableEmptyLine
+            text={
+              hasRunsOutsidePlans
+                ? "These runs were started outside a run plan. Group by scenario or target to read them."
+                : "No run plans match these filters."
+            }
+          />
         ) : null}
       </ResultsTableBody>
 

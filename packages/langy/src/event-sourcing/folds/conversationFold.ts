@@ -272,7 +272,15 @@ export function foldLangyConversationState<
         UserId: state.UserId || event.data.userId,
         Title: title,
         TitleSource: titleSource,
-        Status: nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
+        // Only a message from the developer opens the conversation for a turn.
+        // A notice recorded by the platform (the shared folder disconnected,
+        // say) is news, not a question: it lands in the transcript and leaves
+        // the status where it was, so the panel does not sit on a working
+        // state waiting for an answer that nobody is writing.
+        Status:
+          event.data.role === "user"
+            ? nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE)
+            : nextStatus(state, state.Status),
         MessageCount: state.MessageCount + 1,
         LastActivityAt: event.occurredAt,
       };

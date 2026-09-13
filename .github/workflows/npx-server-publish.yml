@@ -61,14 +61,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
+      # The workspace install pulls node-pty through mcp-server, so it runs
+      # through the shared action: it puts node-gyp on PATH and makes pnpm's
+      # bundled gyp_main.py executable. The version check below still gates the
+      # publish, it just runs after a frozen-lockfile install rather than before.
+      - name: Setup pnpm + Node
+        uses: ./.github/actions/setup-pnpm-node
         with:
-          node-version: "24"
+          install: all
           registry-url: "https://registry.npmjs.org"
-
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          run_install: false
 
       - name: Resolve and verify versions
         id: versions
@@ -111,9 +112,6 @@ jobs:
 
           echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
           echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
-
-      - name: Install pnpm dependencies (workspace)
-        run: pnpm install --frozen-lockfile
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

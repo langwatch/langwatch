@@ -1,6 +1,7 @@
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   LANGY_TITLE_SOURCE,
   type LangyConversationStateData,
@@ -571,6 +572,37 @@ describe("LangyConversationStateFoldProjection", () => {
       const init = fold.init();
       expect(init.PendingHandoffToken).toBeNull();
       expect(init.PendingHandoffTurnId).toBeNull();
+    });
+  });
+
+  describe("given every event the conversation pipeline processes", () => {
+    // The row this projection writes carries the conversation's cursor, and
+    // the freshness signal is published only once that cursor has reached the
+    // event that raised it. An event this projection did not read was an event
+    // the cursor could never reach, so the signal for it was retried until it
+    // was dropped: a permission card raised or answered while a command ran
+    // reached no tab that was not streaming the turn itself.
+    for (const type of LANGY_CONVERSATION_PROCESSING_EVENT_TYPES) {
+      /** @scenario "Every event of the conversation moves its projection forward" */
+      it(`reads ${type} and moves its cursor`, () => {
+        const before = fold.init();
+        const after = fold.apply(before, {
+          ...event("MESSAGE_RECORDED", "1", {}, 5000),
+          type,
+        });
+        expect(after.LastEventOccurredAt).toBe(5000);
+      });
+    }
+
+    it("folds nothing of a card into the conversation row", () => {
+      const before = fold.init();
+      const after = fold.apply(before, {
+        ...event("MESSAGE_RECORDED", "1", {}, 5000),
+        type: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
+      });
+      expect(after.MessageCount).toBe(before.MessageCount);
+      expect(after.Status).toBe(before.Status);
+      expect(after.LastActivityAt).toBe(before.LastActivityAt);
     });
   });
 });

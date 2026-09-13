@@ -1,0 +1,1108 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * @vitest-environment node
+ *
+ * The daily cost rollup against real ClickHouse — the rules that are only
+ * decidable with a ReplacingMergeTree underneath: what survives a compaction,
+ * what a version-aware read returns before one, and whether a redelivered
+ * event doubles the money.
+ *
+ * Every seed sits inside the table's 13-month TTL horizon. Outside it the
+ * background delete removes the rows mid-test and the assertions pass or fail
+ * for reasons that have nothing to do with the code.
+ *
+ * Spec: specs/governance/governance-cost-rollup.feature
+ * Decision: ADR-128.
+ */
+import type { ClickHouseClient } from "@clickhouse/client";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import type { FoldProjectionDefinition } from "~/server/event-sourcing/projections/foldProjection.types";
+import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
+import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+
+import {
+  GovernanceCostRollupClickHouseRepository,
+  type GovernanceCostRollupRow,
+} from "../../services/governanceCostRollup.clickhouse.repository";
+import {
+  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+  GOVERNANCE_COST_ROLLUP_TABLE,
+  GOVERNANCE_COST_SOURCE,
+} from "../governanceCostRollup.constants";
+import {
+  GovernanceCostRollupFoldProjection,
+  type GovernanceCostRollupState,
+  governanceCostRollupKey,
+} from "../governanceCostRollup.foldProjection";
+import { GovernanceCostRollupStore } from "../governanceCostRollup.store";
+
+/** Well inside the 13-month TTL horizon, so nothing is swept mid-test. */
+const DAY = "2026-08-01";
+const DAY_MS = Date.parse(`${DAY}T09:30:00.000Z`);
+
+let ch: ClickHouseClient;
+let repo: GovernanceCostRollupClickHouseRepository;
+let store: GovernanceCostRollupStore;
+let tenantId: string;
+
+/**
+ * One pulled observation.
+ *
+ * `costNanoMinor` and `currencyCode` are both spelled out because the fold
+ * does not validate its events: a helper that omitted the money would hand it
+ * `undefined`, the cell's amount would be `NaN`, and its key would carry a
+ * null currency — while every assertion downstream still appeared to pass.
+ */
+function observed({
+  costNanoMinor,
+  currencyCode = "USD",
+  costNanoUsd = null,
+  observedAtMs,
+  restatementKey = "bucket-hash",
+  costStatus = "estimate",
+  rawActorId = "",
+  id = nanoid(),
+}: {
+  costNanoMinor: number;
+  currencyCode?: string;
+  costNanoUsd?: number | null;
+  observedAtMs: number;
+  restatementKey?: string;
+  costStatus?: "exact" | "estimate";
+  rawActorId?: string;
+  id?: string;
+}) {
+  return {
+    id,
+    type: "lw.obs.pulled_usage.observed",
+    tenantId,
+    aggregateId: restatementKey,
+    occurredAt: DAY_MS,
+    data: {
+      itemKey: `usage_report:${DAY}:1d`,
+      restatementKey,
+      source: "anthropic_admin",
+      ingestionSourceId: "src_1",
+      organizationId: "org_acme",
+      teamId: "team_platform",
+      projectId: tenantId,
+      model: "anthropic/claude-sonnet-5",
+      tokensInput: 1_000,
+      tokensOutput: 200,
+      tokensCacheRead: 0,
+      tokensCacheWrite: 0,
+      costNanoMinor,
+      currencyCode,
+      costNanoUsd,
+      rateVersion: "registry@2026-08-01",
+      costBasis: "computed",
+      costStatus,
+      rawActorId,
+      occurredAtMs: DAY_MS,
+      observedAtMs,
+    },
+  };
+}
+
+/**
+ * The event that withdraws what one restatement key holds in the cell it is
+ * currently filed under.
+ *
+ * `lw.obs.pulled_usage.retracted` (settlement 9), whose shape is
+ * `PulledUsageRetractedEventSchema`. Nothing emits one in production yet: the
+ * detector that would compare an incoming key against the restatement index
+ * is the piece still to be written.
+ *
+ * Built inline as a plain envelope, exactly like `observed` above, because
+ * the fold reads `type`, `tenantId` and `data` and nothing else.
+ */
+function retracted({
+  currencyCode = "USD",
+  observedAtMs,
+  restatementKey = "bucket-hash",
+  rawActorId = "",
+  id = nanoid(),
+}: {
+  currencyCode?: string;
+  observedAtMs: number;
+  restatementKey?: string;
+  rawActorId?: string;
+  id?: string;
+}) {
+  return {
+    id,
+    type: "lw.obs.pulled_usage.retracted",
+    tenantId,
+    aggregateId: restatementKey,
+    occurredAt: DAY_MS,
+    data: {
+      restatementKey,
+      source: "anthropic_admin",
+      ingestionSourceId: "src_1",
+      organizationId: "org_acme",
+      model: "anthropic/claude-sonnet-5",
+      // Spelled out even though a retraction carries no money: the cell an
+      // event addresses is derived through `readPulledUsageMoney`, which falls
+      // back to dollars when `costNanoMinor` is absent - so a retraction
+      // omitting it would empty the DOLLAR cell and leave the euro one live.
+      costNanoMinor: 0,
+      currencyCode,
+      costNanoUsd: null,
+      rawActorId,
+      // The day this CORRECTS, not the day the correction arrived.
+      occurredAtMs: DAY_MS,
+      observedAtMs,
+    },
+  };
+}
+
+/**
+ * The index migration `00094` creates: a `ReplacingMergeTree(EventTimestamp)`
+ * ordered by `(TenantId, RestatementKey)` recording the cell each key was
+ * first filed under. The rollup store writes it in the same write as the
+ * cell.
+ *
+ * Spelled out rather than imported from the store's own constant on purpose.
+ * The assertion below is that the rows land in THIS table, and a name read
+ * from the code under test would follow it through a rename and keep passing
+ * against a table nothing else knows about.
+ */
+const RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
+
+/** Where each of one tenant's restatement keys is currently filed. */
+async function restatementIndexRows(
+  forTenant: string,
+): Promise<Array<Record<string, unknown>>> {
+  const result = await ch.query({
+    query: `
+      SELECT RestatementKey, Day, CurrencyCode, RawActorId
+      FROM ${RESTATEMENT_INDEX_TABLE}
+      WHERE TenantId = {tenantid:String}
+    `,
+    query_params: { tenantid: forTenant },
+    format: "JSONEachRow",
+  });
+  return (await result.json()) as Array<Record<string, unknown>>;
+}
+
+/** Folds an event through the real executor, so redelivery dedup is exercised. */
+async function foldThroughExecutor(
+  event: ReturnType<typeof observed> | ReturnType<typeof retracted>,
+  { deliveryAttempt = 1 }: { deliveryAttempt?: number } = {},
+): Promise<void> {
+  const projection = new GovernanceCostRollupFoldProjection({ store });
+  const context: ProjectionStoreContext = {
+    aggregateId: event.aggregateId,
+    tenantId: tenantId as never,
+    key: governanceCostRollupKey(event as never),
+    deliveryAttempt,
+  };
+  await new FoldProjectionExecutor().execute(
+    projection as unknown as FoldProjectionDefinition<
+      GovernanceCostRollupState,
+      never
+    >,
+    event as never,
+    context,
+  );
+}
+
+/** What a naive reader would get: no version awareness at all. */
+async function plainSumOfDay(): Promise<number> {
+  const result = await ch.query({
+    query: `
+      SELECT sum(AmountNanoUsd) AS Total
+      FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+      WHERE TenantId = {tenantid:String} AND Day = {day:String}
+    `,
+    query_params: { tenantid: tenantId, day: DAY },
+    format: "JSONEachRow",
+  });
+  const rows = (await result.json()) as Array<{ Total: unknown }>;
+  return Number(rows[0]?.Total ?? 0);
+}
+
+/**
+ * Compacts on demand, around the merge freeze `beforeAll` installs.
+ *
+ * `OPTIMIZE` is itself a merge, so it is refused while merges are stopped —
+ * the freeze has to lift for exactly as long as the compaction takes.
+ */
+async function compact(): Promise<void> {
+  await ch.command({
+    query: `SYSTEM START MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+  });
+  await ch.command({
+    query: `OPTIMIZE TABLE ${GOVERNANCE_COST_ROLLUP_TABLE} FINAL`,
+  });
+  await ch.command({
+    query: `SYSTEM STOP MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+  });
+}
+
+async function rawRowCount(): Promise<number> {
+  const result = await ch.query({
+    query: `
+      SELECT count() AS N
+      FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+      WHERE TenantId = {tenantid:String} AND Day = {day:String}
+    `,
+    query_params: { tenantid: tenantId, day: DAY },
+    format: "JSONEachRow",
+  });
+  const rows = (await result.json()) as Array<{ N: unknown }>;
+  return Number(rows[0]?.N ?? 0);
+}
+
+/** One cell's dimensions, fixed so the seed and the read address the same row. */
+function withdrawnCellDimensions() {
+  return {
+    tenantId,
+    day: DAY,
+    costSource: GOVERNANCE_COST_SOURCE.PULLED,
+    ingestionSourceId: "src_1",
+    provider: "anthropic",
+    model: "claude-sonnet-4",
+    agentId: "",
+    currencyCode: "USD",
+    rawActorId: "",
+  };
+}
+
+/**
+ * A stored row carrying a price, written straight to the table. The fold is
+ * not involved on purpose: this exercises what the READ does with two versions
+ * of one cell, which is a property of the query rather than of the fold.
+ */
+function pricedCell({
+  amountNanoUsd,
+  at,
+}: {
+  amountNanoUsd: number | null;
+  at: number;
+}): GovernanceCostRollupRow {
+  const d = withdrawnCellDimensions();
+  return {
+    TenantId: d.tenantId,
+    Day: d.day,
+    CostSource: d.costSource,
+    IngestionSourceId: d.ingestionSourceId,
+    Provider: d.provider,
+    Model: d.model,
+    AgentId: d.agentId,
+    CurrencyCode: d.currencyCode,
+    RawActorId: d.rawActorId,
+    OrganizationId: "org_acme",
+    ExactOrEstimate: "exact",
+    AmountNanoUsd: amountNanoUsd,
+    AmountNanoMinor: amountNanoUsd ?? 0,
+    TokensInput: 100,
+    TokensOutput: 20,
+    TokensCacheRead: 0,
+    TokensCacheWrite: 0,
+    RequestCount: 1,
+    RevisionCount: 0,
+    PreviousAmountNanoUsd: null,
+    // Never restated, and never touched by a pull. Both `DateTime` columns, so
+    // both are in SECONDS here, unlike the millisecond fields above.
+    RevisedAt: null,
+    LastObservedAt: Math.floor(at / 1000),
+    PulledItemsJson: "{}",
+    Version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+    AppliedEventIds: [],
+    CreatedAt: DAY_MS,
+    LastEventOccurredAt: DAY_MS,
+    EventTimestamp: at,
+  };
+}
+
+/**
+ * A metered-lane row an older build left behind. The fold no longer writes
+ * these — the metered lane is read straight off its own per-request ledger —
+ * but production still holds the ones it wrote, so a test about the pulled
+ * lane's reads has to survive one sitting beside its rows.
+ */
+function leftoverGatewayCell({
+  amountNanoUsd,
+  at,
+}: {
+  amountNanoUsd: number;
+  at: number;
+}): GovernanceCostRollupRow {
+  return {
+    ...pricedCell({ amountNanoUsd, at }),
+    CostSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+    IngestionSourceId: "",
+    Provider: "openai",
+    Model: "openai/gpt-5-mini",
+    RawActorId: "user_ada",
+  };
+}
+
+describe("governance cost rollup", () => {
+  beforeAll(async () => {
+    const client = getTestClickHouseClient();
+    if (!client) throw new Error("Test ClickHouse is not available");
+    ch = client;
+    repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
+    store = new GovernanceCostRollupStore(repo);
+
+    // Half these tests assert on what is still on disk BEFORE a compaction —
+    // that a superseded version survives, and that the read steps over it
+    // rather than waiting for a merge. A ReplacingMergeTree merges on its own
+    // schedule, so left running it can collapse those rows between the write
+    // and the assertion, and the test then fails for a reason that has nothing
+    // to do with the code. Merges are stopped for the whole file and lifted
+    // only inside `compact()`, where a compaction is the point.
+    await ch.command({
+      query: `SYSTEM STOP MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+    });
+  });
+
+  beforeEach(() => {
+    // A fresh tenant per test: the table is shared, so tests must not be able
+    // to see each other's rows. Note this does NOT isolate them from each
+    // other's merges, which are table-wide — the freeze above is what does.
+    tenantId = `proj-costrollup-${nanoid(8)}`;
+  });
+
+  afterAll(async () => {
+    // Leaving a shared table frozen would strand every later test that needs a
+    // merge, so the freeze is lifted even though the container is torn down.
+    await ch
+      ?.command({
+        query: `SYSTEM START MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+      })
+      .catch(() => undefined);
+    await ch?.close();
+  });
+
+  describe("given cost events for one day and one dimension combination", () => {
+    /** @scenario "A day's spend lands as one summary row per dimension combination" */
+    it("holds exactly one row whose amount is the sum of those events", async () => {
+      // Two different provider items sharing one cell, so the day is a SUM
+      // rather than a restatement of one item.
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 5_000_000_000,
+          restatementKey: "bucket-a",
+          observedAtMs: DAY_MS,
+        }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 7_340_000_000,
+          restatementKey: "bucket-b",
+          observedAtMs: DAY_MS,
+        }),
+      );
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      expect(cells).toHaveLength(1);
+      expect(cells[0]!.AmountNanoUsd).toBe(12_340_000_000);
+      expect(cells[0]!.RequestCount).toBe(2);
+      expect(cells[0]!.Version).toBe(
+        GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      );
+    });
+  });
+
+  describe("given two different spenders with the same provider, model, day, and amount", () => {
+    /** @scenario "Two spenders with identical numbers stay two rows after compaction" */
+    it("still holds a separate row for each spender", async () => {
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 5_000_000_000,
+          restatementKey: "bucket-ada",
+          rawActorId: "user_ada",
+          observedAtMs: DAY_MS,
+        }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 5_000_000_000,
+          restatementKey: "bucket-grace",
+          rawActorId: "user_grace",
+          observedAtMs: DAY_MS,
+        }),
+      );
+
+      // Force the merge BEFORE asserting. Without it both rows survive even
+      // when the spender is missing from the dedup key, and the first real
+      // merge in production then deletes one spender's money.
+      await compact();
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      expect(cells.map((cell) => cell.RawActorId).sort()).toEqual([
+        "user_ada",
+        "user_grace",
+      ]);
+      expect(cells.every((cell) => cell.AmountNanoUsd === 5_000_000_000)).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("given one day has events in two currencies", () => {
+    /** @scenario "Amounts in different currencies stay separate rows after compaction" */
+    it("keeps each currency's own total and produces no combined figure", async () => {
+      // Two provider items billed in two currencies, folded through the real
+      // store: what is under test is the dedup KEY, so the currency has to
+      // survive the trip from the event rather than be set on a hand-built
+      // row. The euro item carries no dollar figure of its own.
+      for (const [currencyCode, amount] of [
+        ["USD", 5_000_000_000],
+        ["EUR", 4_200_000_000],
+      ] as const) {
+        await foldThroughExecutor(
+          observed({
+            costNanoMinor: amount,
+            currencyCode,
+            restatementKey: `bucket-${currencyCode}`,
+            observedAtMs: DAY_MS,
+          }),
+        );
+      }
+
+      await compact();
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      expect(cells).toHaveLength(2);
+      const byCurrency = Object.fromEntries(
+        cells.map((cell) => [cell.CurrencyCode, cell.AmountNanoMinor]),
+      );
+      expect(byCurrency).toEqual({ USD: 5_000_000_000, EUR: 4_200_000_000 });
+      // No combined single figure: the dollar total counts the dollar row and
+      // nothing else, and the euro row is reported as holding no dollar figure
+      // rather than being folded in as if it did.
+      const summed = await repo.sumDay({ tenantId, day: DAY });
+      expect(summed.amountNanoUsd).toBe(5_000_000_000);
+      expect(summed.cellsWithoutAmount).toBe(1);
+    });
+  });
+
+  describe("given a day was summarized and the provider then restates it", () => {
+    /** @scenario "A restated day reads as the restated amount even before compaction" */
+    it("returns only the restated amount, and says what it was before", async () => {
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 12_340_000_000,
+          observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
+        }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 9_000_000_000,
+          observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
+          costStatus: "exact",
+        }),
+      );
+
+      // Deliberately NOT compacted: both versions of the row are still there.
+      expect(await rawRowCount()).toBe(2);
+
+      // The counterexample. A naive reader adds the superseded figure to the
+      // one that replaced it and reports money nobody spent.
+      expect(await plainSumOfDay()).toBe(21_340_000_000);
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      expect(cells).toHaveLength(1);
+      expect(cells[0]!.AmountNanoUsd).toBe(9_000_000_000);
+      // The revision stays visible rather than being quietly overwritten.
+      expect(cells[0]!.RevisionCount).toBe(1);
+      expect(cells[0]!.PreviousAmountNanoUsd).toBe(12_340_000_000);
+      expect(cells[0]!.ExactOrEstimate).toBe("exact");
+    });
+
+    /** @scenario "The markers survive a read taken before storage compacts" */
+    it("returns the newest revision marker and last-observed time, not an older one", async () => {
+      const first = Date.parse("2026-08-02T04:00:00.000Z");
+      const second = Date.parse("2026-08-03T04:00:00.000Z");
+      await foldThroughExecutor(
+        observed({ costNanoMinor: 12_340_000_000, observedAtMs: first }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 9_000_000_000,
+          observedAtMs: second,
+          costStatus: "exact",
+        }),
+      );
+
+      // Deliberately NOT compacted. A read that is not replacement-aware picks
+      // whichever version the scan reached, and annotates a current figure
+      // with a superseded revision — or with no revision at all.
+      expect(await rawRowCount()).toBe(2);
+
+      const [cell] = await repo.findCellsForDay({ tenantId, day: DAY });
+      // Both columns are DateTime, so both come back in SECONDS.
+      expect(cell?.RevisedAt).toBe(Math.floor(second / 1000));
+      expect(cell?.LastObservedAt).toBe(Math.floor(second / 1000));
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lane?.revisedAt).toBe(Math.floor(second / 1000));
+      expect(lane?.lastObservedAt).toBe(Math.floor(second / 1000));
+      // What the day totalled before the restatement, reconstructed from the
+      // cells that changed plus the ones that did not.
+      expect(lane?.previousAmountNanoUsd).toBe(12_340_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+  });
+
+  describe("given two spenders' cells restated on different dates", () => {
+    /** @scenario "A day restated twice reports only the latest move" */
+    it("reports what the day held just before the LATEST revision", async () => {
+      // The counterexample for the day-level "was $X". Two cells of one day,
+      // restated a fortnight apart. Summing every revised cell's prior figure
+      // regardless of date reports $300 — a $70 move — under the later date,
+      // whose actual move was $50. §15: the marker holds only the latest
+      // revision.
+      const early = Date.parse("2026-08-05T04:00:00.000Z");
+      const late = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      for (const cell of [
+        // ada: 100 -> 120, restated on the 5th.
+        {
+          RawActorId: "ada",
+          AmountNanoUsd: 120_000_000_000,
+          PreviousAmountNanoUsd: 100_000_000_000,
+          RevisedAt: Math.floor(early / 1000),
+          LastObservedAt: Math.floor(early / 1000),
+        },
+        // bob: 200 -> 250, restated on the 20th — the day's latest.
+        {
+          RawActorId: "bob",
+          AmountNanoUsd: 250_000_000_000,
+          PreviousAmountNanoUsd: 200_000_000_000,
+          RevisedAt: Math.floor(late / 1000),
+          LastObservedAt: Math.floor(late / 1000),
+        },
+      ]) {
+        await repo.upsert({ ...base, ...cell, EventTimestamp: 1_000 });
+      }
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lane?.amountNanoUsd).toBe(370_000_000_000);
+      expect(lane?.revisedAt).toBe(Math.floor(late / 1000));
+      // 120 + 200: ada was already at its restated figure by the 20th, so it
+      // contributes what it holds now, not what it held on the 5th.
+      expect(lane?.previousAmountNanoUsd).toBe(320_000_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+
+    it("sums every prior when the whole day was restated at one moment", async () => {
+      const at = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      for (const actor of ["ada", "bob"]) {
+        await repo.upsert({
+          ...base,
+          RawActorId: actor,
+          AmountNanoUsd: 250_000_000_000,
+          PreviousAmountNanoUsd: 200_000_000_000,
+          RevisedAt: Math.floor(at / 1000),
+          LastObservedAt: Math.floor(at / 1000),
+          EventTimestamp: 1_000,
+        });
+      }
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      // Both cells ARE the latest revision, so both swap in their priors. The
+      // pinning rule must not cost the common case its answer.
+      expect(lane?.amountNanoUsd).toBe(500_000_000_000);
+      expect(lane?.previousAmountNanoUsd).toBe(400_000_000_000);
+    });
+
+    it("carries an unrevised cell's current figure into the earlier total", async () => {
+      const at = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      await repo.upsert({
+        ...base,
+        RawActorId: "ada",
+        AmountNanoUsd: 250_000_000_000,
+        PreviousAmountNanoUsd: 200_000_000_000,
+        RevisedAt: Math.floor(at / 1000),
+        LastObservedAt: Math.floor(at / 1000),
+        EventTimestamp: 1_000,
+      });
+      await repo.upsert({
+        ...base,
+        RawActorId: "bob",
+        AmountNanoUsd: 70_000_000_000,
+        EventTimestamp: 1_000,
+      });
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      // bob was never revised, so it compares NULL against the day's latest
+      // revision. It has to land in the current-amount arm — dropping out of
+      // the sum would understate the earlier total by its whole figure.
+      expect(lane?.amountNanoUsd).toBe(320_000_000_000);
+      expect(lane?.previousAmountNanoUsd).toBe(270_000_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+  });
+
+  describe("given a cell summarized before the markers were added", () => {
+    /** @scenario "A day summarized before the markers existed reads as settled" */
+    it("reads as never revised and never observed", async () => {
+      // What the ALTER's defaults leave on every pre-existing row. The pullers
+      // look thirty days back, so a day genuinely still settling is re-stamped
+      // by the next daily pull; a day this calls settled was one no pull was
+      // ever going to touch again.
+      await repo.upsert({
+        ...pricedCell({ amountNanoUsd: 12_340_000_000, at: 1_000 }),
+        RevisedAt: null,
+        LastObservedAt: 0,
+      });
+
+      const cell = await repo.findCellWithApplied(withdrawnCellDimensions());
+      expect(cell?.RevisedAt).toBeNull();
+      expect(cell?.LastObservedAt).toBe(0);
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lane?.revisedAt).toBeNull();
+      expect(lane?.lastObservedAt).toBe(0);
+    });
+  });
+
+  describe("given a priced cell is restated to carry no figure at all", () => {
+    /**
+     * The other half of the restatement rule, and the one an aggregate-level
+     * dedup gets wrong on its own. `argMax` ignores rows whose FIRST argument
+     * is NULL, so a cell that went priced -> unpriced reads back at its old
+     * price: the newest version is skipped for being NULL and the superseded
+     * one wins by default. That resurrects a figure the provider withdrew.
+     *
+     * Wrapping the value in a tuple is what fixes it. A tuple is never NULL,
+     * so no version is ever skipped, and `.1` unwraps the NULL the winning
+     * version actually held.
+     */
+    it("reports no figure, rather than resurrecting the withdrawn one", async () => {
+      const priced = pricedCell({ amountNanoUsd: 12_340_000_000, at: 1_000 });
+      await repo.upsert(priced);
+      await repo.upsert({
+        ...priced,
+        AmountNanoUsd: null,
+        PreviousAmountNanoUsd: 12_340_000_000,
+        RevisionCount: 1,
+        EventTimestamp: 2_000,
+      });
+
+      // Deliberately NOT compacted: both versions are still on disk, which is
+      // the window this whole class of bug lives in.
+      expect(await rawRowCount()).toBe(2);
+
+      const cell = await repo.findCellWithApplied(withdrawnCellDimensions());
+      expect(cell?.AmountNanoUsd).toBeNull();
+      // The withdrawal is a restatement like any other, so what it replaced
+      // stays readable.
+      expect(cell?.PreviousAmountNanoUsd).toBe(12_340_000_000);
+
+      const day = await repo.sumDay({ tenantId, day: DAY });
+      expect(day.amountNanoUsd).toBeNull();
+      expect(day.cellsWithoutAmount).toBe(1);
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lanes).toHaveLength(1);
+      expect(lanes[0]!.amountNanoUsd).toBeNull();
+      expect(lanes[0]!.cellsWithoutAmount).toBe(1);
+    });
+  });
+
+  describe("given a restated day read through the screen's range query", () => {
+    it("totals only the surviving version, and keeps a leftover metered row out of it", async () => {
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 12_340_000_000,
+          observedAtMs: Date.parse("2026-08-02T04:00:00.000Z"),
+        }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 9_000_000_000,
+          observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
+          costStatus: "exact",
+        }),
+      );
+      // A metered row an older build wrote, still on disk in production.
+      await repo.upsert(
+        leftoverGatewayCell({ amountNanoUsd: 5_000_000_000, at: 1_000 }),
+      );
+
+      // Deliberately NOT compacted: the superseded version is still there, so
+      // the read has to survive it rather than wait for a merge. The
+      // self-check: the table must still hold more physical rows than the read
+      // returns cells, or this test would be asserting dedup against data that
+      // has nothing left to dedup.
+      const rawRows = await rawRowCount();
+      expect(rawRows).toBe(3);
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(rawRows).toBeGreaterThan(lanes.length);
+
+      const pulled = lanes.find((lane) => lane.costSource === "pulled");
+      expect(pulled?.amountNanoUsd).toBe(9_000_000_000);
+      expect(pulled?.day).toBe(DAY);
+      // The leftover is never folded into the pulled figure — a summed
+      // 14_000_000_000 anywhere in the answer is the defect.
+      expect(lanes.every((lane) => lane.amountNanoUsd !== 14_000_000_000)).toBe(
+        true,
+      );
+    });
+
+    it("answers null, never zero, for a window nothing reported", async () => {
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lanes).toEqual([]);
+    });
+
+    /** @scenario "Rows written by an older summary shape are not counted" */
+    it("counts the current version only, and drops the older stamp", async () => {
+      // Two DIFFERENT cells, so neither can replace the other: an older-shape
+      // row that shared a key would be beaten by the dedup anyway, which would
+      // let a read with no version filter at all pass this test.
+      const current = pricedCell({ amountNanoUsd: 9_000_000_000, at: 2_000 });
+      await repo.upsert(current);
+      await repo.upsert({
+        ...current,
+        Model: "claude-opus-4",
+        AmountNanoUsd: 4_000_000_000,
+        Version: "1999-01-01",
+        EventTimestamp: 3_000,
+      });
+
+      // Self-check: both rows really are on disk, so "the older one is not
+      // counted" is a statement about the read rather than about a seed that
+      // never landed. The newer EventTimestamp on the stale row is what would
+      // make a version-blind read prefer it.
+      expect(await rawRowCount()).toBe(2);
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lanes).toHaveLength(1);
+      expect(lanes[0]!.amountNanoUsd).toBe(9_000_000_000);
+      // Not 13_000_000_000: the older shape's money is not this build's money.
+      expect(lanes[0]!.cellsWithoutAmount).toBe(0);
+    });
+
+    it("names the currencies of the cells it holds no dollar figure for", async () => {
+      const priced = pricedCell({ amountNanoUsd: 9_000_000_000, at: 1_000 });
+      await repo.upsert(priced);
+      for (const currencyCode of ["EUR", "JPY"]) {
+        await repo.upsert({
+          ...priced,
+          CurrencyCode: currencyCode,
+          AmountNanoUsd: null,
+          AmountNanoMinor: 4_200_000_000,
+          EventTimestamp: 1_000,
+        });
+      }
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lanes).toHaveLength(1);
+      // Zero, and this is the whole point of the test rather than an aside.
+      // The euro and yen cells each hold a real 4.2-unit amount, and unpriced
+      // means no amount in ANY currency, so neither is unpriced. "We hold no
+      // DOLLAR figure for it" and "we hold no figure for it at all" are
+      // different questions about the same cell, and only the second one
+      // withholds the day's total. An earlier rule answered 2 here, which
+      // withheld the dollar figure of every day that touched a foreign bill.
+      // That the count is live rather than stuck at zero is pinned next door,
+      // in governanceCostRollupReads.integration.test.ts, where a cell with no
+      // currency and no money at all makes the same count read 1.
+      expect(lanes[0]!.cellsWithoutAmount).toBe(0);
+      // Sorted and USD-free: USD names no currency the screen could report,
+      // and an unstable order would make the rendered sentence flap.
+      expect(lanes[0]!.currenciesWithoutUsdAmount).toEqual(["EUR", "JPY"]);
+    });
+  });
+
+  describe("given the same event is redelivered after its state was stored", () => {
+    // Queue delivery is at-least-once. The applied-event-id watermark riding
+    // on the row is what stops a retry that reaches a cold cache from folding
+    // the same event a second time; the pulled lane's restatement rule would
+    // catch this particular redelivery too, so this pins the seam rather than
+    // proving the watermark alone.
+    it("does not count the money twice", async () => {
+      const event = observed({
+        costNanoMinor: 5_000_000_000,
+        observedAtMs: DAY_MS,
+      });
+      await foldThroughExecutor(event);
+      await foldThroughExecutor(event, { deliveryAttempt: 2 });
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      expect(cells[0]!.AmountNanoUsd).toBe(5_000_000_000);
+      expect(cells[0]!.RequestCount).toBe(1);
+    });
+  });
+
+  describe("given a populated summary and the events it came from", () => {
+    /** @scenario "Rebuilding the summary from history reproduces it exactly" */
+    it("reproduces every row when rebuilt from the event history", async () => {
+      const history = [
+        observed({
+          costNanoMinor: 5_000_000_000,
+          restatementKey: "bucket-ada-1",
+          rawActorId: "user_ada",
+          observedAtMs: DAY_MS,
+        }),
+        observed({
+          costNanoMinor: 7_340_000_000,
+          restatementKey: "bucket-ada-2",
+          rawActorId: "user_ada",
+          observedAtMs: DAY_MS,
+        }),
+        observed({
+          costNanoMinor: 1_000_000_000,
+          restatementKey: "bucket-grace",
+          rawActorId: "user_grace",
+          observedAtMs: DAY_MS,
+        }),
+      ];
+      for (const event of history) await foldThroughExecutor(event);
+      const original = await repo.findCellsForDay({ tenantId, day: DAY });
+
+      // Rebuild into a second tenant from the same history, which is what a
+      // replay of the log does: the projection is a pure consequence of the
+      // events, so the same events must produce the same numbers.
+      const rebuiltTenant = `${tenantId}-rebuilt`;
+      const previousTenant = tenantId;
+      tenantId = rebuiltTenant;
+      for (const event of history) {
+        await foldThroughExecutor({
+          ...event,
+          tenantId: rebuiltTenant,
+        } as never);
+      }
+      const rebuilt = await repo.findCellsForDay({
+        tenantId: rebuiltTenant,
+        day: DAY,
+      });
+      tenantId = previousTenant;
+
+      expect(rebuilt).toHaveLength(original.length);
+      const comparable = (rows: typeof original) =>
+        rows.map((row) => ({
+          RawActorId: row.RawActorId,
+          Provider: row.Provider,
+          Model: row.Model,
+          CurrencyCode: row.CurrencyCode,
+          AmountNanoUsd: row.AmountNanoUsd,
+          TokensInput: row.TokensInput,
+          TokensOutput: row.TokensOutput,
+          RequestCount: row.RequestCount,
+        }));
+      expect(comparable(rebuilt)).toEqual(comparable(original));
+    });
+  });
+
+  describe("given the organization has trace cost for a day", () => {
+    /** @scenario "Trace cost stays out of the rollup" */
+    it("summarizes the day without any row carrying trace cost", async () => {
+      await ch.insert({
+        table: "trace_summaries",
+        values: [
+          {
+            ProjectionId: `proj-${nanoid()}`,
+            TenantId: tenantId,
+            TraceId: `trace-${nanoid()}`,
+            Version: "v1",
+            Attributes: {},
+            OccurredAt: new Date(DAY_MS),
+            CreatedAt: new Date(DAY_MS),
+            UpdatedAt: new Date(DAY_MS),
+            ComputedIOSchemaVersion: "",
+            TotalDurationMs: 100,
+            SpanCount: 1,
+            ContainsErrorStatus: 0,
+            ContainsOKStatus: 1,
+            Models: ["claude-sonnet-5"],
+            TotalCost: 42.5,
+            TokensEstimated: false,
+            TotalPromptTokenCount: 10,
+            TotalCompletionTokenCount: 5,
+            OutputFromRootSpan: 0,
+            OutputSpanEndTimeMs: 0,
+            BlockedByGuardrail: 0,
+          },
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+
+      await foldThroughExecutor(
+        observed({ costNanoMinor: 5_000_000_000, observedAtMs: DAY_MS }),
+      );
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      // The trace's 42.5 USD is nowhere in the summary, under any label: the
+      // only row is the pulled one, and the lane vocabulary has no third
+      // value for a trace to hide behind.
+      expect(cells).toHaveLength(1);
+      expect(cells[0]!.CostSource).toBe(GOVERNANCE_COST_SOURCE.PULLED);
+      expect(cells[0]!.AmountNanoUsd).toBe(5_000_000_000);
+      expect(cells.some((cell) => cell.CostSource.includes("trace"))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given a day summarized from a bill issued in one currency", () => {
+    const BILLED = 10_000_000_000;
+    const REISSUED = 11_000_000_000;
+    const FIRST_PULL = Date.parse("2026-08-02T04:00:00.000Z");
+    const SECOND_PULL = Date.parse("2026-08-05T04:00:00.000Z");
+
+    /** @scenario "A day whose bill changed currency is never counted under both" */
+    it("holds the day under the second currency only", async () => {
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: BILLED,
+          currencyCode: "EUR",
+          observedAtMs: FIRST_PULL,
+        }),
+      );
+      await foldThroughExecutor(
+        retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: REISSUED,
+          currencyCode: "USD",
+          observedAtMs: SECOND_PULL,
+        }),
+      );
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      const byCurrency = new Map(
+        cells.map((cell) => [cell.CurrencyCode, cell.AmountNanoMinor]),
+      );
+
+      // The first currency is still a row - the day really was billed in it
+      // once, and the history says so - but it contributes nothing.
+      expect(byCurrency.get("EUR")).toBe(0);
+      expect(byCurrency.get("USD")).toBe(REISSUED);
+      // Read across every currency the day holds, the one bill is counted
+      // once. Left un-retracted, both versions are live and this is
+      // BILLED + REISSUED.
+      expect(
+        cells.reduce((total, cell) => total + cell.AmountNanoMinor, 0),
+      ).toBe(REISSUED);
+    });
+  });
+
+  describe("given a day summarized in one currency and then rebuilt from history", () => {
+    const BILLED = 10_000_000_000;
+    const REISSUED = 11_000_000_000;
+    const FIRST_PULL = Date.parse("2026-08-02T04:00:00.000Z");
+    const SECOND_PULL = Date.parse("2026-08-05T04:00:00.000Z");
+
+    /** @scenario "A correction still retracts its earlier version after the summary is rebuilt" */
+    it("still retracts the earlier version once the correction arrives", async () => {
+      const history = [
+        observed({
+          costNanoMinor: BILLED,
+          currencyCode: "EUR",
+          observedAtMs: FIRST_PULL,
+        }),
+      ];
+      for (const event of history) await foldThroughExecutor(event);
+
+      // The rebuild: the same history replayed into a fresh tenant, which is
+      // what a replay of the log does.
+      const rebuiltTenant = `${tenantId}-rebuilt`;
+      const previousTenant = tenantId;
+      tenantId = rebuiltTenant;
+      for (const event of history) {
+        await foldThroughExecutor({ ...event, tenantId: rebuiltTenant });
+      }
+
+      // The correction arrives AFTER the rebuild, so the only way it can find
+      // the euro cell is from something the rebuild itself reproduced.
+      await foldThroughExecutor(
+        retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: REISSUED,
+          currencyCode: "USD",
+          observedAtMs: SECOND_PULL,
+        }),
+      );
+
+      const cells = await repo.findCellsForDay({
+        tenantId: rebuiltTenant,
+        day: DAY,
+      });
+      tenantId = previousTenant;
+
+      const byCurrency = new Map(
+        cells.map((cell) => [cell.CurrencyCode, cell.AmountNanoMinor]),
+      );
+      expect(byCurrency.get("EUR")).toBe(0);
+      expect(byCurrency.get("USD")).toBe(REISSUED);
+
+      // Where the charge landed the first time is written down beside the
+      // summary as it is built, out of the same events. Held only in memory it
+      // would be lost by every restart, and looked for by searching the day it
+      // would mean reading every row of that day on every correction.
+      expect(await restatementIndexRows(rebuiltTenant)).toEqual([
+        expect.objectContaining({
+          RestatementKey: "bucket-hash",
+          Day: DAY,
+          CurrencyCode: "EUR",
+        }),
+      ]);
+    });
+  });
+});

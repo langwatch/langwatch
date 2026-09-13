@@ -35,6 +35,25 @@ import { RESULTS_SEGMENT } from "../useAgentTestingRouting";
  */
 export const CLI_EPHEMERAL_LABEL = "cli-ephemeral";
 
+/** The suite fields the run plan rule reads. */
+export type StoredSuite = { kind?: string | null; labels: string[] };
+
+/**
+ * The suites of a project that are run plans.
+ *
+ * A test suite is a group of scenarios and never a row of the Test Runs list,
+ * and the throwaway suites `scenario run` makes are deleted again. Every
+ * surface that counts or lists run plans reads this one rule, so the number
+ * beside the Results tab can never disagree with the rows under it.
+ */
+export function toRunPlanSuites<T extends StoredSuite>(suites: T[]): T[] {
+  return suites.filter(
+    (suite) =>
+      suite.kind !== "test_suite" &&
+      !suite.labels.includes(CLI_EPHEMERAL_LABEL),
+  );
+}
+
 export type RunPlanKind = "suite" | "external";
 
 /**
@@ -235,22 +254,20 @@ export function buildRunPlans({
   suiteSummaries: Record<string, SuiteRunSummary>;
   externalSets: ExternalSetSummary[];
 }): RunPlan[] {
-  const suitePlans: RunPlan[] = plans
-    .filter((suite) => !suite.labels.includes(CLI_EPHEMERAL_LABEL))
-    .map((suite) => {
-      const summary = suiteSummaries[suite.id];
-      return {
-        slug: suite.slug,
-        name: suite.name,
-        kind: "suite" as const,
-        scenarioSetId: getSuiteSetId(suite.id),
-        suiteId: suite.id,
-        caseCount: suite.scenarioIds.length,
-        lastRun: summary ? toLastRun(summary) : null,
-        scopeLabel: suiteScopeLabel({ suite, suiteNames }),
-        scopeKind: suiteScopeKind(suite),
-      };
-    });
+  const suitePlans: RunPlan[] = toRunPlanSuites(plans).map((suite) => {
+    const summary = suiteSummaries[suite.id];
+    return {
+      slug: suite.slug,
+      name: suite.name,
+      kind: "suite" as const,
+      scenarioSetId: getSuiteSetId(suite.id),
+      suiteId: suite.id,
+      caseCount: suite.scenarioIds.length,
+      lastRun: summary ? toLastRun(summary) : null,
+      scopeLabel: suiteScopeLabel({ suite, suiteNames }),
+      scopeKind: suiteScopeKind(suite),
+    };
+  });
 
   const externalPlans: RunPlan[] = externalSets.map((set) => ({
     slug: toExternalPlanSlug(set.scenarioSetId),

@@ -41,6 +41,12 @@ describe("handleFailedJobResult", () => {
         ensureFailureEventsEmitted:
           mockEnsureFailureEventsEmitted as ProcessorDependencies["failureEmitter"]["ensureFailureEventsEmitted"],
       },
+      agentInstanceRecorder: {
+        recordAgentInstance: vi.fn().mockResolvedValue(undefined),
+      },
+      cutAtLimitRecorder: {
+        recordCutAtLimit: vi.fn(async () => {}),
+      },
     };
   });
 

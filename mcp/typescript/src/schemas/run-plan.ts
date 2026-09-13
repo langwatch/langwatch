@@ -50,11 +50,15 @@ export const runParametersSchema = z.record(
  */
 export const runPlanTargetSchema = z.object({
   type: z
-    .enum(["prompt", "http", "code", "workflow"])
-    .describe("What kind of thing the target is"),
+    .enum(["connected", "prompt", "http", "code", "workflow"])
+    .describe(
+      "What kind of thing the target is. A connected agent is one that registered itself from code with connectAgent (TypeScript) or connect_agent (Python).",
+    ),
   referenceId: z
     .string()
-    .describe("The ID of the prompt, agent or workflow to run against"),
+    .describe(
+      "The ID of the prompt, agent or workflow to run against. A connected agent may also be named as <name>@<environment>, for example support-agent@production; the platform resolves it.",
+    ),
   parameters: runParametersSchema
     .optional()
     .describe(

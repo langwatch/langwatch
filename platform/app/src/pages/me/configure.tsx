@@ -74,9 +74,7 @@ function MySettingsPage() {
       });
       setNewKeyLabel("");
       setShowAddForm(false);
-      void utils.personalVirtualKeys.list.invalidate({
-        organizationId: ctx.organizationId,
-      });
+      void utils.personalVirtualKeys.list.invalidate();
       toaster.create({
         title: `Issued personal key '${issued.label}'`,
         type: "success",
@@ -152,9 +150,7 @@ function MySettingsPage() {
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
     onSuccess: () => {
-      void utils.personalVirtualKeys.list.invalidate({
-        organizationId: ctx.organizationId,
-      });
+      void utils.personalVirtualKeys.list.invalidate();
       setPendingRevokeId(null);
       toaster.create({
         title: "Key revoked",
@@ -252,7 +248,7 @@ function MySettingsPage() {
           >
             <Tabs.List marginBottom={3}>
               <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
-              <Tabs.Trigger value="devices">Devices</Tabs.Trigger>
+              <Tabs.Trigger value="devices">Devices and keys</Tabs.Trigger>
             </Tabs.List>
 
             <Tabs.Content value="keys">

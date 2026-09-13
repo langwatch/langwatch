@@ -19,6 +19,8 @@ export function estimateCost({
   cacheCreation1hTokens,
   inputAudioTokens,
   outputAudioTokens,
+  inputImageTokens,
+  outputImageTokens,
   inputCharacters,
   audioSeconds,
 }: {
@@ -49,6 +51,14 @@ export function estimateCost({
   // total did.
   inputAudioTokens?: number;
   outputAudioTokens?: number;
+  // Image tokens, billed at their own rates by the token-priced image
+  // models: OpenAI charges $30 to $40 per million output image tokens on
+  // gpt-image against $5 for text input. These are DISJOINT from
+  // `inputTokens` / `outputTokens`, the same exclusive split as the audio
+  // buckets, so each token prices once. There is no text fallback: a model
+  // with no image rate prices image tokens at zero.
+  inputImageTokens?: number;
+  outputImageTokens?: number;
   // Audio usage: characters synthesized by TTS and seconds transcribed by
   // STT, billed at their own per-character / per-second rates. Sourced
   // from the gateway's gen_ai.usage.input_chars / gen_ai.usage.audio_seconds
@@ -69,7 +79,9 @@ export function estimateCost({
     !!llmModelCost?.cacheCreationCostPerToken ||
     !!llmModelCost?.cacheCreation1hCostPerToken ||
     !!llmModelCost?.inputAudioCostPerToken ||
-    !!llmModelCost?.outputAudioCostPerToken;
+    !!llmModelCost?.outputAudioCostPerToken ||
+    !!llmModelCost?.inputImageCostPerToken ||
+    !!llmModelCost?.outputImageCostPerToken;
   if (!hasAnyRate) return undefined;
 
   const inputRate = llmModelCost.inputCostPerToken ?? 0;
@@ -104,6 +116,8 @@ export function estimateCost({
     (outputTokens ?? 0) * outputRate +
     (inputAudioTokens ?? 0) * inputAudioRate +
     (outputAudioTokens ?? 0) * outputAudioRate +
+    (inputImageTokens ?? 0) * (llmModelCost.inputImageCostPerToken ?? 0) +
+    (outputImageTokens ?? 0) * (llmModelCost.outputImageCostPerToken ?? 0) +
     (cacheReadTokens ?? 0) * cacheReadRate +
     cacheWriteCost +
     (inputCharacters ?? 0) * (llmModelCost.inputCostPerCharacter ?? 0) +

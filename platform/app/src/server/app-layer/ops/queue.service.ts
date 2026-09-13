@@ -184,21 +184,59 @@ export class QueueService {
   async unblockGroup(params: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ wasBlocked: boolean }> {
-    return this.repo.unblockGroup(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.unblockGroup(rest);
+    // Only when it changed something. A no-op unblock on a group that was not
+    // blocked is a misread of the dashboard, not an act, and auditing it would
+    // bury the acts that did happen.
+    if (result.wasBlocked) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_unblock_group",
+        queueName: params.queueName,
+        metadata: { groupId: params.groupId, ...result },
+      });
+    }
+    return result;
   }
 
   async unblockAll(params: {
     queueName: string;
+    requestedBy: string;
   }): Promise<{ unblockedCount: number }> {
-    return this.repo.unblockAll(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.unblockAll(rest);
+    if (result.unblockedCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_unblock_all",
+        queueName: params.queueName,
+        metadata: { ...result },
+      });
+    }
+    return result;
   }
 
   async drainGroup(params: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsRemoved: number }> {
-    return this.repo.drainGroup(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.drainGroup(rest);
+    // A drain removes the jobs outright, so this row is the only thing that
+    // survives to say the group was emptied and by whom.
+    if (result.jobsRemoved > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_drain_group",
+        queueName: params.queueName,
+        metadata: { groupId: params.groupId, ...result },
+      });
+    }
+    return result;
   }
 
   async pausePipeline(params: {
@@ -249,23 +287,67 @@ export class QueueService {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
+    requestedBy: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
-    return this.repo.drainTenant(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.drainTenant(rest);
+    // The widest act on this surface: every group for one tenant. The filter
+    // that selected them is recorded too, because "which groups" is not
+    // recoverable from the counts once the jobs are gone.
+    if (result.groupsDrained > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_drain_tenant",
+        queueName: params.queueName,
+        metadata: {
+          tenantId: params.tenantId,
+          groupIdContains: params.groupIdContains ?? null,
+          ...result,
+        },
+      });
+    }
+    return result;
   }
 
   async moveToDlq(params: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsMoved: number }> {
-    return this.repo.moveToDlq(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.moveToDlq(rest);
+    if (result.jobsMoved > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_move_group_to_dlq",
+        queueName: params.queueName,
+        metadata: { groupId: params.groupId, ...result },
+      });
+    }
+    return result;
   }
 
   async moveAllBlockedToDlq(params: {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
+    requestedBy: string;
   }): Promise<{ movedCount: number; jobsMoved: number }> {
-    return this.repo.moveAllBlockedToDlq(params);
+    const { requestedBy, ...rest } = params;
+    const result = await this.repo.moveAllBlockedToDlq(rest);
+    if (result.movedCount > 0) {
+      await this.audit.append({
+        actorUserId: requestedBy,
+        action: "queue_move_all_blocked_to_dlq",
+        queueName: params.queueName,
+        metadata: {
+          pipelineFilter: params.pipelineFilter ?? null,
+          errorFilter: params.errorFilter ?? null,
+          ...result,
+        },
+      });
+    }
+    return result;
   }
 
   async replayFromDlq(params: {

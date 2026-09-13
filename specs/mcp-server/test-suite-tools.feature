@@ -28,6 +28,41 @@ Feature: MCP Test Suite Tools
     Then the response confirms the test suite was created
     And the response says to file scenarios in it with testSuiteId
 
+  Scenario: Agent creates a test suite with fields and evaluators
+    When the agent calls platform_create_test_suite with fields and evaluator attachments
+    Then the fields are sent as given
+    And every attachment is sent with an id and a gate, generated when the agent left them out
+    And the response lists the fields and each evaluator with its mappings
+
+  Scenario: Agent updates the fields of a test suite
+    Given a test suite exists with id "suite_abc123"
+    When the agent calls platform_update_test_suite with a field list and nothing else
+    Then the request carries the field list alone
+
+  Scenario: Agent updates the evaluators of a test suite
+    Given a test suite exists with id "suite_abc123"
+    When the agent calls platform_update_test_suite with an evaluator list
+    Then the request carries the attachments with the gate the agent set
+    And the response confirms the new state with each evaluator's gate and mappings
+
+  Scenario: Agent reads a test suite that declares fields and evaluators
+    Given a test suite exists with one field and one evaluator
+    When the agent calls platform_get_test_suite
+    Then the response lists the field with its type
+    And the response lists the evaluator with its mappings
+
+  Scenario: Agent files a scenario with values for the suite's fields
+    When the agent calls platform_create_scenario with fields
+    Then the values are sent under fields
+    And the response echoes each value
+
+  Scenario: Agent reads a simulation run with evaluator results
+    Given a finished simulation run whose results carry evaluations
+    When the agent calls platform_get_simulation_run
+    Then the response lists each evaluator with its status, its score when it has one, and whether it is required
+    And the reason of a failed or skipped evaluator is shown under it
+    And the json format serves them under results.evaluations
+
   Scenario: Agent reads a test suite with the scenarios filed in it
     Given a test suite exists with two scenarios filed in it
     When the agent calls platform_get_test_suite

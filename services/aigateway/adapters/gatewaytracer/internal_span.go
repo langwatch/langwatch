@@ -109,7 +109,7 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 // usageAttributes returns the operational usage values that are present. It
 // intentionally contains no request or response body fields.
 func usageAttributes(usage domain.Usage) []attribute.KeyValue {
-	attrs := make([]attribute.KeyValue, 0, 7)
+	attrs := make([]attribute.KeyValue, 0, 12)
 	if usage.PromptTokens > 0 {
 		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageIn, usage.PromptTokens))
 	}
@@ -136,6 +136,15 @@ func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 	}
 	if usage.AudioSeconds > 0 {
 		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, usage.AudioSeconds))
+	}
+	if usage.InputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputImageTokens, usage.InputImageTokens))
+	}
+	if usage.OutputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputImageTokens, usage.OutputImageTokens))
+	}
+	if usage.ImageCount > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageImageCount, usage.ImageCount))
 	}
 	return attrs
 }

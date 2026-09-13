@@ -529,11 +529,23 @@ export const traceMetadataSchema =
 
 export type TraceMetadata = z.infer<typeof traceMetadataSchema>;
 
+/**
+ * A metric key must round-trip through the event drilldown's composite-key
+ * encoding (`<key>\x1F<value>`, see EVENT_METRIC_SEP in
+ * `query-language/eventMetrics.ts`) — an unconstrained string can carry the
+ * ASCII unit separator itself, which the decoder can no longer split
+ * unambiguously and silently drops. Reject it here, at ingest, rather than
+ * accept an event whose metric can never surface in the explorer.
+ */
+const eventMetricKeySchema = z.string().refine((key) => !key.includes("\x1f"), {
+  message: "Metric key must not contain the ASCII unit separator (0x1F)",
+});
+
 export const eventSchema = z.object({
   event_id: z.string(),
   event_type: z.string(), // Type of event (e.g., 'thumbs_up_down', 'add_to_cart')
   project_id: z.string(),
-  metrics: z.record(z.string(), z.number()),
+  metrics: z.record(eventMetricKeySchema, z.number()),
   event_details: z.record(z.string(), z.string()),
   trace_id: z.string(),
   timestamps: z.object({

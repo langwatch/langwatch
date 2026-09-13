@@ -8,6 +8,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
+import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
+import { evaluationsToColumns } from "~/server/simulations/simulation-evaluations.columns";
 import {
   startTestContainers,
   stopTestContainers,
@@ -45,6 +47,7 @@ function makeRow({
   durationMs = "1500",
   name = "Refund Flow",
   agents,
+  evaluations = [],
 }: {
   scenarioId?: string;
   scenarioRunId?: string;
@@ -68,6 +71,8 @@ function makeRow({
   name?: string | null;
   /** What the code that pushed the run reported about who took part in it. */
   agents?: { name: string; role: "agent" | "user" | "judge" }[];
+  /** The evaluator results recorded on the run, if any. */
+  evaluations?: ScenarioEvaluationResult[];
 }) {
   const metadata: Record<string, unknown> = {};
   if (targetReferenceId) {
@@ -104,6 +109,7 @@ function makeRow({
     MetCriteria: [],
     UnmetCriteria: [],
     Error: null,
+    ...evaluationsToColumns(evaluations),
     DurationMs: durationMs,
     TotalCost: totalCost,
     TraceMetricsJson: traceMetricsJson,
@@ -428,6 +434,122 @@ describe("findAtoms", () => {
       const secondIds = second.atoms.map((atom) => atom.ScenarioRunId);
       expect(secondIds).toHaveLength(3);
       expect(new Set([...firstIds, ...secondIds]).size).toBe(5);
+    });
+  });
+});
+
+describe("the evaluator results of an atom", () => {
+  const sqlCheck = (
+    over: Partial<ScenarioEvaluationResult> = {},
+  ): ScenarioEvaluationResult => ({
+    evaluatorId: "ragas/sql_query_equivalence",
+    name: "SQL Query Equivalence",
+    status: "failed",
+    required: true,
+    passed: false,
+    details: "The generated query filters on the wrong column.",
+    inputs: { output: "SELECT 1", expected_output: "SELECT 2" },
+    ...over,
+  });
+  const qualityScore: ScenarioEvaluationResult = {
+    evaluatorId: "eval_quality",
+    name: "Answer quality",
+    status: "scored",
+    required: false,
+    score: 0.75,
+    label: "good",
+  };
+
+  describe("given a scenario run on which two evaluators reported", () => {
+    /** @scenario "An atom carries the evaluator results of its run" */
+    it("carries one entry per evaluator, without the details and inputs", async () => {
+      const batchRunId = `batch-${nanoid()}`;
+      await insertRows([
+        makeRow({
+          batchRunId,
+          scenarioSetId: `set-${nanoid()}`,
+          status: "FAILURE",
+          evaluations: [sqlCheck(), qualityScore],
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter(),
+        limit: 50,
+      });
+      const atom = atoms.find((row) => row.BatchRunId === batchRunId);
+
+      expect(atom).toBeDefined();
+      expect(atom!.EvaluationIds).toEqual([
+        "ragas/sql_query_equivalence",
+        "eval_quality",
+      ]);
+      expect(atom!.EvaluationNames).toEqual([
+        "SQL Query Equivalence",
+        "Answer quality",
+      ]);
+      expect(atom!.EvaluationStatuses).toEqual(["failed", "scored"]);
+      expect(atom!.EvaluationRequired).toEqual([1, 0]);
+      expect(atom!.EvaluationPassed).toEqual([0, null]);
+      expect(atom!.EvaluationScores).toEqual([null, 0.75]);
+      expect(atom!.EvaluationLabels).toEqual(["", "good"]);
+      expect(atom).not.toHaveProperty("Evaluations.Details");
+      expect(atom).not.toHaveProperty("Evaluations.InputsJson");
+      expect(JSON.stringify(atom)).not.toContain("wrong column");
+      expect(JSON.stringify(atom)).not.toContain("SELECT 1");
+    });
+  });
+
+  describe("given a run that met every criterion and failed a required evaluator", () => {
+    /** @scenario "An atom whose required evaluator failed reads as failed" */
+    it("reads as failed, and its group counts it as failed", async () => {
+      const scenarioSetId = `set-${nanoid()}`;
+      const batchRunId = `batch-${nanoid()}`;
+      // The fold writes the gated status when the evaluated event lands:
+      // every criterion met, the required check failed, the run is FAILURE.
+      await insertRows([
+        makeRow({
+          batchRunId,
+          scenarioSetId,
+          status: "FAILURE",
+          evaluations: [sqlCheck()],
+        }),
+      ]);
+
+      const filter = baseFilter({ scenarioSetIds: [scenarioSetId] });
+      const { atoms } = await repo.findAtoms({ filter, limit: 50 });
+      const groups = await repo.aggregateGroups({ filter, groupBy: "plan" });
+
+      expect(atoms).toHaveLength(1);
+      expect(atoms[0]!.Outcome).toBe("failed");
+      expect(groups).toHaveLength(1);
+      expect(groups[0]!.Passed).toBe("0");
+      expect(groups[0]!.Settled).toBe("1");
+    });
+  });
+
+  describe("given a run that met every criterion and failed an evaluator that is not required", () => {
+    /** @scenario "An evaluator that is not required leaves the outcome of an atom alone" */
+    it("reads as passed", async () => {
+      const scenarioSetId = `set-${nanoid()}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid()}`,
+          scenarioSetId,
+          status: "SUCCESS",
+          evaluations: [sqlCheck({ required: false })],
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [scenarioSetId] }),
+        limit: 50,
+      });
+
+      expect(atoms).toHaveLength(1);
+      expect(atoms[0]!.Outcome).toBe("passed");
+      expect(atoms[0]!.EvaluationStatuses).toEqual(["failed"]);
+      expect(atoms[0]!.EvaluationRequired).toEqual([0]);
     });
   });
 });

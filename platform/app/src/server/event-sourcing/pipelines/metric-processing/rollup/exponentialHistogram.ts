@@ -1,7 +1,4 @@
-import type {
-  CanonicalMetricDataPoint,
-  MetricRollupRow,
-} from "../schemas/metricDataPoint";
+import type { MetricRollupRow } from "../schemas/metricDataPoint";
 import {
   absorbZeroBuckets,
   type BucketMap,
@@ -13,7 +10,12 @@ import {
   subtractMaps,
 } from "./exponentialBuckets";
 import { type BucketEntry, extendExtrema, resetOrGap } from "./row";
-import { bigint, previousPoint, startsNewSequence } from "./sequence";
+import {
+  bigint,
+  type MetricRollupSourcePoint,
+  previousPoint,
+  startsNewSequence,
+} from "./sequence";
 
 /** A point re-expressed at the bucket's common scale and zero threshold. */
 interface NormalizedPoint {
@@ -39,7 +41,7 @@ function mergedIndexSpan({
   points,
   scale,
 }: {
-  points: CanonicalMetricDataPoint[];
+  points: MetricRollupSourcePoint[];
   scale: number;
 }): number {
   let span = 0;
@@ -65,7 +67,7 @@ function mergedIndexSpan({
 }
 
 function selectCommonLayout(
-  contributors: Map<string, CanonicalMetricDataPoint>,
+  contributors: Map<string, MetricRollupSourcePoint>,
 ): CommonLayout {
   const points = [...contributors.values()];
   let scale = Math.min(...points.map((point) => point.exponentialScale ?? 0));
@@ -114,7 +116,7 @@ function normalizePoint({
   point,
   layout,
 }: {
-  point: CanonicalMetricDataPoint;
+  point: MetricRollupSourcePoint;
   layout: CommonLayout;
 }): NormalizedPoint {
   const buckets = layout.downscaled.get(point.pointId)!;
@@ -173,10 +175,10 @@ function usablePredecessor({
   all,
   index,
 }: {
-  point: CanonicalMetricDataPoint;
-  all: CanonicalMetricDataPoint[];
+  point: MetricRollupSourcePoint;
+  all: MetricRollupSourcePoint[];
   index: number;
-}): CanonicalMetricDataPoint | undefined {
+}): MetricRollupSourcePoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
   const previous = previousPoint(all, index);
   if (previous?.metricKind !== "exponential_histogram") {
@@ -191,17 +193,17 @@ function collectContributors({
   all,
 }: {
   entries: BucketEntry[];
-  all: CanonicalMetricDataPoint[];
-}): Map<string, CanonicalMetricDataPoint> {
-  const predecessors = new Map<string, CanonicalMetricDataPoint>();
+  all: MetricRollupSourcePoint[];
+}): Map<string, MetricRollupSourcePoint> {
+  const predecessors = new Map<string, MetricRollupSourcePoint>();
   for (const { point, index } of entries) {
     const previous = usablePredecessor({ point, all, index });
     if (previous) predecessors.set(previous.pointId, previous);
   }
-  return new Map<string, CanonicalMetricDataPoint>([
+  return new Map<string, MetricRollupSourcePoint>([
     ...entries.map(
       ({ point }) =>
-        [point.pointId, point] as [string, CanonicalMetricDataPoint],
+        [point.pointId, point] as [string, MetricRollupSourcePoint],
     ),
     ...predecessors,
   ]);
@@ -220,7 +222,7 @@ export function buildExponentialHistogramRow({
 }: {
   row: MetricRollupRow;
   entries: BucketEntry[];
-  all: CanonicalMetricDataPoint[];
+  all: MetricRollupSourcePoint[];
 }): void {
   const layout = selectCommonLayout(collectContributors({ entries, all }));
 

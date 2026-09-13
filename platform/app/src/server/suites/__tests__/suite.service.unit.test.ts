@@ -9,10 +9,22 @@ import {
   AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  VoiceAgentsDisabledError,
 } from "../errors";
 import type { SuiteRepository } from "../suite.repository";
 import { SuiteService, type SuiteTarget } from "../suite.service";
 import { targetKeyOf } from "../target-key";
+
+const isVoiceAgentsEnabled = vi.fn();
+vi.mock("~/server/featureFlag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/featureFlag")>();
+  return {
+    ...actual,
+    featureFlagService: {
+      isEnabled: (...args: unknown[]) => isVoiceAgentsEnabled(...args),
+    },
+  };
+});
 
 function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
@@ -32,6 +44,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: null,
+    evaluators: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -54,6 +68,7 @@ function makeMockRepository(
     findSlugsByPrefix: vi.fn().mockResolvedValue([]),
     findFirstByLabel: vi.fn().mockResolvedValue(null),
     findNamesByIds: vi.fn(async () => []),
+    findAllByIdsIncludingArchived: vi.fn(async () => []),
     // No plan answers to a name unless a scenario says one does.
     findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
@@ -67,6 +82,7 @@ type MockScenarioRepository = {
   findNamesByIds: ReturnType<typeof vi.fn>;
   findActiveNamesByIds: ReturnType<typeof vi.fn>;
   findRunConfigByIds: ReturnType<typeof vi.fn>;
+  findTestSuiteIdsByIds: ReturnType<typeof vi.fn>;
   findManyByTestSuite: ReturnType<typeof vi.fn>;
   findAll: ReturnType<typeof vi.fn>;
 };
@@ -74,6 +90,8 @@ type MockScenarioRepository = {
 type MockAgentRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
   findNamesByIds: ReturnType<typeof vi.fn>;
+  findConnectedByNameAndEnvironment: ReturnType<typeof vi.fn>;
+  findConnectedByName: ReturnType<typeof vi.fn>;
 };
 
 type MockLlmConfigRepository = {
@@ -100,6 +118,9 @@ function makeMockScenarioRepository(
         version: 1,
       })),
     ),
+    findTestSuiteIdsByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({ id, testSuiteId: null })),
+    ),
     findManyByTestSuite: vi.fn(async () => []),
     findAll: vi.fn(async () => []),
     ...overrides,
@@ -114,6 +135,8 @@ function makeMockAgentRepository(
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
     findNamesByIds: vi.fn(async () => []),
+    findConnectedByNameAndEnvironment: vi.fn(async () => []),
+    findConnectedByName: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -206,6 +229,7 @@ const RUN_DEFAULTS = {
 describe("SuiteService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isVoiceAgentsEnabled.mockResolvedValue(true);
   });
 
   describe("calculateJobCount()", () => {
@@ -293,6 +317,33 @@ describe("SuiteService", () => {
           expect(result.jobCount).toBe(6);
           expect(suiteRunService.startRun).toHaveBeenCalledWith(
             expect.objectContaining({ repeatCount: 3 }),
+          );
+        });
+      });
+    });
+
+    describe("given a target is a voice agent and the project's flag is off", () => {
+      describe("when the suite run is triggered", () => {
+        /** @scenario "A run against a voice target is refused while the project's flag is off" */
+        it("refuses the run before resolving anything and never queues it", async () => {
+          isVoiceAgentsEnabled.mockResolvedValue(false);
+          const { service, suiteRunService } = createService();
+          const suite = makeSuite({
+            targets: [
+              { type: "voice", referenceId: "voice_agent_1" },
+            ] as SuiteTarget[],
+          });
+
+          await expect(
+            service.run({ suite, ...RUN_DEFAULTS }),
+          ).rejects.toBeInstanceOf(VoiceAgentsDisabledError);
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+          expect(isVoiceAgentsEnabled).toHaveBeenCalledWith(
+            "release_voice_agents_enabled",
+            expect.objectContaining({
+              projectId: RUN_DEFAULTS.projectId,
+              organizationId: RUN_DEFAULTS.organizationId,
+            }),
           );
         });
       });
@@ -787,6 +838,45 @@ describe("SuiteService", () => {
             expect.objectContaining({
               activeTargets: [{ type: "http", referenceId: "agent_1" }],
               skippedArchived: { scenarios: [], targets: ["agent_archived"] },
+            }),
+          );
+        });
+      });
+    });
+
+    describe("given a connected target unseen for thirty one days", () => {
+      describe("when the suite run is triggered", () => {
+        /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
+        it("skips it the way it skips an archived target", async () => {
+          const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+          const { service, suiteRunService } = createService({
+            agentRepository: {
+              findManyIncludingArchived: vi.fn(
+                async ({ ids }: { ids: string[] }) =>
+                  ids.map((id) => ({
+                    id,
+                    type: id === "agent_unseen" ? "connected" : "http",
+                    archivedAt: null,
+                    lastSeenAt: id === "agent_unseen" ? unseenAt : null,
+                  })),
+              ),
+            },
+          });
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "connected", referenceId: "agent_unseen" },
+            ] as SuiteTarget[],
+          });
+
+          const result = await service.run({ suite, ...RUN_DEFAULTS });
+
+          expect(result.jobCount).toBe(1);
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+              activeTargets: [{ type: "http", referenceId: "agent_1" }],
+              skippedArchived: { scenarios: [], targets: ["agent_unseen"] },
             }),
           );
         });
@@ -1518,6 +1608,8 @@ describe("SuiteService", () => {
           targets: [],
           repeatCount: 1,
           labels: [],
+          fields: [],
+          evaluators: [],
         });
       });
     });
@@ -1867,6 +1959,33 @@ describe("SuiteService", () => {
             data: { scenarioIds: ["scen_x"] },
           }),
         ).rejects.toMatchObject({ code: "validation_error" });
+      });
+    });
+  });
+});
+
+describe("SuiteService fields and evaluators on a run plan", () => {
+  describe("given a run plan", () => {
+    describe("when fields are written on it", () => {
+      /** @scenario "A run plan takes evaluators but no fields" */
+      it("refuses with validation_error naming the fields", async () => {
+        const { service, suiteRepo } = createService({
+          suiteRepository: {
+            findById: vi.fn(async () => makeSuite({ kind: "run_plan" })),
+          },
+        });
+
+        await expect(
+          service.update({
+            id: "suite_abc123",
+            projectId: "proj_1",
+            data: { fields: [{ identifier: "golden_sql", type: "text" }] },
+          }),
+        ).rejects.toMatchObject({
+          code: "validation_error",
+          meta: { fieldErrors: { fields: expect.any(Array) } },
+        });
+        expect(suiteRepo.update).not.toHaveBeenCalled();
       });
     });
   });

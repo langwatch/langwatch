@@ -9,6 +9,9 @@ import (
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -54,15 +57,15 @@ func TestRawResponseFromBifrostError_UnmarshalFailure(t *testing.T) {
 		},
 	}
 
-	body, gotStatus, ok := rawResponseFromBifrostError(berr)
+	raw, ok := rawResponseFromBifrostError(berr, domain.RequestTypeResponses)
 	if !ok {
 		t.Fatalf("rawResponseFromBifrostError returned ok=false despite populated RawResponse")
 	}
-	if gotStatus != status {
-		t.Fatalf("status mismatch: got %d, want %d", gotStatus, status)
+	if raw.status != status {
+		t.Fatalf("status mismatch: got %d, want %d", raw.status, status)
 	}
-	if string(body) != `{"id":"resp_abc","object":"response"}` {
-		t.Fatalf("body mismatch: got %q", body)
+	if string(raw.body) != `{"id":"resp_abc","object":"response"}` {
+		t.Fatalf("body mismatch: got %q", raw.body)
 	}
 }
 
@@ -527,7 +530,7 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 			"aws_region_name":       "us-east-1",
 		},
 	}
-	k := credentialToBifrostKey(cred, bfschemas.Bedrock)
+	k := credentialToBifrostKey(cred, bfschemas.Bedrock, nil)
 	if k.BedrockKeyConfig == nil {
 		t.Fatal("BedrockKeyConfig is nil")
 	}
@@ -594,7 +597,7 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 		ProviderID: domain.ProviderCustom,
 		Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.VLLM)
+	key := credentialToBifrostKey(cred, bfschemas.VLLM, nil)
 
 	if key.VLLMKeyConfig == nil {
 		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
@@ -618,7 +621,7 @@ func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
 		ID:         "mp-ds",
 		ProviderID: domain.ProviderDeepSeek,
 		APIKey:     "sk-ds",
-	}, bfschemas.VLLM)
+	}, bfschemas.VLLM, nil)
 
 	if key.VLLMKeyConfig == nil {
 		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
@@ -650,7 +653,7 @@ func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
 		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
 		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.Azure)
+	key := credentialToBifrostKey(cred, bfschemas.Azure, nil)
 
 	if key.AzureKeyConfig == nil {
 		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
@@ -661,60 +664,70 @@ func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
 	}
 }
 
-// A provider with no AZURE_OPENAI_API_VERSION configured sends no
-// x-litellm-api_version, so gatewayproxy never writes Extra["api_version"].
-// APIVersion must then stay NIL, because nil is precisely what makes Bifrost
-// apply its own AzureAPIVersionDefault ("2024-10-21",
-// bifrost/core/providers/azure/types.go) at azure.go's
-// `if apiVersion == nil` fallback. validateKeyConfig never checks APIVersion,
-// so nil is safe — an unset version is not a misconfiguration.
-//
-// The ok-guard in credentialToBifrostKey is what preserves that. Assigning
-// unconditionally would store a non-nil EnvVar wrapping "", Bifrost's nil check
-// would not fire, and the request URL would carry `?api-version=` — the same
-// empty-value shape as the endpoint bug this PR exists to fix, but failing at
-// Azure instead of at the config check. Pinned here so a refactor that drops the
-// guard fails loudly rather than silently emitting an empty api-version.
-func TestCredentialToBifrostKey_Azure_NoAPIVersion_StaysNilSoBifrostDefaults(t *testing.T) {
+// bifrost v1.5 removed the per-key AzureKeyConfig.APIVersion field: the Azure
+// provider now injects its own api-version (DefaultAzureAPIVersion for classic
+// /deployments/ routes, "preview" for the responses API) and only when the
+// query is absent, so the empty-`?api-version=` shape #5760 guarded against is
+// structurally unreachable. The adapter therefore emits no api-version at all;
+// the caller-supplied api_version override is no longer forwarded (see the
+// bifrost/core v1.5.17 bump, GO-2026-6320). What remains adapter-owned for
+// Azure is the endpoint (dual-named endpoint/api_base) and the model->deployment
+// map, which v1.5 moved onto Key.Aliases and resolves via Aliases.Resolve.
+func TestCredentialToBifrostKey_Azure_EndpointAndDeploymentsMapToKey(t *testing.T) {
 	cred := domain.Credential{
 		ID:            "mp-azure",
 		ProviderID:    domain.ProviderAzure,
 		APIKey:        "az-key",
 		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
-		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt5mini-deploy"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.Azure)
+	key := credentialToBifrostKey(cred, bfschemas.Azure, nil)
 
 	if key.AzureKeyConfig == nil {
 		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
 	}
-	if key.AzureKeyConfig.APIVersion != nil {
-		t.Fatalf("AzureKeyConfig.APIVersion = %q, want nil so Bifrost applies its "+
-			"own AzureAPIVersionDefault; a non-nil empty version skips that default "+
-			"and sends `?api-version=` (#5760)", key.AzureKeyConfig.APIVersion.Val)
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint (#5760)", got)
+	}
+	if got := key.Aliases.Resolve("gpt-5-mini"); got != "gpt5mini-deploy" {
+		t.Fatalf("Aliases.Resolve(gpt-5-mini) = %q, want the mapped deployment; "+
+			"v1.5 resolves model->deployment via Key.Aliases", got)
 	}
 }
 
-// The counterpart: an explicitly configured api_version must still win, so the
-// nil-means-default rule above cannot be satisfied by simply never setting it.
-func TestCredentialToBifrostKey_Azure_ExplicitAPIVersionWins(t *testing.T) {
+// A caller-supplied api_version (still sent by the control plane, see
+// config_wire.go) is dropped by bifrost v1.5 (no per-key api-version field),
+// but must not panic and must not block the rest of the key build — and the
+// drop must be observable via a warning log, so a customer's pinned version
+// silently ignored is at least visible in logs.
+func TestCredentialToBifrostKey_Azure_APIVersionOverrideWarnsAndIsDropped(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+	logger := zap.New(core)
+
 	cred := domain.Credential{
 		ID:         "mp-azure",
 		ProviderID: domain.ProviderAzure,
 		APIKey:     "az-key",
 		Extra: map[string]string{
 			"api_base":    "https://acme.openai.azure.com",
-			"api_version": "2025-04-01-preview",
+			"api_version": "2023-05-15",
 		},
-		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.Azure)
+	key := credentialToBifrostKey(cred, bfschemas.Azure, logger)
 
-	if key.AzureKeyConfig.APIVersion == nil {
-		t.Fatal("AzureKeyConfig.APIVersion is nil, want the configured api_version")
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
 	}
-	if got := key.AzureKeyConfig.APIVersion.Val; got != "2025-04-01-preview" {
-		t.Fatalf("AzureKeyConfig.APIVersion = %q, want %q", got, "2025-04-01-preview")
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint even with api_version set", got)
+	}
+
+	entries := logs.FilterMessage("azure api_version override is ignored: bifrost v1.5 sets api-version itself").All()
+	if len(entries) != 1 {
+		t.Fatalf("want 1 warning about the dropped api_version override, got %d", len(entries))
+	}
+	if got := entries[0].ContextMap()["api_version"]; got != "2023-05-15" {
+		t.Fatalf("warning api_version field = %v, want 2023-05-15", got)
 	}
 }
 

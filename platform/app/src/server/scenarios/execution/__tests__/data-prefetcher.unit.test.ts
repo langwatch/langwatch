@@ -9,8 +9,9 @@
  * Uses dependency injection for clean, fast tests without vi.mock.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
@@ -40,6 +41,34 @@ vi.mock("~/env.mjs", () => ({
     CREDENTIALS_SECRET: "11".repeat(32),
   },
 }));
+
+// The voice branch resolves its ElevenLabs credential through this service;
+// mock it at its seam so the prefetch is exercised without a database.
+const findElevenLabsProviderForProject = vi.fn().mockResolvedValue(null);
+const getElevenLabsApiCredential = vi.fn().mockResolvedValue(null);
+vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
+  findElevenLabsProviderForProject: (...args: unknown[]) =>
+    findElevenLabsProviderForProject(...args),
+  getElevenLabsApiCredential: (...args: unknown[]) =>
+    getElevenLabsApiCredential(...args),
+}));
+
+// The voice branch also resolves the caller's OpenAI key from the project's
+// model providers; mock it so the prefetch needs no database. Default: no
+// OpenAI provider, so callerEnv comes out empty.
+const getProjectModelProviders = vi.fn().mockResolvedValue({});
+const prepareEnvKeys = vi.fn().mockReturnValue({});
+vi.mock(
+  "~/server/api/routers/modelProviders.utils",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/server/api/routers/modelProviders.utils")
+    >()),
+    getProjectModelProviders: (...args: unknown[]) =>
+      getProjectModelProviders(...args),
+    prepareEnvKeys: (...args: unknown[]) => prepareEnvKeys(...args),
+  }),
+);
 
 describe("prefetchScenarioData", () => {
   const defaultContext: ExecutionContext = {
@@ -956,6 +985,35 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("given the connected agent does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("names the missing target as a connected agent", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = {
+            type: "connected",
+            referenceId: "agent_connected",
+          };
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target,
+            deps,
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe(
+              "Connected agent agent_connected not found",
+            );
+          }
+        });
+      });
+    });
+
     describe("given code agent does not exist", () => {
       describe("when prefetching scenario data", () => {
         it("returns failure with code agent not found error", async () => {
@@ -1191,6 +1249,71 @@ describe("prefetchScenarioData", () => {
             );
             expect(result.reason).toBe("provider_not_enabled");
           }
+        });
+      });
+    });
+
+    describe("given model resolution throws", () => {
+      const promptWithoutAModel = {
+        id: "prompt_123",
+        prompt: "You are helpful",
+        messages: [],
+      };
+
+      const depsWhoseResolverThrows = (error: unknown) =>
+        createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi
+              .fn()
+              .mockResolvedValue(promptWithoutAModel),
+          },
+          modelResolver: {
+            resolve: vi.fn().mockRejectedValue(error),
+          },
+        });
+
+      describe("when the error is one LangWatch wrote for the customer", () => {
+        /** @scenario "Technical detail stops at the trace id" */
+        it("keeps its message, and names the reason", async () => {
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
+            deps: depsWhoseResolverThrows(
+              new ModelNotConfiguredError(
+                "scenarios.agent_under_test",
+                "DEFAULT",
+                "Agent under test",
+                "project_123",
+              ),
+            ),
+          });
+
+          expect(result.success).toBe(false);
+          if (result.success) return;
+          expect(result.reason).toBe("model_not_configured");
+          expect(result.error).not.toBe(
+            "The models this run needs could not be resolved",
+          );
+        });
+      });
+
+      describe("when the error is an internal one", () => {
+        /** @scenario "Technical detail stops at the trace id" */
+        it("never puts its message in the reason the customer reads", async () => {
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
+            deps: depsWhoseResolverThrows(
+              new Error("connect ECONNREFUSED 10.0.0.4:5432"),
+            ),
+          });
+
+          expect(result.success).toBe(false);
+          if (result.success) return;
+          expect(result.error).toBe(
+            "The models this run needs could not be resolved",
+          );
+          expect(result.reason).toBeUndefined();
         });
       });
     });
@@ -2557,6 +2680,170 @@ describe("prefetchScenarioData", () => {
         expect(
           deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
         ).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when the target is a voice agent", () => {
+    const voiceAgent = {
+      id: "agent_voice",
+      type: "voice" as const,
+      name: "Support line",
+      projectId: "proj_123",
+      config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+      workflowId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    const voiceTarget: TargetConfig = {
+      type: "voice",
+      referenceId: "agent_voice",
+    };
+
+    beforeEach(() => {
+      findElevenLabsProviderForProject.mockReset().mockResolvedValue(null);
+      getElevenLabsApiCredential.mockReset().mockResolvedValue(null);
+      getProjectModelProviders.mockReset().mockResolvedValue({});
+      prepareEnvKeys.mockReset().mockReturnValue({});
+    });
+
+    describe("given the project has an enabled ElevenLabs provider", () => {
+      /** @scenario "A voice target resolves its ElevenLabs credential from the project provider" */
+      it("carries the resolved credential on the prepared voice target", async () => {
+        findElevenLabsProviderForProject.mockResolvedValueOnce({
+          id: "prov_1",
+        });
+        getElevenLabsApiCredential.mockResolvedValueOnce({
+          apiKey: "sk-el",
+          baseUrl: "https://api.elevenlabs.io",
+        });
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.adapterData).toMatchObject({
+          type: "voice",
+          voiceTarget: {
+            transport: "elevenlabs_convai",
+            agentId: "el_agent",
+            credential: {
+              apiKey: "sk-el",
+              baseUrl: "https://api.elevenlabs.io",
+            },
+          },
+        });
+      });
+    });
+
+    describe("given the project has no ElevenLabs provider", () => {
+      /** @scenario "A voice target with no ElevenLabs provider resolves a null credential" */
+      it("prepares the run with a null credential", async () => {
+        findElevenLabsProviderForProject.mockResolvedValueOnce(null);
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.adapterData).toMatchObject({
+          type: "voice",
+          voiceTarget: { credential: null },
+        });
+        expect(getElevenLabsApiCredential).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given the scenario has a caller voice", () => {
+      /** @scenario "A voice target carries the scenario caller voice to the child" */
+      it("carries the scenario's caller voice onto the prepared data", async () => {
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              callerVoice: {
+                voiceModel: "openai/tts-1",
+                interruptProbability: 0.3,
+                effects: "phone_line",
+              },
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.callerVoice).toMatchObject({
+          interruptProbability: 0.3,
+          effects: "phone_line",
+        });
+      });
+    });
+
+    describe("given the project has an enabled OpenAI provider", () => {
+      /** @scenario A voice target carries the caller OpenAI key to the child */
+      it("carries the project's OpenAI key as caller env", async () => {
+        getProjectModelProviders.mockResolvedValueOnce({
+          openai: { provider: "openai", enabled: true },
+        });
+        prepareEnvKeys.mockReturnValueOnce({ OPENAI_API_KEY: "sk-openai" });
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.adapterData).toMatchObject({
+          type: "voice",
+          callerEnv: { OPENAI_API_KEY: "sk-openai" },
+        });
+      });
+    });
+
+    describe("given the project has no OpenAI provider", () => {
+      it("carries an empty caller env", async () => {
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.adapterData).toMatchObject({
+          type: "voice",
+          callerEnv: {},
+        });
       });
     });
   });

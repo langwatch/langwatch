@@ -1,6 +1,6 @@
 """Unit tests for server-side ``langwatch.experiment.run`` with per-row results.
 
-These mock the HTTP boundary (``httpx.Client``) so we assert exactly what JSON body
+These mock the HTTP boundary (``create_client``) so we assert exactly what JSON body
 the SDK posts to ``/api/evaluations/v3/{slug}/run`` and that ``result.results``
 materializes the expected per-row DataFrame from the ``/results`` response.
 
@@ -158,7 +158,7 @@ class TestExperimentRunWithInlineData:
         _script_full_run()
         rows = [{"question": "what is AI?"}, {"question": "what is ML?"}]
 
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             result = experiment_run("rag-eval", data=rows, poll_interval=0)
 
             # Body carries inline data and no dataset id.
@@ -184,7 +184,7 @@ class TestExperimentRunWithInlineData:
 
     def test_results_request_includes_experiment_slug(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             result = experiment_run("rag-eval", data=[{"q": "x"}], poll_interval=0)
             _ = result.results
             results_get = next(
@@ -194,7 +194,7 @@ class TestExperimentRunWithInlineData:
 
     def test_results_are_cached_after_first_access(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             result = experiment_run("rag-eval", data=[{"q": "x"}], poll_interval=0)
             _ = result.results
             _ = result.results
@@ -211,7 +211,7 @@ class TestExperimentRunWithDataFrame:
         _script_full_run()
         frame = pd.DataFrame([{"question": "a"}, {"question": "b"}])
 
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             experiment_run("rag-eval", data=frame, poll_interval=0)
 
         run_post = next(p for p in _FakeClient.captured_posts if "/run" in p["url"])
@@ -223,7 +223,7 @@ class TestExperimentRunWithDatasetId:
 
     def test_posts_dataset_id_and_no_inline_data(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             experiment_run("rag-eval", dataset_id="ds_abc", poll_interval=0)
 
         run_post = next(p for p in _FakeClient.captured_posts if "/run" in p["url"])
@@ -236,7 +236,7 @@ class TestExperimentRunWithParameters:
 
     def test_parameters_are_sent_in_body(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             experiment_run(
                 "rag-eval", parameters={"model": "gpt-5-mini"}, poll_interval=0
             )
@@ -250,7 +250,7 @@ class TestExperimentRunWithNoBody:
 
     def test_sends_json_none_to_preserve_no_body_behavior(self):
         _script_full_run()
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             experiment_run("rag-eval", poll_interval=0)
 
         run_post = next(p for p in _FakeClient.captured_posts if "/run" in p["url"])
@@ -261,7 +261,7 @@ class TestExperimentRunValidation:
     """when both inline data and a dataset id are provided"""
 
     def test_raises_value_error_before_any_http_call(self):
-        with patch.object(platform_run.httpx, "Client", _FakeClient):
+        with patch.object(platform_run, "create_client", _FakeClient):
             with pytest.raises(ValueError):
                 experiment_run("rag-eval", data=[{"q": "x"}], dataset_id="ds_abc")
 
@@ -313,7 +313,7 @@ class TestExperimentRunResultsRetry:
                     return _FakeResponse(200, _results_payload())
                 return _FakeResponse(200, status_payload)
 
-        with patch.object(platform_run.httpx, "Client", _LaggyClient):
+        with patch.object(platform_run, "create_client", _LaggyClient):
             result = experiment_run("rag-eval", data=[{"q": "x"}], poll_interval=0)
             df = result.results
             assert len(df) == 2

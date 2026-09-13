@@ -23,7 +23,10 @@ import {
   type RunGroupSummary,
   targetKeyOfRun,
 } from "~/components/suites/run-history-transforms";
-import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import {
+  type TargetIdentity,
+  useTargetIdentityMap,
+} from "~/hooks/useTargetNameMap";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
@@ -32,6 +35,7 @@ import {
   targetParametersLabel,
   targetSortKey,
 } from "~/server/suites/target-key";
+import type { TargetKind } from "../shared/TargetMark";
 import { targetColor } from "../shared/target-colors";
 
 /** One target of a run, as the run detail reads it. */
@@ -44,6 +48,8 @@ export type BatchTarget = {
   parameters: RunParameterValues | null;
   /** The name of the agent or the prompt, or the reference id when unknown. */
   name: string;
+  /** The kind of agent behind the target, for the mark that leads its rows. */
+  kind: TargetKind;
   /**
    * The name, with the parameters that differ from the other targets of the
    * same agent when the agent appears more than once.
@@ -55,6 +61,11 @@ export type BatchTarget = {
    * `default` for the one of them that carries none, or the name.
    */
   shortLabel: string;
+  /**
+   * The environment of a connected agent, with its owner when it has one:
+   * `production`, or `development (Ana)`. Null for every other target.
+   */
+  environmentLabel: string | null;
   color: string;
 };
 
@@ -125,10 +136,11 @@ function targetFactsOf(run: ScenarioRunData): {
  */
 export function batchTargetsOf({
   scenarioRuns,
-  targetNameMap,
+  targetIdentities,
 }: {
   scenarioRuns: ScenarioRunData[];
-  targetNameMap: ReadonlyMap<string, string>;
+  /** What each reference id stands for: its name, environment and owner. */
+  targetIdentities: ReadonlyMap<string, TargetIdentity>;
 }): BatchTarget[] {
   const facts = groupRunsByTargetKey({ runs: scenarioRuns })
     .map((group) => {
@@ -152,13 +164,26 @@ export function batchTargetsOf({
     ),
   );
 
+  const identityOf = (target: { referenceId: string }) =>
+    targetIdentities.get(target.referenceId);
   const nameOf = (target: { referenceId: string }) =>
-    targetNameMap.get(target.referenceId) ?? target.referenceId;
+    identityOf(target)?.name ?? target.referenceId;
+  const environmentOf = (target: { referenceId: string }) =>
+    identityOf(target)?.environment ?? null;
+  const ownerNameOf = (target: { referenceId: string }) =>
+    identityOf(target)?.ownerName ?? null;
+  const kindOf = (target: { referenceId: string }): TargetKind =>
+    identityOf(target)?.kind ?? "unknown";
   const labelled = sorted.map((target) => ({
     referenceId: target.referenceId,
     runParameters: target.parameters ?? undefined,
   }));
-  const labels = targetLabels({ targets: labelled, nameOf });
+  const labels = targetLabels({
+    targets: labelled,
+    nameOf,
+    environmentOf,
+    ownerNameOf,
+  });
   const differing = differingParameterNames(labelled);
   const repeated = new Set(
     labelled
@@ -171,6 +196,7 @@ export function batchTargetsOf({
     referenceId: target.referenceId,
     parameters: target.parameters,
     name: nameOf(target),
+    kind: kindOf(target),
     label: labels[index] ?? nameOf(target),
     shortLabel: repeated.has(target.referenceId)
       ? targetParametersLabel({
@@ -178,17 +204,28 @@ export function batchTargetsOf({
           names: differing.get(target.referenceId),
         }) || DEFAULT_TARGET_SHORT_LABEL
       : nameOf(target),
+    environmentLabel: environmentLabelOf(identityOf(target)),
     color: targetColor(index),
   }));
+}
+
+/** `production`, or `development (Ana)`; nothing when there is no environment. */
+function environmentLabelOf(
+  identity: TargetIdentity | undefined,
+): string | null {
+  if (!identity?.environment) return null;
+  return identity.ownerName
+    ? `${identity.environment} (${identity.ownerName})`
+    : identity.environment;
 }
 
 /** The targets of the runs given, named from the project's agents and prompts. */
 export function useBatchTargets(
   scenarioRuns: ScenarioRunData[],
 ): BatchTarget[] {
-  const targetNameMap = useTargetNameMap();
+  const targetIdentities = useTargetIdentityMap();
   return useMemo(
-    () => batchTargetsOf({ scenarioRuns, targetNameMap }),
-    [scenarioRuns, targetNameMap],
+    () => batchTargetsOf({ scenarioRuns, targetIdentities }),
+    [scenarioRuns, targetIdentities],
   );
 }

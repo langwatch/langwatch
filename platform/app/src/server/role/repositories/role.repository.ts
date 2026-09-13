@@ -253,9 +253,18 @@ export class RoleRepository {
   async create({
     params,
     actor,
+    requireProjection = false,
   }: {
     params: CreateRoleParams;
     actor: LedgerActor;
+    /**
+     * Whether a definition that did not become readable inside the
+     * read-your-writes window is an error. The API-key mint turns it on: it
+     * binds a grant to this role and then activates the credential, so an
+     * unconfirmed definition would hand out a key whose permissions nothing
+     * can resolve.
+     */
+    requireProjection?: boolean;
   }): Promise<CustomRole> {
     const roleId = nanoid();
     await this.assertNameFree({
@@ -276,6 +285,7 @@ export class RoleRepository {
       permissions: params.permissions as string[],
       kind: kind as "custom" | "system_api_key",
       actor,
+      requireProjection,
     });
     const now = new Date();
     return {

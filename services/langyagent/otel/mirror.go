@@ -153,7 +153,7 @@ func forEachMirrorSpan(td ptrace.Traces, fn func(ptrace.Span)) {
 //     trace resolves to Langy in LangWatch's own project (a prompt-injectable
 //     worker must not choose the provenance marker);
 //   - replaces a platform-impersonating service.name with "langy", leaving a
-//     legitimate worker service.name ("opencode") untouched;
+//     legitimate worker service.name untouched;
 //   - groups the trace by conversation (langwatch.thread.id). Its Langy
 //     provenance is the origin stamp alone; no label repeats it. A worker-set
 //     tag.tags rides through deduplicated to its leading copy;
@@ -210,7 +210,7 @@ func substituteTrustedModel(attrs pcommon.Map, trustedModel string) {
 
 // mirrorModelSignalKeys mirror otelrelay's genAIModelSignalKeys: the span
 // attributes that mark a worker span as a model call. The ai.model.* pair is
-// the shape opencode's Vercel AI SDK spans carry on the wire.
+// the shape a worker's Vercel AI SDK spans carry on the wire.
 var mirrorModelSignalKeys = []string{
 	"gen_ai.provider.name",
 	"gen_ai.request.model",

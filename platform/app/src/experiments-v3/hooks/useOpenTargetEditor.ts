@@ -254,6 +254,47 @@ export const useOpenTargetEditor = () => {
             requestAnimationFrame(() => {
               scrollToTargetColumn(target.id);
             });
+          } else if (agent?.type === "connected") {
+            // A connected agent is registered from the customer's own code,
+            // so there is nothing here to edit: the drawer reads what the
+            // function declares, and the column maps its inputs to the
+            // dataset the same way every other target does.
+            const availableSources = buildAvailableSources();
+            const uiMappings = buildUIMappings(target, activeDatasetId);
+
+            setFlowCallbacks("agentConnectedDetail", {
+              // See the workflow-agent branch above for why this captures
+              // activeDatasetId/isDatasetSource instead of reading the store
+              // live: this drawer isn't modal either.
+              onInputMappingsChange: (
+                identifier: string,
+                mapping: UIFieldMapping | undefined,
+              ) => {
+                if (mapping) {
+                  setTargetMapping(
+                    target.id,
+                    activeDatasetId,
+                    identifier,
+                    convertFromUIMapping(mapping, isDatasetSource),
+                  );
+                } else {
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
+                }
+              },
+            });
+
+            openDrawer("agentConnectedDetail", {
+              availableSources,
+              inputMappings: uiMappings,
+              urlParams: {
+                targetId: target.id,
+                agentId: target.dbAgentId ?? "",
+              },
+            });
+
+            requestAnimationFrame(() => {
+              scrollToTargetColumn(target.id);
+            });
           } else if (agent?.type === "http") {
             // HTTP agent - open HTTP editor drawer
             const availableSources = buildAvailableSources();

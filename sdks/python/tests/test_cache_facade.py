@@ -297,3 +297,45 @@ class TestMessages:
             "(validation_error: value: Expected string, received object)"
         )
         assert "whatever" not in str(raised.value)
+
+    # @scenario "A write refused for a bad time to live names that field too"
+    def test_a_refusal_under_error_meta_names_the_rejected_field(self):
+        # The body the production route answers, field for field.
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                400,
+                json={
+                    "error": {
+                        "type": "bad_request",
+                        "code": "validation_error",
+                        "message": "The request body didn't match the expected shape.",
+                        "meta": {
+                            "target": "json",
+                            "fields": ["ttl_seconds"],
+                            "reasons": [
+                                {
+                                    "code": "schema_failure",
+                                    "message": "ttl_seconds must be at least 5",
+                                    "meta": {
+                                        "field": "ttl_seconds",
+                                        "type": "too_small",
+                                        "message": "ttl_seconds must be at least 5",
+                                    },
+                                }
+                            ],
+                        },
+                        "trace_id": "15ed8c22c5c1ce30fd38065a07a80a7e",
+                    }
+                },
+            )
+
+        with pytest.raises(ValueError) as raised:
+            CacheFacade(FakeRestClient(handler)).set(
+                "ACME_SESSION", "whatever", ttl_seconds=1
+            )
+
+        assert str(raised.value) == (
+            "The agent cache refused the call: 400 "
+            "(validation_error: ttl_seconds: ttl_seconds must be at least 5)"
+        )
+        assert "whatever" not in str(raised.value)

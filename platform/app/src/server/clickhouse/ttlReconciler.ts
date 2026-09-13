@@ -1,7 +1,7 @@
 import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "@langwatch/observability";
-import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
+import { RETENTION_TTL_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
 import { parseConnectionUrl } from "./goose";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
@@ -192,6 +192,48 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     retentionTTLColumn: "BucketStart",
     retentionTTLColumnExpression: "toDateTime(BucketStart)",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_ROLLUP_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  // ADR-128: the governance cost tables. They anchor on `Day` (a Date, and the
+  // partition leaf on the rollup) and reached the reconciler by a different
+  // route from everything above: they are NOT in the customer retention
+  // cascade, they are in INDEFINITE_DEFAULT_RETENTION_TABLES, so their
+  // `_retention_days` column defaults to 0 and nothing expires unless a day
+  // count is deliberately stamped. Entries here are what installs and maintains
+  // the TTL clause that reads that column (migration 00095 installs it first);
+  // the cold-storage MOVE half follows the same 49-day default as every other
+  // table, since it only relocates parts and deletes nothing.
+  //
+  // The two `...ColumnExpression` overrides below spell out `toDateTime(Day)`,
+  // which is byte-for-byte what the default would build anyway. They are
+  // written out because `Day` is a `Date`, not a DateTime, and the wrap is the
+  // thing that makes the interval arithmetic legal — not because the default
+  // would produce anything different.
+  //
+  // Migration 00095 stopped the 13-month hard delete on both of these tables,
+  // and its header says nothing else moves them. That is wrong about this
+  // file: the two entries below keep rendering the 49-day
+  // `MOVE ... TO VOLUME 'cold'` clause on any cluster with cold storage
+  // enabled and the tiered policy. The MOVE relocates parts and deletes
+  // nothing, so a row whose `_retention_days` is 0 still lives forever — it
+  // just lives on cheaper disk once it is 49 days old.
+  {
+    table: "governance_cost_rollup_1d",
+    ttlColumn: "Day",
+    ttlColumnExpression: "toDateTime(Day)",
+    retentionTTLColumn: "Day",
+    retentionTTLColumnExpression: "toDateTime(Day)",
+    envVar: "CLICKHOUSE_COLD_STORAGE_GOVERNANCE_COST_ROLLUP_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
+    table: "governance_cost_rollup_restatement_index",
+    ttlColumn: "Day",
+    ttlColumnExpression: "toDateTime(Day)",
+    retentionTTLColumn: "Day",
+    retentionTTLColumnExpression: "toDateTime(Day)",
+    envVar:
+      "CLICKHOUSE_COLD_STORAGE_GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TTL_DAYS",
     hardcodedDefault: 49,
   },
 ] as const;
@@ -395,9 +437,7 @@ export async function reconcileTTL(
         const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
         if (
           retentionTTLExpr &&
-          (RETENTION_MANAGED_TABLES as readonly string[]).includes(
-            tableConfig.table,
-          ) &&
+          RETENTION_TTL_MANAGED_TABLES.includes(tableConfig.table) &&
           !hasRetentionTTL(tableInfo.engine_full)
         ) {
           // No ON CLUSTER: whenever a cluster is configured the database uses
@@ -432,14 +472,15 @@ export async function reconcileTTL(
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const isManaged = (
-        RETENTION_MANAGED_TABLES as readonly string[]
-      ).includes(tableConfig.table);
+      const carriesRetentionTTL = RETENTION_TTL_MANAGED_TABLES.includes(
+        tableConfig.table,
+      );
       // Whether the cold TTL alone is enough to skip this run — i.e. nothing
-      // has changed in the cold-TTL space. For managed tables we must still
-      // run when retention TTL is missing from the table (first-time apply).
+      // has changed in the cold-TTL space. For a table that carries the
+      // retention clause we must still run when the clause is absent from the
+      // table (first-time apply).
       const retentionMissing =
-        isManaged && retentionTTLExpr && !hasRetentionTTL(engineFull);
+        carriesRetentionTTL && retentionTTLExpr && !hasRetentionTTL(engineFull);
 
       if (
         !shouldRewriteTTL({ currentDays, desiredDays, engineFull }) &&
@@ -460,13 +501,13 @@ export async function reconcileTTL(
         days: desiredDays,
       });
 
-      // MODIFY TTL replaces the whole expression atomically, so for managed
-      // tables we ALWAYS re-emit retentionTTLExpr — even when it's already
-      // present — otherwise a hot-days bump silently drops the retention
-      // DELETE clause from the table.
+      // MODIFY TTL replaces the whole expression atomically, so for a table
+      // that carries the retention clause we ALWAYS re-emit retentionTTLExpr —
+      // even when it's already present — otherwise a hot-days bump silently
+      // drops the retention DELETE clause from the table.
       const ttlClauses = [
         coldTTLExpr,
-        isManaged && retentionTTLExpr ? retentionTTLExpr : null,
+        carriesRetentionTTL && retentionTTLExpr ? retentionTTLExpr : null,
       ]
         .filter(Boolean)
         .join(",\n  ");
@@ -482,7 +523,7 @@ export async function reconcileTTL(
             table: tableConfig.table,
             from: currentDays,
             to: desiredDays,
-            retentionTTL: isManaged && !!retentionTTLExpr,
+            retentionTTL: carriesRetentionTTL && !!retentionTTLExpr,
           },
           "Updating TTL",
         );

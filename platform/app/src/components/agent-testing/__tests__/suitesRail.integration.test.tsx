@@ -8,7 +8,13 @@
  * @see specs/suites/test-suites.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,6 +90,8 @@ function makeSuite(overrides: Partial<TestSuiteEntry> = {}): TestSuiteEntry {
     name: "Refunds",
     slug: "refunds",
     caseCount: 3,
+    fields: [],
+    evaluators: [],
     ...overrides,
   };
 }
@@ -110,7 +118,7 @@ function renderRail(
     onNewSuite: vi.fn(),
     onNewTestCase: vi.fn(),
     onRunSuite: vi.fn(),
-    onRenameSuite: vi.fn(),
+    onEditSuite: vi.fn(),
     onArchiveSuite: vi.fn(),
     period: THIRTY_DAYS,
     periodMode: "relative",
@@ -294,7 +302,7 @@ describe("the test suites rail", () => {
     expect(items).toEqual([
       "New scenario",
       "Run suite",
-      "Rename",
+      "Edit",
       "Open recent runs",
       "Archive suite",
     ]);
@@ -347,9 +355,10 @@ describe("the test suites rail", () => {
   // --- The row menu ---
 
   /** @scenario "The row menu of a test suite offers its five actions in order" */
-  it("offers its five actions in order", async () => {
-    renderRail();
-    await openSuiteMenu("Refunds");
+  /** @scenario "The rail row menu offers Edit in place of Rename" */
+  it("offers its five actions in order, and Edit opens the suite editor", async () => {
+    const { props } = renderRail();
+    const user = await openSuiteMenu("Refunds");
 
     const items = (await screen.findAllByRole("menuitem")).map(
       (item) => item.textContent,
@@ -357,10 +366,13 @@ describe("the test suites rail", () => {
     expect(items).toEqual([
       "New scenario",
       "Run suite",
-      "Rename",
+      "Edit",
       "Open recent runs",
       "Archive suite",
     ]);
+
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
+    expect(props.onEditSuite).toHaveBeenCalledWith("suite_1");
   });
 
   describe("given the project ran batches of this suite and of another", () => {
@@ -553,19 +565,16 @@ describe("the test suites rail", () => {
       setId: "nightly-ci",
     });
     expect(
-      screen.queryByRole("menuitem", { name: "Rename" }),
+      screen.queryByRole("menuitem", { name: "Edit" }),
     ).not.toBeInTheDocument();
   });
 
-  // --- The suite editor ---
-
-  describe("when the suite editor is opened", () => {
+  describe("when the new suite dialog is opened", () => {
     function renderEditor(
       overrides: Partial<React.ComponentProps<typeof SuiteNameDialog>> = {},
     ) {
       const props: React.ComponentProps<typeof SuiteNameDialog> = {
         open: true,
-        initialName: "Refunds",
         onClose: vi.fn(),
         onConfirm: vi.fn(),
         ...overrides,
@@ -574,14 +583,14 @@ describe("the test suites rail", () => {
       return { props };
     }
 
-    /** @scenario "Rename opens a small centered dialog holding only a Name field" */
+    /** @scenario "The rail offers to create a test suite" */
     it("opens a small centered dialog holding only a Name field", () => {
       renderEditor();
 
       const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
-      expect(within(dialog).getByText("Rename test suite")).toBeInTheDocument();
+      expect(within(dialog).getByText("New test suite")).toBeInTheDocument();
       const name = within(dialog).getByLabelText("Test suite name");
-      expect(name).toHaveValue("Refunds");
+      expect(name).toHaveValue("");
       expect(within(dialog).getAllByRole("textbox")).toHaveLength(1);
     });
 
@@ -617,25 +626,11 @@ describe("the test suites rail", () => {
       expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
-    /** @scenario "Saving the name dialog renames the suite" */
-    it("renames the suite on save", async () => {
-      const user = userEvent.setup();
-      const { props } = renderEditor();
-
-      const name = screen.getByLabelText("Test suite name");
-      await user.clear(name);
-      await user.type(name, "Refunds and returns");
-      await user.click(screen.getByTestId("suite-name-confirm"));
-
-      expect(props.onConfirm).toHaveBeenCalledWith("Refunds and returns");
-    });
-
     /** @scenario "The name dialog refuses an empty name" */
     it("refuses an empty name and saves nothing", async () => {
       const user = userEvent.setup();
       const { props } = renderEditor();
 
-      await user.clear(screen.getByLabelText("Test suite name"));
       await user.click(screen.getByTestId("suite-name-confirm"));
 
       expect(screen.getByTestId("suite-name-problem")).toHaveTextContent(
@@ -645,7 +640,7 @@ describe("the test suites rail", () => {
     });
 
     /** @scenario "The name dialog offers no destructive action" */
-    it("offers only Cancel and Save", () => {
+    it("offers only Cancel and Create", () => {
       renderEditor();
 
       const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
@@ -653,16 +648,14 @@ describe("the test suites rail", () => {
         .getAllByRole("button")
         .map((button) => button.textContent)
         .filter((label) => !!label);
-      expect(actions).toEqual(["Cancel", "Save"]);
+      expect(actions).toEqual(["Cancel", "Create"]);
     });
 
     /** @scenario "Naming the first test suite opens it" */
-    it("reads as a create when it is opened on no suite", async () => {
+    it("creates the suite under the name typed", async () => {
       const user = userEvent.setup();
-      const { props } = renderEditor({ initialName: "" });
+      const { props } = renderEditor();
 
-      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
-      expect(within(dialog).getByText("New test suite")).toBeInTheDocument();
       await user.type(screen.getByLabelText("Test suite name"), "Refunds");
       await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -683,17 +676,41 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "The period picker opens upward at the foot of the rail" */
-  it("offers the three windows and names what it cannot reach", async () => {
+  it("offers the same ranges as the shared period control, any date included", async () => {
     const user = userEvent.setup();
     renderRail();
 
     await user.click(screen.getByTestId("results-period-picker"));
 
     expect(await screen.findByText("Last 7 days")).toBeInTheDocument();
-    expect(screen.getByText("Last 15 days")).toBeInTheDocument();
-    expect(
-      screen.getByText("Runs older than 30 days are in cold storage."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Last 90 days")).toBeInTheDocument();
+    expect(screen.getByText("Last 1 year")).toBeInTheDocument();
+    // A free start and end date, so windows older than thirty days can be
+    // read too.
+    expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
+    expect(screen.getByLabelText("End Date")).toBeInTheDocument();
+    expect(screen.queryByText(/cold storage/i)).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The period picker opens upward at the foot of the rail" */
+  it("hands a freely typed start date back as the new window", async () => {
+    const user = userEvent.setup();
+    const { props } = renderRail();
+
+    await user.click(screen.getByTestId("results-period-picker"));
+    fireEvent.change(await screen.findByLabelText("Start Date"), {
+      target: { value: "2026-01-15T09:30" },
+    });
+
+    // The free dates are the reason the rail took the shared control, so the
+    // window has to travel, not only render.
+    expect(props.setPeriod).toHaveBeenCalledTimes(1);
+    const [startDate] = vi.mocked(props.setPeriod).mock.calls[0] as [
+      Date,
+      Date,
+    ];
+    expect(startDate.getFullYear()).toBe(2026);
+    expect(startDate.getMonth()).toBe(0);
   });
 
   /** @scenario "Changing the period reloads the last results and the runs" */
@@ -710,10 +727,12 @@ describe("the test suites rail", () => {
     expect(props.setRelativePeriod).toHaveBeenCalledWith("7d");
   });
 
-  /** @scenario "The rail keeps the voice agents note" */
-  it("keeps the voice agents note", () => {
+  /** @scenario "The rail carries the new-simulations announcement" */
+  it("carries the new-simulations announcement", () => {
     renderRail();
 
-    expect(screen.getByText("Try voice agent simulations")).toBeInTheDocument();
+    expect(
+      screen.getByText("Welcome to the new simulations screen"),
+    ).toBeInTheDocument();
   });
 });

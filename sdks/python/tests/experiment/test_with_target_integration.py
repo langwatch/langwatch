@@ -334,21 +334,24 @@ class TestRaceConditionPrevention:
         iteration context, but multiple target() calls within the same submitted
         function should all use that same iteration context.
         """
-        import pandas as pd
         import json
-        from unittest.mock import patch, MagicMock
-        import langwatch
 
-        # Mock HTTP to capture what gets sent
+        import httpx
+        import pandas as pd
+        from unittest.mock import patch
+
+        import langwatch
+        from langwatch.http_client import create_client
+
+        # Record every batch body the experiment sends.
         captured_bodies = []
 
-        def mock_post(*args, **kwargs):
-            body = json.loads(kwargs.get("data", "{}"))
-            captured_bodies.append(body)
-            response = MagicMock()
-            response.status_code = 200
-            response.raise_for_status = MagicMock()
-            return response
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured_bodies.append(json.loads(request.content))
+            return httpx.Response(200)
+
+        def client_factory(**kwargs):
+            return create_client(transport=httpx.MockTransport(handler))
 
         # Setup langwatch
         langwatch._api_key = "test-key"
@@ -365,7 +368,7 @@ class TestRaceConditionPrevention:
             {"question": "Question C"},
         ])
 
-        with patch("httpx.post", side_effect=mock_post):
+        with patch("langwatch.experiment.experiment.create_client", client_factory):
             for index, row in evaluation.loop(df.iterrows(), threads=3):
                 def task(index, row):
                     # First target

@@ -72,15 +72,45 @@ export type SuiteRunItemCompletedEvent = z.infer<
 >;
 
 /**
+ * SuiteRunItemRegraded event - emitted when a completed item's verdict
+ * changes after the fact, which happens when the evaluators attached to the
+ * run gate its verdict. Carries what the item counted as before and what it
+ * counts as now, so the fold moves its counters without per-item state.
+ */
+export const suiteRunItemRegradedEventDataSchema = z.object({
+  batchRunId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  previousStatus: z.string(),
+  previousVerdict: z.string().optional(),
+  status: z.string(),
+  verdict: z.string().optional(),
+});
+export type SuiteRunItemRegradedEventData = z.infer<
+  typeof suiteRunItemRegradedEventDataSchema
+>;
+
+export const SuiteRunItemRegradedEventSchema = EventSchema.extend({
+  type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_REGRADED),
+  version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_REGRADED),
+  data: suiteRunItemRegradedEventDataSchema,
+});
+export type SuiteRunItemRegradedEvent = z.infer<
+  typeof SuiteRunItemRegradedEventSchema
+>;
+
+/**
  * Union of all suite run processing event types.
  */
 export type SuiteRunProcessingEvent =
   | SuiteRunStartedEvent
   | SuiteRunItemStartedEvent
-  | SuiteRunItemCompletedEvent;
+  | SuiteRunItemCompletedEvent
+  | SuiteRunItemRegradedEvent;
 
 export {
   isSuiteRunItemCompletedEvent,
+  isSuiteRunItemRegradedEvent,
   isSuiteRunItemStartedEvent,
   isSuiteRunStartedEvent,
 } from "./typeGuards";

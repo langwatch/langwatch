@@ -1,4 +1,3 @@
-import type { Event } from "../../../domain/types";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
@@ -72,6 +71,18 @@ export interface CodingAgentSessionEventRecord {
   toolResultBytes: number;
   promptChars: number;
   totalTokens: number;
+  /**
+   * The working context active when the event happened, stamped onto the
+   * event by the contribute command from the session's last `session_context`
+   * declaration. '' on rows from before a declaration (or before the stamp
+   * existed), which the usage read prices under the legacy whole-session
+   * rule. This is what lets one session's cost split across every pull
+   * request it drove.
+   */
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
 }
 
 /**
@@ -124,7 +135,9 @@ export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
  * `""`, which resolves to `null` — declined the same way an unlisted name is,
  * because `map()` would also have written nothing for it.
  */
-export function mapsToCodingAgentSessionEvent(event: Event): boolean {
+export function mapsToCodingAgentSessionEvent(event: {
+  data?: unknown;
+}): boolean {
   return resolveEventKind(rawEventName(event)) !== null;
 }
 
@@ -203,6 +216,10 @@ export class CodingAgentSessionEventsMapProjection
       toolResultBytes: nat(facts.tool_result_size_bytes),
       promptChars: nat(facts.prompt_length),
       totalTokens: nat(facts.total_tokens),
+      repositoryHost: event.data.repositoryHost ?? "",
+      repositoryOwner: event.data.repositoryOwner ?? "",
+      repositoryName: event.data.repositoryName ?? "",
+      branch: event.data.branch ?? "",
     };
   }
 }

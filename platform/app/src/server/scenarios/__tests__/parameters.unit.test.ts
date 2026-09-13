@@ -316,7 +316,18 @@ describe("scenario run parameters", () => {
       });
     });
 
-    describe("when it carries no default value", () => {
+    describe("when it also lists options", () => {
+      /** @scenario "A parameter declared secret cannot list options" */
+      it("rejects the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, options: ["credential"] },
+        ]);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when it carries no default value and no options", () => {
       it("accepts the declaration", () => {
         const result = scenarioParameterDefinitionsSchema.safeParse([
           { name: "api_token", secret: true, description: "The API token" },

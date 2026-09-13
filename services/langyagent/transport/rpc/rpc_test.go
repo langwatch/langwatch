@@ -82,35 +82,6 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 }
 
-// The probe folds the harness into the signature it compares, so a harness
-// flip is a probe MISS: the control plane then mints and the turn replaces
-// the worker, while an omitted harness normalises with the default and keeps
-// hitting workers spawned before harness selection existed.
-//
-// @scenario "The pre-turn probe answers for the harness the turn will use"
-func TestProbe_CarriesHarnessIntoTheSignature(t *testing.T) {
-	pool := &stubPool{liveWorker: true}
-	router := newTestRouter(pool)
-
-	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","harness":"pi"}`)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	if pool.lastSig.Harness != "pi" {
-		t.Fatalf("probe signature harness = %q, want pi", pool.lastSig.Harness)
-	}
-
-	// Omitted harness → the default, so the probe asks the same question a
-	// pre-selection control plane always asked.
-	rec = post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m"}`)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	if pool.lastSig.Harness != "opencode" {
-		t.Fatalf("probe signature harness = %q, want opencode when omitted", pool.lastSig.Harness)
-	}
-}
-
 // A cancel is the token-burn half of the user's Stop (ADR-078): fire-and-forget,
 // 204 with no body, handed straight to the pool for the named conversation+turn.
 //

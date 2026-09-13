@@ -15,6 +15,9 @@ from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_target_typ
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_agent_instance import (
+        PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance,
+    )
     from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters import (
         PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters,
     )
@@ -39,6 +42,7 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         resolved_judge_model (str | Unset):
         actor_id (str | Unset):
         actor_label (PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel | Unset):
+        agent_instance (PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance | Unset):
     """
 
     target_reference_id: str
@@ -53,6 +57,7 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
     resolved_judge_model: str | Unset = UNSET
     actor_id: str | Unset = UNSET
     actor_label: PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel | Unset = UNSET
+    agent_instance: PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -84,6 +89,10 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         if not isinstance(self.actor_label, Unset):
             actor_label = self.actor_label.value
 
+        agent_instance: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.agent_instance, Unset):
+            agent_instance = self.agent_instance.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -112,11 +121,16 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
             field_dict["actorId"] = actor_id
         if actor_label is not UNSET:
             field_dict["actorLabel"] = actor_label
+        if agent_instance is not UNSET:
+            field_dict["agentInstance"] = agent_instance
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_agent_instance import (
+            PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance,
+        )
         from ..models.post_api_scenario_events_body_type_0_metadata_langwatch_target_parameters import (
             PostApiScenarioEventsBodyType0MetadataLangwatchTargetParameters,
         )
@@ -158,6 +172,13 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
         else:
             actor_label = PostApiScenarioEventsBodyType0MetadataLangwatchActorLabel(_actor_label)
 
+        _agent_instance = d.pop("agentInstance", UNSET)
+        agent_instance: PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance | Unset
+        if isinstance(_agent_instance, Unset):
+            agent_instance = UNSET
+        else:
+            agent_instance = PostApiScenarioEventsBodyType0MetadataLangwatchAgentInstance.from_dict(_agent_instance)
+
         post_api_scenario_events_body_type_0_metadata_langwatch = cls(
             target_reference_id=target_reference_id,
             target_type=target_type,
@@ -171,6 +192,7 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
             resolved_judge_model=resolved_judge_model,
             actor_id=actor_id,
             actor_label=actor_label,
+            agent_instance=agent_instance,
         )
 
         post_api_scenario_events_body_type_0_metadata_langwatch.additional_properties = d

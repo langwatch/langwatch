@@ -14,15 +14,19 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 export function TargetDot({
   color,
   testId = "target-dot",
+  marginTop,
 }: {
   color: string;
   testId?: string;
+  /** Where the dot sits against a label of more than one line. */
+  marginTop?: string;
 }) {
   return (
     <Box
       boxSize="8px"
       borderRadius="full"
       flexShrink={0}
+      marginTop={marginTop}
       backgroundColor={color}
       data-testid={testId}
     />
@@ -34,16 +38,29 @@ export function TargetLegend({
   label,
   fontSize = "12px",
   testId,
+  isWrapped = false,
 }: {
   color: string;
   label: string;
   fontSize?: string;
   testId?: string;
+  /**
+   * Whether a label too long for the space wraps to a second line. Cut short
+   * by default, which is what a row of a rail wants; a column header asks for
+   * the whole name, because a cut name is what the reader picks a column by.
+   */
+  isWrapped?: boolean;
 }) {
   return (
-    <HStack gap={1.5} minWidth={0} data-testid={testId}>
-      <TargetDot color={color} />
-      <Text fontSize={fontSize} fontWeight="semibold" truncate>
+    <HStack gap={1.5} minWidth={0} alignItems="flex-start" data-testid={testId}>
+      <TargetDot color={color} marginTop={isWrapped ? "5px" : undefined} />
+      <Text
+        fontSize={fontSize}
+        fontWeight="semibold"
+        truncate={!isWrapped}
+        whiteSpace={isWrapped ? "normal" : undefined}
+        wordBreak={isWrapped ? "break-word" : undefined}
+      >
         {label}
       </Text>
     </HStack>

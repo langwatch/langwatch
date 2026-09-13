@@ -54,7 +54,7 @@ import type {
  * which is the same bar the violation codes are held to. The set is the four
  * rules issue #6480 scopes — fanout, truncation, comparison period, missing
  * buckets — plus the unfiltered-time-range rule, which is here because the
- * partition-pruning measurement recorded in `./views.ts` puts an eight-fold
+ * partition-pruning measurement recorded in `./provisioning/catalogStatements.ts` puts an eight-fold
  * read cost on exactly that shape.
  */
 export const LWQL_DIAGNOSTIC_CODES = [

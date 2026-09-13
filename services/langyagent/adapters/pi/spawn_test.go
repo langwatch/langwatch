@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -69,14 +68,23 @@ func modelOf(t *testing.T, cfg map[string]any) map[string]any {
 // var NAMES (never secrets), AGENTS.md, the session dir, and the shared skills
 // path.
 //
+// The persona slot carries Langy's own prompt: the wrapper hands it straight
+// to the agent as the whole system prompt, so no stock coding-agent persona is
+// assembled underneath it, and the operating contract stays in AGENTS.md.
+//
 // @scenario "The prompt reaches the worker exactly as it was written"
+// @scenario "The system prompt is Langy's own, not a coding agent's"
+// @scenario "The worker runs only the skills we ship it"
 func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	creds := testCreds()
 	home, cfg := provisionHome(t, creds)
 
-	// The persona is the SAME text the opencode provision uses.
-	if cfg["personaPrompt"] != opencode.LangyAgentPrompt {
-		t.Errorf("personaPrompt diverged from the shared Langy persona")
+	persona, _ := cfg["personaPrompt"].(string)
+	if persona != langyAgentPrompt {
+		t.Errorf("personaPrompt diverged from the Langy persona")
+	}
+	if !strings.Contains(persona, "Langy") || !strings.Contains(persona, "AGENTS.md") {
+		t.Errorf("personaPrompt must carry the Langy persona and point at the AGENTS.md contract; got\n%s", persona)
 	}
 	if cfg["agentsFilePath"] != filepath.Join(home, "AGENTS.md") {
 		t.Errorf("agentsFilePath = %v", cfg["agentsFilePath"])
@@ -110,6 +118,12 @@ func TestProvision_WritesTheWorkerHome(t *testing.T) {
 	skills, _ := cfg["skillsDir"].(string)
 	if filepath.Base(skills) != "skills" || strings.HasPrefix(skills, home) {
 		t.Errorf("skillsDir %q must point at the shared workspace skills tree", skills)
+	}
+	// The config names ONE skills directory, the tree the manager materialized
+	// from its embedded assets. The wrapper loads from that path alone, so a
+	// skill installed in the host account's own home is never in reach.
+	if hostHome, err := os.UserHomeDir(); err == nil && hostHome != "" && strings.HasPrefix(skills, hostHome) {
+		t.Errorf("skillsDir %q resolves inside the host account home", skills)
 	}
 
 	// The config references env var NAMES and never a secret value.
@@ -340,9 +354,9 @@ func envMap(t *testing.T, env []string) map[string]string {
 }
 
 // The spawn env contract: mediated LLM wiring with a placeholder key, the
-// langwatch CLI pair, NO opencode-specific or OTLP variables, and NO_PROXY
-// always covering loopback (the bun-compiled wrapper honors proxy env on LLM
-// fetches, the W1 spike's finding).
+// langwatch CLI pair, NO OTLP variables, and NO_PROXY always covering loopback
+// (the bun-compiled wrapper honors proxy env on LLM fetches, the W1 spike's
+// finding).
 func TestBuildWorkerEnv_Contract(t *testing.T) {
 	home := t.TempDir()
 	in := SpawnInput{
@@ -385,11 +399,8 @@ func TestBuildWorkerEnv_Contract(t *testing.T) {
 	if env[fakeWrapperModeEnv] != "happy" {
 		t.Errorf("capability env missing: %v", env[fakeWrapperModeEnv])
 	}
-	// Nothing opencode-specific and no OTLP export (pi exports none).
+	// No OTLP export (pi exports none).
 	for key := range env {
-		if strings.HasPrefix(key, "OPENCODE_") {
-			t.Errorf("opencode variable %q leaked into the pi worker env", key)
-		}
 		if strings.HasPrefix(key, "OTEL_") {
 			t.Errorf("OTLP variable %q leaked into the pi worker env", key)
 		}

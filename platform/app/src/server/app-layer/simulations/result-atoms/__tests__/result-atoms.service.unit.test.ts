@@ -461,6 +461,13 @@ describe("the target parameters of an atom", () => {
     CostUsd: "0",
     CostSource: "none",
     SortKey: String(now),
+    EvaluationIds: [],
+    EvaluationNames: [],
+    EvaluationStatuses: [],
+    EvaluationRequired: [],
+    EvaluationPassed: [],
+    EvaluationScores: [],
+    EvaluationLabels: [],
     ...over,
   });
 
@@ -524,6 +531,66 @@ describe("the target parameters of an atom", () => {
       expect(byScenario.groups[0]?.targetParameters).toBeNull();
     });
   });
+
+  describe("given an atom whose run carries evaluator results", () => {
+    it("reads them back typed, without the prose", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          atoms: [
+            atom({
+              Status: "FAILURE",
+              Outcome: "failed",
+              EvaluationIds: ["ragas/sql_query_equivalence", "eval_quality"],
+              EvaluationNames: ["SQL Query Equivalence", "Answer quality"],
+              EvaluationStatuses: ["failed", "scored"],
+              EvaluationRequired: [1, 0],
+              EvaluationPassed: [0, null],
+              EvaluationScores: [null, 0.8],
+              EvaluationLabels: ["different", ""],
+            }),
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const { atoms } = await service.getAtoms({ filter, limit: 10 });
+
+      expect(atoms[0]?.outcome).toBe("failed");
+      expect(atoms[0]?.evaluations).toEqual([
+        {
+          evaluatorId: "ragas/sql_query_equivalence",
+          name: "SQL Query Equivalence",
+          status: "failed",
+          required: true,
+          passed: false,
+          score: null,
+          label: "different",
+        },
+        {
+          evaluatorId: "eval_quality",
+          name: "Answer quality",
+          status: "scored",
+          required: false,
+          passed: null,
+          score: 0.8,
+          label: null,
+        },
+      ]);
+    });
+  });
+
+  describe("given an atom whose run carries no evaluator results", () => {
+    it("reads an empty list", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({ atoms: [atom()] }),
+        makePrisma(),
+      );
+
+      const { atoms } = await service.getAtoms({ filter, limit: 10 });
+
+      expect(atoms[0]?.evaluations).toEqual([]);
+    });
+  });
 });
 
 describe("getAtoms", () => {
@@ -552,6 +619,13 @@ describe("getAtoms", () => {
         CostUsd: "",
         CostSource: "unknown",
         SortKey: String(now),
+        EvaluationIds: [],
+        EvaluationNames: [],
+        EvaluationStatuses: [],
+        EvaluationRequired: [],
+        EvaluationPassed: [],
+        EvaluationScores: [],
+        EvaluationLabels: [],
       };
       const service = new ResultAtomsService(
         makeRepo({ atoms: [row] }),
@@ -680,6 +754,13 @@ describe("the shape of an atom", () => {
               CostUsd: "0.01",
               CostSource: "run",
               SortKey: String(now),
+              EvaluationIds: [],
+              EvaluationNames: [],
+              EvaluationStatuses: [],
+              EvaluationRequired: [],
+              EvaluationPassed: [],
+              EvaluationScores: [],
+              EvaluationLabels: [],
             },
           ],
         }),

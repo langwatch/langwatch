@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Records which repository and branch each coding-agent session worked in, and teaches the agent to read its own traces back from LangWatch.",
   "author": {
     "name": "LangWatch",

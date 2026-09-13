@@ -1123,6 +1123,23 @@ langwatch_nlp:
     blockLocalHTTPCalls: false
     allowedProxyHosts: []
 
+  # Ceiling on how long a workflow code block may run inside the sandboxed
+  # Python subprocess before nlpgo kills it. Held at or below 710 on purpose:
+  # 710 is the engine's stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS,
+  # 720s default) minus the 10s safety margin the Lambda client clamps to
+  # (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS) — a ceiling above 710 races the
+  # stream shutting down.
+  #
+  # The app and the workers derive their own fetch deadline from this number
+  # and get it whether or not the NLP service is deployed here, so even with
+  # langwatch_nlp.enabled false the chart still enforces the same ceiling
+  # check — refusing a value that would let the clients' deadline outrun any
+  # engine's real limit — but otherwise passes the value through unchanged;
+  # a shortened value is a legal external-engine config. Configure the real
+  # ceiling on the external service and match it here.
+  ## @param langwatch_nlp.codeBlockTimeoutSeconds [default: 600] Seconds a code block may run before nlpgo kills it. Keep at or below 710 — the engine's stream idle timeout (720s default) minus a 10s safety margin. When langwatch_nlp.enabled is false the engine is external: set the real ceiling there and match it here.
+  codeBlockTimeoutSeconds: 600
+
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox
   # user code blocks, so it has a small footprint.
@@ -1843,6 +1860,88 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
+  # NOT the same as the root `lwql` key (see the LangWatchQL section below):
+  # root `lwql.enabled` is the FEATURE switch (does LangWatchQL run at all, on
+  # either provisioning path); this `clickhouse.lwqlAccessModel` block is the
+  # chart-managed-ClickHouse RENDER switch plus its secret-key wiring — it tells
+  # the clickhouse-serverless subchart to render the access model as config.
+  #
+  # LangWatchQL access model, rendered as ClickHouse config by the
+  # clickhouse-serverless subchart. Helm cannot derive this from the parent's
+  # lwql.enabled, so it is set here to match that default: for chart-managed
+  # ClickHouse the subchart is the ONLY provisioner (the app self-provisions only
+  # for external/BYO ClickHouse), so this must be on or LangWatchQL goes
+  # unprovisioned. langwatch.lwql.provisioningGuard fails the render if this is
+  # turned off while lwql.enabled stays true.
+  lwqlAccessModel:
+    ## @param clickhouse.lwqlAccessModel.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
+    enabled: true
+    # ClickHouse database that holds the LangWatchQL objects. Single source of
+    # truth: the clickhouse-serverless subchart renders the access model into
+    # this database, and the app/workers read it back via LWQL_DATABASE (both
+    # resolve this same value). Matches the app's own `langwatch` default.
+    ## @param clickhouse.lwqlAccessModel.database [default: langwatch] Database holding the LangWatchQL objects; the subchart provisions here and the app queries here (LWQL_DATABASE).
+    database: langwatch
+    # Design C: whoever owns the ClickHouse server owns the LangWatchQL access
+    # model, so for chart-managed ClickHouse the LWQL passwords live in the
+    # ClickHouse credentials Secret — the one templates/clickhouse/url-secret.yaml
+    # writes (autogen) or the operator pre-creates (clickhouse.auth.existingSecret).
+    # Left EMPTY so the clickhouse-serverless subchart falls back to that Secret
+    # by its own default, which tracks the real Secret name across every preset
+    # (no hardcoded name to drift when secrets.existingSecret is renamed). The
+    # app and workers read the SAME Secret/keys via langwatch.clickhouse.lwqlSecretName,
+    # so the query password can never disagree with the one the pod created the
+    # langwatch_lwql user from. Set this only to point the pod at a DIFFERENT
+    # Secret you own (external-secrets, terraform) — you then own its keys too.
+    ## @param clickhouse.lwqlAccessModel.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own — it also redirects langwatch.clickhouse.lwqlSecretName, so the app/workers read LWQL_CLICKHOUSE_PASSWORD from this same Secret.
+    existingSecret: ""
+    ## @param clickhouse.lwqlAccessModel.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
+    passwordSecretKey: lwql_password
+    # lwql_postgres named collection — the ClickHouse -> PostgreSQL bridge that
+    # backs the api-key -> tenant map. It must reach the SAME PostgreSQL the app
+    # dials via DATABASE_URL, and it connects as a DEDICATED read-only role
+    # (`lwql_ro`), never the PostgreSQL superuser: the app converges that role
+    # from the reader password (LWQL_POSTGRES_READER_PASSWORD, the same
+    # `lwql_pg_password` key the subchart mounts here) at deploy time, granting it
+    # SELECT on the approved views only. A superuser bridge would both fail to
+    # authenticate (its password lives under `postgres-password`, not this key)
+    # and discard that reader isolation.
+    #
+    # CHART-MANAGED PostgreSQL (postgresql.chartManaged: true, the default):
+    # `host` below defaults to the chart's own PostgreSQL Service. THIS parent
+    # chart composes '<release>-postgresql' as its own default (a tpl string the
+    # subchart only evaluates — the subchart never guesses a host), so the
+    # collection renders and works out of the box. `database` must equal
+    # postgresql.auth.database, and `user` must stay `lwql_ro` — the render fails
+    # if either drifts while the bridge dials this Service, since Helm cannot
+    # derive one subchart value from a parent one and the app converges exactly
+    # that reader.
+    #
+    # EXTERNAL PostgreSQL (postgresql.chartManaged: false): leaving `host` at ""
+    # DISABLES the bridge — a supported, deliberate posture, not a fallback (no
+    # shipped LangWatchQL view reads through it yet, langwatch-saas#7387). NOTES.txt
+    # and a langwatch.io/lwql-postgres-bridge: disabled annotation on the app
+    # Deployment say so loudly. A PARTIAL override (host left "" but
+    # .database/.user/.passwordSecretKey changed) still fails the render as a likely
+    # forgotten host. Setting an explicit non-empty `host` turns the bridge live
+    # against your PostgreSQL and now REQUIRES clickhouse.lwqlAccessModel.existingSecret
+    # to point at a Secret you own carrying BOTH `lwql_pg_password` (the lwql_ro
+    # reader password ClickHouse dials your PostgreSQL with) AND `lwql_password`
+    # (the langwatch_lwql ClickHouse identity password) — the chart never
+    # provisions a reader on a PostgreSQL it does not own and will not autogenerate
+    # a password nobody set there, so the render fails otherwise. Set `database` to
+    # your instance's, and keep `user: lwql_ro` unless you provision a different
+    # reader yourself.
+    postgres:
+      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: "{{ .Release.Name }}-postgresql"] PostgreSQL host the lwql_postgres bridge dials, tpl'd by the clickhouse-serverless subchart. Defaults to the chart-managed PostgreSQL Service so a default install works out of the box. Every external-PostgreSQL example/profile resets this to "" to disable the bridge (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) instead of failing the render — but a PARTIAL override (only .database/.user/.passwordSecretKey changed while this stays empty) still fails the render as a likely mistake.
+      host: '{{ .Release.Name }}-postgresql'
+      ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads. Must equal postgresql.auth.database for chart-managed PostgreSQL; set to your instance's database for an external PostgreSQL.
+      database: langwatch
+      ## @param clickhouse.lwqlAccessModel.postgres.user [default: lwql_ro] PostgreSQL role the bridge connects as — a dedicated read-only reader the app converges (never the superuser). Keep the default unless you provision your own reader on an external PostgreSQL.
+      user: lwql_ro
+      ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_ro reader password. Matches the subchart's default projection and the key the app reads as LWQL_POSTGRES_READER_PASSWORD; mounted whenever the bridge renders.
+      passwordSecretKey: lwql_pg_password
+
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
   # ---------------------------------------------------------------------------
@@ -1940,7 +2039,10 @@ clickhouse:
     ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
     password: ""
     ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password. Supports tpl expressions.
-    existingSecret: '{{ printf "%s-clickhouse" .Release.Name }}'
+    ## Defaults to the chart-managed ClickHouse Service name (release name truncated
+    ## to 36 chars, matching clickhouse-serverless.fullname), so the parent-rendered
+    ## Secret and the subchart mount agree on a release name of any length.
+    existingSecret: '{{ include "langwatch.clickhouse.serviceName" . }}'
     ## @extra clickhouse.auth.secretKeys Key mappings for existing secret.
     secretKeys:
       ## @param clickhouse.auth.secretKeys.passwordKey [string, default: password] Key name in the existing secret.
@@ -1959,6 +2061,43 @@ clickhouse:
     affinity: {}
     ## @param clickhouse.scheduling.tolerations [array] Tolerations for ClickHouse pods.
     tolerations: []
+
+# =============================================================================
+# LangWatchQL (LWQL) Configuration
+# =============================================================================
+# The governed analytics SQL API. Its backend is the restricted ClickHouse
+# identity (langwatch_lwql), the lwql_restricted settings profile, the tenant
+# row policies, the lwql_postgres named collection and the caller-facing views.
+# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
+# backend objects exist regardless.
+#
+# Ownership follows one rule (Design C, langwatch-saas#1168): whoever owns the
+# ClickHouse server owns the access model, and exactly one provisioner writes
+# each entity name.
+#
+#   - Chart-managed ClickHouse (clickhouse.chartManaged=true, the default):
+#     the clickhouse-serverless subchart renders the whole access model as
+#     ClickHouse config at pod boot (clickhouse.lwqlAccessModel.enabled, default true). The
+#     app does NOT run provisioning DDL — a second SQL owner of the same names
+#     is startup-fatal (named-collection collision) or wedges access entities
+#     (error 495 on every repair statement). Works at any replica count.
+#   - External / BYO ClickHouse (clickhouse.chartManaged=false): the chart
+#     cannot render config into a server it does not run, so the app
+#     self-provisions the same objects via SQL DDL on every boot, and degrades
+#     to a logged, fail-closed refusal if the server rejects a statement. This
+#     requires a ClickHouse whose admin user may run access-management DDL.
+#
+# Either way the app authenticates as langwatch_lwql at query time, so the two
+# stable passwords (chart-generated) reach the app on both paths.
+## @section LangWatchQL (LWQL)
+# NOT the same as `clickhouse.lwqlAccessModel` (in the ClickHouse section above):
+# this root `lwql` key is the FEATURE switch (turns LangWatchQL on/off regardless
+# of who provisions it), while `clickhouse.lwqlAccessModel` is the chart-managed-
+# ClickHouse RENDER switch that tells the clickhouse-serverless subchart to render
+# the access model as config. Both default true so the two agree out of the box.
+lwql:
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Chart-managed ClickHouse renders it as config via the clickhouse-serverless subchart; external ClickHouse has the app self-provision it. The feature flag still gates the endpoint.
+  enabled: true
 
 # =============================================================================
 # Redis Configuration
@@ -2114,7 +2253,7 @@ gateway:
     authExistingSecretName: ""
     authSecretKey: token
 
-## The Langy agent is the OpenCode "manager" pod that backs the in-product
+## The Langy agent is the worker manager pod that backs the in-product
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
@@ -2129,9 +2268,9 @@ gateway:
 ## ISOLATION. The agent runs shell written by a language model, and the workers
 ## hold the requesting user's credentials, so the controls that bound that are
 ## on by DEFAULT and cost nothing: each conversation's worker runs under its own
-## UID with its own credentials, workers cannot read each other's, the per-worker
-## opencode password separates them, and the NetworkPolicy denies egress to the
-## internet unless you turn it on.
+## UID with its own credentials, workers cannot read each other's, a worker
+## binds no listener a sibling could dial, and the NetworkPolicy denies egress
+## to the internet unless you turn it on.
 ##
 ## Those are the controls that stop the attack that actually happens: a worker
 ## reached by prompt injection through ingested data, using its own legitimate

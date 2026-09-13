@@ -108,6 +108,9 @@ export function applyConfigurationTo({
   const secretRows = secretRowsOf(primary);
   fields.setShowParams(hasParameters || secretRows.length > 0);
   fields.setParameterLine(line);
+  // The dialog wrote this line, so it may be shortened again if the agent it
+  // opens on cannot read what is on it.
+  fields.setParameterLineTyped(false);
   fields.setParameterRows(
     secretRows.length > 0 ? [...rowsFromLine(line), ...secretRows] : null,
   );

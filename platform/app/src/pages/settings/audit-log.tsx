@@ -14,12 +14,12 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Download, Search } from "lucide-react";
-import Parse from "papaparse";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { useRouter } from "~/utils/compat/next-router";
+import { downloadCsv } from "~/utils/downloadCsv";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import {
   PeriodSelector,
@@ -341,24 +341,12 @@ function AuditLogPage() {
         truncateJsonForCsv(log.after),
       ]);
 
-      // Generate CSV
-      const csvBlob = Parse.unparse({
+      const formattedDate = new Date().toISOString().split("T")[0];
+      downloadCsv({
         fields,
-        data: csvData,
+        rows: csvData,
+        fileName: `audit_logs_${formattedDate}.csv`,
       });
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([csvBlob]));
-      const link = document.createElement("a");
-      link.href = url;
-      const today = new Date();
-      const formattedDate = today.toISOString().split("T")[0];
-      const fileName = `audit_logs_${formattedDate}.csv`;
-      link.setAttribute("download", fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to export audit logs:", error);
     } finally {

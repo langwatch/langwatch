@@ -42,6 +42,7 @@ import * as path from "node:path";
 import chalk from "chalk";
 import { normalizeEndpoint } from "../../internal/endpoint";
 import { configPath } from "./governance/config";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** How long one showing of the notice keeps later ones quiet. */
 export const NOTICE_SUPPRESSION_MS = 30 * 60 * 1000;
@@ -167,7 +168,7 @@ export async function maybePrintIdentityNotice({
   mode,
   apiKey,
   endpoint,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
 }: {
   mode: NoticeMode;
   apiKey: string;

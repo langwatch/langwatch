@@ -53,7 +53,12 @@ const SOURCE = {
   sourceType: "databricks_genie",
   organizationId: "org-1",
   teamId: null,
+  createdAt: new Date("2026-07-01T00:00:00.000Z"),
   traceProjectId: "proj-dest",
+  // A source that has never failed to price anything. Routing does not read
+  // these, but the fixture stands in for a real row, which always carries them.
+  unpricedUsageSince: null,
+  unpricedUsageThrough: null,
 };
 
 function genieEvent(): NormalizedPullEvent {
@@ -96,7 +101,7 @@ function copilotEvent(): NormalizedPullEvent {
     tokens_output: 0,
     raw_payload: JSON.stringify({
       conversationtranscriptid: "row-1",
-      name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
+      name: "cccccccc-0000-4000-8000-000000000003_agent-one",
       conversationstarttime: "2026-08-25T19:14:34Z",
       metadata: JSON.stringify({ BatchId: 0 }),
       content: JSON.stringify({

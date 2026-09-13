@@ -68,6 +68,10 @@ const mockGetSuiteById = vi.hoisted(() =>
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The run dialog reads the saved evaluators for the ones a run carries.
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
@@ -169,6 +173,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
   }),
+}));
+
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
 }));
 
 vi.mock("~/hooks/useDrawer", () => ({
@@ -868,6 +878,81 @@ describe("<RunPlanDetail/>", () => {
     expect(screen.queryByText("Queued")).not.toBeInTheDocument();
   });
 
+  // The evaluators report after the run finished, on an event of their own.
+  // The live stream refreshes the same query on it, so the rows and the header
+  // fill in from the reread the way a verdict does.
+  /** @scenario "The evaluator results land after the run finished without a reload" */
+  it("fills in the evaluator pills of the rows and the header when the results arrive", () => {
+    const finished = makeRun({
+      scenarioRunId: "run_a",
+      results: {
+        verdict: Verdict.SUCCESS,
+        metCriteria: ["a"],
+        unmetCriteria: [],
+      },
+    });
+    setRuns([finished]);
+    const { view } = renderDetail();
+    expect(screen.getByText("Passed (1/1)")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-result-evaluators"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-summary-evaluators"),
+    ).not.toBeInTheDocument();
+
+    setRuns([
+      makeRun({
+        scenarioRunId: "run_a",
+        status: ScenarioRunStatus.FAILED,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: ["a"],
+          unmetCriteria: [],
+          evaluations: [
+            {
+              evaluatorId: "eval_sql",
+              name: "SQL Query Equivalence",
+              status: "failed",
+              required: true,
+              passed: false,
+            },
+          ],
+        },
+      }),
+    ]);
+    view.rerender(
+      <Wrapper>
+        <RunPlanDetail
+          plan={suitePlan}
+          batchRunId={null}
+          onSelectRun={vi.fn()}
+          onBack={vi.fn()}
+          onEditPlan={vi.fn()}
+          period={period}
+          periodMode="relative"
+          setPeriod={vi.fn()}
+          setRelativePeriod={vi.fn()}
+          isSseConnected
+        />
+      </Wrapper>,
+    );
+
+    const table = screen.getByTestId("run-results-table");
+    // The stored verdict moved with the evaluator: the row reads it as failed.
+    expect(within(table).getByText("Failed (1/1)")).toBeInTheDocument();
+    expect(
+      within(within(table).getByTestId("run-result-evaluators")).getByTestId(
+        "evaluator-pill-eval_sql",
+      ),
+    ).toHaveTextContent("Fail");
+    expect(
+      within(screen.getByTestId("run-summary-evaluators")).getByTestId(
+        "evaluator-pill-eval_sql",
+      ),
+    ).toHaveTextContent("0%");
+  });
+
   /** @scenario "When the live connection drops the results still update" */
   it("keeps refreshing on the fallback cadence when the live stream is down", () => {
     renderDetail({ isSseConnected: false });
@@ -1010,6 +1095,24 @@ describe("<RunPlanDetail/>", () => {
     const { props } = renderDetail();
 
     expect(screen.getByText("No run in this period")).toBeInTheDocument();
+    await user.click(screen.getByTestId("widen-period-button"));
+    expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
+  });
+
+  /** @scenario "A run opened before its first scenario reports reads as waiting" */
+  it("waits for the first result when the address names a run the window does not hold yet", async () => {
+    const user = userEvent.setup();
+    const { props } = renderDetail({ batchRunId: "batch_just_started" });
+
+    expect(
+      screen.getByText("Waiting for the first result"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No run in this period")).not.toBeInTheDocument();
+    // The rail row reads "Starting", which is the status the scenario names.
+    const pendingRow = screen.getByTestId("runs-sidebar-pending");
+    expect(pendingRow).toHaveTextContent("Starting");
+
+    // The same address serves an old link, so the widen offer stays.
     await user.click(screen.getByTestId("widen-period-button"));
     expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
   });
@@ -1553,8 +1656,8 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     mockFreshnessQuery.mockReturnValue({ data: undefined });
     vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
       data: [
-        { id: DEV, name: "dev-agent" },
-        { id: PROD, name: "prod-agent" },
+        { id: DEV, name: "dev-agent", type: "connected", environment: null },
+        { id: PROD, name: "prod-agent", type: "http" },
       ],
     } as never);
     setRuns(comparisonBatch());
@@ -1889,6 +1992,22 @@ describe("<RunPlanDetail/> on a comparison run", () => {
         screen.getByTestId(`runs-sidebar-item-batch_3-target-dot-${DEV}`),
       ).backgroundColor,
     ).toBe(rgbOf(TARGET_COLORS[0]));
+  });
+
+  /** @scenario "The mark of a target carries its colour only in a comparison" */
+  it("marks each target with the kind of its agent, in the colour of that target", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const dev = screen.getByTestId(`run-settings-mark-${DEV}`);
+    const prod = screen.getByTestId(`run-settings-mark-${PROD}`);
+
+    expect(dev.dataset.kind).toBe("connected");
+    expect(prod.dataset.kind).toBe("http");
+    expect(dev.dataset.color).toBe(TARGET_COLORS[0]);
+    expect(prod.dataset.color).toBe(TARGET_COLORS[1]);
   });
 
   /** @scenario "The run settings of a comparison read one layer of parameters" */

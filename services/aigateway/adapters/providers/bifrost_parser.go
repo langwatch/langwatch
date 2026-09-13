@@ -217,6 +217,65 @@ func stripDropTuningParams(body []byte) []byte {
 	return out
 }
 
+// requestWithResolvedDeployment returns a request whose body addresses the
+// deployment this credential names, without touching the caller's request.
+//
+// The copy is the point: app.dispatch walks the credential chain with
+// retry.Walk and hands the same *domain.Request to Dispatch on every attempt
+// (app/dispatch.go). Writing the rewritten body back into that shared request
+// would outlive the credential that caused it — the next Azure key would be
+// sent the previous key's deployment (the guard below early-returns when
+// deployment == model, so nothing rewrites it back), and a non-Azure fallback
+// returns earlier still. Either way the next resource is asked for a
+// deployment it does not have. ensureStreamIncludeUsage may write through the
+// shared request precisely because it is idempotent and reads nothing off the
+// credential; this is neither.
+//
+// Only the rewriting case allocates. With the body unchanged the original
+// pointer comes straight back, so the common path shares the request exactly
+// as it did before.
+func requestWithResolvedDeployment(req *domain.Request, cred domain.Credential, model string) *domain.Request {
+	body, rewritten := withResolvedDeployment(req.Body, cred, model)
+	if !rewritten {
+		return req
+	}
+	clone := *req
+	clone.Body = body
+	return &clone
+}
+
+// withResolvedDeployment points a raw-forwarded Azure body at the deployment
+// the credential names for this model, reporting whether it changed anything.
+//
+// Azure addresses a model by deployment name, and its v1 API carries that name
+// in the request body's `model` field rather than in the URL. Bifrost resolves
+// model -> deployment through Key.Aliases, but Azure is raw-forwarded
+// (isOpenAICompatibleProvider), so the client's own bytes are what reach the
+// wire and Bifrost's resolved model never lands in them. A provider whose
+// deployment name differs from the model id would therefore be sent a name its
+// resource does not have, and Azure answers "deployment not found".
+//
+// Rewrites only when the deployment actually differs from the model, so the
+// common case (deployment == model id) stays byte-identical and OpenAI's
+// prompt-prefix auto-cache keeps hitting — the same conditional rule
+// stripDropTuningParams follows. Callers apply WithDeploymentSelfMap first, so
+// DeploymentMap already carries both the provider's explicit mapping and the
+// self-mapped default.
+func withResolvedDeployment(body []byte, cred domain.Credential, model string) ([]byte, bool) {
+	if cred.ProviderID != domain.ProviderAzure {
+		return body, false
+	}
+	deployment := cred.DeploymentMap[model]
+	if deployment == "" || deployment == model {
+		return body, false
+	}
+	out, err := sjson.SetBytes(body, "model", deployment)
+	if err != nil {
+		return body, false
+	}
+	return out, true
+}
+
 // isOpenAICompatibleProvider reports whether the destination provider
 // natively speaks OpenAI chat-completions wire format. When true, the
 // gateway raw-forwards the inbound body rather than parse+re-marshal,

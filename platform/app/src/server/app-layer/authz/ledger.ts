@@ -78,6 +78,7 @@ import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.er
 import { tryGetApp } from "../app";
 import { organizationOnAuthzEngine } from "./engine-gate";
 import { bumpAuthzEpoch } from "./epoch";
+import { AuthzGrantNotConfirmedError } from "./errors";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
 import { liveGrants } from "./repositories/live-rows";
 
@@ -377,6 +378,7 @@ export class GrantsLedgerWriter {
     commandId,
     occurredAtMs: occurredAtOverrideMs,
     awaitProjection = true,
+    requireProjection = false,
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
@@ -416,6 +418,16 @@ export class GrantsLedgerWriter {
      * only spend the request's time.
      */
     awaitProjection?: boolean;
+    /**
+     * Whether an unlanded projection is an error. Off by default, because for
+     * most callers the append is the write and the fold converging later is
+     * the normal, correct outcome. A caller that is about to hand out access
+     * these very rows decide — minting an API key — turns it on, and gets an
+     * {@link AuthzGrantNotConfirmedError} instead of a silent pass. It implies
+     * the wait: there is nothing to require without one, so asking for the
+     * error with `awaitProjection: false` waits anyway rather than passing.
+     */
+    requireProjection?: boolean;
   }): Promise<AttachOutcome> {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
 
@@ -462,8 +474,8 @@ export class GrantsLedgerWriter {
     );
 
     const wanted = fresh.map((binding) => binding.bindingId);
-    if (awaitProjection) {
-      await this.awaitProjection({
+    if (awaitProjection || requireProjection) {
+      const landed = await this.awaitProjection({
         what: `attach of ${wanted.length} binding(s)`,
         organizationId,
         check: async () => {
@@ -473,6 +485,7 @@ export class GrantsLedgerWriter {
           return present === wanted.length;
         },
       });
+      if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     }
     await bumpAuthzEpoch({ organizationId });
     return { attached: wanted, duplicates };
@@ -1299,6 +1312,7 @@ export class GrantsLedgerWriter {
     permissions,
     kind,
     actor,
+    requireProjection = false,
   }: {
     organizationId: string;
     roleId: string;
@@ -1307,6 +1321,14 @@ export class GrantsLedgerWriter {
     permissions: string[];
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
+    /**
+     * Whether an unlanded projection is an error. Same contract as
+     * {@link GrantsLedgerWriter.attachBindings}: a caller about to bind a
+     * grant to this role and then hand the credential out turns it on, so a
+     * role definition that never became readable refuses the mint instead of
+     * leaving a binding pointing at a role that grants nothing.
+     */
+    requireProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
     if (!(await this.onLedger(organizationId))) {
@@ -1340,7 +1362,7 @@ export class GrantsLedgerWriter {
     // that write fails if the role row is not there yet. Commands are queued
     // per command name, not per organization, so `attachGrants` can be picked
     // up before `defineRoles` and cannot stand in for this hold.
-    await this.awaitProjection({
+    const landed = await this.awaitProjection({
       what: `definition of role ${roleId}`,
       organizationId,
       // The COMPAT head, like every other read-your-writes check here: that
@@ -1360,6 +1382,7 @@ export class GrantsLedgerWriter {
         );
       },
     });
+    if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     await bumpAuthzEpoch({ organizationId });
   }
 
@@ -1502,8 +1525,12 @@ export class GrantsLedgerWriter {
 
   /**
    * Bounded read-your-writes: poll until the projection reflects the write.
-   * Timing out is NOT a failure — the append landed and the fold will drain
-   * (Redis-down doctrine); the caller's write is durable either way.
+   * Answers whether the rows landed inside the window.
+   *
+   * Timing out is not in itself a failure — the append landed and the fold
+   * will drain (Redis-down doctrine), so the caller's write is durable either
+   * way. It IS a failure for a caller whose next step only makes sense once
+   * the rows are readable, which is what `requireProjection` states.
    */
   private async awaitProjection({
     what,
@@ -1513,7 +1540,7 @@ export class GrantsLedgerWriter {
     what: string;
     organizationId: string;
     check: () => Promise<boolean>;
-  }): Promise<void> {
+  }): Promise<boolean> {
     const poll = this.deps.poll ?? {
       intervalMs: CONVERGENCE_POLL_MS,
       timeoutMs: CONVERGENCE_TIMEOUT_MS,
@@ -1524,13 +1551,13 @@ export class GrantsLedgerWriter {
     // ever time out.
     const deadline = Date.now() + poll.timeoutMs;
     for (;;) {
-      if (await check()) return;
+      if (await check()) return true;
       if (Date.now() >= deadline) {
         logger.warn(
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
         );
-        return;
+        return false;
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
     }

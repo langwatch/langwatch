@@ -134,6 +134,45 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_execution_timeout"
 
   @unit
+  Scenario: An adapter that never got a response is an execution timeout, not a generic failure
+    Given a scenario run failed because the NLP service did not respond in time
+    When the failure is classified
+    Then the handled error code is "scenario_execution_timeout"
+    And the message offers the timeout hint
+
+  @unit
+  @integration
+  Scenario: The drawer tells the user it was their agent's code, not LangWatch
+    Given a run failed because the agent's Python code raised
+    When the run drawer renders the error
+    Then the title says the agent's code failed
+    And the agent's own exception is shown
+    And the drawer does not say the simulation timed out
+    And no raw traceback frame is shown
+
+  @unit
+  Scenario: A failure in the agent's own code is not reported as our infrastructure failing
+    Given a scenario failed because the agent's Python code raised
+    And that error text happens to contain the words "timed out"
+    When the failure is classified
+    Then it is reported as a failure in the agent's code, not an execution timeout
+    And the message names the agent's own error
+    And the message does not claim the simulation timed out
+
+  @unit
+  Scenario: A failure in the agent's code is not reported as an unreachable endpoint
+    Given a scenario failed because the agent's Python code raised a connection error
+    When the failure is classified
+    Then it is reported as a failure in the agent's code, not an unreachable endpoint
+
+  @unit
+  Scenario: A user-code failure with no readable detail still never leaks internals
+    Given a scenario failed because the agent's Python code raised
+    And every candidate detail in that failure text exposes our internals
+    When the failure is classified
+    Then it is reported as a failure in the agent's code
+    And the message is the generic unreadable-failure sentence, not the raw internals
+
   Scenario: An unrecognised failure keeps its message under a generic infra code
     Given a scenario run failed with a raw error "Something unexpected happened"
     When the failure is classified
@@ -208,6 +247,71 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_model_not_allowed_for_surface"
     And the message does not contain a raw stack trace
     And the hint points at the project's model default settings
+
+  # A model that answered with nothing is not a provider rejection: the
+  # request was accepted and answered, and the answer held no words. It gets
+  # its own code so the copy can say which model went quiet and what to do
+  # about it, instead of sending the customer to look at their API key.
+
+  @unit
+  Scenario: A model that answered with no text becomes an empty-response error
+    Given a scenario run failed because the model that plays the simulated user returned no text
+    When the failure is classified
+    Then the handled error code is "scenario_model_empty_response"
+    And the message names the model that plays the simulated user
+    And the message says the provider accepted the request
+    And the hint offers another model or a clearer end condition
+
+  @unit
+  Scenario: A judge model that answered with no text names the judge
+    Given a scenario run failed because the judge model returned no text
+    When the failure is classified
+    Then the handled error code is "scenario_model_empty_response"
+    And the message names the judge model
+
+  # The message says what happened; the detail says where. A reader who opens
+  # the details gets the stack the runner recorded, so the raw text is kept
+  # rather than lost, but it is never what the panel opens with.
+
+  # A request that never got an answer arrives under one wrapper from the
+  # model client, whatever the cause. The wrapper is read last, so a refused
+  # certificate or a rejected key still classifies as itself.
+
+  @unit
+  Scenario: A request that never reached the model endpoint is named
+    Given a scenario run failed because the model client could not connect and reported no cause
+    When the failure is classified
+    Then the handled error code is "scenario_platform_unreachable"
+    And the message says the simulation could not reach the model endpoint
+    And it holds no stack trace
+
+  @unit
+  Scenario: A cause inside the wrapper still wins
+    Given a scenario run failed with a connect wrapper that carries a certificate or key reason
+    When the failure is classified
+    Then the reason inside the wrapper names the handled error, not the wrapper
+
+  # The scenario runner writes the class name of the adapter in front of every
+  # failure it catches. On the platform the adapter is ours, so the name states
+  # an implementation detail and pushes the sentence that matters off the line.
+
+  @unit
+  Scenario: The name of the adapter is dropped from a run failure
+    Given a scenario run failed with a message the runner led with the adapter class name
+    When the failure is classified
+    Then the message does not carry the adapter class name
+
+  @unit
+  Scenario: The stack of a run failure is kept as the detail
+    Given a run whose error field holds the runner's name, message and stack
+    When the detail of that failure is read
+    Then it is the stack, with its line breaks kept
+
+  @unit
+  Scenario: An envelope we wrote ourselves carries no detail
+    Given a run whose error field holds an encoded handled error
+    When the detail of that failure is read
+    Then there is none, as the envelope holds nothing under its message
 
   @unit
   Scenario: The handled error round-trips through the results error field

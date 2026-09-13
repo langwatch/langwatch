@@ -27,11 +27,12 @@ function assistantMessage(parts: unknown[]): UIMessage {
   return { id: "assistant-1", role: "assistant", parts: parts as never };
 }
 
-function renderMessage(message: UIMessage) {
+function renderMessage(message: UIMessage, { isStreaming = false } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <MessageContent
         message={message}
+        isStreaming={isStreaming}
         appliedOutcomes={{}}
         discardedProposals={new Set()}
         applyingProposals={new Set()}
@@ -78,9 +79,31 @@ describe("the GitHub card set", () => {
             input: { command: "git push -u origin langy/fix-retriever" },
           },
         ]),
+        // Mid-flow means the turn is still streaming. A settled turn names the
+        // furthest step it reached instead, which is the point of the label.
+        { isStreaming: true },
       );
 
       expect(container.textContent).toContain("Working on it");
+    });
+
+    it("names the furthest step reached once the turn has settled", () => {
+      const { container } = renderMessage(
+        assistantMessage([
+          {
+            type: "tool-bash",
+            toolCallId: "c1",
+            state: "output-available",
+            input: {
+              command:
+                "git clone https://x-access-token@github.com/acme/checkout",
+            },
+          },
+        ]),
+      );
+
+      expect(container.textContent).toContain("Cloned");
+      expect(container.textContent).not.toContain("Working on it");
     });
   });
 

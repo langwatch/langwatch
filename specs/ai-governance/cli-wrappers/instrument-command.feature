@@ -31,6 +31,55 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
   Background:
     Given the langwatch CLI is installed
 
+  Rule: changed code telemetry warns about an active LangWatch launcher
+
+    Detection targets the `langwatch code` command, including npm and native
+    binary launches. A detached VS Code editor whose launcher has exited is
+    outside this detection. Process inspection is bounded and best-effort.
+
+    @unit @cli-wrappers @instrument
+    Scenario: A running langwatch code command needs a restart after reconfiguration
+      Given code telemetry is configured and another `langwatch code` command is running
+      When instrumentation successfully changes code's ingest key or endpoint
+      Then the CLI suggests restarting `langwatch code` to apply the change
+
+    @unit @cli-wrappers @instrument
+    Scenario: Login refresh reports the same restart advice
+      Given code telemetry points at an earlier instance and `langwatch code` is running
+      When login successfully refreshes code's telemetry wiring
+      Then the CLI suggests restarting `langwatch code` to apply the change
+
+    @unit @cli-wrappers @instrument
+    Scenario: Switching projects through the wrapper reports restart advice
+      Given code telemetry points at project A and another `langwatch code` command is running
+      When `langwatch code --project B` successfully refreshes the persisted wiring
+      Then the CLI suggests restarting the existing launcher to apply the change
+
+    @integration @cli-wrappers @instrument
+    Scenario: Launch detection handles install paths with spaces and Node runtime flags
+      Given a running npm-style `langwatch code` launcher
+      And its install path contains spaces or Node was started with runtime flags
+      When the CLI checks for running launchers
+      Then it detects that launcher
+
+    @unit @cli-wrappers @instrument
+    Scenario: Unchanged wiring needs no restart notice
+      Given code telemetry already matches the requested settings
+      When instrumentation runs again
+      Then there is no restart notice
+
+    @unit @cli-wrappers @instrument
+    Scenario: Other applications do not trigger the notice
+      Given only plain Claude, plain VS Code, or other LangWatch commands are running
+      When code telemetry changes
+      Then there is no restart notice
+
+    @unit @cli-wrappers @instrument
+    Scenario: Process inspection failure does not fail configuration
+      Given running processes cannot be inspected
+      When code telemetry changes
+      Then configuration succeeds without claiming a running session was detected
+
   Rule: scope flags pick where the telemetry goes
 
     @unit @cli-wrappers @instrument

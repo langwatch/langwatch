@@ -110,8 +110,22 @@ export function describeScope(scope: RunPlanScope | null | undefined): string {
   return `labels: ${scope.labels.join(", ")}`;
 }
 
-/** The target types a run may go against. */
-const TARGET_TYPES = ["prompt", "http", "code", "workflow"] as const;
+/**
+ * The target types a run may go against. A `connected` target names an
+ * agent by `<name>` (the agent in development, or the one other environment
+ * it is online in), by `<name>@<environment>`, or by id; the platform
+ * resolves the names, so they are passed through as the reference id.
+ */
+const TARGET_TYPES = [
+  "prompt",
+  "http",
+  "code",
+  "workflow",
+  "connected",
+] as const satisfies readonly RunPlanTarget["type"][];
+
+const isTargetType = (value: string): value is RunPlanTarget["type"] =>
+  (TARGET_TYPES as readonly string[]).includes(value);
 
 /**
  * A target as the command line writes it: what to run against, plus the
@@ -180,7 +194,7 @@ function parseTargetParameters({
     }
     const key = decodeQueryPart({ part: pair.slice(0, separator), target });
     const value = decodeQueryPart({ part: pair.slice(separator + 1), target });
-    parsed.set(key, coerceParameterValue(value));
+    parsed.set(key, coerceParameterValue({ value }));
   }
   return Object.fromEntries(parsed);
 }
@@ -205,7 +219,7 @@ export function parseTargets(
   if (!targetStrings || targetStrings.length === 0) {
     console.error(
       chalk.red(
-        "Error: --target is required. Give at least one, as <type>:<referenceId> (for example http:agent_abc123).",
+        "Error: --target is required. Give at least one, as <type>:<referenceId> (for example connected:support-agent, connected:support-agent@production or connected:agent_abc123).",
       ),
     );
     process.exit(1);
@@ -216,14 +230,14 @@ export function parseTargets(
     if (colonIndex === -1) {
       console.error(
         chalk.red(
-          `Error: invalid target "${value}". Use <type>:<referenceId>, for example http:agent_abc123.`,
+          `Error: invalid target "${value}". Use <type>:<referenceId>, for example connected:support-agent, connected:support-agent@production or connected:agent_abc123.`,
         ),
       );
       process.exit(1);
     }
     const type = value.slice(0, colonIndex);
     const rest = value.slice(colonIndex + 1);
-    if (!TARGET_TYPES.includes(type as (typeof TARGET_TYPES)[number])) {
+    if (!isTargetType(type)) {
       console.error(
         chalk.red(
           `Error: invalid target type "${type}". It must be one of: ${TARGET_TYPES.join(", ")}.`,
@@ -235,7 +249,7 @@ export function parseTargets(
     const questionIndex = rest.indexOf("?");
     if (questionIndex === -1) {
       return {
-        type: type as RunPlanTarget["type"],
+        type,
         referenceId: decodeQueryPart({ part: rest, target: value }),
       };
     }
@@ -254,11 +268,53 @@ export function parseTargets(
       );
     }
     return {
-      type: type as RunPlanTarget["type"],
+      type,
       referenceId,
       runParameters: parseTargetParameters({ query, target: value }),
     };
   });
+}
+
+/** How long `--wait` polls when no number of minutes is given. */
+export const DEFAULT_WAIT_MINUTES = 45;
+
+/** What `--wait` asked for. */
+export interface WaitOptions {
+  /** How long the poll runs before it gives up. */
+  timeoutMs: number;
+}
+
+/**
+ * Reads the `--wait [minutes]` flag.
+ *
+ * A bare `--wait` polls for 45 minutes, which covers a suite of slow agents
+ * with repeats; a number of minutes replaces that limit. Anything else is
+ * refused before the run is scheduled, so a typo does not start a batch the
+ * command then never waits for.
+ *
+ * @see specs/features/run-plan-cli.feature
+ */
+export function parseWait(
+  value: boolean | string | undefined,
+): WaitOptions | undefined {
+  if (value === undefined || value === false) return undefined;
+  if (value === true) return { timeoutMs: DEFAULT_WAIT_MINUTES * 60 * 1000 };
+  const minutes = Number(value);
+  const timeoutMs = minutes * 60 * 1000;
+  if (
+    value.trim() === "" ||
+    !Number.isFinite(minutes) ||
+    minutes <= 0 ||
+    !Number.isFinite(timeoutMs)
+  ) {
+    console.error(
+      chalk.red(
+        `Error: --wait takes a number of minutes, such as --wait 90, not "${value}".`,
+      ),
+    );
+    process.exit(1);
+  }
+  return { timeoutMs };
 }
 
 /**

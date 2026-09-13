@@ -1,5 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { AGENT_TEST_SET_SUFFIX } from "~/server/scenarios/agent-test-scenario";
 import {
   DEFAULT_SET_ID,
   expandSetIdFilter,
@@ -15,6 +17,10 @@ import type {
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
+import {
+  EVALUATION_COLUMNS_SQL,
+  EVALUATION_LIST_COLUMNS_SQL,
+} from "~/server/simulations/simulation-evaluations.columns";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -53,7 +59,17 @@ const EXPORT_SORT_KEY =
  * QUEUED and RUNNING belong here beside PENDING and IN_PROGRESS: the queue
  * writes them, and a batch that still holds one of the four is not finished.
  */
-const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
+const RUNNING_STATUSES =
+  "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED','RUNNING'";
+
+/**
+ * Leaves out runs that are not results of a scenario: the "Test agent" one-off
+ * checks, and the legacy `voice-calls` set that pre-#8020 drawer "Talk to it"
+ * calls landed in (a drawer call no longer writes a run at all). No set list,
+ * batch list or last-result summary shows them. A run is still read by its own
+ * id, so a direct link to an old voice-call run still opens.
+ */
+const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}') AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`;
 
 /**
  * Batch-level aggregate SELECT list, shared by the batch history page and the
@@ -62,7 +78,8 @@ const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
  * SettledCount is the complement of RUNNING_STATUSES, never a list of terminal
  * names: ClickHouse stores a raw FAILURE status that the terminal status enum
  * does not carry, so a positive list would report a failed batch as unfinished
- * forever.
+ * forever. A run stored PENDING_EVALUATION counts as running, so a batch is
+ * complete only once every run has been graded.
  */
 const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
         toString(count())                                               AS TotalCount,
@@ -381,6 +398,7 @@ const RUN_COLUMNS = `
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  ${EVALUATION_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -418,6 +436,7 @@ const LIST_COLUMNS = `
   CAST(NULL AS Nullable(String)) AS Reasoning,
   MetCriteria, UnmetCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
+  ${EVALUATION_LIST_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -551,6 +570,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            ${dateFilter.whereClause}
+           ${AGENT_TEST_SET_EXCLUSION}
            ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        )
        WHERE ArchivedAt IS NULL
@@ -1116,13 +1136,20 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     };
   }
 
-  /** The newest UpdatedAt across every live run, for the cheap change check. */
+  /**
+   * The newest UpdatedAt across every live run, for the cheap change check.
+   *
+   * Reads the same rows the page reads. An agent test run is left out here
+   * too: it never reaches the page, so counting it would report a change the
+   * page cannot show and hold the caller's freshness cursor still.
+   */
   private async readMaxUpdatedAt(projectId: string): Promise<number> {
     const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
       `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
-         AND ArchivedAt IS NULL`,
+         AND ArchivedAt IS NULL
+         ${AGENT_TEST_SET_EXCLUSION}`,
       { tenantId: projectId },
     );
     return Number(tsRows[0]?.LastUpdatedAt ?? "0");
@@ -1176,6 +1203,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE TenantId = {tenantId:String}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
+         ${AGENT_TEST_SET_EXCLUSION}
          ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
        ${combinedHaving}
@@ -1408,7 +1436,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const wherePredicate =
       filter === "external"
-        ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+        ? `AND NOT startsWith(ScenarioSetId, '__internal__') ${AGENT_TEST_SET_EXCLUSION}`
         : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
 
     // External sets normalize empty ScenarioSetId to 'default'
@@ -1434,8 +1462,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT
            NormalizedSetId,
            BatchRunId,
-           -- Settled = all terminal states (excludes in-progress/queued)
-           countIf(Status NOT IN ('IN_PROGRESS', 'PENDING', 'QUEUED', 'RUNNING')) AS SettledCount,
+           -- Settled is the complement of the running statuses, the same
+           -- list the batch aggregate uses, so a set and its batches agree.
+           countIf(Status NOT IN (${RUNNING_STATUSES})) AS SettledCount,
            countIf(Status = 'SUCCESS') AS PassCount,
            countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED')) AS FailCount,
            -- Use min(StartedAt) to match frontend's minTimestamp (batch creation time)
@@ -1495,7 +1524,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       scenarioIds !== undefined
         ? "AND ScenarioId IN ({scenarioIds:Array(String)})"
         : "";
-    const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause}`;
+    const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause} ${AGENT_TEST_SET_EXCLUSION}`;
 
     const rows = await this.queryRows<{
       ScenarioId: string;
@@ -1621,6 +1650,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId IN ({projectIds:Array(String)})
            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+           ${AGENT_TEST_SET_EXCLUSION}
          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE latestIsActive`,

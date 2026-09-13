@@ -48,7 +48,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -99,7 +101,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -129,8 +133,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -142,7 +146,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Invalid input */
@@ -188,7 +194,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -256,8 +264,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -270,8 +278,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            status?: string;
-                            message?: string;
+                            data: components["schemas"]["Annotation"];
                         };
                     };
                 };
@@ -686,42 +693,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/agents": {
+    "/api/v1/agents/connect/register": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived agents for the project (paginated) */
-        get: operations["getApiAgents"];
+        get?: never;
         put?: never;
-        /** @description Create a new agent */
-        post: operations["postApiAgents"];
+        /** @description Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerConnectedAgentInstance"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/agents/{id}": {
+    "/api/v1/agents/connect/poll": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Get an agent by its id */
-        get: operations["getApiAgentsById"];
-        /** @description Update an agent by its id */
-        put: operations["putApiAgentsById"];
+        /** @description Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollConnectedAgentInstance"];
+        put?: never;
         post?: never;
-        /** @description Archive an agent (soft-delete) */
-        delete: operations["deleteApiAgentsById"];
+        delete?: never;
         options?: never;
         head?: never;
-        /** @description Update an agent by its id */
-        patch: operations["patchApiAgentsById"];
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        post: operations["postConnectedAgentFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's agents, paginated, with the presence and owner of each connected agent. Archived agents are left out. */
+        get: operations["listAgents"];
+        put?: never;
+        /** @description Create an agent from a name, a type and the configuration of that type. A connected agent is registered from code by the SDK and answers 422 agent_register_only here. */
+        post: operations["createAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found. */
+        get: operations["getAgent"];
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
+        put: operations["replaceAgent"];
+        post?: never;
+        /** @description Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row. */
+        delete: operations["archiveAgent"];
+        options?: never;
+        head?: never;
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
+        patch: operations["updateAgent"];
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous. */
+        post: operations["testAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected. */
+        post: operations["callConnectedAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/api-keys": {
@@ -787,46 +879,6 @@ export interface paths {
         put?: never;
         /** @description Query analytics timeseries data with metrics, aggregations, and filters */
         post: operations["postApiAnalyticsTimeseries"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run LangWatchQL analytics SQL
-         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
-         */
-        post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{projectId}/analytics/schema": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Discover the LangWatchQL analytics schema
-         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
-         */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -909,6 +961,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List dashboard widgets
+         * @description Lists every dashboard widget in this project, each with the React source file it renders and the named LangWatchQL queries it may run. Saved workbench charts and builder charts are different kinds and are not listed here.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        put?: never;
+        /**
+         * Create a dashboard widget
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a dashboard widget
+         * @description Returns one dashboard widget with its React source and named queries. A widget saved in another project is reported as not found.
+         */
+        get: operations["getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a dashboard widget
+         * @description Deletes one dashboard widget. Answers 204 with no body; deleting a widget that is not in this project is reported as not found.
+         */
+        delete: operations["deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a dashboard widget
+         * @description Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.
+         */
+        patch: operations["patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a dashboard widget to a dashboard
+         * @description Assigns a dashboard widget to a dashboard. The widget is repositioned to the next free row on that dashboard; its size (colSpan/rowSpan) is preserved.
+         */
+        post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a LangWatchQL query
+         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.
+         *
+         *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         *
+         *     The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.
+         *
+         *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
+         */
+        post: operations["postApiV1Query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/query/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the queryable LangWatchQL schema
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         *
+         *     Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         */
+        get: operations["getApiV1QuerySchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -938,9 +1110,29 @@ export interface paths {
         };
         /**
          * Get pull request coding agent usage
-         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price. Prefer `GET /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API key alone and needs no X-Project-Id header.
          */
         get: operations["getApiCodingAgentPullRequestUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coding-agent/pull-request-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get pull request usage
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with an organization API key and nothing else: no project id is sent anywhere. A key created for you reads with your own access; an organization service key, such as one a continuous integration job holds, reads with the access its bindings grant. Rows appear only for projects the key may view, and cost only for those it may price.
+         */
+        get: operations["getPullRequestUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2212,6 +2404,108 @@ export interface paths {
         patch: operations["patchApiGraphsById"];
         trace?: never;
     };
+    "/api/v1/langy/control/connect/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Share a folder over HTTP, for a network that blocks WebSockets. The body is the register frame of the control protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerLangyControlSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Wait for the next frames of a shared folder, then answer with what is waiting or with an empty list. Each poll is also the folder's heartbeat, so a command line that polls reads connected. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollLangyControlSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the frames the command line has for the platform: the acknowledgement of a call, its result, a permission the developer has to answer first, and the deregister that ends the share. */
+        post: operations["postLangyControlFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
+        get: operations["listLangyControlRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused. */
+        post: operations["approveLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again. */
+        post: operations["cancelLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/usage": {
         parameters: {
             query?: never;
@@ -3436,7 +3730,7 @@ export interface paths {
         /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
         get: operations["listTestSuites"];
         put?: never;
-        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        /** @description Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start. */
         post: operations["createTestSuite"];
         delete?: never;
         options?: never;
@@ -3462,8 +3756,8 @@ export interface paths {
         delete: operations["archiveTestSuite"];
         options?: never;
         head?: never;
-        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
-        patch: operations["renameTestSuite"];
+        /** @description Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are. */
+        patch: operations["updateTestSuite"];
         trace?: never;
     };
     "/api/v1/test-suites/{id}/run": {
@@ -4121,23 +4415,23 @@ export interface components {
     schemas: {
         Annotation: {
             /** @description The ID of the annotation */
-            id?: string;
+            id: string;
             /** @description The ID of the project */
-            projectId?: string;
+            projectId: string;
             /** @description The ID of the trace */
-            traceId?: string;
+            traceId: string;
             /** @description The comment of the annotation */
-            comment?: string;
+            comment: string | null;
             /** @description The thumbs up status of the annotation */
-            isThumbsUp?: boolean;
+            isThumbsUp: boolean | null;
             /** @description The ID of the user */
-            userId?: string;
+            userId: string | null;
             /** @description The created at of the annotation */
-            createdAt?: string;
+            createdAt: string;
             /** @description The updated at of the annotation */
-            updatedAt?: string;
+            updatedAt: string;
             /** @description The email of the user */
-            email?: string;
+            email: string | null;
         };
         Error: {
             /** Format: int32 */
@@ -4927,7 +5221,275 @@ export interface operations {
             };
         };
     };
-    getApiAgents: {
+    registerConnectedAgentInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    sdk: {
+                        name: string;
+                        version: string;
+                        language: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        label?: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                        maxConcurrency?: number;
+                    };
+                    agents: {
+                        name: string;
+                        environment: string;
+                        /** @default {} */
+                        parameters?: {
+                            [key: string]: unknown;
+                        };
+                        concurrency?: number;
+                        timeoutMs?: number;
+                        sticky?: boolean;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The instance is registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            agents: {
+                                name: string;
+                                environment: string;
+                                id: string;
+                                url: string;
+                                parameterNotes: string[];
+                            }[];
+                            heartbeatIntervalMs: number;
+                            instanceId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "project_required" | "permission_denied" | "key_type_not_allowed" | "replica_count_unsupported" | "parameters_invalid" | "environment_invalid" | "protocol_invalid";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key type or its permissions cannot connect an agent: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame, or an agent of it is not valid: a refused frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The deployment runs several replicas without Redis: a refused frame */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollConnectedAgentInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the instance, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The call and cancel frames waiting for the instance; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            callId: string;
+                            agentId: string;
+                            threadId: string;
+                            messages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            newMessages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            params: {
+                                [key: string]: string | number | boolean;
+                            };
+                            session?: unknown;
+                            traceparent: string | null;
+                            deadlineAt: number;
+                            run: {
+                                scenarioRunId?: string;
+                                scenarioName?: string;
+                                batchRunId?: string;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postConnectedAgentFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        output?: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        session?: unknown;
+                        error?: {
+                            code: string;
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A frame is not one the endpoint takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAgents: {
         parameters: {
             query?: {
                 page?: number;
@@ -4938,9 +5500,94 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            /**
+                             * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                             * @enum {string}
+                             */
+                            type: "signature" | "code" | "workflow" | "http" | "connected";
+                            config: {
+                                [key: string]: unknown;
+                            } | null;
+                            /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                            environment: string | null;
+                            /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                            ownerUserId: string | null;
+                            /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                            hostLabel: string | null;
+                            /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                            lastSeenAt: string | null;
+                            /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                            parameters: {
+                                name: string;
+                                description?: string;
+                                defaultValue?: string | number | boolean;
+                                secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
+                            }[];
+                            /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                            owner: {
+                                userId: string;
+                                name: string | null;
+                            } | null;
+                            /**
+                             * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                             * @enum {string}
+                             */
+                            status: "online" | "offline";
+                            /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                            instances: {
+                                instanceId: string;
+                                hostname: string;
+                                username: string;
+                                pid: number;
+                                label: string | null;
+                                sdk: {
+                                    name: string;
+                                    version: string;
+                                    language: string;
+                                };
+                                connectedAt: string;
+                                inflight: number;
+                                maxConcurrency: number;
+                            }[];
+                            /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                            selectable: boolean;
+                            /**
+                             * @description Why the agent cannot be run by this credential. Null when it can.
+                             * @enum {string|null}
+                             */
+                            notSelectableReason: "owned_by_another_person" | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            /** Format: uri */
+                            platformUrl: string;
+                        }[];
+                        pagination: {
+                            page: number;
+                            limit: number;
+                            total: number;
+                            totalPages: number;
+                        };
+                    };
+                };
+            };
+        };
     };
-    postApiAgents: {
+    createAgent: {
         parameters: {
             query?: never;
             header?: never;
@@ -4951,8 +5598,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    /** @enum {string} */
-                    type: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type: "signature" | "code" | "workflow" | "http" | "connected";
                     config: {
                         [key: string]: unknown;
                     };
@@ -4960,25 +5610,181 @@ export interface operations {
                 };
             };
         };
-        responses: never;
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
-    getApiAgentsById: {
+    getAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
-        responses: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
     };
-    putApiAgentsById: {
+    replaceAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
@@ -4987,8 +5793,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
-                    /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -4997,7 +5806,97 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Agent updated */
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5007,60 +5906,19 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
-                        config: {
-                            [key: string]: unknown;
-                        } | null;
-                        createdAt: string;
-                        updatedAt: string;
-                        /** Format: uri */
-                        platformUrl: string;
-                    };
-                };
-            };
-            /** @description Agent not found in this project */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description The request body does not match the expected shape */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        archivedAt: string | null;
                     };
                 };
             };
         };
     };
-    deleteApiAgentsById: {
+    updateAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    patchApiAgentsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
@@ -5069,8 +5927,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
-                    /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -5079,7 +5940,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Agent updated */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5088,11 +5949,66 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
                             [key: string]: unknown;
                         } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5100,29 +6016,153 @@ export interface operations {
                     };
                 };
             };
-            /** @description Agent not found in this project */
+        };
+    };
+    testAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run to follow; open it in the simulations run drawer. */
+                        scenarioRunId: string;
+                        /** @description The batch the run belongs to. */
+                        batchRunId: string;
+                        /** @description The internal set that holds agent test runs. */
+                        setId: string;
+                    };
+                };
+            };
+            /** @description The agent is a personal development agent of someone else */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No agent with that id in this project */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
+                content?: never;
+            };
+            /** @description The agent cannot be tested as it is set up */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    callConnectedAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The connected agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The whole conversation so far, OpenAI style. */
+                    messages: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The messages added since the agent's last turn. Defaults to the last message. */
+                    newMessages?: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The conversation id. Turns of one conversation share it; a new id starts a new one. */
+                    threadId?: string;
+                    /** @description Run parameter values by name, as JSON scalars. */
+                    params?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description The session the agent returned on its previous turn of this conversation, echoed back as is. */
+                    session?: unknown;
+                    /** @description The W3C trace context the agent adopts, so its spans join this turn's trace. */
+                    traceparent?: string;
+                    /** @description The simulation run this turn belongs to, if any. */
+                    run?: {
+                        scenarioRunId?: string;
+                        scenarioName?: string;
+                        batchRunId?: string;
                     };
                 };
             };
-            /** @description The request body does not match the expected shape */
-            422: {
+        };
+        responses: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        /** @description What the function answered: text, one message, or a list of messages. */
+                        output: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        /** @description The agent's per-conversation memory, to send on the next turn. */
+                        session?: unknown;
+                        instance: {
+                            hostname: string;
+                            label: string | null;
+                        };
+                        durationMs: number;
                     };
                 };
+            };
+            /** @description No connected agent with that id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Every instance is busy; Retry-After says when to try again */
+            429: {
+                headers: {
+                    /** @description How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked. */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No instance of the agent is connected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -6000,291 +7040,6 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
-                    };
-                };
-            };
-        };
-    };
-    postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    sql: string;
-                    parameters?: {
-                        [key: string]: string | number | boolean | null;
-                    };
-                    timeWindow?: {
-                        start: string | number;
-                        end: string | number;
-                    };
-                    granularitySeconds?: 1 | 60 | 3600;
-                };
-            };
-        };
-        responses: {
-            /** @description The query ran, and the result is scoped to the caller's project */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        columns: {
-                            name: string;
-                            type: string;
-                        }[];
-                        rows: {
-                            [key: string]: unknown;
-                        }[];
-                        statistics: {
-                            elapsedMs: number;
-                            rowsRead: number;
-                            bytesRead: number;
-                            rowsReturned: number;
-                        };
-                        truncated: boolean;
-                        followsTimeWindow: boolean;
-                        followsGranularity: boolean;
-                        granularitySeconds?: number;
-                        coarsenedFromSeconds?: number;
-                        diagnostics: {
-                            /** @enum {string} */
-                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    getApiV1ProjectsByProjectIdAnalyticsSchema: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The LangWatchQL schema, scoped to the caller's permissions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        database: string;
-                        datasets: {
-                            name: string;
-                            description: string;
-                            grain: string;
-                            joinKeys: string[];
-                            timeColumn: string;
-                            freshness: string;
-                            columns: {
-                                name: string;
-                                type: string;
-                                description: string;
-                                /** @enum {string|null} */
-                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
-                                gates: ("input" | "output" | "costs")[];
-                                available: boolean;
-                            }[];
-                            exampleSql: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
                     };
                 };
             };
@@ -7236,6 +7991,1148 @@ export interface operations {
             };
         };
     };
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's dashboard widgets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            definition: {
+                                version: number;
+                                code: string;
+                                queries: {
+                                    name: string;
+                                    sql: string;
+                                    parameters?: {
+                                        name: string;
+                                        /** @enum {string} */
+                                        type: "string" | "number" | "boolean";
+                                        default?: string | number | boolean;
+                                    }[];
+                                }[];
+                            };
+                            createdAt: string;
+                            updatedAt: string;
+                            platformUrl: string;
+                            dashboardId: string | null;
+                            gridColumn: number;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    code: string;
+                    queries: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The widget was deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    code?: string;
+                    queries?: {
+                        name: string;
+                        sql: string;
+                        parameters?: {
+                            name: string;
+                            /** @enum {string} */
+                            type: "string" | "number" | "boolean";
+                            default?: string | number | boolean;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The updated widget */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                widgetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dashboardId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The widget was added to the dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        definition: {
+                            version: number;
+                            code: string;
+                            queries: {
+                                name: string;
+                                sql: string;
+                                parameters?: {
+                                    name: string;
+                                    /** @enum {string} */
+                                    type: "string" | "number" | "boolean";
+                                    default?: string | number | boolean;
+                                }[];
+                            }[];
+                        };
+                        createdAt: string;
+                        updatedAt: string;
+                        platformUrl: string;
+                        dashboardId: string | null;
+                        gridColumn: number;
+                        gridRow: number;
+                        colSpan: number;
+                        rowSpan: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No dashboard widget with this id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiV1Query: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    timeWindow?: {
+                        start: string | number;
+                        end: string | number;
+                    };
+                    granularitySeconds?: 1 | 60 | 3600;
+                };
+            };
+        };
+        responses: {
+            /** @description The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
+                        };
+                        truncated: boolean;
+                        followsTimeWindow: boolean;
+                        followsGranularity: boolean;
+                        granularitySeconds?: number;
+                        coarsenedFromSeconds?: number;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1QuerySchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The datasets and columns this key may query, with the permissions that unlock each one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     getApiCodingAgentSessionsBySessionIdEvents: {
         parameters: {
             query?: {
@@ -7482,6 +9379,85 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getPullRequestUsage: {
+        parameters: {
+            query: {
+                /** @description The repository as "owner/name". */
+                repository: string;
+                /** @description The pull request number. */
+                pullRequest: number;
+                /** @description The GitHub host. Defaults to this instance's configured GitHub host, which is github.com unless an operator named a GitHub Enterprise Server. */
+                host?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        pullRequest: {
+                            repositoryHost: string;
+                            repositoryFullName: string;
+                            prNumber: number;
+                            headBranch: string;
+                            htmlUrl: string;
+                            state: string;
+                            isDraft: boolean;
+                            authorLogin: string | null;
+                            prCreatedAtMs: number;
+                            prClosedAtMs: number | null;
+                            prMergedAtMs: number | null;
+                        };
+                        rows: {
+                            projectId: string;
+                            projectSlug: string;
+                            contributorLabel: string;
+                            contributorIsProject: boolean;
+                            agent: string;
+                            models: string[];
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        }[];
+                        totals: {
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        };
+                        modelBreakdown: {
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            tokensKnown: boolean;
+                        }[];
                     };
                 };
             };
@@ -16787,6 +18763,501 @@ export interface operations {
             };
         };
     };
+    registerLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    cli: {
+                        name: string;
+                        version: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                    };
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The folder is shared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The session key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key is not a Langy session key, or it controls no conversation: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the folder, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The frames waiting for the folder; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            call: {
+                                callId: string;
+                                conversationId: string;
+                                turnId: string;
+                                deadlineAt: number;
+                            } & ({
+                                /** @constant */
+                                tool: "local_read";
+                                params: {
+                                    path: string;
+                                    offset?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_write";
+                                params: {
+                                    path: string;
+                                    content: string;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_edit";
+                                params: {
+                                    path: string;
+                                    edits: {
+                                        oldText: string;
+                                        newText: string;
+                                    }[];
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_bash";
+                                params: {
+                                    command: string;
+                                    timeout?: number;
+                                    background?: boolean;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_grep";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    glob?: string;
+                                    ignoreCase?: boolean;
+                                    literal?: boolean;
+                                    context?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_find";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_ls";
+                                params: {
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            });
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "permission";
+                            callId: string;
+                            /** @enum {string} */
+                            decision: "allow_once" | "allow_pattern" | "deny" | "expired";
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "policy";
+                            skipPermissions: boolean;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "disconnect";
+                            reason: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postLangyControlFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result, permission_required and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "register";
+                        cli: {
+                            name: string;
+                            version: string;
+                        };
+                        instance: {
+                            id: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            startedAt: string;
+                            /** @default [] */
+                            inFlightCallIds?: string[];
+                        };
+                        workspace: {
+                            root: string;
+                            name: string;
+                            gitBranch?: string;
+                            gitRemote?: string;
+                            gitDirty?: boolean;
+                            os: string;
+                            nodeVersion?: string;
+                            pythonVersion?: string;
+                            ghAuthenticated?: boolean;
+                            packageManager?: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        ok: boolean;
+                        text?: string;
+                        output?: {
+                            exitCode: number | null;
+                            stdout: string;
+                            stderr: string;
+                            truncated: boolean;
+                            logPath?: string;
+                            pid?: number;
+                            durationMs: number;
+                        };
+                        error?: {
+                            /** @enum {string} */
+                            code: "path_refused" | "command_refused" | "permission_denied" | "permission_expired" | "cancelled" | "timeout" | "exec_failed" | "not_found";
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_required";
+                        callId: string;
+                        summary: string;
+                        pattern: string;
+                        reason: string;
+                        skipOffered: boolean;
+                        segments?: {
+                            command: string;
+                            pattern: string;
+                            readOnly: boolean;
+                        }[];
+                        timeoutSeconds?: number;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_answered";
+                        callId: string;
+                        /** @enum {string} */
+                        decision: "allow_once" | "allow_pattern" | "deny";
+                        patterns?: string[];
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a list of frames */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listLangyControlRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        requests: {
+                            id: string;
+                            conversationId: string;
+                            conversationTitle: string;
+                            conversationUrl: string;
+                            projectId: string;
+                            projectName: string;
+                            createdAt: string;
+                            expiresAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    approveLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sessionKey: string;
+                        endpoint: string;
+                        conversation: {
+                            id: string;
+                            title: string;
+                            url: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    cancelLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The request that was cancelled. */
+                        id: string;
+                        /**
+                         * @description Always true once the request is gone.
+                         * @constant
+                         */
+                        cancelled: true;
+                    };
+                };
+            };
+        };
+    };
     getApiMeUsage: {
         parameters: {
             query?: {
@@ -22470,7 +24941,7 @@ export interface operations {
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
-                            targetType: "prompt" | "http" | "code" | "workflow";
+                            targetType: "prompt" | "http" | "code" | "workflow" | "connected";
                             targetKey?: string;
                             targetParameters?: {
                                 [key: string]: string | number | boolean;
@@ -22484,6 +24955,10 @@ export interface operations {
                             actorId?: string;
                             /** @enum {string} */
                             actorLabel?: "user" | "api" | "cli";
+                            agentInstance?: {
+                                hostname: string;
+                                label: string | null;
+                            };
                         };
                     } & {
                         [key: string]: unknown;
@@ -22507,6 +24982,24 @@ export interface operations {
                         metCriteria: string[];
                         unmetCriteria: string[];
                         error?: string;
+                        evaluations?: {
+                            evaluatorId: string;
+                            name: string;
+                            /** @enum {string} */
+                            status: "passed" | "failed" | "scored" | "skipped" | "error";
+                            required: boolean;
+                            passed?: boolean;
+                            score?: number;
+                            label?: string;
+                            details?: string;
+                            cost?: {
+                                currency: string;
+                                amount: number;
+                            };
+                            inputs?: {
+                                [key: string]: string;
+                            };
+                        }[];
                     } | null;
                 } | {
                     /** @constant */
@@ -22646,6 +25139,35 @@ export interface operations {
                         content: string;
                         encryptedValue?: string;
                     }) | {
+                        role?: string;
+                        content: ({
+                            /** @constant */
+                            type: "text";
+                            text: string;
+                            citations?: unknown[] | null;
+                        } | {
+                            /** @constant */
+                            type: "tool_use";
+                            id: string;
+                            name: string;
+                            input?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "tool_result";
+                            tool_use_id: string;
+                            content?: string | unknown[];
+                            is_error?: boolean;
+                        } | {
+                            /** @constant */
+                            type: "thinking";
+                            thinking: string;
+                            signature?: string;
+                        } | {
+                            /** @constant */
+                            type: "redacted_thinking";
+                            data: string;
+                        })[];
+                    } | {
                         role?: "system" | "developer" | "user" | "assistant" | "function" | "tool" | "unknown";
                         content?: string | ({
                             /** @constant */
@@ -23173,6 +25695,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23184,6 +25710,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -23261,6 +25791,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23272,6 +25806,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -23293,6 +25831,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23304,6 +25846,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23387,6 +25933,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23398,6 +25948,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23487,6 +26041,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23498,6 +26056,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -23519,6 +26081,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23530,6 +26096,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23704,6 +26274,10 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
                     /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
                     simulatorModel?: string | null;
@@ -23715,6 +26289,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -23736,6 +26314,10 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
                         /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
                         simulatorModel?: string | null;
@@ -23747,6 +26329,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23963,11 +26549,19 @@ export interface operations {
                                 description?: string;
                                 defaultValue?: string | number | boolean;
                                 secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
                             }[];
                             simulatorModel: string | null;
                             judgeModel: string | null;
                             maxTurns: number | null;
                             minTurns: number | null;
+                            /** @description The field values as this version saved them. Absent on servers that predate suite fields. */
+                            fields?: {
+                                [key: string]: string | number | boolean;
+                            };
                         };
                     };
                 };
@@ -24860,6 +27454,25 @@ export interface operations {
                                 metCriteria?: string[];
                                 unmetCriteria?: string[];
                                 error?: string | null;
+                                /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                                evaluations?: {
+                                    evaluatorId: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                    required: boolean;
+                                    passed?: boolean;
+                                    score?: number;
+                                    label?: string;
+                                    details?: string;
+                                    cost?: {
+                                        currency: string;
+                                        amount: number;
+                                    };
+                                    inputs?: {
+                                        [key: string]: string;
+                                    };
+                                }[];
                             } | null;
                             messages: {
                                 role: string;
@@ -24963,6 +27576,25 @@ export interface operations {
                             metCriteria?: string[];
                             unmetCriteria?: string[];
                             error?: string | null;
+                            /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                            evaluations?: {
+                                evaluatorId: string;
+                                name: string;
+                                /** @enum {string} */
+                                status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                required: boolean;
+                                passed?: boolean;
+                                score?: number;
+                                label?: string;
+                                details?: string;
+                                cost?: {
+                                    currency: string;
+                                    amount: number;
+                                };
+                                inputs?: {
+                                    [key: string]: string;
+                                };
+                            }[];
                         } | null;
                         messages: {
                             role: string;
@@ -25290,11 +27922,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25399,11 +28031,11 @@ export interface operations {
                     /** @default [] */
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -25453,11 +28085,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25569,11 +28201,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25773,11 +28405,11 @@ export interface operations {
                     scenarioIds?: string[];
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -25825,11 +28457,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -25955,11 +28587,11 @@ export interface operations {
                         } | null;
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26057,11 +28689,11 @@ export interface operations {
                     /** @description The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own. */
                     targets?: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -26104,11 +28736,11 @@ export interface operations {
                             scenarioId: string;
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26230,11 +28862,11 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26249,6 +28881,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -26298,11 +28953,11 @@ export interface operations {
                         /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26317,6 +28972,29 @@ export interface operations {
                         judgeModel?: string | null;
                         /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
+                        /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
@@ -26361,11 +29039,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26437,11 +29115,11 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /**
-                             * @description What kind of thing the scenarios run against.
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                              * @enum {string}
                              */
-                            type: "prompt" | "http" | "code" | "workflow";
-                            /** @description The id of the prompt, agent or workflow to run against. */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
                             /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                             runParameters?: {
@@ -26456,6 +29134,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -26559,11 +29260,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {
@@ -26618,6 +29319,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -26646,6 +29380,39 @@ export interface operations {
                 "application/json": {
                     /** @description The test suite name, as it reads in the platform. */
                     name: string;
+                    /** @description The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -26667,6 +29434,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -26712,6 +29512,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -26766,7 +29599,7 @@ export interface operations {
             };
         };
     };
-    renameTestSuite: {
+    updateTestSuite: {
         parameters: {
             query?: never;
             header?: never;
@@ -26779,8 +29612,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The test suite name, as it reads in the platform. */
-                    name: string;
+                    /** @description The new name. The slug is kept. */
+                    name?: string;
+                    /** @description The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -26802,6 +29668,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -26834,11 +29733,11 @@ export interface operations {
                     /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
                     targets: {
                         /**
-                         * @description What kind of thing the scenarios run against.
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                          * @enum {string}
                          */
-                        type: "prompt" | "http" | "code" | "workflow";
-                        /** @description The id of the prompt, agent or workflow to run against. */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
                         /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                         runParameters?: {
@@ -26896,11 +29795,11 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /**
-                                 * @description What kind of thing the scenarios run against.
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
                                  * @enum {string}
                                  */
-                                type: "prompt" | "http" | "code" | "workflow";
-                                /** @description The id of the prompt, agent or workflow to run against. */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
                                 /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
                                 runParameters?: {

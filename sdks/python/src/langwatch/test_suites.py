@@ -26,9 +26,21 @@ from langwatch.utils.run_inputs import build_run_inputs
 TEST_SUITES_PATH = "/api/v1/test-suites"
 
 
+SuiteFields = List[Dict[str, Any]]
+"""The fields a test suite declares, as ``{"identifier": ..., "type": ...}``
+rows. An identifier is lowercase letters, digits and underscores, starting
+with a letter; the type is ``text``, ``number`` or ``boolean``."""
+
+EvaluatorAttachments = List[Dict[str, Any]]
+"""The evaluators attached to a test suite or a run plan, as
+``{"id": ..., "evaluatorId": ..., "required": ..., "mappings": {...}}`` rows.
+A mapping reads ``{"type": "source", "sourceId": "conversation" | "scenario"
+| "trace", "path": [...]}`` or ``{"type": "value", "value": "..."}``."""
+
+
 class TestSuitesFacade:
-    """Facade for the project's test suites: list, create, read, rename,
-    archive and run."""
+    """Facade for the project's test suites: list, create, read, update,
+    rename, archive and run."""
 
     __test__ = False
     """Keeps pytest from trying to collect this class as a test. The name
@@ -63,16 +75,33 @@ class TestSuitesFacade:
         raise_for_status(response, operation="list test suites")
         return response.json()
 
-    def create(self, *, name: str) -> Dict[str, Any]:
-        """Create an empty test suite.
+    def create(
+        self,
+        *,
+        name: str,
+        fields: Optional[SuiteFields] = None,
+        evaluators: Optional[EvaluatorAttachments] = None,
+    ) -> Dict[str, Any]:
+        """Create a test suite. It starts with no scenarios.
 
         Args:
             name: What to call it.
+            fields: The fields the suite declares, for example
+                ``[{"identifier": "golden_sql", "type": "text"}]``. Every
+                scenario filed in the suite carries one value per field.
+            evaluators: The evaluators that run after every scenario run of
+                the suite, with their mappings. A required evaluator that
+                fails fails the scenario.
 
         Returns:
             Dictionary containing the created test suite.
         """
-        response = self._http().post(TEST_SUITES_PATH, json={"name": name})
+        body: Dict[str, Any] = {"name": name}
+        if fields is not None:
+            body["fields"] = list(fields)
+        if evaluators is not None:
+            body["evaluators"] = list(evaluators)
+        response = self._http().post(TEST_SUITES_PATH, json=body)
         raise_for_status(response, operation="create test suite")
         return response.json()
 
@@ -89,6 +118,42 @@ class TestSuitesFacade:
             f"{TEST_SUITES_PATH}/{quote_path_segment(test_suite_id)}"
         )
         raise_for_status(response, operation="get test suite")
+        return response.json()
+
+    def update(
+        self,
+        test_suite_id: str,
+        *,
+        name: Optional[str] = None,
+        fields: Optional[SuiteFields] = None,
+        evaluators: Optional[EvaluatorAttachments] = None,
+    ) -> Dict[str, Any]:
+        """Edit a test suite: any of its name, its fields and its evaluators.
+
+        Args:
+            test_suite_id: The test suite to edit.
+            name: The new name. The slug is kept.
+            fields: The full list of fields the suite declares. It replaces
+                the list the suite holds. A field an attached evaluator still
+                reads cannot be removed.
+            evaluators: The full list of evaluators attached to the suite. It
+                replaces the list the suite holds.
+
+        Returns:
+            Dictionary containing the updated test suite.
+        """
+        body: Dict[str, Any] = {}
+        if name is not None:
+            body["name"] = name
+        if fields is not None:
+            body["fields"] = list(fields)
+        if evaluators is not None:
+            body["evaluators"] = list(evaluators)
+        response = self._http().patch(
+            f"{TEST_SUITES_PATH}/{quote_path_segment(test_suite_id)}",
+            json=body,
+        )
+        raise_for_status(response, operation="update test suite")
         return response.json()
 
     def rename(self, test_suite_id: str, *, name: str) -> Dict[str, Any]:

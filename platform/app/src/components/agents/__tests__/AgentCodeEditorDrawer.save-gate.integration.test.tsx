@@ -163,6 +163,14 @@ vi.mock("~/utils/api", () => ({
           isPending: false,
         }),
       },
+      testTurn: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          isPending: false,
+          data: undefined,
+          error: null,
+        }),
+      },
     },
     useUtils: () => ({
       agents: {

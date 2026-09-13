@@ -141,6 +141,13 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
         so older CLI versions keep working unchanged
 
     @integration
+    Scenario: the exchange reports the permissions the key was minted with
+      Given the user approved the device code with the default selection
+      When the CLI polls the exchange endpoint
+      Then `cli_api_key_scope` carries the permission slugs of the minted key
+      And `langwatch whoami` can print them beside the key's reach
+
+    @integration
     Scenario: an approval that is never exchanged mints nothing
       Given the user approved the device code
       But the CLI never polls the exchange endpoint before the code expires

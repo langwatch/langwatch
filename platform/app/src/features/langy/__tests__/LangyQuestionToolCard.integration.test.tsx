@@ -182,6 +182,46 @@ describe("the question tool card", () => {
     });
   });
 
+  describe("given the answer went back to the tool's wait", () => {
+    /** @scenario "A settled question reads settled, with the option that was chosen" */
+    it("locks the card on the option the wait names, with nothing left to click", () => {
+      // The wait is the only record of this answer: answering a mid-turn
+      // question returns it to the waiting tool and writes no selection into
+      // the transcript, so the timeline alone reads the card as never
+      // answered and offers it again after the turn.
+      const message = assistantMessage([questionToolPart()]);
+      const onChoiceSelect = vi.fn();
+
+      renderMessage(message, {
+        onChoiceSelect,
+        questionWaits: new Map([
+          [
+            "call-q1",
+            {
+              waitId: "lwait_1",
+              toolCallId: "call-q1",
+              status: "answered" as const,
+              questions: null,
+              answers: [
+                {
+                  question: "Which agent should the scenario run against?",
+                  selected: ["Staging agent"],
+                },
+              ],
+            },
+          ],
+        ]),
+      });
+
+      fireEvent.click(screen.getByText("Staging agent"));
+
+      expect(onChoiceSelect).not.toHaveBeenCalled();
+      expect(
+        screen.getByText("Staging agent").closest("button"),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
   describe("given a question payload the choices contract cannot render", () => {
     it("stays on the raw activity path — broken input must never half-render", () => {
       renderMessage(

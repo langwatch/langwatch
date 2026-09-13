@@ -11,7 +11,11 @@
 
 import { Box, Button, HStack, NativeSelect } from "@chakra-ui/react";
 import { ChartColumn } from "lucide-react";
-import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
+import type {
+  Period,
+  PeriodMode,
+  RelativePresetKey,
+} from "~/components/PeriodSelector";
 import { FG_MUTED } from "../shared/design";
 import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import { ToggleButton } from "../shared/ToggleButton";
@@ -47,6 +51,8 @@ export type ResultsFilterRowProps = {
   isChartsShown: boolean;
   onChartsToggle: () => void;
   period: Period;
+  periodMode: PeriodMode;
+  setPeriod: (startDate: Date, endDate: Date) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
 };
 
@@ -61,6 +67,8 @@ export function ResultsFilterRow({
   isChartsShown,
   onChartsToggle,
   period,
+  periodMode,
+  setPeriod,
   setRelativePeriod,
 }: ResultsFilterRowProps) {
   return (
@@ -140,6 +148,8 @@ export function ResultsFilterRow({
 
       <AgentTestingPeriodPicker
         period={period}
+        periodMode={periodMode}
+        setPeriod={setPeriod}
         setRelativePeriod={setRelativePeriod}
       />
     </HStack>

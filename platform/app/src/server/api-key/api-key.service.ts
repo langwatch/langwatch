@@ -37,6 +37,7 @@ import {
 } from "./errors";
 import { mintLegacyKeyGrant } from "./legacy-grant-mint";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 const logger = createLogger("langwatch:api-key:service");
 
@@ -180,6 +181,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     isSystemManaged = false,
   }: {
     name: string;
@@ -194,6 +196,12 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * The CLI login key of the device session minting this ingestion key,
+     * so revoking that session revokes this key with it. Null for every key
+     * minted outside a CLI session.
+     */
+    parentApiKeyId?: string | null;
     /**
      * Only the product's own minting paths (e.g. the Langy session key) may
      * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
@@ -317,6 +325,11 @@ export class ApiKeyService {
     // is that a failed create leaves less-or-equal access, never a live token
     // with no grants (which is also the shape the read-through mint refuses
     // to widen, see ./legacy-grant-mint.ts).
+    //
+    // "Facts" means readable, not merely appended. The grant writes below
+    // require the projection, so a durable append that the fold has not
+    // landed yet throws AuthzGrantNotConfirmedError and the key is never
+    // activated: the row stays revoked and the token cannot authenticate.
     const apiKey = await this.repo.create({
       name,
       description,
@@ -330,6 +343,7 @@ export class ApiKeyService {
       ingestSourceType,
       ingestionTemplateId,
       createdByDeviceLabel,
+      parentApiKeyId,
       startsDisabled: true,
     });
 
@@ -342,6 +356,7 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        requireProjection: true,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
@@ -508,6 +523,7 @@ export class ApiKeyService {
           kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
         },
         actor,
+        requireProjection: true,
       });
       effectiveBindings = effectiveBindings.map((b) =>
         b.role === TeamUserRole.CUSTOM
@@ -516,13 +532,12 @@ export class ApiKeyService {
       );
     }
 
-    await this.repo.update({
-      id,
-      name,
-      description,
-      permissionMode,
-    });
-
+    // The grants move first, the metadata after. `replaceRoleBindings` can
+    // refuse with AuthzGrantNotConfirmedError, and a metadata write that had
+    // already landed would leave the key describing permissions it does not
+    // hold — a key marked "restricted" while the old grants are still the
+    // live ones. Writing it last means a refused grant change leaves the key
+    // exactly as it was.
     if (effectiveBindings) {
       await this.repo.replaceRoleBindings({
         apiKeyId: id,
@@ -552,6 +567,13 @@ export class ApiKeyService {
         });
       }
     }
+
+    await this.repo.update({
+      id,
+      name,
+      description,
+      permissionMode,
+    });
 
     const updated = await this.repo.findById({ id });
     if (!updated) throw new ApiKeyNotFoundError(id);
@@ -954,6 +976,17 @@ export class ApiKeyService {
     // Expired tokens are rejected
     if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null;
 
+    // A key minted under a CLI session cannot outlive that session. The
+    // cascade retires it when the login key is revoked, but the cascade is
+    // one caller's work and a credential must not depend on it having run:
+    // a transient failure mid-cascade, or a revoke through a path that has
+    // no cascade behind it, would otherwise leave this key authenticating
+    // under a session that ended. The parent is the authority, so this is
+    // the one place that has to agree with it.
+    if (apiKey.parentApiKeyId && !(await this.isParentLive(apiKey))) {
+      return null;
+    }
+
     // Verify the secret portion — supports both current HMAC and legacy SHA-256
     const result = verifySecret(parts.secret, apiKey.hashedSecret);
     if (result === "no_match") return null;
@@ -979,6 +1012,26 @@ export class ApiKeyService {
     this.mintLegacyGrant({ apiKey });
 
     return apiKey;
+  }
+
+  /**
+   * Whether the CLI login key a key was minted under is still live.
+   *
+   * A parent that is gone reads as dead: the row is the only record of the
+   * session, so its absence is not something to authenticate past. Expiry
+   * counts as well as revocation, which is what retires the children of a
+   * session that ran out in the window before the hourly sweep reaches it.
+   */
+  private async isParentLive(apiKey: {
+    id: string;
+    parentApiKeyId: string | null;
+  }): Promise<boolean> {
+    if (!apiKey.parentApiKeyId) return true;
+    const parent = await this.repo.findLivenessById({
+      id: apiKey.parentApiKeyId,
+    });
+    if (!parent || parent.revokedAt) return false;
+    return !(parent.expiresAt && parent.expiresAt < new Date());
   }
 
   /**
@@ -1027,8 +1080,17 @@ export class ApiKeyService {
     callerIsAdmin,
     organizationId,
     awaitProjection = true,
+    cause = "user",
+    cascadeToChildren = true,
   }: {
     id: string;
+    /**
+     * Why the key dies, recorded on the row. Defaults to a person's decision,
+     * which is what every user-facing path is; the platform's own revocations
+     * (a hard-cut rotation, the personal ingest-key cap) name themselves so
+     * the CLI can tell a key it may re-mint from one it must leave dead.
+     */
+    cause?: ApiKeyRevocationCause;
     /**
      * Null when the caller is a service credential. Ownership then never
      * matches, so a null caller revokes a key only through `callerIsAdmin`.
@@ -1045,6 +1107,12 @@ export class ApiKeyService {
      * ingestion-key rotation) turns this off and saves a fold pickup cycle.
      */
     awaitProjection?: boolean;
+    /**
+     * Whether to retire the keys minted under this one. On by default, so
+     * every entry point cascades; the cascade itself turns it off, since a
+     * child has no children and nothing should recurse further.
+     */
+    cascadeToChildren?: boolean;
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
@@ -1067,7 +1135,7 @@ export class ApiKeyService {
       ),
     ];
 
-    const result = await this.repo.revoke({ id });
+    const result = await this.repo.revoke({ id, cause });
 
     if (customRoleIds.length > 0) {
       await this.roleRepo.deleteExclusiveToApiKey({
@@ -1082,7 +1150,87 @@ export class ApiKeyService {
       });
     }
 
+    if (cascadeToChildren) {
+      await this.revokeChildrenOf({
+        parentApiKeyId: id,
+        organizationId,
+        callerUserId,
+        cause,
+      });
+    }
+
     return result;
+  }
+
+  /**
+   * Retire the keys minted under one key.
+   *
+   * This lives on the primitive rather than in the CLI session service
+   * because the parent link is a property of the row, and the revoke reaches
+   * it from the API-keys page, the REST route and the tRPC mutation as well
+   * as from a logout. A cascade implemented in one caller is one the other
+   * three skip.
+   *
+   * Best effort, and never fails the revoke that triggered it: the parent is
+   * already dead by the time this runs, and reporting a failure would say the
+   * revoke did not happen when it did. A child left behind is refused at
+   * authentication anyway, because `verify` reads the parent.
+   *
+   * `callerIsAdmin` is true here for the same reason the cause is remapped:
+   * this is the platform retiring what a dead session owned, not the caller
+   * reaching for someone else's key. Whoever was allowed to revoke the parent
+   * is allowed to have its children go with it.
+   */
+  private async revokeChildrenOf({
+    parentApiKeyId,
+    organizationId,
+    callerUserId,
+    cause,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+    callerUserId: string | null;
+    cause: ApiKeyRevocationCause;
+  }): Promise<void> {
+    let children: Array<{ id: string }>;
+    try {
+      children = await this.repo.findLiveChildren({
+        parentApiKeyId,
+        organizationId,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, parentApiKeyId, organizationId },
+        "could not read the keys minted under a revoked key",
+      );
+      return;
+    }
+
+    // A person's revoke of the parent is not a decision about each child, so
+    // the children record that their session went, not that someone chose
+    // them. Every other cause describes the session itself and passes down.
+    const childCause: ApiKeyRevocationCause =
+      cause === "user" ? "session" : cause;
+
+    for (const child of children) {
+      try {
+        await this.revoke({
+          id: child.id,
+          callerUserId,
+          callerIsAdmin: true,
+          organizationId,
+          awaitProjection: false,
+          cause: childCause,
+          cascadeToChildren: false,
+        });
+      } catch (err) {
+        if (err instanceof ApiKeyAlreadyRevokedError) continue;
+        logger.warn(
+          { err, apiKeyId: child.id, parentApiKeyId },
+          "could not retire a key minted under a revoked key",
+        );
+      }
+    }
   }
 
   /**

@@ -145,8 +145,13 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({
           data: [
-            { id: "agent_dev", name: "dev-agent" },
-            { id: "agent_prod", name: "prod-agent" },
+            {
+              id: "agent_dev",
+              name: "dev-agent",
+              type: "connected",
+              environment: "development",
+            },
+            { id: "agent_prod", name: "prod-agent", type: "http" },
           ],
         }),
       },
@@ -934,6 +939,33 @@ describe("the toolbar of the Results tab", () => {
       expect(within(prod).getByTestId("pass-rate-text")).toHaveTextContent(
         "100%",
       );
+    });
+
+    /** @scenario "A target row is marked with the kind of agent behind it" */
+    it("marks each target row with the kind of its agent, in no colour", async () => {
+      const user = userEvent.setup();
+      overviewState.byGroupBy.target = {
+        totals: makeTotals(),
+        groups: [
+          makeGroup({ key: "agent_prod", title: "prod-agent" }),
+          makeGroup({ key: "agent_dev", title: "dev-agent" }),
+        ],
+      };
+
+      renderList();
+
+      await user.click(screen.getByRole("radio", { name: "Target" }));
+
+      const dev = await screen.findByTestId(
+        "results-group-target-mark-agent_dev",
+      );
+      const prod = screen.getByTestId("results-group-target-mark-agent_prod");
+
+      expect(dev.dataset.kind).toBe("connected");
+      expect(prod.dataset.kind).toBe("http");
+      // The colour tells the targets of a comparison apart, and this list
+      // compares nothing.
+      expect(dev.dataset.color).toBeUndefined();
     });
 
     /** @scenario "Grouping by none reads the flat list" */

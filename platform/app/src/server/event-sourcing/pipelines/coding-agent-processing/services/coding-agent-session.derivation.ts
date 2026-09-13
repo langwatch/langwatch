@@ -21,6 +21,10 @@ import type {
   SessionStep,
   SessionTitleSource,
 } from "./coding-agent-session.types";
+import {
+  SESSION_CONTEXT_ATTR,
+  SESSION_CONTEXT_EVENT,
+} from "./session-context-memo";
 
 /**
  * Derive a coding-agent SESSION from its contributions (ADR-056,
@@ -148,14 +152,10 @@ const CODEX = {
  */
 const LANGWATCH = {
   EVENT: {
-    SESSION_CONTEXT: "session_context",
+    SESSION_CONTEXT: SESSION_CONTEXT_EVENT,
   },
   ATTR: {
-    REPOSITORY_HOST: "vcs.repository.host",
-    REPOSITORY_OWNER: "vcs.repository.owner",
-    REPOSITORY_NAME: "vcs.repository.name",
-    BRANCH: "vcs.ref.head.name",
-    WORKTREE: "vcs.worktree.name",
+    ...SESSION_CONTEXT_ATTR,
     TITLE: SESSION_TITLE_FACT_KEY,
     TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
     NAME: SESSION_NAME_FACT_KEY,
@@ -1001,12 +1001,14 @@ export function applyLogToCodingAgentSession({
       });
 
     case LANGWATCH.EVENT.SESSION_CONTEXT: {
-      // Repository identity and worktree are once-set: a session is one
-      // checkout, so the first answer stands. The branch is the exception:
-      // it moves during a session, and the branch a session ENDS on is the
-      // one its pull request comes from. Every branch it passed through joins
-      // the set as well, because a session that moves on has still driven the
-      // branch it left, and the pull request it opened there.
+      // Everything here is present tense, last write wins: a resumed session
+      // moves between branches, worktrees and even repositories, and the row
+      // answers where it is NOW. Per-branch history lives on the fact rows
+      // (the contribute command stamps each one with the context active when
+      // it happened), so nothing is lost by letting the scalars move. Every
+      // branch the session passed through also joins the set, because a
+      // session that moves on has still driven the branch it left, and the
+      // pull request it opened there.
       const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
       // Two titles can ride the record. The context title is the codex
       // harvest's prompt-derived name (codex withholds prompt text from its
@@ -1026,12 +1028,12 @@ export function applyLogToCodingAgentSession({
       return {
         ...named,
         repositoryHost:
-          base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]) ?? base.repositoryHost,
         repositoryOwner:
-          base.repositoryOwner ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]) ?? base.repositoryOwner,
         repositoryName:
-          base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
-        gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]) ?? base.repositoryName,
+        gitWorktree: str(attrs[LANGWATCH.ATTR.WORKTREE]) ?? base.gitWorktree,
         gitBranch: branch ?? base.gitBranch,
         gitBranches:
           branch !== null

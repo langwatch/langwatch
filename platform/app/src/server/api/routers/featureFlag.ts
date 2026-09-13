@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";
@@ -12,6 +13,59 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
   string,
   ...string[],
 ]);
+
+/**
+ * Intersect the requested organization ids with the caller's real
+ * `OrganizationUser` memberships, in one round trip.
+ *
+ * Read as a NESTED select off the person rather than as a top-level
+ * `organizationUser` call. The question spans every organization one person
+ * belongs to, so it has no single-organization predicate to offer and
+ * `guardOrganizationId` (ADR-021) refuses it — a refusal that surfaces as a
+ * 500, not as a skipped check. The guard sees top-level model operations only
+ * (`$allOperations` in `src/server/db.ts`), so going through the person asks
+ * the same question in a shape the guard is right not to inspect. Same shape
+ * as `identity/repositories/mfa-enrollment.prisma.repository.ts`.
+ *
+ * This replaces a fan-out of one `organizationUser.findUnique` per id. Prisma
+ * batched those into a single `userId = $1 AND organizationId IN (...)`
+ * statement, but the planner still probed the composite key once per
+ * organization, and the two procedures below run three times per page load.
+ * For a caller with a large workspace list that made this statement the
+ * heaviest read on the database. One nested select asks once.
+ *
+ * Input order is preserved and ids the caller is not a member of are dropped
+ * silently, so the result cannot be used as a membership oracle.
+ */
+async function resolveMemberOrganizationIds({
+  prisma,
+  userId,
+  organizationIds,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationIds: string[];
+}): Promise<string[]> {
+  const person = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      orgMemberships: {
+        where: { organizationId: { in: organizationIds } },
+        select: { organizationId: true },
+      },
+    },
+  });
+
+  const memberOf = new Set(
+    (person?.orgMemberships ?? []).map(
+      (membership) => membership.organizationId,
+    ),
+  );
+
+  return organizationIds.filter((organizationId) =>
+    memberOf.has(organizationId),
+  );
+}
 
 /**
  * tRPC router for feature flag checks.
@@ -135,21 +189,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabled: false };
       }
 
-      // OrganizationUser is org-scoped under the single-organization
-      // invariant of guardOrganizationId, so a single `in:` query would
-      // be rejected for spanning multiple orgs. Resolve memberships
-      // per-id; the user's org count is bounded by their workspace list.
-      const memberships = await Promise.all(
-        input.organizationIds.map((organizationId) =>
-          ctx.prisma.organizationUser.findUnique({
-            where: { userId_organizationId: { userId, organizationId } },
-            select: { organizationId: true },
-          }),
-        ),
-      );
-      const allowedOrganizationIds = memberships
-        .filter((m): m is { organizationId: string } => m !== null)
-        .map((m) => m.organizationId);
+      const allowedOrganizationIds = await resolveMemberOrganizationIds({
+        prisma: ctx.prisma,
+        userId,
+        organizationIds: input.organizationIds,
+      });
 
       if (allowedOrganizationIds.length === 0) {
         return { enabled: false };
@@ -205,17 +249,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabledByOrganizationId: {} as Record<string, boolean> };
       }
 
-      const memberships = await Promise.all(
-        input.organizationIds.map((organizationId) =>
-          ctx.prisma.organizationUser.findUnique({
-            where: { userId_organizationId: { userId, organizationId } },
-            select: { organizationId: true },
-          }),
-        ),
-      );
-      const allowedOrganizationIds = memberships
-        .filter((m): m is { organizationId: string } => m !== null)
-        .map((m) => m.organizationId);
+      const allowedOrganizationIds = await resolveMemberOrganizationIds({
+        prisma: ctx.prisma,
+        userId,
+        organizationIds: input.organizationIds,
+      });
 
       const entries = await Promise.all(
         allowedOrganizationIds.map(

@@ -76,6 +76,28 @@ Feature: Langy runs on the model the project chose
     Then the turn carries what was already said in this conversation
     And the new model can answer from it
 
+  # A credential connected at the organization or the team serves every project
+  # under it (ADR-021), and the turn's virtual key walks that same ladder. The
+  # picker reads the project's provider list, which carries those rows, so a
+  # project with no provider row of its own still gets the models.
+  @integration
+  Scenario: A provider configured on the organization enables its models in the picker
+    Given the project's only model provider is connected at the organization
+    When the composer's model picker opens
+    Then it offers the models that provider serves
+    And it offers no model from a provider nobody connected
+
+  # The default model is resolved from the project's configuration, which can
+  # name a provider nobody connected here. Seeding it put a model in the pill
+  # that the pill's own menu never offered, and every send died at the gateway
+  # with "no provider connected". The seed reads the same list the menu does.
+  @unit
+  Scenario: A default naming a provider nobody connected never reaches the composer
+    Given the resolved Langy default names a provider this project cannot reach
+    When the composer seeds its model
+    Then it holds the first model the project's providers serve
+    And a model the project can serve is seeded unchanged
+
   @unit
   Scenario: The composer follows a default-model change made in settings
     Given the composer's model was seeded from the resolved default

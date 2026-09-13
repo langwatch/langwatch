@@ -7,7 +7,7 @@ import {
 
 /**
  * A settled trace search exactly as the live transport hands it to the panel:
- * opencode ran the CLI through `bash`, and the envelope retyped the call to
+ * The worker ran the CLI through `bash`, and the envelope retyped the call to
  * `langwatch.trace.search` while keeping the shell payload as its input.
  */
 const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({

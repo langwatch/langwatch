@@ -32,6 +32,7 @@ import type {
   BatchedFacetResult,
   CategoricalFacetResult,
   DiscreteFacetResult,
+  EventMetricValues,
   TraceListCursor,
   TraceListRepository,
   TraceListSort,
@@ -409,6 +410,9 @@ interface CategoricalFacetDescriptor {
     label?: string;
     count: number;
     aggregates?: EvaluatorValueAggregates;
+    /** Set only on the event facet: per-metric-key value tallies for the
+     *  inline drilldown (see {@link EventMetricValues}). */
+    eventMetrics?: EventMetricValues[];
   }[];
   totalDistinct: number;
 }
@@ -1072,9 +1076,25 @@ export class TraceListService {
   private async computeFacetValues(
     params: FacetValuesParams,
   ): Promise<FacetValuesResult> {
-    // Dynamic per-attribute drill: "attribute.<key>" — not in the static registry.
+    // Dynamic per-attribute drills — not in the static registry. Each prefix
+    // routes to the store its filter actually queries: `event.attribute.` /
+    // `span.attribute.` read stored_spans (Events.Attributes / SpanAttributes),
+    // the bare `attribute.` prefix keeps its legacy trace_summaries alias.
+    // Order matters: the specific prefixes must match before the generic one.
+    if (params.facetKey.startsWith("event.attribute.")) {
+      return this.attributeFacetValues(params, "event.attribute.", (p) =>
+        this.repository.findEventAttributeValues(p),
+      );
+    }
+    if (params.facetKey.startsWith("span.attribute.")) {
+      return this.attributeFacetValues(params, "span.attribute.", (p) =>
+        this.repository.findSpanAttributeValues(p),
+      );
+    }
     if (params.facetKey.startsWith("attribute.")) {
-      return this.attributeFacetValues(params);
+      return this.attributeFacetValues(params, "attribute.", (p) =>
+        this.repository.findAttributeValues(p),
+      );
     }
 
     const def = FACET_REGISTRY.find((d) => d.key === params.facetKey);
@@ -1120,13 +1140,22 @@ export class TraceListService {
 
   private async attributeFacetValues(
     params: FacetValuesParams,
+    facetPrefix: string,
+    find: (p: {
+      tenantId: string;
+      timeRange: { from: number; to: number };
+      attributeKey: string;
+      prefix?: string;
+      limit: number;
+      offset: number;
+    }) => Promise<CategoricalFacetResult>,
   ): Promise<FacetValuesResult> {
-    const attributeKey = params.facetKey.slice("attribute.".length);
+    const attributeKey = params.facetKey.slice(facetPrefix.length);
     if (!attributeKey || !ATTRIBUTE_KEY_REGEX.test(attributeKey)) {
       throw new Error(`Invalid attribute key: ${attributeKey}`);
     }
 
-    return this.repository.findAttributeValues({
+    return find({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       attributeKey,

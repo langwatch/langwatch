@@ -4,479 +4,246 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The AI Gateway ships as a sub-chart (`charts/gateway/`) of the LangWatch umbrella chart (`charts/langwatch/`). Installing the umbrella with `gateway.chartManaged: true` (the default) lifts the gateway pod alongside `langwatch-app` in the same release. The gateway runs as a separate Kubernetes Deployment (own pod, own container, own service) and reaches the LangWatch control plane for VK resolution, budget enforcement, and guardrail execution.
+The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment, Service and Ingress next to `langwatch-app`. This guide takes you from an empty namespace to a gateway that answers a chat completion.
 
-<Note>The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the umbrella `langwatch` chart by release-please (`.github/release-please-config.json` `.` package extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching gateway sub-chart, operators should never need to pin them separately.</Note>
+## Prerequisites
 
-## Pre-create the runtime secrets
+- A Kubernetes cluster and `helm` 3.
+- An ingress controller. The chart defaults to `ingress.className: nginx`.
+- A hostname for the gateway, separate from the app hostname. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
+- The LangWatch umbrella chart. Follow [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for the app side first if you have not installed it yet.
 
-**The gateway pod does not start until two values exist in a Kubernetes Secret that the chart references but does not materialise.** This is the most common rollout failure, so do it before `helm install`:
+<Steps>
+<Step title="Create the app Secret">
+
+The gateway pod and the app pod mount the same Secret. The gateway reads two keys from it: `LW_GATEWAY_INTERNAL_SECRET` signs every call between the gateway and the control plane, and `LW_GATEWAY_JWT_SECRET` verifies the JWTs the control plane issues for resolved virtual keys.
+
+With `autogen.enabled=true` the chart creates the Secret on first install. Otherwise create it before `helm install`:
 
 ```bash
-# Default Secret name when installing the umbrella `langwatch` chart.
-# (Gateway sub-chart standalone uses `gateway-runtime-secrets` instead;
-# pass --set gateway.secrets.existingSecretName=... to override either.)
-kubectl create secret generic langwatch-gateway-auth \
-  --namespace langwatch \
+kubectl create namespace langwatch
+
+kubectl -n langwatch create secret generic langwatch-app-secrets \
+  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
   --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
 ```
 
-Both values MUST also be mounted on the `langwatch-app` Deployment under the same env-var names, the gateway and control plane sign and verify each other's calls byte-for-byte. The umbrella chart references one Secret name from both Deployments to keep them in sync; if you split secrets across two Kubernetes Secrets, ensure the values match.
+`gateway.secrets.existingSecretName` (default `langwatch-app-secrets`) must equal the app Secret name. If you set `secrets.existingSecret` or `autogen.secretNames.app` to another name, set `gateway.secrets.existingSecretName` to the same name. The chart refuses to render when the two differ.
 
-The third sensitive value, `LW_VIRTUAL_KEY_PEPPER`, is **control-plane-only**: it hashes virtual-key secrets at rest and must never leave the `langwatch-app` pod. The gateway never reads it.
+`virtualKeyPepper` is read by the app only. The gateway never mounts it.
 
-Failure mode if you skip this step: the gateway pod's `valueFrom.secretKeyRef` resolves against a missing Secret and the pod loops in `CreateContainerConfigError` until the `helm install --atomic` deadline (default 8 min) trips a rollback.
+</Step>
+<Step title="Write the gateway values">
 
-## Image registry and tag
-
-The gateway image is published to **Docker Hub** (`docker.io/langwatch/ai-gateway`) by the `ai-gateway` matrix entry in `.github/workflows/publish-docker-app.yml` on every `release.published` event for `langwatch@*` tags. Each release publishes three tags: `<version>`, `latest`, and `<short-sha>`.
-
-In the chart, leaving `image.tag: ""` (the default) resolves to `.Chart.AppVersion`, which is bumped in lockstep with the langwatch app version. Override only when you mirror the image to an internal registry or pin to a specific sha for a hotfix:
+Add a `gateway` block to your umbrella `values.yaml`:
 
 ```yaml
 gateway:
-  image:
-    repository: docker.io/langwatch/ai-gateway   # default
-    tag: ""                                       # default → .Chart.AppVersion (lockstep)
-    pullPolicy: IfNotPresent
-```
+  chartManaged: true
 
-## Enabling the gateway
+  # Externally reachable URL the control plane hands to CLI users at login.
+  # Leave empty to derive https://<ingress.host> from the ingress below.
+  publicUrl: ""
 
-In your umbrella `values.yaml`:
-
-```yaml
-gateway:
-  chartManaged: true                              # default; flip to false to disable
-
-  # Where the gateway reaches the control plane. The default targets the
-  # langwatch-app Service in the same namespace.
+  # Where the gateway reaches the control plane. Empty resolves to
+  # http://<release>-app:5560, the app Service of this install.
   controlPlane:
-    baseUrl: http://langwatch-app:5560
+    baseUrl: ""
 
-  # Secret you pre-created above.
   secrets:
-    existingSecretName: langwatch-gateway-auth    # default for the umbrella chart
-    internalSecretKey: LW_GATEWAY_INTERNAL_SECRET # key WITHIN that Secret
-    jwtSecretKey: LW_GATEWAY_JWT_SECRET           # key WITHIN that Secret
-
-  # OTLP endpoint the gateway exports spans to. Default targets the
-  # control plane's /api/otel ingest, which routes spans into the
-  # owning project via the langwatch.project_id span attribute.
-  otel:
-    endpoint: http://langwatch-app:5560/api/otel
-    # Production: provide the X-Auth-Token via a pre-existing Secret.
-    authExistingSecretName: ""
-    authSecretKey: token
+    existingSecretName: langwatch-app-secrets
+    internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET
+    jwtSecretPreviousKey: ""      # set only during a JWT secret rotation
 
   ingress:
     enabled: true
     className: nginx
-    host: gateway.your-corp.com
-    path: /v1                                     # only /v1/* needs to be public
+    host: gateway.acme.com        # your hostname, never the chart placeholder
+    path: /v1
     pathType: Prefix
+    healthPath:
+      enabled: true               # publishes GET /health for uptime monitors
+      path: /health
     tls:
       enabled: true
       secretName: gateway-tls
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
-  # Edge protection. Cap request body before auth runs so a misconfigured
-  # caller can't OOM the pod. 10 MiB fits ~3 MiB prompts plus base64 images.
   security:
-    maxRequestBodyBytes: 33554432                 # 32 MiB
+    maxRequestBodyBytes: 33554432 # 32 MiB, applied before auth
+    blockLocalHTTPCalls: false
+    requireHTTPSCustomEndpoints: false
+    allowedProxyHosts: []
+
+  # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
+  otel:
+    endpoint: ""
+
+  spend:
+    enabled: true                 # off means budgets are never debited
+
+  shutdown:
+    preDrainWaitSeconds: 5
+    timeoutSeconds: 60
+  terminationGracePeriodSeconds: 75
 ```
 
-The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
+The image is `docker.io/langwatch/ai-gateway`. `image.tag` defaults to the chart `appVersion`. Set `image.repository` to your mirror if the cluster cannot pull from Docker Hub.
 
-Apply:
+</Step>
+<Step title="Install or upgrade">
 
 ```bash
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+
 helm upgrade --install langwatch langwatch/langwatch \
+  --namespace langwatch --create-namespace \
   -f values.yaml \
-  --namespace langwatch --create-namespace
+  --wait --timeout 10m
 ```
 
-## Env vars wired by the chart
+The umbrella chart bundles the gateway sub-chart, so one `helm upgrade` rolls the app and the gateway together. The gateway Deployment uses a `RollingUpdate` with `maxSurge: 1` and `maxUnavailable: 0`.
 
-Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
-
-| Env var | Source | Purpose |
-|---|---|---|
-| `SERVER_ADDR` | configmap (`":5563"`) | Public listen addr. Service `targetPort` matches |
-| `LOG_LEVEL` | configmap (`logging.level`) | `debug`, `info`, `warn`, `error` |
-| `LW_GATEWAY_BASE_URL` | configmap (`controlPlane.baseUrl`) | Where the gateway reaches `/api/internal/gateway/*` on the control plane |
-| `OTEL_OTLP_ENDPOINT` | configmap (`otel.endpoint`, only when set) | OTLP/HTTP ingest URL |
-| `SERVER_MAX_REQUEST_BODY_BYTES` | configmap (`security.maxRequestBodyBytes`) | Body-size cap, rendered as `%d` int |
-| `LW_GATEWAY_INTERNAL_SECRET` | Secret `secrets.existingSecretName` | HMAC for `/api/internal/gateway/*` calls |
-| `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
-| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
-
-The deployment template intentionally does not inject `GATEWAY_ADMIN_AUTH_TOKEN` or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the gateway has no admin/pprof listener and no OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
-
-## Secret rotation
-
-Rotate `LW_GATEWAY_JWT_SECRET` without downtime using the dual-key overlap pattern. The chart conditionally injects a second `secretKeyRef` from the same Secret when `jwtSecretPreviousKey` is set:
-
-```yaml
-gateway:
-  secrets:
-    existingSecretName: langwatch-gateway-auth
-    jwtSecretKey: LW_GATEWAY_JWT_SECRET
-    # Rotation window only: which key in the same Secret holds the retired
-    # value. Empty = strict single-key mode (production steady state).
-    jwtSecretPreviousKey: LW_GATEWAY_JWT_SECRET_PREVIOUS
-```
-
-When `jwtSecretPreviousKey` is non-empty, the deployment renders a second env var (`LW_GATEWAY_JWT_SECRET_PREVIOUS`) and the gateway's resolver verifies tokens against either value. When empty, no second env var is set and the gateway runs strict.
-
-**4-step zero-downtime flow:**
-
-1. Flip the control plane's signing secret to the new value (rotate `LW_GATEWAY_JWT_SECRET` on the `langwatch-app` Deployment first, the issuer must accept the new value before the gateway starts seeing it on inbound JWTs).
-2. Update the `langwatch-gateway-auth` Secret: keep `LW_GATEWAY_JWT_SECRET` pointing at the new value, add `LW_GATEWAY_JWT_SECRET_PREVIOUS` carrying the old value. `helm upgrade` with `gateway.secrets.jwtSecretPreviousKey: LW_GATEWAY_JWT_SECRET_PREVIOUS`.
-3. Rolling restart picks up both keys. Tokens signed under the old key verify against `LW_GATEWAY_JWT_SECRET_PREVIOUS`; new tokens use `LW_GATEWAY_JWT_SECRET`.
-4. After ~15 min (longest pre-rotation bundle TTL), remove `LW_GATEWAY_JWT_SECRET_PREVIOUS` from the Secret and unset `jwtSecretPreviousKey`. Rolling restart. Strict mode resumes.
-
-The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever the previous-key env var is set, operators should monitor for runaway rotation windows (accepting a retired key indefinitely is a security-posture regression):
+</Step>
+<Step title="Verify">
 
 ```bash
-kubectl logs -n langwatch deploy/langwatch-gateway | grep jwt_secret_rotation_active
+kubectl -n langwatch rollout status deploy/langwatch-gateway
+kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
+  -- curl -sS http://langwatch-gateway/health
 ```
 
-`LW_GATEWAY_INTERNAL_SECRET` rotation uses the same Secret slot under a `previous` key, the HMAC verifier accepts both during the overlap window. Rotate both together in one operation when possible.
-
-See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation) for the env-var contract.
-
-## Dependencies on the control plane
-
-Two control-plane components must be running for the gateway to function fully:
-
-- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) but new VKs cannot resolve and rate limits cannot tighten.
-- **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
-
-  The gateway side of that pipeline is `spend.enabled`, on by default. It is what writes each request's spend record to the on-disk spool a background drainer ships to the control plane, so **turning it off leaves the gateway serving traffic that costs money and debits nothing**: budgets sit at zero and stop enforcing. Turn it off only while running a gateway newer than a control plane that has no spend ingest route yet, and even then leaving it on is the safer degraded state, because the drainer retries on backoff and the spool is bounded. Watch `gateway_spend_spool_dropped_total`: every drop is spend that is never billed.
-
-## Networking
-
-The gateway needs to reach:
-
-- The LangWatch control plane (`gateway.controlPlane.baseUrl` → `LW_GATEWAY_BASE_URL`) for `/api/internal/gateway/*` calls.
-- Outbound to each provider API (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, Gemini). NetworkPolicy must allow egress (see below).
-
-Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443. The chart hardcodes the path to `/v1` so only the OpenAI-compatible, Anthropic, Gemini routes are publicly reachable; `/healthz`, `/readyz`, `/metrics`, and `/debug/pprof/*` are NEVER exposed via the public Ingress. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls) for the full DNS/cert flow.
-
-## Scaling
-
-See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration and replica sizing. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
-
-## High availability
-
-- Run ≥2 replicas with a PodDisruptionBudget (chart default `minAvailable: 1`) so rolling updates don't remove every pod simultaneously.
-- The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
-- The auth cache is per pod. A replica added by HPA scale-out warms from the control plane on its first request per key, the same first-request cost every replica pays after a rolling deploy, and the grace window above is the operational backstop for a control plane that is unreachable.
-
-## Monitoring
-
-The gateway binary exposes Prometheus metrics at `/metrics` (port 5563). For the metric names + labels, see [Observability](/ai-gateway/observability).
-
-<Note>The chart does not currently render a `ServiceMonitor` object. Scrape via your own ServiceMonitor pointed at the gateway Service (port 80, target 5563), or via Pod-level annotations if your Prometheus uses the legacy annotation-based discovery. Chart-managed `ServiceMonitor` is on the v1.1 roadmap.</Note>
-
-## Probes
-
-The chart wires three Kubernetes probes against the gateway's `/healthz` (liveness), `/readyz` (readiness), and `/startupz` (startup) endpoints, all on container port 5563. See [Health checks](/ai-gateway/self-hosting/health-checks) for the canonical reference: probe semantics, cadence tuning, what each endpoint dials, and how to interpret a flapping `/readyz` during a rollout.
-
-### Startup network check
-
-When `NetworkPolicy` is enabled, a subtly-broken egress rule, typically a missing DNS entry or a provider CIDR typo, passes `/livez` and `/healthz` (which never dial outbound) but causes the first customer request to fail. The startup netcheck closes that gap by running a one-shot DNS-resolve + TCP-dial against a configured host list **before** `MarkStarted` fires, failing the pod at deploy time rather than first request.
-
-```yaml
-gateway:
-  startup:
-    # Leave empty to disable (default, backwards-compatible).
-    # Comma-separated host:port list (same wire format as GATEWAY_STARTUP_NETCHECK_HOSTS).
-    netcheckHosts:
-      - api.openai.com:443
-      - api.anthropic.com:443
-      - generativelanguage.googleapis.com:443
-    netcheckTimeout: 2s
-```
-
-Failure-class distinction (the key operational value): the probe separates DNS resolution failures from TCP dial failures in the error message. If a host fails with `dns resolution failed: ...`, the broken rule is DNS egress, almost always the `kube-system :53` rule in your `NetworkPolicy`. If it fails with `tcp dial failed: ...`, DNS worked but the provider `:443` egress rule is broken (wrong CIDR, wrong port, or a missing `egressToProviders` override). Operators can diagnose deploy failures without running `tcpdump` in the pod.
-
-```bash
-# Grep the pod logs after a failed rollout
-kubectl logs -n langwatch deploy/langwatch-gateway | grep -E 'dns resolution failed|tcp dial failed'
-```
-
-The probe is disabled by default (empty list) so greenfield and air-gapped-via-forward-proxy deploys are unaffected. `helm upgrade` on an existing deploy without overriding `startup.netcheckHosts` renders the same ConfigMap that earlier chart versions did.
-
-## Admin listener
-
-<Note>
-**v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the v1 gateway binary does not expose an admin/pprof listener and the deployment template does not inject `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale comment in `charts/gateway/templates/deployment.yaml`). The three postures below describe the planned v1.1 contract; setting the values today is a no-op. For live diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
-</Note>
-
-The gateway's `net/http/pprof` diagnostic surface (v1.1) will ship behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
-
-### Posture 1: disabled
-
-```yaml
-gateway:
-  admin:
-    addr: ""
-```
-
-No pprof. Use this for compliance-regulated deployments that forbid live profiling. Forfeits the [production runbook](/ai-gateway/cookbooks/production-runbook) recipes, you're back to restart-as-debugging for p99 spikes, goroutine leaks, etc.
-
-### Posture 2: loopback-only (default)
-
-```yaml
-gateway:
-  admin:
-    addr: "127.0.0.1:6060"
-    # existingAuthSecretName: <unset>   # optional, works as a defence-in-depth layer
-```
-
-Listener binds `127.0.0.1:6060`, reachable only via `kubectl port-forward`. This is the default posture and appropriate for k8s deployments, `kubectl port-forward` tunnels through the Kubernetes API server, so every access is authenticated against your cluster's RBAC and logged in the cluster audit trail.
-
-Supplying `existingAuthSecretName` in this posture is allowed and recommended as a second layer of defence, the listener still binds loopback but also requires the bearer token.
-
-### Posture 3: bearer-gated non-loopback
-
-```yaml
-gateway:
-  admin:
-    addr: "0.0.0.0:6060"
-    existingAuthSecretName: gateway-admin-token
-    authSecretKey: token                # key within the Secret; default "token"
-```
-
-Where:
-
-```bash
-kubectl create secret generic gateway-admin-token \
-  --from-literal=token="$(openssl rand -hex 32)" \
-  -n langwatch
-```
-
-Listener binds on all interfaces and enforces `Authorization: Bearer <token>` on every request. Token comparison uses `crypto/subtle.ConstantTimeCompare`, no timing side-channel on length or prefix. The chart NEVER materialises the token into its own values or ConfigMap; only the reference to the pre-existing Secret flows through.
-
-Pick this for:
-- non-k8s deploys (systemd, Nomad, plain Docker) where `kubectl port-forward` isn't available;
-- k8s deploys behind a corporate VPN or internal LB where operators want direct HTTP access without going through `kubectl exec`.
-
-### Safety net (v1.1)
-
-When the admin listener ships in v1.1, the gateway's `config.validate()` will run at startup and enforce:
-
-> **Non-loopback `GATEWAY_ADMIN_ADDR` + empty `GATEWAY_ADMIN_AUTH_TOKEN` + unset `GATEWAY_ALLOW_INSECURE`** ⇒ the gateway will refuse to start with an error naming both env vars.
-
-This is the critical safety net for the v1.1 admin surface: an operator who accidentally binds the admin listener to `0.0.0.0` without a token won't silently expose unauthenticated pprof to the pod network. The pod will crash, k8s will back off, and the boot logs will name the env variable to fix. `GATEWAY_ALLOW_INSECURE=true` will exist only for test harnesses, never set it in production. None of this is wired in the v1 binary today; the chart values just describe the planned shape.
-
-### Accessing pprof with the bearer token
-
-```bash
-TOKEN=$(kubectl get secret gateway-admin-token -n langwatch -o jsonpath='{.data.token}' | base64 -d)
-
-# pprof's -source_token flag threads the Authorization header through
-go tool pprof \
-  -source_token "Bearer $TOKEN" \
-  http://gateway.your-corp.internal:6060/debug/pprof/heap
-
-# Or curl-based workflow
-curl -sS -H "Authorization: Bearer $TOKEN" \
-  http://gateway.your-corp.internal:6060/debug/pprof/goroutine?debug=1 \
-  | head -100
-```
-
-Every `RequireBearer` 401 emits a clean `WWW-Authenticate: Bearer realm=gateway-admin` challenge. Credentials monitoring (GitHub secret-scanning, Cloudflare Secret Scanner) will pick up accidental commits of the token, rotate via the standard Secret rotation flow if that happens.
-
-### Observability
-
-The startup log line is enriched with `auth_required` and `loopback_only` booleans so operators have an audit breadcrumb:
+Expected output:
 
 ```json
-{"msg":"admin_listening","addr":"0.0.0.0:6060","auth_required":true,"loopback_only":false}
+{"status":"ok","checks":{"gateway":"ok","control_plane":"ok"}}
 ```
 
-Grep for this in your log pipeline if you want to assert on it in a compliance check.
+Then run the [post-install checklist](/ai-gateway/self-hosting/post-install-checklist) to send a first completion through the gateway.
 
-## NetworkPolicy
+</Step>
+</Steps>
 
-The gateway chart ships an optional Kubernetes `NetworkPolicy` that implements deny-by-default ingress + egress on the gateway pod. It's **off by default** so dev clusters (which often run without a CNI that supports `NetworkPolicy`) aren't broken by `helm upgrade`. Flip it on in production:
+## What the chart renders into the pod
 
-```yaml
-gateway:
-  networkPolicy:
-    enabled: true
+The chart passes these environment variables to the container. Every other key in the gateway `values.yaml` (`cache.*`, `bifrost.*`, `guardrails.*`, `budget.*`, `startup.*`, `otel.auth*`, `otel.batchTimeout`, `otel.maxQueueSize`, `security.*Timeout`, `controlPlane.*Timeout`) does not reach the pod.
 
-    # Optional, restrict OTLP egress to a specific namespace/pod.
-    # Leave empty to skip the OTLP egress rule entirely (not exported externally).
-    egressToOTLP:
-      - namespaceSelector: { matchLabels: { name: observability } }
-        podSelector: { matchLabels: { app: otel-collector } }
+| Env var | Value source | Purpose |
+|---|---|---|
+| `SERVER_ADDR` | fixed `:5563` | Listen address. The Service targets port 5563 |
+| `LOG_LEVEL` | `logging.level` | `debug`, `info`, `warn` or `error` |
+| `LW_GATEWAY_BASE_URL` | `controlPlane.baseUrl`, else `http://<release>-app:5560` | Control plane URL |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set | OTLP/HTTP endpoint for the gateway's own spans |
+| `LW_GATEWAY_SPEND_ENABLED` | `spend.enabled` | Spend record emission |
+| `SERVER_MAX_REQUEST_BODY_BYTES` | `security.maxRequestBodyBytes` | Request body cap |
+| `SERVER_DRAIN_DELAY_SECONDS` | `shutdown.preDrainWaitSeconds` | Wait after `/readyz` flips to 503 |
+| `SERVER_GRACEFUL_SECONDS` | `shutdown.timeoutSeconds` | In-flight request budget on shutdown |
+| `BLOCK_LOCAL_HTTP_CALLS` | `security.blockLocalHTTPCalls` | Refuse provider endpoints on private addresses |
+| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `security.requireHTTPSCustomEndpoints` | Refuse `http://` provider endpoints |
+| `ALLOWED_PROXY_HOSTS` | `security.allowedProxyHosts`, comma-joined | Private hostnames exempt from the block |
+| `LW_GATEWAY_INTERNAL_SECRET` | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls |
+| `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey` | JWT verification secret |
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret, key `secrets.jwtSecretPreviousKey`, only when set | Previous JWT secret during rotation |
 
-    # Optional, lock provider egress to explicit CIDRs (stricter than default).
-    # Default: allow any IP EXCEPT RFC1918 ranges (see below).
-    egressToProviders:
-      - cidr: 104.18.0.0/16    # cloudflare (fronts most providers)
-      - cidr: 52.0.0.0/8       # aws us-east-1 (Anthropic, Bedrock)
-```
+The chart renders no authentication header for the OTLP export. Point `otel.endpoint` at a collector that accepts unauthenticated OTLP/HTTP, or leave it empty. The full variable reference is on [Config](/ai-gateway/self-hosting/config).
 
-### What the default policy allows
+Write `maxRequestBodyBytes` as an integer literal. The chart renders it with `%d`, and a YAML float such as `3.3554432e+07` fails the render.
 
-**Ingress**:
+## Rotate the JWT secret without downtime
 
-- `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
-- `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
+The gateway verifies a JWT against `LW_GATEWAY_JWT_SECRET` first, then against `LW_GATEWAY_JWT_SECRET_PREVIOUS` when that variable is set. The control plane signs with the `LW_GATEWAY_JWT_SECRET` key of the same Secret, and a JWT lives 15 minutes.
 
-Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The v1 binary opens no admin or pprof listener at all, so there is nothing extra on the pod to reach; the planned listener binds `127.0.0.1:6060` and would be unaffected by `NetworkPolicy` anyway, because `kubectl port-forward` tunnels through the Kubernetes API server rather than the pod network.
+1. Edit the Secret: copy the current `LW_GATEWAY_JWT_SECRET` value into a new key `LW_GATEWAY_JWT_SECRET_PREVIOUS`, then replace `LW_GATEWAY_JWT_SECRET` with the new value.
+2. Set `gateway.secrets.jwtSecretPreviousKey: LW_GATEWAY_JWT_SECRET_PREVIOUS` and run `helm upgrade`. The gateway pods restart with both values. Wait for `kubectl -n langwatch rollout status deploy/langwatch-gateway`.
+3. Run `kubectl -n langwatch rollout restart deploy/langwatch-app`. New JWTs are signed with the new value; JWTs signed before the restart still verify against the previous value.
+4. After 15 minutes, delete the `LW_GATEWAY_JWT_SECRET_PREVIOUS` key from the Secret, clear `jwtSecretPreviousKey`, and run `helm upgrade` again.
 
-**Egress**:
+`LW_GATEWAY_INTERNAL_SECRET` has no previous-key slot. Change it in the Secret and restart the app and the gateway Deployments together.
 
-- DNS to `kube-system` on TCP+UDP `:53` (ordering matters, DNS rule MUST come first or other rules fail to resolve hostnames).
-- Control plane (`langwatch-app` label selector) on port `5560` for `/resolve-key`, `/config`, `/changes`, `/budget`, `/guardrail`. Matches the langwatch chart's `langwatch-app` Service (app=5560, nlp=5561, langevals=5562, gateway=5563).
-- OTLP `:4318`, only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
-- Provider upstreams on `:443`, default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
+## Control plane dependency
 
-<Note>The "any IP except RFC1918" default is a compromise: allowing any IP locks lateral movement out of the pod (no hitting internal services by accident) while still working for OpenAI/Anthropic/Bedrock/Vertex/Gemini without operators having to pin CIDR ranges per provider. If your cluster's CNI enforces egress strictly, you can tighten this via `egressToProviders`.</Note>
+The gateway calls these routes on `LW_GATEWAY_BASE_URL`, signed with `LW_GATEWAY_INTERNAL_SECRET`: `/api/internal/gateway/resolve-key`, `/config`, `/changes`, `/health`, `/budget-bucket-spend` and `/realtime-sessions`. It also ships spend records to the control plane's spend ingest.
 
-### Verifying the policy rendered
+When the control plane is unreachable, virtual keys already in the auth cache keep serving under the stale-while-error rules on [Config](/ai-gateway/self-hosting/config#auth-cache). Keys not in the cache fail with `503 auth_upstream_unavailable`.
 
-```bash
-helm template langwatch langwatch/langwatch \
-  -f values.yaml \
-  --set gateway.networkPolicy.enabled=true \
-  | grep -A2 'kind: NetworkPolicy'
-```
-
-Should emit exactly one `NetworkPolicy` with name `langwatch-gateway`. With `enabled=false` (the default), no `NetworkPolicy` object renders. The gateway CI gate asserts both invariants on every PR.
-
-### Inside the pod
-
-To confirm the policy is active at runtime:
-
-```bash
-# Ingress check, should succeed from ingress-nginx, fail from elsewhere
-kubectl exec -n langwatch deploy/langwatch-gateway -- curl -sS http://localhost:5563/healthz
-
-# Egress check, should succeed to api.openai.com, fail to a lateral pod
-kubectl exec -n langwatch deploy/langwatch-gateway -- \
-  curl -sS --max-time 3 https://api.openai.com/v1/models
-```
-
-If egress fails with DNS resolution errors, verify the kube-system selector in the chart matches your cluster's DNS namespace (some clusters use `kube-dns` in `kube-system`, others use a custom namespace).
+Budget debits come from the spend records the gateway ships. With `spend.enabled: false` the gateway serves traffic and debits no budget. The spool lives in the pod's `/tmp` emptyDir (`scratchSizeLimit`, default `1Gi`) and is capped at 64 MiB. Alert on `gateway_spend_spool_dropped_total`: every drop is spend that is never debited.
 
 ## Graceful drain
 
-Rolling deploys, HPA scale-downs, and voluntary pod evictions all invoke SIGTERM. The gateway's four-phase drain makes sure in-flight requests finish and new requests route to surviving replicas:
+On `SIGTERM` the gateway:
 
-1. **SIGTERM received.** `ctx.Done()` fires.
-2. **Flip readiness + gauge.** `/readyz` starts returning `503 {"status":"draining"}`; `gateway_draining{pod=...}` goes to 1.
-3. **Pre-drain wait** (`shutdown.preDrainWaitSeconds`, default 5). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/healthz` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
-4. **Graceful close.** `server.Shutdown` blocks up to `shutdown.timeoutSeconds` (default 60) until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
+1. Flips `/readyz` to `503 {"status":"draining"}` and sets the `gateway_draining` gauge to 1.
+2. Waits `shutdown.preDrainWaitSeconds` (default 5) so the endpoint controller removes the pod from the Service.
+3. Stops the HTTP listener and gives in-flight requests up to `shutdown.timeoutSeconds` (default 60) to finish, then stops the other services in reverse start order. The spend spool closes after the listener, so requests that finish during the drain still record spend.
+
+`terminationGracePeriodSeconds` must be at least `preDrainWaitSeconds + timeoutSeconds + 10`. The chart refuses to render otherwise. It also refuses the retired keys `shutdown.preDrainWait` and `shutdown.timeout`.
+
+A streaming response can run up to 14 minutes, the provider request timeout. With the default `timeoutSeconds: 60` the gateway logs `graceful_shutdown_shorter_than_max_stream_duration` at boot, and a stream still open after 60 seconds of drain is cut. To finish long streams on every rollout:
 
 ```yaml
 gateway:
   shutdown:
     preDrainWaitSeconds: 5
-    timeoutSeconds: 60
-  terminationGracePeriodSeconds: 75   # MUST be ≥ preDrainWaitSeconds + timeoutSeconds + slack
+    timeoutSeconds: 840
+  terminationGracePeriodSeconds: 855
 ```
 
-`timeoutSeconds` defaults above the gateway's 45 s non-streaming heartbeat interval on purpose. That interval is the line between a request that is merely slow and one that is stuck, so a shorter window would cut off exactly the requests the heartbeat exists to keep alive. Narrow it and the gateway says so at boot with a `graceful_shutdown_shorter_than_heartbeat_interval` warning.
+Watch `gateway_draining` together with `gateway_in_flight_requests`. During a healthy drain the in-flight count falls to 0. A flat count past the window is a stuck handler, and the kubelet kills the pod when the grace period ends.
 
-### Invariant
+## NetworkPolicy
 
-`terminationGracePeriodSeconds ≥ preDrainWaitSeconds + timeoutSeconds + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 60 + 10-slack = 75 which matches the template, enforced in CI (`.github/workflows/go-services.yaml`'s `helm` job renders the chart and checks this invariant directly).
+`networkPolicy.enabled` is `false` by default. When enabled the chart renders one deny-by-default policy:
 
-The two keys are a plain count of seconds. A values file still carrying the duration-string names `shutdown.preDrainWait` or `shutdown.timeout` fails `helm template` with a message naming the key to use instead, rather than installing a release whose drain timing silently ignores them.
+| Direction | Allowed | Value |
+|---|---|---|
+| Ingress | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom` |
+| Egress | DNS to `kube-system` on TCP and UDP 53 | fixed |
+| Egress | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560 | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
+| Egress | OTLP collector on port 4318, only when the list is non-empty | `networkPolicy.egressToOTLP` |
+| Egress | Any public IP on TCP 443, with private, loopback, link-local and cloud metadata ranges excluded | `networkPolicy.egressToProviders`, `networkPolicy.providerPorts` |
 
-If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWaitSeconds` **and** `terminationGracePeriodSeconds` together:
+Replace `egressToProviders` with explicit CIDR blocks when your policy requires a pinned provider egress set. Check the namespace labels on your cluster before enabling: the defaults match upstream ingress-nginx and kube-prometheus-stack.
 
-```yaml
-gateway:
-  shutdown:
-    preDrainWaitSeconds: 15
-    timeoutSeconds: 60
-  terminationGracePeriodSeconds: 85   # 15 + 60 + 10 slack
+Confirm the policy renders:
+
+```bash
+helm template langwatch langwatch/langwatch -f values.yaml \
+  --set gateway.networkPolicy.enabled=true | grep -A2 'kind: NetworkPolicy'
 ```
 
-### Observability
+## Pod security
 
-Two gauges, always exported:
+The pod runs as user and group `65532` with `runAsNonRoot`, a read-only root filesystem, all capabilities dropped, the `RuntimeDefault` seccomp profile and `automountServiceAccountToken: false`. The only writable path is the `/tmp` emptyDir. Adjust `podSecurityContext` and `containerSecurityContext` only if an admission policy on your cluster requires it.
 
-- `gateway_draining`, 0 normally, 1 during shutdown. A stuck pod (draining but never dying) shows as this being 1 for > grace.
-- `gateway_in_flight_requests`, the count of currently-executing handlers. During drain this should curve down to 0.
+## Roll back
 
-Both are unlabelled in the registry; per-pod series come from the `pod` target label your Prometheus attaches during Kubernetes service discovery.
-
-Pairing the two during drain gives two operationally distinct patterns:
-
-| Pattern | Meaning |
-|---|---|
-| `draining=1` + `in_flight` monotonically decreasing to 0 | **healthy drain**: nothing to do |
-| `draining=1` + `in_flight` flat for > grace | **stuck handler**: upstream hang or a breaker without a deadline. Pod is about to SIGKILL |
-
-See [Production runbook → Recipe 7](/ai-gateway/cookbooks/production-runbook#recipe-7--stuck-drain) for the diagnostic ladder when handlers don't exit within the grace.
-
-## Security
-
-Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or budget accounting. First (and currently only) knob is the request body cap:
-
-```yaml
-gateway:
-  security:
-    maxRequestBodyBytes: 33554432   # 32 MiB, default
+```bash
+helm history langwatch -n langwatch
+helm rollback langwatch <revision> -n langwatch
 ```
 
-Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
-- `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, reconciles asynchronously from the spend commands the gateway emits, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
-- `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
+Every new gateway pod starts with an empty auth cache and resolves each virtual key from the control plane on its first request.
 
-The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
+## Common failures
 
-### When to tune
+| Symptom | Cause | Fix |
+|---|---|---|
+| Pod in `CreateContainerConfigError` | The Secret named by `gateway.secrets.existingSecretName` or one of its keys does not exist | Create the Secret from step 1, then delete the pod |
+| `helm upgrade` fails naming `gateway.secrets.existingSecretName` | The gateway Secret name differs from the app Secret name | Set both to the same name |
+| `helm upgrade` fails naming `terminationGracePeriodSeconds` | Drain timing exceeds the grace period | Raise `terminationGracePeriodSeconds` to the number in the message |
+| Pods healthy, every `/v1` call answers `503 auth_upstream_unavailable` | `LW_GATEWAY_BASE_URL` points at the wrong host or port | Set `gateway.controlPlane.baseUrl` to the app Service URL |
+| `/health` answers 503 with `control_plane: unreachable for Ns` | Control plane unreachable, or `LW_GATEWAY_INTERNAL_SECRET` differs between the two pods | Compare the value in both Deployments, then check the Service and DNS |
+| Pod refuses to start with `LW_GATEWAY_AUTH_CACHE_... is no longer read` | A retired duration-string variable is still set | Set the `_SECONDS` variable named in the message instead |
 
-- **Lower** to ~1 MiB if you're fronting a tightly-scoped internal API with known small payloads and want to reject bot scans at the cheapest possible cost.
-- **Raise** to ~50 MiB when a customer's workload includes large base64-encoded images in `vision` messages. You'll know you need it when legitimate requests start returning `413 payload_too_large`; the troubleshooting entry in [Troubleshooting](/ai-gateway/troubleshooting#413-payload_too_large) tells users exactly which env var to bump.
-- **Do not disable**. A body cap is the single cheapest defence against drive-by memory pressure on a public endpoint.
-
-### HTTP server timeouts
-
-Slowloris-style attacks complete TLS + headers, then trickle the body at 1 B/s holding the handler goroutine indefinitely. Three explicit timeouts on the `http.Server` close the gap:
-
-```yaml
-gateway:
-  security:
-    readHeaderTimeout: 5s    # TLS-handshake-then-stall probes
-    readTimeout: 60s         # full body read; stops byte-trickle
-    idleTimeout: 120s        # keep-alive cap; MUST exceed nginx keepalive_timeout
-```
-
-Notable omissions:
-
-- **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
-- **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
-
-All three timeouts apply to the public listener, which is the only listener the v1 binary opens. They will cover the [admin listener](#admin-listener) identically once it ships.
-
-## Chart and data-plane CI
-
-The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
-
-- **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
-- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
-
-Jobs are timeout-capped (15 m, 10 m) and use concurrency cancellation on force-push, so a runaway test can't burn runner minutes.
-
-Consequence for operators: an upgrade path where `helm upgrade` would have silently dropped `NetworkPolicy`, broken under `-race`, or regressed a benchmark beyond 2× baseline cannot land on `main` without the gate catching it first. Pin your chart version to one of the release tags and `helm diff upgrade` before rollout.
-
-## Upgrade procedure
-
-Gateway and control plane are versioned in **lockstep**: release-please bumps both `charts/gateway/Chart.yaml` and `charts/langwatch/Chart.yaml` to the same version on every langwatch release. A single `helm upgrade langwatch langwatch/langwatch` rolls both pods together via the umbrella chart's RollingUpdate strategy.
-
-1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
-2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
-3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
-4. Roll back via `helm rollback langwatch <revision>` if anomalies appear. Each replaced gateway pod starts with an empty auth cache and warms from the control plane on its first request per key, the same cost every rolling update pays. Both sub-charts roll back together.
+More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).

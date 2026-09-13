@@ -108,26 +108,27 @@ const registry = {
     tips: [
       "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
-      "`period_start` and `period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
-      "`period_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`dashboard_context_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
     ],
   },
   lwql_reserved_parameter_supplied: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
-      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_granularity_seconds` is likewise supplied by the surface; drop it from `parameters` and send it as the request's own `granularitySeconds` field instead",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
     ],
   },
   lwql_granularity_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the parameter whose declaration was refused",
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}",
       "When the surface supplies the step itself, it must be one of the offered steps: 1 second, 1 minute, or 1 hour",
     ],
   },
@@ -139,7 +140,7 @@ const registry = {
   },
   lwql_granularity_requires_window: {
     tips: [
-      "A chart declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}",
+      "A chart declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}",
       "The bucket budget is computed against the period those two bounds describe",
     ],
   },
@@ -147,6 +148,18 @@ const registry = {
     tips: [
       "The LangWatchQL feature is not enabled for this project; retrying will not help",
       "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
+  custom_chart_playground_not_enabled: {
+    tips: [
+      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
+    ],
+  },
+  custom_graph_writes_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -180,10 +193,28 @@ const registry = {
       "Save the chart again from the workbench to replace the unreadable definition",
     ],
   },
+  saved_workbench_charts_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+    ],
+  },
+  lwql_unknown_identifier: {
+    tips: [
+      "Check the column name against the dataset's columns; a typo is the usual cause",
+      "Column existence is only known when the query runs, so a saved chart can carry this until it is run",
+    ],
+  },
   lwql_unavailable: {
     tips: [
       "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",
       "Contact support to have it enabled for this workspace",
+    ],
+  },
+  lwql_provisioning_incomplete: {
+    tips: [
+      "The deployment's LangWatchQL access is provisioned, but the identity's grants on one dataset this query needs are incomplete",
+      "This is a platform-side gap, not a per-workspace setting; retry shortly, and contact support if it persists",
     ],
   },
   page_too_deep: {
@@ -212,6 +243,36 @@ const registry = {
       "List the keys on the organization to find the right id",
     ],
     docsPath: "/api-reference/api-keys/overview",
+  },
+
+  // ---- ingestion keys ----
+  ingestion_key_not_found: {
+    tips: [
+      "Check the key id against your own ingestion keys; another person's key and a key outside this organization both read as not found",
+      "List your ingestion keys to find the right id",
+    ],
+  },
+  ingestion_key_revoke_incomplete: {
+    tips: [
+      "Retry the rotation; keys already revoked stay revoked and only the survivors named in meta.survivors are attempted again",
+      "No new key was minted, so the tokens in use are unchanged",
+    ],
+  },
+  ingestion_key_session_revoked: {
+    tips: [
+      "Run `langwatch login --device` on this machine to start a new session, then mint again",
+    ],
+  },
+  ingestion_key_source_not_allowed: {
+    tips: [
+      "A tool the CLI wraps gets its key from `langwatch instrument <tool>` on the machine that runs it",
+      "Any other source needs a published ingestion template that names it; pass that template's id",
+    ],
+  },
+  ingestion_key_workspace_missing: {
+    tips: [
+      "Sign in to the organization once so your personal workspace is created, then mint again",
+    ],
   },
   api_key_not_owned: {
     tips: ["Ask the key's owner or an organization admin to make this change"],
@@ -334,6 +395,148 @@ const registry = {
     docsPath: "/agent-testing/authenticated-agents",
   },
 
+  // ---- connected agents ----
+  agent_register_only: {
+    tips: [
+      "A connected agent is created and updated by the SDK when the decorated function's process starts; change the code and start the process again",
+      "This API can archive the agent; every other field is the SDK's to write",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_test_refused: {
+    tips: [
+      "A test run sends the agent one message and waits for its answer; it needs an HTTP, code, workflow or connected agent whose configuration is complete",
+      "Open the agent, fix what the message names, save it and test again",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  scenario_parameter_option_invalid: {
+    tips: [
+      "A parameter with options accepts only the values it lists; pick one of them for this run",
+      "To accept another value, widen the options on the scenario, or on the decorated function of a connected agent",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
+  agent_environment_unresolved: {
+    tips: [
+      "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
+      "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_not_found: {
+    tips: [
+      "List the project's agents with `langwatch agent list` and use an id from that list",
+      "An archived agent is not found; a connected agent that registers again restores its row",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_offline: {
+    tips: [
+      "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "Check that the process connects with the same project and environment as the agent you are running against",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_owner_only: {
+    tips: [
+      "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
+      "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  // ---- Langy local control (ADR-129) ----
+  langy_local_workspace_offline: {
+    tips: [
+      "Run `npx langwatch@latest langy --share-control` in the folder Langy should work in, then approve the request in the terminal",
+      "A folder is shared with one conversation; a folder connected to another chat does not answer here",
+    ],
+  },
+  langy_local_request_invalid: {
+    tips: [
+      "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own",
+      "A request is single use, so a second approval of the same one is refused",
+    ],
+  },
+  langy_local_request_expired: {
+    tips: [
+      "A request to share a folder lasts fifteen minutes; ask Langy for the code change again to get a new one",
+    ],
+  },
+  langy_local_permission_timeout: {
+    tips: [
+      "Answer the permission card in the LangWatch panel while Langy is working",
+      "To stop the cards for a whole session, choose to skip permission checks on the card, where the model allows it",
+    ],
+  },
+  langy_local_skip_model_not_allowed: {
+    tips: [
+      "Add the model to the provider's allowed models list in the model provider settings",
+      "Answer each permission card instead; the folder boundary and the privilege rule hold either way",
+    ],
+  },
+  langy_wait_expired: {
+    tips: [
+      "Send your answer to Langy as a message; it reads a late answer as the next thing you said",
+    ],
+  },
+  agent_call_timeout: {
+    tips: [
+      "Raise the agent's timeout, up to the platform cap of 300 seconds",
+      "Check the agent logs for the turn that did not finish",
+    ],
+  },
+  agent_call_failed: {
+    tips: [
+      "Fix the error the function raised, then test again; the process logs carry the stack",
+    ],
+  },
+  agent_disconnected: {
+    tips: [
+      "The turn is never sent again once the call reached the process, since the function may have side effects; start the process again and run again",
+    ],
+  },
+  agent_instance_lost: {
+    tips: [
+      "A sticky agent pins each conversation to one instance; when that instance is gone the conversation fails rather than moving to another one",
+      "Set `sticky` to false if the agent keeps no local state per conversation",
+    ],
+  },
+  agent_busy: {
+    tips: [
+      "Wait `meta.retryAfterMs` milliseconds and send the call again",
+      "Raise `concurrency` on the decorated function, or connect more instances",
+    ],
+  },
+  agent_parameter_invalid: {
+    tips: [
+      "Parameter names start with a letter or underscore and hold only letters, digits and underscores",
+      "Declare at most 20 parameters and at most 50 options per parameter",
+      "A secret is declared on the scenario, never on the agent",
+    ],
+    docsPath: "/agent-testing/run-parameters",
+  },
+  agent_register_refused: {
+    tips: [
+      "Read `meta.reason`: api_key_invalid, project_required, permission_denied, key_type_not_allowed, replica_count_unsupported, parameters_invalid or environment_invalid",
+      "The key needs `scenarios:manage`; an ingestion key or a Langy session key can never connect",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_session_unknown: {
+    tips: [
+      "Post a new register frame to /api/v1/agents/connect/register and use the instance token it answers with",
+      "A session expires five minutes after its last poll",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
+  agent_payload_too_large: {
+    tips: [
+      "Read `meta.what` and `meta.limitBytes`, and `meta.sizeBytes` when the payload was measured",
+      "On a self-hosted deployment raise the cap with LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
+    ],
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [
@@ -437,6 +640,11 @@ const registry = {
   },
   langy_model_not_configured: {
     tips: ["Pick a model in the project's model settings, then retry"],
+  },
+  langy_skill_not_available: {
+    tips: [
+      "This skill is gated by a feature flag that is off for this project — use an available alternative instead of retrying",
+    ],
   },
   langy_model_not_allowed: {
     tips: ["Choose one of the models configured for this project and retry"],

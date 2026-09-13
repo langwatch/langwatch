@@ -19,9 +19,14 @@ import {
   ModelProviderRoutingHandleInvalidError,
   ModelProviderRoutingHandleTakenError,
   ModelProviderScopesRequiredError,
+  ModelProviderSkipPermissionsPatternInvalidError,
   ModelProviderTestRateLimitedError,
 } from "./errors";
 import { rowCannotServeEmbeddings } from "./geminiDoor";
+import {
+  firstInvalidSkipPattern,
+  readStoredSkipList,
+} from "./langySkipPermissions";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -73,7 +78,7 @@ type ModelProviderWrite = {
   scopes: ScopeInput[] | undefined;
 };
 
-/** The advanced gateway settings that ride the same row as the basic fields. */
+/** The advanced settings that ride the same row as the basic fields. */
 function advancedFields(input: UpdateModelProviderInput): AdvancedGatewayInput {
   return {
     rateLimitRpm: input.rateLimitRpm,
@@ -81,6 +86,15 @@ function advancedFields(input: UpdateModelProviderInput): AdvancedGatewayInput {
     rateLimitRpd: input.rateLimitRpd,
     fallbackPriorityGlobal: input.fallbackPriorityGlobal,
     providerConfig: input.providerConfig,
+    // An empty list is a cleared field, and a cleared field means the
+    // provider's default applies, so it is stored as null rather than as an
+    // empty array that would read as "trust nothing".
+    langySkipPermissionsModels:
+      input.langySkipPermissionsModels === undefined
+        ? undefined
+        : (input.langySkipPermissionsModels?.length ?? 0) > 0
+          ? input.langySkipPermissionsModels
+          : null,
   };
 }
 
@@ -155,6 +169,13 @@ export type UpdateModelProviderInput = {
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
+  /**
+   * Regular expression sources naming the models allowed to run a Langy
+   * conversation with the permission checks skipped (ADR-129). Omit to leave
+   * the stored list alone; send an empty list to clear it, which returns the
+   * provider to its registry default.
+   */
+  langySkipPermissionsModels?: string[] | null;
 };
 
 /**
@@ -189,6 +210,7 @@ type AdvancedGatewayInput = {
   rateLimitRpd?: number | null;
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
+  langySkipPermissionsModels?: string[] | null;
 };
 
 /**
@@ -271,6 +293,9 @@ function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   }
   if (input.providerConfig !== undefined) {
     out.providerConfig = input.providerConfig;
+  }
+  if (input.langySkipPermissionsModels !== undefined) {
+    out.langySkipPermissionsModels = input.langySkipPermissionsModels;
   }
   return out;
 }
@@ -653,6 +678,16 @@ export class ModelProviderService {
           handle: normalizedHandle ?? "",
           problem,
         });
+      }
+    }
+
+    // The skip-permissions list is checked before any database work too. A
+    // line that never compiles matches nothing, so storing it would leave the
+    // operator believing a model is trusted when the gate always says no.
+    if (input.langySkipPermissionsModels) {
+      const invalid = firstInvalidSkipPattern(input.langySkipPermissionsModels);
+      if (invalid) {
+        throw new ModelProviderSkipPermissionsPatternInvalidError(invalid);
       }
     }
 
@@ -1358,6 +1393,13 @@ export class ModelProviderService {
       customEmbeddingsModels:
         customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
       deploymentMapping: mp.deploymentMapping,
+      // The operator's own skip-permissions list, so the drawer can show it
+      // back. Null on the row means the registry default applies, which the
+      // drawer renders as placeholder text rather than as a value.
+      langySkipPermissionsModels:
+        mp.langySkipPermissionsModels === null
+          ? null
+          : readStoredSkipList(mp.langySkipPermissionsModels),
       disabledByDefault: defaultProvider?.disabledByDefault,
       extraHeaders: mp.extraHeaders as { key: string; value: string }[] | null,
       scopes: mp.scopes.map((s) => ({

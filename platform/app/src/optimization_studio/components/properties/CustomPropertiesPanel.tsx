@@ -1,8 +1,9 @@
-import { Avatar, Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
+import { Avatar } from "~/components/ui/avatar";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Link } from "../../../components/ui/link";
 import { toaster } from "../../../components/ui/toaster";

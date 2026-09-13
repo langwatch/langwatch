@@ -67,6 +67,21 @@ Feature: AI Gateway — transparent upstream error forwarding
     And the upstream retry-signalling headers (Retry-After, x-should-retry) are preserved
     And the gateway does not flatten the retryable 429 into a terminal 4xx
 
+  # A provider 2xx the engine cannot decode is still the provider's answer.
+  # OpenAI's Responses image_generation_call item carries "action":"generate"
+  # as a string, and the engine schema reads that field as an object. Treating
+  # that decode failure as an engine error writes the complete, valid 200 body
+  # under a 502 and records zero usage for a request the provider billed.
+  @bdd @error-transparency @integration
+  Scenario: A provider 200 the engine cannot decode is forwarded as a 200 with its usage
+    Given the upstream provider responds 200 on /v1/responses with an image_generation_call output item
+    And the engine fails to decode that body into its schema
+    When the client calls the gateway with "vk-demo"
+    Then the gateway responds with HTTP 200
+    And the response body is the provider's body, unmodified
+    And the request's usage is read from the provider's usage block, not zero
+    And the gateway logs the decode failure at warn level
+
   # The handled-error marker proves a response body is LangWatch-authored, so
   # a forwarded provider response must never carry one — on the error path OR
   # the passthrough lane, which forwards upstream headers wholesale.

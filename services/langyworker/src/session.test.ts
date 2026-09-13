@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { openSessionManager } from "./session.js";
+import { ENABLED_TOOLS, openSessionManager } from "./session.js";
 
 function tempHome(): { home: string; sessionDir: string } {
   const home = mkdtempSync(join(tmpdir(), "langy-session-"));
@@ -77,6 +77,40 @@ describe("openSessionManager", () => {
       const { sessionManager, resumed } = openSessionManager({ home, sessionDir });
       expect(resumed).toBe(false);
       expect(sessionManager.getEntries()).toHaveLength(0);
+    });
+  });
+});
+
+describe("ENABLED_TOOLS", () => {
+  describe("when the session hands pi its tool allowlist", () => {
+    /** @scenario The worker does not expose tools the panel cannot show */
+    it("names only the tools Langy's role needs", () => {
+      const enabled = new Set<string>(ENABLED_TOOLS);
+
+      // Subagent spawning has no surface in the panel, and pi's own
+      // interactive prompt would ask the user through a channel the panel
+      // does not render. Neither is on the list, and the list is an
+      // allowlist, so nothing else pi ships reaches the model either.
+      for (const denied of ["task", "agent", "subagent", "ask", "prompt"]) {
+        expect(enabled.has(denied)).toBe(false);
+      }
+      // The tools the role does need: the shell and file surface the CLI and
+      // the GitHub skill run on, the skill tool, the plan channel, and the
+      // question tool the panel renders as a choices card.
+      for (const tool of [
+        "bash",
+        "read",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls",
+        "todowrite",
+        "skill",
+        "question",
+      ]) {
+        expect(enabled.has(tool)).toBe(true);
+      }
     });
   });
 });

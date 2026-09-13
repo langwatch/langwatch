@@ -2,12 +2,14 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
+import { EVENT_METRIC_SEP } from "../query-language/eventMetrics";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
   DiscreteFacetResult,
+  EventMetricValues,
   FacetCountResult,
   FacetTableName,
   TraceListPage,
@@ -165,9 +167,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(query.tenantId);
 
-    // Latest-version dedup, shared by the page, the heavy read, and the count.
+    // Latest-version dedup, shared by the page's inner stage and the count.
     // Decided on the base predicates alone, so the filter chooses among current
     // traces rather than deciding which version is current.
+    //
+    // It is a whole-window aggregate: it groups every row this tenant has in
+    // the time range, so each place it appears is another pass over that set.
+    // State it once per read — see the outer stage below, which reuses the
+    // inner stage's result instead of deriving the same thing again.
     const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM ${TABLE_NAME}
@@ -175,13 +182,33 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           GROUP BY TenantId, TraceId
         )`;
 
-    // Page the matching TraceIds first (key + sort columns only), then read
-    // the heavy columns (ComputedInput/ComputedOutput and the rest) for that
+    // Page the matching rows first (key + sort columns only), then read the
+    // heavy columns (ComputedInput/ComputedOutput and the rest) for that
     // bounded page alone. The previous single query materialized those
     // payloads for every deduped trace in the window before ORDER BY ... LIMIT
     // trimmed it, and `count() OVER ()` forced the whole deduped set to buffer
     // — together the dominant read-bytes cost on this list. The total is now a
     // separate light count that never touches the payload columns.
+    //
+    // The inner stage hands the outer stage the winning rows' full identity
+    // (TenantId, TraceId, UpdatedAt), not just their TraceIds. That identity
+    // IS the dedup result, so the outer stage does not restate `dedupFilter`:
+    // re-stating it made ClickHouse build the whole-window aggregate a second
+    // time to reach rows the inner stage had already named. On a tenant with
+    // ~1.3M traces in the window, dropping that second pass measured 4.45M ->
+    // 2.98M rows read and 4.6s -> 2.3s.
+    //
+    // The outer WHERE does keep the full `whereClause`, not just the base
+    // predicates. `trace_summaries` is a ReplacingMergeTree, so until a merge
+    // runs, two physical rows can share one (TenantId, TraceId, UpdatedAt) and
+    // disagree on everything else — a re-publish at the same version lands in
+    // its own part. Identity alone cannot tell those apart, so the outer stage
+    // has to re-apply the user's filter to pick the version that actually
+    // matches it; without that, a filtered page returns the version that does
+    // not match and disagrees with its own total. Re-applying the filter is
+    // cheap next to the dedup (it is the same predicate over an already
+    // identity-bounded set, and it costs nothing at all on the unfiltered
+    // default view, where `whereClause` IS `baseWhereClause`).
     //
     // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
     // aliasing DateTime to millis in the same scope shadows the column and
@@ -306,8 +333,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
-            AND TraceId IN (
-              SELECT TraceId
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, UpdatedAt
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
                 AND ${dedupFilter}
@@ -321,7 +348,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
-            AND ${dedupFilter}
           ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
           LIMIT {limit:UInt32}
         )
@@ -1000,6 +1026,144 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return mapFacetRows(rows);
   }
 
+  async findEventAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findEventAttributeValues",
+    );
+
+    // Same bounded-sample strategy as findAttributeValues, against the store
+    // the `event.attribute.` filter actually queries: `Events.Attributes` is
+    // an Array(Map) parallel to `Events.Name`, so a span contributes one
+    // candidate value per event that carries the key.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    // The prefix filter lives INSIDE arrayFilter (not a WHERE on the
+    // arrayJoin alias) so the sample keeps its one-pass shape.
+    const valuePredicate = params.prefix
+      ? "v -> v != '' AND lower(v) LIKE concat({prefix:String}, '%')"
+      : "v -> v != ''";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT arrayJoin(
+          arrayFilter(
+            ${valuePredicate},
+            arrayMap(m -> m[{attrKey:String}], \`Events.Attributes\`)
+          )
+        ) AS facet_value
+        FROM stored_spans
+        PREWHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND arrayExists(m -> mapContains(m, {attrKey:String}), \`Events.Attributes\`)
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
+  }
+
+  async findSpanAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findSpanAttributeValues",
+    );
+
+    // Same bounded-sample strategy as findAttributeValues, against
+    // `stored_spans.SpanAttributes` — the store the `span.attribute.` filter
+    // actually queries.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    const innerPrefix = params.prefix
+      ? "AND lower(SpanAttributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
+      : "";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT SpanAttributes[{attrKey:String}] AS facet_value
+        FROM stored_spans
+        PREWHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND mapContains(SpanAttributes, {attrKey:String})
+        WHERE SpanAttributes[{attrKey:String}] != ''
+          ${innerPrefix}
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
+  }
+
   private toTraceSummaryData(row: ClickHouseSummaryRow): TraceSummaryData {
     return {
       traceId: row.TraceId,
@@ -1076,6 +1240,11 @@ type FacetRow = {
   // the `Array(Tuple(String, UInt64))` as `[[value, count], …]`. Counts may
   // arrive as strings for large UInt64, so the mapper coerces with Number().
   label_values?: [string, number | string][];
+  // Event facet only: top-N (composite key, count) tuples where the composite
+  // is `<metric key>\x1F<stored value>` (see EVENT_METRIC_SEP in
+  // facets/events.ts). Same Array(Tuple(String, UInt64)) serialisation as
+  // label_values.
+  metric_values?: [string, number | string][];
 };
 
 function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
@@ -1085,8 +1254,45 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
       ...(r.facet_label ? { label: r.facet_label } : {}),
       count: Number(r.cnt),
       ...extractFacetAggregates(r),
+      ...extractEventMetrics(r),
     })),
     totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+  };
+}
+
+/**
+ * Reshape the event facet's composite-key buckets into per-metric-key value
+ * lists. Values pass through as stored — verbatim strings — so a drilldown
+ * click round-trips exactly into `event.attribute.<key>:<value>`.
+ */
+function extractEventMetrics(r: FacetRow): {
+  eventMetrics?: EventMetricValues[];
+} {
+  if (!r.metric_values?.length) return {};
+  const byKey = new Map<string, { value: string; count: number }[]>();
+  for (const [composite, count] of r.metric_values) {
+    const sep = composite.indexOf(EVENT_METRIC_SEP);
+    if (sep <= 0) continue; // malformed bucket — no separator or empty key
+    const key = composite.slice(0, sep);
+    const value = composite.slice(sep + EVENT_METRIC_SEP.length);
+    // A second separator means the metric key itself carried one. Metric keys
+    // are unconstrained strings, so nothing stops a caller sending one with an
+    // embedded 0x1F, and the split point is then a guess. Drop the bucket
+    // rather than render a row whose key and value are both wrong.
+    if (value === "" || value.includes(EVENT_METRIC_SEP)) continue;
+    let list = byKey.get(key);
+    if (!list) {
+      list = [];
+      byKey.set(key, list);
+    }
+    list.push({ value, count: Number(count) });
+  }
+  if (byKey.size === 0) return {};
+  return {
+    eventMetrics: [...byKey.entries()].map(([key, values]) => ({
+      key,
+      values,
+    })),
   };
 }
 
