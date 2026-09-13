@@ -1,6 +1,6 @@
 <p align="center">
 <a href="https://discord.gg/kT4PhDS2gH" target="_blank"><img src="https://img.shields.io/discord/1227886780536324106?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord"></a>
-<a href="https://pypi.org/project/langwatch/" target="_blank"><img src="https://img.shields.io/pypi/dm/langwatch?logo=python&logoColor=white&label=pypi%20langwatch&color=blue" alt="langwatch Python package on PyPi"></a>
+<a href="https://pypi.org/project/langwatch/" target="_blank"><img src="https://static.pepy.tech/personalized-badge/langwatch?period=month&units=international_system&left_color=grey&right_color=blue&left_text=pypi%20langwatch" alt="langwatch Python package downloads per month"></a>
 <a href="https://www.npmjs.com/package/langwatch" target="_blank"><img src="https://img.shields.io/npm/dm/langwatch?logo=npm&logoColor=white&label=npm%20langwatch&color=blue" alt="langwatch npm package"></a>
 <a href="https://twitter.com/intent/follow?screen_name=langwatchai" target="_blank"><img src="https://img.shields.io/twitter/follow/langwatchai?logo=X&color=%20%23f5f5f5" alt="follow on X"></a>
 <img src="https://img.shields.io/badge/license-Apache%202.0%20%2B%20Enterprise-blue" alt="Open-core: Apache 2.0 core + Enterprise extension">
@@ -22,9 +22,8 @@ LangWatch is the open-source platform for AI in production: trace, test, route a
 
 ```bash
 npx langwatch claude
+# or codex, copilot, opencode, ...
 ```
-
-Works for Claude Code, Codex, Copilot and opencode.
 
 ### Self-host
 
@@ -48,6 +47,13 @@ Only Node.js required. For production, see [Self-hosting LangWatch](https://lang
 - **[Coding Agents](https://langwatch.ai/docs/coding-agents/overview)**: sessions, cost per pull request and per team, privacy controls
 - **[AI Gateway](https://langwatch.ai/docs/ai-gateway/overview)**: one OpenAI and Anthropic compatible endpoint, virtual keys, budgets, routing
 - **[AI Governance](https://langwatch.ai/docs/ai-governance/overview)**: every AI tool in the company, who uses it, anomaly rules
+
+## Things you can do with LangWatch
+
+1. Create [simulation tests](https://langwatch.ai/docs/agent-testing/overview) for evaluating or benchmarking your agents and [voice agents](https://langwatch.ai/docs/agent-testing/voice-agents)
+2. Measure the [cost per PR](https://langwatch.ai/docs/coding-agents/pull-requests) and [optimize your Claude Code usage](https://langwatch.ai/docs/coding-agents/find-your-context-sweet-spot) to get your weekly limits to last twice as long
+3. Create [virtual keys with budgets](https://langwatch.ai/docs/ai-gateway/virtual-keys) to give your customers or employees
+4. Find out that 40% of the [Copilot Studio subscriptions](https://langwatch.ai/docs/ai-governance/overview) are not actually being used at your company and cancel them
 
 ## Integrations
 
