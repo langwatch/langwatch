@@ -68,6 +68,8 @@ import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatc
 import type { EventEmitter } from "node:events";
 import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput } from "@langwatch/scenario-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { buildScenarioComposition } from "./scenario-composition.build.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
 import type {
   RunConfigurationEntry,
@@ -157,25 +159,38 @@ export interface ScenarioAppInfrastructure {
 /** The one peer API this feature reads directly. */
 export const scenarioAppDependencyTokens = { users: UserApi };
 
+/**
+ * What `ScenarioApp.create` is handed as `setup.members`: the one platform
+ * member the module reads directly, plus the collaborators the deleted
+ * `scenario.composition.ts` still hands over whole (see the
+ * scenario-composition-green handover for the remaining triage).
+ */
+type ScenarioAppMembers = MembersRead<typeof ScenarioApp.reads> &
+  Omit<ScenarioAppInfrastructure, "ids" | "testSuiteIds" | "clock" | "secretCipher">;
+
 export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
+  static readonly reads = reads("encryption");
 
   static create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
-      ScenarioAppInfrastructure,
+      ScenarioAppMembers,
       undefined,
       ScenarioRepositories
     >,
   ): ScenarioApp {
+    const { ids, testSuiteIds, clock, secretCipher } = buildScenarioComposition({
+      encryption: setup.members.encryption,
+    });
     const scenarios = ScenarioService.create({
       repository: setup.repositories.scenarios,
       simulations: setup.members.simulations,
-      ids: setup.members.ids,
-      testSuiteIds: setup.members.testSuiteIds,
-      clock: setup.members.clock,
-      secretCipher: setup.members.secretCipher,
+      ids,
+      testSuiteIds,
+      clock,
+      secretCipher,
     });
 
     return new ScenarioApp({

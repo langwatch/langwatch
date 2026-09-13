@@ -4652,6 +4652,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -4676,6 +4679,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -4691,6 +4697,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
