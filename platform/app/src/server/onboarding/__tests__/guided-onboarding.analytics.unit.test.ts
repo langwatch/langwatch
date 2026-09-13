@@ -61,9 +61,26 @@ describe("trackOnboardingVariantAssigned()", () => {
         event: "onboarding_variant_assigned",
         properties: {
           variant: "guided",
+          "$feature/experiment_onboarding_langy_guided": "guided",
           organization_id: "org_1",
           $set: { onboarding_variant: "guided" },
         },
+      });
+    });
+  });
+
+  describe("when an organization is initialized with the classic variant", () => {
+    /** @scenario "the variant assignment is the exposure of the experiment" */
+    it("carries the experiment property with the baseline named control", () => {
+      trackOnboardingVariantAssigned({
+        userId: "user_1",
+        organizationId: "org_1",
+        variant: "classic",
+      });
+
+      expect(tracked().properties).toMatchObject({
+        variant: "classic",
+        "$feature/experiment_onboarding_langy_guided": "control",
       });
     });
   });
@@ -91,6 +108,23 @@ describe("trackGuidedOnboardingEvent()", () => {
       expect(call.event).toBe("guided_onboarding_paths_selected");
       expect(call.properties.paths).toEqual(["gateway", "llmops"]);
       expect(call.properties.primary_path).toBe("gateway");
+    });
+  });
+
+  describe("when any guided event is tracked", () => {
+    /** @scenario "every guided onboarding event carries the experiment property" */
+    it("carries the experiment property with the guided variant", () => {
+      trackGuidedOnboardingEvent(
+        event({
+          event: "paths_selected",
+          payload: { paths: ["gateway"], primaryPath: "gateway" },
+          state: { paths: ["gateway"], donePaths: [], currentPath: "gateway" },
+        }),
+      );
+
+      expect(tracked().properties).toMatchObject({
+        "$feature/experiment_onboarding_langy_guided": "guided",
+      });
     });
   });
 

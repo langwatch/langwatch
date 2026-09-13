@@ -4,6 +4,7 @@ import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
+import { onboardingExperimentProperties } from "~/server/onboarding/guided-onboarding.experiment";
 import { readOnboardingVariantForProject } from "~/server/onboarding/onboarding-variant";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
@@ -84,7 +85,10 @@ export const scenarioCrudRouter = createTRPCRouter({
         event: "scenario_created",
         projectId: input.projectId,
         properties: onboardingVariant
-          ? { onboarding_variant: onboardingVariant }
+          ? {
+              onboarding_variant: onboardingVariant,
+              ...onboardingExperimentProperties(onboardingVariant),
+            }
           : undefined,
       });
 

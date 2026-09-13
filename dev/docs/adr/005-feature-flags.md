@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
 
-**Status:** Accepted — amended 2026-08-20 and 2026-08-31, see below
+**Status:** Accepted — amended 2026-08-20, 2026-08-31, 2026-09-07 and 2026-09-13, see below
 
 ## Amendment (2026-08-20): PostHog removed from the resolver
 
@@ -19,6 +19,35 @@ Three consequences the rest of this document predates:
 - **A SYSTEM-scoped flag exposed to the frontend is a legitimate shape.** `FeatureFlagKey` is the union of all registered keys regardless of scope, so the `featureFlag.isEnabled` router's cast is safe either way. The Langy family relies on this: internal levers that gate a product surface. A guard added in #7357 asserted the opposite — that every frontend-exposed flag must be PRODUCT — and went red on `main` when #7424 landed a SYSTEM flag in `FRONTEND_FEATURE_FLAGS` (issue #7511); it was removed rather than extended, because the premise was inherited from this ADR after the code beneath it had changed.
 
 Sections below describing a PostHog path (Resolution order, Architecture Flow, Targeting via personProperties, PostHog local evaluation) are retained as history of the 2026-05 design and are **not** the current behaviour. `POSTHOG_FEATURE_FLAGS_KEY` no longer affects flag resolution; PostHog remains in the product for analytics and error capture only.
+
+## Amendment (2026-09-13): PostHog experiments without PostHog feature flags
+
+An A/B test on this platform is analysed in PostHog as an experiment without
+a PostHog feature flag (https://posthog.com/docs/experiments/running-experiments-without-feature-flags).
+PostHog is never consulted for the assignment: the flag in the registry
+decides it, through its targeting rules, and the assignment is recorded on
+the subject at the moment it is made. For the onboarding experiment the flag
+is `experiment_onboarding_langy_guided` and the assignment is
+`Organization.signupData.onboardingVariant`, written when the organization is
+created.
+
+PostHog needs two things from us. An exposure event, tracked once per subject
+when the assignment is made (`onboarding_variant_assigned`), and the variant
+on every metric event, as the event property `$feature/<flag key>`, here
+`$feature/experiment_onboarding_langy_guided`. The baseline variant is named
+`control`, the PostHog convention: the classic onboarding maps to `control`
+and the guided one to `guided`. The mapping and the property name live in
+`src/server/onboarding/guided-onboarding.experiment.ts`, which both the server
+events and the browser import.
+
+Server events read the variant next to the user they are tracked against
+(`resolveOrgAdmin` for a project-scoped milestone, the organization for an
+onboarding event). The browser registers the property with posthog-js once
+the organization's variant is known, so client events carry it too.
+
+SaaS only. An organization without a recorded variant, self-hosted or older
+than the experiment, gets no exposure and no property, and its events are
+unchanged.
 
 ## Amendment (2026-08-31): targeting by organization age ("New users")
 

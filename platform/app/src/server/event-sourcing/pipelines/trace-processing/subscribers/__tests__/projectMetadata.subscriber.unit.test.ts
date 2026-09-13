@@ -267,6 +267,46 @@ describe("createProjectMetadataHandler()", () => {
         mockTrackServerEvent.mock.calls[0]![0].properties,
       ).not.toHaveProperty("onboarding_variant");
     });
+
+    /** @scenario "first_trace_integrated carries the experiment property" */
+    it("carries the experiment property, control for the classic variant", async () => {
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: "admin-user-1",
+        organizationId: "org-1",
+        firstMessage: false,
+        onboardingVariant: "classic",
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(
+        createEvent(tenantId),
+        createContext(tenantId, createFoldState()),
+      );
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "first_trace_integrated",
+          properties: expect.objectContaining({
+            "$feature/experiment_onboarding_langy_guided": "control",
+          }),
+        }),
+      );
+    });
+
+    /** @scenario "a milestone of an organization without a variant carries no experiment property" */
+    it("carries no experiment property when the organization recorded no variant", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await subscriber(
+        createEvent(tenantId),
+        createContext(tenantId, createFoldState()),
+      );
+
+      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
+      expect(
+        mockTrackServerEvent.mock.calls[0]![0].properties,
+      ).not.toHaveProperty("$feature/experiment_onboarding_langy_guided");
+    });
   });
 
   describe("when sdk.language is python", () => {

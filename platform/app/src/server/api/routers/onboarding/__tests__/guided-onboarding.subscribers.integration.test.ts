@@ -156,6 +156,7 @@ describe("guided onboarding subscribers reached from procedure writes", () => {
         event: "onboarding_variant_assigned",
         properties: {
           variant: "guided",
+          "$feature/experiment_onboarding_langy_guided": "guided",
           organization_id: organizationId,
           $set: { onboarding_variant: "guided" },
         },
@@ -196,6 +197,7 @@ describe("guided onboarding subscribers reached from procedure writes", () => {
           properties: {
             paths: ["gateway", "llmops"],
             primary_path: "gateway",
+            "$feature/experiment_onboarding_langy_guided": "guided",
             organization_id: organizationId,
             $set: {
               onboarding_variant: "guided",
@@ -267,8 +269,11 @@ describe("guided onboarding subscribers reached from procedure writes", () => {
   });
 
   describe("when a scenario is created in the organization's project", () => {
-    /** @scenario "scenario_created carries the onboarding variant of the organization" */
-    it("captures scenario_created with onboarding_variant guided", async () => {
+    /**
+     * @scenario "scenario_created carries the onboarding variant of the organization"
+     * @scenario "scenario_created carries the experiment property"
+     */
+    it("captures scenario_created with onboarding_variant guided and the experiment property", async () => {
       await callerFor(owner).scenarios.create({
         projectId,
         name: "Guest completes checkout",
@@ -280,7 +285,10 @@ describe("guided onboarding subscribers reached from procedure writes", () => {
         userId: owner.id,
         event: "scenario_created",
         projectId,
-        properties: { onboarding_variant: "guided" },
+        properties: {
+          onboarding_variant: "guided",
+          "$feature/experiment_onboarding_langy_guided": "guided",
+        },
       });
     });
   });

@@ -147,3 +147,156 @@ Feature: PostHog guided onboarding events
     Given the onboarding check status of the project carries the guided variant
     When the onboarding progress card loads
     Then the "viewed onboarding_progress" event carries onboarding_variant "guided"
+
+  # ============================================================================
+  # PostHog experiment without feature flags
+  # ============================================================================
+
+  # The experiment is analysed in PostHog without a PostHog feature flag: the
+  # organization keeps the assignment, the exposure event and every metric
+  # event carry the variant under $feature/experiment_onboarding_langy_guided,
+  # with the classic onboarding named control.
+
+  @unit
+  Scenario: the experiment property maps the guided variant to guided and the classic variant to control
+    Given the experiment property helper
+    When it is asked for the guided variant
+    Then it returns $feature/experiment_onboarding_langy_guided "guided"
+    When it is asked for the classic variant
+    Then it returns $feature/experiment_onboarding_langy_guided "control"
+    When it is asked for no variant
+    Then it returns no property
+
+  @unit
+  Scenario: the variant assignment is the exposure of the experiment
+    When a user initializes an organization with the classic variant
+    Then the "onboarding_variant_assigned" event carries $feature/experiment_onboarding_langy_guided "control"
+
+  @unit
+  Scenario: every guided onboarding event carries the experiment property
+    Given a guided onboarding event "paths_selected"
+    Then the tracked event carries $feature/experiment_onboarding_langy_guided "guided"
+
+  @unit
+  Scenario: first_trace_integrated carries the experiment property
+    Given a project whose organization was initialized with the classic variant
+    When its first real trace is ingested
+    Then the "first_trace_integrated" event carries $feature/experiment_onboarding_langy_guided "control"
+
+  @unit
+  Scenario: a milestone of an organization without a variant carries no experiment property
+    Given a project whose organization predates the experiment
+    When its first real trace is ingested
+    Then the "first_trace_integrated" event carries no $feature/experiment_onboarding_langy_guided property
+
+  @integration
+  Scenario: scenario_created carries the experiment property
+    Given a project whose organization was initialized with the guided variant
+    When a scenario is created through the scenarios procedure
+    Then the "scenario_created" event carries $feature/experiment_onboarding_langy_guided "guided"
+
+  # ============================================================================
+  # scenario_run_succeeded
+  # ============================================================================
+
+  @unit
+  Scenario: a scenario run that finished against a connected agent is tracked as succeeded
+    Given a scenario run against a connected agent finishes with the verdict success
+    Then a "scenario_run_succeeded" event is tracked against the organization admin
+    And it carries scenario_id, run_id, connected_agent true and the experiment property
+
+  @unit
+  Scenario: a scenario run whose verdict is failed still counts as succeeded
+    Given a scenario run against a connected agent finishes with the verdict failure
+    Then a "scenario_run_succeeded" event is tracked
+
+  @unit
+  Scenario: a scenario run that ended in an error is not tracked as succeeded
+    Given a scenario run against a connected agent finishes with the status ERROR
+    Then no "scenario_run_succeeded" event is tracked
+
+  @unit
+  Scenario: a scenario run against anything but a connected agent is not tracked as succeeded
+    Given a scenario run against a prompt finishes with the verdict success
+    Then no "scenario_run_succeeded" event is tracked
+
+  @unit
+  Scenario: the finished run event carries the target the run was queued with
+    Given a run queued against a connected agent
+    When the run finishes
+    Then the finished event carries the connected target
+
+  # ============================================================================
+  # project_active_day
+  # ============================================================================
+
+  @unit
+  Scenario: the first application trace of a day tracks the project as active
+    Given a project whose organization was created three days ago
+    When its first trace of the day is ingested
+    Then a "project_active_day" event is tracked against the organization admin
+    And it carries source "trace", days_since_signup 3 and the experiment property
+
+  @unit
+  Scenario: a second trace on the same day tracks nothing more
+    Given a project already tracked as active today
+    When another trace is ingested
+    Then no "project_active_day" event is tracked
+    And the organization admin is not read again
+
+  @unit
+  Scenario: the first successful scenario run of a day tracks the project as active
+    Given a project not yet active today
+    When a scenario run against a connected agent finishes
+    Then a "project_active_day" event is tracked with source "scenario_run"
+
+  @unit
+  Scenario: Langy's own turns and sample traces never track the project as active
+    Given a trace carrying the langy origin
+    When it is ingested
+    Then no "project_active_day" event is tracked
+
+  # ============================================================================
+  # guided_onboarding_turn_failed
+  # ============================================================================
+
+  @unit
+  Scenario: a failed Langy turn of the guided conversation is tracked with its code and path
+    Given a guided onboarding conversation on the gateway path
+    When one of its turns fails with the code langy_github_not_connected
+    Then a "guided_onboarding_turn_failed" event is tracked against the user of the conversation
+    And it carries code langy_github_not_connected, path gateway and the experiment property
+
+  @unit
+  Scenario: a turn that ended in failure with a partial answer is tracked as failed
+    Given a guided onboarding conversation
+    When one of its turns ends with the outcome failed
+    Then a "guided_onboarding_turn_failed" event is tracked
+
+  @unit
+  Scenario: a failed turn of an ordinary conversation tracks nothing
+    Given a conversation that is not the organization's guided conversation
+    When one of its turns fails
+    Then no "guided_onboarding_turn_failed" event is tracked
+
+  # ============================================================================
+  # Client registration
+  # ============================================================================
+
+  @integration
+  Scenario: the browser registers the experiment property once the organization's variant is known
+    Given a signed-in user whose organization recorded the guided variant
+    When the app identifies the user
+    Then posthog-js registers $feature/experiment_onboarding_langy_guided "guided"
+
+  @integration
+  Scenario: the browser registers nothing for an organization without a variant
+    Given a signed-in user whose organization predates the experiment
+    When the app identifies the user
+    Then posthog-js registers no experiment property
+
+  @integration
+  Scenario: the welcome flow registers the experiment property as soon as the organization is created
+    Given a user leaving the tailor step of the guided welcome flow
+    When the organization is created
+    Then posthog-js registers $feature/experiment_onboarding_langy_guided "guided"

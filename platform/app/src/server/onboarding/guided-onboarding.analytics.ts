@@ -14,6 +14,7 @@ import type {
   AttributedGuidedOnboardingEvent,
   GuidedOnboardingEvent,
 } from "./guided-onboarding.events";
+import { onboardingExperimentProperties } from "./guided-onboarding.experiment";
 
 const POSTHOG_EVENT: Record<GuidedOnboardingEvent, string | null> = {
   paths_selected: "guided_onboarding_paths_selected",
@@ -80,6 +81,7 @@ export function trackGuidedOnboardingEvent(
     event,
     properties: {
       ...eventProperties(input),
+      ...onboardingExperimentProperties("guided"),
       organization_id: input.organizationId,
       $set: guidedOnboardingPersonProperties(input.state),
     },
@@ -88,7 +90,8 @@ export function trackGuidedOnboardingEvent(
 
 /**
  * Tracked once, when the organization is created, for both variants: this is
- * the event the funnel starts from on either side of the experiment.
+ * the event the funnel starts from on either side of the experiment, and the
+ * exposure PostHog reads the assignment from.
  */
 export function trackOnboardingVariantAssigned({
   userId,
@@ -104,6 +107,7 @@ export function trackOnboardingVariantAssigned({
     event: "onboarding_variant_assigned",
     properties: {
       variant,
+      ...onboardingExperimentProperties(variant),
       organization_id: organizationId,
       $set: { onboarding_variant: variant },
     },

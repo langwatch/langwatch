@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { LANGY_TRACE_ORIGIN } from "~/server/app-layer/traces/derive-trace-origin";
+import { onboardingExperimentProperties } from "~/server/onboarding/guided-onboarding.experiment";
 import { trackServerEvent } from "~/server/posthog";
 import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
@@ -100,6 +101,7 @@ async function trackFirstTraceIntegrated({
       sdk_language: attrs["sdk.language"] ?? "unknown",
       sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
       ...(onboardingVariant ? { onboarding_variant: onboardingVariant } : {}),
+      ...onboardingExperimentProperties(onboardingVariant),
     },
     projectId: tenantId,
   });
