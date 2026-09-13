@@ -66,8 +66,20 @@ export interface FeatureFlagCache {
  * is, so a deployment's flag overrides need no wiring beyond its own `.env`.
  */
 const featureFlagAppConfigSchema: FeatureConfigSchema<FeatureFlagConfig> = {
-  parse: (value: unknown): FeatureFlagConfig =>
-    resolveFeatureFlagConfig((value ?? {}) as Record<string, unknown>),
+  parse: (value: unknown): FeatureFlagConfig => {
+    // The slice is the process's ALREADY-PARSED FeatureFlagConfig: env-var
+    // parsing belongs to the process config layer (`resolveFeatureFlagConfig`
+    // stays exported from the contract for exactly that), and parsing a
+    // parsed record a second time silently emptied the force-enable list —
+    // the process's Map and Set carry no env-var names to read.
+    if (value === undefined) return resolveFeatureFlagConfig({});
+    const config = value as FeatureFlagConfig;
+    if (config.overrides instanceof Map && config.forceEnabled instanceof Set) return config;
+    throw new Error(
+      'The "feature-flag" config slice must be the process\'s resolved FeatureFlagConfig ' +
+        "(resolveFeatureFlagConfig over its own environment), not a raw env record.",
+    );
+  },
 };
 
 type FeatureFlagSetup = FeatureSetup<

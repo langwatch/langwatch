@@ -1,14 +1,6 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import {
-  type CodingAgentCallerScopeDirectory,
-  type CodingAgentScopePermissions,
-  codingAgentServer,
-  type CodingAgentBillingPolicy,
-  type CodingAgentClickHouse,
-  type CodingAgentScopeCaller,
-  type CodingAgentScopePermission,
-  type CodingAgentScopeProject,
-} from "@langwatch/coding-agent-server";
+import { codingAgentServer, type CodingAgentBillingPolicy } from "@langwatch/coding-agent-server";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { composeGithubApi, PostgresGithubRepositories } from "@langwatch/github-server";
 import { GithubApi, type GithubServerConfig } from "@langwatch/github-contract";
@@ -43,9 +35,32 @@ export async function createWorkerCodingAgentApp(options: {
   database: PrismaConnection["client"];
   organizations: OrganizationApi;
   projects: ProjectApi;
+  /**
+   * No longer wired: `CodingAgentApp` still declares a bespoke infrastructure
+   * bag (billing, scope directory, scope permissions, content visibility,
+   * audit sink — see `modules/coding-agent/server/src/app/coding-agent.app.ts`)
+   * that the v2 builder has no seam for, since the module has not yet
+   * declared its own `reads()`. Kept on this options record purely for
+   * call-site compatibility with `worker-observability-apps.composition.ts`;
+   * closing the gap is the coding-agent module's own conversion, not this
+   * composition's.
+   */
   authorization: AuthzApi;
   billing: CodingAgentBillingPolicy;
-  clickHouse: CodingAgentClickHouse | null;
+  /**
+   * No longer wired: the module's live tier now reads a "clickhouse" process
+   * member typed `ClickHouseQueryClient` (see
+   * `modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts`),
+   * not the per-tenant `resolve` this process holds. Left unsupplied so the
+   * live tier refuses by name at boot rather than being silently downgraded
+   * to memory.
+   */
+  clickHouse: { resolve(tenantId: string): Promise<ClickHouseClient> } | null;
+  /**
+   * No longer wired: the live tier now hardcodes its retention default (see
+   * the same repositories file) — a member vocabulary may only name process
+   * clients, not a per-deployment number.
+   */
   defaultTraceRetentionDays: number;
   redis: WorkerGithubRedisConnection | null;
   github: GithubServerConfig;
@@ -66,108 +81,11 @@ export async function createWorkerCodingAgentApp(options: {
     ...(options.github.host === undefined ? {} : { hostConfig: { host: options.github.host } }),
   });
 
-  // The worker folds sessions into ClickHouse; without one the tier is the
-  // empty memory twin and nothing is folded.
-  const persistence = options.clickHouse
-    ? {
-        backend: "clickhouse",
-        infrastructure: {
-          clickhouse: options.clickHouse,
-          defaultRetentionDays: options.defaultTraceRetentionDays,
-        },
-      }
-    : { backend: "memory", infrastructure: {} };
-
-  const runtime = await createApp({ name: "langwatch-worker" })
-    .withPersistence(persistence.backend, persistence.infrastructure)
-    .withInfrastructure({})
+  const runtime = await createApp({ role: "worker" })
     .withProvided(ProjectApi, options.projects)
     .withProvided(GithubApi, github)
-    .withModule(codingAgentServer, {
-      infrastructure: {
-        billing: options.billing,
-        scopeDirectory: new WorkerCodingAgentScopeDirectory(options.database),
-        scopePermissions: new WorkerCodingAgentScopePermissions(options.authorization),
-        // The worker serves nobody: it projects sessions and never answers a read
-        // on behalf of a viewer, so a visibility question here is a wiring bug
-        // rather than a redaction, and the audit trail belongs to the door that
-        // does answer one.
-        visibility: {
-          readVisibility: () =>
-            Promise.reject(
-              new Error("The worker resolves no viewer, so it reads no content visibility"),
-            ),
-        },
-        audit: {
-          auditLog: () =>
-            Promise.reject(new Error("The worker answers no read that names people")),
-        },
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([codingAgentServer])
+    .boot();
 
   return { app: runtime.module(codingAgentServer).provided, github };
-}
-
-class WorkerCodingAgentScopeDirectory implements CodingAgentCallerScopeDirectory {
-  constructor(private readonly database: PrismaConnection["client"]) {}
-
-  listOrganizationProjects(input: {
-    organizationId: string;
-  }): Promise<readonly CodingAgentScopeProject[]> {
-    return this.database.project.findMany({
-      where: { team: { organizationId: input.organizationId }, archivedAt: null },
-      select: { id: true, name: true, slug: true, teamId: true, isPersonal: true },
-    });
-  }
-
-  async listPersonalTeamOwnerNames(input: {
-    teamIds: readonly string[];
-  }): Promise<ReadonlyMap<string, string>> {
-    if (input.teamIds.length === 0) return new Map();
-    const members = await this.database.teamUser.findMany({
-      where: { teamId: { in: [...input.teamIds] } },
-      select: { teamId: true, user: { select: { name: true, email: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-    const names = new Map<string, string>();
-    for (const member of members) {
-      if (names.has(member.teamId)) continue;
-      const label = member.user?.name?.trim() || member.user?.email?.trim();
-      if (label) names.set(member.teamId, label);
-    }
-    return names;
-  }
-}
-
-class WorkerCodingAgentScopePermissions implements CodingAgentScopePermissions {
-  constructor(private readonly authorization: AuthzApi) {}
-
-  async projectCuts(input: {
-    caller: CodingAgentScopeCaller;
-    organizationId: string;
-    projects: readonly CodingAgentScopeProject[];
-    permissions: readonly CodingAgentScopePermission[];
-  }): Promise<ReadonlyMap<CodingAgentScopePermission, ReadonlySet<string>>> {
-    const result = await this.authorization.canBatchPermissionsByIds({
-      principal:
-        input.caller.kind === "user"
-          ? { type: "user", id: input.caller.userId }
-          : { type: "apiKey", id: input.caller.apiKeyId },
-      permissions: [...input.permissions],
-      organizationId: input.organizationId,
-      teams: [],
-      projects: input.projects.map((project) => ({ projectId: project.id, teamId: project.teamId })),
-    });
-    return new Map(
-      input.permissions.map((permission) => [
-        permission,
-        new Set(
-          [...(result.byPermission.get(permission)?.projects ?? new Map())]
-            .filter(([, allowed]) => allowed)
-            .map(([projectId]) => projectId),
-        ),
-      ]),
-    );
-  }
 }

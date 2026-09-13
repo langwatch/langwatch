@@ -1,27 +1,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { AgentApi, MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
+import { AgentApi } from "@langwatch/agent-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
 import {
   createApp,
   instantiateRepositories,
   LocalFeatureApis,
+  membersFrom,
   type ResourceScope,
 } from "@langwatch/runtime-composition";
 import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
-import {
-  AgentTestService,
-  PostgresScenarioRepositories,
-  RedisScenarioTabStoreRepository,
-  ResultAtomsClickHouseRepository,
-  ResultAtomsService,
-  RunConfigurationsClickHouseRepository,
-  RunConfigurationsService,
-  scenarioServer,
-  ScenarioTabRegistryService,
-  SerializedAgentRegistryAdapter,
-  type ScenarioExecutionPoolService,
-} from "@langwatch/scenario-server";
-import { nowInstant, toDate } from "@langwatch/time";
+import { scenarioServer, type ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import {
@@ -31,6 +19,7 @@ import {
   workflowRepositories,
 } from "@langwatch/workflow-server";
 import { installWorkerAgent } from "./worker-agent.composition.ts";
+import { resolveWorkerStoredSecretCipher } from "./worker-automation-graph.composition.ts";
 import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
 import type { WorkerFoundationApps } from "./worker-foundation-apps.composition.ts";
 import {
@@ -77,48 +66,24 @@ export async function createWorkerAgentApps(options: {
   });
   const broadcast = BroadcastAdapter.create(prerequisites.redis);
   resources.own("worker scenario broadcasts", () => broadcast.close());
-  const config = {
-    langwatchEndpoint: prerequisites.langwatchEndpoint,
-    nlpServiceUrl: prerequisites.nlpServiceUrl,
-    legacyDefaultModel: prerequisites.config.infrastructure.execution.defaultModel,
-  };
-  const scenarioRuntime = await createApp({ name: "langwatch-worker-scenario" })
-    .withPersistence("postgres", { prisma: database })
-    .withInfrastructure({})
+  // The scenario module's App still reads a bespoke infrastructure bag
+  // (agentTesting, scenarioTabs, broadcast, resultAtoms, runConfigurations,
+  // ...) that the v2 builder has no seam for — only its declared `reads`
+  // ("encryption") and its one peer dependency (UserApi) travel through
+  // `createApp` now. The rest (agentTesting built from `agents`/`graph`,
+  // the tab registry, the broadcast subscription, the ClickHouse-backed
+  // result/run-configuration reads) has nowhere left to plug in; that gap is
+  // the scenario module's own conversion to close, not this composition's.
+  const scenarioRuntime = await createApp({
+    role: "worker",
+    members: membersFrom({
+      prisma: database,
+      encryption: resolveWorkerStoredSecretCipher(prerequisites.config),
+    }),
+  })
     .withProvided(UserApi, foundation.users)
-    .withModule(scenarioServer, {
-      infrastructure: {
-        ...graph.scenarioPorts,
-        simulations,
-        scenarioExecution: execution.execution,
-        agentTesting: AgentTestService.create({
-          agents,
-          projects: foundation.tenancy.projects,
-          workflows: graph.workflows,
-          prompts: graph.prompts,
-          secrets: graph.secrets,
-          modelProviders: prerequisites.modelProviders,
-          simulations,
-          config,
-          agentAdapters: SerializedAgentRegistryAdapter.create(),
-          maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
-        }),
-        scenarioTabs: ScenarioTabRegistryService.create({
-          store: RedisScenarioTabStoreRepository.create(prerequisites.redis),
-          clock: { now: () => toDate(nowInstant()) },
-        }),
-        broadcast,
-        resultAtoms: ResultAtomsService.create(
-          ResultAtomsClickHouseRepository.create(options.resolveClickHouseClient),
-          PostgresScenarioRepositories.create({ prisma: database }).scenarios,
-        ),
-        runConfigurations: RunConfigurationsService.create(
-          RunConfigurationsClickHouseRepository.create(options.resolveClickHouseClient),
-          PostgresScenarioRepositories.create({ prisma: database }).scenarios,
-        ),
-      },
-    })
-    .boot({ role: "worker" });
+    .withModules([scenarioServer])
+    .boot();
   resources.own("worker scenario module", () => scenarioRuntime.stop());
   const scenarios = scenarioRuntime.module(scenarioServer).provided;
   const evaluators = await installWorkerEvaluator({
@@ -152,7 +117,7 @@ export async function createWorkerAgentApps(options: {
   });
   const agent = await installWorkerAgent({
     connection: prerequisites.connection,
-    infrastructure: { redis: prerequisites.redis },
+    redis: prerequisites.redis,
     config: {
       publicBaseUrl,
       connected: prerequisites.config.infrastructure.connectedAgents,

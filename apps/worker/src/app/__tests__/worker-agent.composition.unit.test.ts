@@ -57,7 +57,7 @@ describe("installWorkerAgent", () => {
     const redis = createApiFixture<RedisConnection>({ duplicate });
     const composition = await installWorkerAgent({
       connection: databaseFixture(),
-      infrastructure: { redis },
+      redis,
       config: {
         publicBaseUrl: "https://langwatch.test",
         connected: { replicaCount: 2, relayMaxPayloadMb: void 0 },
