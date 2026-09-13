@@ -90,18 +90,25 @@ describe("finding drift without changing anything", () => {
       await h.writeSummary({ amountNanoMinor: 9_999_000_000 });
       await h.record(h.charge());
       await h.runDueCheck();
-      await h.drainOutbox();
+      // Each check is taken to the end of its ladder before the next begins.
+      // Draining only the first look instead would leave that comparison due
+      // for a retry, and the clock jump below would then land it inside the
+      // second check's drain — the two checks' looks interleaved, and the
+      // count below reading whatever the timing happened to produce.
+      await h.drainThroughRetries({ passes: COST_ROLLUP_WATCH_MAX_ATTEMPTS });
       const summaryAfterFirst = await h.summarizedAmountsFor(TODAY);
+      const looksPerCheck = h.comparisons.length;
 
       // A new slot, so the second comparison is a new question rather than a
       // repeat the outbox would recognise and suppress.
       h.clock = TONIGHT + 3_600_000;
       await h.record(h.charge({ occurredAtMs: NOW }));
       await h.runDueCheck();
-      await h.drainOutbox();
+      await h.drainThroughRetries({ passes: COST_ROLLUP_WATCH_MAX_ATTEMPTS });
 
-      expect(h.comparisons).toHaveLength(2);
-      expect(h.comparisons[1]!.mismatches).toEqual(
+      expect(looksPerCheck).toBe(COST_ROLLUP_WATCH_MAX_ATTEMPTS);
+      expect(h.comparisons).toHaveLength(looksPerCheck * 2);
+      expect(h.comparisons.at(-1)!.mismatches).toEqual(
         h.comparisons[0]!.mismatches,
       );
       expect(await h.summarizedAmountsFor(TODAY)).toEqual(summaryAfterFirst);

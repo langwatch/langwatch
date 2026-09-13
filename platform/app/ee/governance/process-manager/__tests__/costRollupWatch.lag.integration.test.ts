@@ -74,8 +74,13 @@ describe("checking a day whose summary is still catching up", () => {
       await h.runDueCheck();
       await h.drainOutbox();
 
+      // The first look SAW the difference — it is not hidden from anyone — and
+      // saw why: the summary's own watermark is older than the charge it is
+      // missing. What it did not do is call it drift.
       expect(driftLines()).toEqual([]);
-      expect(h.comparisons).toEqual([]);
+      expect(h.comparisons).toHaveLength(1);
+      expect(h.comparisons[0]?.mismatches).toHaveLength(1);
+      expect(h.comparisons[0]?.behind).toHaveLength(1);
       expect((await h.messagesFor())[0]?.status).toBe("pending");
 
       // The projection catches up. Nothing re-marks the day and nothing arms a
@@ -89,9 +94,10 @@ describe("checking a day whose summary is still catching up", () => {
       drift.mockRestore();
 
       expect(linesAfter).toEqual([]);
-      expect(h.comparisons).toHaveLength(1);
-      expect(h.comparisons[0]?.day).toBe(TODAY);
-      expect(h.comparisons[0]?.mismatches).toEqual([]);
+      expect(h.comparisons).toHaveLength(2);
+      expect(h.comparisons[1]?.day).toBe(TODAY);
+      expect(h.comparisons[1]?.mismatches).toEqual([]);
+      expect(h.comparisons[1]?.behind).toEqual([]);
       expect((await h.messagesFor())[0]?.status).toBe("dispatched");
     });
   });
