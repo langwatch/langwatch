@@ -28,6 +28,13 @@ import {
   isGuidedKickoffPrompt,
   prependSkillBody,
 } from "./guided-kickoff.js";
+import {
+  GUIDED_TURN_BARE_END_LOG,
+  GUIDED_TURN_CONTINUED_LOG,
+  TurnCallLog,
+  decideGuidedContinuation,
+  historyHasGuidedKickoff,
+} from "./guided-turn-end.js";
 import { prependResumeSeed } from "./system-prompt.js";
 import type { TurnContext } from "./tools/turn-context.js";
 import type { ProtocolWriter } from "./writer.js";
@@ -50,6 +57,10 @@ type TurnState = {
   shutdownRequested: boolean;
   terminalEmitted: boolean;
   mapper: TurnEventMapper;
+  /** The turn's settled calls, read by the guided turn end guard. */
+  calls: TurnCallLog;
+  /** Continuation messages appended to this turn so far; one is the limit. */
+  continuations: number;
 };
 
 export type TurnRunnerOptions = {
@@ -99,6 +110,7 @@ export class TurnRunner {
     const state = this.current;
     if (!state || state.terminalEmitted) return;
     try {
+      state.calls.record(event);
       for (const mapped of state.mapper.map(event)) {
         void this.options.writer.emit(mapped);
       }
@@ -134,7 +146,7 @@ export class TurnRunner {
         });
         return;
       }
-      await this.runTurn(command);
+      await this.runTurn(command, seq);
     })();
     return this.running;
   }
@@ -177,7 +189,7 @@ export class TurnRunner {
     return this.running.catch(() => undefined);
   }
 
-  private async runTurn(command: TurnCommand): Promise<void> {
+  private async runTurn(command: TurnCommand, seq: number): Promise<void> {
     const { session, writer, composeSystem } = this.options;
     const state: TurnState = {
       turnId: command.turnId,
@@ -185,6 +197,8 @@ export class TurnRunner {
       shutdownRequested: false,
       terminalEmitted: false,
       mapper: new TurnEventMapper(command.turnId),
+      calls: new TurnCallLog(),
+      continuations: 0,
     };
     this.current = state;
     if (this.options.turnContext) this.options.turnContext.turnId = command.turnId;
@@ -207,7 +221,12 @@ export class TurnRunner {
         thrown = error;
       }
 
-      terminal = this.deriveTerminal(state, thrown);
+      terminal = await this.continueGuidedTurn({
+        command,
+        state,
+        seq,
+        terminal: this.deriveTerminal(state, thrown),
+      });
     } catch (error) {
       // A failure in our own orchestration still terminates the turn.
       terminal = {
@@ -245,6 +264,58 @@ export class TurnRunner {
       prompt = prependResumeSeed({ prompt, seed: command.resumeToken });
     }
     return prompt;
+  }
+
+  /**
+   * The guided turn end guard. A turn on the guided path that ended clean but
+   * on none of the calls the skill allows (a card, the closing line, the one
+   * line of a failed step) gets one continuation message, appended to the same
+   * turn, naming what it still owes; the model goes on and the terminal is
+   * derived again. A second bare end is logged and left. A newer turn from the
+   * user, submitted meanwhile, takes precedence: the turn is theirs to
+   * continue then, not the guard's.
+   */
+  private async continueGuidedTurn({
+    command,
+    state,
+    seq,
+    terminal,
+  }: {
+    command: TurnCommand;
+    state: TurnState;
+    seq: number;
+    terminal: TerminalEvent;
+  }): Promise<TerminalEvent> {
+    if (terminal.type !== "turn_done" || terminal.outcome !== "ok") return terminal;
+    const guided =
+      isGuidedKickoffPrompt(command.prompt) ||
+      historyHasGuidedKickoff(this.options.session.agent.state.messages);
+    const decision = decideGuidedContinuation({
+      calls: state.calls.calls,
+      guided,
+      continuations: state.continuations,
+    });
+    if (decision.kind === "leave") return terminal;
+    const missing = decision.missing.join("; ");
+    if (decision.kind === "give_up") {
+      this.warn(`${GUIDED_TURN_BARE_END_LOG} turn=${state.turnId} missing=${missing}`);
+      return terminal;
+    }
+    if (state.abortRequested || seq !== this.submitSeq) return terminal;
+    state.continuations += 1;
+    this.warn(`${GUIDED_TURN_CONTINUED_LOG} turn=${state.turnId} missing=${missing}`);
+    let thrown: unknown;
+    try {
+      await this.options.session.prompt(decision.message);
+    } catch (error) {
+      thrown = error;
+    }
+    return this.continueGuidedTurn({
+      command,
+      state,
+      seq,
+      terminal: this.deriveTerminal(state, thrown),
+    });
   }
 
   private deriveTerminal(state: TurnState, thrown: unknown): TerminalEvent {

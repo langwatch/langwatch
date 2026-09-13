@@ -1168,6 +1168,46 @@ Feature: Langy guides the first setup after sign-up
       Then the feedback ask is held while no reply since the kickoff ran complete-path
       And it may show once the path is closed, after the pull request card
 
+  Rule: A guided turn ends on a card or a closing line, never on its own
+
+    # Two films out of three ended the step 2 turn on the plan write: the
+    # question card never asked, no scenario, no traces. One of them ticked
+    # "the three step 2 lines said" with the branch line never said. The
+    # skill's prose did not hold, so the worker reads the turn's own calls.
+    @unit
+    Scenario: A guided turn that ends bare is continued once
+      Given a turn on the guided path that ended clean on neither a card, the closing line nor a failed-step line
+      When the worker reads the turn's calls
+      Then it appends one continuation message to the same turn and lets the model go on
+      And it logs guided_turn_continued with what the turn owes
+      And a second bare end logs guided_turn_bare_end and the turn ends
+
+    @unit
+    Scenario: The continuation names the step 2 lines the turn did not say
+      Given a step 2 turn whose say calls miss the branch line
+      When the worker reads the turn's calls
+      Then the continuation says the branch line was not said and the first scenario card was not asked
+      And a step 2 turn that said all three lines but asked no card is told only about the card
+      And a step 2 turn that said the lines and asked the card is left alone
+
+    @unit
+    Scenario: A turn that ended on a card, a closing line or a failed step is left alone
+      Given a guided turn that ended on the question card, the code access card, the closing line after complete-path, or the one line after a failed command
+      When the worker reads the turn's calls
+      Then no continuation is appended
+      And a turn outside the guided path is never continued
+
+    @unit
+    Scenario: A message from the user cancels the continuation
+      Given a guided turn that ended bare
+      And a newer turn from the user submitted meanwhile
+      Then the worker appends no continuation and the newer turn runs
+
+    @unit
+    Scenario: The step 2 lines the guard checks are the skill's own
+      Given the guided-onboarding skill source
+      Then every line template, the framework line's shape, the checklist item and the complete-path command the guard reads are in it word for word
+
   Rule: The complete-path result renders as one line, the panel's done marker
 
     @integration

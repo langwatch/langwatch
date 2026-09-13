@@ -97,6 +97,43 @@ async function until(condition: () => boolean): Promise<void> {
   expect(condition()).toBe(true);
 }
 
+/** Feed the runner one settled tool call, the way pi's session reports it. */
+function settle(
+  runner: TurnRunner,
+  { id, name, input, output = "", isError = false }: { id: string; name: string; input: unknown; output?: string; isError?: boolean },
+): void {
+  runner.onSessionEvent({ type: "tool_execution_start", toolCallId: id, toolName: name, args: input });
+  runner.onSessionEvent({
+    type: "tool_execution_end",
+    toolCallId: id,
+    toolName: name,
+    isError,
+    result: { content: [{ type: "text", text: output }] },
+  });
+}
+
+/** The kickoff turn ends on the code access card: feed that card so the turn ended as written. */
+function endOnCard(runner: TurnRunner): void {
+  settle(runner, { id: "card", name: "code_access", input: { reason: "wire tracing in" } });
+}
+
+const STEP2_LINES = {
+  framework: "I found a LangGraph agent in app/graph.py.",
+  branch: "I left branch langy/acme-checkout checked out: the agent you started runs on it.",
+  pullRequest:
+    "I opened a pull request with the tracing change: https://example.test/acme/pull/5. You can merge it already.",
+};
+
+/** A step 2 turn's calls up to the pull request line, with the branch line left unsaid. */
+function feedStep2WithoutBranchLine(runner: TurnRunner): void {
+  settle(runner, { id: "p1", name: "todowrite", input: { todos: [{ content: "The three step 2 lines said", status: "in_progress" }] } });
+  settle(runner, { id: "s1", name: "say", input: { text: STEP2_LINES.framework }, output: "Said." });
+  settle(runner, { id: "s2", name: "say", input: { text: STEP2_LINES.pullRequest }, output: "Said." });
+  settle(runner, { id: "p2", name: "todowrite", input: { todos: [{ content: "The three step 2 lines said", status: "completed" }] } });
+}
+
+const GUIDED_HISTORY = [{ role: "user", content: "Guided onboarding kickoff.\nPath to set up now: llmops." }];
+
 describe("TurnRunner", () => {
   describe("when the local tools need the turn they belong to", () => {
     it("names the turn in flight and names none once it ends", async () => {
@@ -129,6 +166,103 @@ describe("TurnRunner", () => {
     });
   });
 
+  describe("when a guided turn ends on none of the calls the skill allows", () => {
+    /** @scenario "A guided turn that ends bare is continued once" */
+    it("appends one continuation to the same turn, then ends the turn and logs the second bare end", async () => {
+      const fake = makeFakeSession();
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const warnings: string[] = [];
+      const { runner, events } = makeRunner({
+        session: fake.session,
+        options: { warn: (message) => warnings.push(message) },
+      });
+      const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
+      await until(() => fake.promptCalls.length === 1);
+      feedStep2WithoutBranchLine(runner);
+      fake.finish();
+      await until(() => fake.promptCalls.length === 2);
+      expect(fake.promptCalls[1]?.prompt).toBe(
+        "Step 2 is not finished: the branch line was not said, and the first scenario card was not asked. Say the missing line, then continue with step 3 and end on the question card.",
+      );
+      expect(warnings).toContain("guided_turn_continued turn=t2 missing=the branch line; the first scenario card");
+      expect(events.some((event) => event.type === "turn_done")).toBe(false);
+      fake.finish();
+      await done;
+      expect(fake.promptCalls).toHaveLength(2);
+      expect(events[events.length - 1]).toEqual({ type: "turn_done", turnId: "t2", outcome: "ok" });
+      expect(warnings).toContain("guided_turn_bare_end turn=t2 missing=the branch line; the first scenario card");
+    });
+
+    /** @scenario "The continuation names the step 2 lines the turn did not say" */
+    it("continues with only the card named once the missing line was said on the second pass, and stops there", async () => {
+      const fake = makeFakeSession();
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const warnings: string[] = [];
+      const { runner } = makeRunner({ session: fake.session, options: { warn: (message) => warnings.push(message) } });
+      const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
+      await until(() => fake.promptCalls.length === 1);
+      feedStep2WithoutBranchLine(runner);
+      fake.finish();
+      await until(() => fake.promptCalls.length === 2);
+      settle(runner, { id: "s3", name: "say", input: { text: STEP2_LINES.branch }, output: "Said." });
+      fake.finish();
+      await done;
+      expect(fake.promptCalls).toHaveLength(2);
+      expect(warnings).toContain("guided_turn_bare_end turn=t2 missing=the first scenario card");
+    });
+
+    /** @scenario "A turn that ended on a card, a closing line or a failed step is left alone" */
+    it("leaves a turn that ended on the question card alone", async () => {
+      const fake = makeFakeSession();
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const warnings: string[] = [];
+      const { runner, events } = makeRunner({ session: fake.session, options: { warn: (message) => warnings.push(message) } });
+      const done = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
+      await until(() => fake.promptCalls.length === 1);
+      feedStep2WithoutBranchLine(runner);
+      settle(runner, { id: "s3", name: "say", input: { text: STEP2_LINES.branch }, output: "Said." });
+      settle(runner, { id: "q1", name: "question", input: { questions: [{ header: "Create the first scenario" }] } });
+      fake.finish();
+      await done;
+      expect(fake.promptCalls).toHaveLength(1);
+      expect(warnings).toEqual([]);
+      expect(events[events.length - 1]).toEqual({ type: "turn_done", turnId: "t2", outcome: "ok" });
+    });
+
+    it("leaves a turn outside the guided path alone", async () => {
+      const fake = makeFakeSession();
+      const { runner } = makeRunner({ session: fake.session });
+      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "How do I add a trace?" });
+      await until(() => fake.promptCalls.length === 1);
+      settle(runner, { id: "s1", name: "say", input: { text: "Like this." }, output: "Said." });
+      fake.finish();
+      await done;
+      expect(fake.promptCalls).toHaveLength(1);
+    });
+
+    /** @scenario "A message from the user cancels the continuation" */
+    it("does not continue a turn the user has already moved past", async () => {
+      const fake = makeFakeSession();
+      fake.session.agent.state.messages = GUIDED_HISTORY;
+      const warnings: string[] = [];
+      const { runner, events } = makeRunner({ session: fake.session, options: { warn: (message) => warnings.push(message) } });
+      const first = runner.submitTurn({ type: "turn", turnId: "t2", prompt: "Local folder connected" });
+      await until(() => fake.promptCalls.length === 1);
+      feedStep2WithoutBranchLine(runner);
+      fake.finish();
+      const second = runner.submitTurn({ type: "turn", turnId: "t3", prompt: "Actually, use the other folder." });
+      await first;
+      await until(() => fake.promptCalls.length === 2);
+      expect(fake.promptCalls[1]?.prompt).toBe("Actually, use the other folder.");
+      expect(warnings.filter((message) => message.startsWith("guided_turn_continued"))).toEqual([]);
+      // The newer turn ends on the card, as written.
+      settle(runner, { id: "q1", name: "question", input: { questions: [] } });
+      fake.finish();
+      await second;
+      expect(events.filter((event) => event.type === "turn_done").map((event) => event.turnId)).toEqual(["t2", "t3"]);
+    });
+  });
+
   describe("when the turn is a guided onboarding kickoff", () => {
     const KICKOFF = "Guided onboarding kickoff.\nPath to set up now: coding (Coding Agent Tracking).\nTour: completed.";
     const SKILL = "---\nname: guided-onboarding\n---\n\n# Guided onboarding\n\nSay the two lines.";
@@ -148,6 +282,7 @@ describe("TurnRunner", () => {
       });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: KICKOFF });
       await until(() => fake.promptCalls.length === 1);
+      endOnCard(runner);
       fake.finish();
       await done;
       expect(loaded).toEqual(["guided-onboarding"]);
@@ -170,6 +305,7 @@ describe("TurnRunner", () => {
         resumeToken: "user: earlier",
       });
       await until(() => fake.promptCalls.length === 1);
+      endOnCard(runner);
       fake.finish();
       await done;
       const prompt = fake.promptCalls[0]?.prompt ?? "";
@@ -188,6 +324,7 @@ describe("TurnRunner", () => {
       });
       const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: KICKOFF });
       await until(() => fake.promptCalls.length === 1);
+      endOnCard(runner);
       fake.finish();
       await done;
       expect(fake.promptCalls[0]?.prompt).toBe(KICKOFF);
