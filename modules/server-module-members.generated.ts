@@ -23,7 +23,7 @@ export const serverModuleMembers = {
   dataset: [],
   entitlement: [],
   evaluation: [],
-  evaluator: [],
+  evaluator: ["prisma"],
   experiment: [],
   "feature-flag": [],
   gateway: [],

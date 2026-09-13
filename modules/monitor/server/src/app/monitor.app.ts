@@ -12,13 +12,19 @@
  * to one, is here.
  */
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
-import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
+import {
+  EvaluationApi,
+  type MonitorPerformanceQuery,
+  type OnlineEvaluationPerformance,
+} from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
+  EvaluatorApi,
   evaluatorsSchema,
   getEvaluatorDefinitions,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import {
   MonitorApi,
   MonitorCheckSettingsInvalidError,
@@ -48,6 +54,7 @@ import type { MonitorRepositories } from "../repositories/monitor.repositories.t
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
+import { buildMonitorInfrastructure } from "./monitor-composition.build.ts";
 
 /** The window the performance strip reports, and compares to the one before it. */
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -91,14 +98,21 @@ export interface MonitorAppInfrastructure {
 
 type MonitorSetup = FeatureSetup<
   typeof MonitorApp.dependencies,
-  MonitorAppInfrastructure,
+  MembersRead<typeof MonitorApp.reads>,
   undefined,
   MonitorRepositories
 >;
 
 export class MonitorApp implements MonitorApi {
   static readonly contract = MonitorApi;
-  static readonly dependencies = { permissions: AuthzApi };
+  static readonly dependencies = {
+    permissions: AuthzApi,
+    /** The one evaluator service on this process, for the evaluator port and the copy replication. */
+    evaluators: EvaluatorApi,
+    /** The seven-day trend, through the ONE evaluation application that already owns the read. */
+    evaluation: EvaluationApi,
+  };
+  static readonly reads = reads();
 
   #monitors: MonitorService;
   #catalogue: MonitorCatalogService;
@@ -126,8 +140,37 @@ export class MonitorApp implements MonitorApi {
     this.#publicBaseUrl = members.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members }: MonitorSetup): MonitorApp {
-    return new MonitorApp(repositories, dependencies, members);
+  /**
+   * Builds this process's own {@link MonitorAppInfrastructure} from its
+   * evaluator and evaluation peers, then composes exactly as
+   * {@link MonitorApp.fromInfrastructure} does. Replaces
+   * `apps/api/src/features/monitor/monitor.composition.ts`'s hand
+   * composition (deleted by b383462d96).
+   */
+  static create(setup: MonitorSetup): MonitorApp {
+    const infrastructure = buildMonitorInfrastructure({
+      evaluators: setup.dependencies.evaluators,
+      evaluation: setup.dependencies.evaluation,
+    });
+
+    return MonitorApp.fromInfrastructure({
+      infrastructure,
+      dependencies: setup.dependencies,
+      repositories: setup.repositories,
+    });
+  }
+
+  /**
+   * Composes over an already-built {@link MonitorAppInfrastructure}. Kept
+   * because every unit test's fixture still builds one directly rather than
+   * reading process members.
+   */
+  static fromInfrastructure(setup: {
+    infrastructure: MonitorAppInfrastructure;
+    dependencies: MonitorSetup["dependencies"];
+    repositories: MonitorRepositories;
+  }): MonitorApp {
+    return new MonitorApp(setup.repositories, setup.dependencies, setup.infrastructure);
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {

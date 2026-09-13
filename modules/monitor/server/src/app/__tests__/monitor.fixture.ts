@@ -6,11 +6,11 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
+  EvaluationApi,
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
-import { EvaluatorNotFoundError } from "@langwatch/evaluator-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MonitorEvaluator } from "../monitor.app.ts";
@@ -102,14 +102,16 @@ export function createMonitorTestApp(
     publicBaseUrl?: string;
   }> = {},
 ): MonitorApp {
-  return MonitorApp.create({
+  return MonitorApp.fromInfrastructure({
     repositories: input.repositories ?? createMonitorTestRepositories(),
     dependencies: {
       permissions:
         input.permissions ??
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+      evaluators: createApiFixture<EvaluatorApi>(),
+      evaluation: createApiFixture<EvaluationApi>(),
     },
-    members: {
+    infrastructure: {
       evaluators: input.evaluators ?? new FakeMonitorEvaluators(),
       performance: input.performance ?? new FakeMonitorPerformance(),
       replication:
@@ -117,7 +119,5 @@ export function createMonitorTestApp(
       generateId: input.generateId ?? (() => "monitor_test"),
       publicBaseUrl: input.publicBaseUrl ?? "https://app.langwatch.test",
     },
-    config: void 0,
-    resources: new ResourceScope(),
   });
 }

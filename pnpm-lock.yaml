@@ -5063,6 +5063,9 @@ importers:
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -5081,6 +5084,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@langwatch/analytics-server':
         specifier: workspace:*
@@ -5879,6 +5885,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -7756,6 +7765,9 @@ importers:
 
   modules/monitor/server:
     dependencies:
+      '@langwatch/analytics-server':
+        specifier: workspace:*
+        version: link:../../analytics/server
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -7768,9 +7780,15 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/evaluator-server':
+        specifier: workspace:*
+        version: link:../../evaluator/server
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../contract
@@ -7786,6 +7804,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      nanoid:
+        specifier: 'catalog:'
+        version: 5.1.16
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -7796,9 +7817,6 @@ importers:
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
-      nanoid:
-        specifier: 'catalog:'
-        version: 5.1.16
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
