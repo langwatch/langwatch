@@ -16,7 +16,7 @@ const root = path.resolve(here, "..", "..");
 
 const PAGES = {
   cover: { width: 1200, height: 400, out: "cover.jpg" },
-  areas: { width: 1200, height: 560, out: "areas.jpg" },
+  areas: { width: 1200, height: 340, out: "areas.jpg" },
   signup: { width: 260, height: 56, out: "signup.png", transparent: true },
 };
 
