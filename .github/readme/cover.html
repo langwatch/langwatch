@@ -83,7 +83,8 @@
     background: rgba(255, 255, 255, 0.04);
     color: #dbe2ee;
   }
-  /* ?theme=light: cream background, navy copy, for a light backdrop image. */
+  /* The default: cream background, navy copy, over the flat illustration in backdrop.jpg.
+     ?theme=dark switches to the dark palette above (for a dark backdrop or the card grid). */
   body.light {
     --bg: #f5f3ee;
     --text: #1d293d;
@@ -124,11 +125,11 @@
     </div>
   </div>
   <script>
-    // The backdrop is backdrop.jpg by default. ?bg=<image> swaps it, ?bg=grid uses the
-    // card grid instead, and ?theme=light gives the cream variant with the navy wordmark.
+    // Cream copy over backdrop.jpg by default. ?bg=<image> swaps the backdrop, ?bg=grid uses
+    // the card grid instead, and ?theme=dark gives the dark palette with the light wordmark.
     const params = new URLSearchParams(location.search);
     const bg = params.get("bg") || "backdrop.jpg";
-    if (params.get("theme") === "light") {
+    if (params.get("theme") !== "dark") {
       document.body.classList.add("light");
       document.querySelector(".logo").src = "logo-navy.svg";
     }

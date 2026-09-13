@@ -1,8 +1,7 @@
 // Renders cover.html to cover.jpg (2400x800) with Playwright's Chromium.
 //
-//   node .github/readme/render.mjs                 # default backdrop, dark copy
-//   node .github/readme/render.mjs --theme light   # cream variant with the navy wordmark
-//   node .github/readme/render.mjs --bg grid       # the card grid instead of backdrop.jpg
+//   node .github/readme/render.mjs                        # cream copy over backdrop.jpg
+//   node .github/readme/render.mjs --theme dark --bg grid # dark palette over the card grid
 //   node .github/readme/render.mjs --out /tmp/x.png
 //
 // Edit the headline, description or area pills in cover.html, run this, commit both.
