@@ -24,6 +24,7 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import { authorizeLangyApiKey } from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
@@ -456,10 +457,9 @@ secured
       return c.json({ message: "Trigger not found." }, { status: 404 });
     }
 
-    const lastTriggerSent = await prisma.triggerSent.findFirst({
-      where: { triggerId, projectId: project.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const lastTriggerSent = await TriggerFireHistoryService.create(
+      prisma,
+    ).getLatestFireForTrigger({ projectId: project.id, triggerId });
 
     if (!lastTriggerSent) {
       return c.json({ message: "No trigger sent found." }, { status: 404 });

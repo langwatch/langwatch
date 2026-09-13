@@ -54,6 +54,21 @@ export class TriggerFireHistoryService {
   }
 
   /**
+   * The newest fire for one trigger, or null when it never fired. This is
+   * what the `/api/health/triggers` probe asks: did this trigger fire
+   * recently enough to count as alive.
+   */
+  async getLatestFireForTrigger({
+    projectId,
+    triggerId,
+  }: {
+    projectId: string;
+    triggerId: string;
+  }): Promise<TriggerFire | null> {
+    return this.repo.findLatestByTriggerId({ projectId, triggerId });
+  }
+
+  /**
    * Latest fires across every trigger in the project, newest first — the
    * activity feed on the automations page. Metadata only.
    */

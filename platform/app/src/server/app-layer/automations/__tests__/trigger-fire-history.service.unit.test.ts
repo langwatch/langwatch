@@ -36,6 +36,7 @@ describe("TriggerFireHistoryService", () => {
     repo = {
       findAllStatsForProject: vi.fn().mockResolvedValue(stats),
       findAllRecentByTriggerId: vi.fn().mockResolvedValue(fires),
+      findLatestByTriggerId: vi.fn().mockResolvedValue(fires[0]),
       findAllRecentForProject: vi.fn().mockResolvedValue(fires),
     };
     service = new TriggerFireHistoryService(repo);
@@ -99,6 +100,41 @@ describe("TriggerFireHistoryService", () => {
         // service is a passthrough, so asserting the shape here would only
         // test the fixture. That guard is asserted directly against the
         // prisma `select` in trigger-fire-history.prisma.repository.unit.test.ts.
+      });
+    });
+
+    describe("when fetching the latest fire for one trigger", () => {
+      it("scopes the lookup to the project and trigger", async () => {
+        await service.getLatestFireForTrigger({
+          projectId: "proj_123",
+          triggerId: "trigger_1",
+        });
+
+        expect(repo.findLatestByTriggerId).toHaveBeenCalledWith({
+          projectId: "proj_123",
+          triggerId: "trigger_1",
+        });
+      });
+
+      it("returns the repository's newest fire unchanged", async () => {
+        const result = await service.getLatestFireForTrigger({
+          projectId: "proj_123",
+          triggerId: "trigger_1",
+        });
+
+        expect(result).toEqual(fires[0]);
+      });
+
+      /** @scenario "A trigger that never fired reads as nothing" */
+      it("returns null when the trigger never fired", async () => {
+        vi.mocked(repo.findLatestByTriggerId).mockResolvedValueOnce(null);
+
+        const result = await service.getLatestFireForTrigger({
+          projectId: "proj_123",
+          triggerId: "trigger_never",
+        });
+
+        expect(result).toBeNull();
       });
     });
   });
