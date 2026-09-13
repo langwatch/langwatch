@@ -403,6 +403,38 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "clickhouse-containment|apps/api/src/platform/config/api.config.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|apps/worker/src/platform/config/worker.config.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|modules/analytics/server/src/tasks/lwql-provision.task.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|modules/organization/server/src/repositories/memory/memory.tenant-directory.repository.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|modules/organization/server/src/services/tenant-directory.service.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|modules/trace/server/src/services/offload/trace-cold-scan-detector.service.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|modules/trace/server/src/services/support/trace-retention-floor.service.ts",
+      "measured": "2026-09-13"
+    },
+    {
+      "key": "clickhouse-containment|packages/infrastructure/src/tenant-directory.ts",
+      "measured": "2026-09-13"
+    },
+    {
       "key": "cognitive-complexity|apps/api/src/app-trpc/app-trpc.sse.ts",
       "measured": "2026-09-06"
     },
