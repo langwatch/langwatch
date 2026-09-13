@@ -104,9 +104,32 @@ export function codexHelperThreadMarkersOf({
   spans: OtlpSpan[];
 }): Map<string, string> {
   const markers = new Map<string, string>();
-  if (!isCodexScope(scopeName)) return markers;
+  const requestSpanIds = temporaryStructuredRequestSpanIdsOf({
+    scopeName,
+    spans,
+  });
+  if (requestSpanIds.size === 0) return markers;
 
-  const requestSpanIds = new Set<string>();
+  for (const span of spans) {
+    if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) continue;
+    const parentId = TraceRequestUtils.normalizeOtlpId(span.parentSpanId);
+    if (!requestSpanIds.has(parentId)) continue;
+    const threadId = queuedThreadIdOf(span);
+    if (threadId) markers.set(parentId, threadId);
+  }
+  return markers;
+}
+
+/** The ids of the temporary structured request spans in one export batch. */
+function temporaryStructuredRequestSpanIdsOf({
+  scopeName,
+  spans,
+}: {
+  scopeName: string | null | undefined;
+  spans: OtlpSpan[];
+}): Set<string> {
+  const ids = new Set<string>();
+  if (!isCodexScope(scopeName)) return ids;
   for (const span of spans) {
     if (
       isCodexTemporaryStructuredRequestSpan({
@@ -114,21 +137,17 @@ export function codexHelperThreadMarkersOf({
         attributes: stringAttributes(span),
       })
     ) {
-      requestSpanIds.add(TraceRequestUtils.normalizeOtlpId(span.spanId));
+      ids.add(TraceRequestUtils.normalizeOtlpId(span.spanId));
     }
   }
-  if (requestSpanIds.size === 0) return markers;
+  return ids;
+}
 
-  for (const span of spans) {
-    if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) continue;
-    const parentId = TraceRequestUtils.normalizeOtlpId(span.parentSpanId);
-    if (!requestSpanIds.has(parentId)) continue;
-    const key = stringAttributes(span).key;
-    const threadId =
-      typeof key === "string" ? QUEUE_KEY_THREAD_ID.exec(key)?.[1] : undefined;
-    if (threadId) markers.set(parentId, threadId);
-  }
-  return markers;
+/** The thread id a queue child names, off its Debug-formatted `key`. */
+function queuedThreadIdOf(span: OtlpSpan): string | undefined {
+  const key = stringAttributes(span).key;
+  if (typeof key !== "string") return undefined;
+  return QUEUE_KEY_THREAD_ID.exec(key)?.[1];
 }
 
 /** The request span with the helper's thread id on it. */
