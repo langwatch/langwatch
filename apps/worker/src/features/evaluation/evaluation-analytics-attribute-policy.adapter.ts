@@ -10,7 +10,7 @@ import { trimAttributesForAnalytics } from "@langwatch/trace-server";
  * the other to state it. Moved here verbatim from the application, which is
  * where the same join used to be made.
  */
-export class TraceAnalyticsAttributePolicy extends EvaluationAnalyticsAttributePolicy {
+export class TraceAnalyticsAttributePolicy implements EvaluationAnalyticsAttributePolicy {
   trim(attributes: Record<string, string>): Record<string, string> {
     return trimAttributesForAnalytics(attributes);
   }

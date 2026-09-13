@@ -254,14 +254,12 @@ function parseJson(input: string): unknown {
 }
 
 /** Ops inspection decodes ordinary JSON jobs while preserving opaque envelopes as unreadable. */
-class WorkerOpsQueuePayloadDecoder extends QueuePayloadDecoder {
+class WorkerOpsQueuePayloadDecoder implements QueuePayloadDecoder {
   static create(): WorkerOpsQueuePayloadDecoder {
     return new WorkerOpsQueuePayloadDecoder();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   async tryDecode(input: {
     queueName: string;
@@ -274,7 +272,7 @@ class WorkerOpsQueuePayloadDecoder extends QueuePayloadDecoder {
 }
 
 /** A fresh replay engine per run, over the live worker registry and shared Redis markers. */
-class WorkerOpsReplayRuntime extends OpsReplayRuntimeFactory {
+class WorkerOpsReplayRuntime implements OpsReplayRuntimeFactory {
   static create(input: {
     eventing: EventSourcing;
     redis: RedisConnection;
@@ -289,9 +287,7 @@ class WorkerOpsReplayRuntime extends OpsReplayRuntimeFactory {
       redis: RedisConnection;
       resolveClient: EventingClickHouseReplayClientResolver;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   create() {
     const projections = replayProjections(this.input.eventing);

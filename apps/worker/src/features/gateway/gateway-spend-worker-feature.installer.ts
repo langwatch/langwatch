@@ -80,10 +80,8 @@ export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstalle
 }
 
 /** The pipeline's `confirmSpend`, behind the port a voice settlement asks for. */
-class DeferredGatewaySpendConfirmation extends GatewaySpendConfirmation {
-  constructor(private readonly send: CommandDispatcher<ConfirmSpendCommandData>) {
-    super();
-  }
+class DeferredGatewaySpendConfirmation implements GatewaySpendConfirmation {
+  constructor(private readonly send: CommandDispatcher<ConfirmSpendCommandData>) {}
 
   confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
     return this.send(data);

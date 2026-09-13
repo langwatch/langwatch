@@ -239,14 +239,12 @@ export type WorkerTraceProcessingPipelineOptions = Omit<
   "originGateHandler"
 >;
 
-export class WorkerTraceProcessingPipeline extends TraceProcessingPipeline {
+export class WorkerTraceProcessingPipeline implements TraceProcessingPipeline {
   static create(options: WorkerTraceProcessingCompositionOptions): WorkerTraceProcessingPipeline {
     return new WorkerTraceProcessingPipeline(composeWorkerTraceProcessingDeps(options));
   }
 
-  private constructor(private readonly deps: WorkerTraceProcessingPipelineOptions) {
-    super();
-  }
+  private constructor(private readonly deps: WorkerTraceProcessingPipelineOptions) {}
 
   build(options: { deferredOrigins: TraceDeferredOriginScheduler }) {
     return createWorkerTraceProcessingPipeline({
@@ -346,7 +344,7 @@ function composeWorkerTraceProcessingDeps(
 /**
  * The publisher a process with no Redis hands the two broadcast subscribers.
  */
-class WorkerInertTraceBroadcast extends TraceTenantBroadcast {
+class WorkerInertTraceBroadcast implements TraceTenantBroadcast {
   async broadcastToTenant(): Promise<void> {}
 }
 

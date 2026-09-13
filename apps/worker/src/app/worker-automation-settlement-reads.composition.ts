@@ -295,10 +295,8 @@ export class WorkerAutomationSettlementEvaluationReader extends AutomationSettle
  * configures its event store with. A second number here would let a settled match be confirmed
  * against runs the writer had already expired, or refuse runs the writer still holds.
  */
-class RetentionFloorFromDefault extends EvaluationRetentionFloor {
-  constructor(private readonly defaultRetentionDays: number) {
-    super();
-  }
+class RetentionFloorFromDefault implements EvaluationRetentionFloor {
+  constructor(private readonly defaultRetentionDays: number) {}
 
   async getFloorMs(): Promise<number> {
     return nowInstant().epochMilliseconds - this.defaultRetentionDays * 24 * 60 * 60 * 1000;

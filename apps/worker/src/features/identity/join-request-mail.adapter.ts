@@ -31,7 +31,7 @@ import type { EmailDelivery } from "@langwatch/notification-server";
  * The ending is deliberately quiet: a requester who learns which colleague
  * turned them down has learned something that is not theirs.
  */
-export class JoinRequestMailAdapter extends JoinRequestMail {
+export class JoinRequestMailAdapter implements JoinRequestMail {
   static create(options: {
     mailer: EmailDelivery;
     /** Renders the words. `ReactEmailMailRenderer` in every real process. */
@@ -46,9 +46,7 @@ export class JoinRequestMailAdapter extends JoinRequestMail {
     private readonly mailer: EmailDelivery,
     private readonly renderer: MailRender,
     private readonly baseHost: string,
-  ) {
-    super();
-  }
+  ) {}
 
   /** The one nudge, on the seventh day. */
   async sendStillWaiting({
@@ -109,14 +107,12 @@ export class JoinRequestMailAdapter extends JoinRequestMail {
  * A process that CLAIMS `event-sourcing/jobs` never gets here:
  * `WorkerProductionComposition` refuses to compose that graph without mail.
  */
-export class AbsentJoinRequestMail extends JoinRequestMail {
+export class AbsentJoinRequestMail implements JoinRequestMail {
   static create(): AbsentJoinRequestMail {
     return new AbsentJoinRequestMail();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   async sendStillWaiting(_input: {
     adminEmail: string;

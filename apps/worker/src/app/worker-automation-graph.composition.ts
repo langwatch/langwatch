@@ -240,7 +240,7 @@ class UnconfiguredAutomationCrypto implements AutomationSecretCrypto {
  * and two clocks in one process is how a cache expires against a time the
  * evaluator has not reached.
  */
-export class WorkerAutomationClock extends AutomationClock {
+export class WorkerAutomationClock implements AutomationClock {
   now() {
     return nowInstant();
   }

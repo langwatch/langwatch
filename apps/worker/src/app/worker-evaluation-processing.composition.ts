@@ -194,11 +194,10 @@ function createEvaluationExecutionIntent(options: WorkerEvaluationProcessingOpti
  * mappings: the command carries them as an opaque record because a queue payload is JSON, and the
  * engine reads a parsed `MappingState`.
  */
-class WorkerEvaluationEngine extends EvaluationExecution {
+class WorkerEvaluationEngine implements EvaluationExecution {
   #engine: EvaluationExecutionService;
 
   constructor(engine: EvaluationExecutionService) {
-    super();
     this.#engine = engine;
   }
 
@@ -210,7 +209,7 @@ class WorkerEvaluationEngine extends EvaluationExecution {
   }
 }
 
-class AbsentEvaluatorExecution extends EvaluationExecutionIntent {
+class AbsentEvaluatorExecution implements EvaluationExecutionIntent {
   execute(input: ExecuteEvaluationCommandData): Promise<never> {
     return Promise.reject(
       new Error(
@@ -225,11 +224,10 @@ class AbsentEvaluatorExecution extends EvaluationExecutionIntent {
  * configures its event store with. The same class the settlement reader uses, for the same reason:
  * a second number would let the fold read back runs the writer had already expired.
  */
-class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloor {
+class WorkerEvaluationRetentionFloor implements EvaluationRetentionFloor {
   #defaultRetentionDays: number;
 
   constructor(defaultRetentionDays: number) {
-    super();
     this.#defaultRetentionDays = defaultRetentionDays;
   }
 

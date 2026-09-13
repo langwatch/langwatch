@@ -38,7 +38,7 @@ export function createWorkerEvaluationModelEnv(input: {
  * model providers. Composed HERE since it bridges two features' server
  * packages. The Azure Content Safety branch never reads `process.env`.
  */
-export class WorkerEvaluationModelEnv extends EvaluationModelEnv {
+export class WorkerEvaluationModelEnv implements EvaluationModelEnv {
   static create(input: {
     modelProviders: ModelProviderApi;
     managedProviders: ManagedProviderApi;
@@ -56,9 +56,7 @@ export class WorkerEvaluationModelEnv extends EvaluationModelEnv {
       azureSafetyCredentials: EvaluationAzureSafetyCredentials;
       environment: Readonly<Record<string, string | undefined>>;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   async resolveForEvaluator({
     evaluatorType,

@@ -29,14 +29,12 @@ export type WorkerTraceSpoolStorageOptions = {
  * byte-writing surface here uses, resolved per project so a BYOC tenant writes
  * into its own bucket.
  */
-export class WorkerTraceSpoolStorageAdapter extends TraceSpoolStorage {
+export class WorkerTraceSpoolStorageAdapter implements TraceSpoolStorage {
   static create(options: WorkerTraceSpoolStorageOptions): WorkerTraceSpoolStorageAdapter {
     return new WorkerTraceSpoolStorageAdapter(options);
   }
 
-  private constructor(private readonly options: WorkerTraceSpoolStorageOptions) {
-    super();
-  }
+  private constructor(private readonly options: WorkerTraceSpoolStorageOptions) {}
 
   get azureRetentionConfirmed(): boolean {
     return this.options.azureRetentionConfirmed;
@@ -70,7 +68,7 @@ export class WorkerTraceSpoolStorageAdapter extends TraceSpoolStorage {
  * v1 key can only ever name an S3 object. Minting one against an Azure or file
  * destination would fabricate a location nothing ever wrote to.
  */
-export class WorkerTraceSpoolLegacyObjectAdapter extends TraceSpoolLegacyObject {
+export class WorkerTraceSpoolLegacyObjectAdapter implements TraceSpoolLegacyObject {
   static create(options: {
     runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;
@@ -81,9 +79,7 @@ export class WorkerTraceSpoolLegacyObjectAdapter extends TraceSpoolLegacyObject 
   private constructor(
     private readonly runtime: StoredObjectStorageRuntimeAdapter,
     private readonly aws: AwsClientProcessRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
   async read(input: { projectId: string; key: string }): Promise<Readable> {
     const { objectStore, uri } = await this.locate(input);

@@ -158,7 +158,7 @@ function createWorkerStoredObjects(options: {
   });
 }
 
-class WorkerStoredObjectsClickHouse extends StoredObjectsClickHouse {
+class WorkerStoredObjectsClickHouse implements StoredObjectsClickHouse {
   static create(
     resolveClient: (tenantId: string) => Promise<ClickHouseClient>,
   ): WorkerStoredObjectsClickHouse {
@@ -167,9 +167,7 @@ class WorkerStoredObjectsClickHouse extends StoredObjectsClickHouse {
 
   private constructor(
     private readonly resolveClientForTenant: (tenantId: string) => Promise<ClickHouseClient>,
-  ) {
-    super();
-  }
+  ) {}
 
   async resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient> {
     return WorkerStoredObjectsClickHouseClient.create(await this.resolveClientForTenant(projectId));

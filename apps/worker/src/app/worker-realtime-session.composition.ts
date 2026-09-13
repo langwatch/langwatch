@@ -185,14 +185,12 @@ class WorkerElevenLabsCredentials implements ElevenLabsCredentialReader {
  * value written under a rotated key all read as "no custom keys" rather than throwing: one
  * unreadable credential must not stop the sweep that settles every other session.
  */
-class WorkerGatewayModelProviderCredentials extends GatewayModelProviderCredentials {
+class WorkerGatewayModelProviderCredentials implements GatewayModelProviderCredentials {
   static create(encryption: AesGcmSecretEncryptionAdapter): WorkerGatewayModelProviderCredentials {
     return new WorkerGatewayModelProviderCredentials(encryption);
   }
 
-  private constructor(private readonly encryption: AesGcmSecretEncryptionAdapter) {
-    super();
-  }
+  private constructor(private readonly encryption: AesGcmSecretEncryptionAdapter) {}
 
   readCustomKeys(stored: unknown): Record<string, unknown> {
     const read = EncryptedModelProviderCredentialAdapter.readCustomKeys(stored, this.encryption);

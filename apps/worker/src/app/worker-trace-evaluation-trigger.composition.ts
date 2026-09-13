@@ -102,15 +102,13 @@ export class WorkerTraceEvaluationTrigger {
  * process's, and the key is the evaluation command's, so both graphs squash
  * against the same string while both are ingesting.
  */
-class WorkerTraceEvaluationDispatchAdapter extends TraceEvaluationDispatch {
+class WorkerTraceEvaluationDispatchAdapter implements TraceEvaluationDispatch {
   constructor(
     private readonly sendEvaluation: (
       data: ExecuteEvaluationCommandData,
       sendOptions?: QueueSendOptions<ExecuteEvaluationCommandData>,
     ) => Promise<void>,
-  ) {
-    super();
-  }
+  ) {}
 
   makeDedupId(data: ExecuteEvaluationCommandData): string {
     return ExecuteEvaluationCommand.makeJobId(data);

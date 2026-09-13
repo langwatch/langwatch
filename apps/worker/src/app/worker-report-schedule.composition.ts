@@ -178,10 +178,8 @@ function refuseReportRead<T extends object>(capability: string): T {
  * The floor an evaluation read will not look below, from the one retention
  * default this process configures its event store with.
  */
-class ReportRetentionFloor extends EvaluationRetentionFloor {
-  constructor(private readonly defaultRetentionDays: number) {
-    super();
-  }
+class ReportRetentionFloor implements EvaluationRetentionFloor {
+  constructor(private readonly defaultRetentionDays: number) {}
 
   async getFloorMs(): Promise<number> {
     return Date.now() - this.defaultRetentionDays * 24 * 60 * 60 * 1000;

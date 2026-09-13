@@ -24,7 +24,7 @@ type Tiktoken = { encode: (text: string) => Uint32Array; free: () => void };
  * the `with` attribute because production runs an esbuild bundle where tiktoken
  * stays external and Node resolves them through the ESM loader.
  */
-export class WorkerTiktokenCounterAdapter extends TraceTokenCounter {
+export class WorkerTiktokenCounterAdapter implements TraceTokenCounter {
   static create(config: WorkerTraceTokenizerConfig): WorkerTiktokenCounterAdapter {
     return new WorkerTiktokenCounterAdapter(config);
   }
@@ -32,9 +32,7 @@ export class WorkerTiktokenCounterAdapter extends TraceTokenCounter {
   private readonly cache = new Map<string, Tiktoken>();
   private readonly loading = new Map<string, Promise<Tiktoken | undefined>>();
 
-  private constructor(private readonly config: WorkerTraceTokenizerConfig) {
-    super();
-  }
+  private constructor(private readonly config: WorkerTraceTokenizerConfig) {}
 
   async tryCountTokens(model: string, text: string | undefined): Promise<number | undefined> {
     if (!text) return undefined;

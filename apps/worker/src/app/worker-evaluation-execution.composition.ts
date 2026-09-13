@@ -142,10 +142,8 @@ export async function createWorkerMonitorApp(options: {
 }
 
 /** A monitor read this process makes, over the one monitor application. */
-class WorkerEvaluationMonitorLookup extends EvaluationMonitorLookup {
-  constructor(private readonly monitors: MonitorApi) {
-    super();
-  }
+class WorkerEvaluationMonitorLookup implements EvaluationMonitorLookup {
+  constructor(private readonly monitors: MonitorApi) {}
 
   async tryGetMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator | null> {
     return (await this.monitors.findById(input)) ?? null;
@@ -185,7 +183,7 @@ class UncomposedMonitorReplication implements MonitorReplicationReader {
   }
 }
 
-class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentials {
+class WorkerEvaluationAzureSafetyCredentials implements EvaluationAzureSafetyCredentials {
   static create(input: {
     modelProviders: ModelProviderApi;
   }): WorkerEvaluationAzureSafetyCredentials {
@@ -195,7 +193,6 @@ class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCreden
   #modelProviders: ModelProviderApi;
 
   private constructor(modelProviders: ModelProviderApi) {
-    super();
     this.#modelProviders = modelProviders;
   }
 
@@ -217,7 +214,7 @@ class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCreden
 }
 
 /** Evaluation's full-content trace reads through Trace's composed API. */
-class WorkerEvaluationTraceReads extends EvaluationTraceRead {
+class WorkerEvaluationTraceReads implements EvaluationTraceRead {
   static create(traces: TraceApi): WorkerEvaluationTraceReads {
     return new WorkerEvaluationTraceReads(traces);
   }
@@ -225,7 +222,6 @@ class WorkerEvaluationTraceReads extends EvaluationTraceRead {
   #traces: TraceApi;
 
   private constructor(traces: TraceApi) {
-    super();
     this.#traces = traces;
   }
 
@@ -268,7 +264,7 @@ class WorkerEvaluationTraceReads extends EvaluationTraceRead {
   }
 }
 
-class WorkerEvaluationTraceEvidence extends EvaluationTraceEvidence {
+class WorkerEvaluationTraceEvidence implements EvaluationTraceEvidence {
   static create(traces: TraceApi): WorkerEvaluationTraceEvidence {
     return new WorkerEvaluationTraceEvidence(traces);
   }
@@ -276,7 +272,6 @@ class WorkerEvaluationTraceEvidence extends EvaluationTraceEvidence {
   #traces: TraceApi;
 
   private constructor(traces: TraceApi) {
-    super();
     this.#traces = traces;
   }
 
@@ -289,7 +284,7 @@ class WorkerEvaluationTraceEvidence extends EvaluationTraceEvidence {
   }
 }
 
-class WorkerEvaluationSettingsRecovery extends EvaluationSettingsRecovery {
+class WorkerEvaluationSettingsRecovery implements EvaluationSettingsRecovery {
   static create(flags: FeatureFlagApi): WorkerEvaluationSettingsRecovery {
     return new WorkerEvaluationSettingsRecovery(flags);
   }
@@ -297,7 +292,6 @@ class WorkerEvaluationSettingsRecovery extends EvaluationSettingsRecovery {
   #flags: FeatureFlagApi;
 
   private constructor(flags: FeatureFlagApi) {
-    super();
     this.#flags = flags;
   }
 
@@ -306,7 +300,7 @@ class WorkerEvaluationSettingsRecovery extends EvaluationSettingsRecovery {
   }
 }
 
-class WorkerEvaluationInputsOffload extends EvaluationInputsOffload {
+class WorkerEvaluationInputsOffload implements EvaluationInputsOffload {
   static create(input: {
     inputs: EvaluationInputsOffloadService;
     flags: FeatureFlagApi;
@@ -318,7 +312,6 @@ class WorkerEvaluationInputsOffload extends EvaluationInputsOffload {
   #flags: FeatureFlagApi;
 
   private constructor(inputs: EvaluationInputsOffloadService, flags: FeatureFlagApi) {
-    super();
     this.#inputs = inputs;
     this.#flags = flags;
   }
@@ -335,21 +328,19 @@ class WorkerEvaluationInputsOffload extends EvaluationInputsOffload {
   }
 }
 
-class WorkerEvaluationSpanDigest extends EvaluationSpanDigest {
+class WorkerEvaluationSpanDigest implements EvaluationSpanDigest {
   static create(): WorkerEvaluationSpanDigest {
     return new WorkerEvaluationSpanDigest();
   }
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   format(spans: Span[]): Promise<string> {
     return TraceReadableSpanService.formatSpansDigest(spans);
   }
 }
 
-class WorkerEvaluationWorkflowExecutor extends EvaluationWorkflowExecutor {
+class WorkerEvaluationWorkflowExecutor implements EvaluationWorkflowExecutor {
   static create(workflows: WorkerEvaluationWorkflows): WorkerEvaluationWorkflowExecutor {
     return new WorkerEvaluationWorkflowExecutor(
       WorkflowEvaluationAdapter.create(workflows.workflows),
@@ -359,7 +350,6 @@ class WorkerEvaluationWorkflowExecutor extends EvaluationWorkflowExecutor {
   #workflows: WorkflowEvaluationAdapter;
 
   private constructor(workflows: WorkflowEvaluationAdapter) {
-    super();
     this.#workflows = workflows;
   }
 

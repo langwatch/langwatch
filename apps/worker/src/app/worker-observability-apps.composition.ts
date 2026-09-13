@@ -235,10 +235,9 @@ class WorkerModelProviderTraceSpans {
   }
 }
 
-class WorkerCodingAgentBilling extends CodingAgentBillingPolicy {
+class WorkerCodingAgentBilling implements CodingAgentBillingPolicy {
   #policy: PostgresGovernanceServices["policy"];
   constructor(policy: PostgresGovernanceServices["policy"]) {
-    super();
     this.#policy = policy;
   }
   isSourceNonBillable(input: { organizationId: string; sourceType: string }): Promise<boolean> {

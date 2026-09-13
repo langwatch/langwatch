@@ -37,7 +37,7 @@ import type { WorkerProductAnalyticsConfig } from "../config/worker.config.ts";
  * opposite reason — `tiktoken` is optional at runtime and stays external to the
  * production bundle — and that precedent does not reach here.
  */
-export class WorkerPostHogProductAnalyticsAdapter extends TraceProductAnalytics {
+export class WorkerPostHogProductAnalyticsAdapter implements TraceProductAnalytics {
   static create(options: {
     config: WorkerProductAnalyticsConfig;
     logger?: Logger;
@@ -75,9 +75,7 @@ export class WorkerPostHogProductAnalyticsAdapter extends TraceProductAnalytics 
       key: string,
       options: { host: string | undefined },
     ) => ProductAnalyticsClient = (key, options) => new PostHog(key, options),
-  ) {
-    super();
-  }
+  ) {}
 
   /**
    * Fire and forget, and never at the expense of the trace.

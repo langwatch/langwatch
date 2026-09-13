@@ -100,10 +100,8 @@ export class WorkerTracePrivacy {
  * not become one — a service that extended one feature's port could not answer
  * the other two features' ports for the same policy.
  */
-class WorkerTraceSpanPiiRedactionAdapter extends TraceSpanPiiRedaction {
-  constructor(private readonly service: OtlpSpanPiiRedactionService) {
-    super();
-  }
+class WorkerTraceSpanPiiRedactionAdapter implements TraceSpanPiiRedaction {
+  constructor(private readonly service: OtlpSpanPiiRedactionService) {}
 
   async redact(
     span: OtlpSpan,

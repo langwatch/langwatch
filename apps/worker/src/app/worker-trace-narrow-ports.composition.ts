@@ -110,10 +110,8 @@ export type WorkerTraceNarrowMembers = Readonly<{
   productAnalytics: TraceProductAnalytics;
 }>;
 
-class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadata {
-  constructor(private readonly projects: TraceProjectMetadataReader) {
-    super();
-  }
+class WorkerTraceProjectMetadataAdapter implements TraceProjectMetadata {
+  constructor(private readonly projects: TraceProjectMetadataReader) {}
 
   tryGetById(id: string): Promise<Project | null> {
     return this.projects.tryGetById(id);
@@ -128,20 +126,16 @@ class WorkerTraceProjectMetadataAdapter extends TraceProjectMetadata {
   }
 }
 
-class WorkerTraceEvaluationMonitorAdapter extends TraceEvaluationMonitor {
-  constructor(private readonly monitors: TraceEvaluationMonitorReader) {
-    super();
-  }
+class WorkerTraceEvaluationMonitorAdapter implements TraceEvaluationMonitor {
+  constructor(private readonly monitors: TraceEvaluationMonitorReader) {}
 
   getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
     return this.monitors.getEnabledOnMessageMonitors(projectId);
   }
 }
 
-class WorkerTraceModelCostCatalogAdapter extends TraceModelCostCatalog {
-  constructor(private readonly modelProviders: TraceModelCostReader) {
-    super();
-  }
+class WorkerTraceModelCostCatalogAdapter implements TraceModelCostCatalog {
+  constructor(private readonly modelProviders: TraceModelCostReader) {}
 
   listCosts(input: { projectId: string }): Promise<ModelCost[]> {
     return this.modelProviders.listCosts(input);

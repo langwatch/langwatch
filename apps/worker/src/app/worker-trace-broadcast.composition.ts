@@ -53,10 +53,8 @@ export function tryCreateWorkerTraceBroadcast(options: {
  * subscriber that started publishing something other than `trace_updated` would
  * have to say so at its own call site rather than having it silently corrected.
  */
-class WorkerTraceTenantBroadcastAdapter extends TraceTenantBroadcast {
-  constructor(private readonly broadcast: TenantBroadcast) {
-    super();
-  }
+class WorkerTraceTenantBroadcastAdapter implements TraceTenantBroadcast {
+  constructor(private readonly broadcast: TenantBroadcast) {}
 
   broadcastToTenant(tenantId: string, event: string, eventType: "trace_updated"): Promise<void> {
     return this.broadcast.broadcastToTenant({ tenantId, event, eventType });

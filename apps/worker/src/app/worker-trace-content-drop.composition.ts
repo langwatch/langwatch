@@ -67,10 +67,8 @@ export class WorkerTraceContentDrop {
  * ingestion paths when they convert, and a service extending one feature's
  * port could not answer the others'.
  */
-class WorkerTraceSpanContentDropAdapter extends TraceSpanContentDrop {
-  constructor(private readonly service: OtlpSpanContentDropService) {
-    super();
-  }
+class WorkerTraceSpanContentDropAdapter implements TraceSpanContentDrop {
+  constructor(private readonly service: OtlpSpanContentDropService) {}
 
   async drop(span: OtlpSpan, projectId: string): Promise<TraceSpanContentDropResult> {
     return await this.service.dropSpanContent({ span, projectId });

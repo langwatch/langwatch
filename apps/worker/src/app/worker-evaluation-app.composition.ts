@@ -203,7 +203,7 @@ function numericClickHouseSettings(
   );
 }
 
-class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloor {
+class WorkerEvaluationRetentionFloor implements EvaluationRetentionFloor {
   static create(defaultRetentionDays: number): WorkerEvaluationRetentionFloor {
     return new WorkerEvaluationRetentionFloor(defaultRetentionDays);
   }
@@ -211,7 +211,6 @@ class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloor {
   #defaultRetentionDays: number;
 
   private constructor(defaultRetentionDays: number) {
-    super();
     this.#defaultRetentionDays = defaultRetentionDays;
   }
 
@@ -221,7 +220,7 @@ class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloor {
 }
 
 /** Persists evaluation input blobs under the same tenant-routed object store as trace blobs. */
-class WorkerEvaluationInputStorage extends EvaluationInputStorage {
+class WorkerEvaluationInputStorage implements EvaluationInputStorage {
   static create(input: {
     runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;
@@ -233,7 +232,6 @@ class WorkerEvaluationInputStorage extends EvaluationInputStorage {
   #aws: AwsClientProcessRuntime;
 
   private constructor(runtime: StoredObjectStorageRuntimeAdapter, aws: AwsClientProcessRuntime) {
-    super();
     this.#runtime = runtime;
     this.#aws = aws;
   }

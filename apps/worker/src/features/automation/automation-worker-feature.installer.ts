@@ -37,7 +37,7 @@ type RecordTriggerMatchInput = TriggerMatchRecordedEventData & {
  * receive this port and Automation connects the real command sender to it at
  * install time — the same late-binding shape Trace uses for Topic assignment.
  */
-class WorkerAutomationTriggerMatches extends AutomationTriggerMatchRecorder {
+class WorkerAutomationTriggerMatches implements AutomationTriggerMatchRecorder {
   private delegate: AutomationTriggerMatchRecorder | undefined;
 
   connect(delegate: AutomationTriggerMatchRecorder): void {
@@ -52,7 +52,7 @@ class WorkerAutomationTriggerMatches extends AutomationTriggerMatchRecorder {
   }
 }
 
-class RegisteredAutomationTriggerMatches extends AutomationTriggerMatchRecorder {
+class RegisteredAutomationTriggerMatches implements AutomationTriggerMatchRecorder {
   static create(command: {
     send(data: RecordTriggerMatchInput): Promise<unknown>;
   }): RegisteredAutomationTriggerMatches {
@@ -61,9 +61,7 @@ class RegisteredAutomationTriggerMatches extends AutomationTriggerMatchRecorder 
 
   private constructor(
     private readonly command: { send(data: RecordTriggerMatchInput): Promise<unknown> },
-  ) {
-    super();
-  }
+  ) {}
 
   async send(input: RecordTriggerMatchInput): Promise<void> {
     await this.command.send(input);

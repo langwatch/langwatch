@@ -96,14 +96,12 @@ export function createWorkerTopicRuntime(
 /**
  * Topic's langevals exchange, posted directly.
  */
-export class WorkerTopicClusteringLangevalsAdapter extends TopicClusteringLangevals {
+export class WorkerTopicClusteringLangevalsAdapter implements TopicClusteringLangevals {
   static create(fetchImpl: typeof globalThis.fetch): WorkerTopicClusteringLangevalsAdapter {
     return new WorkerTopicClusteringLangevalsAdapter(fetchImpl);
   }
 
-  private constructor(private readonly fetchImpl: typeof globalThis.fetch) {
-    super();
-  }
+  private constructor(private readonly fetchImpl: typeof globalThis.fetch) {}
 
   async postClustering(params: {
     url: string;

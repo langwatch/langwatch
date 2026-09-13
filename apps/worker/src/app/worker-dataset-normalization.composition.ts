@@ -129,13 +129,12 @@ class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorker {
  * policy the rest of this process's object storage uses — so dataset
  * chunks, the trace spool, and every other stored object agree on account.
  */
-export class WorkerDatasetStorageResolver extends DatasetStorageResolver {
+export class WorkerDatasetStorageResolver implements DatasetStorageResolver {
   private readonly s3: S3DatasetStorageAdapter;
   /** Built once, on first use — matching the general registry's Azure laziness. */
   private azure: AzureDatasetStorageAdapter | undefined;
 
   constructor(private readonly storage: WorkerDatasetObjectStorage) {
-    super();
     this.s3 = S3DatasetStorageAdapter.create(
       new WorkerDatasetS3ClientResolver(storage.aws, storage.projects, storage.globalS3),
     );
@@ -162,10 +161,8 @@ export class WorkerDatasetStorageResolver extends DatasetStorageResolver {
  * one-account model `WorkerAzureStorageAdapter` uses for the general path.
  * `projectId` is unread: this process composes no per-project Azure routing.
  */
-class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolver {
-  constructor(private readonly azure: WorkerStorageConfig["azure"]) {
-    super();
-  }
+class WorkerDatasetAzureConfigResolver implements DatasetAzureConfigResolver {
+  constructor(private readonly azure: WorkerStorageConfig["azure"]) {}
 
   async resolve(_projectId: string): Promise<DatasetAzureConfig> {
     const driver = createWorkerAzureBlobDriver(this.azure);
@@ -183,14 +180,12 @@ class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolver {
  * RELEASE: one normalize job per dataset, so a fresh client per job removes
  * the lifecycle the application's shared manager needs.
  */
-class WorkerDatasetS3ClientResolver extends DatasetS3ClientResolver {
+class WorkerDatasetS3ClientResolver implements DatasetS3ClientResolver {
   constructor(
     private readonly aws: AwsClientProcessRuntime,
     private readonly projects: WorkerProjectS3Source,
     private readonly globalS3: WorkerProjectS3Target | undefined,
-  ) {
-    super();
-  }
+  ) {}
 
   async acquire(projectId: string): Promise<DatasetS3ClientLease> {
     const target = (await this.projects.tryGet(projectId)) ?? this.globalS3;

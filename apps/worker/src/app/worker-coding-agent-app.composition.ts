@@ -109,10 +109,8 @@ export async function createWorkerCodingAgentApp(options: {
   return { app: runtime.module(codingAgentServer).provided, github };
 }
 
-class WorkerCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectory {
-  constructor(private readonly database: PrismaConnection["client"]) {
-    super();
-  }
+class WorkerCodingAgentScopeDirectory implements CodingAgentCallerScopeDirectory {
+  constructor(private readonly database: PrismaConnection["client"]) {}
 
   listOrganizationProjects(input: {
     organizationId: string;
@@ -142,10 +140,8 @@ class WorkerCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectory {
   }
 }
 
-class WorkerCodingAgentScopePermissions extends CodingAgentScopePermissions {
-  constructor(private readonly authorization: AuthzApi) {
-    super();
-  }
+class WorkerCodingAgentScopePermissions implements CodingAgentScopePermissions {
+  constructor(private readonly authorization: AuthzApi) {}
 
   async projectCuts(input: {
     caller: CodingAgentScopeCaller;
