@@ -45,7 +45,9 @@ export async function bootNodeExecutable(service: string, load: () => Promise<un
     await load();
   } catch (error) {
     writeFatal(service, "fatal boot failure", error);
-    process.exitCode = 1;
+    // Exit outright: pollers a half-built graph already started would
+    // otherwise hold the event loop open forever, spinning on closed clients.
+    process.exit(1);
   } finally {
     guard.dispose();
   }
