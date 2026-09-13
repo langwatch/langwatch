@@ -101,7 +101,7 @@ Work on a branch of your own, never on the branch the user has checked out: `git
    ```
 
    `False` is not a failed step: fix the load order of item 2 and run the same command again.
-6. Start the agent from that branch the way the repo starts it (the `local_*` tools run the process), then run `langwatch agent list --wait-online <agent name> --format json` once, with the `timeout` parameter of the shell tool set to 150: it prints the list as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. The wait takes up to 120 seconds, so a shell limit at or under that cuts the command before the CLI prints its line, and what you read is the shell's limit instead of the line naming the agent, the wait and the credentials: the wait always gets more room than it takes. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Every `--target` below is `connected:<that name>`.
+6. Start the agent from that branch the way the repo starts it (the `local_*` tools run the process), then run `langwatch agent list --wait-online "<agent name>" --format json` once, with the `timeout` parameter of the shell tool set to 150: it prints the list as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. The wait takes up to 120 seconds, so a shell limit at or under that cuts the command before the CLI prints its line, and what you read is the shell's limit instead of the line naming the agent, the wait and the credentials: the wait always gets more room than it takes. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Every `--target` below is `"connected:<that name>"`. The name you chose goes in double quotes in every command that carries it, here and in the runs below: a name with a space passed bare is read as two arguments, and the command never runs.
 7. Commit the instrumentation on that branch, in one command: stage the files you edited or wrote, by name (the manifest the install of item 1 changed or you wrote the package line into, `requirements.txt` included, and the lockfile it changed, unless the repository ignores it, the tracing edit, the connect adapter), never the env file and never `git add -A`, with this message and no trailer:
 
 ```bash
@@ -185,7 +185,7 @@ Before I run it, why a scenario and not a plain test? A scenario is a simulated 
 Running it against your agent now.
 
 ```bash
-langwatch scenario run <scenario_id> --target connected:<agent name> --wait --format json
+langwatch scenario run <scenario_id> --target "connected:<agent name>" --wait --format json
 ```
 
 ### 5. From one run to a suite
@@ -201,7 +201,7 @@ Items 5 to 8, without another question:
 ```bash
 langwatch test-suite create "Full regression" --format json
 langwatch scenario create "<title>" --situation "..." --criteria "..." --test-suite <suite_id> --format json   # three or four more, each a different path through the agent
-langwatch test-suite run <suite_id> --target connected:<agent name> --wait --format json
+langwatch test-suite run <suite_id> --target "connected:<agent name>" --wait --format json
 langwatch navigate open <the scenariorun_ id the suite run printed>
 ```
 
@@ -227,7 +227,11 @@ The first: the workspace facts say `git: not a repository`, so no branch and no 
 
 The second: every rung of the Python install ladder of item 1 answered a command not found. The question is this, verbatim: "I couldn't find pip or uv on this machine, so I can't install the LangWatch package. Want me to install uv?" Options, in this order: "Install uv for me" and "I'll set up Python myself". On "Install uv for me": run the official installer, `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `uv init` when the folder has no `pyproject.toml`, then `uv add langwatch`, and item 1 goes on. On "I'll set up Python myself": end the turn saying what to install, Python 3 with pip or uv, and to send a message when it is done.
 
-`gh` not signed in is not a dead end: the no-remote line of item 8 already covers it. Every other error keeps the rule below.
+`gh` not signed in is not a dead end: the no-remote line of item 8 already covers it.
+
+A command that fails for a cause you can act on from what you already know is fixed and run once more, never reported. Three cases. The command was written wrong: a usage error, `too many arguments`, `unknown option`, `missing required argument`, an exit code 2 with the usage printed, so fix the shape, a name with a space in double quotes. A spelling was missing: a command not found, so the next rung of the ladder. A module or dependency the folder declares is missing: `ModuleNotFoundError`, `Cannot find module`, so install what the folder declares through the interpreter or manager that worked, `uv sync`, `python -m pip install -r requirements.txt`, `npm install`, and run the same command again. The rerun's answer is the step's answer. One fix and one rerun per command: a second failure of the same kind is a failed step, and the unlock question of this section, when one covers it, comes before any stop. A `say` that ends the turn on what is "not done yet because" of a cause like these, with no fix tried and no question asked, is never the reply.
+
+Every other error keeps the rule below.
 
 A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file: say in one line, with `say`, what is not done and what the error names as the cause, and end the turn with the open items left open. One exception to the reads, with one repair in it: when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named (`local_read` on the path its result printed). When its last lines name a cause in your own work of this step, a module that is not installed, an import or syntax error in a file you edited, a name the adapter got wrong, fix that cause, start the agent again the same way and run the wait once more, with the same timeout. A log that shows a clean start, the server up and no exception, with the row never online means the adapter did not register with the SDK, which is your own work of this step too: the repair is to rewrite the adapter as the SDK connect call of item 3, start the agent again and run the wait once more. The repair happens once and never touches the env file or reads the key: a second failed wait, or a cause outside those edits, stops there as this section says, and you report its last lines, the exception if there is one, as the reason. Never a guess about the CLI, the login or the project in its place. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
 

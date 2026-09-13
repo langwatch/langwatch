@@ -430,7 +430,7 @@ describe("the guided-onboarding skill", () => {
 
     /** @scenario "The instrumentation is committed once the agent is online" */
     it("commits the instrumentation on the langy branch as soon as the agent is online, with one fixed message", () => {
-      const online = rendered.indexOf("run `langwatch agent list --wait-online <agent name> --format json` once");
+      const online = rendered.indexOf("run `langwatch agent list --wait-online \"<agent name>\" --format json` once");
       const commit = rendered.indexOf(
         'git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"',
       );
@@ -562,7 +562,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The wait for the agent gets more room than it takes" */
     it("runs the wait with a shell timeout above the wait itself, so the CLI's own line is what it reads", () => {
       expect(rendered).toContain(
-        "run `langwatch agent list --wait-online <agent name> --format json` once, with the `timeout` parameter of the shell tool set to 150:",
+        "run `langwatch agent list --wait-online \"<agent name>\" --format json` once, with the `timeout` parameter of the shell tool set to 150:",
       );
       expect(rendered).toContain(
         "The wait takes up to 120 seconds, so a shell limit at or under that cuts the command before the CLI prints its line",
@@ -724,7 +724,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "Nothing runs against an agent that is not online" */
     it("waits for the agent row to be online through one CLI call, before any run", () => {
       expect(rendered).toContain(
-        "run `langwatch agent list --wait-online <agent name> --format json` once",
+        "run `langwatch agent list --wait-online \"<agent name>\" --format json` once",
       );
       expect(rendered).toContain(
         "it fails after two minutes when the row never does.",
@@ -919,6 +919,64 @@ describe("the guided-onboarding skill", () => {
       );
       expect(section).toContain(
         'On "I\'ll set up Python myself": end the turn saying what to install, Python 3 with pip or uv, and to send a message when it is done.',
+      );
+    });
+
+    /** @scenario "A chosen name is quoted in every command that carries it" */
+    it("quotes the agent name in the wait, the run and the suite run", () => {
+      expect(rendered).toContain(
+        'run `langwatch agent list --wait-online "<agent name>" --format json` once',
+      );
+      expect(rendered).toContain(
+        'langwatch scenario run <scenario_id> --target "connected:<agent name>" --wait --format json',
+      );
+      expect(rendered).toContain(
+        'langwatch test-suite run <suite_id> --target "connected:<agent name>" --wait --format json',
+      );
+      expect(rendered).toContain(
+        "a name with a space passed bare is read as two arguments, and the command never runs",
+      );
+      expect(rendered).not.toContain("--wait-online <agent name>");
+      expect(rendered).not.toContain("--target connected:<agent name>");
+      const skillNamed = (slug: string) =>
+        renderSkill(
+          (listNativeSkills(skillsRoot).find((s) => s.slug === slug) ??
+            listPublishedSkills(skillsRoot).find((s) => s.slug === slug))!,
+        );
+      const connectAgent = skillNamed("connect-agent");
+      expect(connectAgent).toContain('--target "connected:ACME checkout"');
+      expect(connectAgent).toContain('--wait-online "ACME checkout"');
+      const scenarios = skillNamed("scenarios");
+      expect(scenarios).toContain(
+        'A name with a space is quoted whole: `--target "connected:ACME checkout"`.',
+      );
+    });
+
+    /** @scenario "A command Langy wrote wrong is rerun, not reported as a failed step" */
+    it("reruns a command it wrote wrong instead of reporting a failed step", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      const rule = "A command that fails for a cause you can act on from what you already know is fixed and run once more, never reported.";
+      expect(section).toContain(rule);
+      expect(section).toContain(
+        "The command was written wrong: a usage error, `too many arguments`, `unknown option`, `missing required argument`, an exit code 2 with the usage printed, so fix the shape, a name with a space in double quotes.",
+      );
+      expect(section).toContain(
+        "A spelling was missing: a command not found, so the next rung of the ladder.",
+      );
+      expect(section).toContain(
+        "A module or dependency the folder declares is missing: `ModuleNotFoundError`, `Cannot find module`, so install what the folder declares through the interpreter or manager that worked, `uv sync`, `python -m pip install -r requirements.txt`, `npm install`, and run the same command again.",
+      );
+      expect(section).toContain(
+        "One fix and one rerun per command: a second failure of the same kind is a failed step, and the unlock question of this section, when one covers it, comes before any stop.",
+      );
+      // The reply two films ended on: a status line naming the cause, no fix
+      // tried, no question asked, and the turn closed.
+      expect(section).toContain(
+        'A `say` that ends the turn on what is "not done yet because" of a cause like these, with no fix tried and no question asked, is never the reply.',
+      );
+      expect(section.indexOf(rule)).toBeLessThan(
+        section.indexOf("A step fails when a command answers an error, never when a judge answers a verdict"),
       );
     });
 

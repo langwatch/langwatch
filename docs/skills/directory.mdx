@@ -1758,7 +1758,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -1771,7 +1771,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -2243,7 +2243,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -2278,7 +2278,7 @@ Report failures as they happened. If a CLI command failed or the platform was un
 A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
 
 1. Restart the service that holds the connect call, on the same port.
-2. Run `langwatch agent get <name>` and read the parameter list back.
+2. Run `langwatch agent get "<name>"` and read the parameter list back.
 3. Put that list in the pull request body, as the command printed it.
 
 When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
@@ -4979,7 +4979,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -4992,7 +4992,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -5713,7 +5713,7 @@ Ask light questions with options. Don't overwhelm: pick the top 2-3 most impactf
 After each improvement:
 
 1. Show what was accomplished
-2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run <id|name> --target <type:id> --wait`, etc.)
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run "<id|name>" --target <type:id> --wait`, etc.)
 3. Ask what to tackle next
 4. Stop when the user says "that's enough"
 

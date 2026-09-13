@@ -16,6 +16,7 @@
  */
 
 import { Command, Option } from "commander";
+import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -1917,7 +1918,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--timeout <seconds>",
         "How long --wait-online waits before failing",
         "120",
-      ),
+      )
+      // No positional argument here, so a stray word is a name with a space
+      // passed bare after --wait-online: the refusal says to quote it.
+      .configureOutput({
+        outputError: (message, write) => write(withQuotedNameHint(message)),
+      }),
     async (options: { waitOnline?: string; timeout?: string }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
       return impl(options);

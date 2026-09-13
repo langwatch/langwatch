@@ -742,6 +742,27 @@ Feature: Langy guides the first setup after sign-up
       Then a run that answers a verdict, passed or failed, gets the two-things line
       And after a failed verdict the explanation comes first, then the line, then the suite
 
+    # A film named the agent "ACME checkout" and ran the wait as
+    # --wait-online ACME checkout: the CLI read one word as the name and
+    # refused the other, and Langy reported the setup as blocked.
+    @unit
+    Scenario: A chosen name is quoted in every command that carries it
+      When the compiled guided-onboarding skill is read
+      Then the wait, the run and the suite run carry the agent name in double quotes
+      And the skill says a name with a space passed bare is read as two arguments
+      And the connect-agent and scenarios skills quote a name with a space in the target
+
+    # Two films ended on a status line: "not done because the agent name was
+    # passed in the wrong shape", "not done yet because the environment is
+    # missing the dotenv module". Both causes were Langy's to act on.
+    @unit
+    Scenario: A command Langy wrote wrong is rerun, not reported as a failed step
+      When the compiled guided-onboarding skill is read
+      Then a command that fails for a cause Langy can act on from what it already knows is fixed and rerun once, never reported
+      And the three cases are a command written wrong, a missing spelling and a missing module or dependency the folder declares
+      And a second failure of the same kind is a failed step, whose unlock question comes before any stop
+      And a turn never ends on a "not done yet because" line with no fix tried and no question asked
+
     @unit
     Scenario: A failed step stops with one line and no completion
       When the compiled guided-onboarding skill is read

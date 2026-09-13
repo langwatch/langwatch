@@ -45,6 +45,12 @@ Feature: The agent commands show connected agents and run them through the relay
     # the identity notice ("... Switch: langwatch login ...") and a gray hint
     # on stderr reads, to a model, as the command line asking for a login,
     # on a command line that is signed in.
+    @unit
+    Scenario: A name with spaces passed bare is told to quote it
+      When I run "langwatch agent list --wait-online ACME checkout --format json"
+      Then the command refuses the stray word as too many arguments
+      And the refusal says a name with spaces goes in double quotes
+
     Scenario: The wait's timeout names the agent, the wait and the credentials, never a login
       Given a connected agent that never reports online
       When I run "langwatch agent list --wait-online acme-checkout --format json" and the timeout passes
