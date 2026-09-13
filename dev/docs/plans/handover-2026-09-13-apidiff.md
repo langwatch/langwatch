@@ -70,3 +70,15 @@ enterprise-tier decision, nobody ports them now.
 Run apidiff for real. **Exit 1 with a findings report is SUCCESS.** Then the
 70 unserved documented operations
 (`unserved-documented-operations-2026-09-12.md`) and the findings themselves.
+
+## Pattern-list addition (2026-09-13, from the worker drive, confirmed twice)
+
+**The error path is a seam too, and it can be built-but-never-connected like
+any other.** `tools/dev-runtime`'s backend entrypoint swallows a worker boot
+REJECTION: members close (redis+pg), no fatal is logged, the process neither
+exits nor serves, and the outbox/wake pollers spin on closed pools forever —
+a zombie that monitors read as quiet. The identical failure under
+`pnpm --filter @langwatch/worker start` logs the fatal and exits through
+bootNodeExecutable. Fix (propagate the rejection out of the backend
+entrypoint, or log+exit) rides with whoever next touches tools/dev-runtime;
+until then, verify worker boots SOLO, never through the dev-runtime lane.
