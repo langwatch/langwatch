@@ -165,7 +165,10 @@ export async function createLangySession({
     extensionFactories: [
       createSystemPromptExtension(systemPrompt),
       createTodowriteExtension(),
-      createSkillExtension(config.skillsDir),
+      createSkillExtension({
+        skillsDir: config.skillsDir,
+        disabledSkills: config.disabledSkills,
+      }),
       createQuestionExtension({ turnContext }),
       createSayExtension(),
       createSecretSnippetExtension(),

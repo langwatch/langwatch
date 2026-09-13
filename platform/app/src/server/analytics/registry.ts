@@ -368,12 +368,16 @@ export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap(
 
 export const getMetric = (
   groupMetric: FlattenAnalyticsMetricsEnum,
-): AnalyticsMetric => {
+): AnalyticsMetric | undefined => {
   const [group, metric_] = groupMetric.split(".") as [
     AnalyticsMetricsGroupsEnum,
     string,
   ];
-  return (analyticsMetrics[group] as any)[metric_];
+  // Optional chaining on the group lookup: an unknown group (not just an
+  // unknown metric within a known group) must return undefined here rather
+  // than throw a raw TypeError — the only caller (AnalyticsService.
+  // getTimeseries) turns `undefined` into a clean ValidationError.
+  return (analyticsMetrics[group] as any)?.[metric_];
 };
 
 export const getGroup = (

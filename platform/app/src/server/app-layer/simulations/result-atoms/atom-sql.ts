@@ -1,3 +1,4 @@
+import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import { AGENT_TEST_SET_SUFFIX } from "~/server/scenarios/agent-test-scenario";
 import { expandSetIdFilter } from "~/server/scenarios/internal-set-id";
 import { TABLE_NAME } from "../repositories/simulation.clickhouse.repository";
@@ -292,8 +293,11 @@ function stableFilterParts(filter: ResultsFilter): FilterParts {
   // as a row with no name.
   const parts: string[] = [
     "ScenarioId != ''",
-    // A "Test agent" run is a check of an agent, not a result of a scenario.
+    // A "Test agent" run is a check of an agent, not a result of a scenario;
+    // the legacy `voice-calls` set is a pre-#8020 drawer call, likewise never a
+    // scenario result (a drawer call no longer writes a run at all).
     `NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`,
+    `ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`,
   ];
   const params: Record<string, string | string[]> = {};
 

@@ -1,0 +1,48 @@
+---
+title: Langy Health Check
+description: An endpoint an uptime monitor can poll that sends Langy a real greeting and reports whether it answered.
+sidebarTitle: Health check
+keywords:
+  - langy health check
+  - langy uptime monitor
+  - langy canary
+---
+
+`GET /api/health/langy` sends one real user turn, "Hi Langy.", through the same path the browser and the API use, waits for the answer, and reports the result in a shape an uptime monitor can alert on. Point any HTTP monitor at it.
+
+## Configure the monitor
+
+| Setting | Value |
+| --- | --- |
+| Method and URL | `GET https://<your-langwatch-host>/api/health/langy` |
+| Headers | `X-Auth-Token: <API key>` and `X-Project-Id: <project id>` |
+| Expected status | `200` |
+| Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
+| Check interval | 3 minutes or longer |
+
+The API key must be one issued to a user (Settings → API keys), that user must have Langy access, and the key must carry the `langy:create` permission. The turn runs as that user, so create a dedicated user and key for the monitor rather than reusing a person's. The project's own key from the project settings page has no owning user and is refused with `403`.
+
+`X-Project-Id` names the project the turn runs in. A key scoped to exactly one project may omit it; any other key without it is refused with `401`.
+
+The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be on for that project. While it is off, the endpoint answers `404` like any unmounted path.
+
+## What it answers
+
+| Status | Body | Meaning |
+| --- | --- | --- |
+| `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
+| `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
+| `429` | `{ "status": "busy" }` | A check for the same key is still running, or its last one timed out less than 55 seconds ago. Poll less often. |
+| `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
+
+Every response the probe answers itself carries `Cache-Control: no-store`. The one exception is the `404` while the surface flag is off, which is byte-identical to an unmounted path, headers included, so the response does not disclose whether the flag is on. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
+
+The 55-second budget starts once the key is authenticated, so a slow database adds to the wall clock. If a reverse proxy in front of LangWatch has its own read timeout (ingress-nginx defaults to 60 seconds), raise it above the monitor's timeout, or a stalled check reaches the monitor as a `504` from the proxy instead of a `503` with `reason: "timeout"`. Either one still fails the check.
+
+## What each check costs
+
+Each poll is one real Langy turn: one worker boot and one model call, attributed to the monitor's user in the monitor's project. A 3-minute interval is 480 turns a day.
+
+A check that times out gives up waiting, but the turn it started keeps running until the worker finishes or fails it. So a check that arrives within 55 seconds of a timed-out one is answered `429` rather than starting a second turn, which caps what a monitor polling faster than the interval above can spend. At a 3-minute interval that never applies.
+
+Langy's first turn on a cold worker is the slowest part of the path, so a `timeout` under load or right after a deploy is worth a second look before it is treated as an outage. Most monitors confirm a failure from a second location before alerting, which covers that.

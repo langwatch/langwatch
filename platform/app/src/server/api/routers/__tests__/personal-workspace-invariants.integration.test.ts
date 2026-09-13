@@ -1002,16 +1002,23 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
 
   /** @scenario A personal workspace is not listed among the access an admin manages */
   it("keeps every member's workspace out of the organization-wide list", async () => {
+    // The population first, or the two exclusions below prove nothing: an
+    // empty answer excludes every workspace too, and a fixture that stopped
+    // minting these bindings would read as the guard holding. Both workspaces
+    // hold a binding, and the listing returns a workspace it is meant to.
+    await expect(teamBindingRoles(seatPersonalTeamId)).resolves.toEqual([
+      TeamUserRole.ADMIN,
+    ]);
+    expect(await ownerBindingsOnPersonalTeam()).not.toHaveLength(0);
+
     const bindings = await callerAsOwner().roleBinding.listForOrg({
       organizationId,
     });
+    const scopeIds = bindings.map((binding) => binding.scopeId);
 
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      seatPersonalTeamId,
-    );
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      personalTeamId,
-    );
+    expect(scopeIds).toContain(sharedTeamId);
+    expect(scopeIds).not.toContain(seatPersonalTeamId);
+    expect(scopeIds).not.toContain(personalTeamId);
   });
 }
 

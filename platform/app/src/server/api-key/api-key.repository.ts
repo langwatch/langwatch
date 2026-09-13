@@ -68,6 +68,7 @@ export class ApiKeyRepository {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     startsDisabled = false,
   }: {
     name: string;
@@ -82,6 +83,7 @@ export class ApiKeyRepository {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    parentApiKeyId?: string | null;
     /**
      * Born revoked, to be activated once the key's grants are facts (see
      * {@link activate}). The row and its grants cannot share a transaction —
@@ -104,6 +106,7 @@ export class ApiKeyRepository {
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
         createdByDeviceLabel: createdByDeviceLabel ?? null,
+        parentApiKeyId: parentApiKeyId ?? null,
         ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
     });
@@ -118,35 +121,6 @@ export class ApiKeyRepository {
     return this.prisma.apiKey.update({
       where: { id },
       data: { revokedAt: null },
-    });
-  }
-
-  /**
-   * Finds the live ingestion key for a (project, sourceType) pair: a non-revoked
-   * ApiKey carrying that ingestSourceType whose role binding is project-scoped to
-   * `projectId`. Used by the ingest-key service to rotate-in-place rather than
-   * accumulate keys.
-   */
-  async findIngestKey({
-    organizationId,
-    projectId,
-    sourceType,
-  }: {
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-  }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findFirst({
-      where: {
-        organizationId,
-        ingestSourceType: sourceType,
-        revokedAt: null,
-        roleBindings: {
-          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-        },
-      },
-      include: { roleBindings: true },
-      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -177,6 +151,32 @@ export class ApiKeyRepository {
     });
   }
 
+  /**
+   * Lists every live ingestion key one person owns in an organization,
+   * newest first. This is the set a session cascade, a source rotation and
+   * the devices tab read: it filters by the indexed `userId` and the callers
+   * match parent, source type or template in memory over a person's few live
+   * keys, which is why `parentApiKeyId` needs no index of its own.
+   */
+  async findIngestKeysForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    return this.prisma.apiKey.findMany({
+      where: {
+        organizationId,
+        userId,
+        ingestSourceType: { not: null },
+        revokedAt: null,
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   async findByLookupId({
     lookupId,
   }: {
@@ -193,6 +193,44 @@ export class ApiKeyRepository {
         OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
       include: { roleBindings: true },
+    });
+  }
+
+  /**
+   * The live keys minted under one key, inside its organization.
+   *
+   * Bounded by `organizationId` so it goes through the ordinary tenancy
+   * guard rather than a cross-tenant hatch: a cascade always knows whose
+   * organization it is retiring keys in.
+   */
+  async findLiveChildren({
+    parentApiKeyId,
+    organizationId,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>> {
+    return this.prisma.apiKey.findMany({
+      where: { organizationId, parentApiKeyId, revokedAt: null },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Whether one key is still usable, by id, without its bindings.
+   *
+   * The auth path asks this about a key's parent on every request that
+   * presents a session-minted key, so it reads the two columns that decide it
+   * and nothing else.
+   */
+  async findLivenessById({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ revokedAt: Date | null; expiresAt: Date | null } | null> {
+    return this.prisma.apiKey.findUnique({
+      where: { id },
+      select: { revokedAt: true, expiresAt: true },
     });
   }
 
@@ -574,7 +612,11 @@ export class ApiKeyRepository {
 
   async findProjectsInOrg({ organizationId }: { organizationId: string }) {
     return this.prisma.project.findMany({
-      where: { team: { organizationId }, archivedAt: null },
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: "internal_governance" },
+      },
       select: { id: true, name: true, teamId: true },
       orderBy: { name: "asc" },
     });

@@ -61,6 +61,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 describe("project.regenerateApiKey mutation logic", () => {
   let mockPrisma: {
     project: {
+      findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
     };
   };
@@ -70,6 +71,10 @@ describe("project.regenerateApiKey mutation logic", () => {
     vi.clearAllMocks();
     mockPrisma = {
       project: {
+        // The mutation reads the project's kind before re-keying it: the
+        // hidden governance project's key is what the receiver ingests under,
+        // and this route is not allowed to replace it (ADR-128 §11).
+        findUnique: vi.fn().mockResolvedValue({ kind: "application" }),
         update: vi.fn(),
       },
     };
@@ -169,6 +174,19 @@ describe("project.regenerateApiKey mutation logic", () => {
         code: "NOT_FOUND",
         message: "Project not found",
       });
+    });
+  });
+
+  describe("when the project is the hidden governance record", () => {
+    it("refuses without touching the key the receiver ingests under", async () => {
+      mockPrisma.project.findUnique.mockResolvedValueOnce({
+        kind: "internal_governance",
+      });
+
+      await expect(
+        caller.regenerateApiKey({ projectId: "project_governance" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(mockPrisma.project.update).not.toHaveBeenCalled();
     });
   });
 

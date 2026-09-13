@@ -670,6 +670,7 @@ export function ApiKeysSection({
         {/* Ingestion keys render below the API keys table. */}
         <IngestionKeysSection
           keys={ingestionKeys}
+          allKeys={allApiKeys}
           isAdmin={isAdmin}
           onRevoke={setApiKeyToRevoke}
         />

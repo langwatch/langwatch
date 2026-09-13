@@ -11,6 +11,7 @@
  * the parser/cursor/error paths without testcontainers.
  *
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
+ * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */
 import { Readable } from "node:stream";
 
@@ -310,6 +311,86 @@ describe("S3PollingPullerAdapter", () => {
       // still advances, because re-pulling it forever is the failure this
       // whole path exists to avoid.
       expect(result.cursor).toBe("anthropic/compliance/worse.ndjson");
+    });
+  });
+
+  describe("runOnce — a store holding more files than one run may read", () => {
+    /** @scenario "A read of a stored log that stops at its file limit says it stopped early" */
+    it("says it stopped before the end rather than reporting a whole read", async () => {
+      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
+        "../s3PollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      // One more object than the per-run file cap, so the listing is cut
+      // short. The exact cap is the adapter's own business; what matters is
+      // that a listing it truncated and a listing it drained leave through
+      // the same exit today, so nothing above can tell a source stuck on a
+      // fraction of its bucket from a healthy one.
+      stubObjects = Array.from({ length: 101 }, (_, at) => ({
+        key: `anthropic/compliance/2026-01-15-${String(at).padStart(4, "0")}.ndjson`,
+        body: JSON.stringify({
+          id: `e${at}`,
+          timestamp: "2026-01-15T00:00:00Z",
+          user_email: "a@x",
+          event: "completion",
+          model: "m",
+          cost: 0.001,
+          tokens_in: 10,
+          tokens_out: 5,
+        }),
+      }));
+
+      const result = await adapter.runOnce(
+        { cursor: null },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      // Not yet implemented: PullResult.completeness (the run port field the
+      // truncation settlement adds). Field not yet on the port (held by PR
+      // #8043 work), so it is read off a widened view of the result here.
+      const reported = result as typeof result & {
+        completeness?: "complete" | "truncated";
+      };
+      expect(reported.completeness).toBe("truncated");
+      // The money and the audit rows it did read are still handed back — a
+      // truncated read is not a failed one.
+      expect(result.errorCount).toBe(0);
+      expect(result.events.length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A read of a stored log that stops at its file limit says it stopped early" */
+    it("says it read the store whole when the listing fits inside the limit", async () => {
+      // The arm from the far side: without it the assertion above passes on
+      // an adapter that reports every run as truncated.
+      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
+        "../s3PollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      stubObjects = [
+        {
+          key: "anthropic/compliance/2026-01-15-0000.ndjson",
+          body: JSON.stringify({
+            id: "e1",
+            timestamp: "2026-01-15T00:00:00Z",
+            user_email: "a@x",
+            event: "completion",
+            model: "m",
+            cost: 0.001,
+            tokens_in: 10,
+            tokens_out: 5,
+          }),
+        },
+      ];
+
+      const result = await adapter.runOnce(
+        { cursor: null },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      const reported = result as typeof result & {
+        completeness?: "complete" | "truncated";
+      };
+      expect(reported.completeness).toBe("complete");
     });
   });
 

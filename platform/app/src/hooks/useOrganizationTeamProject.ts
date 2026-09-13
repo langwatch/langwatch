@@ -20,11 +20,16 @@ import {
 /**
  * Whether a permission is org-scoped: it lives in ORGANIZATION_ROLE_PERMISSIONS
  * and must be resolved against the user's organization role, not any team-role
- * bag. Covers `organization:` itself plus the AI Governance resource family
- * (governance / ingestionSources / anomalyRules / complianceExport /
- * activityMonitor / aiTools). Team admins do NOT inherit these automatically;
- * delegation flows through the CustomRolePermissions JSON column at the team
- * level (matching the rest of the RBAC catalog).
+ * bag. Team admins do NOT inherit these automatically; delegation flows through
+ * the CustomRolePermissions JSON column at the team level (matching the rest of
+ * the RBAC catalog).
+ *
+ * The members are exactly the resources the authz registry declares grantable
+ * at the organization tier and no other — `ORG_EXCLUSIVE_RESOURCES` in rbac.ts,
+ * `permissionGrantTiers` in @langwatch/authz. Deliberately not enumerated here:
+ * this list has fallen behind the registry three times, and a docblock naming
+ * the members goes stale the same way. The unit test walks the registry and
+ * fails when the two disagree, so that check lives in CI rather than in prose.
  *
  * @internal Exported for testing only
  */
@@ -41,7 +46,12 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     // (rbac.ts ADMIN defaults); resolving them against team roles denies
     // org admins client-side while the server correctly allows them.
     permission.startsWith("webhookEndpoints:") ||
-    permission.startsWith("gatewaySpend:")
+    permission.startsWith("gatewaySpend:") ||
+    // The cost screen is org-exclusive on the server (rbac.ts
+    // ORG_EXCLUSIVE_RESOURCES). Omitting it here sent the check down the
+    // team-role path, where no bag carries it, so the screen refused every
+    // org admin while the router allowed them.
+    permission.startsWith("governanceCost:")
   );
 }
 
@@ -672,7 +682,26 @@ export const useOrganizationTeamProject = (
 
     // Check if user has custom role assignment
     if (teamMember.assignedRole) {
-      // If user has custom role, ONLY use custom role permissions (no fallback)
+      // An org admin keeps admin access whatever team role they hold — both
+      // server paths answer this way (an ORGANIZATION-scoped ADMIN binding
+      // grants everything: checkPermissionFromBindings in rbac.ts, and the
+      // engine's bindingGrants), and the no-team-membership branch above
+      // already mirrors it. EXTERNAL users are never ADMIN, so their
+      // restriction below is unaffected.
+      //
+      // What the hook actually reads is the membership row's role, standing
+      // in for that binding — the same trust the branch above already
+      // places in it. The two are written together but not atomically, so
+      // they can diverge (binding deleted or edited on its own, or a crash
+      // between the membership and grant writes on invite acceptance).
+      // In that state this shows admin controls the server then refuses —
+      // a stale-UI failure, not an access grant.
+      if (organizationRole === OrganizationUserRole.ADMIN) {
+        return true;
+      }
+
+      // Otherwise ONLY the custom role's permissions apply (no fallback to
+      // the built-in team role it replaced)
       const rawPermissions = teamMember.assignedRole.permissions as
         | string[]
         | null

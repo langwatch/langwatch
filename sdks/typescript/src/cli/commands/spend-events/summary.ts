@@ -193,12 +193,20 @@ export const spendSummaryCommand = async (options: {
       table: () => {
         console.log();
         for (const row of data) {
+          const imageTokens =
+            row.usage.input_image_tokens + row.usage.output_image_tokens;
+          // Only on rows that have image spend: the text buckets read as the
+          // whole story otherwise, and image tokens are not part of them.
+          const imageNote =
+            imageTokens > 0 || row.usage.image_count > 0
+              ? `  img ${row.usage.input_image_tokens} / ${row.usage.output_image_tokens} tok, ${row.usage.image_count} image${row.usage.image_count !== 1 ? "s" : ""}`
+              : "";
           const settledNote =
             row.settled_count > 0
               ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`)
               : "";
           console.log(
-            `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}`,
+            `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}${imageNote}`,
           );
         }
         console.log();

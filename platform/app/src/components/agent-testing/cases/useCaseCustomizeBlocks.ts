@@ -1,6 +1,6 @@
 /**
  * The optional blocks of the scenario dialog: the parameters, the turn
- * limits and the model overrides.
+ * limits, the model overrides and the caller voice.
  *
  * The dialog asks its four questions and offers the rest as chips, the way the
  * run dialog does. A chip opens its block; the x on the block closes it again
@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useVoiceAgentsEnabled } from "~/components/agents/voice/useVoiceAgentsEnabled";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import type { CaseDraft } from "./useCaseEditor";
 
@@ -19,12 +20,14 @@ type OpenBlocks = {
   parameters: boolean;
   turns: boolean;
   models: boolean;
+  callerVoice: boolean;
 };
 
 const NONE_OPEN: OpenBlocks = {
   parameters: false,
   turns: false,
   models: false,
+  callerVoice: false,
 };
 
 /** The blocks a draft already needs, so editing a scenario opens them. */
@@ -33,6 +36,7 @@ function blocksOf(draft: CaseDraft): OpenBlocks {
     parameters: draft.parameters.trim() !== "",
     turns: draft.maxTurns !== null || draft.minTurns !== null,
     models: draft.simulatorModel !== null || draft.judgeModel !== null,
+    callerVoice: draft.callerVoice !== null,
   };
 }
 
@@ -40,9 +44,11 @@ export type CaseCustomizeBlocks = {
   showParameters: boolean;
   showTurns: boolean;
   showModels: boolean;
+  showCallerVoice: boolean;
   removeParameters: () => void;
   removeTurns: () => void;
   removeModels: () => void;
+  removeCallerVoice: () => void;
   /** The blocks that are not open yet, in the order they are offered. */
   chips: CustomizeChip[];
 };
@@ -58,6 +64,7 @@ export function useCaseCustomizeBlocks({
   setDraft: (update: Partial<CaseDraft>) => void;
 }): CaseCustomizeBlocks {
   const [open, setOpen] = useState<OpenBlocks>(NONE_OPEN);
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
 
   useEffect(() => {
     setOpen(blocksOf(draft));
@@ -79,6 +86,11 @@ export function useCaseCustomizeBlocks({
   const removeModels = useCallback(() => {
     setOpen((current) => ({ ...current, models: false }));
     setDraft({ simulatorModel: null, judgeModel: null });
+  }, [setDraft]);
+
+  const removeCallerVoice = useCallback(() => {
+    setOpen((current) => ({ ...current, callerVoice: false }));
+    setDraft({ callerVoice: null });
   }, [setDraft]);
 
   const chips: CustomizeChip[] = [];
@@ -103,14 +115,23 @@ export function useCaseCustomizeBlocks({
       onAdd: () => setOpen((current) => ({ ...current, models: true })),
     });
   }
+  if (!open.callerVoice && voiceAgentsEnabled) {
+    chips.push({
+      key: "case-caller-voice",
+      label: "Caller voice",
+      onAdd: () => setOpen((current) => ({ ...current, callerVoice: true })),
+    });
+  }
 
   return {
     showParameters: open.parameters,
     showTurns: open.turns,
     showModels: open.models,
+    showCallerVoice: open.callerVoice && voiceAgentsEnabled,
     removeParameters,
     removeTurns,
     removeModels,
+    removeCallerVoice,
     chips,
   };
 }

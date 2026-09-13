@@ -5,12 +5,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.mjs\" claude-code || true",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" session-context || true",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-guidance.mjs\" || true",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" session-guidance || true",
             "timeout": 10
           }
         ]
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.mjs\" claude-code || true",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/launch.mjs\" session-context || true",
             "timeout": 10
           }
         ]

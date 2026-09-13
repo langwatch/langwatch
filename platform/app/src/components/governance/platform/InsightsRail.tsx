@@ -1,0 +1,168 @@
+import { Badge, chakra, Separator, Text, VStack } from "@chakra-ui/react";
+import { Archive, Bell, Clock, Inbox, Mail } from "lucide-react";
+
+/**
+ * The inbox's folder rail: what Langy filed, what went stale, what was put
+ * away, and the two streams that ride on top. Every count is zero until
+ * there is a job to fill them, and the rail says zero rather than hiding
+ * the numbers: an empty inbox with its folders in place reads as an inbox,
+ * not as a page that forgot its navigation.
+ *
+ * Same grammar as the annotations rail (AnnotationsLayout): 12.5px rows,
+ * the selected row on `bg.muted`, the count in the trailing slot. Folders
+ * are page state, not routes, because nothing lives behind them yet.
+ *
+ * Spec: specs/governance/governance-platform-placeholders.feature
+ */
+export type InsightsFolder =
+  | "inbox"
+  | "stale"
+  | "archived"
+  | "alerts"
+  | "notifications";
+
+export type InsightsRailCounts = Record<InsightsFolder, number>;
+
+export const EMPTY_INSIGHTS_COUNTS: InsightsRailCounts = {
+  inbox: 0,
+  stale: 0,
+  archived: 0,
+  alerts: 0,
+  notifications: 0,
+};
+
+/** What each folder says when it is empty; the inbox has its own card. */
+export const EMPTY_FOLDER_LINE: Record<
+  Exclude<InsightsFolder, "inbox">,
+  string
+> = {
+  stale:
+    "Nothing has gone stale. Insights land here when their validity runs out.",
+  archived: "Nothing archived. Insights you put away keep their evidence here.",
+  alerts: "No alerts. Signals that trip land here, on top of the brief.",
+  notifications:
+    "No notifications. Mentions and hand-offs from Langy land here.",
+};
+
+const FOLDERS: Array<{
+  id: InsightsFolder;
+  label: string;
+  icon: typeof Inbox;
+  /** Streams wear a badge; folders a quiet number. */
+  stream: boolean;
+}> = [
+  { id: "inbox", label: "Inbox", icon: Inbox, stream: false },
+  { id: "stale", label: "Stale", icon: Clock, stream: false },
+  { id: "archived", label: "Archived", icon: Archive, stream: false },
+  { id: "alerts", label: "Alerts", icon: Bell, stream: true },
+  { id: "notifications", label: "Notifications", icon: Mail, stream: true },
+];
+
+type Folder = (typeof FOLDERS)[number];
+
+/** Streams sit under a rule: they are not folders of the brief, they ride on top of it. */
+function opensStreamGroup({ index }: { index: number }): boolean {
+  const folder = FOLDERS[index];
+  const previous = FOLDERS[index - 1];
+  return Boolean(folder?.stream) && previous !== undefined && !previous.stream;
+}
+
+export function InsightsRail({
+  selected,
+  counts,
+  onSelect,
+}: {
+  selected: InsightsFolder;
+  counts: InsightsRailCounts;
+  onSelect: (folder: InsightsFolder) => void;
+}) {
+  return (
+    <VStack
+      as="nav"
+      aria-label="Insights folders"
+      align="stretch"
+      gap={0.5}
+      minWidth="200px"
+      fontSize="12.5px"
+      flexShrink={0}
+    >
+      {FOLDERS.map((folder, index) => (
+        <VStack key={folder.id} align="stretch" gap={0.5}>
+          {opensStreamGroup({ index }) ? <Separator marginY={1.5} /> : null}
+          <FolderRow
+            folder={folder}
+            active={folder.id === selected}
+            count={counts[folder.id]}
+            onSelect={onSelect}
+          />
+        </VStack>
+      ))}
+    </VStack>
+  );
+}
+
+function FolderRow({
+  folder,
+  active,
+  count,
+  onSelect,
+}: {
+  folder: Folder;
+  active: boolean;
+  count: number;
+  onSelect: (folder: InsightsFolder) => void;
+}) {
+  const Icon = folder.icon;
+  return (
+    <chakra.button
+      type="button"
+      aria-current={active ? "true" : undefined}
+      onClick={() => onSelect(folder.id)}
+      display="flex"
+      alignItems="center"
+      gap={2.5}
+      width="full"
+      paddingX="10px"
+      paddingY="6px"
+      borderRadius="lg"
+      textAlign="left"
+      fontWeight={active ? "medium" : "normal"}
+      color={active ? "fg" : "fg.muted"}
+      background={active ? "bg.muted" : "transparent"}
+      cursor="pointer"
+      _hover={{ background: "bg.muted/60" }}
+    >
+      <Icon size={15} />
+      <Text as="span" flex={1}>
+        {folder.label}
+      </Text>
+      {/* The count is plain text in the row, so the button's own name
+          carries it ("Inbox 0"): no label on a generic box, which
+          assistive tech would ignore (see RunsSidebarEntry). */}
+      <FolderCount stream={folder.stream} count={count} />
+    </chakra.button>
+  );
+}
+
+/** Streams wear a badge; folders a quiet number. */
+function FolderCount({ stream, count }: { stream: boolean; count: number }) {
+  if (stream) {
+    return (
+      <Badge
+        size="sm"
+        borderRadius="full"
+        variant={count > 0 ? "solid" : "subtle"}
+        colorPalette={count > 0 ? "orange" : "gray"}
+        minWidth="22px"
+        justifyContent="center"
+      >
+        {count}
+      </Badge>
+    );
+  }
+  return (
+    <Text as="span" fontSize="10.5px" fontWeight="500" color="fg.subtle">
+      {count}
+    </Text>
+  );
+}

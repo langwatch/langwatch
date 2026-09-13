@@ -1477,21 +1477,23 @@ Rule: AI query composer (Ask AI)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CHIP LABELS WITH HOVER-TO-ID
+# CHIP LABELS, WITH THE ID IN THE TOOLTIP
 # ─────────────────────────────────────────────────────────────────────────────
 # Filter chips render the human-readable name of the value (evaluator
 # name, topic name, etc.) on top of the underlying id — but the field
 # prefix is always part of the overlay, so the chip reads as
-# "evaluator:Policy Check", never a bare "Policy Check". Hovering the chip
-# fades the overlay so only the value tail swaps to the raw id; the
-# "evaluator:" prefix never moves. The query language is unchanged — the
-# document still holds the id, search matching is still id-only. Names
-# exist for discovery and reading comfort only.
+# "evaluator:Policy Check", never a bare "Policy Check". The chip's size
+# does not depend on pointer state: the id is reachable through the
+# tooltip and through clicking the chip, never by swapping the visible
+# text. The query language is unchanged — the document still holds the
+# id, search matching is still id-only. Names exist for discovery and
+# reading comfort only.
 
-Rule: Chip labels are field-qualified and reveal the id on hover
+Rule: Chip labels are field-qualified and never resize on hover
   When a facet returns a `label` for a topValue, the chip paints
-  "field:label" on top of the id and reveals "field:id" on hover. The
-  field prefix shows in both states; only the value tail changes.
+  "field:label" on top of the id and keeps that text in every pointer
+  state. The raw id is surfaced through the chip's tooltip, which costs
+  no layout, so the remove button stays where the user aimed.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -1507,16 +1509,23 @@ Rule: Chip labels are field-qualified and reveal the id on hover
     Then the chip is only as wide as "evaluator:Policy Check"
     And no empty space is reserved for the longer id before the remove button
 
-  Scenario: Hovering the chip expands it to reveal the id, prefix intact
+  Scenario: Hovering the chip changes neither its text nor its width
     Given the search bar contains "@evaluator:eval_abc123"
     When the user hovers the chip
-    Then the chip grows in place to fit the full id
-    And the chip reads "evaluator:eval_abc123"
+    Then the chip still reads "evaluator:Policy Check"
+    And the chip's width is unchanged
 
-  Scenario: The field prefix never disappears between rest and hover
+  Scenario: Hovering the remove button leaves the chip's geometry alone
     Given the search bar contains "@evaluator:eval_abc123"
-    Then the "evaluator:" prefix is visible both at rest and on hover
-    And only the value swaps between "Policy Check" and "eval_abc123"
+    When the user moves the pointer onto the chip's remove button
+    Then the remove button does not move
+    And a single click removes the filter
+
+  Scenario: The tooltip carries the raw id
+    Given the search bar contains "@evaluator:eval_abc123" labeled "Policy Check"
+    When the user rests the pointer on the chip
+    Then the tooltip reads "evaluator:eval_abc123 — click to change value"
+    And the placeholder and the live editor show the same tooltip
 
   Scenario: The placeholder and live editor paint an identical chip
     Given the search bar contains "@evaluator:eval_abc123" on cold load

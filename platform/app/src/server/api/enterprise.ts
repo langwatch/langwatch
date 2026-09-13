@@ -16,6 +16,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   SCIM: "SCIM provisioning requires an Enterprise plan",
   ANOMALY_RULES: "Anomaly rules require an Enterprise plan",
   ACTIVITY_MONITOR: "The activity monitor requires an Enterprise plan",
+  GOVERNANCE_COST: "Governance cost views require an Enterprise plan",
   INGESTION_SOURCES: "Ingestion sources require an Enterprise plan",
   OCSF_EXPORT: "OCSF compliance export requires an Enterprise plan",
   MANAGEMENT_API: "The management API requires an Enterprise plan",

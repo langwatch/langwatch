@@ -38,9 +38,9 @@ type Body = Record<string, any>;
 
 /** Declares the granularity parameter alongside both reserved period bounds. */
 const GRANULARITY_SQL =
-  "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   "count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
   "GROUP BY bucket ORDER BY bucket";
 
 /** Seven days, in seconds — the window every request below reports over. */
@@ -122,7 +122,7 @@ describe("given the /api/v1/query REST endpoint and the granularity budget", () 
   });
 
   describe("when a statement declaring the parameter is run at one-second steps over a week", () => {
-    /** @scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST" */
+    /** @scenario "A window that would produce more buckets than the ceiling refuses on caller-owned surfaces" */
     it("is refused with the named code and the bucket arithmetic in the error meta", async () => {
       const { status, body } = await call({
         sql: GRANULARITY_SQL,
