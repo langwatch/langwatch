@@ -54,6 +54,11 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { z } from "zod";
+import {
+  dashboardWidgetPlatformUrl as dashboardWidgetPlatformUrl_,
+  savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_,
+} from "../rules/analytics-platform-url.rules.ts";
 import { lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import {
   resolveApiKeyProtections as resolveApiKeyProtectionsRule,
@@ -128,10 +133,21 @@ type AnalyticsDependencies = Readonly<{
   projects: typeof ProjectApi;
 }>;
 
+/**
+ * The contract's env-resolved LWQL identity, plus the one value the api's
+ * own composition supplies rather than an env var this module reads
+ * itself: the deployment's public origin, for the deep links this module
+ * publishes on saved charts and dashboard widgets.
+ */
+const analyticsAppConfigSchema = analyticsServerConfigSchema.and(
+  z.object({ publicBaseUrl: z.url() }),
+);
+export type AnalyticsAppConfig = z.infer<typeof analyticsAppConfigSchema>;
+
 type AnalyticsSetup = FeatureSetup<
   AnalyticsDependencies,
   MembersRead<typeof AnalyticsApp.reads>,
-  AnalyticsServerConfig
+  AnalyticsAppConfig
 >;
 
 const isPresent = (value: string | undefined): value is string => Boolean(value);
@@ -200,7 +216,7 @@ export class AnalyticsApp implements AnalyticsApiContract {
     dataPrivacy: DataPrivacyApi,
     projects: ProjectApi,
   };
-  static readonly configSchema = analyticsServerConfigSchema;
+  static readonly configSchema = analyticsAppConfigSchema;
   static readonly reads = reads("clickhouse");
 
   static create(setup: AnalyticsSetup): AnalyticsApp {
@@ -228,21 +244,26 @@ export class AnalyticsApp implements AnalyticsApiContract {
       : null;
     const langWatchQL = LangWatchQLAdapter.create({ connection });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
-    return new AnalyticsApp({
-      analytics,
-      filterOptions: FilterOptionsAdapter.create({ resolveClient }),
-      langWatchQL,
-      featureFlags: setup.dependencies.featureFlags,
-      authz: setup.dependencies.authz,
-      dataPrivacy: setup.dependencies.dataPrivacy,
-      projects: setup.dependencies.projects,
-    });
+    return new AnalyticsApp(
+      {
+        analytics,
+        filterOptions: FilterOptionsAdapter.create({ resolveClient }),
+        langWatchQL,
+        featureFlags: setup.dependencies.featureFlags,
+        authz: setup.dependencies.authz,
+        dataPrivacy: setup.dependencies.dataPrivacy,
+        projects: setup.dependencies.projects,
+      },
+      setup.config.publicBaseUrl,
+    );
   }
 
   #dependencies: AnalyticsAppDependencies;
+  #publicBaseUrl: string;
 
-  private constructor(dependencies: AnalyticsAppDependencies) {
+  private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string) {
     this.#dependencies = dependencies;
+    this.#publicBaseUrl = publicBaseUrl;
   }
 
   /** The series behind every analytics chart and every dashboard graph card. */
@@ -388,6 +409,22 @@ export class AnalyticsApp implements AnalyticsApiContract {
       dataPrivacy: this.#dependencies.dataPrivacy,
       projectId: input.projectId,
       credential: input.credential,
+    });
+  }
+
+  /** The deep link back to the Workbench editor for a saved chart in this project. */
+  savedWorkbenchChartPlatformUrl(input: { projectSlug: string }): string {
+    return savedWorkbenchChartPlatformUrl_({
+      publicBaseUrl: this.#publicBaseUrl,
+      projectSlug: input.projectSlug,
+    });
+  }
+
+  /** The deep link back to the dashboards list for a playground widget in this project. */
+  dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
+    return dashboardWidgetPlatformUrl_({
+      publicBaseUrl: this.#publicBaseUrl,
+      projectSlug: input.projectSlug,
     });
   }
 

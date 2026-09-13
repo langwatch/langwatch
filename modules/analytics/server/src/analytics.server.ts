@@ -9,9 +9,12 @@ import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
 import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
-import { dashboardWidgetRest } from "./transport/dashboard-widget.rest.ts";
+import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
 import { langWatchQLCallerProtections, queryRest } from "./transport/query.rest.ts";
-import { savedWorkbenchChartRest } from "./transport/saved-workbench-chart.rest.ts";
+import {
+  savedWorkbenchChartRest,
+  savedWorkbenchChartUrl,
+} from "./transport/saved-workbench-chart.rest.ts";
 
 export type { AnalyticsInfrastructure } from "./app/analytics.app.ts";
 
@@ -38,5 +41,19 @@ export const analyticsServer = defineServerModule("analytics")
         credential: credentialPrincipalOfToken(credential),
       });
     }),
+    // The deployment's own public origin, resolved into the SAME deep link
+    // shape the deleted `langwatch-ql-rest.mount.ts` built: the credential's
+    // own project slug, never a project id, on the app's configured
+    // `publicBaseUrl`.
+    bindRestMiddleware(savedWorkbenchChartUrl, (context) =>
+      app.savedWorkbenchChartPlatformUrl({
+        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
+      }),
+    ),
+    bindRestMiddleware(dashboardWidgetUrl, (context) =>
+      app.dashboardWidgetPlatformUrl({
+        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
+      }),
+    ),
   ])
   .build();

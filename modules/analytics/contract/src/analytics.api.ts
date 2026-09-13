@@ -72,6 +72,10 @@ export interface AnalyticsApi {
     projectId: string;
     credential: RestCredentialPrincipal;
   }): Promise<LangWatchQLProtections>;
+  /** The deep link back to the Workbench editor for a saved chart in this project. */
+  savedWorkbenchChartPlatformUrl(input: { projectSlug: string }): string;
+  /** The deep link back to the dashboards list for a playground widget in this project. */
+  dashboardWidgetPlatformUrl(input: { projectSlug: string }): string;
   /**
    * The restricted tenant identity a member's own statement runs as, together
    * with their protections. Refuses with `project_not_found` when the project
