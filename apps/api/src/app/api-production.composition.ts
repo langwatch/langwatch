@@ -159,6 +159,11 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
         config.infrastructure.storedObjects.azureSpoolRetentionConfirmed,
       routes: Object.fromEntries(config.infrastructure.storedObjects.routes),
     },
+    /** The api's own name in trace refusals, and the address media links are built under. */
+    trace: {
+      processName: config.serviceName,
+      publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
+    },
     automation: {},
     log: {},
     "platform-health": config.platformHealth,

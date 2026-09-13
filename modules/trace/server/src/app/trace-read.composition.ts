@@ -15,6 +15,8 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { TraceTreeComposition } from "./trace-tree.composition.ts";
+import { traceRefusalProxy } from "./trace-composition.build.ts";
+import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
 import { SessionGroupsService } from "../services/session/trace-session-groups.service.ts";
@@ -45,11 +47,13 @@ import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 export type TraceReaderCompositionOptions = {
   /** The rows the registry chose for this process, one tier over both stores. */
   repositories: TraceRepositories;
-  resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
-  defaultRetentionDays: number;
+  /** Absent on a process that composed no ClickHouse: every read refuses by name. */
+  resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
+  defaultRetentionDays?: number | undefined;
   canonicalisation: TraceCanonicalisationService;
   blobStore: TraceBlobStoreService;
-  summaryStore: FoldProjectionStore<TraceSummaryData>;
+  /** Absent on a process that folds no trace projections; the summary read then has no fold to ask. */
+  summaryStore?: FoldProjectionStore<TraceSummaryData> | undefined;
   projects: ProjectApi;
   topics: TopicApi;
   modelProviders: ModelProviderApi;
@@ -57,7 +61,10 @@ export type TraceReaderCompositionOptions = {
   annotations: AnnotationApi;
   dataRetention: DataRetentionApi;
   protections: TraceViewerProtectionOptions;
-  filterConditions: import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions;
+  /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
+  filterConditions?:
+    | import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions
+    | undefined;
   evaluations: TraceAppDependencies["evaluations"];
   codingAgents: TraceAppDependencies["codingAgents"];
   share: TraceAppDependencies["share"];
@@ -84,8 +91,8 @@ export function composeTraceAppDependencies(
     traceCanonicalisation: options.canonicalisation,
     traceRead: TraceLegacyReadClickHouseRepository.create({
       traceCanonicalisation: options.canonicalisation,
-      resolveClickHouseClient: resolve,
-      filterConditions: options.filterConditions,
+      ...(resolve ? { resolveClickHouseClient: resolve } : {}),
+      ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
       retentionResolver: options.dataRetention,
       annotationService: options.annotations,
       blobResolutionDeps,
@@ -100,18 +107,27 @@ export function composeTraceAppDependencies(
     topicService: options.topics,
   });
   const protections = TraceViewerProtectionService.create(options.protections);
-  const tree = TraceTreeComposition.create({
+  const summaryStore = options.summaryStore;
+  const tree = !resolve
+    ? traceRefusalProxy<TraceTreeService>(options.protections.processName, "the trace tree read")
+    : TraceTreeComposition.create({
     resolveClient: resolve,
     modelProviders: options.modelProviders,
     queryFieldValues: TraceReadQueryFieldValues.create(list),
     queryClassification: TraceQueryClassificationAdapter.create(),
-    summaryReader: {
-      tryGetSummary: ({ tenantId, traceId }) =>
-        options.summaryStore.tryGet(traceId, {
-          aggregateId: traceId,
-          tenantId: createTenantId(tenantId),
-        }),
-    },
+    // A process that folds no trace projections has no fold to ask, so the
+    // reader is left out rather than answering an empty summary.
+    ...(summaryStore
+      ? {
+          summaryReader: {
+            tryGetSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
+              summaryStore.tryGet(traceId, {
+                aggregateId: traceId,
+                tenantId: createTenantId(tenantId),
+              }),
+          },
+        }
+      : {}),
     records: {
       getById: async ({ projectId, traceId }) => {
         const resolved = await protections.resolve({

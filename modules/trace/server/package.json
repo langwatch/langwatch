@@ -72,7 +72,6 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*",
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
@@ -90,6 +89,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -99,6 +99,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",

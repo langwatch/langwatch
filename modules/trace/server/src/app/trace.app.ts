@@ -76,8 +76,11 @@ import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/codin
 import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { z } from "zod";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { traceDependencies, type TraceInfrastructure } from "./trace-composition.types.ts";
+import { traceDependencies } from "./trace-composition.types.ts";
+import { buildTraceCollaborators } from "./trace-composition.build.ts";
 import { composeTraceAppDependencies } from "./trace-read.composition.ts";
 import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 
@@ -368,32 +371,67 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
   return occurredAtMs !== undefined ? { occurredAtMs } : {};
 }
 
+/**
+ * What the deployment states for this module.
+ *
+ * `fallbackVisibilityDays` is the window a caller sees when no plan answers
+ * one. It defaults to the free plan's fourteen days: both processes must read
+ * the same number or one would redact what the other shows, and a core module
+ * may not import the enterprise licensing contract that declares it.
+ */
+const traceAppConfigSchema = z
+  .object({
+    processName: z.string().default("langwatch-api"),
+    fallbackVisibilityDays: z.number().default(14),
+    publicBaseUrl: z.string().optional(),
+  })
+  // Defaulted as a whole so a process that states no `trace` slice still boots:
+  // every field here names a refusal or a link, and none of them decides what
+  // a caller may read.
+  .default(() => ({ processName: "langwatch-api", fallbackVisibilityDays: 14 }));
+export type TraceAppConfig = z.infer<typeof traceAppConfigSchema>;
+
+type TraceSetup = FeatureSetup<
+  typeof traceDependencies,
+  MembersRead<typeof TraceApp.reads>,
+  TraceAppConfig,
+  TraceRepositories
+>;
+
 export class TraceApp implements TraceApi {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
+  static readonly configSchema = traceAppConfigSchema;
+  /**
+   * ClickHouse is where every captured span lives, `eventing` is the pipeline
+   * this process stages commands on, and the logger names the process in a
+   * blob read's refusal. Everything else Trace composes over is a peer Api or
+   * a row from its own repository registry.
+   */
+  static readonly reads = reads("clickhouse", "eventing", "logger");
 
-  static create(
-    input:
-      | TraceAppDependencies
-      | FeatureSetup<typeof traceDependencies, TraceInfrastructure, undefined, TraceRepositories>,
-  ): TraceApp {
-    const dependencies =
-      "members" in input
-        ? composeTraceAppDependencies({
-            ...input.members.trace,
-            ...input.dependencies,
-            repositories: input.repositories,
-            protections: {
-              authz: input.dependencies.authz,
-              projects: input.dependencies.projects,
-              plans: input.dependencies.plans,
-              dataPrivacy: input.dependencies.dataPrivacy,
-              fallbackVisibilityDays: input.members.trace.fallbackVisibilityDays,
-              processName: input.members.trace.processName,
-            },
-          })
-        : input;
-    return new TraceApp(dependencies);
+  static create(input: TraceAppDependencies | TraceSetup): TraceApp {
+    if (!("members" in input)) return new TraceApp(input);
+
+    const collaborators = buildTraceCollaborators({
+      members: input.members,
+      config: input.config,
+    });
+    return new TraceApp(
+      composeTraceAppDependencies({
+        ...collaborators,
+        ...input.dependencies,
+        repositories: input.repositories,
+        protections: {
+          authz: input.dependencies.authz,
+          projects: input.dependencies.projects,
+          plans: input.dependencies.plans,
+          dataPrivacy: input.dependencies.dataPrivacy,
+          fallbackVisibilityDays: collaborators.fallbackVisibilityDays,
+          processName: collaborators.processName,
+        },
+      }),
+    );
   }
 
   #contentReader: TraceContentReadService;
