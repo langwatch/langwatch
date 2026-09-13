@@ -760,18 +760,43 @@ async function attachProvider({
       model: `${PROVIDER}/${MODEL}`,
     },
   });
+  // Everything that is not Langy runs on the DEFAULT role: the scenario user
+  // simulator, the judge, the evaluations. A role nothing covers does not fall
+  // back to the one provider the organization has, it raises
+  // ModelNotConfiguredError, so a path that gets all the way to running its
+  // first scenario fails there with the agent online and the scenario written.
+  // A real connect ends up with this key because the form's save seeds the
+  // roles for the provider; seeding through the API has to write it.
+  await trpcMutate({
+    cookie,
+    path: "modelProvider.setRoleAssignmentForScope",
+    input: {
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+      role: "DEFAULT",
+      model: `${PROVIDER}/${MODEL}`,
+    },
+  });
   await trpcMutate({
     cookie,
     path: "onboarding.recordProvider",
     input: { organizationId, provider: PROVIDER, model: MODEL },
   });
   if (LANGY_MODEL) await pointLangyAt({ cookie, organizationId });
-  const resolved = await trpcQuery<unknown>({
-    cookie,
-    path: "modelProvider.getResolvedDefault",
-    input: { projectId, featureKey: "langy" },
-  });
-  console.log(`[guided] langy model resolves to ${JSON.stringify(resolved)}`);
+  // Both keys, because they answer different questions: langy is who writes
+  // the path, and the user simulator is what a scenario run needs before it
+  // can start. A run that reaches its first scenario and finds no simulator
+  // model fails there, long after the seeding that caused it.
+  for (const featureKey of ["langy", "scenarios.user_simulator"]) {
+    const resolved = await trpcQuery<unknown>({
+      cookie,
+      path: "modelProvider.getResolvedDefault",
+      input: { projectId, featureKey },
+    });
+    console.log(
+      `[guided] ${featureKey} resolves to ${JSON.stringify(resolved)}`,
+    );
+  }
 }
 
 /**
