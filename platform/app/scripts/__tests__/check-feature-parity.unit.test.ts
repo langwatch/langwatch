@@ -319,12 +319,9 @@ describe("collectMalformedJsdocAnnotations", () => {
     mkdirSync(tests);
     writeFileSync(
       join(tests, "parity.test.ts"),
-      [
-        "/**",
-        " * @scenario",
-        " */",
-        'it("covers the case", () => {});',
-      ].join("\n"),
+      ["/**", " * @scenario", " */", 'it("covers the case", () => {});'].join(
+        "\n",
+      ),
       "utf8",
     );
 
@@ -346,14 +343,16 @@ describe("collectMalformedJsdocAnnotations", () => {
       join(tests, "parity.test.ts"),
       [
         "const example = `/**",
-        " * @scenario \\\"not a real annotation\\\"",
+        ' * @scenario \\"not a real annotation\\"',
         " */`;",
         'it("covers the case", () => {});',
       ].join("\n"),
       "utf8",
     );
 
-    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([]);
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual(
+      [],
+    );
   });
 
   it("does not report the supported single-line JSDoc form", () => {
@@ -365,7 +364,9 @@ describe("collectMalformedJsdocAnnotations", () => {
       "utf8",
     );
 
-    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([]);
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual(
+      [],
+    );
   });
 });
 
