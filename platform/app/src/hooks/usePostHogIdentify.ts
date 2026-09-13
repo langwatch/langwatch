@@ -51,7 +51,7 @@ export function usePostHogIdentify({
 
   // 3. Register the onboarding experiment variant the organization recorded,
   // so every event captured from the browser carries it (re-runs on org
-  // switch). An organization without a variant registers nothing.
+  // switch). An organization without a variant clears the property.
   const onboardingVariant = parseOnboardingVariant(organization?.signupData);
   useEffect(() => {
     if (typeof window === "undefined") return;

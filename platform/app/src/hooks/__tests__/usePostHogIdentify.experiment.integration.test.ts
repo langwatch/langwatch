@@ -10,7 +10,10 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockRegister } = vi.hoisted(() => ({ mockRegister: vi.fn() }));
+const { mockRegister, mockUnregister } = vi.hoisted(() => ({
+  mockRegister: vi.fn(),
+  mockUnregister: vi.fn(),
+}));
 
 vi.mock("posthog-js", () => ({
   default: {
@@ -19,6 +22,7 @@ vi.mock("posthog-js", () => ({
     reset: vi.fn(),
     capture: vi.fn(),
     register: mockRegister,
+    unregister: mockUnregister,
   },
 }));
 
@@ -72,7 +76,7 @@ describe("usePostHogIdentify() and the onboarding experiment", () => {
 
   describe("when the organization predates the experiment", () => {
     /** @scenario "the browser registers nothing for an organization without a variant" */
-    it("registers no experiment property", () => {
+    it("registers no experiment property and clears any registered one", () => {
       renderHook(() =>
         usePostHogIdentify({
           session,
@@ -86,6 +90,41 @@ describe("usePostHogIdentify() and the onboarding experiment", () => {
       );
 
       expect(mockRegister).not.toHaveBeenCalled();
+      expect(mockUnregister).toHaveBeenCalledWith(
+        "$feature/experiment_onboarding_langy_guided",
+      );
+    });
+
+    it("clears the property when the user switches from an organization with a variant", () => {
+      const { rerender } = renderHook(
+        ({ organization }) =>
+          usePostHogIdentify({ session, organization, planType: undefined }),
+        {
+          initialProps: {
+            organization: {
+              id: "org-1",
+              name: "ACME",
+              signupData: { onboardingVariant: "guided" } as unknown,
+            },
+          },
+        },
+      );
+      expect(mockRegister).toHaveBeenCalledWith({
+        "$feature/experiment_onboarding_langy_guided": "guided",
+      });
+      expect(mockUnregister).not.toHaveBeenCalled();
+
+      rerender({
+        organization: {
+          id: "org-2",
+          name: "ACME Legacy",
+          signupData: { companyType: "company" },
+        },
+      });
+
+      expect(mockUnregister).toHaveBeenCalledWith(
+        "$feature/experiment_onboarding_langy_guided",
+      );
     });
   });
 

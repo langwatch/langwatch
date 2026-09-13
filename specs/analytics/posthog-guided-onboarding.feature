@@ -294,6 +294,13 @@ Feature: PostHog guided onboarding events
     Given a signed-in user whose organization predates the experiment
     When the app identifies the user
     Then posthog-js registers no experiment property
+    And the property is cleared, so a switch from an organization with a variant carries nothing over
+
+  @unit
+  Scenario: the registration clears the property for an organization without a variant
+    Given the experiment property was registered for a previous organization
+    When the registration runs with no variant
+    Then posthog-js unregisters $feature/experiment_onboarding_langy_guided
 
   @integration
   Scenario: the welcome flow registers the experiment property as soon as the organization is created
