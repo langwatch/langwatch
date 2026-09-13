@@ -56,6 +56,19 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the trace belongs to the session's conversation
     And a turn span that names no session keeps the turn's own id
 
+  # The turn span is not the only carrier: every codex log record names the
+  # session too. The session fold keys a turn off that record, so a turn whose
+  # turn span never landed still moved the session row's last update, while
+  # its trace, filed under no conversation, was invisible to the replay and
+  # the conversation strip. Opening the session showed the previous turn.
+
+  @unit
+  Scenario: A codex turn is filed under its session by its log records alone
+    Given a codex log record that names its conversation
+    When the record is canonicalised
+    Then the trace belongs to the session's conversation
+    And a codex log record that names no conversation files the trace nowhere
+
   # --- Reasoning effort (the request setting, not the token count) -----------
 
   @unit
