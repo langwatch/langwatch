@@ -143,8 +143,11 @@ function mountRest<Rest>(
 ): Rest {
   if (!host) throw new MissingTransportHostError(entry.feature, "REST");
 
+  // A module binds ONE facts list for both doors; each door takes only its
+  // own shape (REST bindings carry `middleware`, tRPC bindings carry `fact`).
+  const facts = entry.facts.filter((binding) => "middleware" in binding);
   return host.mount(descriptor.router(), entry.provided, {
-    ...(entry.facts.length > 0 ? { facts: entry.facts } : {}),
+    ...(facts.length > 0 ? { facts } : {}),
   });
 }
 
@@ -156,7 +159,8 @@ function mountTrpc<Trpc>(
 ): Trpc {
   if (!host) throw new MissingTransportHostError(entry.feature, "tRPC");
 
-  const options = entry.facts.length > 0 ? { facts: entry.facts } : {};
+  const facts = entry.facts.filter((binding) => "fact" in binding);
+  const options = facts.length > 0 ? { facts } : {};
 
   return host.mount(descriptor, entry.provided, options);
 }

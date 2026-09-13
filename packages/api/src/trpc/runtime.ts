@@ -958,7 +958,7 @@ export function createTrpcRuntime<
       declaration.router(
         {
           procedure: (request: TrpcProcedureRequest<TContext>) =>
-            build(request, factBindings(options)),
+            build(request, factBindings(declaration.namespace, options)),
           router,
         },
         app,
@@ -968,9 +968,18 @@ export function createTrpcRuntime<
 
 /** The bindings this mount supplied, by the fact name each one answers for. */
 function factBindings<TContext>(
+  namespace: unknown,
   options: TrpcMountOptions<TContext> | undefined,
 ): ReadonlyMap<string, TrpcFactBinding<TContext>> {
-  return new Map((options?.facts ?? []).map((binding) => [binding.fact.name, binding] as const));
+  const facts = options?.facts ?? [];
+  facts.forEach((binding, index) => {
+    if (!binding?.fact?.name) {
+      throw new Error(
+        `Namespace "${String(namespace)}" binds a fact that is undefined at index ${index} of ${facts.length} - a circular import in the module that declares it usually explains this.`,
+      );
+    }
+  });
+  return new Map(facts.map((binding) => [binding.fact.name, binding] as const));
 }
 
 /**
