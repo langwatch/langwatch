@@ -168,7 +168,8 @@ describe("langy activity readers", () => {
   });
 
   describe("given a gh with no login on a call that ran in the shared folder", () => {
-    const ghOutput = "To get started with GitHub CLI, please run: gh auth login";
+    const ghOutput =
+      "To get started with GitHub CLI, please run: gh auth login";
     const failedGh = (extra: Record<string, unknown>) => ({
       type: "tool-bash",
       toolCallId: "call-1",
@@ -181,7 +182,9 @@ describe("langy activity readers", () => {
     /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
     it("reads the marker off the durable part", () => {
       const parts = [failedGh({ local: true })];
-      expect(toFailedToolCalls({ parts })[0]?.presentation.code).toBeUndefined();
+      expect(
+        toFailedToolCalls({ parts })[0]?.presentation.code,
+      ).toBeUndefined();
     });
 
     /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
@@ -189,7 +192,9 @@ describe("langy activity readers", () => {
       const parts = [
         failedGh({ resultProviderMetadata: { langwatch: { local: true } } }),
       ];
-      expect(toFailedToolCalls({ parts })[0]?.presentation.code).toBeUndefined();
+      expect(
+        toFailedToolCalls({ parts })[0]?.presentation.code,
+      ).toBeUndefined();
     });
 
     /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
