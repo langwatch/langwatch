@@ -52,5 +52,5 @@ export const serverModuleMembers = {
   trace: ["clickhouse", "eventing", "logger"],
   user: [],
   webhook: [],
-  workflow: [],
+  workflow: ["prisma"],
 } as const;

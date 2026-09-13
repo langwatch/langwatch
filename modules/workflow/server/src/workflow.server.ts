@@ -1,6 +1,7 @@
 import { bindRestHeader, bindRestMiddleware, browserCallerOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { WorkflowApp } from "#app/workflow.app";
+import { workflowRepositories } from "#repositories/workflow-repositories.registry";
 import { cronRest } from "#transport/cron.rest";
 import { createWorkflowRest } from "#transport/workflow.rest";
 import { workflowRunContentType, workflowRunRest } from "#transport/workflow-run.rest";
@@ -9,6 +10,7 @@ import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimizat
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
 
 export const workflowServer = defineServerModule("workflow")
+  .withRepositories(workflowRepositories)
   .withApp(WorkflowApp)
   .withTransports(
     createWorkflowRest(),

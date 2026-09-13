@@ -11264,6 +11264,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract

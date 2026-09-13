@@ -4,8 +4,11 @@
  * operation serves a browser session, an API key and a background job alike.
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import { EvaluatorApi, type Evaluator } from "@langwatch/evaluator-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { AgentApi } from "@langwatch/agent-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { reads } from "@langwatch/infrastructure/members";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
@@ -55,6 +58,12 @@ import type { WorkflowStudioDispatchService } from "../services/workflow-studio-
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
+import {
+  workflowRepositories,
+  type WorkflowRepositories,
+} from "../repositories/workflow-repositories.registry.ts";
+import { ModelProviderWorkflowStudioDslAdapter } from "../adapters/workflow-studio-dsl.adapter.ts";
+import { WorkflowAgentMappingAdapter } from "../adapters/workflow-agent-mapping.adapter.ts";
 
 /** Whether one person may act on a project other than the scoped one. */
 export interface WorkflowPermissionProbe {
@@ -273,10 +282,39 @@ export interface WorkflowInfrastructure {
   publicBaseUrl?: string;
 }
 
+/**
+ * What the process still hands this module directly, now that `evaluators`
+ * (an `EvaluatorApi` dependency), `studioDsl` (built over the model-provider
+ * dependency), `agentMappings` (built over the agent dependency) and
+ * `workflowRows` (built over this module's own `workflowRepositories`
+ * registry) are no longer host-supplied.
+ *
+ * This is still a bespoke bag rather than `MembersRead<typeof
+ * WorkflowApp.reads>` - `lineage`, `publications`, `permissions`,
+ * `evaluations`, `nlpLambda*` and the rest were added to
+ * {@link WorkflowInfrastructure} after `apps/api/src/features/workflow/
+ * workflow.composition.ts` (the deleted authority for this conversion) was
+ * written, so there is no precedented "how" to build them from a `reads()`
+ * member or a peer dependency yet. Boot's automatic `membersFor(members,
+ * app.reads)` only ever produces `{prisma}` for this app and casts the rest
+ * away (`application.ts`'s `membersFor(...) as Members`), so a process that
+ * wants the fields below MUST still construct `WorkflowApp` directly -
+ * exactly what `apps/worker` does today - handing this bag in by hand rather
+ * than through `createApp().withModules([workflowServer]).boot()`. Folding
+ * them into `reads()`/`dependencies` too is real, separate work: several
+ * (`permissions`, `lineage`, `evaluations`) read or write project data with no
+ * existing adapter in this package to convert from.
+ */
+export type WorkflowHostMembers = Omit<
+  WorkflowInfrastructure,
+  "evaluators" | "studioDsl" | "agentMappings" | "workflowRows"
+>;
+
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowApp.dependencies,
-  WorkflowInfrastructure,
-  undefined
+  WorkflowHostMembers,
+  undefined,
+  WorkflowRepositories
 >;
 
 /** The comparable text of a graph: local configuration stripped, keys sorted. */
@@ -294,10 +332,28 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
 
 export class WorkflowApp implements WorkflowApi {
   static readonly contract = WorkflowApi;
-  static readonly dependencies = {} as const;
+  static readonly dependencies = {
+    /** The evaluators a workflow is published as - a peer's App, not a member. */
+    evaluators: EvaluatorApi,
+    /** Resolves a Studio graph's models before any version of it is written. */
+    modelProviders: ModelProviderApi,
+    /** The agent mappings a saved Studio graph refreshes, best effort. */
+    agents: AgentApi,
+  };
+  /** For `workflowRows`, via this module's own `workflowRepositories` registry. */
+  static readonly reads = reads("prisma");
+  static readonly repositories = workflowRepositories;
 
   static create(setup: WorkflowSetup): WorkflowApp {
-    return new WorkflowApp(setup.members);
+    return new WorkflowApp({
+      ...setup.members,
+      evaluators: setup.dependencies.evaluators,
+      studioDsl: ModelProviderWorkflowStudioDslAdapter.create({
+        modelProviders: setup.dependencies.modelProviders,
+      }),
+      agentMappings: WorkflowAgentMappingAdapter.create({ agents: setup.dependencies.agents }),
+      workflowRows: setup.repositories.workflowRows,
+    });
   }
 
   #members: WorkflowInfrastructure;

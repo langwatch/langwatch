@@ -4,6 +4,9 @@
  * operation rather than a process's port.
  */
 // @vitest-environment node
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -18,7 +21,15 @@ import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
   const members = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
 
-  return WorkflowApp.create({ members } as Parameters<typeof WorkflowApp.create>[0]);
+  return WorkflowApp.create({
+    members,
+    dependencies: {
+      evaluators: members.evaluators,
+      modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
+      agents: createApiFixture<AgentApi>({}, "AgentApi"),
+    },
+    repositories: { workflowRows: members.workflowRows },
+  } as Parameters<typeof WorkflowApp.create>[0]);
 }
 
 describe("the studio's NLP Lambda sweep", () => {
