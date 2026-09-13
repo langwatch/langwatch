@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/langwatch/langwatch/compare/agent-plugin@v1.1.0...agent-plugin@v1.2.0) (2026-09-13)
+
+
+### Features
+
+* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([2877be0](https://github.com/langwatch/langwatch/commit/2877be087bf9da0726b5c10d79c01a825080ed38))
+* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([e9d9ea0](https://github.com/langwatch/langwatch/commit/e9d9ea025d4daa61418e49ff2b051558d76d817b))
+
 ## [1.1.0](https://github.com/langwatch/langwatch/compare/agent-plugin@v1.0.0...agent-plugin@v1.1.0) (2026-09-01)
 
 
