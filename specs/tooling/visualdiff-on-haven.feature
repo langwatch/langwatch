@@ -115,6 +115,52 @@ Feature: visualdiff boots its stacks through haven
       Then .env is copied into the worktree
       And .env.example is left alone
 
+  Rule: A missing gateway credential does not stop the diff, and never hides
+
+    # The gateway's three credentials are checked all-or-none and each must be
+    # at least 32 characters. A developer's own .env commonly carries short
+    # placeholders, and the api then refuses to boot - correctly - so a run that
+    # only wanted to photograph screens dies with it. visualdiff substitutes,
+    # but only into the copied .env of a throwaway worktree whose databases
+    # haven creates, migrates and seeds from scratch: the developer's own .env
+    # is never written and their own virtual keys are never touched, because
+    # rotating LW_VIRTUAL_KEY_PEPPER would invalidate every key it protects.
+    #
+    # The announcement is the feature. A tool that manufactures a secret to boot
+    # itself is how a real "this branch will not boot without gateway secrets"
+    # regression becomes invisible - the exact class of bug visualdiff exists to
+    # catch - so every substitution is named on the run log, once per stack.
+
+    @unit
+    Scenario: A placeholder gateway secret is substituted in the worktree's own .env
+      Given a copied .env whose gateway trio carries short placeholders
+      When the worktree is prepared
+      Then each of the three carries a value long enough for the gateway's own check
+      And unrelated variables survive untouched
+      And the developer's own line is commented rather than deleted
+      And the run log names every variable substituted, and why
+
+    @unit
+    Scenario: A real gateway secret is never replaced
+      Given a .env whose gateway trio already passes the gateway's own check
+      When the worktree is prepared
+      Then nothing is substituted
+      And the file is not rewritten at all
+
+    @unit
+    Scenario: Both stacks of a run substitute the same value
+      Given two worktrees of the same run
+      When each is prepared
+      Then the substituted secret is identical on both
+      And a substituted secret can never be the reason two screens differ
+
+    @unit
+    Scenario: A worktree with no .env is left alone
+      Given a worktree the developer had no .env to copy into
+      When the worktree is prepared
+      Then nothing is substituted
+      And visualdiff does not author a .env the developer does not have
+
   Rule: A monolith ref is not refused up front - haven's own answer decides
 
     @unit

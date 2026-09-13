@@ -136,6 +136,17 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 		return fmt.Errorf("copy env for %s: %w", stack.Name, err)
 	}
 	fmt.Fprintf(run.streams.Err, "%s: prepare: copy .env files exit=ok (copied %d)\n", stack.Name, copied)
+	substituted, err := EnsureGatewaySecrets(stack.Dir, run.runID)
+	if err != nil {
+		return fmt.Errorf("gateway secrets for %s: %w", stack.Name, err)
+	}
+	if len(substituted) > 0 {
+		fmt.Fprintf(run.streams.Err,
+			"%s: prepare: SUBSTITUTED GATEWAY SECRETS — %s were absent or shorter than %d characters in the copied .env, "+
+				"so this stack booted on throwaway values. The developer's own .env and databases are untouched. "+
+				"A gateway failure on this stack is therefore NOT evidence of a missing credential.\n",
+			stack.Name, strings.Join(substituted, ", "), MinGatewaySecretLength)
+	}
 	for _, spec := range HavenPrepareCommands(stack.Layout) {
 		spec.dir = stack.Dir
 		fmt.Fprintf(run.streams.Err, "%s: prepare: %s %s\n", stack.Name, spec.name, strings.Join(spec.args, " "))

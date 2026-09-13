@@ -96,6 +96,8 @@ routes:
   - /gateway/virtual-keys
   - /gateway/webhooks
   - /governance
+  - /governance/agents
+  - /governance/analytics
   - /governance/anomaly-rules
   - /governance/billed
   - /governance/catalog
@@ -103,8 +105,10 @@ routes:
   - /governance/costs
   - /governance/departments
   - /governance/ingestion-sources
+  - /governance/insights
   - /governance/inventory
   - /governance/people
+  - /governance/signals
   - /governance/teams
   - /governance/tool-catalog
   - /governance/users
