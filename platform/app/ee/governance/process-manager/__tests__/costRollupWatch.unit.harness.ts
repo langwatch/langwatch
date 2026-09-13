@@ -17,9 +17,9 @@
  * nothing about the shape that ships.
  *
  * `createWatchHarness` is a FACTORY and registers its own `beforeEach`.
- * Nothing mutable lives at module scope: the unit lane runs files with a
- * shared module registry, so a module-level `let` here would be one variable
- * shared by every file that imported it.
+ * Nothing mutable lives at module scope: the helpers below are pure functions
+ * of a `WatchRuntime` the factory owns, so the unit lane's shared module
+ * registry has no variable here to hand from one file to the next.
  *
  * @see specs/governance/cost-rollup-watch.feature
  */
@@ -58,156 +58,187 @@ export const LAST_TUESDAY_MS = Date.UTC(2026, 8, 1, 9, 0, 0);
 /** The slot every charge recorded at `NOW` arms. */
 export const TONIGHT = Date.UTC(2026, 8, 11, 4, 23, 0);
 
+type WatchConfig = ProcessManagerConfig<any, any, PulledUsageProcessingEvent>;
+
+/**
+ * Everything one `beforeEach` rebuilds, held in one object so the helpers can
+ * be plain functions instead of closures over a pile of `let`s. The object's
+ * identity is stable across rebuilds — its fields are replaced, not the box —
+ * which is what lets the returned facade keep reading the live runtime.
+ */
+interface WatchRuntime {
+  store: InMemoryProcessStore;
+  service: ProcessManagerService<CostRollupWatchState>;
+  dispatcher: OutboxDispatcherService;
+  compareDay: ReturnType<typeof vi.fn>;
+  config: WatchConfig;
+  clock: number;
+}
+
+function buildDefinition(compareDay: ReturnType<typeof vi.fn>) {
+  return buildProcessManager<PulledUsageProcessingEvent>({
+    name: COST_ROLLUP_WATCH_PROCESS_NAME,
+    applier: costRollupWatchPM({ comparator: { compareDay } as never }),
+  });
+}
+
+/** The runtime as a fresh `beforeEach` leaves it. */
+function freshRuntime(): WatchRuntime {
+  const compareDay = vi.fn().mockResolvedValue(undefined);
+  const definition = buildDefinition(compareDay);
+  const store = new InMemoryProcessStore();
+  return {
+    store,
+    compareDay,
+    clock: NOW,
+    config: definition.config as WatchConfig,
+    service: new ProcessManagerService<CostRollupWatchState>({
+      store,
+      definition: buildProcessDefinition(
+        definition.config,
+      ) as ProcessDefinition<CostRollupWatchState>,
+    }),
+    dispatcher: new OutboxDispatcherService({
+      store,
+      handlers: buildIntentHandlers(definition.config),
+      processNames: [COST_ROLLUP_WATCH_PROCESS_NAME],
+    }),
+  };
+}
+
+/** What a test may vary about one charge. The tenant defaults to the harness's. */
+export interface ChargeOverrides {
+  tenantId?: string;
+  occurredAtMs?: unknown;
+  eventType?: string;
+  eventId?: string;
+  aggregateId?: string;
+}
+
+/**
+ * One charge, as the log holds it: the tenant it belongs to, the item stream
+ * it arrived on, and the moment it HAPPENED.
+ */
+function makeCharge({
+  tenantId,
+  occurredAtMs = NOW,
+  eventType = PULLED_USAGE_EVENT_TYPES.OBSERVED,
+  eventId = `evt-${nanoid(10)}`,
+  aggregateId = `item-${nanoid(6)}`,
+}: ChargeOverrides & { tenantId: string }): PulledUsageProcessingEvent {
+  return {
+    id: eventId,
+    type: eventType,
+    tenantId,
+    aggregateId,
+    occurredAt: occurredAtMs,
+    data: { restatementKey: aggregateId, occurredAtMs },
+  } as unknown as PulledUsageProcessingEvent;
+}
+
+/** Delivers one charge exactly as the generated subscriber would. */
+async function deliver(
+  runtime: WatchRuntime,
+  event: PulledUsageProcessingEvent,
+  now: number,
+): Promise<void> {
+  const envelope: ProcessEventEnvelope = {
+    eventId: event.id,
+    eventType: event.type,
+    occurredAt: event.occurredAt,
+    tenantId: event.tenantId,
+    projectId: event.tenantId,
+    processKey: runtime.config.keyBy!(event),
+    payload: runtime.config.toPayload!(event),
+  };
+  await runtime.service.handleEvent({ envelope, now });
+}
+
+function refFor(runtime: WatchRuntime, tenantId: string) {
+  return {
+    processName: COST_ROLLUP_WATCH_PROCESS_NAME,
+    projectId: tenantId,
+    processKey: runtime.config.keyBy!(makeCharge({ tenantId })),
+  };
+}
+
+async function instanceOf(runtime: WatchRuntime, tenantId: string) {
+  return await runtime.store.findByRef<CostRollupWatchState>({
+    ref: refFor(runtime, tenantId),
+  });
+}
+
+/** Runs the armed check the way the wake worker does, at its own slot. */
+async function runDueCheck(
+  runtime: WatchRuntime,
+  tenantId: string,
+): Promise<void> {
+  const instance = await instanceOf(runtime, tenantId);
+  if (!instance?.nextWakeAt) {
+    throw new Error(`no check armed for ${tenantId}`);
+  }
+  runtime.clock = instance.nextWakeAt;
+  await runtime.service.handleWake({
+    wake: {
+      ref: refFor(runtime, tenantId),
+      revision: instance.revision,
+      wakeAt: instance.nextWakeAt,
+    },
+    now: runtime.clock,
+  });
+}
+
+async function drainOutbox(
+  runtime: WatchRuntime,
+  passes: number,
+): Promise<void> {
+  for (let i = 0; i < passes; i++) {
+    runtime.clock += 1_000;
+    await runtime.dispatcher.runOnce({ now: runtime.clock, limit: 500 });
+  }
+}
+
 export function createWatchHarness({ tenantPrefix }: { tenantPrefix: string }) {
   const ns = `${tenantPrefix}-${nanoid(8)}`;
   /** The organization's hidden governance project — the tenant of every row. */
   const TENANT = `proj-gov-${ns}`;
   const OTHER_TENANT = `proj-gov-other-${ns}`;
-
-  let store: InMemoryProcessStore;
-  let service: ProcessManagerService<CostRollupWatchState>;
-  let dispatcher: OutboxDispatcherService;
-  let compareDay: ReturnType<typeof vi.fn>;
-  let config: ProcessManagerConfig<any, any, PulledUsageProcessingEvent>;
-  let clock: number;
-
-  function definition() {
-    return buildProcessManager<PulledUsageProcessingEvent>({
-      name: COST_ROLLUP_WATCH_PROCESS_NAME,
-      applier: costRollupWatchPM({
-        comparator: { compareDay } as never,
-      }),
-    });
-  }
-
-  /**
-   * One charge, as the log holds it: the tenant it belongs to, the item stream
-   * it arrived on, and the moment it HAPPENED.
-   */
-  function charge({
-    tenantId = TENANT,
-    occurredAtMs = NOW,
-    eventType = PULLED_USAGE_EVENT_TYPES.OBSERVED,
-    eventId = `evt-${nanoid(10)}`,
-    aggregateId = `item-${nanoid(6)}`,
-  }: {
-    tenantId?: string;
-    occurredAtMs?: unknown;
-    eventType?: string;
-    eventId?: string;
-    aggregateId?: string;
-  } = {}): PulledUsageProcessingEvent {
-    return {
-      id: eventId,
-      type: eventType,
-      tenantId,
-      aggregateId,
-      occurredAt: occurredAtMs,
-      data: { restatementKey: aggregateId, occurredAtMs },
-    } as unknown as PulledUsageProcessingEvent;
-  }
-
-  /** Delivers one charge exactly as the generated subscriber would. */
-  async function record(
-    event: PulledUsageProcessingEvent,
-    { now = clock }: { now?: number } = {},
-  ): Promise<void> {
-    const envelope: ProcessEventEnvelope = {
-      eventId: event.id,
-      eventType: event.type,
-      occurredAt: event.occurredAt,
-      tenantId: event.tenantId,
-      projectId: event.tenantId,
-      processKey: config.keyBy!(event),
-      payload: config.toPayload!(event),
-    };
-    await service.handleEvent({ envelope, now });
-  }
-
-  function refFor(tenantId: string) {
-    return {
-      processName: COST_ROLLUP_WATCH_PROCESS_NAME,
-      projectId: tenantId,
-      processKey: config.keyBy!(charge({ tenantId })),
-    };
-  }
-
-  async function instanceOf(tenantId = TENANT) {
-    return await store.findByRef<CostRollupWatchState>({
-      ref: refFor(tenantId),
-    });
-  }
-
-  async function stateOf(tenantId = TENANT): Promise<CostRollupWatchState> {
-    const instance = await instanceOf(tenantId);
-    if (!instance) throw new Error(`no process instance for ${tenantId}`);
-    return instance.state;
-  }
-
-  /** Runs the armed check the way the wake worker does, at its own slot. */
-  async function runDueCheck(tenantId = TENANT): Promise<void> {
-    const instance = await instanceOf(tenantId);
-    if (!instance?.nextWakeAt) {
-      throw new Error(`no check armed for ${tenantId}`);
-    }
-    clock = instance.nextWakeAt;
-    await service.handleWake({
-      wake: {
-        ref: refFor(tenantId),
-        revision: instance.revision,
-        wakeAt: instance.nextWakeAt,
-      },
-      now: clock,
-    });
-  }
-
-  async function drainOutbox(passes = 4): Promise<void> {
-    for (let i = 0; i < passes; i++) {
-      clock += 1_000;
-      await dispatcher.runOnce({ now: clock, limit: 500 });
-    }
-  }
+  const runtime = freshRuntime();
 
   beforeEach(() => {
-    clock = NOW;
-    compareDay = vi.fn().mockResolvedValue(undefined);
-    config = definition().config as typeof config;
-    store = new InMemoryProcessStore();
-    service = new ProcessManagerService<CostRollupWatchState>({
-      store,
-      definition: buildProcessDefinition(
-        definition().config,
-      ) as ProcessDefinition<CostRollupWatchState>,
-    });
-    dispatcher = new OutboxDispatcherService({
-      store,
-      handlers: buildIntentHandlers(definition().config),
-      processNames: [COST_ROLLUP_WATCH_PROCESS_NAME],
-    });
+    Object.assign(runtime, freshRuntime());
   });
 
   return {
     ns,
     TENANT,
     OTHER_TENANT,
-    charge,
-    record,
-    refFor,
-    instanceOf,
-    stateOf,
-    runDueCheck,
-    drainOutbox,
+    charge: (overrides: ChargeOverrides = {}) =>
+      makeCharge({ ...overrides, tenantId: overrides.tenantId ?? TENANT }),
+    record: (
+      event: PulledUsageProcessingEvent,
+      { now = runtime.clock }: { now?: number } = {},
+    ) => deliver(runtime, event, now),
+    refFor: (tenantId: string) => refFor(runtime, tenantId),
+    instanceOf: (tenantId = TENANT) => instanceOf(runtime, tenantId),
+    stateOf: async (tenantId = TENANT): Promise<CostRollupWatchState> => {
+      const instance = await instanceOf(runtime, tenantId);
+      if (!instance) throw new Error(`no process instance for ${tenantId}`);
+      return instance.state;
+    },
+    runDueCheck: (tenantId = TENANT) => runDueCheck(runtime, tenantId),
+    drainOutbox: (passes = 4) => drainOutbox(runtime, passes),
     get store() {
-      return store;
+      return runtime.store;
     },
     get compareDay() {
-      return compareDay;
+      return runtime.compareDay;
     },
     get clock() {
-      return clock;
+      return runtime.clock;
     },
     set clock(value: number) {
-      clock = value;
+      runtime.clock = value;
     },
   };
 }
