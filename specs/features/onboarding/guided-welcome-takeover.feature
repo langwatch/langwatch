@@ -186,6 +186,15 @@ Feature: Guided welcome flow and takeover screens
     And the default chat model pills show the recommended model first, marked "recommended"
     And Connect is disabled until a key is typed
 
+  @unit
+  Scenario: The recommended model is the newest main-tier model in the catalog
+    Given the committed model catalog
+    When the chat models are listed for OpenAI, Anthropic, Gemini or DeepSeek
+    Then the first pill is the provider's recommendation, the newest main-tier model the catalog carries
+    And it is the model the provider's latest alias resolves to where one exists
+    And no pill is a typed id: every pill is a bare name the catalog carries for that provider
+    # The catalog is synced weekly; a typed default went stale next to it.
+
   @integration
   Scenario: Azure, Bedrock and Custom take credentials and a typed model name
     When I select Azure

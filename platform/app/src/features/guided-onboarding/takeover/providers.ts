@@ -7,6 +7,7 @@ import type {
   ModelProviderKey,
   ModelProviderSpec,
 } from "~/features/onboarding/regions/model-providers/types";
+import { recommendedChatModel } from "~/server/modelProviders/latestAliases";
 import { getProviderModelOptions } from "~/server/modelProviders/registry";
 
 /**
@@ -236,18 +237,20 @@ export function registrySpecFor(provider: GuidedProvider): ModelProviderSpec {
 }
 
 /**
- * The chat model pills for an API-key provider: the registry's default model
- * first (that one is "recommended"), then the catalog's other chat models,
- * capped so the row stays one line.
+ * The chat model pills for an API-key provider: the catalog's recommended
+ * model first (that one is "recommended": the newest main-tier model, the
+ * pick the provider's latest alias resolves to), then the catalog's other
+ * chat models, capped so the row stays one line. The pills carry the bare
+ * model name, without the provider prefix.
  */
 export function guidedChatModels(provider: GuidedProvider): string[] {
-  const spec = registrySpecFor(provider);
-  const catalog = getProviderModelOptions(
-    spec.backendModelProviderKey,
-    "chat",
-  ).map((option) => option.value);
-  const ordered = spec.defaultModel
-    ? [spec.defaultModel, ...catalog.filter((m) => m !== spec.defaultModel)]
+  const backend = registrySpecFor(provider).backendModelProviderKey;
+  const catalog = getProviderModelOptions(backend, "chat").map(
+    (option) => option.value,
+  );
+  const recommended = recommendedChatModel(backend)?.slice(backend.length + 1);
+  const ordered = recommended
+    ? [recommended, ...catalog.filter((m) => m !== recommended)]
     : catalog;
   return ordered.slice(0, GUIDED_MODEL_PILLS_MAX);
 }

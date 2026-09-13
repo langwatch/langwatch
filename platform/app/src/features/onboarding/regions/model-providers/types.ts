@@ -33,7 +33,6 @@ export interface ModelProviderSpec {
   /* The key that the backend uses to identify the model provider. This is different from the key used by the frontend. */
   backendModelProviderKey: ServerModelProviderKey;
   key: ModelProviderKey;
-  defaultModel?: string | null;
   defaultBaseUrl?: string;
   /**
    * The host the provider's APIs hang off, without a version segment.
