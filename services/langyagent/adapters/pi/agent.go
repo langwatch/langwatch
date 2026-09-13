@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -334,11 +335,15 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 // logGuidedTurn writes the wrapper's guided turn end guard report to the
 // manager's log. Worker stderr is discarded (see Spawn), so this event is the
 // guard's only sink, and the event name is the log message so a grep for it
-// finds the line. No frame: the panel has nothing to draw for it.
+// finds the line. The whole report sits on that one line: the turn's logger
+// already carries the turn id (the transport's turnLogFields), so it is not
+// added again, and what the turn owed is joined into one string, since the
+// pretty console draws an array field on a continuation line that a grep for
+// the name does not return. No frame: the panel has nothing to draw for it.
 func logGuidedTurn(ctx context.Context, ev wireEvent) {
 	switch ev.Event {
 	case guidedTurnContinued, guidedTurnBareEnd:
-		clog.Get(ctx).Info(ev.Event, zap.String("turn_id", ev.TurnID), zap.Strings("missing", ev.Missing))
+		clog.Get(ctx).Info(ev.Event, zap.String("missing", strings.Join(ev.Missing, "; ")))
 	default:
 		clog.Get(ctx).Warn("pi worker emitted a guided_turn event of an unknown kind", zap.String("event", ev.Event))
 	}

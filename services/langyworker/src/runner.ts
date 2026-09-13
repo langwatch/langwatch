@@ -202,7 +202,10 @@ export class TurnRunner {
       continuations: 0,
     };
     this.current = state;
-    if (this.options.turnContext) this.options.turnContext.turnId = command.turnId;
+    if (this.options.turnContext) {
+      this.options.turnContext.turnId = command.turnId;
+      this.options.turnContext.calls = state.calls.calls;
+    }
 
     let terminal: TerminalEvent;
     try {
@@ -240,7 +243,10 @@ export class TurnRunner {
 
     state.terminalEmitted = true;
     this.current = null;
-    if (this.options.turnContext) this.options.turnContext.turnId = null;
+    if (this.options.turnContext) {
+      this.options.turnContext.turnId = null;
+      this.options.turnContext.calls = [];
+    }
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
   }

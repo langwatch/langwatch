@@ -5,7 +5,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  CLOSING_LINE,
+  CLOSING_LINE_PUSHBACK,
+  closingLineRefusal,
   COMPLETE_PATH_COMMAND,
+  completePathRan,
   FRAMEWORK_LINE_SHAPE,
   STEP2_LINE_TEMPLATES,
   STEP2_LINES_ITEM,
@@ -208,13 +212,14 @@ describe("the guided turn end guard", () => {
     );
 
     /** @scenario "The step 2 lines the guard checks are the skill's own" */
-    it("carries every template, the framework shape, the checklist item and the closing command word for word", () => {
+    it("carries every template, the framework shape, the checklist item, the closing command and the closing line word for word", () => {
       for (const template of Object.values(STEP2_LINE_TEMPLATES)) {
         expect(skill).toContain(template);
       }
       expect(skill).toContain(FRAMEWORK_LINE_SHAPE);
       expect(skill).toContain(`11. ${STEP2_LINES_ITEM}`);
       expect(skill).toContain(`${COMPLETE_PATH_COMMAND} <path>`);
+      expect(skill).toContain(`\n${CLOSING_LINE}\n`);
     });
 
     it("matches a line with its braces filled and nothing else", () => {
@@ -222,6 +227,27 @@ describe("the guided turn end guard", () => {
       expect(branch.test(BRANCH)).toBe(true);
       expect(branch.test("I left the branch checked out.")).toBe(false);
       expect(branch.test(`${BRANCH} Next I will write a scenario.`)).toBe(false);
+    });
+  });
+
+  describe("when the closing line is said", () => {
+    /** @scenario "The closing line is refused before complete-path" */
+    it("is refused until the complete-path command ran clean in the turn", () => {
+      const early = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(NO_REMOTE)];
+      expect(completePathRan(early)).toBe(false);
+      expect(closingLineRefusal({ text: CLOSING_LINE, calls: early })).toBe(CLOSING_LINE_PUSHBACK);
+      expect(closingLineRefusal({ text: `${CLOSING_LINE} 🎉`, calls: early })).toBe(
+        CLOSING_LINE_PUSHBACK,
+      );
+      expect(closingLineRefusal({ text: NO_REMOTE, calls: early })).toBeUndefined();
+
+      const failed = [...early, shell(`${COMPLETE_PATH_COMMAND} llmops`, 1)];
+      expect(completePathRan(failed)).toBe(false);
+      expect(closingLineRefusal({ text: CLOSING_LINE, calls: failed })).toBe(CLOSING_LINE_PUSHBACK);
+
+      const done = [...early, shell(`${COMPLETE_PATH_COMMAND} llmops`), plan("completed")];
+      expect(completePathRan(done)).toBe(true);
+      expect(closingLineRefusal({ text: CLOSING_LINE, calls: done })).toBeUndefined();
     });
   });
 

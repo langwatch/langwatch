@@ -6,6 +6,11 @@
  * gives a line a place of its own: the call is a tool part like any other, so
  * it is streamed, recorded and replayed in the order it happened, and the
  * panel draws its text as ordinary reply prose instead of an activity row.
+ *
+ * A rule handed in at creation can refuse a line: the tool then throws the
+ * rule's own words, pi records the call as errored, and the panel draws
+ * nothing for a say that errored. The guided path's closing line before the
+ * complete-path command is the one rule (guided-turn-end.ts).
  */
 
 import { Type } from "typebox";
@@ -33,7 +38,10 @@ export function renderSaid(text: unknown): string {
   return SAID_RESULT;
 }
 
-export function createSayExtension(): InlineExtension {
+/** A rule over a line about to be said: the words of the refusal, or undefined to let it through. */
+export type SayRefusal = (text: string) => string | undefined;
+
+export function createSayExtension({ refuse }: { refuse?: SayRefusal } = {}): InlineExtension {
   return {
     name: "langy-say",
     factory: (pi: ExtensionAPI) => {
@@ -41,9 +49,12 @@ export function createSayExtension(): InlineExtension {
         name: SAY_TOOL_NAME,
         label: "Say",
         description:
-          "Show a line to the user now, in place, before the next tool call. The text is drawn as ordinary reply prose where the call happens, so the user reads it before the work that follows. Use it for a line the user must read at that moment: a line a skill asks for before a card or a command, or a result that the reply text would only carry at the end of the turn. Never repeat in the reply what was said with this tool; the reply text can be empty once every line was said.",
+          "Show a line to the user now, in place, before the next tool call. The text is drawn as ordinary reply prose where the call happens, so the user reads it before the work that follows. Use it for a line the user must read at that moment: a line a skill asks for before a card or a command, or a result that the reply text would only carry at the end of the turn. Never repeat in the reply what was said with this tool; the reply text can be empty once every line was said. A line said against a rule of the running skill is refused with the rule, and nothing is drawn.",
         parameters: sayParams,
         async execute(_toolCallId, params) {
+          const text = typeof params.text === "string" ? params.text : "";
+          const refused = text.trim() === "" ? undefined : refuse?.(text);
+          if (refused !== undefined) throw new Error(refused);
           return {
             content: [{ type: "text" as const, text: renderSaid(params.text) }],
             details: {},

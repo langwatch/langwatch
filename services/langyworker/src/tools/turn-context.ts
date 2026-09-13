@@ -6,16 +6,27 @@
  * caller is, the ids say where the card belongs. The conversation is fixed for
  * the life of the worker and arrives in the environment; the turn changes with
  * each turn command, so the runner writes it into a holder the tools read when
- * they call.
+ * they call. The holder also carries the turn's settled calls, for a tool
+ * whose answer depends on what ran before it in the same turn.
  */
+
+/** A call of the turn that has settled, as the runner records it off pi's events. */
+export type SettledCall = {
+  name: string;
+  input: unknown;
+  isError: boolean;
+  output: string;
+};
 
 export type TurnContext = {
   /** The turn in flight, or null between turns. */
   turnId: string | null;
+  /** The settled calls of the turn in flight, in order; empty between turns. */
+  calls: readonly SettledCall[];
 };
 
 export function createTurnContext(): TurnContext {
-  return { turnId: null };
+  return { turnId: null, calls: [] };
 }
 
 /** The conversation this worker serves, as the manager named it at spawn. */

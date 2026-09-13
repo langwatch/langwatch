@@ -1206,15 +1206,30 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: The step 2 lines the guard checks are the skill's own
       Given the guided-onboarding skill source
-      Then every line template, the framework line's shape, the checklist item and the complete-path command the guard reads are in it word for word
+      Then every line template, the framework line's shape, the checklist item, the complete-path command and the closing line the guard reads are in it word for word
+
+    # The closing line is the last thing a path says, after the complete-path
+    # command. A model that says it at the end of step 2 draws it in the
+    # panel, and the guard's continuation cannot take a drawn line back, so
+    # the say tool reads the rule as the line is said.
+    @unit
+    Scenario: The closing line is refused before complete-path
+      Given a say call carrying the closing line in a turn where the complete-path command has not run clean
+      When the worker's say tool reads it
+      Then the tool answers an error naming the rule: the closing line comes after complete-path, the path is not done
+      And the panel draws nothing for a say that errored
+      And the same line after a clean complete-path is said as usual, and every other line as before
 
     # The manager spawns the worker with its stderr discarded, so a log line
     # written in the worker reaches no log: the report rides the protocol.
+    # The pretty console draws an array field on a continuation line, which a
+    # grep for the name does not return, and the turn's logger already carries
+    # the turn id, so the report is one line with the id once.
     @unit
     Scenario: The manager logs the guard's report under its name
       Given the worker sent a guided_turn event for a turn
       When the manager reads it
-      Then it logs the event's name with the turn id and what the turn owed
+      Then it logs the event's name on one line, with the turn id once and what the turn owed beside it
       And no frame reaches the panel for it
 
     # The record the panel keeps places a turn's navigates at its end whatever

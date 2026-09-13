@@ -12,9 +12,14 @@
  * left. Both reports ride the protocol as `guided_turn` events: the manager
  * does not read worker stderr, so it logs them under their names.
  *
- * The step 2 lines and the checklist item are the skill's own words. This
- * package does not depend on the skills tree, so the copies here are pinned
- * to the skill source by a test rather than imported.
+ * The closing line has a rule of its own, read by the `say` tool as the line
+ * is said rather than at the turn's end: it comes after the complete-path
+ * command, and a say that carries it earlier is refused and draws nothing,
+ * since a line already drawn is not taken back by a continuation.
+ *
+ * The step 2 lines, the closing line and the checklist item are the skill's
+ * own words. This package does not depend on the skills tree, so the copies
+ * here are pinned to the skill source by a test rather than imported.
  */
 
 import { contentText } from "./events.js";
@@ -28,6 +33,7 @@ import { QUESTION_TOOL_NAME } from "./tools/question.js";
 import { SAY_TOOL_NAME } from "./tools/say.js";
 import { SKILL_TOOL_NAME } from "./tools/skill.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
+import type { SettledCall } from "./tools/turn-context.js";
 
 /** The names of the guard's two reports, sent to the manager and logged there under these names. */
 export const GUIDED_TURN_CONTINUED_LOG = "guided_turn_continued";
@@ -41,6 +47,13 @@ export const WAIT_ONLINE_MARKER = "agent list --wait-online";
 
 /** The command that closes a path; the closing line follows it. */
 export const COMPLETE_PATH_COMMAND = "langwatch onboarding complete-path";
+
+/** The closing line of every path, said once the complete-path command has run. */
+export const CLOSING_LINE = "All ready! Let me know if there is anything I can help with.";
+
+/** What `say` answers to the closing line while the complete-path command has not run. */
+export const CLOSING_LINE_PUSHBACK =
+  "Nothing was said: the closing line comes after `langwatch onboarding complete-path`; the path is not done. Go on with the step, and say the closing line once that command has run clean.";
 
 /** The shape the framework line takes: "I found a LangGraph agent in app/graph.py." */
 export const FRAMEWORK_LINE_SHAPE = "I found a LangGraph agent in app/graph.py.";
@@ -82,12 +95,7 @@ export const TRANSPARENT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
 /** `langwatch navigate ...` opens a page beside the panel and says nothing: a shell call the ender reads through. */
 const NAVIGATE_COMMAND = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*langwatch\s+navigate\b/;
 
-export type TurnCall = {
-  name: string;
-  input: unknown;
-  isError: boolean;
-  output: string;
-};
+export type TurnCall = SettledCall;
 
 /** The calls of one turn, in order, read off pi's session events. */
 export class TurnCallLog {
@@ -160,6 +168,29 @@ function failed(call: TurnCall): boolean {
   if (call.isError) return true;
   const code = exitCodeOf(call.output);
   return code !== undefined && code !== 0;
+}
+
+/** Did the turn run the complete-path command, and did it answer clean? */
+export function completePathRan(calls: readonly TurnCall[]): boolean {
+  return calls.some(
+    (call) => shellCommand(call)?.includes(COMPLETE_PATH_COMMAND) === true && !failed(call),
+  );
+}
+
+/**
+ * The say tool's rule for the closing line: a say that carries it before the
+ * complete-path command ran clean in the same turn is refused with the
+ * pushback; any other line, and the closing line after the command, passes.
+ */
+export function closingLineRefusal({
+  text,
+  calls,
+}: {
+  text: string;
+  calls: readonly TurnCall[];
+}): string | undefined {
+  if (!text.includes(CLOSING_LINE)) return undefined;
+  return completePathRan(calls) ? undefined : CLOSING_LINE_PUSHBACK;
 }
 
 export type GuidedTurnEnder = "card" | "closing_line" | "failed_step" | "bare";

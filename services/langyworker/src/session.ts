@@ -35,6 +35,7 @@ import {
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SAY_TOOL_NAME, createSayExtension } from "./tools/say.js";
+import { closingLineRefusal } from "./guided-turn-end.js";
 import {
   SECRET_SNIPPET_TOOL_NAME,
   createSecretSnippetExtension,
@@ -171,7 +172,9 @@ export async function createLangySession({
         disabledSkills: config.disabledSkills,
       }),
       createQuestionExtension({ turnContext }),
-      createSayExtension(),
+      createSayExtension({
+        refuse: (text) => closingLineRefusal({ text, calls: turnContext.calls }),
+      }),
       createSecretSnippetExtension(),
       // Registers `bash` in place of pi's built-in: the extension's tool wins
       // the name in the session's registry.

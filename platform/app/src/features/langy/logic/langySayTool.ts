@@ -21,13 +21,15 @@ interface SayToolPartLike {
 }
 
 /**
- * States whose `input` is COMPLETE. While the call is still streaming its
- * input the text may be half a sentence; nothing renders from that.
+ * States in which the line is on screen. While the call is still streaming
+ * its input the text may be half a sentence, and a call that errored was
+ * refused by the worker (the closing line of a guided path before its
+ * complete-path command, answered with the rule instead of "Said."); nothing
+ * renders from either.
  */
-const COMPLETE_INPUT_STATES = new Set([
+const SAID_STATES = new Set([
   "input-available",
   "output-available",
-  "output-error",
   "output-denied",
 ]);
 
@@ -39,13 +41,14 @@ export function isSayToolPart(part: unknown): boolean {
 }
 
 /**
- * The words a `say` part carries, or null while its input is still streaming
- * or when it carries none: a call with nothing to say draws nothing.
+ * The words a `say` part carries, or null while its input is still streaming,
+ * when the call was refused, or when it carries none: a call with nothing to
+ * say draws nothing.
  */
 export function sayToolText(part: unknown): string | null {
   if (!isSayToolPart(part)) return null;
   const p = part as SayToolPartLike;
-  if (!COMPLETE_INPUT_STATES.has(p.state ?? "")) return null;
+  if (!SAID_STATES.has(p.state ?? "")) return null;
   const input = p.input as { text?: unknown } | undefined;
   const text = typeof input?.text === "string" ? input.text : "";
   return text.trim() === "" ? null : text;
