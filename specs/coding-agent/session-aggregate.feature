@@ -209,17 +209,19 @@ Feature: Coding-agent sessions
   # generator right after the first prompt, and the recap. Neither carries a
   # link to the thread it serves. What Codex does state is how it started
   # them: its temporary structured request helper mints the app-server request
-  # ids (`temporary-structured-turn-<uuid>` on the turn/start request that is
-  # the root of the helper turn's trace), and ingestion stamps that statement
-  # onto the helper's turn span as the auxiliary session mark.
+  # ids (`temporary-structured-turn-<uuid>` on the turn/start request), and
+  # ingestion stores that request span stamped with the helper's thread id.
+  # Its contribution carries the auxiliary fact; the thread's turn span and
+  # log events arrive in other batches, in either order.
 
-  Scenario: a codex helper thread's turn marks its session as auxiliary
-    When a codex turn span arrives carrying the auxiliary session mark
+  Scenario: a codex helper thread's request span marks its session as auxiliary
+    When a codex helper thread's request span contributes the auxiliary fact
     Then the session it folds into is marked auxiliary
-    And a later contribution from the same thread does not clear the mark
+    And the thread's turn span and log events, before or after it, do not clear the mark
+    And the request span itself counts no model call
 
-  Scenario: a codex turn without the mark keeps its session unmarked
-    When a codex turn span arrives without the auxiliary session mark
+  Scenario: a codex turn without the fact keeps its session unmarked
+    When a codex turn span arrives for a session with no auxiliary fact
     Then the session it folds into is not marked auxiliary
 
   Scenario: an auxiliary session round-trips through its stored row

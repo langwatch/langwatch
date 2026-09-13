@@ -367,7 +367,6 @@ import { PrismaTopicClusteringStatusRepository } from "./topic-clustering/reposi
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
 import { TopicService } from "./topic-clustering/topic.service";
 import { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
-import { RedisAuxiliaryTraceMemo } from "./traces/codex-auxiliary-thread";
 import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
@@ -1665,7 +1664,6 @@ export function initializeDefaultApp(options?: {
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
-      ...(redis ? { auxiliaryTraces: new RedisAuxiliaryTraceMemo(redis) } : {}),
       // ADR-022: Edge size-check + transient S3 spool, on by default and
       // switchable off per project. projectId === tenantId (routes/otel.ts
       // passes project.id). processCommandData runs PER SPAN (not once per OTLP

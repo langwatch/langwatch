@@ -1,5 +1,5 @@
 import { claudeCacheWritesLongLived } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
-import { AUXILIARY_SESSION_ATTR } from "~/server/app-layer/traces/codex-auxiliary-thread";
+import { AUXILIARY_SESSION_FACT } from "~/server/app-layer/traces/codex-auxiliary-thread";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
@@ -131,6 +131,12 @@ const CLAUDE = {
 const CODEX = {
   SPAN: {
     TURN: "session_task.turn",
+    /**
+     * The app-server request span of a helper thread codex ran for itself,
+     * stamped with the helper's thread id at ingestion. Its one fact is the
+     * auxiliary mark; it counts nothing.
+     */
+    HELPER_REQUEST: "turn/start",
   },
   EVENT: {
     TURN_TTFT: "turn_ttft",
@@ -555,11 +561,11 @@ function withIdentity(
     // session": the two are indistinguishable from here.
     parentSessionId: state.parentSessionId ?? str(attrs.parent_session_id),
     isFork: state.isFork || scalarStr(attrs.is_fork) === "true",
-    // The ingestion stamp of a helper thread's trace (codex's title
-    // generator, its recap). Sticky: the thread's log events fold before
-    // the stamped turn span arrives, and nothing after it may unmark.
+    // The fact a helper thread's request span contributes (codex's title
+    // generator, its recap). Sticky: the thread's other signals fold in
+    // whatever order their export batches land, and none may unmark.
     auxiliary:
-      state.auxiliary || scalarStr(attrs[AUXILIARY_SESSION_ATTR]) === "true",
+      state.auxiliary || scalarStr(attrs[AUXILIARY_SESSION_FACT]) === "true",
   };
 }
 
@@ -765,6 +771,10 @@ export function applySpanToCodingAgentSession({
     // tools that ran inside it, and zero reads honestly as "not measured".
     const folded = foldModelCall(withIdentity(state, attrs), facts, 0);
     return { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) };
+  }
+
+  if (span.name === CODEX.SPAN.HELPER_REQUEST) {
+    return withIdentity(state, attrs);
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {

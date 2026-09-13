@@ -90,11 +90,12 @@ export interface CodingAgentSessionData {
   parentSessionId: string | null;
   isFork: boolean;
   /**
-   * True once any of the session's spans carried the auxiliary mark: the
-   * thread was one the agent ran for itself (codex's thread title generator,
-   * its recap), not a session the user held. Sticky, because the mark rides
-   * the turn span and the thread's log events arrive before it. An auxiliary
-   * session keeps its row and its priced traces; the Sessions list omits it.
+   * True once any contribution carried the auxiliary fact: the thread was one
+   * the agent ran for itself (codex's thread title generator, its recap), not
+   * a session the user held. Sticky, because the fact rides the thread's
+   * request span and its turn span and log events land in other export
+   * batches, in either order. An auxiliary session keeps its row and its
+   * priced traces; the Sessions list omits it.
    */
   auxiliary: boolean;
   /**

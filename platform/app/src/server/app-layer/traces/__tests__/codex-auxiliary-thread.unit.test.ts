@@ -13,23 +13,23 @@ import type {
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
-  AUXILIARY_SESSION_ATTR,
-  AUXILIARY_TRACE_MEMO_TTL_SECONDS,
-  InMemoryAuxiliaryTraceMemo,
+  AUXILIARY_SESSION_FACT,
+  codexAuxiliarySessionFacts,
+  codexHelperThreadMarkersOf,
+  HELPER_THREAD_ID_ATTR,
   isCodexTemporaryStructuredRequestSpan,
 } from "../codex-auxiliary-thread";
 import type { SpanDedupService } from "../span-dedupe.service";
-import {
-  SPAN_MAX_PAST_MS,
-  TraceRequestCollectionService,
-} from "../trace-request-collection.service";
+import { TraceRequestCollectionService } from "../trace-request-collection.service";
 import fixture from "./fixtures/codex-0154-helper-thread.spans.json";
 
 const tenantId = "project_test";
 const piiRedactionLevel: PIIRedactionLevel = "ESSENTIAL";
 
-/** The helper turn's trace: `turn/start` root, then the turn span. */
+/** The helper turn's trace: `turn/start` root, its queue child, the turn. */
 const HELPER_TURN_TRACE = "76fdf6e1";
+/** The helper thread id the queue child names. */
+const HELPER_THREAD_ID = "01a09a08-9915-7450-bedb-bb08c55160d3";
 /** The user turn's trace, whose `turn/start` carries the TUI's counter. */
 const USER_TURN_TRACE = "2a5259d4";
 
@@ -52,7 +52,7 @@ function attributesOf(span: FixtureSpan): Record<string, unknown> {
   );
 }
 
-function makeService(memo?: InMemoryAuxiliaryTraceMemo) {
+function makeService() {
   const recordSpan = vi.fn<(data: RecordSpanCommandData) => Promise<void>>(() =>
     Promise.resolve(),
   );
@@ -61,11 +61,7 @@ function makeService(memo?: InMemoryAuxiliaryTraceMemo) {
     tryConfirmProcessed: vi.fn(() => Promise.resolve()),
     tryReleaseOnFailure: vi.fn(() => Promise.resolve()),
   };
-  const service = new TraceRequestCollectionService({
-    dedup,
-    recordSpan,
-    ...(memo ? { auxiliaryTraces: memo } : {}),
-  });
+  const service = new TraceRequestCollectionService({ dedup, recordSpan });
   return { service, recordSpan };
 }
 
@@ -81,21 +77,21 @@ function batch(spans: FixtureSpan[]): IExportTraceServiceRequest {
   } as unknown as IExportTraceServiceRequest;
 }
 
-function recordedAttributeKeys(
+function recordedSpans(
   recordSpan: ReturnType<typeof makeService>["recordSpan"],
-  spanName: string,
-): string[] {
-  const call = recordSpan.mock.calls.find(
-    ([data]) => data.span.name === spanName,
-  );
-  if (!call) throw new Error(`${spanName} was not recorded`);
-  return call[0].span.attributes.map((a) => a.key);
+): Array<{ name: string; attributes: Record<string, unknown> }> {
+  return recordSpan.mock.calls.map(([data]) => ({
+    name: data.span.name,
+    attributes: Object.fromEntries(
+      data.span.attributes.map((a) => [a.key, a.value.stringValue]),
+    ),
+  }));
 }
 
 describe("isCodexTemporaryStructuredRequestSpan", () => {
   describe("given codex's app-server request spans", () => {
     describe("when the request was minted by the temporary structured request helper", () => {
-      /** @scenario "A codex temporary structured request marks its trace as auxiliary" */
+      /** @scenario "A codex temporary structured request names its helper thread" */
       it("recognises the thread/start and turn/start of the title thread", () => {
         const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
         const [threadStart] = spansOf("23acde07", "thread/start");
@@ -114,10 +110,20 @@ describe("isCodexTemporaryStructuredRequestSpan", () => {
           ).toBe(true);
         }
       });
+
+      it("derives the auxiliary fact for the session contribution", () => {
+        const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+        expect(
+          codexAuxiliarySessionFacts({
+            scopeName: fixture.scope.name,
+            attributes: attributesOf(turnStart!),
+          }),
+        ).toEqual({ [AUXILIARY_SESSION_FACT]: true });
+      });
     });
 
     describe("when the request is the user's own turn", () => {
-      /** @scenario "A codex turn span of an ordinary trace is not stamped" */
+      /** @scenario "A codex turn of the user's own is not marked" */
       it("does not recognise a turn/start carrying the TUI's request counter", () => {
         const [turnStart] = spansOf(USER_TURN_TRACE, "turn/start");
         expect(attributesOf(turnStart!)["rpc.request_id"]).toBe("5");
@@ -127,6 +133,12 @@ describe("isCodexTemporaryStructuredRequestSpan", () => {
             attributes: attributesOf(turnStart!),
           }),
         ).toBe(false);
+        expect(
+          codexAuxiliarySessionFacts({
+            scopeName: fixture.scope.name,
+            attributes: attributesOf(turnStart!),
+          }),
+        ).toEqual({});
       });
     });
 
@@ -144,25 +156,45 @@ describe("isCodexTemporaryStructuredRequestSpan", () => {
   });
 });
 
-describe("the auxiliary trace memo", () => {
-  describe("given a turn span that arrives long after the request that marked it", () => {
-    /** @scenario "An auxiliary trace is remembered for as long as ingestion accepts its spans" */
-    it("remembers the trace for as long as ingestion accepts the span", () => {
-      // A shorter memo would store the late turn unmarked and list the helper
-      // thread as a session; a longer one would keep keys for traces whose
-      // spans ingestion already rejects.
-      expect(AUXILIARY_TRACE_MEMO_TTL_SECONDS * 1000).toBe(SPAN_MAX_PAST_MS);
+describe("codexHelperThreadMarkersOf", () => {
+  describe("given one export batch of the helper turn", () => {
+    /** @scenario "A codex temporary structured request names its helper thread" */
+    it("maps the request span to the thread its queue child names", () => {
+      const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+      const markers = codexHelperThreadMarkersOf({
+        scopeName: fixture.scope.name,
+        spans: spansOf(HELPER_TURN_TRACE) as OtlpSpan[],
+      });
+      expect(markers.get(turnStart!.spanId)).toBe(HELPER_THREAD_ID);
+      expect(markers.size).toBe(1);
+    });
+
+    it("maps nothing when the queue child is not in the batch", () => {
+      const markers = codexHelperThreadMarkersOf({
+        scopeName: fixture.scope.name,
+        spans: spansOf(HELPER_TURN_TRACE, "turn/start") as OtlpSpan[],
+      });
+      expect(markers.size).toBe(0);
+    });
+  });
+
+  describe("given the user's own turn", () => {
+    it("maps nothing, whatever the queue child names", () => {
+      const markers = codexHelperThreadMarkersOf({
+        scopeName: fixture.scope.name,
+        spans: spansOf(USER_TURN_TRACE) as OtlpSpan[],
+      });
+      expect(markers.size).toBe(0);
     });
   });
 });
 
 describe("TraceRequestCollectionService and codex helper threads", () => {
-  describe("given the helper turn's request span arrives in one export batch", () => {
-    describe("when its turn span arrives in a later batch", () => {
-      /** @scenario "A codex temporary structured request marks its trace as auxiliary" */
-      it("filters the request span and remembers its trace", async () => {
-        const memo = new InMemoryAuxiliaryTraceMemo();
-        const { service, recordSpan } = makeService(memo);
+  describe("given the helper turn's request span and its queue child in one batch", () => {
+    describe("when the batch is ingested", () => {
+      /** @scenario "The codex helper request span is stored with its thread id" */
+      it("stores the request span stamped with the helper's thread id and filters the rest", async () => {
+        const { service, recordSpan } = makeService();
 
         const result = await service.handleOtlpTraceRequest(
           tenantId,
@@ -177,23 +209,42 @@ describe("TraceRequestCollectionService and codex helper threads", () => {
         );
 
         expect(result.rejectedSpans).toBe(0);
-        expect(recordSpan).not.toHaveBeenCalled();
-        const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
-        expect(await memo.has({ tenantId, traceId: turnStart!.traceId })).toBe(
-          true,
+        const stored = recordedSpans(recordSpan);
+        expect(stored.map((s) => s.name)).toEqual(["turn/start"]);
+        expect(stored[0]!.attributes[HELPER_THREAD_ID_ATTR]).toBe(
+          HELPER_THREAD_ID,
+        );
+        expect(stored[0]!.attributes["rpc.request_id"]).toMatch(
+          /^temporary-structured-turn-/,
         );
       });
 
-      /** @scenario "The codex turn span of an auxiliary trace is stamped" */
-      it("stamps the turn span with the auxiliary session mark", async () => {
-        const memo = new InMemoryAuxiliaryTraceMemo();
-        const { service, recordSpan } = makeService(memo);
+      it("stamps the request span whatever order the batch lists the two in", async () => {
+        const { service, recordSpan } = makeService();
+        const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+        const [queued] = spansOf(
+          HELPER_TURN_TRACE,
+          "app_server.serialized_request_queue",
+        );
 
         await service.handleOtlpTraceRequest(
           tenantId,
-          batch(spansOf(HELPER_TURN_TRACE, "turn/start")),
+          batch([turnStart!, queued!]),
           piiRedactionLevel,
         );
+
+        expect(
+          recordedSpans(recordSpan)[0]!.attributes[HELPER_THREAD_ID_ATTR],
+        ).toBe(HELPER_THREAD_ID);
+      });
+    });
+  });
+
+  describe("given the helper's turn span in a later batch", () => {
+    describe("when it is ingested", () => {
+      it("stores the turn span as it came, with no stamp of its own", async () => {
+        const { service, recordSpan } = makeService();
+
         await service.handleOtlpTraceRequest(
           tenantId,
           batch(
@@ -202,39 +253,39 @@ describe("TraceRequestCollectionService and codex helper threads", () => {
           piiRedactionLevel,
         );
 
-        expect(
-          recordedAttributeKeys(recordSpan, "session_task.turn"),
-        ).toContain(AUXILIARY_SESSION_ATTR);
-        expect(recordedAttributeKeys(recordSpan, "handle_responses")).toContain(
-          AUXILIARY_SESSION_ATTR,
-        );
+        const stored = recordedSpans(recordSpan);
+        expect(stored.map((s) => s.name).sort()).toEqual([
+          "handle_responses",
+          "session_task.turn",
+        ]);
+        for (const span of stored) {
+          expect(span.attributes[HELPER_THREAD_ID_ATTR]).toBeUndefined();
+        }
       });
+    });
+  });
 
-      it("stamps the turn span even when both land in the same batch, turn first", async () => {
-        const memo = new InMemoryAuxiliaryTraceMemo();
-        const { service, recordSpan } = makeService(memo);
-        const [turn] = spansOf(HELPER_TURN_TRACE, "session_task.turn");
-        const [turnStart] = spansOf(HELPER_TURN_TRACE, "turn/start");
+  describe("given the request span arrives without its queue child", () => {
+    describe("when it is ingested", () => {
+      it("filters it as the noise it is on its own", async () => {
+        const { service, recordSpan } = makeService();
 
         await service.handleOtlpTraceRequest(
           tenantId,
-          batch([turn!, turnStart!]),
+          batch(spansOf(HELPER_TURN_TRACE, "turn/start")),
           piiRedactionLevel,
         );
 
-        expect(
-          recordedAttributeKeys(recordSpan, "session_task.turn"),
-        ).toContain(AUXILIARY_SESSION_ATTR);
+        expect(recordSpan).not.toHaveBeenCalled();
       });
     });
   });
 
   describe("given the user's own turn", () => {
     describe("when its spans are ingested", () => {
-      /** @scenario "A codex turn span of an ordinary trace is not stamped" */
-      it("stores the turn span without the mark", async () => {
-        const memo = new InMemoryAuxiliaryTraceMemo();
-        const { service, recordSpan } = makeService(memo);
+      /** @scenario "A codex turn of the user's own is not marked" */
+      it("filters the request span and stores the turn span unstamped", async () => {
+        const { service, recordSpan } = makeService();
 
         await service.handleOtlpTraceRequest(
           tenantId,
@@ -242,52 +293,9 @@ describe("TraceRequestCollectionService and codex helper threads", () => {
           piiRedactionLevel,
         );
 
-        expect(
-          recordedAttributeKeys(recordSpan, "session_task.turn"),
-        ).not.toContain(AUXILIARY_SESSION_ATTR);
-      });
-    });
-  });
-
-  describe("given a process with no memo", () => {
-    describe("when a helper turn is ingested", () => {
-      it("stores the turn span unmarked rather than failing", async () => {
-        const { service, recordSpan } = makeService();
-
-        await service.handleOtlpTraceRequest(
-          tenantId,
-          batch(spansOf(HELPER_TURN_TRACE)),
-          piiRedactionLevel,
-        );
-
-        expect(
-          recordedAttributeKeys(recordSpan, "session_task.turn"),
-        ).not.toContain(AUXILIARY_SESSION_ATTR);
-      });
-    });
-  });
-
-  describe("given a memo that fails", () => {
-    describe("when a helper turn is ingested", () => {
-      it("keeps ingesting and stores the span unmarked", async () => {
-        const failing = {
-          mark: vi.fn(() => Promise.reject(new Error("redis down"))),
-          has: vi.fn(() => Promise.reject(new Error("redis down"))),
-        };
-        const { service, recordSpan } = makeService(
-          failing as unknown as InMemoryAuxiliaryTraceMemo,
-        );
-
-        const result = await service.handleOtlpTraceRequest(
-          tenantId,
-          batch(spansOf(HELPER_TURN_TRACE)),
-          piiRedactionLevel,
-        );
-
-        expect(result.ingestionFailures).toBe(0);
-        expect(
-          recordedAttributeKeys(recordSpan, "session_task.turn"),
-        ).not.toContain(AUXILIARY_SESSION_ATTR);
+        const stored = recordedSpans(recordSpan);
+        expect(stored.map((s) => s.name)).toEqual(["session_task.turn"]);
+        expect(stored[0]!.attributes[HELPER_THREAD_ID_ATTR]).toBeUndefined();
       });
     });
   });

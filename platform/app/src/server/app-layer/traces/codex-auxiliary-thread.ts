@@ -1,4 +1,5 @@
-import type { Cluster, Redis } from "ioredis";
+import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { isCodexScope } from "./coding-agent-span-filter";
 
 /**
@@ -26,47 +27,45 @@ import { isCodexScope } from "./coding-agent-span-filter";
  *   - `thread/unsubscribe` `temporary-structured-unsubscribe-<uuid>`
  *
  * and stamps it as `rpc.request_id` on the request span (a user-driven
- * `turn/start` carries the TUI's own request counter, `"5"`). The `turn/start`
- * span is the ROOT of the same trace the helper's `session_task.turn` lands
- * in, so trace id is the join. The request spans are infrastructure noise and
- * stay filtered (`coding-agent-span-filter.ts`); what they say about their
- * trace is remembered here and stamped onto the turn span, which codex exports
- * in a later batch (the request returns once the turn is dispatched; the turn
- * span ends when the model answers).
- *
- * The memo is Redis-backed because those two batches can land on different
- * pods. Ordering holds by construction: codex's batch exporter sends spans in
- * end order, one request at a time, and the request span ends before the turn
- * span starts its model call.
+ * `turn/start` carries the TUI's own request counter, `"5"`). The request
+ * span names no thread, but its `app_server.serialized_request_queue` child
+ * does: `key = Thread { thread_id: "<uuid>" }`, and the two end together, so
+ * codex's batch exporter sends them in one batch. That is the join: the
+ * helper's thread id is read off the child in the same batch and stamped on
+ * the request span as `langwatch.thread.id`, which is what lets the request
+ * span through the noise filter and gives the coding-agent session fold a
+ * contribution keyed by the helper's thread id. The fold absorbs facts in any
+ * order, so the helper's turn span and log events, exported in other batches,
+ * need no stamp of their own.
  */
 
 /**
- * The stamp a span of an auxiliary trace carries. The coding-agent session
- * fold lifts it as a fact and marks the session, and the Sessions list omits
- * marked sessions.
+ * The fact a helper thread's request span contributes to its session. The
+ * fold sets a sticky flag from it, and the Sessions list omits marked
+ * sessions.
  */
-export const AUXILIARY_SESSION_ATTR = "langwatch.session.auxiliary";
+export const AUXILIARY_SESSION_FACT = "langwatch.session.auxiliary";
+
+/**
+ * Where the helper's thread id lands on its request span. The same key the
+ * codex extractor sets for the session on every other codex record, so the
+ * span reads as the thread's on every surface.
+ */
+export const HELPER_THREAD_ID_ATTR = "langwatch.thread.id";
 
 const TEMPORARY_STRUCTURED_REQUEST_ID_PREFIX = "temporary-structured-";
 
-/**
- * How long an auxiliary trace is remembered for its remaining spans.
- *
- * The same 31 days ingestion accepts a span's start time from
- * (`SPAN_MAX_PAST_MS` in `trace-request-collection.service.ts`, pinned to this
- * constant by the module's unit test). The request span and the turn span it
- * marks normally land seconds apart, but nothing in the exporter contract
- * bounds the delay between two batches, and a memo that expired first would
- * store the turn unmarked and let the helper thread list as a session. Any
- * span that arrives late enough for the memo to be gone is a span ingestion
- * rejects anyway.
- */
-export const AUXILIARY_TRACE_MEMO_TTL_SECONDS = 31 * 24 * 60 * 60;
+/** The child of an app-server request span that names the thread it queued on. */
+const REQUEST_QUEUE_SPAN_NAME = "app_server.serialized_request_queue";
+
+/** `Thread { thread_id: "01a0…" }`, as codex's Debug formatting spells it. */
+const QUEUE_KEY_THREAD_ID =
+  /thread_id: "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/;
 
 /**
  * Whether a codex span is one of the app-server request spans codex's
  * temporary structured request helper issues. Scope-gated: the request id
- * shape is codex's own, and a foreign span reusing it must not mark a trace.
+ * shape is codex's own, and a foreign span reusing it must not mark a thread.
  */
 export function isCodexTemporaryStructuredRequestSpan({
   scopeName,
@@ -83,69 +82,84 @@ export function isCodexTemporaryStructuredRequestSpan({
   );
 }
 
-export interface AuxiliaryTraceMemo {
-  mark(params: { tenantId: string; traceId: string }): Promise<void>;
-  has(params: { tenantId: string; traceId: string }): Promise<boolean>;
+function stringAttributes(span: OtlpSpan): Record<string, unknown> {
+  return Object.fromEntries(
+    span.attributes.map((a) => [a.key, a.value.stringValue]),
+  );
 }
 
-const memoKey = ({
-  tenantId,
-  traceId,
+/**
+ * The helper thread each temporary structured request span in one export
+ * batch was issued for, keyed by the request span's id: the request span
+ * carries the mark, its queue child carries the thread id. A request span
+ * whose child is not in the batch maps to nothing, and the helper then lists
+ * as a session, which is the failure before this module rather than a wrong
+ * attribution.
+ */
+export function codexHelperThreadMarkersOf({
+  scopeName,
+  spans,
 }: {
-  tenantId: string;
-  traceId: string;
-}): string => `coding-agent:auxiliary-trace:${tenantId}:${traceId}`;
+  scopeName: string | null | undefined;
+  spans: OtlpSpan[];
+}): Map<string, string> {
+  const markers = new Map<string, string>();
+  if (!isCodexScope(scopeName)) return markers;
 
-export class RedisAuxiliaryTraceMemo implements AuxiliaryTraceMemo {
-  constructor(private readonly redis: Redis | Cluster) {}
-
-  async mark({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<void> {
-    await this.redis.set(
-      memoKey({ tenantId, traceId }),
-      "1",
-      "EX",
-      AUXILIARY_TRACE_MEMO_TTL_SECONDS,
-    );
+  const requestSpanIds = new Set<string>();
+  for (const span of spans) {
+    if (
+      isCodexTemporaryStructuredRequestSpan({
+        scopeName,
+        attributes: stringAttributes(span),
+      })
+    ) {
+      requestSpanIds.add(TraceRequestUtils.normalizeOtlpId(span.spanId));
+    }
   }
+  if (requestSpanIds.size === 0) return markers;
 
-  async has({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<boolean> {
-    return (await this.redis.exists(memoKey({ tenantId, traceId }))) === 1;
+  for (const span of spans) {
+    if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) continue;
+    const parentId = TraceRequestUtils.normalizeOtlpId(span.parentSpanId);
+    if (!requestSpanIds.has(parentId)) continue;
+    const key = stringAttributes(span).key;
+    const threadId =
+      typeof key === "string" ? QUEUE_KEY_THREAD_ID.exec(key)?.[1] : undefined;
+    if (threadId) markers.set(parentId, threadId);
   }
+  return markers;
 }
 
-/** For tests and for a process with no Redis. */
-export class InMemoryAuxiliaryTraceMemo implements AuxiliaryTraceMemo {
-  private readonly marked = new Set<string>();
+/** The request span with the helper's thread id on it. */
+export function stampCodexHelperThread({
+  span,
+  threadId,
+}: {
+  span: OtlpSpan;
+  threadId: string;
+}): OtlpSpan {
+  return {
+    ...span,
+    attributes: [
+      ...span.attributes,
+      { key: HELPER_THREAD_ID_ATTR, value: { stringValue: threadId } },
+    ],
+  };
+}
 
-  async mark({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<void> {
-    this.marked.add(memoKey({ tenantId, traceId }));
-  }
-
-  async has({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<boolean> {
-    return this.marked.has(memoKey({ tenantId, traceId }));
-  }
+/**
+ * The auxiliary fact off one span's attributes, for the session contribution:
+ * set on a codex temporary structured request span, absent otherwise.
+ */
+export function codexAuxiliarySessionFacts({
+  scopeName,
+  attributes,
+}: {
+  scopeName: string | null | undefined;
+  attributes: Record<string, unknown>;
+}): Record<string, boolean> {
+  return isCodexTemporaryStructuredRequestSpan({ scopeName, attributes })
+    ? { [AUXILIARY_SESSION_FACT]: true }
+    : {};
 }
