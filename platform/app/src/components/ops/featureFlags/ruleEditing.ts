@@ -1,8 +1,8 @@
-import {
-  emailDomainsOf,
-  type FeatureFlagRuleMatch,
-  type FeatureFlagRules,
+import type {
+  FeatureFlagRuleMatch,
+  FeatureFlagRules,
 } from "~/server/featureFlag";
+import { emailDomainsOf } from "~/server/featureFlag/rules";
 
 /**
  * The editing model behind the targeting-rules dialog.

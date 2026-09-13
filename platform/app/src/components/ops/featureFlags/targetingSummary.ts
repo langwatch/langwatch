@@ -1,4 +1,5 @@
-import { emailDomainsOf, type FeatureFlagRules } from "~/server/featureFlag";
+import type { FeatureFlagRules } from "~/server/featureFlag";
+import { emailDomainsOf } from "~/server/featureFlag/rules";
 
 /**
  * One line under a flag's toggle saying who a rule has already switched the
