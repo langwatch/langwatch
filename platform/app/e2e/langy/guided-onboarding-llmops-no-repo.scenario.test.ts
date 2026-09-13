@@ -84,6 +84,7 @@ describe("Langy asks before making a repository in a folder that has none", () =
     }
     python = await createPythonEnv({
       at: path.join(folder.root, "..", "guided-no-repo-python"),
+      forFolder: folder.root,
     });
   }, 1_200_000);
 

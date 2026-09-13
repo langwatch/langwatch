@@ -87,6 +87,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
     });
     python = await createPythonEnv({
       at: path.join(folder.root, "..", "guided-pip-missing-python"),
+      forFolder: folder.root,
     });
   }, 1_200_000);
 

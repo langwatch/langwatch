@@ -793,16 +793,29 @@ export interface PythonEnv {
  * It sits BESIDE the shared folder, never in it: a `.venv` inside the folder
  * is a fact about the project that the install ladder reads, and these
  * scenarios are about a project that has none.
+ *
+ * Pass `forFolder` and the project's own `requirements.txt` is installed into
+ * it, so the only thing the terminal is short of is what the scenario took
+ * away. Without it the first command that imports a declared dependency fails
+ * for a reason the scenario never set up.
  */
 export async function createPythonEnv({
   at,
+  forFolder,
 }: {
   at: string;
+  forFolder?: string;
 }): Promise<PythonEnv> {
   await fs.rm(at, { recursive: true, force: true });
   sh("python3", ["-m", "venv", at], { timeoutMs: 300_000 });
   const binDir = path.join(at, "bin");
   const python = path.join(binDir, "python3");
+  const requirements = forFolder && path.join(forFolder, "requirements.txt");
+  if (requirements && existsSync(requirements)) {
+    sh(python, ["-m", "pip", "install", "-r", requirements], {
+      timeoutMs: 600_000,
+    });
+  }
   return {
     binDir,
     python,

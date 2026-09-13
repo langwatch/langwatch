@@ -96,6 +96,7 @@ describe("Langy walks the install ladder down to a rung that works", () => {
     });
     python = await createPythonEnv({
       at: path.join(folder.root, "..", "guided-pip-gone-python"),
+      forFolder: folder.root,
     });
     shimLog = path.join(folder.root, "..", "guided-pip-gone-shims.log");
   }, 1_200_000);
