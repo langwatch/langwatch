@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LangWatch README: the four areas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 560px;
+    background: #f5f3ee; color: #1d293d;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    box-sizing: border-box; padding: 36px 40px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 20px; height: 100%; }
+  .card {
+    background: #ffffff; border: 1px solid rgba(29, 41, 61, 0.10); border-radius: 16px;
+    padding: 26px 28px; box-shadow: 0 1px 2px rgba(29, 41, 61, 0.04);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #e17100; }
+  h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  p { margin: 0; font-size: 16px; line-height: 1.5; color: #4b5a70; }
+  .items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+  .item {
+    font-size: 13px; font-weight: 600; color: #1d293d;
+    padding: 6px 10px; border-radius: 999px;
+    background: #f5f3ee; border: 1px solid rgba(29, 41, 61, 0.10);
+  }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="card">
+      <div class="kicker">For the agents you build</div>
+      <h2>LLM Ops</h2>
+      <p>Every call as a trace, scenarios against your real agent, experiments and monitors, versioned prompts.</p>
+      <div class="items">
+        <span class="item">Observability</span>
+        <span class="item">Agent Testing</span>
+        <span class="item">Evaluations</span>
+        <span class="item">Prompt Management</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="kicker">For the tools your engineers use</div>
+      <h2>Coding Agents</h2>
+      <p>What Claude Code, Codex, Copilot and opencode do and cost, per session, per pull request and per team, with privacy controls.</p>
+      <div class="items">
+        <span class="item">Sessions</span>
+        <span class="item">Cost per pull request</span>
+        <span class="item">Team usage</span>
+        <span class="item">Privacy</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="kicker">For every LLM call in the company</div>
+      <h2>AI Gateway</h2>
+      <p>One OpenAI and Anthropic compatible endpoint. Provider keys stay in LangWatch, every caller gets a virtual key with a budget, every request lands as a trace.</p>
+      <div class="items">
+        <span class="item">Virtual keys</span>
+        <span class="item">Budgets</span>
+        <span class="item">Routing</span>
+        <span class="item">Caching</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="kicker">For the whole company</div>
+      <h2>AI Governance</h2>
+      <p>An inventory of every AI tool in use and who uses it, anomaly rules on their activity, and a personal home page for each developer.</p>
+      <div class="items">
+        <span class="item">Inventory</span>
+        <span class="item">People</span>
+        <span class="item">Anomaly rules</span>
+        <span class="item">Compliance</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

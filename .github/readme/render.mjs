@@ -1,10 +1,10 @@
-// Renders cover.html to cover.jpg (2400x800) with Playwright's Chromium.
+// Renders the README images in this folder with Playwright's Chromium, at 2x.
 //
-//   node .github/readme/render.mjs                        # cream copy over backdrop.jpg
-//   node .github/readme/render.mjs --theme dark --bg grid # dark palette over the card grid
-//   node .github/readme/render.mjs --out /tmp/x.png
+//   node .github/readme/render.mjs                 # every page below
+//   node .github/readme/render.mjs cover           # one page
+//   node .github/readme/render.mjs cover --theme dark --bg grid --out /tmp/x.png
 //
-// Edit the headline, description or area pills in cover.html, run this, commit both.
+// Edit the HTML, run this, commit the HTML and the image together.
 // Playwright comes from platform/app (a normal `pnpm install` at the root provides it).
 import { createRequire } from "node:module";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -13,6 +13,12 @@ import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
+
+const PAGES = {
+  cover: { width: 1200, height: 400, out: "cover.jpg" },
+  areas: { width: 1200, height: 560, out: "areas.jpg" },
+  signup: { width: 260, height: 56, out: "signup.png", transparent: true },
+};
 
 function loadPlaywright() {
   const candidates = [path.join(root, "platform/app/package.json")];
@@ -35,17 +41,29 @@ const opt = (name) => {
   const i = args.indexOf(`--${name}`);
   return i === -1 ? undefined : args[i + 1];
 };
-const out = opt("out") ?? path.join(here, "cover.jpg");
-const url = pathToFileURL(path.join(here, "cover.html"));
-if (opt("bg")) url.searchParams.set("bg", opt("bg"));
-if (opt("theme")) url.searchParams.set("theme", opt("theme"));
+const names = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")));
+const selected = names.length ? names : Object.keys(PAGES);
 
 const { chromium } = loadPlaywright();
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1200, height: 400 }, deviceScaleFactor: 2 });
-await page.goto(url.href, { waitUntil: "networkidle" });
-await page.evaluate(() => document.fonts.ready);
-await page.waitForTimeout(300);
-await page.screenshot(out.endsWith(".png") ? { path: out, type: "png" } : { path: out, type: "jpeg", quality: 90 });
+for (const name of selected) {
+  const page = PAGES[name];
+  if (!page) throw new Error(`unknown page ${name}; known: ${Object.keys(PAGES).join(", ")}`);
+  const out = opt("out") ?? path.join(here, page.out);
+  const url = pathToFileURL(path.join(here, `${name}.html`));
+  if (opt("bg")) url.searchParams.set("bg", opt("bg"));
+  if (opt("theme")) url.searchParams.set("theme", opt("theme"));
+
+  const tab = await browser.newPage({ viewport: { width: page.width, height: page.height }, deviceScaleFactor: 2 });
+  await tab.goto(url.href, { waitUntil: "networkidle" });
+  await tab.evaluate(() => document.fonts.ready);
+  await tab.waitForTimeout(300);
+  await tab.screenshot(
+    out.endsWith(".png")
+      ? { path: out, type: "png", omitBackground: !!page.transparent }
+      : { path: out, type: "jpeg", quality: 90 },
+  );
+  await tab.close();
+  console.log("wrote", out);
+}
 await browser.close();
-console.log("wrote", out);
