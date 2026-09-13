@@ -224,6 +224,16 @@ Feature: Guided welcome flow and takeover screens
     And Connect uses that key when I paste none
 
   @integration
+  Scenario: The pending Codex sign-in shows the code with a copy button and a Cancel on the status row
+    Given I started the Codex sign-in
+    When OpenAI gives me a one-time code to approve
+    Then "Waiting for ChatGPT…" reads as a status, not as a button
+    And Cancel sits on that same row and stops the sign-in
+    And I see "Enter this code on OpenAI's device page to approve the sign-in:"
+    And the code, a copy button and "Open openai.com" share one row
+    And copying the code puts it on my clipboard and confirms with a check
+
+  @integration
   Scenario: A Codex sign-in that times out says so and lets the user try again
     Given I started the Codex sign-in
     When the sign-in is not approved in time

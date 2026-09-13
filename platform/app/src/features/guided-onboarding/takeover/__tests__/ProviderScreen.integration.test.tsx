@@ -183,6 +183,17 @@ const pills = () =>
     screen.getByRole("radiogroup", { name: "Default chat model" }),
   ).getAllByRole("radio");
 
+/** OpenAI handed us a code and is waiting for the user to approve it. */
+function pendingSignIn() {
+  codexState.phase = {
+    name: "pending",
+    userCode: "ABCD-1234",
+    verificationUrl: "https://auth.openai.com/device",
+  };
+}
+
+const writeText = vi.fn<(text: string) => Promise<void>>();
+
 describe("ProviderScreen", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -196,6 +207,12 @@ describe("ProviderScreen", () => {
     codexState.phase = { name: "idle" };
     codexState.begin = vi.fn();
     codexState.cancel = vi.fn();
+    writeText.mockReset();
+    writeText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -403,23 +420,6 @@ describe("ProviderScreen", () => {
       });
     });
 
-    it("shows the one-time code while the approval is pending", () => {
-      codexState.phase = {
-        name: "pending",
-        userCode: "ABCD-1234",
-        verificationUrl: "https://auth.openai.com/device",
-      };
-      renderProvider();
-      expect(screen.getByTestId("codex-pending")).toHaveTextContent(
-        "ABCD-1234",
-      );
-      expect(
-        screen.getByRole("button", { name: "Waiting for ChatGPT…" }),
-      ).toBeDisabled();
-      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-      expect(codexState.cancel).toHaveBeenCalledTimes(1);
-    });
-
     it("records the Codex connection on the organization once signed in", () => {
       const { onConnected } = renderProvider();
       act(() => {
@@ -440,6 +440,59 @@ describe("ProviderScreen", () => {
       expect(onConnected).toHaveBeenCalledWith(
         expect.objectContaining({ provider: "openai_codex", kind: "oauth" }),
       );
+    });
+  });
+
+  describe("when the Codex sign-in waits for the approval", () => {
+    /** @scenario "The pending Codex sign-in shows the code with a copy button and a Cancel on the status row" */
+    it("shows the sentence, the code and the OpenAI link while the approval is pending", () => {
+      pendingSignIn();
+      renderProvider();
+      const pending = screen.getByTestId("codex-pending");
+      expect(pending).toHaveTextContent(
+        "Enter this code on OpenAI's device page to approve the sign-in:",
+      );
+      expect(
+        within(pending).getByLabelText("One-time sign-in code"),
+      ).toHaveTextContent("ABCD-1234");
+      expect(
+        within(pending).getByRole("link", { name: "Open openai.com" }),
+      ).toHaveAttribute("href", "https://auth.openai.com/device");
+    });
+
+    /** @scenario "The pending Codex sign-in shows the code with a copy button and a Cancel on the status row" */
+    it("keeps the waiting state a status and cancels from the button beside it", () => {
+      pendingSignIn();
+      renderProvider();
+      const waiting = screen.getByTestId("codex-waiting");
+      expect(waiting).toHaveTextContent("Waiting for ChatGPT…");
+      expect(
+        screen.queryByRole("button", { name: "Waiting for ChatGPT…" }),
+      ).not.toBeInTheDocument();
+
+      const cancel = within(waiting).getByRole("button", { name: "Cancel" });
+      fireEvent.click(cancel);
+      expect(codexState.cancel).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "The pending Codex sign-in shows the code with a copy button and a Cancel on the status row" */
+    it("copies the code and flashes the check", async () => {
+      pendingSignIn();
+      renderProvider();
+      const copy = screen.getByRole("button", { name: "Copy code" });
+      expect(copy).toHaveAttribute("data-copied", "false");
+
+      await act(async () => {
+        fireEvent.click(copy);
+        await Promise.resolve();
+      });
+      expect(writeText).toHaveBeenCalledWith("ABCD-1234");
+      expect(copy).toHaveAttribute("data-copied", "true");
+
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(copy).toHaveAttribute("data-copied", "false");
     });
   });
 

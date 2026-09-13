@@ -4,11 +4,12 @@ import {
   chakra,
   Flex,
   HStack,
+  IconButton,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronRight, KeyRound, Sparkles } from "lucide-react";
+import { Check, ChevronRight, Copy, KeyRound, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { useCodexDeviceSignIn } from "~/components/settings/useCodexDeviceSignIn";
@@ -18,6 +19,7 @@ import { Link } from "~/components/ui/link";
 import { HEADING_FONT } from "~/features/auth-front-door/frontDoorTheme";
 import { langyFirstPartyLinkProps } from "~/features/langy/hooks/useLangyExternalLinkGuard";
 import type { IconData } from "~/features/onboarding/regions/shared/types";
+import { useCopyToClipboard } from "~/features/traces-v2/hooks/useCopyToClipboard";
 import { CODEX_DEFAULT_MODEL } from "~/server/modelProviders/codexRestrictions";
 import { api } from "~/utils/api";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
@@ -629,51 +631,76 @@ function CodexPanel({
           {phase.message}
         </Text>
       )}
-      <Button
-        onClick={() => void signIn.begin()}
-        disabled={waiting || isConnected || !projectId}
-        w="full"
-        h="44px"
-        borderRadius="12px"
-        fontSize="13.5px"
-        fontWeight="600"
-        gap={2.5}
-        bg="fg"
-        color="bg.panel"
-        _hover={{ opacity: 0.9 }}
-        _disabled={{ opacity: 0.7, cursor: "not-allowed" }}
-      >
-        {waiting ? (
-          <Spinner size="xs" />
-        ) : (
+      {waiting ? (
+        <HStack justify="space-between" gap={3} data-testid="codex-waiting">
+          <HStack gap={2} minW={0} color="fg.muted" role="status">
+            <Spinner size="xs" flexShrink={0} />
+            <Text fontSize="13.5px" fontWeight="500">
+              Waiting for ChatGPT…
+            </Text>
+          </HStack>
+          <Button
+            variant="outline"
+            onClick={signIn.cancel}
+            h="36px"
+            px={4}
+            borderRadius="10px"
+            border="1px solid"
+            borderColor="border"
+            bg="bg.panel"
+            color="fg.muted"
+            fontSize="12.5px"
+            fontWeight="600"
+            flexShrink={0}
+            _hover={{ bg: "bg.muted", color: "fg" }}
+          >
+            Cancel
+          </Button>
+        </HStack>
+      ) : (
+        <Button
+          onClick={() => void signIn.begin()}
+          disabled={isConnected || !projectId}
+          w="full"
+          h="44px"
+          borderRadius="12px"
+          fontSize="13.5px"
+          fontWeight="600"
+          gap={2.5}
+          bg="fg"
+          color="bg.panel"
+          _hover={{ opacity: 0.9 }}
+          _disabled={{ opacity: 0.7, cursor: "not-allowed" }}
+        >
           <chakra.img
             src="/images/external-icons/openai-darktheme.svg"
             alt=""
             w="16px"
             h="16px"
           />
-        )}
-        {isConnected
-          ? "Signed in"
-          : waiting
-            ? "Waiting for ChatGPT…"
-            : "Sign in with ChatGPT"}
-      </Button>
+          {isConnected ? "Signed in" : "Sign in with ChatGPT"}
+        </Button>
+      )}
       {phase.name === "pending" && (
-        <VStack align="stretch" gap={2} data-testid="codex-pending">
+        // The top margin lifts the sentence off the status row so it carries
+        // the same 20px of air above it as below it.
+        <VStack align="stretch" gap={5} mt={1} data-testid="codex-pending">
           <Text fontSize="12.5px" color="fg.muted">
             Enter this code on OpenAI's device page to approve the sign-in:
           </Text>
           <HStack justify="space-between" gap={3} wrap="wrap">
-            <Text
-              fontSize="2xl"
-              fontWeight="700"
-              fontFamily="mono"
-              letterSpacing="0.12em"
-              aria-label="One-time sign-in code"
-            >
-              {phase.userCode}
-            </Text>
+            <HStack gap={1} minW={0}>
+              <Text
+                fontSize="2xl"
+                fontWeight="700"
+                fontFamily="mono"
+                letterSpacing="0.12em"
+                aria-label="One-time sign-in code"
+              >
+                {phase.userCode}
+              </Text>
+              <CopyCodeButton code={phase.userCode} />
+            </HStack>
             <Button asChild size="sm" colorPalette="orange">
               <Link
                 href={phase.verificationUrl}
@@ -686,16 +713,29 @@ function CodexPanel({
               </Link>
             </Button>
           </HStack>
-          <Button
-            size="2xs"
-            variant="ghost"
-            alignSelf="flex-start"
-            onClick={signIn.cancel}
-          >
-            Cancel
-          </Button>
         </VStack>
       )}
     </VStack>
+  );
+}
+
+/** Puts the one-time code on the clipboard, then flashes a check for a beat. */
+function CopyCodeButton({ code }: { code: string }) {
+  const { copied, copy } = useCopyToClipboard();
+
+  return (
+    <IconButton
+      aria-label="Copy code"
+      title="Copy code"
+      data-copied={copied}
+      variant="ghost"
+      size="sm"
+      borderRadius="8px"
+      color={copied ? "green.fg" : "fg.subtle"}
+      _hover={{ bg: "bg.muted", color: copied ? "green.fg" : "fg" }}
+      onClick={() => copy(code)}
+    >
+      {copied ? <Check size={16} /> : <Copy size={16} />}
+    </IconButton>
   );
 }
