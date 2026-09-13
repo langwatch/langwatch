@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   answerOfTurn,
   demoReposToPrune,
+  judgeMessages,
   listeningPids,
   permissionAnswerNote,
   pidsRunningIn,
@@ -243,6 +244,87 @@ describe("pidsRunningIn", () => {
           root: "/tmp/scenario-repos/code-access-1",
         }),
       ).toEqual([40321]);
+    });
+  });
+});
+
+describe("judgeMessages", () => {
+  const say = (text: string, id: string) => ({
+    type: "tool-say",
+    toolCallId: id,
+    input: { text },
+    state: "output-available",
+    output: "",
+  });
+  const call = (name: string, id: string) => ({
+    type: `tool-${name}`,
+    toolCallId: id,
+    input: { command: name },
+    state: "output-available",
+    output: "done",
+  });
+  /** The reply the judge reads last: an assistant message carrying one line. */
+  const lastReply = (parts: Array<Record<string, unknown>>): string => {
+    const messages = judgeMessages({ role: "assistant", parts });
+    const last = messages[messages.length - 1];
+    return last?.role === "assistant" && typeof last.content === "string"
+      ? last.content
+      : "";
+  };
+
+  // The shape the whole llmops path ends on: the closing line, then the two
+  // `navigate open` calls that open what was made, then an empty text part.
+  describe("when the turn ends on tool calls and an empty text part", () => {
+    const parts = [
+      say("I found a FastAPI agent in app/main.py.", "c1"),
+      call("local_bash", "c2"),
+      say("All ready! Let me know if there is anything I can help with.", "c3"),
+      call("langwatch.navigate.open", "c4"),
+      call("langwatch.navigate.open", "c5"),
+      { type: "text", role: "assistant", text: "" },
+    ];
+
+    it("still ends on a reply, and that reply is the closing line", () => {
+      expect(lastReply(parts)).toBe(
+        "All ready! Let me know if there is anything I can help with.",
+      );
+    });
+
+    it("keeps the earlier passages in front of the calls they introduce", () => {
+      const messages = judgeMessages({ role: "assistant", parts });
+      const said = messages.flatMap((message) =>
+        Array.isArray(message.content)
+          ? message.content
+              .filter((piece) => piece.type === "text")
+              .map((piece) => (piece as { text: string }).text)
+          : [],
+      );
+      expect(said).toEqual([
+        "I found a FastAPI agent in app/main.py.",
+        "All ready! Let me know if there is anything I can help with.",
+      ]);
+    });
+  });
+
+  describe("when the turn ends on its passages", () => {
+    it("replies with the last line alone, not every line joined", () => {
+      expect(
+        lastReply([
+          call("local_bash", "c1"),
+          say("I found a FastAPI agent in app/main.py.", "c2"),
+          say(
+            "No pull request was opened, since the folder has no remote.",
+            "c3",
+          ),
+          say("I left branch langy/acme checked out.", "c4"),
+        ]),
+      ).toBe("I left branch langy/acme checked out.");
+    });
+  });
+
+  describe("when the turn said nothing at all", () => {
+    it("replies with empty text, which is the failure the rubric names", () => {
+      expect(lastReply([call("local_bash", "c1")])).toBe("");
     });
   });
 });

@@ -1453,6 +1453,16 @@ export function isToolCallPart(part: Record<string, unknown>): boolean {
  * twice grades a turn that repeated itself.
  */
 export function storedProse(parts: Array<Record<string, unknown>>): string {
+  return storedPassages(parts).join("\n");
+}
+
+/**
+ * The same lines, each on its own, which is how the panel draws them and how a
+ * judge reads a turn: one passage per `say`, in order.
+ */
+export function storedPassages(
+  parts: Array<Record<string, unknown>>,
+): string[] {
   const said: string[] = [];
   for (const part of parts) {
     const text = partProse(part);
@@ -1461,7 +1471,97 @@ export function storedProse(parts: Array<Record<string, unknown>>): string {
     }
     said.push(text);
   }
-  return said.join("\n");
+  return said;
+}
+
+/**
+ * One stored message as the judge reads it: the tool calls and their results
+ * as their own messages, in the order the turn ran them, with the lines
+ * written between them in front of the calls they introduce. The part type
+ * carries the tool name as `tool-<name>`, which is the panel's own shape.
+ *
+ * This is the shape the streaming adapter builds for a turn the scenario
+ * drives itself, so a turn the panel started on its own grades the same way.
+ */
+export function judgeMessages(message: {
+  role: string;
+  parts: Array<Record<string, unknown>>;
+}): JudgeMessage[] {
+  const messages: JudgeMessage[] = [];
+  let narration: string[] = [];
+  let batch: Array<Record<string, unknown>> = [];
+
+  const flush = () => {
+    if (batch.length === 0 && narration.length === 0) return;
+    messages.push({
+      role: "assistant",
+      content: [
+        ...narration.map((text) => ({ type: "text" as const, text })),
+        ...batch.map((part) => ({
+          type: "tool-call" as const,
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.type).slice("tool-".length),
+          input: part.input,
+        })),
+      ],
+    });
+    if (batch.length > 0) {
+      messages.push({
+        role: "tool",
+        content: batch.map((part) => ({
+          type: "tool-result" as const,
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.type).slice("tool-".length),
+          output: {
+            type:
+              part.state === "output-error"
+                ? ("error-text" as const)
+                : ("text" as const),
+            value: toolOutputText(part),
+          },
+        })),
+      });
+    }
+    narration = [];
+    batch = [];
+  };
+
+  for (const part of message.parts) {
+    const said = partProse(part);
+    if (said !== null) {
+      // A passage after a call opens the next stretch of work, so the calls
+      // already gathered close here and keep their place in front of it.
+      if (batch.length > 0) flush();
+      // The reply a turn folds down to repeats the line it ended on.
+      if (said.trim() !== narration[narration.length - 1]?.trim()) {
+        narration.push(said);
+      }
+      continue;
+    }
+    if (isToolCallPart(part)) {
+      batch.push(part);
+    }
+  }
+  flush();
+
+  // The turn's reply is the line it ended on, on its own.
+  //
+  // Every passage is already above, in front of the calls it introduces, so
+  // the reply repeats one line rather than adding anything new: what it adds
+  // is an ending. Two shapes went wrong without it. A turn that ended on a
+  // tool call and then stored an empty text part, which is what the whole
+  // llmops path does (two `navigate open` calls after the closing line),
+  // handed the judge a transcript ending on a tool result with no reply at
+  // all, and it was graded as a turn that trailed off. A turn that did end on
+  // a passage got every passage of the turn joined into one reply, and a
+  // judge asked whether the reply answers with concrete results or reads as a
+  // work log fairly called twenty joined lines a log.
+  const passages = storedPassages(message.parts);
+  messages.push({
+    role: "assistant",
+    content: passages[passages.length - 1] ?? "",
+  });
+  return messages;
 }
 
 /**
@@ -1805,87 +1905,6 @@ export function watchLangyConversation({
   }): string => storedProse(message.parts);
 
   /**
-   * One stored message as the judge reads it: the tool calls and their results
-   * as their own messages, in the order the turn ran them, with the lines
-   * written between them in front of the calls they introduce. The part type
-   * carries the tool name as `tool-<name>`, which is the panel's own shape.
-   *
-   * This is the shape the streaming adapter builds for a turn the scenario
-   * drives itself, so a turn the panel started on its own grades the same way.
-   */
-  const judgeMessagesOf = (message: {
-    role: string;
-    parts: Array<Record<string, unknown>>;
-  }): JudgeMessage[] => {
-    const messages: JudgeMessage[] = [];
-    let narration: string[] = [];
-    let batch: Array<Record<string, unknown>> = [];
-    let endedOnText = false;
-
-    const flush = () => {
-      if (batch.length === 0 && narration.length === 0) return;
-      messages.push({
-        role: "assistant",
-        content: [
-          ...narration.map((text) => ({ type: "text" as const, text })),
-          ...batch.map((part) => ({
-            type: "tool-call" as const,
-            toolCallId: String(part.toolCallId),
-            toolName: String(part.type).slice("tool-".length),
-            input: part.input,
-          })),
-        ],
-      });
-      if (batch.length > 0) {
-        messages.push({
-          role: "tool",
-          content: batch.map((part) => ({
-            type: "tool-result" as const,
-            toolCallId: String(part.toolCallId),
-            toolName: String(part.type).slice("tool-".length),
-            output: {
-              type:
-                part.state === "output-error"
-                  ? ("error-text" as const)
-                  : ("text" as const),
-              value: toolOutputText(part),
-            },
-          })),
-        });
-      }
-      narration = [];
-      batch = [];
-    };
-
-    for (const part of message.parts) {
-      const said = partProse(part);
-      if (said !== null) {
-        // A passage after a call opens the next stretch of work, so the calls
-        // already gathered close here and keep their place in front of it.
-        if (batch.length > 0) flush();
-        // The reply a turn folds down to repeats the line it ended on.
-        if (said.trim() !== narration[narration.length - 1]?.trim()) {
-          narration.push(said);
-        }
-        endedOnText = true;
-        continue;
-      }
-      if (isToolCallPart(part)) {
-        batch.push(part);
-        endedOnText = false;
-      }
-    }
-    flush();
-
-    // A turn that ran tools and then went quiet has no reply of its own: the
-    // passages are already above, and appending them would say each twice.
-    if (endedOnText || messages.length === 0) {
-      messages.push({ role: "assistant", content: messageText(message) });
-    }
-    return messages;
-  };
-
-  /**
    * Read a turn's answer, waiting for it to be stored.
    *
    * A turn that has just gone idle may have no answer row yet: the fold that
@@ -1982,7 +2001,7 @@ export function watchLangyConversation({
     lastTurnMessages: async (input = {}) => {
       const answer = await readTurnAnswer(input);
       if (!answer) return [];
-      return judgeMessagesOf(answer);
+      return judgeMessages(answer);
     },
     stop: () => {
       stopped = true;
