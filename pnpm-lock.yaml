@@ -4304,6 +4304,9 @@ importers:
       '@langwatch/identity-server':
         specifier: workspace:*
         version: link:../../identity/server
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6593,6 +6596,9 @@ importers:
 
   modules/gateway/server:
     dependencies:
+      '@langwatch/analytics-server':
+        specifier: workspace:*
+        version: link:../../analytics/server
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -6602,6 +6608,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -6617,6 +6626,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
@@ -6653,6 +6665,12 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:../../webhook/contract
+      '@langwatch/webhook-server':
+        specifier: workspace:*
+        version: link:../../webhook/server
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
@@ -9375,6 +9393,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

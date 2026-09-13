@@ -361,3 +361,7 @@ export { MemoryIdentityRepositories } from "./repositories/memory/memory.identit
 export { PostgresIdentityRepositories } from "./repositories/prisma/prisma.identity.repositories.ts";
 export { PrismaJoinMembershipRepository } from "./repositories/prisma/prisma.join-membership.repository.ts";
 export { PrismaJoinSettingRepository } from "./repositories/prisma/prisma.join-setting.repository.ts";
+export {
+  BetterAuthIdentityBirthAdapter,
+  type IdentityBirthScope,
+} from "./services/better-auth-identity-birth.service.ts";

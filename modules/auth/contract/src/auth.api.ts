@@ -12,6 +12,17 @@ import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.t
  * the account, and the session half is what the browser holds afterwards.
  */
 export interface AuthApi {
+  /**
+   * Whether Better Auth accepts the session token these headers carry.
+   *
+   * The deployment's own request boundary, and the half that carries the RAW
+   * auth-session id an impersonation is started and stopped against. A process
+   * that composed no sign-in door answers null, so its callers are anonymous
+   * rather than failing.
+   */
+  tryVerifyBrowserSession(input: {
+    headers: Headers;
+  }): Promise<VerifiedBrowserSession | null>;
   /** A missing, revoked, expired, or unusable session resolves to null. */
   tryResolveBrowserSession(input: {
     verified: VerifiedBrowserSession | null;
@@ -71,6 +82,7 @@ export interface AuthApi {
  */
 export type BrowserSessionApi = Pick<
   AuthApi,
+  | "tryVerifyBrowserSession"
   | "tryResolveBrowserSession"
   | "revokeAllBrowserSessions"
   | "revokeBrowserSession"

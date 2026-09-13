@@ -41,6 +41,7 @@ import type {
 } from "@langwatch/runtime-composition";
 import { z } from "zod";
 import {
+  BetterAuthBrowserSessionTransportAdapter,
   composeApiBrowserSession,
   type ApiBrowserSessionResolver,
   type ApiBrowserSessionTransport,
@@ -216,12 +217,22 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     // The ONE session answer this process gives. The verifying half is the
     // deployment's, the live-session half is the auth module's, and they are
     // joined here so no door can compose a second pair.
+    //
+    // The verifying half comes from the auth module itself unless this host was
+    // handed one: the module builds the deployment's ONE Better Auth instance,
+    // so reaching for it through the peer is what keeps a second instance from
+    // ever existing over the same cookie namespace.
     const auth = peers.find(AuthApi);
+    const sessions =
+      config.browserSessions ??
+      (auth
+        ? BetterAuthBrowserSessionTransportAdapter.create({
+            api: { getSession: (input) => auth.tryVerifyBrowserSession(input) },
+          })
+        : undefined);
     const browserSession =
       config.browserSession ??
-      (config.browserSessions && auth
-        ? composeApiBrowserSession({ sessions: config.browserSessions, auth })
-        : undefined);
+      (sessions && auth ? composeApiBrowserSession({ sessions, auth }) : undefined);
 
     // The directory bearer is an ENTERPRISE module's, so a build without it
     // still mounts the SCIM family and admits nobody through it.

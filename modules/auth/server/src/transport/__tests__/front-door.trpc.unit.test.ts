@@ -30,6 +30,7 @@ const door: AuthApi = {
   readInviteLanding,
   requestFreshInvite,
   resolveAuthProvider: () => unreached("resolveAuthProvider"),
+  tryVerifyBrowserSession: () => unreached("tryVerifyBrowserSession"),
   tryResolveBrowserSession: () => unreached("tryResolveBrowserSession"),
   revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
   revokeBrowserSession: () => unreached("revokeBrowserSession"),

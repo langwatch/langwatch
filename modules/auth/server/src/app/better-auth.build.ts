@@ -1,0 +1,348 @@
+/**
+ * This deployment's ONE Better Auth instance, built by the module that owns
+ * sign-in rather than by the process that happens to host it.
+ *
+ * Ported from `apps/api/src/app/api-better-auth.composition.ts`, deleted by
+ * b383462d96 along with the hand-wired api graph. Nothing composed a Better
+ * Auth instance between that commit and this file, so `/api/auth/*` answered
+ * nothing at all; every collaborator below is the one the deleted composition
+ * passed, in the same posture, so the sign-in wire is the wire it had.
+ *
+ * The absences are deliberate and each one names itself: this module holds no
+ * licence reader, no mail gateway, no grant writer and no identity pipeline,
+ * because none of them is auth's to own and the peers that would carry them
+ * are a later lane's. An absent collaborator refuses BY NAME or logs by name —
+ * it never quietly succeeds.
+ */
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
+import { SignInMethodPolicyService } from "@langwatch/identity-server";
+import type { Logger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { RedisConnection } from "@langwatch/redis-client";
+import type { UserApi } from "@langwatch/user-contract";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
+import {
+  createBetterAuthTransport,
+  isEmailPasswordEnabled,
+  type BetterAuthTransport,
+} from "../transport/better-auth/better-auth.api.ts";
+import {
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+  BetterAuthPendingInvite,
+  BetterAuthStorage,
+  type BetterAuthAccountRow,
+  type PendingOrganizationInvite,
+} from "../transport/better-auth/better-auth.collaborators.ts";
+import type { SignUpVerification } from "../transport/better-auth/passkey-sign-up.api.ts";
+import { SignInRouterShadow } from "../transport/better-auth/sign-in-router-shadow.api.ts";
+
+/** The deployment's browser-session identity: present whole, or not at all. */
+export type BetterAuthDeploymentIdentity = Readonly<{
+  secret: string;
+  baseUrl: string;
+  publicBaseUrl?: string | undefined;
+  mfaEnrollmentOpen: boolean;
+  passkeysEnabled: boolean;
+  passkeyHandleSecret: string;
+}>;
+
+/** Better Auth's storage engine: the stock Prisma adapter over the module's own client. */
+export class PrismaBetterAuthStorage extends BetterAuthStorage {
+  static create(database: PrismaClient): PrismaBetterAuthStorage {
+    return new PrismaBetterAuthStorage(database);
+  }
+
+  private constructor(private readonly database: PrismaClient) {
+    super();
+  }
+
+  adapter(): unknown {
+    return prismaAdapter(this.database, { provider: "postgresql" });
+  }
+}
+
+/**
+ * ADR-027's licence questions.
+ *
+ * The hosted product is licensed by definition; a self-hosted install reports
+ * unlicensed here, because this module reads no licence. That is exactly what
+ * the deleted composition answered — the api process passed it no licensing
+ * store either — and {@link buildBetterAuth} says so once at boot.
+ */
+export class ModuleBetterAuthFederation extends BetterAuthFederation {
+  static create(options: {
+    authProvider: string | undefined;
+    passkeysEnabled: boolean;
+    isSaas: boolean;
+  }): ModuleBetterAuthFederation {
+    return new ModuleBetterAuthFederation(options);
+  }
+
+  private constructor(
+    private readonly deployment: {
+      authProvider: string | undefined;
+      passkeysEnabled: boolean;
+      isSaas: boolean;
+    },
+  ) {
+    super();
+  }
+
+  federationCapable(): boolean {
+    const provider = this.deployment.authProvider?.trim();
+    return provider !== undefined && provider !== "" && provider !== "email";
+  }
+
+  resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
+    return SignInMethodPolicyService.create({
+      resolveAuthProvider: () => Promise.resolve(this.deployment.authProvider ?? "email"),
+      federationLicensed: () => Promise.resolve(this.deployment.isSaas),
+      offersPasskeys: () => this.deployment.passkeysEnabled,
+      selfHosted: () => !this.deployment.isSaas,
+    }).resolvePolicy();
+  }
+
+  platformSsoAllowed(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+}
+
+/**
+ * The identity ceremonies, absent. Every method is the no-op the legacy branch
+ * already ran: a user delete erases no identifier, an account write is not
+ * restated as an attach, and its id is Better Auth's own.
+ */
+export class AbsentBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremonies {
+  static create(): AbsentBetterAuthIdentityCeremonies {
+    return new AbsentBetterAuthIdentityCeremonies();
+  }
+
+  async beforeUserDelete(): Promise<void> {}
+
+  async tryBeforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
+    return undefined;
+  }
+
+  async beforeAccountDelete(_account: BetterAuthAccountRow): Promise<void> {}
+}
+
+/**
+ * The pending-invitation lookup, absent. Answers "no pending invite", which
+ * sends an SSO auto-join down its default membership path.
+ */
+export class AbsentBetterAuthPendingInvites extends BetterAuthPendingInvite {
+  static create(logger: Logger): AbsentBetterAuthPendingInvites {
+    return new AbsentBetterAuthPendingInvites(logger);
+  }
+
+  private constructor(private readonly logger: Logger) {
+    super();
+  }
+
+  async tryFindPendingByOrganizationAndEmail(input: {
+    organizationId: string;
+    email: string;
+  }): Promise<PendingOrganizationInvite | null> {
+    this.logger.warn(
+      { organizationId: input.organizationId },
+      "No invitation service in this process: a domain auto-join applies the default membership rather than a pending invite",
+    );
+    return null;
+  }
+
+  async applyInvite(): Promise<void> {
+    throw new Error("This process composes no invitation service");
+  }
+}
+
+/** The announcements, over what this process actually holds. */
+export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
+  static create(logger: Logger): LoggedBetterAuthAnnouncements {
+    return new LoggedBetterAuthAnnouncements(logger);
+  }
+
+  private constructor(private readonly logger: Logger) {
+    super();
+  }
+
+  trackServerEvent(input: { userId: string; event: string }): void {
+    this.logger.debug(
+      { userId: input.userId, event: input.event },
+      "Product analytics is not composed in this process; the event was not sent",
+    );
+  }
+
+  reportError(error: unknown): void {
+    this.logger.error({ error }, "Better Auth swallowed an error on a best-effort path");
+  }
+
+  announceSignup(input: { userEmail: string; organizationName: string }): void {
+    this.logger.info(
+      { organizationName: input.organizationName },
+      "New user joined an organization through its domain; no signup notification transport is composed in this process",
+    );
+  }
+
+  ssoAutoAddNurturing(): void {}
+
+  sessionNurturing(): void {}
+}
+
+/**
+ * The sign-in router shadow, reported off. `mode()` is the whole switch: `off`
+ * returns before the comparison reads, computes or logs anything, so this
+ * absence costs exactly what the flag being off costs.
+ */
+export class OffSignInRouterShadow extends SignInRouterShadow {
+  static create(): OffSignInRouterShadow {
+    return new OffSignInRouterShadow();
+  }
+
+  mode(): "off" {
+    return "off";
+  }
+
+  route(): Promise<RoutingDecision> {
+    return Promise.reject(
+      new Error("The sign-in router shadow is off in this process and routes nothing"),
+    );
+  }
+
+  resolveAuthProvider(): Promise<string> {
+    return Promise.reject(
+      new Error("The sign-in router shadow is off in this process and resolves no provider"),
+    );
+  }
+}
+
+/**
+ * Sign-up's address confirmation, absent. Reached only from the passkey sign-up
+ * ceremony, and only when the passkey plugin is mounted.
+ */
+export class AbsentSignUpVerification implements SignUpVerification {
+  static create(logger: Logger): AbsentSignUpVerification {
+    return new AbsentSignUpVerification(logger);
+  }
+
+  private constructor(private readonly logger: Logger) {}
+
+  async requestVerification(): Promise<void> {
+    this.logger.warn(
+      "Passkey sign-up could not send an address confirmation: this process composes no sign-up verification service",
+    );
+  }
+}
+
+/**
+ * Nothing to write a grant with. Reached only from the SSO domain auto-join,
+ * which runs only when {@link ModuleBetterAuthFederation} allows platform SSO —
+ * and it answers that it does not.
+ */
+export class UnavailableBetterAuthGrants {
+  static create(): AuthzGrantsService {
+    return new Proxy({} as AuthzGrantsService, {
+      get() {
+        return () => {
+          throw new Error("This process composes no grant writer for the Better Auth transport");
+        };
+      },
+    });
+  }
+}
+
+/**
+ * Password-reset mail, on a module that composes no gateway. Refuses by name
+ * rather than resolving: a reset link nobody sends is worse than a refusal an
+ * operator can read.
+ */
+export function unconfiguredPasswordResetMail(): Promise<never> {
+  return Promise.reject(
+    new Error(
+      "This deployment composes no mail gateway behind sign-in, so it cannot send a password-reset link",
+    ),
+  );
+}
+
+export type BuildBetterAuthOptions = Readonly<{
+  /** The deployment's browser-session identity; without it, no instance. */
+  identity: BetterAuthDeploymentIdentity;
+  /** The typed client every database hook reads and writes through. */
+  prisma: PrismaClient;
+  /** Better Auth's session cache lives here when this process has a Redis. */
+  redis: RedisConnection | null;
+  /** The Auth application whose sessions this instance mints and revokes. */
+  auth: AuthApi;
+  /** The same user directory the rest of this process serves from. */
+  users: UserApi;
+  /** `"email"`, or the federated provider id this deployment mounted. */
+  authProvider: string | undefined;
+  /** Whether this is the hosted product rather than a self-hosted install. */
+  isSaas: boolean;
+  logger: Logger;
+}>;
+
+/**
+ * Builds this deployment's Better Auth instance. Built ONCE per process and
+ * shared. Calling this twice would produce two instances over one cookie
+ * namespace, and the second would be the one that happened to be asked.
+ */
+export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTransport {
+  const { identity, logger } = options;
+
+  logger.warn(
+    {
+      absent: [
+        "enterprise-licensing",
+        "identity-pipeline",
+        "password-reset-mail",
+        "pending-invitations",
+        "sign-in-router-shadow",
+        "sso-providers",
+      ],
+    },
+    "Better Auth composed by the auth module: federation reports unlicensed, it runs the stock Prisma storage engine, it cannot send a password-reset link, it applies no pending invitation on a domain auto-join, it runs no sign-in router shadow and it mounts no SSO provider",
+  );
+
+  return createBetterAuthTransport({
+    auth: options.auth,
+    users: options.users,
+    database: PrismaBetterAuthHooksRepository.create(options.prisma),
+    redis: options.redis,
+    storage: PrismaBetterAuthStorage.create(options.prisma),
+    deployment: {
+      baseUrl: identity.baseUrl,
+      publicBaseUrl: identity.publicBaseUrl,
+      secret: identity.secret,
+      emailPasswordEnabled: isEmailPasswordEnabled({
+        authProvider: options.authProvider,
+        isSaas: options.isSaas,
+      }),
+      mfaEnrollmentOpen: identity.mfaEnrollmentOpen,
+      passkeysEnabled: identity.passkeysEnabled,
+      passkeyHandleSecret: identity.passkeyHandleSecret,
+      // No SSO provider is mounted here: building one needs the client
+      // credentials and issuer of an identity provider, and this module reads
+      // none. An empty pair is the honest answer, and it is the same one the
+      // licence gate above already gives.
+      socialProviders: {},
+      genericOAuthConfigs: [],
+    },
+    federation: ModuleBetterAuthFederation.create({
+      authProvider: options.authProvider,
+      passkeysEnabled: identity.passkeysEnabled,
+      isSaas: options.isSaas,
+    }),
+    identity: AbsentBetterAuthIdentityCeremonies.create(),
+    invites: AbsentBetterAuthPendingInvites.create(logger),
+    announcements: LoggedBetterAuthAnnouncements.create(logger),
+    shadow: OffSignInRouterShadow.create(),
+    authzGrants: UnavailableBetterAuthGrants.create(),
+    signUpVerification: AbsentSignUpVerification.create(logger),
+    sendResetPassword: () => unconfiguredPasswordResetMail(),
+  });
+}

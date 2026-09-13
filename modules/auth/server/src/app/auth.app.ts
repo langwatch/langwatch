@@ -23,14 +23,18 @@ import {
   type SignUpVerificationResult,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
+import { z } from "zod";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
+import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import {
   SignUpVerificationService,
@@ -38,6 +42,10 @@ import {
   type SignUpAccountFactory,
   type SignUpVerificationMailer,
 } from "../services/signup-verification.service.ts";
+import type { AuthDirectory } from "../transport/auth-directory.ts";
+import type { AuthRestFederatedLogout, AuthRestSession } from "../transport/auth.rest.ts";
+import type { BetterAuthTransport } from "../transport/better-auth/better-auth.api.ts";
+import { buildBetterAuth } from "./better-auth.build.ts";
 
 /**
  * The account rows sign-up reads and confirms. Auth owns neither: the `User`
@@ -66,66 +74,134 @@ export type AuthSignUpCollaborators = Readonly<{
   baseUrl: string;
 }>;
 
-/** What the process holds behind this module. None of it is auth's own. */
-export type AuthInfrastructure = Readonly<{
-  /** Better Auth caches live sessions here, so a revocation clears them too. */
-  redis: RedisConnection | null;
-  /** The address the identifier ledger holds for a person, where it holds one. */
-  identityEmails: IdentityEmailService;
-  /** The shared counter every front-door throttle meters through. */
-  rateLimit(
-    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<Readonly<{ allowed: boolean }>>;
-  /** Where an address signs in. The decision object IS the contract. */
-  route(
-    input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
-  ): Promise<RoutingDecision>;
-  /**
-   * The sign-up ceremony, or nothing. Absent together and that is not an
-   * accident: without a base URL a confirmation link points at nowhere, and
-   * without a mail gateway it is never sent.
-   */
-  signUp: AuthSignUpCollaborators | null;
-  /** The invitation reads, or nothing where this process composed none. */
-  invites: AuthInviteDirectory | null;
-  /** This deployment's sign-in mode, ADR-027's single source of truth. */
-  authProvider(): Promise<string>;
-  /** Names this process in every refusal below. */
-  processName: string;
-  /** Process time, injected so session expiry has deterministic tests. */
-  now?: (() => Instant) | undefined;
-}>;
+/**
+ * What the process holds behind this module. None of it is auth's own.
+ *
+ * The first three arrive as DECLARED members ({@link AuthApp.reads}): a process
+ * that cannot supply one refuses at boot, naming the module and the member.
+ * The rest is still the pre-`reads` shape and is `undefined` at runtime — the
+ * front-door half (`route`, `signUp`, `invites`, `identityEmails`, `rateLimit`,
+ * `authProvider`) needs identity, organization and mail peers, which is a lane
+ * of its own.
+ */
+export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
+  Readonly<{
+    /** The address the identifier ledger holds for a person, where it holds one. */
+    identityEmails: IdentityEmailService;
+    /** The shared counter every front-door throttle meters through. */
+    rateLimit(
+      input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+    ): Promise<Readonly<{ allowed: boolean }>>;
+    /** Where an address signs in. The decision object IS the contract. */
+    route(
+      input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
+    ): Promise<RoutingDecision>;
+    /**
+     * The sign-up ceremony, or nothing. Absent together and that is not an
+     * accident: without a base URL a confirmation link points at nowhere, and
+     * without a mail gateway it is never sent.
+     */
+    signUp: AuthSignUpCollaborators | null;
+    /** The invitation reads, or nothing where this process composed none. */
+    invites: AuthInviteDirectory | null;
+    /** This deployment's sign-in mode, ADR-027's single source of truth. */
+    authProvider(): Promise<string>;
+    /** Names this process in every refusal below. */
+    processName: string;
+    /** Process time, injected so session expiry has deterministic tests. */
+    now?: (() => Instant) | undefined;
+  }>;
+
+/**
+ * The deployment's browser-session identity, whole or absent.
+ *
+ * The five fields travel together because Better Auth builds its callback,
+ * cookie and redirect URLs from one configured base: half of them composes an
+ * instance that signs everybody out while looking configured. A process that
+ * states none composes no instance and says so when the door is asked.
+ */
+const browserSessionIdentitySchema = z.object({
+  secret: z.string().min(1),
+  baseUrl: z.string().min(1),
+  publicBaseUrl: z.string().optional(),
+  mfaEnrollmentOpen: z.boolean().default(false),
+  passkeysEnabled: z.boolean().default(false),
+  passkeyHandleSecret: z.string().min(1),
+});
+
+const authAppConfigSchema = z
+  .object({
+    /** Names this process in the sign-in door's refusals. */
+    processName: z.string().default("langwatch"),
+    /** Absent means this process composes no Better Auth instance at all. */
+    browserSession: browserSessionIdentitySchema.optional(),
+    /** `"email"`, or the federated provider id this deployment mounted. */
+    authProvider: z.string().optional(),
+    /** Whether this is the hosted product rather than a self-hosted install. */
+    isSaas: z.boolean().default(false),
+  })
+  .default({ processName: "langwatch", isSaas: false });
+
+export type AuthAppConfig = z.infer<typeof authAppConfigSchema>;
 
 type AuthSetup = FeatureSetup<
   typeof AuthApp.dependencies,
   AuthInfrastructure,
-  undefined,
+  AuthAppConfig,
   AuthRepositories
 >;
 
 export class AuthApp implements AuthApiContract {
   static readonly contract = AuthApi;
-  static readonly dependencies = { users: UserApi };
+  static readonly dependencies = {
+    users: UserApi,
+    /** The credential ledger the legacy `X-Auth-Token` check resolves through. */
+    apiKeys: ApiKeyApi,
+    /** This deployment's flag store, for the born-finalized entrance. */
+    featureFlags: FeatureFlagApi,
+  };
+  static readonly configSchema = authAppConfigSchema;
+  /**
+   * Declared rather than cast. Better Auth's storage, its hooks and its session
+   * cache are this module's to build, and each needs one of these three: a
+   * process that cannot supply one refuses at boot, by module and by member,
+   * instead of composing a sign-in door whose collaborators are `undefined`.
+   */
+  static readonly reads = reads("logger", "prisma", "redis");
 
   readonly #sessions: BrowserSessionService;
   readonly #signUp: SignUpVerificationService | null;
   readonly #members: AuthInfrastructure;
+  readonly #config: AuthAppConfig;
+  readonly #dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
+  /**
+   * The deployment's ONE Better Auth instance, or nothing where it named no
+   * browser-session identity. Assigned once, in {@link AuthApp.create}, because
+   * the instance is built over this application: Better Auth revokes every
+   * browser session of a person who resets their password, and it has to revoke
+   * them on the same application every other caller revokes through.
+   */
+  #betterAuth: BetterAuthTransport | null = null;
 
   private constructor(
     sessions: BrowserSessionService,
     signUp: SignUpVerificationService | null,
     members: AuthInfrastructure,
+    config: AuthAppConfig,
+    dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi },
   ) {
     this.#sessions = sessions;
     this.#signUp = signUp;
     this.#members = members;
+    this.#config = config;
+    this.#dependencies = dependencies;
   }
 
   static create(setup: AuthSetup): AuthApp {
-    const { members, repositories, dependencies } = setup;
+    const { members, repositories, dependencies, config } = setup;
     const now = members.now ?? nowInstant;
 
-    return new AuthApp(
+    const app = new AuthApp(
       BrowserSessionService.create({
         sessions: repositories.sessions,
         cache: RedisAuthSessionCacheRepository.create({ redis: members.redis }),
@@ -135,6 +211,116 @@ export class AuthApp implements AuthApiContract {
       }),
       signUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
+      config,
+      { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
+    );
+
+    const identity = config.browserSession;
+    if (identity) {
+      app.#betterAuth = buildBetterAuth({
+        identity,
+        prisma: members.prisma,
+        redis: members.redis,
+        auth: app,
+        users: dependencies.users,
+        authProvider: config.authProvider,
+        isSaas: config.isSaas,
+        logger: members.logger,
+      });
+    } else {
+      members.logger.info(
+        { module: "auth" },
+        "This process named no browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no Better Auth instance: every browser caller reads as signed out and the sign-in door refuses",
+      );
+    }
+
+    return app;
+  }
+
+  /** The deployment's ONE Better Auth instance, or the refusal that names why there is none. */
+  betterAuth(): BetterAuthTransport {
+    if (!this.#betterAuth) {
+      throw new AuthUnavailableError({
+        capability:
+          "browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no sign-in door",
+        processName: this.#config.processName,
+      });
+    }
+
+    return this.#betterAuth;
+  }
+
+  /**
+   * Whether Better Auth accepts the session token these headers carry.
+   *
+   * Answers "nobody" rather than refusing when this process composed no
+   * instance: an unconfigured deployment has anonymous callers, not failing
+   * ones, and {@link AuthApp.betterAuth} is where the reason is named.
+   */
+  async tryVerifyBrowserSession(input: {
+    headers: Headers;
+  }): Promise<VerifiedBrowserSession | null> {
+    if (!this.#betterAuth) return null;
+
+    return (await this.#betterAuth.api.getSession({
+      headers: input.headers,
+    })) as VerifiedBrowserSession | null;
+  }
+
+  /** The session the browser's own poll reads, verified and then resolved. */
+  async resolveSession(request: Request): Promise<AuthRestSession | null> {
+    const verified = await this.tryVerifyBrowserSession({ headers: request.headers });
+
+    return this.tryResolveBrowserSession({ verified });
+  }
+
+  /** The project a legacy `X-Auth-Token` names, by slug. */
+  async findProjectSlugByToken(input: { token: string }): Promise<string | null> {
+    const resolved = await this.#dependencies.apiKeys.findResolvedToken({ token: input.token });
+
+    return resolved?.project.slug ?? null;
+  }
+
+  featureFlags(): FeatureFlagApi {
+    return this.#dependencies.featureFlags;
+  }
+
+  directory(): AuthDirectory {
+    return PrismaAuthDirectoryRepository.create(this.#members.prisma);
+  }
+
+  /** The origin every state-changing auth request is checked against. */
+  get baseUrl(): string {
+    return this.#config.browserSession?.baseUrl ?? "";
+  }
+
+  /**
+   * Where a GET logout lands. Local: ending the identity provider's own session
+   * needs its end-session endpoint, and this module reads none.
+   */
+  readonly federatedLogout: AuthRestFederatedLogout = () => Promise.resolve(null);
+
+  /**
+   * ADR-116 §3's birth context, which this module cannot establish.
+   *
+   * `BetterAuthIdentityBirthAdapter` is the one object that opens it, and
+   * `@langwatch/identity-server` publishes it nowhere: its
+   * `./adapters/better-auth-identity-birth` subpath still points at a file the
+   * identity module renamed, and its barrel does not re-export the class.
+   *
+   * Refuses rather than running the handler unwrapped. Reached only when the
+   * born-finalized entrance is switched on for this request, and a sign-up that
+   * completes OUTSIDE the birth context writes the legacy rows while every
+   * later read expects the finalized ones — a wrong answer is worse here than
+   * an answer that names what is missing.
+   */
+  runWithIdentityBirth<T>(_run: () => Promise<T>): Promise<T> {
+    return Promise.reject(
+      new AuthUnavailableError({
+        capability:
+          "identity birth context (@langwatch/identity-server publishes no BetterAuthIdentityBirthAdapter), so it cannot run a born-finalized sign-up",
+        processName: this.#config.processName,
+      }),
     );
   }
 

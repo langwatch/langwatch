@@ -121,6 +121,11 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       langwatchQl: config.infrastructure.clickhouse.langwatchQl ?? {},
       publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
     },
+    auth: {
+      processName: config.serviceName,
+      ...(config.browserSession ? { browserSession: config.browserSession } : {}),
+      isSaas: config.infrastructure.modelProvider.isSaas,
+    },
     "api-key": { pepper: config.apiKeyPepper },
     "data-retention": {
       platformDefaultRetentionDays: config.platformDefaultRetentionDays,
