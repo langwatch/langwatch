@@ -938,6 +938,55 @@ describe("the guided-onboarding skill", () => {
       );
     });
 
+    /** @scenario "The install is checked for the API before code is written" */
+    it("checks the installed package for the API before any code is written against it", () => {
+      expect(rendered).toContain(
+        "Then, before any code edit, check that the installed package carries the API, through the interpreter the install worked with: `python -c \"import langwatch; langwatch.setup; langwatch.connect_agent\"` for Python (`.venv/bin/python -c` when `.venv` exists, `uv run python -c` for a uv project), `node -e \"require('langwatch')\"` for JavaScript.",
+      );
+      expect(rendered).toContain(
+        "A Python release below 1.3.0 has neither `setup` nor `connect_agent`, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, so pip walks back to the last release with none and reports success.",
+      );
+      expect(rendered).toContain(
+        "`pip install langwatch --upgrade` never runs there: that interpreter has no newer release to get.",
+      );
+      const tracing = renderSkill(
+        listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!,
+      );
+      expect(tracing).toContain(
+        "Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c \"import langwatch; langwatch.setup; langwatch.connect_agent\"` for Python, `node -e \"require('langwatch')\"` for TypeScript.",
+      );
+      expect(tracing).toContain("`pip install langwatch --upgrade` cannot help there.");
+    });
+
+    /** @scenario "An installed SDK without the tracing API is an interpreter question, not a stop" */
+    it("asks about the interpreter when the installed SDK has no tracing API", () => {
+      expect(rendered).toContain(
+        "When the check fails, or the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of \"When a step fails\", asked before any edit.",
+      );
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain("Three dead ends have a known unlock, and an unlock is asked, never stopped on:");
+      expect(section).toContain(
+        "The third: the check of item 1 fails, or the installed version is below 1.3.0, after an install that reported success.",
+      );
+      expect(section).toContain(
+        "Your Python 3.14 is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?",
+      );
+      expect(section).toContain(
+        "Options, in this order: \"Install Python 3.13 with uv for me\" and \"I'll pick the interpreter myself\".",
+      );
+      expect(section).toContain(
+        "On \"Install Python 3.13 with uv for me\": `uv python install 3.13` (when `uv` is a command not found, the installer of the second question runs first), then the ladder's uv rung against that interpreter: `uv add --python 3.13 langwatch` when the folder has a `pyproject.toml`; `uv venv --python 3.13` then `uv pip install langwatch` when it has none, and the manifest line of item 1 goes into the requirements file as for any pip project.",
+      );
+      expect(section).toContain(
+        "Then the check of item 1 runs again through `.venv/bin/python`, and item 1 goes on; the agent of item 6 starts through that interpreter, `uv run` or `.venv/bin/python`, never the machine's `python3`.",
+      );
+      expect(section).toContain(
+        "On \"I'll pick the interpreter myself\": end the turn saying that the SDK needs a Python it supports, 3.13 today, and to send a message when the folder's interpreter is one.",
+      );
+      expect(section).toContain("and no `--upgrade` can change that");
+    });
+
     /** @scenario "A chosen name is quoted in every command that carries it" */
     it("quotes the agent name in the wait, the run and the suite run", () => {
       expect(rendered).toContain(

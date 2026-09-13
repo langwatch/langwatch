@@ -655,6 +655,26 @@ Feature: Langy guides the first setup after sign-up
       And a command not found moves to the next rung without a retry
       And only when every rung is missing does the question offer "Install uv for me" or "I'll set up Python myself"
 
+    # A film installed langwatch 0.1.32 on Python 3.14: every release with
+    # the API caps the interpreter below 3.14, pip walked back to the last
+    # release without a cap and reported success, and the tracing edit then
+    # failed on `module 'langwatch' has no attribute 'setup'`.
+    @unit
+    Scenario: The install is checked for the API before code is written
+      When the compiled guided-onboarding skill is read
+      Then item 1 imports langwatch.setup and langwatch.connect_agent through the interpreter that installed it, before any edit
+      And a JavaScript install is checked with a require
+      And pip install --upgrade never runs against an interpreter the SDK does not support
+      And the tracing skill says the same
+
+    @unit
+    Scenario: An installed SDK without the tracing API is an interpreter question, not a stop
+      When the compiled guided-onboarding skill is read
+      Then a failed check, or a version below 1.3.0, is the third unlock question of "When a step fails"
+      And the question names the Python version and offers "Install Python 3.13 with uv for me" and "I'll pick the interpreter myself", plain answers with no ref
+      And the first option installs Python 3.13 with uv, runs the ladder's uv rung against it and checks the install again
+      And the second ends the turn naming the Python the SDK supports
+
     # The wait is one CLI call, not a loop the model writes: a hand-written
     # poll once misread the list and gave up on an agent that was online.
     @unit
