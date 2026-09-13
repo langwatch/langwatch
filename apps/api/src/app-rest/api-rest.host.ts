@@ -86,7 +86,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
 
     // The directory bearer is an ENTERPRISE module's, so a build without it
     // still mounts the SCIM family and admits nobody through it.
-    return new ApiRestHost(credentials, config, peers.find(ScimApi));
+    return new ApiRestHost(credentials, config, peers.find(ScimApi), peers.app(AuditLogApi));
   }
 
   /** The project credential this door resolved, for the facts it binds. */
@@ -102,6 +102,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     private readonly credentials: ApiRestCredentials,
     private readonly config: ApiRestDoorConfig,
     private readonly scim: Pick<ScimApi, "authenticateDirectory"> | undefined,
+    private readonly auditLog: AuditLogApi,
   ) {}
 
   /**
@@ -124,6 +125,24 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     return createRestRuntime({
       identity: door === "public" ? this.publicDoor() : doors[door],
       doors,
+      // Every route-declared trail lands on the ONE audit application this
+      // process installed; a caller no door named is recorded as anonymous.
+      audit: {
+        record: (row) =>
+          this.auditLog.record({
+            userId: row.actorId ?? "anonymous",
+            action: row.action,
+            args: { ...row.params, ...(row.scope ? { scope: row.scope } : {}) },
+            ...(typeof row.params.projectId === "string"
+              ? { projectId: row.params.projectId }
+              : {}),
+            ...(typeof row.params.organizationId === "string"
+              ? { organizationId: row.params.organizationId }
+              : {}),
+            ...(row.resultId ? { targetId: row.resultId } : {}),
+            ...(row.errorCode ? { error: row.errorCode } : {}),
+          }),
+      },
     }).mount(rest, {
       app,
       onError: familyErrors,
