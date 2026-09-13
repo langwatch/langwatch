@@ -71,7 +71,7 @@ Read [CONTRIBUTING.md](https://github.com/langwatch/langwatch/blob/main/CONTRIBU
 
 ## License
 
-LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules under [`platform/app/ee/`](/platform/app/ee/) (SSO, SCIM provisioning, audit logs, gateway webhooks, billing, governance ingestion) are the one part that needs a commercial license in production, and the SDKs are MIT. See [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing) for what a license adds, and [`LICENSE.md`](/LICENSE.md) for the per-folder breakdown.
+LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules under [`platform/app/ee/`](platform/app/ee/) (SSO, SCIM provisioning, audit logs, gateway webhooks, billing, governance ingestion) are the one part that needs a commercial license in production, and the SDKs are MIT. See [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing) for what a license adds, and [`LICENSE.md`](LICENSE.md) for the per-folder breakdown.
 
 ## Security
 
