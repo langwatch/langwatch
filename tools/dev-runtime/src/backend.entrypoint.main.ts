@@ -85,8 +85,10 @@ export function bootBackendEntry(): Promise<void> {
     .then((started) => {
       halves = started;
     })
-    .catch(() => {
-      // Exit outright: a failed boot's own pollers would hold the loop open.
+    .catch((error) => {
+      // Name the failure, then exit outright: a failed boot's own pollers
+      // would hold the loop open, and a silent exit costs the diagnosis.
+      write(processFailureLine({ service: BACKEND_SERVICE, event: "fatal boot failure", error }));
       process.exit(1);
     });
 }
