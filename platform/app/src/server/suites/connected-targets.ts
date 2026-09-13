@@ -313,14 +313,16 @@ export async function assertConnectedAgentsOnline({
  * row whose declarations this version does not understand runs with none.
  */
 export function agentParameterDefinitionsOf(
-  agent: AgentIdentityRow | undefined,
+  agent: (Pick<AgentIdentityRow, "type"> & { config: unknown }) | undefined,
 ): ScenarioParameterDefinition[] {
   if (agent?.type !== "connected") return [];
-  const config = agent.config;
+  const config: unknown = agent.config;
   if (typeof config !== "object" || config === null || Array.isArray(config)) {
     return [];
   }
-  return parseScenarioParameterDefinitions(config.parameters);
+  return parseScenarioParameterDefinitions(
+    "parameters" in config ? config.parameters : undefined,
+  );
 }
 
 /** The display names of the owners of the personal agents among these. */

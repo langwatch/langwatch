@@ -17,3 +17,13 @@ postgresql:
       secretKeyRef:
         name: "langwatch-db"
         key: "connectionString"
+
+# The LangWatchQL Postgres bridge (lwql_postgres named collection) defaults to
+# the chart-managed PostgreSQL Service — wrong for an external PostgreSQL.
+# Cancel it back to empty so the bridge renders disabled (a loud NOTES.txt +
+# Deployment-annotation warning) instead of pointing at a Service that does
+# not exist. Set this to your PostgreSQL host to enable the bridge instead.
+clickhouse:
+  lwqlAccessModel:
+    postgres:
+      host: ""

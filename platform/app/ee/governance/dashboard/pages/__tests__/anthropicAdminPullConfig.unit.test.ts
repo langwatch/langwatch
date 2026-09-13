@@ -68,18 +68,10 @@ describe("buildAnthropicAdminPullConfig", () => {
     expect(parsed.bucketWidth).toBe("1h");
   });
 
-  it("given an invalid report, bucket width, or start date, refuses to build", () => {
+  it("given an invalid report or start date, refuses to build", () => {
     const base = { credentialsToken: "sk-ant-admin-test", report: "cost" };
     expect(
       buildAnthropicAdminPullConfig(composer({ ...base, report: "both" })),
-    ).toBeNull();
-    // Deliberately `usage`, not the `cost` of `base`: on a cost report the
-    // usage-only gate rejects any width first, so this assertion would pass
-    // with the value check deleted and prove nothing about "2h".
-    expect(
-      buildAnthropicAdminPullConfig(
-        composer({ ...base, report: "usage", bucketWidth: "2h" }),
-      ),
     ).toBeNull();
     expect(
       buildAnthropicAdminPullConfig(
@@ -91,19 +83,25 @@ describe("buildAnthropicAdminPullConfig", () => {
     ).toBeNull();
   });
 
-  it("given a bucket width on a cost report, refuses to build", () => {
-    // The puller sends COST_REPORT_BUCKET_WIDTH and ignores config.bucketWidth,
-    // so saving one on a cost source records a setting that never applies —
-    // which is the opposite of what the field's own hint promises.
+  it("given a bucket width it cannot honour, drops it instead of refusing", () => {
+    // The form stopped asking for a width, so a refusal here would block the
+    // save over a control that is not on the screen. Both of these are widths
+    // the adapter would not honour as given: `2h` is not in its domain at all,
+    // and on a cost report the puller sends COST_REPORT_BUCKET_WIDTH and
+    // ignores the setting, so any width there was never in effect.
+    const base = { credentialsToken: "sk-ant-admin-test" };
+
     expect(
       buildAnthropicAdminPullConfig(
-        composer({
-          credentialsToken: "sk-ant-admin-test",
-          report: "cost",
-          bucketWidth: "1h",
-        }),
+        composer({ ...base, report: "usage", bucketWidth: "2h" }),
       ),
-    ).toBeNull();
+    ).toMatchObject({ bucketWidth: "1d" });
+
+    const onCost = buildAnthropicAdminPullConfig(
+      composer({ ...base, report: "cost", bucketWidth: "1h" }),
+    );
+    expect(onCost).not.toBeNull();
+    expect(onCost).not.toHaveProperty("bucketWidth");
   });
 
   it("given a start date that is impossible or timezone-less, refuses to build", () => {

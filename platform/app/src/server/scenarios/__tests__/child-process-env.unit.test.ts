@@ -5,8 +5,18 @@
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
 
-import { describe, expect, it } from "vitest";
-import { buildChildProcessEnv } from "../execution/child-environment";
+import { describe, expect, it, vi } from "vitest";
+import {
+  buildChildEnvironment,
+  buildChildProcessEnv,
+} from "../execution/child-environment";
+import type { ExecutionJobData } from "../execution/execution-pool";
+
+// child-environment reads `env` at module load; stub it so this node test needs
+// no real environment validation.
+vi.mock("~/env.mjs", () => ({
+  env: { IS_SAAS: false },
+}));
 
 describe("buildChildProcessEnv", () => {
   describe("given the scenario processor builds the child environment", () => {
@@ -87,6 +97,50 @@ describe("buildChildProcessEnv", () => {
       const env = buildChildProcessEnv({ SOME_UNSET_VAR: undefined });
 
       expect("SOME_UNSET_VAR" in env).toBe(false);
+    });
+  });
+});
+
+describe("buildChildEnvironment", () => {
+  const jobData: ExecutionJobData = {
+    projectId: "proj_1",
+    scenarioId: "scen_1",
+    scenarioRunId: "run_1",
+    batchRunId: "batch_1",
+    setId: "set_1",
+    target: { type: "voice", referenceId: "agent_1" },
+  };
+  const telemetry = { endpoint: "http://app:5560", apiKey: "lw-key" };
+
+  describe("given a voice run with caller env keys", () => {
+    /** @scenario The caller voice keys reach the child env only for a voice target */
+    it("merges the caller OpenAI key into the child env", () => {
+      const env = buildChildEnvironment({
+        jobData,
+        labels: [],
+        telemetry,
+        callerEnv: { OPENAI_API_KEY: "sk-openai" },
+      });
+
+      expect(env.OPENAI_API_KEY).toBe("sk-openai");
+    });
+  });
+
+  describe("given a non-voice run with a non-empty caller env", () => {
+    /** @scenario The caller voice keys reach the child env only for a voice target */
+    it("excludes the caller's keys from the child env", () => {
+      const httpJobData: ExecutionJobData = {
+        ...jobData,
+        target: { type: "http", referenceId: "agent_1" },
+      };
+      const env = buildChildEnvironment({
+        jobData: httpJobData,
+        labels: [],
+        telemetry,
+        callerEnv: { OPENAI_API_KEY: "sk-openai" },
+      });
+
+      expect("OPENAI_API_KEY" in env).toBe(false);
     });
   });
 });

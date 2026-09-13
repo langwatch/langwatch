@@ -41,6 +41,7 @@ function makeScenario(
     criteria: [],
     labels: [],
     parameters: null,
+    callerVoice: null,
     simulatorModel: null,
     judgeModel: null,
     maxTurns: null,

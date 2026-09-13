@@ -145,6 +145,15 @@ export interface ProjectRepository {
      */
     projectIds?: string[];
   }): Promise<PaginatedResult<Project>>;
+  /**
+   * Every project id of the organization, ordered by id ascending: archived
+   * ones and every kind INCLUDED. This is the tenant scope for reads keyed by
+   * the traffic's own project (the gateway spend ledger), where a project
+   * archived last month still has spend inside the window.
+   */
+  findAllIdsByOrganization(params: {
+    organizationId: string;
+  }): Promise<string[]>;
   findBySlugInTeam(params: {
     slug: string;
     teamId: string;
@@ -235,6 +244,12 @@ export class NullProjectRepository implements ProjectRepository {
     projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
+  }
+
+  async findAllIdsByOrganization(_params: {
+    organizationId: string;
+  }): Promise<string[]> {
+    return [];
   }
 
   async findBySlugInTeam(_params: {

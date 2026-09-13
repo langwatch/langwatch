@@ -29,7 +29,7 @@ import {
   lwqlGrantStatement,
   lwqlPolicyCoverageQuery,
   lwqlRowPolicyStatement,
-} from "../provisioning";
+} from "../provisioning/accessModel";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,

@@ -34,13 +34,32 @@ function isExpired(key: IngestionKeyRow): boolean {
  */
 export function IngestionKeysSection({
   keys,
+  allKeys,
   isAdmin,
   onRevoke,
 }: {
   keys: IngestionKeyRow[];
+  /**
+   * Every key the page loaded, ingestion and login alike. A key minted by a
+   * CLI session before the CLI sent a device label carries no label of its
+   * own, but its session's login key does, and both are already on this
+   * page: the join is a lookup rather than a second query.
+   */
+  allKeys: IngestionKeyRow[];
   isAdmin: boolean;
   onRevoke: (apiKeyId: string) => void;
 }) {
+  const deviceLabelById = new Map(
+    allKeys
+      .filter((key) => key.createdByDeviceLabel)
+      .map((key) => [key.id, key.createdByDeviceLabel!]),
+  );
+  const machineOf = (key: IngestionKeyRow): string | null =>
+    key.createdByDeviceLabel ??
+    (key.parentApiKeyId
+      ? (deviceLabelById.get(key.parentApiKeyId) ?? null)
+      : null);
+
   if (keys.length === 0) return null;
 
   return (
@@ -134,8 +153,8 @@ export function IngestionKeysSection({
                     </Badge>
                   </Table.Cell>
                   <Table.Cell>
-                    {apiKey.createdByDeviceLabel ? (
-                      <Text fontSize="sm">{apiKey.createdByDeviceLabel}</Text>
+                    {machineOf(apiKey) ? (
+                      <Text fontSize="sm">{machineOf(apiKey)}</Text>
                     ) : (
                       <Text fontSize="sm" color="fg.muted">
                         Unknown device

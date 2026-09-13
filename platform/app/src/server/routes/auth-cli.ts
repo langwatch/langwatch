@@ -32,10 +32,11 @@ import { IngestionSourceService } from "@ee/governance/services/activity-monitor
 import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
-  IngestionKeyService,
-  PersonalSourceTypeNotAllowedError,
-  PersonalWorkspaceMissingError,
-} from "@ee/governance/services/ingestionKey.service";
+  IngestionKeySessionRevokedError,
+  IngestionKeySourceNotAllowedError,
+  IngestionKeyWorkspaceMissingError,
+} from "@ee/governance/services/ingestionKey.errors";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
   NoEligibleProvidersError,
@@ -48,6 +49,7 @@ import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platf
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -57,10 +59,15 @@ import {
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
-  CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
   type CliKeySelection,
+  type CliLoginKeyRevocationCause,
   CliLoginKeyService,
+  loginKeyExpiresAt,
 } from "~/server/api-key/cli-login-key.service";
+import {
+  deviceLabelForSession,
+  sanitizeDeviceLabel,
+} from "~/server/api-key/device-label";
 import { ApiKeyScopeViolationError } from "~/server/api-key/errors";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
@@ -74,6 +81,10 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import {
+  publishDeviceCodeSettled,
+  waitForDeviceCodeSettled,
+} from "./_lib/device-approval-signal";
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -158,6 +169,13 @@ const REFRESH_TOKEN_TTL_SECONDS = positiveIntFromEnv(
 );
 /** Min seconds between successive /exchange polls per device_code. */
 const POLL_RATE_LIMIT_SECONDS = 4;
+/**
+ * How long one /exchange holds the exclusive redemption claim on an approved
+ * device code. Long enough to cover the Prisma reads, the personal-workspace
+ * ensure and the login-key mint the redemption does; short enough that an
+ * unexpected throw before the release frees the code well inside its TTL.
+ */
+const EXCHANGE_CLAIM_SECONDS = 30;
 
 const DEVICE_CODE_PREFIX = "lwcli:device:"; // Redis key prefix for device-code records
 const REFRESH_TOKEN_PREFIX = "lwcli:refresh:"; // Redis key prefix for refresh-token records
@@ -363,6 +381,16 @@ async function validateAccessToken(
 
 function pollRateKey(deviceCode: string): string {
   return `${POLL_RATE_PREFIX}${deviceCode}`;
+}
+
+/**
+ * Redemption claim for an approved device code. A settled code skips the
+ * poll-rate window, so this claim is what serialises concurrent /exchange
+ * calls on the approved branch: one request redeems the code, the rest get
+ * the same slow_down the window would have given them.
+ */
+function deviceExchangeClaimKey(deviceCode: string): string {
+  return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
 }
 
 function getRedis() {
@@ -659,29 +687,37 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
 
   const { device_code } = parsed.data;
 
+  const raw = await redis.get(deviceCodeKey(device_code));
+  const settledEarly =
+    raw !== null && (JSON.parse(raw) as DeviceCodeRecord).status !== "pending";
+
   // Per-device polling rate-limit. RFC 8628 says clients respect the
   // server-issued interval but defensive servers must enforce it too.
   // We use SET NX EX — first call writes the key with TTL, subsequent
-  // calls within window see existing key and get rejected.
-  const setResult = await redis.set(
-    pollRateKey(device_code),
-    "1",
-    "EX",
-    POLL_RATE_LIMIT_SECONDS,
-    "NX",
-  );
-  if (setResult !== "OK") {
-    return c.json(
-      {
-        error: "slow_down",
-        error_description:
-          "Polling too fast. Increase your interval before retrying.",
-      },
-      429,
+  // calls within window see existing key and get rejected. A code that has
+  // already been approved or denied skips the window: that poll is the one
+  // `/device-approval` just told the CLI to make, and answering it with
+  // slow_down would put back the wait the stream exists to remove.
+  if (!settledEarly) {
+    const setResult = await redis.set(
+      pollRateKey(device_code),
+      "1",
+      "EX",
+      POLL_RATE_LIMIT_SECONDS,
+      "NX",
     );
+    if (setResult !== "OK") {
+      return c.json(
+        {
+          error: "slow_down",
+          error_description:
+            "Polling too fast. Increase your interval before retrying.",
+        },
+        429,
+      );
+    }
   }
 
-  const raw = await redis.get(deviceCodeKey(device_code));
   if (!raw) {
     // Either the device_code never existed or it expired and Redis evicted it.
     // RFC 8628 recommends `expired_token` here.
@@ -749,6 +785,35 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // Exclusive redemption. Everything below hands out a credential the
+    // device code is only supposed to buy once: the project-key branch
+    // returns the project apiKey, the device-session branch mints an ApiKey
+    // and a token pair, and the mint revokes the previous login key for the
+    // same device label. Two concurrent exchanges both reaching that would
+    // hand out two sets and let the second revoke the first's key, so the
+    // approved branch is entered by one request at a time. The loser gets
+    // the same slow_down a too-fast poll gets, which the CLI already
+    // retries, and the winner deletes the device code on every path that
+    // consumes it.
+    const claimKey = deviceExchangeClaimKey(device_code);
+    const claimed = await redis.set(
+      claimKey,
+      "1",
+      "EX",
+      EXCHANGE_CLAIM_SECONDS,
+      "NX",
+    );
+    if (claimed !== "OK") {
+      return c.json(
+        {
+          error: "slow_down",
+          error_description:
+            "Polling too fast. Increase your interval before retrying.",
+        },
+        429,
+      );
+    }
+
     // Look up user + org details for the response payload. We only fetch
     // the fields the CLI actually needs to print on success.
     const user = await prisma.user.findUnique({
@@ -757,12 +822,20 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     });
     const organization = await prisma.organization.findUnique({
       where: { id: record.organization_id },
-      select: { id: true, name: true, slug: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        maxSessionDurationDays: true,
+      },
     });
     if (!user || !organization) {
       logger.error(
         `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
       );
+      // Nothing was consumed, so the code stays redeemable for whatever
+      // retry the CLI makes next.
+      await redis.del(claimKey);
       return c.json(
         {
           error: "server_error",
@@ -814,6 +887,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         logger.warn(
           `[auth-cli] approved project_api_key device_code ${device_code} missing project payload — returning pending`,
         );
+        await redis.del(claimKey);
         return c.json(
           {
             error: "authorization_pending",
@@ -902,17 +976,14 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           permissions: string[];
         }
       | undefined;
+    // The session starts now: the same instant stamps the token records
+    // and anchors the login key's expiry, so the ceiling the org sets is
+    // measured from one clock.
+    const now = Date.now();
     if (record.key_selection) {
-      // Same normalization the other label paths use, and the user-chosen
-      // label wins over the machine hostname. The value names the key AND
-      // matches the previous login key for replacement, so an unnormalized
-      // value would leave the old key alive on a hostname or formatting
-      // change and let credentials accumulate.
-      const deviceLabel =
-        sanitizeDeviceLabel(
-          parsed.data.client_info?.device_label ??
-            parsed.data.client_info?.hostname,
-        ) ?? CLI_LOGIN_UNKNOWN_DEVICE_LABEL;
+      // The same label the ingest keys minted under this session carry, so
+      // the devices tab can put them beside it.
+      const deviceLabel = deviceLabelForSession(parsed.data.client_info);
       let minted: Awaited<
         ReturnType<CliLoginKeyService["mintForDeviceSession"]>
       >;
@@ -922,6 +993,9 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           organizationId: organization.id,
           deviceLabel,
           selection: record.key_selection,
+          sessionStartedAtMs: now,
+          maxSessionDurationDays: organization.maxSessionDurationDays ?? 0,
+          refreshWindowMs: REFRESH_TOKEN_TTL_SECONDS * 1000,
         });
       } catch (err) {
         // A ceiling refusal is permanent: the selection was approved minutes
@@ -947,6 +1021,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
             410,
           );
         }
+        await redis.del(claimKey);
         throw err;
       }
       cliApiKey = minted.token;
@@ -963,7 +1038,6 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // tokens against an authoritative store.
     const accessToken = generateAccessToken();
     const refreshToken = generateRefreshToken();
-    const now = Date.now();
     // Phase 8 — stamp client device info so the devices inventory can show
     // "Bob's MacBook Pro" entries. session_started_at is preserved
     // through future /refresh rotations so the dashboard can show
@@ -1070,6 +1144,134 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/cli/device-approval
+// ---------------------------------------------------------------------------
+
+/** How often the stream writes a comment so proxies keep it open. */
+const APPROVAL_KEEPALIVE_MS = 15_000;
+
+/**
+ * How many approval streams one pod holds open at once. Minting a device code
+ * takes no credential, so without a ceiling anyone could park a connection, a
+ * pair of timers and a Redis subscription per code they mint. Past the ceiling
+ * the route refuses, and a CLI that gets nothing polls the way it always did.
+ */
+const MAX_OPEN_APPROVAL_STREAMS = 512;
+let openApprovalStreams = 0;
+
+/** The device code's status once it has settled, or null while it is pending. */
+async function readDeviceCodeStatus({
+  redis,
+  deviceCode,
+}: {
+  redis: ReturnType<typeof getRedis>;
+  deviceCode: string;
+}): Promise<string | null> {
+  const raw = await redis.get(deviceCodeKey(deviceCode));
+  if (!raw) return "expired";
+  const status = (JSON.parse(raw) as DeviceCodeRecord).status;
+  return status === "pending" ? null : status;
+}
+
+/**
+ * Tell the CLI the moment its device code settles, so `langwatch login` does
+ * not sit on the spinner until its next scheduled poll.
+ *
+ * The device_code is the credential, exactly as it is on `/exchange`, and the
+ * stream carries no session material: the CLI still has to POST `/exchange` to
+ * get its tokens. That keeps this route a latency fix rather than a second way
+ * to authenticate.
+ *
+ * The stream is an accelerator, never the contract. It ends on the first
+ * settle, on the device code's own deadline, or when the client disconnects,
+ * and a CLI that never reaches it just polls at the interval it was given.
+ */
+secured.access(CLI_POLICY).get("/device-approval", async (c: Context) => {
+  const redis = getRedis();
+  const deviceCode = c.req.query("device_code");
+  if (!deviceCode) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "device_code is required",
+      },
+      400,
+    );
+  }
+
+  const raw = await redis.get(deviceCodeKey(deviceCode));
+  const record = raw ? (JSON.parse(raw) as DeviceCodeRecord) : null;
+  const deadline = record?.expires_at ?? Date.now();
+  const wouldWait = record?.status === "pending" && Date.now() <= deadline;
+
+  if (wouldWait && openApprovalStreams >= MAX_OPEN_APPROVAL_STREAMS) {
+    return c.json(
+      {
+        error: "temporarily_unavailable",
+        error_description:
+          "Too many approval streams are open. Poll /exchange at the interval you were given.",
+      },
+      503,
+    );
+  }
+
+  return streamSSE(c, async (stream) => {
+    // An already-settled code (or one Redis no longer holds) needs no wait:
+    // the CLI's next poll is the one that matters and it can make it now.
+    if (record?.status !== "pending" || Date.now() > deadline) {
+      await stream.writeSSE({
+        data: JSON.stringify({ status: record?.status ?? "expired" }),
+      });
+      return;
+    }
+
+    openApprovalStreams++;
+    const controller = new AbortController();
+    const closeOnDeadline = setTimeout(
+      () => controller.abort(),
+      Math.max(1000, deadline - Date.now()),
+    );
+    stream.onAbort(() => controller.abort());
+
+    const keepalive = setInterval(() => {
+      void stream.writeSSE({ data: "", event: "ping" }).catch(() => {
+        controller.abort();
+      });
+    }, APPROVAL_KEEPALIVE_MS);
+
+    try {
+      const watch = waitForDeviceCodeSettled({
+        redis,
+        deviceCode,
+        signal: controller.signal,
+      });
+      await watch.subscribed;
+
+      // Redis pub/sub keeps nothing for a late subscriber, so a code settled
+      // between the read above and that subscribe published to no one. Read it
+      // once more now that the channel is live: from here on, either the
+      // record already says so or the publication reaches us.
+      const status =
+        (await readDeviceCodeStatus({ redis, deviceCode })) ??
+        (await watch.settled);
+      if (status) {
+        await stream.writeSSE({ data: JSON.stringify({ status }) });
+      }
+    } catch (error) {
+      logger.debug(
+        { error },
+        "[auth-cli] device-approval stream ended early; the CLI's own poll still settles the login",
+      );
+    } finally {
+      clearInterval(keepalive);
+      clearTimeout(closeOnDeadline);
+      controller.abort();
+      openApprovalStreams--;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/auth/cli/refresh
 // ---------------------------------------------------------------------------
 const refreshRequestSchema = z.object({
@@ -1106,6 +1308,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const record = JSON.parse(raw) as RefreshTokenRecord;
   if (Date.now() > record.expires_at) {
     await redis.del(refreshTokenKey(refresh_token));
+    await retireExpiredSessionKey(record);
     return c.json(
       {
         error: "invalid_grant",
@@ -1115,43 +1318,34 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     );
   }
 
-  // Phase 8 — enforce admin-configured max session duration. The
-  // session-start anchor is `client_info.session_started_at` (set at
-  // /exchange and preserved across rotations); fall back to
-  // record.issued_at for sessions started before client_info was
-  // captured. When maxSessionDurationDays > 0 and the session is
-  // older, reject the refresh — the user must re-run `langwatch login`.
   const sessionAnchorMs =
     record.client_info?.session_started_at ?? record.issued_at;
-  const org = await prisma.organization.findUnique({
-    where: { id: record.organization_id },
-    select: { maxSessionDurationDays: true },
+  const ceiling = await CliLoginKeyService.create(prisma).sessionCeiling({
+    organizationId: record.organization_id,
+    sessionAnchorMs,
   });
-  const maxDurationDays = org?.maxSessionDurationDays ?? 0;
-  if (maxDurationDays > 0) {
-    const sessionAgeMs = Date.now() - sessionAnchorMs;
-    const maxDurationMs = maxDurationDays * 24 * 60 * 60 * 1000;
-    if (sessionAgeMs > maxDurationMs) {
-      // Reject + invalidate the old refresh token to prevent further
-      // rotation attempts. The CLI gets 401 → wipes local state.
-      await redis.del(refreshTokenKey(refresh_token));
-      logger.info(
-        {
-          userId: record.user_id,
-          organizationId: record.organization_id,
-          sessionAgeDays: Math.round(sessionAgeMs / 86_400_000),
-          maxDurationDays,
-        },
-        "rejecting refresh: session exceeded org max-duration policy",
-      );
-      return c.json(
-        {
-          error: "invalid_grant",
-          error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
-        },
-        401,
-      );
-    }
+  const { maxDurationDays } = ceiling;
+  if (ceiling.exceeded) {
+    // Reject + invalidate the old refresh token to prevent further
+    // rotation attempts. The CLI gets 401 → wipes local state.
+    await redis.del(refreshTokenKey(refresh_token));
+    await retireExpiredSessionKey(record);
+    logger.info(
+      {
+        userId: record.user_id,
+        organizationId: record.organization_id,
+        sessionAgeDays: Math.round(ceiling.sessionAgeMs / 86_400_000),
+        maxDurationDays,
+      },
+      "rejecting refresh: session exceeded org max-duration policy",
+    );
+    return c.json(
+      {
+        error: "invalid_grant",
+        error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
+      },
+      401,
+    );
   }
 
   // Rotation mints a new credential pair, so it re-derives membership the way
@@ -1170,6 +1364,10 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   });
   if (!activeMembership) {
     await redis.del(refreshTokenKey(refresh_token));
+    // Not `expired`: this session had time left and lost its person instead.
+    // The cause reaches the ingest keys under it, and the CLI reads it as a
+    // sign-out no mint on this machine can repair.
+    await retireExpiredSessionKey(record, "offboarded");
     logger.info(
       { userId: record.user_id, organizationId: record.organization_id },
       "rejecting refresh: caller is not an active member of the organization",
@@ -1244,6 +1442,32 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
+  // The login key's expiry slides with the refresh window, held under the
+  // organization's ceiling from the session start, so the hourly sweep only
+  // retires sessions the CLI has stopped refreshing. Best effort: a key
+  // whose expiry did not move is retired one refresh window early, not a
+  // refresh the CLI is refused.
+  if (record.cli_api_key_id) {
+    try {
+      await CliLoginKeyService.create(prisma).extendExpiry({
+        apiKeyId: record.cli_api_key_id,
+        userId: record.user_id,
+        organizationId: record.organization_id,
+        expiresAt: loginKeyExpiresAt({
+          nowMs: now,
+          sessionStartedAtMs: sessionAnchorMs,
+          maxSessionDurationDays: maxDurationDays,
+          refreshWindowMs: REFRESH_TOKEN_TTL_SECONDS * 1000,
+        }),
+      });
+    } catch (err) {
+      logger.warn(
+        { err, apiKeyId: record.cli_api_key_id, userId: record.user_id },
+        "[auth-cli] could not extend the CLI login key's expiry on refresh",
+      );
+    }
+  }
+
   return c.json(
     {
       access_token: newAccessToken,
@@ -1255,6 +1479,32 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     200,
   );
 });
+
+/**
+ * A refused refresh is the end of the session, so the login key it minted
+ * goes with it and the ingest keys under that key with it. Best effort and
+ * idempotent, like the token delete beside it: the refusal is answered
+ * either way, and a key left behind is retired by the hourly sweep.
+ */
+async function retireExpiredSessionKey(
+  record: RefreshTokenRecord,
+  cause: CliLoginKeyRevocationCause = "expired",
+): Promise<void> {
+  if (!record.cli_api_key_id) return;
+  try {
+    await CliLoginKeyService.create(prisma).revokeSessionKey({
+      apiKeyId: record.cli_api_key_id,
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      cause,
+    });
+  } catch (err) {
+    logger.warn(
+      { err, apiKeyId: record.cli_api_key_id, userId: record.user_id },
+      "[auth-cli] could not revoke the CLI login key of a refused refresh",
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/auth/cli/budget/status
@@ -1526,22 +1776,6 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
 const issueVirtualKeySchema = z.object({
   device_label: z.string().optional(),
 });
-
-/**
- * Reduce a free-form device label to the charset a VK name carries. Returns
- * null when nothing usable survives, so the caller falls back to a random
- * suffix rather than naming every machine the same.
- */
-function sanitizeDeviceLabel(raw: string | undefined): string | null {
-  if (!raw) return null;
-  const cleaned = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .slice(0, 24)
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return cleaned.length > 0 ? cleaned : null;
-}
 
 secured.access(CLI_POLICY).post("/virtual-key", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
@@ -2389,9 +2623,25 @@ secured
 
 /**
  * The personal-project branch of the ingestion-key mint: the caller's own
- * workspace, one key per device. Create-only, because the caller is a
+ * workspace, one key per session. Create-only, because the caller is a
  * device session and the other devices under this login are still exporting
- * with theirs; the service's cap is what keeps the list bounded.
+ * with theirs. The key is parented to this session's login key, which is
+ * what retires it later: logout, the devices tab, a re-login from this
+ * device, or the session running out.
+ *
+ * A session whose record names no login key mints an unparented key: the row
+ * this route wrote before login keys existed, in the "Other keys" group, with
+ * no cascade behind it. Those are sessions approved before 2026-08-22, when
+ * `cli_api_key_id` began to be written; the refresh window is 90 days, so
+ * some are still alive and still minting. Refusing them would tell a person
+ * whose CLI works to sign in again for a reason they cannot see. The window
+ * closes as those sessions age out, so this branch is temporary by
+ * construction: every session opened since carries a login key and is
+ * parented.
+ *
+ * A session that names a login key which is revoked is still refused as
+ * signed out. That one is a real sign-out, and the repair is `langwatch
+ * login`.
  */
 async function mintPersonalIngestionKey(
   c: Context,
@@ -2406,17 +2656,15 @@ async function mintPersonalIngestionKey(
   },
 ): Promise<Response> {
   try {
-    const result = await service.issueForPersonalProject({
+    const result = await service.mint({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       sourceType,
-      // Snapshot which device minted the key so the API-keys settings page
-      // can attribute it. Falls back to the hostname when the CLI sent no
-      // explicit label; null for CLIs that predate device metadata.
-      createdByDeviceLabel:
-        tokenRecord.client_info?.device_label ??
-        tokenRecord.client_info?.hostname ??
-        null,
+      fromCliSession: true,
+      parentApiKeyId: tokenRecord.cli_api_key_id ?? null,
+      // The same label the session's login key carries, so the devices tab
+      // can put the key beside its session.
+      createdByDeviceLabel: deviceLabelForSession(tokenRecord.client_info),
     });
     return c.json(
       {
@@ -2427,12 +2675,13 @@ async function mintPersonalIngestionKey(
       201,
     );
   } catch (err) {
-    // A source type no wrapped tool stamps and a missing workspace are the
-    // two failures the caller can act on, so they are the only ones that
-    // report as such. Everything else is a server fault: it gets logged and a
-    // fixed message, the way the project branch does, rather than a prompt
-    // the user cannot act on and an internal error string on the wire.
-    if (err instanceof PersonalSourceTypeNotAllowedError) {
+    // A source type no wrapped tool stamps, a missing workspace and a
+    // signed-out session are the failures the caller can act on, so they
+    // are the only ones that report as such. Everything else is a server
+    // fault: it gets logged and a fixed message, the way the project branch
+    // does, rather than a prompt the user cannot act on and an internal
+    // error string on the wire.
+    if (IngestionKeySourceNotAllowedError.is(err)) {
       return c.json(
         {
           error: "invalid_request",
@@ -2441,7 +2690,7 @@ async function mintPersonalIngestionKey(
         400,
       );
     }
-    if (err instanceof PersonalWorkspaceMissingError) {
+    if (IngestionKeyWorkspaceMissingError.is(err)) {
       return c.json(
         {
           error: "precondition_failed",
@@ -2450,6 +2699,9 @@ async function mintPersonalIngestionKey(
         },
         412,
       );
+    }
+    if (IngestionKeySessionRevokedError.is(err)) {
+      return signedOut(c);
     }
     logger.error(
       { err, userId: tokenRecord.user_id, sourceType },
@@ -2463,6 +2715,21 @@ async function mintPersonalIngestionKey(
       500,
     );
   }
+}
+
+/**
+ * The answer for a session whose login key is gone: the same 401 the CLI
+ * already reads as "sign in again", so the device's own repair path fires.
+ */
+function signedOut(c: Context): Response {
+  return c.json(
+    {
+      error: "unauthorized",
+      error_description:
+        "This device session is signed out. Run `langwatch login` to start a new session.",
+    },
+    401,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2498,7 +2765,7 @@ secured
       );
     }
     const service = IngestionKeyService.create(prisma);
-    const keys = await service.listForPersonalProject({
+    const keys = await service.list({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
     });
@@ -2525,7 +2792,9 @@ secured
 // `langwatch instrument` again.
 //
 // Response: { lookup_id, status: "live" | "revoked" | "unknown",
-//             source_type?, revocation_cause?: "user" | "rotation" | "cap" | null }
+//             source_type?,
+//             revocation_cause?: "user" | "rotation" | "session" | "expired"
+//                                | "offboarded" | "cap" | null }
 //
 // `unknown` is a 200, not a 404, so a CLI can tell "no such key of yours"
 // from "a server too old to have this route".
@@ -2557,7 +2826,7 @@ secured
       );
     }
     const service = IngestionKeyService.create(prisma);
-    const key = await service.describePersonalKey({
+    const key = await service.describe({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       lookupId,
@@ -3008,10 +3277,11 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
 });
 
 /**
- * Revokes the CLI ApiKeys named by a logout's token records. Best-effort and
- * idempotent, like the token deletes beside it: logout stays a 200 whatever
- * state the key is in, and a failed revoke is logged rather than surfaced —
- * the key still dies with the owner's next re-login from the same device.
+ * Revokes the CLI ApiKeys named by a logout's token records, and with each
+ * login key the ingest keys parented to it. Best-effort and idempotent, like
+ * the token deletes beside it: logout stays a 200 whatever state the key is
+ * in, and a failed revoke is logged rather than surfaced: the key still dies
+ * with the owner's next re-login from the same device, or in the sweep.
  */
 async function revokeCliKeysFromTokenRecords(
   raws: Array<string | null>,
@@ -3029,10 +3299,11 @@ async function revokeCliKeysFromTokenRecords(
     if (!apiKeyId || seen.has(apiKeyId)) continue;
     seen.add(apiKeyId);
     try {
-      await CliLoginKeyService.create(prisma).revokeForLogout({
+      await CliLoginKeyService.create(prisma).revokeSessionKey({
         apiKeyId,
         userId: record.user_id,
         organizationId: record.organization_id,
+        cause: "user",
       });
     } catch (err) {
       logger.warn(
@@ -3121,6 +3392,7 @@ export async function approveDeviceCode({
     "EX",
     remainingSeconds,
   );
+  await publishDeviceCodeSettled({ redis, deviceCode, status: "approved" });
   return { approved: true };
 }
 
@@ -3141,4 +3413,5 @@ export async function denyDeviceCode(deviceCode: string): Promise<void> {
     "EX",
     Math.ceil(remainingMs / 1000),
   );
+  await publishDeviceCodeSettled({ redis, deviceCode, status: "denied" });
 }

@@ -18,8 +18,14 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import {
+  codexHelperThreadMarkersOf,
+  type ScopedSpans,
+  stampCodexHelperThread,
+} from "./codex-auxiliary-thread";
 import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
+import { SpanIngestionTally } from "./span-ingestion-tally";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 /**
@@ -119,66 +125,6 @@ export interface TraceRequestCollectionDeps {
 }
 
 /**
- * Per-request tally of span outcomes, and the one place that decides what each
- * outcome means to a caller.
- *
- * It exists as its own unit because two of those decisions are load-bearing and
- * were previously inline: filtered spans are NOT rejections, and drops and
- * dispatch failures are rejections with opposite retry answers (see
- * `TraceRequestCollectionResult`).
- */
-class SpanIngestionTally {
-  private collected = 0;
-  private dropped = 0;
-  private deduped = 0;
-  private filtered = 0;
-  private failed = 0;
-  private readonly errors: string[] = [];
-  private readonly failureErrors: string[] = [];
-
-  record(result: SpanIngestionResult): void {
-    switch (result.status) {
-      case "collected":
-        this.collected++;
-        break;
-      case "dropped":
-        this.dropped++;
-        break;
-      case "deduped":
-        this.deduped++;
-        break;
-      case "filtered":
-        this.filtered++;
-        break;
-      case "failed":
-        this.failed++;
-        if (result.error) this.failureErrors.push(result.error);
-        break;
-    }
-    if (result.error) this.errors.push(result.error);
-  }
-
-  annotate(span: OtelSpan): void {
-    span.setAttribute("spans.ingestion.successes", this.collected);
-    span.setAttribute("spans.ingestion.failures", this.failed);
-    span.setAttribute("spans.ingestion.drops", this.dropped);
-    span.setAttribute("spans.ingestion.deduped", this.deduped);
-    span.setAttribute("spans.ingestion.filtered", this.filtered);
-  }
-
-  toResult(): TraceRequestCollectionResult {
-    return {
-      // Filtered spans are intentionally not stored (coding-agent infra
-      // noise), so they are NOT rejections.
-      rejectedSpans: this.dropped + this.failed,
-      ingestionFailures: this.failed,
-      ingestionFailureMessage: this.failureErrors.join("; "),
-      errorMessage: this.errors.join("; "),
-    };
-  }
-}
-
-/**
  * Service for collecting trace requests into the trace processing pipeline.
  *
  * Normalizes OTLP trace requests and sends each span as a span-received event
@@ -214,7 +160,14 @@ export class TraceRequestCollectionService {
         },
       },
       async (span) => {
-        const tally = new SpanIngestionTally();
+        const tally = SpanIngestionTally.create();
+
+        // A codex helper thread's request span names its thread only through
+        // a child in the same export (see codex-auxiliary-thread.ts), so the
+        // join runs over the whole request before any span is processed.
+        const helperThreads = codexHelperThreadMarkersOf({
+          scopes: scopedSpansOf(traceRequest),
+        });
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
@@ -245,6 +198,7 @@ export class TraceRequestCollectionService {
                 scope: scopeParseResult.data ?? null,
                 piiRedactionLevel,
                 otelSpanRef: span,
+                helperThreads,
               });
 
               tally.record(result);
@@ -360,6 +314,7 @@ export class TraceRequestCollectionService {
     scope,
     piiRedactionLevel,
     otelSpanRef,
+    helperThreads,
   }: {
     tenantId: string;
     otelSpan: unknown;
@@ -367,6 +322,12 @@ export class TraceRequestCollectionService {
     scope: OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: OtelSpan;
+    /**
+     * The codex helper threads this batch's temporary structured request
+     * spans were issued for, by request span id. Absent for a caller that
+     * ingests one span at a time, which then stamps nothing.
+     */
+    helperThreads?: Map<string, string>;
   }): Promise<SpanIngestionResult> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
     if (!spanParseResult.success) {
@@ -396,6 +357,19 @@ export class TraceRequestCollectionService {
       };
     }
 
+    // A codex helper thread's request span gets its thread id here, before
+    // the filter reads the span: the stamp is what admits it.
+    const helperThreadId = helperThreads?.get(
+      TraceRequestUtils.normalizeOtlpId(spanParseResult.data.spanId),
+    );
+    const span =
+      helperThreadId !== undefined
+        ? stampCodexHelperThread({
+            span: spanParseResult.data,
+            threadId: helperThreadId,
+          })
+        : spanParseResult.data;
+
     // Drop pure-infra spans from the noisy coding-agent tools (codex/opencode)
     // so their traces read like claude's and the infra-only fragment traces
     // never get created. Scoped to those two instrumentation scopes; all other
@@ -405,8 +379,8 @@ export class TraceRequestCollectionService {
       process.env.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER !== "true" &&
       shouldFilterCodingAgentSpan({
         scopeName: scope?.name,
-        spanName: spanParseResult.data.name,
-        attributeKeys: spanParseResult.data.attributes.map((a) => a.key),
+        spanName: span.name,
+        attributeKeys: span.attributes.map((a) => a.key),
       })
     ) {
       return { status: "filtered" };
@@ -414,11 +388,36 @@ export class TraceRequestCollectionService {
 
     return await this.ingestNormalizedSpan({
       tenantId,
-      span: normalizeSpanIds(spanParseResult.data),
+      span: normalizeSpanIds(span),
       resource,
       instrumentationScope: scope,
       piiRedactionLevel,
       otelSpanRef,
     });
   }
+}
+
+/** Every scope entry of the request with its parsed spans, for the helper-thread join. */
+function scopedSpansOf(
+  traceRequest: IExportTraceServiceRequest,
+): ScopedSpans[] {
+  const scopes: ScopedSpans[] = [];
+  for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      scopes.push({
+        scopeName: scopeSpan?.scope?.name,
+        spans: parsedSpansOf(scopeSpan?.spans ?? []),
+      });
+    }
+  }
+  return scopes;
+}
+
+function parsedSpansOf(otelSpans: unknown[]): OtlpSpan[] {
+  const spans: OtlpSpan[] = [];
+  for (const otelSpan of otelSpans) {
+    const parsed = spanSchema.safeParse(otelSpan);
+    if (parsed.success) spans.push(parsed.data);
+  }
+  return spans;
 }

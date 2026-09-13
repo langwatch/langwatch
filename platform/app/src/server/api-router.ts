@@ -53,6 +53,7 @@ import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
+import { app as voiceSessionApp } from "../app/api/voice/[[...route]]/app";
 import { app as webhookPlatformApp } from "../app/api/webhooks/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
@@ -178,6 +179,7 @@ export function createApiRouter() {
   api.route("/", scimTokensApp);
   api.route("/", promptsApp);
   api.route("/", scenarioEventsApp);
+  api.route("/", voiceSessionApp); // /api/voice/session mint + finish + audio proxy
   api.route("/", scenariosApp);
   api.route("/", secretsApp);
   api.route("/", agentCacheApp);

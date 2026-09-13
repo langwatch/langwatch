@@ -37,6 +37,7 @@ const DECLINED = { status: "declined" } as const;
 const FAILED = { status: "failed" } as const;
 /** The platform said a person revoked the key on purpose. */
 const WITHHELD = { status: "withheld" } as const;
+const EXPIRED = { status: "expired" } as const;
 
 /** A collector that rejects the old bearer and accepts the fresh one. */
 const rotatedCollector: typeof fetch = ((
@@ -112,6 +113,31 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(hook.stdout).toEqual([]);
+      expect(hook.exits).toEqual([]);
+    });
+  });
+
+  describe("given a rejected key on a tool pinned to a project", () => {
+    /** @scenario "A rejected pinned key is reported rather than healed" */
+    it("tells the user the pinned key was rejected and mints nothing", async () => {
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
+
+      await hook.runHook({
+        shouldOmitExporterEnv: true,
+        fetchImpl: hook.collector(401),
+        healRevokedKey,
+        readCliConfig: () => ({
+          control_plane_url: "https://app.example.com",
+          tool_project_keys: { claude: { secret: "sk-lw-pinned_secret" } },
+        }),
+      });
+
+      expect(healRevokedKey).not.toHaveBeenCalled();
+      expect(posted).toHaveLength(1);
+      expect(hook.stdout).toHaveLength(1);
+      expect(JSON.parse(hook.stdout[0]!)).toEqual({
+        systemMessage: expect.stringContaining("pinned"),
+      });
       expect(hook.exits).toEqual([]);
     });
   });
@@ -315,6 +341,23 @@ describe("the session context hook's self-heal", () => {
         fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
       ).toBe(true);
       expect(hook.stdout).toEqual([]);
+    });
+  });
+
+  describe("given a device the platform refuses to authenticate", () => {
+    /** @scenario "A signed-out device is told to sign in again" */
+    it("tells the user to sign the machine in again", async () => {
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey: vi.fn().mockResolvedValue(EXPIRED),
+      });
+
+      expect(hook.stdout).toHaveLength(1);
+      const notice = JSON.parse(hook.stdout[0]!) as { systemMessage: string };
+      expect(notice.systemMessage).toContain("signed out");
+      expect(notice.systemMessage).toContain("langwatch login --device");
+      expect(hook.exits).toEqual([]);
     });
   });
 

@@ -147,6 +147,32 @@ describe("redactEssentialPiiInText", () => {
       );
       expect(text).toContain("[CRYPTO]");
     });
+
+    it("redacts a lowercase segwit address", () => {
+      const { text } = redact(
+        "send to bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4 today",
+      );
+      expect(text).toContain("[CRYPTO]");
+    });
+
+    // BIP-173 makes an address case-insensitive and QR encoders emit the
+    // uppercase form, because uppercase fits a QR alphanumeric segment. A
+    // lowercase-only pattern reads that form as ordinary text.
+    /** @scenario "An uppercase segwit address is redacted like its lowercase form" */
+    it("redacts an uppercase segwit address", () => {
+      const { text } = redact(
+        "send to BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4 today",
+      );
+      expect(text).toContain("[CRYPTO]");
+    });
+
+    // Mixed case is invalid per BIP-173, and the pattern must not become so
+    // loose that the legacy alternative starts accepting `0`, `O`, `I` and `l`
+    // — the four characters base58 leaves out precisely to avoid confusion.
+    it("leaves a mixed case segwit address alone", () => {
+      const input = "send to BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7Kv8f3t4 today";
+      expect(redact(input).text).toBe(input);
+    });
   });
 
   describe("given provider response ids", () => {
