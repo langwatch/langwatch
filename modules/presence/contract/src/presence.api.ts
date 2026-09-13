@@ -27,6 +27,10 @@ export interface PresenceApi {
   cursors(
     input: PresenceCursorSubscription & { signal?: PresenceStreamSignal },
   ): AsyncGenerator<PresenceCursorEvent>;
+  /** {@link PresenceBroadcastFabric}: the tenant's live-update signals. */
+  getTenantEmitter(tenantId: string): PresenceTenantEmitter;
+  /** {@link PresenceBroadcastFabric}: releases the tenant emitter a subscription borrowed. */
+  cleanupTenantEmitter(tenantId: string): void;
 }
 
 export const PresenceApi = moduleApi<PresenceApi>("presence");

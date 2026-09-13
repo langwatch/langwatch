@@ -14,6 +14,13 @@ import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
+import {
+  EventSourcing,
+  EventStoreProducerOnly,
+  type EventSourcedQueueDefinition,
+  type EventSourcedQueueProcessor,
+} from "@langwatch/eventing";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { describe, expect, it, vi } from "vitest";
@@ -223,8 +230,8 @@ function compositionOptions() {
 
 function createApp(): LangyApp {
   return LangyApp.create({
-    dependencies: { commands: commands(), broadcast: testBroadcast() },
-    members: { prisma: undefined!, redis: null },
+    dependencies: { presence: testPresence() },
+    members: { prisma: undefined!, redis: null, eventing: producerEventing() },
     config: { agentUrl: undefined, internalSecret: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
     repositories: {} as LangyRepositories,
@@ -232,9 +239,44 @@ function createApp(): LangyApp {
 }
 
 /** The live-edge collaborators the application takes; these suites never use them. */
-function testBroadcast() {
+function testPresence(): PresenceApi {
   return {
+    isEnabledForProject: () => Promise.resolve(true),
+    update: () => Promise.resolve(),
+    leave: () => Promise.resolve(),
+    list: () => Promise.resolve([]),
+    broadcastCursor: () => Promise.resolve(),
+    events: async function* () {},
+    cursors: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
+}
+
+/** Records what a producer enqueued; a producer-only process starts no consumer. */
+function recordingQueue() {
+  const factory = (
+    _definition: EventSourcedQueueDefinition<Record<string, unknown>>,
+  ): EventSourcedQueueProcessor<Record<string, unknown>> => ({
+    async send() {},
+    async sendBatch() {},
+    async waitUntilReady() {},
+    async close() {},
+  });
+  return { factory };
+}
+
+/**
+ * A real, minimal producer-only `EventSourcing`: `EventSourcing` holds
+ * private state, so only a real instance satisfies its type.
+ */
+function producerEventing(): EventSourcing {
+  return new EventSourcing({
+    enabled: true,
+    eventStore: EventStoreProducerOnly.create({ processName: "langwatch-test" }),
+    queueFactory: recordingQueue().factory,
+    consumersEnabled: false,
+    executionTarget: "api",
+    processManagerMode: "producer-only",
+  });
 }

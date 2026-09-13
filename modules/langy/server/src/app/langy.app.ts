@@ -24,10 +24,7 @@ import {
 } from "@langwatch/langy-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import {
-  PresenceBroadcastFabric,
-  type PresenceTenantEmitter,
-} from "@langwatch/presence-contract";
+import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
@@ -40,7 +37,7 @@ import {
 } from "../services/langy-turn-tail.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
-import { LangyConversationCommands } from "./langy.members.ts";
+import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -62,10 +59,10 @@ type LangyAppDependencies = {
   redis: LangyRedis | null;
   /**
    * The SAME per-tenant fabric presence publishes on, reached through its
-   * narrow peer token: both live channels ride one emitter per tenant rather
+   * module API: both live channels ride one emitter per tenant rather
    * than a second of their own.
    */
-  broadcast: PresenceBroadcastFabric;
+  presence: PresenceApi;
 };
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
@@ -106,20 +103,22 @@ type LangySetup = FeatureSetup<
 export class LangyApp implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
   /**
-   * `commands` is the agent-pipeline dispatcher shared with the `scenario`
-   * feature; its composition root keeps building it, exactly as the deleted
-   * hand composition did (`composedAgentPipelines.langyConversations`) —
-   * this only names the shape Langy takes it in. `broadcast` is the SAME
-   * per-tenant fabric presence publishes on, reached through its narrow peer
-   * token rather than a second fabric of Langy's own.
+   * `presence` is the SAME per-tenant fabric presence publishes on, reached
+   * through its module API rather than a second fabric of Langy's own.
    */
   static readonly dependencies = {
-    commands: LangyConversationCommands,
-    broadcast: PresenceBroadcastFabric,
+    presence: PresenceApi,
   };
   static readonly configSchema = langyServerConfigSchema;
-  /** Everything else this application needs is built from these two, in `create`. */
-  static readonly reads = reads("prisma", "redis");
+  /**
+   * `eventing` is the agent-pipeline dispatcher's own producer registration
+   * (`langy-eventing.build.ts`): the twenty-two conversation writes this
+   * module now registers and dispatches itself, exactly as the deleted hand
+   * composition did (`composedAgentPipelines.langyConversations`) — only
+   * inside the module that reads it rather than a process composition root.
+   * Everything else this application needs is built from `prisma`/`redis`.
+   */
+  static readonly reads = reads("prisma", "redis", "eventing");
 
   static create(setup: LangySetup): LangyApp {
     const built = buildLangyInfrastructure({
@@ -128,15 +127,19 @@ export class LangyApp implements LangyApiContract {
       repositories: setup.repositories,
     });
     const adapter = PostgresLangyAdapter.create({ database: setup.members.prisma });
+    const commands = buildLangyConversationCommands({
+      eventing: setup.members.eventing,
+      processName: "langy",
+    });
     const langy = adapter.build({
       ...built,
-      commands: setup.dependencies.commands,
+      commands,
     });
     return new LangyApp({
       langy,
       repositories: setup.repositories,
       redis: setup.members.redis,
-      broadcast: setup.dependencies.broadcast,
+      presence: setup.dependencies.presence,
     });
   }
 
@@ -460,12 +463,12 @@ export class LangyApp implements LangyApiContract {
 
   /** The tenant's conversation-update signals. */
   conversationUpdates(projectId: string): PresenceTenantEmitter {
-    return this.dependencies.broadcast.getTenantEmitter(projectId);
+    return this.dependencies.presence.getTenantEmitter(projectId);
   }
 
   /** Releases the tenant emitter this subscription borrowed. */
   releaseConversationUpdates(projectId: string): void {
-    this.dependencies.broadcast.cleanupTenantEmitter(projectId);
+    this.dependencies.presence.cleanupTenantEmitter(projectId);
   }
 
   /**

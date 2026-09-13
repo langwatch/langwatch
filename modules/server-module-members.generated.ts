@@ -30,7 +30,7 @@ export const serverModuleMembers = {
   github: [],
   "hosted-mcp": [],
   identity: ["eventing", "prisma"],
-  langy: ["prisma", "redis"],
+  langy: ["eventing", "prisma", "redis"],
   log: [],
   metric: [],
   "model-provider": [],
@@ -52,5 +52,5 @@ export const serverModuleMembers = {
   trace: ["clickhouse", "eventing", "logger"],
   user: [],
   webhook: [],
-  workflow: ["prisma"],
+  workflow: ["encryption", "prisma"],
 } as const;
