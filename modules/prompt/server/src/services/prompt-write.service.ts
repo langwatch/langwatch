@@ -64,7 +64,12 @@ export type CreatePromptParams = {
   reasoning?: string;
   verbosity?: string;
   promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
-  demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
+  // The dataset shape lives one level up, on the wire command
+  // (`z.unknown()` in `CreatePromptCommand`, the workflow dataset schema in
+  // the tRPC input) - this layer only ever forwards it into
+  // `transformToDbFormat`, which is itself `Record<string, unknown>` in and
+  // out, so narrowing here would just be an unenforced promise.
+  demonstrations?: unknown;
   commitMessage?: string | null;
   parameters?: Record<string, unknown>;
 };
