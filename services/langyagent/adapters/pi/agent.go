@@ -11,13 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
-	"go.uber.org/zap"
 )
 
 // progressInterval is the heartbeat cadence:
