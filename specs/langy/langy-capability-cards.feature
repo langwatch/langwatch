@@ -402,6 +402,15 @@ Feature: Langy renders domain-capability cards for tool calls
       Then each paragraph appears once, where it was written
       And no closing paragraph is added after the last call
 
+    @unit
+    Scenario: A line Langy wrote is shown once
+      Given a turn that said four lines with the say tool and then wrote a reply repeating three of them
+      And the proposal was both said and passed as the question of its question card
+      When the turn is recorded
+      Then each said line appears once, where it was said
+      And the reply keeps only the lines that were not said
+      And the proposal is drawn by its question card alone
+
     # Two paths finish a turn and race each other: the live relay's terminal
     # frame, and the agent's own post over HTTP. The record keeps whichever
     # lands first, so the order must not be read by one of them. It is read
