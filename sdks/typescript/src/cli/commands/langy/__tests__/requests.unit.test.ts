@@ -90,6 +90,46 @@ describe("given the share-control command", () => {
       ).toThrow(/filesystem root/);
     });
 
+    /** @scenario "A folder uv manages names uv as its package manager" */
+    it("names uv for a lock file, a tool.uv table, or a virtual environment uv made", () => {
+      const withLock = path.join(base, "with-lock");
+      fs.mkdirSync(withLock);
+      fs.writeFileSync(path.join(withLock, "package-lock.json"), "");
+      fs.writeFileSync(path.join(withLock, "uv.lock"), "");
+      expect(packageManagerOf(withLock)).toBe("uv");
+
+      const withTable = path.join(base, "with-table");
+      fs.mkdirSync(withTable);
+      fs.writeFileSync(
+        path.join(withTable, "pyproject.toml"),
+        '[project]\nname = "acme"\n\n[tool.uv]\ndev-dependencies = []\n',
+      );
+      expect(packageManagerOf(withTable)).toBe("uv");
+
+      // The r38 checkout: a pyproject with no uv table, no lock file, and a
+      // venv uv made. Nothing else names a manager, and that venv has no pip.
+      const withVenv = path.join(base, "with-venv");
+      fs.mkdirSync(path.join(withVenv, ".venv"), { recursive: true });
+      fs.writeFileSync(
+        path.join(withVenv, "pyproject.toml"),
+        '[project]\nname = "acme"\n\n[build-system]\nrequires = ["hatchling"]\n',
+      );
+      fs.writeFileSync(
+        path.join(withVenv, ".venv", "pyvenv.cfg"),
+        "home = /opt/python/bin\nimplementation = CPython\nuv = 0.10.12\nversion_info = 3.13.0\n",
+      );
+      expect(packageManagerOf(withVenv)).toBe("uv");
+
+      const plainVenv = path.join(base, "plain-venv");
+      fs.mkdirSync(path.join(plainVenv, ".venv"), { recursive: true });
+      fs.writeFileSync(
+        path.join(plainVenv, ".venv", "pyvenv.cfg"),
+        "home = /opt/python/bin\nversion = 3.12.1\n",
+      );
+      fs.writeFileSync(path.join(plainVenv, "requirements.txt"), "");
+      expect(packageManagerOf(plainVenv)).toBe("pip");
+    });
+
     it("reads the folder's package manager and git state", () => {
       const root = path.join(base, "project");
       fs.mkdirSync(root);

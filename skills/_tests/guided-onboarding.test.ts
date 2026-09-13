@@ -530,7 +530,7 @@ describe("the guided-onboarding skill", () => {
       expect(install).toBeGreaterThan(branch);
       expect(tracingItem).toBeGreaterThan(install);
       const how = rendered.indexOf(
-        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager. For Python the install is a ladder, not one command: `uv add langwatch` when the folder has a `uv.lock` or the workspace facts name uv; otherwise the folder's own interpreter first, `.venv/bin/python -m pip install langwatch` when `.venv` exists, then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`, stopping at the first that works.",
+        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager. For Python the install is a ladder, not one command, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it); otherwise the folder's own interpreter, `.venv/bin/python -m pip install langwatch` when `.venv` exists; and only after those the interpreter's pip, `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`, stopping at the first that works. The interpreter's pip never runs before the named manager or the folder's own interpreter.",
       );
       const tracingStep = rendered.indexOf("2. `tracing` for the detected framework.");
       expect(how).toBeGreaterThan(-1);
@@ -895,6 +895,22 @@ describe("the guided-onboarding skill", () => {
       expect(section).toContain("`gh` not signed in is not a dead end");
       expect(rendered).toContain(
         "When the workspace facts say `git: not a repository`, there is no branch to make: that is the first unlock question of \"When a step fails\", asked before any command of this step.",
+      );
+    });
+
+    /** @scenario "The manager the facts name is the first rung of the install ladder" */
+    it("installs through the manager the facts name before any pip spelling", () => {
+      expect(rendered).toContain(
+        "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it)",
+      );
+      expect(rendered).toContain(
+        "The interpreter's pip never runs before the named manager or the folder's own interpreter.",
+      );
+      const tracing = renderSkill(
+        listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!,
+      );
+      expect(tracing).toContain(
+        "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line",
       );
     });
 

@@ -108,14 +108,40 @@ const quiet = (command: string, args: string[], cwd: string): string | null => {
 };
 
 /** The lockfile that says which package manager the folder uses. */
+/** The file's text, or nothing when it is not there or cannot be read. */
+function readText(file: string): string {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * uv owns a Python folder when its lock file is there, when `pyproject.toml`
+ * carries a `[tool.uv]` table, or when the virtual environment was made by
+ * uv: its `pyvenv.cfg` carries a `uv = <version>` line. The last one matters
+ * most, because a venv uv made has no pip in it, so every pip spelling fails
+ * there while `uv add` works.
+ */
+function uvOwns(root: string): boolean {
+  if (fs.existsSync(path.join(root, "uv.lock"))) return true;
+  if (/^\[tool\.uv[\].]/m.test(readText(path.join(root, "pyproject.toml")))) {
+    return true;
+  }
+  return /^uv\s*=/m.test(readText(path.join(root, ".venv", "pyvenv.cfg")));
+}
+
 export function packageManagerOf(root: string): string | undefined {
+  // uv wins over every other signal: a folder with a JS lockfile beside its
+  // Python project still installs the Python package through uv.
+  if (uvOwns(root)) return "uv";
   const lockfiles: Array<[string, string]> = [
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["bun.lockb", "bun"],
     ["bun.lock", "bun"],
     ["package-lock.json", "npm"],
-    ["uv.lock", "uv"],
     ["poetry.lock", "poetry"],
     ["Pipfile.lock", "pipenv"],
     ["requirements.txt", "pip"],

@@ -638,6 +638,16 @@ Feature: Langy guides the first setup after sign-up
     # A run ended on "this folder does not have the pip package manager
     # available" after one `pip install` answered 127: pip3, python -m pip and
     # uv were never tried.
+    # A film ran python3 -m pip first in a folder whose venv uv had made,
+    # where pip is not installed, and reached uv add only on the second try.
+    @unit
+    Scenario: The manager the facts name is the first rung of the install ladder
+      When the compiled guided-onboarding skill is read
+      Then the install ladder starts with the manager the workspace facts name
+      And uv is that manager when the facts name it, the folder has a uv.lock, or the virtual environment was made by uv
+      And the interpreter's pip spellings come only after the named manager and the folder's own interpreter
+      And the tracing skill says the same
+
     @unit
     Scenario: A missing pip climbs the install ladder before it asks
       When the compiled guided-onboarding skill is read

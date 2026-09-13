@@ -372,6 +372,14 @@ describe("the folder facts code_access renders", () => {
     });
   });
 
+  describe("when uv manages the folder", () => {
+    /** @scenario "A folder uv manages names uv as its package manager" */
+    it("names uv as the package manager, the first rung of the install ladder", () => {
+      const text = renderWorkspaceFacts({ ...folder, packageManager: "uv" });
+      expect(text).toContain("package manager: uv");
+    });
+  });
+
   describe("when the folder is not a repository", () => {
     /** @scenario "A folder that is not a repository says so in its facts" */
     it("says so in one line and leaves out the branch, remote and dirty lines", () => {

@@ -124,6 +124,16 @@ Feature: Langy works in a folder shared from the developer's machine
       Then Langy learns the folder root, the git branch and remote, whether the tree is dirty, the operating system, the node and python versions, whether the GitHub CLI is signed in and the package manager
       And Langy does not spend a turn asking the folder for those
 
+    # The facts read the manager off a lock file, and a uv project with its
+    # lock file ignored, or not written yet, read as unknown: the venv uv made
+    # is the signal, and that venv has no pip in it.
+    @unit
+    Scenario: A folder uv manages names uv as its package manager
+      Given a folder with a uv.lock, or a pyproject.toml with a tool.uv table, or a .venv whose pyvenv.cfg names uv
+      When the CLI describes the folder
+      Then the facts name uv as the package manager, before any lock file of another language
+      And a plain venv beside a requirements.txt still names pip
+
     @integration
     Scenario: The connection survives a network blip
       Given a connected folder
