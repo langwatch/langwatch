@@ -3,39 +3,43 @@
 Written 2026-09-13 ~18:30, coordinator handing off mid-run. Two live items
 need picking up within minutes of reading this; they are first.
 
-## LIVE ITEM 1 — a clean apidiff run is IN FLIGHT (attempt 4, relaunched ~18:45)
+## LIVE STATE (rewritten ~21:15, this session)
 
-Attempt 3 (`.apidiff/20260913-182700`) died at branch boot health: the
-handover commit's tRPC-door change left `bootApiProcess` non-async around its
-own `await` - a module-load SyntaxError. Fixed in `277d5d6529` (one word,
-link probe clean). Attempt 4:
+The install-order queue is DONE and the boot walk moved past modules into
+transport mounting. Both processes' remaining walls are NAMED:
 
-    output:     /private/tmp/claude-502/-Users-lw-Source-github-com-langwatch-langwatch/8d4b2972-b4c3-4e41-91f1-23d460ef2057/tasks/b46gkmyzt.output
-    report (if it prints): /Users/lw/.claude/jobs/cbbfd403/tmp/apidiff-report.json
+- **api**: `REST POST /api/query/` declares the fact
+  `langWatchQLCallerProtections` and nothing binds it - the deleted
+  composition's API-key protections resolver never made it into the analytics
+  module. Lane `analytics-apikey-protections` (sonnet, active) is porting it;
+  manifest names the exact `git show` sources. After it lands: solo api boot
+  (throwaway gateway secrets in the shell - this machine's .env placeholders
+  correctly refuse), then a clean apidiff run.
+- **worker**: `Aggregate type "trace" is registered twice` - the trace module
+  (eventing member, producer registration in trace-composition.build.ts:113)
+  collides with the worker's hand-wired full processing pipeline
+  (worker-production.composition.ts ~1369). A DESIGN DECISION: who owns the
+  worker's one trace_processing registration. Do not paper over it; it is the
+  trace module's worker-capability conversion.
 
-Full clean run (no -keep, no reuse): install both sides ~4 min, migrate,
-seed, boot both, probe, compare. Read the output file's tail. Verdicts:
-- **exit 1 + report file = SUCCESS** — the drive's first-ever report. Copy
-  the report somewhere durable (the jobs tmp dir dies with its job), then
-  work its findings (see "After the report").
-- exit 2 "health branch" — read the LAST error in
-  `<work-root>/logs/branch.log` **comparing timestamps** (the file survives
-  reruns; a stale error from an earlier run sits above the real one — this
-  cost us twice today).
-- exit 2 at "install branch: ERR_PNPM_OUTDATED_LOCKFILE" — a lane edited a
-  package.json mid-window again; see LIVE ITEM 2, re-sync (`pnpm install`,
-  announce it first), re-launch the same command:
+Landed this evening (each boot-verified to the next wall): 277d5d6529 async
+boot seam · 2b2224d1c4 + 85dd29e3bc failed boots EXIT (the zombie/pool-spam
+plague is dead - do not re-diagnose "Cannot use a pool" as anything else) ·
+148fa2ad69 + b8a69d0bf9 workflow conversion (builds its own service graph) ·
+7e6999d729 monitor+evaluator into the shared observability app, evaluation
+declares them as peers · 7b7f9b6cf1 production reads them off the shared
+runtime · 3873921a8a the agent graph's studio pair (workflow+evaluator) as
+ONE app, evaluator mini-app deleted · 7a7e741972 langy declared peers ·
+a91fac119c workflow api config slice · 94606926bf door-shape fact split +
+named refusal (the "binds a fact that is undefined" error now names the
+namespace).
 
-    .bin/apidiff/apidiff run -no-haven -main-ref origin/main -json -report <file>
-
-## LIVE ITEM 2 — the package.json freeze is LIFTED (all-clear sent ~18:45)
-
-Attempt 3 got through install before dying, so the lockfile window closed;
-the all-clear went to the sibling ("visualdiff" in ListAgents) with the boot
-failure named as ours. Their lanes may edit package.json again, which means
-**attempt 4 can die at `ERR_PNPM_OUTDATED_LOCKFILE` in install** - if it
-does, announce a `pnpm install` on the channel, run it, relaunch the same
-command. Their worker solo boot was told to launch.
+USER DIRECTION (binding): no hand-wired LocalFeatureApis/.declare/.withProvided
+peer plumbing for module instances; consolidate into shared createApp installs;
+slice work small on cheap models. The visualdiff coordinator is gone; this
+session holds both drives; the worker-consolidate-scenario-workflow lane's
+scenario half remains blocked on scenario's bespoke bag (its handoff has the
+evidence).
 
 ## What today established (do not re-derive)
 
