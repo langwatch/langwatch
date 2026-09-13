@@ -6,11 +6,7 @@ import { adminRest } from "#transport/admin.rest";
 import { bugReportCredential, opsBugReportRest } from "#transport/ops-bug-report.rest";
 import { opsBugReportTrpcTransport } from "#transport/ops-bug-report.trpc";
 import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
-import { opsDashboardTrpcTransport } from "#transport/ops-dashboard.trpc";
-import { opsEventLogTrpcTransport } from "#transport/ops-event-log.trpc";
-import { opsPlatformTrpcTransport } from "#transport/ops-platform.trpc";
-import { opsProcessTrpcTransport } from "#transport/ops-process.trpc";
-import { opsQueueTrpcTransport } from "#transport/ops-queue.trpc";
+import { opsTrpcTransport } from "#transport/ops.trpc";
 
 export const opsServer = defineServerModule("ops")
   .withRepositories(opsRepositories)
@@ -19,11 +15,7 @@ export const opsServer = defineServerModule("ops")
     adminRest,
     opsBugReportRest,
     opsClickHouseExplainRest,
-    opsDashboardTrpcTransport,
-    opsQueueTrpcTransport,
-    opsProcessTrpcTransport,
-    opsEventLogTrpcTransport,
-    opsPlatformTrpcTransport,
+    opsTrpcTransport,
     opsBugReportTrpcTransport,
   )
   // The intake is public - the reporter may be struggling because setup

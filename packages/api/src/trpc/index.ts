@@ -4,6 +4,12 @@
 // exported from their own entrypoints.
 
 export {
+  composeTrpcRouters,
+  type ComposableTrpcRouter,
+  type ComposedTrpcContract,
+} from "./compose.ts";
+
+export {
   bindTrpcFact,
   bindTrpcHeader,
   browserSessionFact,

@@ -21,6 +21,7 @@ import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsProcessTrpcTransport } from "../ops-process.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
+import { opsTrpcTransport } from "../ops.trpc.ts";
 
 type Declaration = { router: TrpcRouterMount<never, never> };
 
@@ -252,6 +253,30 @@ describe("the ops tRPC declarations", () => {
 
       expect(Object.keys(facts).sort()).toEqual(Object.keys(OPS_PROCEDURES).sort());
       expect(Object.values(facts).every((names) => names.includes("opsOperator"))).toBe(true);
+    });
+  });
+
+  /**
+   * Five declarations, one claim: a process mounts one router per namespace,
+   * so what the parts declare has to arrive as a single declaration. A part
+   * that fell out of the composition would leave its procedures unreachable
+   * with nothing failing at boot to say so.
+   */
+  describe("given the one declaration the process mounts", () => {
+    it("claims the ops namespace once, over every part's procedures", () => {
+      expect(opsTrpcTransport.namespace).toBe("ops");
+      expect(Object.keys(opsTrpcTransport.contract.members).sort()).toEqual(
+        Object.keys(OPS_PROCEDURES).sort(),
+      );
+    });
+
+    it("binds each procedure with the access and the facts its own part declared", () => {
+      expect(boundAccess(opsTrpcTransport)).toEqual(
+        Object.assign({}, ...OPS_TRANSPORTS.map(boundAccess)),
+      );
+      expect(boundFacts(opsTrpcTransport)).toEqual(
+        Object.assign({}, ...OPS_TRANSPORTS.map(boundFacts)),
+      );
     });
   });
 

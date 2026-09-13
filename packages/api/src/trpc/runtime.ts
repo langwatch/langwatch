@@ -391,11 +391,17 @@ export type TrpcRouterMount<Api, Contract extends TrpcContract> = <TContext exte
   TRPCDecorateCreateRouterOptions<TrpcContractProcedures<Contract>>
 >;
 
-/** The inert declaration a feature installer retains and a process mounts. */
+/**
+ * The inert declaration a feature installer retains and a process mounts. It
+ * carries the contract it was built from: the declaration is what composition
+ * and the sweeps are handed, and both have to be able to ask what it declares
+ * without importing the contract a second time.
+ */
 export type TrpcRouterDeclaration<Api, Contract extends TrpcContract> = Readonly<{
   readonly protocol: "trpc";
   readonly api: TrpcFeatureApiWitness<Api>;
   readonly namespace: Contract["namespace"];
+  readonly contract: Contract;
   readonly router: TrpcRouterMount<Api, Contract>;
 }>;
 
@@ -622,6 +628,7 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       protocol: "trpc",
       api,
       namespace: contract.namespace,
+      contract,
       router: mountRouter<Api, Contract>(contract, implementations),
     }),
   } as TrpcRouterBuilder<Api, Contract, Implemented>;

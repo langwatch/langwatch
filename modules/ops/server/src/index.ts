@@ -191,11 +191,10 @@ export {
 export { opsBugReportRest, bugReportCredential } from "./transport/ops-bug-report.rest.ts";
 export { opsClickHouseExplainRest } from "./transport/ops-clickhouse-explain.rest.ts";
 export { opsOperatorFact } from "./transport/ops-operator.trpc.ts";
-export { opsDashboardTrpcTransport } from "./transport/ops-dashboard.trpc.ts";
-export { opsQueueTrpcTransport } from "./transport/ops-queue.trpc.ts";
-export { opsProcessTrpcTransport } from "./transport/ops-process.trpc.ts";
-export { opsEventLogTrpcTransport } from "./transport/ops-event-log.trpc.ts";
-export { opsPlatformTrpcTransport } from "./transport/ops-platform.trpc.ts";
+// The five `ops` fragments are composed into one namespace claim, and only the
+// composition is published: a process that mounted a fragment on its own would
+// claim `ops` a second time.
+export { opsTrpcTransport } from "./transport/ops.trpc.ts";
 export { opsBugReportTrpcTransport } from "./transport/ops-bug-report.trpc.ts";
 
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the

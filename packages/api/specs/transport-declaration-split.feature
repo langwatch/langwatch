@@ -308,3 +308,15 @@ Feature: Transport declaration split
     When their sources are read
     Then none names TContext, TRoot, TOptions, a mount type or a tRPC root
     And the process mount binds the framework's request context on its own side
+
+  @unit
+  Scenario: A namespace too large for one declaration is claimed once
+    Given two routers built under the same namespace
+    When the process mounts the composition of them
+    Then it serves every procedure both routers declared, on one router
+
+  @unit
+  Scenario: Two routers that declare the same procedure are refused
+    Given two routers under one namespace that both declare "getById"
+    When they are composed
+    Then the composition is refused, naming the procedure
