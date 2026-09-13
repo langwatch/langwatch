@@ -117,28 +117,28 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
   # neither still logs in at the interval it was given.
   # ---------------------------------------------------------------------------
 
-  @unit @cli @device-flow @login-latency
+  @unit
   Scenario: The CLI asks once before it starts waiting
     Given the CLI has a device_code and the user approves in the browser at once
     When the CLI starts waiting for the approval
     Then it polls "/api/auth/cli/exchange" before its first wait
     And the login finishes without costing a whole poll interval
 
-  @unit @cli @device-flow @login-latency
+  @unit
   Scenario: The approval stream cuts the wait short
     Given the CLI is waiting between polls
     When the approval stream emits a frame for its device_code
     Then the CLI polls "/api/auth/cli/exchange" straight away
     And it does not treat the frame as the approval itself
 
-  @unit @cli @device-flow @login-latency
+  @unit
   Scenario: A server without the approval stream still logs in
     Given the control plane has no "/api/auth/cli/device-approval" route
     When the CLI waits for the approval
     Then it keeps polling at the interval the server asked for
     And the missing stream changes nothing about the outcome
 
-  @integration @cli @device-flow @login-latency
+  @integration
   Scenario: The approval stream tells the CLI to poll the moment the browser settles the code
     Given the CLI is on "/api/auth/cli/device-approval" for its device_code
     When the browser approves or denies that code
@@ -147,7 +147,7 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And an unknown code is reported as expired rather than held open
     And the pod refuses a new stream once it holds too many, so the CLI polls
 
-  @integration @cli @device-flow @login-latency
+  @integration
   Scenario: A publication is lost if the stream has not subscribed yet
     Given a device code settles before the stream subscribes to its channel
     When the stream subscribes afterwards
@@ -156,21 +156,21 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And a settlement published after that point is always heard, so the re-read
       covers the whole gap
 
-  @integration @cli @device-flow @login-latency @rate-limit
+  @integration
   Scenario: A poll on a settled device code is answered, not rate limited
     Given the CLI polled once and is inside the per-device poll window
     When the code is approved or denied and the CLI polls again straight away
     Then the response carries the settled outcome instead of 429
     And a code still pending inside that window is told to slow down
 
-  @integration @cli @device-flow @login-latency
+  @integration
   Scenario: Two exchanges racing the same approval redeem it once
     Given a device code has been approved
     When two exchange calls for that code arrive at the same time
     Then exactly one of them receives the credential
     And the other is told to slow down instead of receiving a second one
 
-  @unit @cli @device-flow @login-latency
+  @unit
   Scenario: An approval that lands during a poll still cuts the next wait short
     Given the CLI has a poll in flight
     When the approval stream emits a frame before that poll answers
