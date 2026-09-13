@@ -13446,6 +13446,7 @@ const (
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeCancelled         PostLangyControlFramesJSONBodyFrames2ErrorCode = "cancelled"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeCommandRefused    PostLangyControlFramesJSONBodyFrames2ErrorCode = "command_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeExecFailed        PostLangyControlFramesJSONBodyFrames2ErrorCode = "exec_failed"
+	PostLangyControlFramesJSONBodyFrames2ErrorCodeKeyRefused        PostLangyControlFramesJSONBodyFrames2ErrorCode = "key_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeNotFound          PostLangyControlFramesJSONBodyFrames2ErrorCode = "not_found"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodePathRefused       PostLangyControlFramesJSONBodyFrames2ErrorCode = "path_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodePermissionDenied  PostLangyControlFramesJSONBodyFrames2ErrorCode = "permission_denied"
@@ -13461,6 +13462,8 @@ func (e PostLangyControlFramesJSONBodyFrames2ErrorCode) Valid() bool {
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeCommandRefused:
 		return true
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeExecFailed:
+		return true
+	case PostLangyControlFramesJSONBodyFrames2ErrorCodeKeyRefused:
 		return true
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeNotFound:
 		return true
@@ -13807,6 +13810,21 @@ const (
 func (e PollLangyControlSession200JSONResponseBodyFrames2Call6Tool) Valid() bool {
 	switch e {
 	case LocalLs:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PollLangyControlSession200JSONResponseBodyFrames2Call7Tool.
+const (
+	LocalLangwatchEnv PollLangyControlSession200JSONResponseBodyFrames2Call7Tool = "local_langwatch_env"
+)
+
+// Valid indicates whether the value is a known member of the PollLangyControlSession200JSONResponseBodyFrames2Call7Tool enum.
+func (e PollLangyControlSession200JSONResponseBodyFrames2Call7Tool) Valid() bool {
+	switch e {
+	case LocalLangwatchEnv:
 		return true
 	default:
 		return false
@@ -16255,8 +16273,9 @@ type PostApiAgentCacheByNameClaimJSONBody struct {
 
 // PostApiAnalyticsJSONBody defines parameters for PostApiAnalytics.
 type PostApiAnalyticsJSONBody struct {
-	EndDate float32 `json:"endDate"`
-	Filters *struct {
+	EndDate        float32   `json:"endDate"`
+	ExcludeOrigins *[]string `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             PostApiAnalyticsJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation"`
 		EvaluationsEvaluatorId               PostApiAnalyticsJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id"`
 		EvaluationsEvaluatorIdGuardrailsOnly PostApiAnalyticsJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only"`
@@ -17163,8 +17182,9 @@ type PostApiAnalytics403JSONResponseBody struct {
 
 // PostApiAnalyticsTimeseriesJSONBody defines parameters for PostApiAnalyticsTimeseries.
 type PostApiAnalyticsTimeseriesJSONBody struct {
-	EndDate PostApiAnalyticsTimeseriesJSONBody_EndDate `json:"endDate"`
-	Filters *struct {
+	EndDate        PostApiAnalyticsTimeseriesJSONBody_EndDate `json:"endDate"`
+	ExcludeOrigins *[]string                                  `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             *PostApiAnalyticsTimeseriesJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiAnalyticsTimeseriesJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiAnalyticsTimeseriesJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -20088,6 +20108,7 @@ type PostApiGatewayV1VirtualKeysJSONBody struct {
 	Name            string                                          `json:"name"`
 	PrincipalUserId *string                                         `json:"principal_user_id,omitempty"`
 	Purpose         *PostApiGatewayV1VirtualKeysJSONBodyPurpose     `json:"purpose,omitempty"`
+	RevealOnce      *bool                                           `json:"reveal_once,omitempty"`
 	RoutingMode     *PostApiGatewayV1VirtualKeysJSONBodyRoutingMode `json:"routing_mode,omitempty"`
 	RoutingPolicyId *string                                         `json:"routing_policy_id,omitempty"`
 	Scopes          *[]struct {
@@ -23632,9 +23653,10 @@ type PostApiTeamsByIdMembersJSONBodyRole string
 // PostApiTracesSearchJSONBody defines parameters for PostApiTracesSearch.
 type PostApiTracesSearchJSONBody struct {
 	// DateField Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
-	DateField *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
-	EndDate   PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
-	Filters   *struct {
+	DateField      *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
+	EndDate        PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
+	ExcludeOrigins *[]string                             `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             *PostApiTracesSearchJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -25469,13 +25491,26 @@ type PollLangyControlSession200JSONResponseBodyFrames2Call1Tool string
 // PollLangyControlSession200JSONResponseBodyFrames2Call2 defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBodyFrames2Call2 struct {
 	Params struct {
-		Edits []struct {
-			NewText string `json:"newText"`
-			OldText string `json:"oldText"`
-		} `json:"edits"`
-		Path string `json:"path"`
+		Edits []PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item `json:"edits"`
+		Path  string                                                                         `json:"path"`
 	} `json:"params"`
 	Tool PollLangyControlSession200JSONResponseBodyFrames2Call2Tool `json:"tool"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 struct {
+	NewText string `json:"newText"`
+	OldText string `json:"oldText"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 struct {
+	Append string `json:"append"`
+}
+
+// PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item struct {
+	union json.RawMessage
 }
 
 // PollLangyControlSession200JSONResponseBodyFrames2Call2Tool defines parameters for PollLangyControlSession.
@@ -25535,6 +25570,17 @@ type PollLangyControlSession200JSONResponseBodyFrames2Call6 struct {
 
 // PollLangyControlSession200JSONResponseBodyFrames2Call6Tool defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBodyFrames2Call6Tool string
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call7 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call7 struct {
+	Params struct {
+		Path *string `json:"path,omitempty"`
+	} `json:"params"`
+	Tool PollLangyControlSession200JSONResponseBodyFrames2Call7Tool `json:"tool"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call7Tool defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call7Tool string
 
 // PollLangyControlSession200JSONResponseBody_Frames_2_Call defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBody_Frames_2_Call struct {
@@ -64116,6 +64162,68 @@ func (t *PostLangyControlFramesJSONBody_Frames_Item) UnmarshalJSON(b []byte) err
 	return err
 }
 
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as a PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0() (PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as a PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1() (PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPollLangyControlSession200JSONResponseBodyFrames2Call0 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as a PollLangyControlSession200JSONResponseBodyFrames2Call0
 func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call) AsPollLangyControlSession200JSONResponseBodyFrames2Call0() (PollLangyControlSession200JSONResponseBodyFrames2Call0, error) {
 	var body PollLangyControlSession200JSONResponseBodyFrames2Call0
@@ -64288,6 +64396,32 @@ func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) FromPollLangy
 
 // MergePollLangyControlSession200JSONResponseBodyFrames2Call6 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call6
 func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) MergePollLangyControlSession200JSONResponseBodyFrames2Call6(v PollLangyControlSession200JSONResponseBodyFrames2Call6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call7 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as a PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call) AsPollLangyControlSession200JSONResponseBodyFrames2Call7() (PollLangyControlSession200JSONResponseBodyFrames2Call7, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call7
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call7 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as the provided PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) FromPollLangyControlSession200JSONResponseBodyFrames2Call7(v PollLangyControlSession200JSONResponseBodyFrames2Call7) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call7 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) MergePollLangyControlSession200JSONResponseBodyFrames2Call7(v PollLangyControlSession200JSONResponseBodyFrames2Call7) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -94206,7 +94340,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		Secret     string `json:"secret"`
+		// Preview With `reveal_once`: the key's display prefix, safe to show in place of the secret.
+		Preview *string `json:"preview,omitempty"`
+
+		// RevealId With `reveal_once`: the id that serves the secret once, through the app.
+		RevealId *string `json:"reveal_id,omitempty"`
+
+		// Secret The secret, absent when `reveal_once` was set.
+		Secret     *string `json:"secret,omitempty"`
 		VirtualKey struct {
 			Config        interface{} `json:"config,omitempty"`
 			CreatedAt     time.Time   `json:"created_at"`
@@ -118170,7 +118311,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			Secret     string `json:"secret"`
+			// Preview With `reveal_once`: the key's display prefix, safe to show in place of the secret.
+			Preview *string `json:"preview,omitempty"`
+
+			// RevealId With `reveal_once`: the id that serves the secret once, through the app.
+			RevealId *string `json:"reveal_id,omitempty"`
+
+			// Secret The secret, absent when `reveal_once` was set.
+			Secret     *string `json:"secret,omitempty"`
 			VirtualKey struct {
 				Config        interface{} `json:"config,omitempty"`
 				CreatedAt     time.Time   `json:"created_at"`
