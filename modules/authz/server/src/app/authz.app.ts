@@ -19,12 +19,16 @@ import type {
 } from "@langwatch/authz-contract";
 import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 import {
   PostgresAuthzAdapter,
+  type AuthzPipeline,
   type PostgresAuthzAdapterOptions,
 } from "./postgres-authz.build.ts";
+import { KsuidAuthzBindingIdAdapter } from "../services/authz-binding-id.service.ts";
+import { EventingAuthzCommandDispatcherAdapter } from "../services/authz-grants-command-dispatcher.service.ts";
 
 /**
  * Private server-side compatibility seam for callers whose legacy operations
@@ -43,26 +47,112 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
+/**
+ * The whole adapter surface, as a caller composing this graph BY HAND supplies
+ * it. The installed module no longer receives this: it reads the two members it
+ * needs and builds the rest itself (see {@link AuthzApp.create}). Kept because
+ * a hand composition is still a supported way to build AuthZ.
+ */
 export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
-export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzInfrastructure, undefined> &
+export type AuthzSetup = FeatureSetup<
+  Readonly<{}>,
+  MembersRead<typeof AuthzApp.reads>,
+  undefined
+> &
   Readonly<{ repositories: AuthzRepositories }>;
 
 /** The composed callable authorization boundary. */
 export class AuthzApp implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
+  /**
+   * `redis` is read rather than optional because the epoch counter behind the
+   * permission cache lives on it. A process without one would compose the same
+   * graph with caching off, but the member system has no optional member, and
+   * every process that installs AuthZ today opens Redis for other modules
+   * anyway — so asking for it states the dependency instead of hiding a
+   * silently uncached deployment behind a null.
+   */
+  static readonly reads = reads("prisma", "redis");
+
   #permissions: AuthzService;
   #grants: AuthzGrantsService;
-  private constructor(permissions: AuthzService, grants: AuthzGrantsService) {
+  /**
+   * Both absent on an app built by {@link AuthzApp.fromServices}: a hand
+   * composition registers the pipeline and connects the dispatcher itself, so
+   * it has no use for either and this app never holds one.
+   */
+  #dispatcher: EventingAuthzCommandDispatcherAdapter | undefined;
+  #pipeline: AuthzPipeline | undefined;
+
+  private constructor(
+    permissions: AuthzService,
+    grants: AuthzGrantsService,
+    eventing?: Readonly<{
+      pipeline: AuthzPipeline;
+      dispatcher: EventingAuthzCommandDispatcherAdapter;
+    }>,
+  ) {
     this.#permissions = permissions;
     this.#grants = grants;
+    this.#pipeline = eventing?.pipeline;
+    this.#dispatcher = eventing?.dispatcher;
   }
+
+  /**
+   * The definition this module's eventing declaration registers.
+   *
+   * Refuses rather than returning nothing, because the only app without one is
+   * the hand-composed app, and a hand composition that reached this would be
+   * asking the module to register a pipeline it is already registering itself.
+   */
+  eventingPipeline(): AuthzPipeline {
+    if (!this.#pipeline) {
+      throw new Error(
+        "This AuthzApp was composed from already-built services, so it holds no pipeline: " +
+          "the composition that built them registers its own.",
+      );
+    }
+    return this.#pipeline;
+  }
+
+  /**
+   * Builds the AuthZ graph over the two members this process opened.
+   *
+   * The dispatcher is constructed here and connected later, by the eventing
+   * declaration, because the senders it needs come from REGISTERING the
+   * pipeline this call produces. That order is not an accident of wiring: the
+   * composition deleted by b383462d96 did the same two steps, and said why —
+   * "the ledger's write path opens here and nowhere else: until `connect`
+   * runs, a grant change waits for the senders and then refuses with a
+   * ledger-unavailable error rather than silently taking the imperative Prisma
+   * path."
+   *
+   * `metrics` is deliberately not supplied. It is optional by design so that a
+   * process rendering no scrape endpoint composes the same graph and counts
+   * nothing; the cutover warning still logs and the revocation is still
+   * recorded, because the feature builds both from this input rather than
+   * receiving them ready-made.
+   */
   static create(setup: AuthzSetup): AuthzApp {
+    const dispatcher = EventingAuthzCommandDispatcherAdapter.create();
+    const bindingIds = KsuidAuthzBindingIdAdapter.create();
     const built = PostgresAuthzAdapter.create({
-      ...setup.members,
+      database: setup.members.prisma,
+      redis: setup.members.redis,
+      dispatcher,
+      newBindingId: () => bindingIds.newBindingId(),
       repositories: setup.repositories,
     }).build();
-    return new AuthzApp(built.authz, built.grants);
+    return new AuthzApp(built.authz, built.grants, { pipeline: built.pipeline, dispatcher });
+  }
+
+  /**
+   * Opens the ledger's write path, once the pipeline this app built has been
+   * registered and answered with its senders.
+   */
+  connectCommands(commands: Readonly<Record<string, unknown>>): void {
+    this.#dispatcher?.connect(EventingAuthzCommandDispatcherAdapter.sendersFrom(commands));
   }
 
   /**

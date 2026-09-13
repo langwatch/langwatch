@@ -1,6 +1,7 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { AuthzApp } from "./app/authz.app.ts";
+import { authzEventing } from "./eventing/authz.eventing.ts";
 import { authzRepositories } from "./repositories/authz-repositories.registry.ts";
 import { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
 import { authzTrpcTransport } from "./transport/authz.trpc.ts";
@@ -25,4 +26,5 @@ export const authzServer = defineServerModule("authz")
       };
     }),
   ])
+  .withEventing(authzEventing)
   .build();

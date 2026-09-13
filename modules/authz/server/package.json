@@ -28,16 +28,17 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/ksuid": "catalog:",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@trpc/server": "catalog:",
