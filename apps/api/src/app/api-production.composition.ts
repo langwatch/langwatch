@@ -138,6 +138,27 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
+    /** The blob backends, as the api already parses them; a Map becomes the JSON shape the schema reads. */
+    "stored-object": {
+      backend: config.infrastructure.storedObjects.backend,
+      localFilesystemRoot: config.infrastructure.storedObjects.localFilesystemRoot,
+      s3: config.infrastructure.storedObjects.s3,
+      azure: {
+        authMode: config.infrastructure.storedObjects.azure.authMode,
+        accountName: config.infrastructure.storedObjects.azure.accountName,
+        accountKey: config.infrastructure.storedObjects.azure.accountKey,
+        container: config.infrastructure.storedObjects.azure.container,
+        endpoint: config.infrastructure.storedObjects.azure.endpoint,
+        authorityHost: config.infrastructure.storedObjects.azure.authorityHost,
+        tokenAudience: config.infrastructure.storedObjects.azure.tokenAudience,
+        allowInsecureTokenEndpointForTests:
+          config.infrastructure.storedObjects.azure.allowInsecureTokenEndpointForTests,
+        identity: config.infrastructure.storedObjects.azure.identity,
+      },
+      azureSpoolRetentionConfirmed:
+        config.infrastructure.storedObjects.azureSpoolRetentionConfirmed,
+      routes: Object.fromEntries(config.infrastructure.storedObjects.routes),
+    },
     automation: {},
     log: {},
     "platform-health": config.platformHealth,

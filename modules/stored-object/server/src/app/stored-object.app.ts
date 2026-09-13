@@ -4,8 +4,11 @@
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
 import type { Readable } from "node:stream";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { z } from "zod";
+import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   DeleteProjectStoredObjectsResult,
   ReadStoredObjectResult,
@@ -67,30 +70,123 @@ export type StoredObjectInfrastructure = Readonly<{
   owners: StoredObjectOwnerResolver;
 }>;
 
+/**
+ * The `storedObjects.*` deployment block: which backend a NEW object is
+ * minted against (BYOC route, then the selected backend, then the documented
+ * single-replica filesystem fallback), and the S3/Azure connection details
+ * each backend needs. Mirrors `ApiStoredObjectsConfigResolution`
+ * (`apps/api/src/platform/config/api.config.ts`) field for field, with
+ * `routes` carried as a plain object keyed by organization id rather than a
+ * `Map` — a config schema parses JSON-shaped input, and a `Map` is not one.
+ */
+const storedObjectS3ConfigSchema = z.object({
+  bucket: z.string().optional(),
+  endpoint: z.string().optional(),
+  region: z.string().optional(),
+  accessKeyId: z.string().optional(),
+  secretAccessKey: z.string().optional(),
+  sessionToken: z.string().optional(),
+});
+
+const storedObjectAzureConfigSchema = z.object({
+  authMode: z.string().optional(),
+  accountName: z.string().optional(),
+  accountKey: z.string().optional(),
+  container: z.string().optional(),
+  endpoint: z.string().optional(),
+  authorityHost: z.string().optional(),
+  tokenAudience: z.string().optional(),
+  allowInsecureTokenEndpointForTests: z.boolean().default(false),
+  identity: z
+    .object({
+      tenantId: z.string().optional(),
+      clientId: z.string().optional(),
+      federatedTokenFile: z.string().optional(),
+    })
+    .default(() => ({})),
+});
+
+const storedObjectAppConfigSchema = z.object({
+  backend: z.enum(["s3", "azure"]).optional(),
+  localFilesystemRoot: z.string().optional(),
+  s3: storedObjectS3ConfigSchema.default(() => ({})),
+  azure: storedObjectAzureConfigSchema.default(() => ({
+    allowInsecureTokenEndpointForTests: false,
+    identity: {},
+  })),
+  azureSpoolRetentionConfirmed: z.boolean().default(false),
+  /** One organization's own S3 account, keyed by organization id. */
+  routes: z
+    .record(
+      z.string(),
+      z.object({
+        endpoint: z.string().optional(),
+        bucket: z.string().optional(),
+        accessKeyId: z.string().optional(),
+        secretAccessKey: z.string().optional(),
+      }),
+    )
+    .default(() => ({})),
+});
+export type StoredObjectAppConfig = z.infer<typeof storedObjectAppConfigSchema>;
+
+/** {@link StoredObjectSetup}'s members, once built into what the app composes over. */
+type StoredObjectDependencies = Record<never, never>;
+
 type StoredObjectSetup = FeatureSetup<
-  Record<never, never>,
-  StoredObjectInfrastructure,
-  undefined,
+  StoredObjectDependencies,
+  MembersRead<typeof StoredObjectApp.reads>,
+  StoredObjectAppConfig,
   StoredObjectRepositories
 >;
 
 export class StoredObjectApp implements StoredObjectApi {
   static readonly contract = StoredObjectApi;
   static readonly dependencies = {};
+  static readonly configSchema = storedObjectAppConfigSchema;
+  static readonly reads = reads("prisma", "clickhouse", "logger");
 
+  /**
+   * Builds this process's own {@link StoredObjectInfrastructure} from the
+   * members it reads and its own config, then composes over it exactly as
+   * {@link StoredObjectApp.fromInfrastructure} does.
+   */
   static create(setup: StoredObjectSetup): StoredObjectApp {
+    const infrastructure = buildStoredObjectInfrastructure({
+      members: setup.members,
+      config: setup.config,
+      resources: setup.resources,
+    });
+
+    return StoredObjectApp.fromInfrastructure({
+      infrastructure,
+      repositories: setup.repositories,
+    });
+  }
+
+  /**
+   * Composes over an already-built {@link StoredObjectInfrastructure}. Kept
+   * because every unit test's fixture still builds one directly rather than
+   * reading process members.
+   */
+  static fromInfrastructure(setup: {
+    infrastructure: StoredObjectInfrastructure;
+    repositories: StoredObjectRepositories;
+  }): StoredObjectApp {
+    const { infrastructure: members, repositories } = setup;
+
     return new StoredObjectApp(
       StoredObjectService.create({
-        records: setup.repositories.records,
-        storage: setup.members.storage,
-        delivery: setup.members.delivery,
-        uploadTokens: setup.members.uploadTokens,
-        idDeriver: setup.members.idDeriver,
-        maximumUploadBytes: setup.members.maximumUploadBytes,
-        uploadExpiryMs: setup.members.uploadExpiryMs,
+        records: repositories.records,
+        storage: members.storage,
+        delivery: members.delivery,
+        uploadTokens: members.uploadTokens,
+        idDeriver: members.idDeriver,
+        maximumUploadBytes: members.maximumUploadBytes,
+        uploadExpiryMs: members.uploadExpiryMs,
       }),
-      setup.members.files,
-      setup.members.owners,
+      members.files,
+      members.owners,
     );
   }
 

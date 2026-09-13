@@ -3,7 +3,6 @@
  * a token codec that remembers what it minted, a fixed delivery capability,
  * and the row-and-stream reads the byte surface performs.
  */
-import { ResourceScope } from "@langwatch/runtime-composition";
 import type {
   StoredObjectDeliveryCapability,
   StoredObjectDirectUploadTarget,
@@ -151,11 +150,8 @@ export function createStoredObjectTestApp(
     members?: Partial<StoredObjectInfrastructure>;
   }> = {},
 ): StoredObjectApp {
-  return StoredObjectApp.create({
+  return StoredObjectApp.fromInfrastructure({
     repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
-    members: createStoredObjectTestInfrastructure(input.members ?? {}),
-    dependencies: {},
-    config: void 0,
-    resources: new ResourceScope(),
+    infrastructure: createStoredObjectTestInfrastructure(input.members ?? {}),
   });
 }
