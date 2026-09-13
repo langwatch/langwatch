@@ -11,6 +11,7 @@ import { TAKEOVER_FADE_MS } from "~/features/guided-onboarding/takeover/Takeover
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { registerOnboardingExperiment } from "~/utils/onboardingExperimentRegistration";
 import { trackEventOnce } from "~/utils/tracking";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
@@ -107,6 +108,7 @@ function useGuidedOrganizationCreate({
       },
       {
         onSuccess: (response) => {
+          registerOnboardingExperiment("guided");
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
@@ -254,6 +256,7 @@ export const WelcomeScreen: React.FC = () => {
       },
       {
         onSuccess: (response, variables) => {
+          registerOnboardingExperiment(variables.onboardingVariant);
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",

@@ -115,6 +115,11 @@ vi.mock("~/features/errors", () => ({
   showErrorToast: (args: unknown) => showErrorToast(args),
 }));
 
+const registerExperiment = vi.fn();
+vi.mock("posthog-js", () => ({
+  default: { register: (...args: unknown[]) => registerExperiment(...args) },
+}));
+
 type MutateOptions = {
   onSuccess?: (data: {
     organizationId: string;
@@ -260,7 +265,10 @@ describe("WelcomeScreen in the guided variant", () => {
   });
 
   describe("when the tailor step is left", () => {
-    /** @scenario "Leaving the tailor step creates the organization and the project with the variant recorded" */
+    /**
+     * @scenario "Leaving the tailor step creates the organization and the project with the variant recorded"
+     * @scenario "the welcome flow registers the experiment property as soon as the organization is created"
+     */
     it("creates the organization with the guided variant and hands over to Langy's hello", async () => {
       initializeOrganization.mockImplementation((_input, options) =>
         options.onSuccess?.({
@@ -289,6 +297,9 @@ describe("WelcomeScreen in the guided variant", () => {
         "organization_initialized",
         expect.objectContaining({ variant: "guided" }),
       );
+      expect(registerExperiment).toHaveBeenCalledWith({
+        "$feature/experiment_onboarding_langy_guided": "guided",
+      });
       expect(invalidateOrganizations).toHaveBeenCalledTimes(1);
 
       const takeover = await screen.findByTestId("guided-takeover");
