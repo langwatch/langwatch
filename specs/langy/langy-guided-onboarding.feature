@@ -524,6 +524,29 @@ Feature: Langy guides the first setup after sign-up
       And the item is done when the manifest names the package
       And the commit stages the manifest and the lockfile the install changed
 
+    # A run on a pip project installed the package with `python3 -m pip
+    # install langwatch`, edited the code and committed a branch that imports
+    # a package the project never declares: the rule named only pyproject.toml
+    # and package.json, and requirements.txt matched neither.
+    @unit
+    Scenario: A pip project's manifest gets the package line
+      When the compiled guided-onboarding skill is read
+      Then the manifest of a pip project is requirements.txt, or the requirements file the folder uses
+      And a pip install writes no manifest, so Langy writes the langwatch line into that file itself
+      And the version comes from python -m pip show langwatch, run with the interpreter the install worked with
+      And the line is pinned the way the file pins its other packages, and unpinned when the file pins none of them
+      And the commit stages that manifest
+
+    # The fixture folder was a repository with no remote, so
+    # `git checkout -b langy/<slug> origin/main` answered exit 128, "'origin/main'
+    # is not a commit". The branch line named the dirty tree as its only case
+    # without a start point.
+    @unit
+    Scenario: A repository with no remote branches from the local default
+      When the compiled guided-onboarding skill is read
+      Then the branch command runs with no start point when the tree is dirty or the facts say git remote: none
+      And the code access facts of a repository with no remote say git remote: none
+
     # The same run gave the wait a 120 second shell timeout, the CLI's own
     # wait, so the shell cut the command first and the CLI's line was lost.
     @unit

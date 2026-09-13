@@ -535,11 +535,27 @@ describe("the guided-onboarding skill", () => {
       const tracingStep = rendered.indexOf("2. `tracing` for the detected framework.");
       expect(how).toBeGreaterThan(-1);
       expect(tracingStep).toBeGreaterThan(how);
+      expect(rendered).toContain("The item is done when the project's manifest names the package.");
       expect(rendered).toContain(
-        "The item is done when the manifest (`pyproject.toml` or `package.json`) names the package.",
+        "the manifest the install of item 1 changed or you wrote the package line into, `requirements.txt` included, and the lockfile it changed, unless the repository ignores it, the tracing edit, the connect adapter",
       );
+    });
+
+    /** @scenario "A pip project's manifest gets the package line" */
+    it("writes the langwatch line into the requirements file itself, since a pip install writes no manifest", () => {
       expect(rendered).toContain(
-        "the manifest and the lockfile the install of item 1 changed, unless the repository ignores it, the tracing edit, the connect adapter",
+        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `python -m pip show langwatch` through the interpreter the install worked with, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and unpinned when the file pins none of them.",
+      );
+      // The commit stages that manifest, whatever the file is called.
+      expect(rendered).toContain(
+        "the manifest the install of item 1 changed or you wrote the package line into, `requirements.txt` included",
+      );
+    });
+
+    /** @scenario "A repository with no remote branches from the local default" */
+    it("branches with no start point when the tree is dirty or the facts say the repository has no remote", () => {
+      expect(rendered).toContain(
+        "`git checkout -b langy/<slug> origin/<default>` (with no start point when the tree is dirty or the workspace facts say `git remote: none`)",
       );
     });
 

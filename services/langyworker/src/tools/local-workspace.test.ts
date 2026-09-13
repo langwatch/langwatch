@@ -384,6 +384,21 @@ describe("the folder facts code_access renders", () => {
     });
   });
 
+  describe("when the repository has no remote", () => {
+    /** @scenario "A repository with no remote branches from the local default" */
+    it("says the remote is none, which is what sends the skill to a branch with no start point", () => {
+      const text = renderWorkspaceFacts({
+        ...folder,
+        gitRepository: true,
+        gitBranch: "main",
+        gitDirty: false,
+      });
+      expect(text).toContain("git branch: main");
+      expect(text).toContain("git remote: none");
+      expect(text).not.toContain("not a repository");
+    });
+  });
+
   describe("when the command line could not run git", () => {
     it("keeps the unknown lines rather than calling the folder a non-repository", () => {
       const text = renderWorkspaceFacts(folder);
