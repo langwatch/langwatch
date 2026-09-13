@@ -6440,6 +6440,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -8214,6 +8217,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8232,6 +8238,9 @@ importers:
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../packages/redaction
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
@@ -8427,15 +8436,27 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/enterprise-plan-gate':
+        specifier: workspace:*
+        version: link:../../../enterprise/packages/plan-gate
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/entitlement-server':
+        specifier: workspace:*
+        version: link:../../entitlement/server
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9949,6 +9970,9 @@ importers:
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../../packages/aws-client
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-client
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -9958,6 +9982,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid

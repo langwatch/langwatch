@@ -17,6 +17,11 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { IdentityApi } from "@langwatch/identity-contract";
+import { z } from "zod";
+import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   AddOrganizationGroupBindingInput,
@@ -176,16 +181,25 @@ export interface ServerOrganizationAppDependencies {
   apiKeys: ApiKeyApi;
 }
 
+/**
+ * Config schema: this process's own name, which every refusal the membership
+ * half raises is attributed to, and the demo organization's person and project.
+ * Both default to the deleted composition's own absent-config answer — the
+ * process name it was constructed with, and empty strings, which is what
+ * `demoProject` carried on a deployment that names no demo.
+ */
+const organizationAppConfigSchema = z.object({
+  processName: z.string().default("langwatch"),
+  demoProject: z
+    .object({ userId: z.string().default(""), projectId: z.string().default("") })
+    .default({ userId: "", projectId: "" }),
+});
+export type OrganizationAppConfig = z.infer<typeof organizationAppConfigSchema>;
+
 type OrganizationSetup = FeatureSetup<
-  {
-    projects: typeof ProjectApi;
-    permissions: typeof AuthzApi;
-    users: typeof UserApi;
-    shares: typeof ShareApi;
-    apiKeys: typeof ApiKeyApi;
-  },
-  OrganizationInfrastructure,
-  undefined,
+  typeof ServerOrganizationApp.dependencies,
+  MembersRead<typeof ServerOrganizationApp.reads>,
+  OrganizationAppConfig,
   OrganizationRepositories
 >;
 
@@ -259,26 +273,47 @@ export class ServerOrganizationApp implements OrganizationApi {
     users: UserApi,
     shares: ShareApi,
     apiKeys: ApiKeyApi,
+    /** The SAME identity application `user.*` answers from, for the caller's own verified addresses (D11 invitation matching). */
+    identity: IdentityApi,
+    /**
+     * The ONE plan application every allowance in this process is read
+     * through: a seat refused here and a seat counted on the usage panel have
+     * to be one number.
+     */
+    entitlement: EntitlementApi,
   };
+  static readonly configSchema = organizationAppConfigSchema;
+  static readonly reads = reads("prisma", "encryption", "logger");
   #dependencies: ServerOrganizationAppDependencies;
 
   static create(setup: OrganizationSetup): ServerOrganizationApp {
+    const members = buildOrganizationInfrastructure({
+      prisma: setup.members.prisma,
+      encryption: setup.members.encryption,
+      logger: setup.members.logger,
+      config: setup.config,
+      dependencies: {
+        projects: setup.dependencies.projects,
+        identity: setup.dependencies.identity,
+        entitlement: setup.dependencies.entitlement,
+      },
+    });
     const organizations = OrganizationEntityService.create({
       repository: setup.repositories.organization,
       teams: setup.repositories.team,
       groups: setup.repositories.group,
-      identities: setup.members.identities,
-      teamIdentities: setup.members.teamIdentities,
-      groupIdentities: setup.members.groupIdentities,
+      identities: members.identities,
+      teamIdentities: members.teamIdentities,
+      groupIdentities: members.groupIdentities,
       authz: setup.dependencies.permissions,
       grants: setup.dependencies.permissions,
-      settingsSecrets: setup.members.settingsSecrets,
-      diagnostics: setup.members.diagnostics,
+      settingsSecrets: members.settingsSecrets,
+      diagnostics: members.diagnostics,
     });
     const membership = OrganizationMembershipService.create({
       repository: setup.repositories.membership(setup.dependencies.permissions),
-      prompts: setup.members.prompts,
-      seats: setup.members.seats,
+      prompts: members.prompts,
+      seats: members.seats,
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
     });
@@ -296,7 +331,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       apiKeys: setup.dependencies.apiKeys,
     });
 
-    application.#members = setup.members;
+    application.#members = members;
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => membership.getAllForUser(input),
@@ -304,30 +339,30 @@ export class ServerOrganizationApp implements OrganizationApi {
         findMemberById: (input) => membership.findMemberById(input),
       },
       permissions: setup.dependencies.permissions,
-      secrets: setup.members.settingsSecrets,
-      demoProject: setup.members.demoProject,
+      secrets: members.settingsSecrets,
+      demoProject: members.demoProject,
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.repositories.personalTeamScope,
     );
-    application.#invitationDoor = setup.members.invitations
+    application.#invitationDoor = members.invitations
       ? OrganizationInvitationDoorService.create({
-          invitations: setup.members.invitations,
-          joinRequests: setup.members.joinRequests,
-          plans: setup.members.plans,
-          signals: setup.members.signals,
+          invitations: members.invitations,
+          joinRequests: members.joinRequests,
+          plans: members.plans,
+          signals: members.signals,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
-    application.#joinDoor = setup.members.joinRequests
+    application.#joinDoor = members.joinRequests
       ? OrganizationJoinDoorService.create({
-          joinRequests: setup.members.joinRequests,
-          directory: setup.members.directory,
+          joinRequests: members.joinRequests,
+          directory: members.directory,
         })
       : null;
     application.#onboarding = OrganizationOnboardingService.create({
-      ceremony: setup.members.ceremony,
-      signals: setup.members.signals,
+      ceremony: members.ceremony,
+      signals: members.signals,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });

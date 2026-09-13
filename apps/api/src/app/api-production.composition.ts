@@ -113,6 +113,14 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
         .map((email) => email.trim())
         .filter((email) => email.length > 0),
     },
+    /** This process's own name in every refusal, and the demo organization every caller may read. */
+    organization: {
+      processName: config.serviceName,
+      demoProject: {
+        userId: config.authz.demoProjectUserId ?? "",
+        projectId: config.authz.demoProjectId ?? "",
+      },
+    },
     /** The operator surface: same ADMIN_EMAILS list, the EXPLAIN account, prod gate. */
     ops: {
       adminEmails: (config.deployment.adminEmails ?? "")
