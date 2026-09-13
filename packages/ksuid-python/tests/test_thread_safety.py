@@ -3,14 +3,14 @@
 import threading
 from typing import List
 
-from ksuid import Instance, InstanceScheme, Node, generate, parse
+from langwatch_ksuid import Instance, InstanceScheme, Node, generate, parse
 
 
 def test_thread_safety():
     """Test that KSUID generation is thread-safe."""
     # Create a custom node for testing
     test_instance = Instance(InstanceScheme.RANDOM, bytes([1, 2, 3, 4, 5, 6, 7, 8]))
-    from ksuid import Ksuid
+    from langwatch_ksuid import Ksuid
 
     node = Node(
         "test",

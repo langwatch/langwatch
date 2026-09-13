@@ -2,7 +2,7 @@
 
 import pytest
 
-from ksuid.instance import Instance, InstanceScheme
+from langwatch_ksuid.instance import Instance, InstanceScheme
 
 
 class TestInstanceScheme:

@@ -1,6 +1,6 @@
 import os
 import langwatch
-from ksuid import generate as generate_ksuid
+from langwatch_ksuid import generate as generate_ksuid
 
 from openai import OpenAI
 from dotenv import load_dotenv

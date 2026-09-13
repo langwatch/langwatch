@@ -28,7 +28,7 @@ uv add langwatch-ksuid
 ### Basic Usage
 
 ```python
-from ksuid import generate, parse
+from langwatch_ksuid import generate, parse
 
 # Generate a KSUID
 id = generate('user')
@@ -45,7 +45,7 @@ print(parsed.date)  # datetime object
 ### Environment-Specific IDs
 
 ```python
-from ksuid import generate, set_environment
+from langwatch_ksuid import generate, set_environment
 
 # Set environment
 set_environment('dev')
@@ -59,7 +59,7 @@ print(dev_ksuid)
 ### Advanced Usage
 
 ```python
-from ksuid import Ksuid, Instance, InstanceScheme
+from langwatch_ksuid import Ksuid, Instance, InstanceScheme
 import time
 
 # Create a custom instance

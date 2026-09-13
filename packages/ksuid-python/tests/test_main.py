@@ -5,7 +5,7 @@ from datetime import datetime
 
 import pytest
 
-from ksuid import (
+from langwatch_ksuid import (
     Instance,
     InstanceScheme,
     Ksuid,

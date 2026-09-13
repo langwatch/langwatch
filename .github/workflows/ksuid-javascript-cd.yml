@@ -47,8 +47,22 @@ jobs:
         working-directory: ./packages/ksuid
         run: pnpm test
 
+      # Token auth for now, same convention as npx-server-publish: the npm
+      # package @langwatch/ksuid predates the vendoring and its Trusted
+      # Publisher (if any) points at the old langwatch/ksuid repository.
+      #
+      # Trusted Publishers (npm OIDC, recommended): configure at npmjs.com →
+      # @langwatch/ksuid → settings → Trusted Publishers, add provider
+      # `GitHub Actions` with:
+      #   Repository:        langwatch/langwatch
+      #   Workflow filename: ksuid-javascript-cd.yml
+      #   Environment:       (leave empty — we don't use job environments)
+      # Once configured, drop the NODE_AUTH_TOKEN line; `id-token: write` is
+      # sufficient for npm to mint a short-lived publish token from OIDC.
       - name: Publish to npm
         working-directory: ./packages/ksuid
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
         run: pnpm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest

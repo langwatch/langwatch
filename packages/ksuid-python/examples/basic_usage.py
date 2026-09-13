@@ -5,7 +5,7 @@ Basic usage example for langwatch-ksuid.
 This example demonstrates the core functionality of the KSUID library.
 """
 
-from ksuid import Ksuid, generate, parse, set_environment
+from langwatch_ksuid import Ksuid, generate, parse, set_environment
 
 
 def main():

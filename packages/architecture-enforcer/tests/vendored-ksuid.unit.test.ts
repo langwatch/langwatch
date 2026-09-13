@@ -54,10 +54,12 @@ describe("vendored ksuid packages", () => {
     /** @scenario "The Python wheel packages the ksuid module" */
     it("targets the directory the module actually lives in", () => {
       // The standalone repository's wheel target named a directory that did
-      // not exist, so the built wheel shipped no code at all.
+      // not exist, so the built wheel shipped no code at all. The module is
+      // langwatch_ksuid — namespaced to match the PyPI package name, since
+      // other PyPI ksuid libraries also claim a bare `ksuid` module.
       const pyproject = readFileSync(join(ksuidPythonRoot, "pyproject.toml"), "utf8");
-      expect(pyproject).toContain('packages = ["ksuid"]');
-      expect(existsSync(join(ksuidPythonRoot, "ksuid", "__init__.py"))).toBe(true);
+      expect(pyproject).toContain('packages = ["langwatch_ksuid"]');
+      expect(existsSync(join(ksuidPythonRoot, "langwatch_ksuid", "__init__.py"))).toBe(true);
     });
   });
 });

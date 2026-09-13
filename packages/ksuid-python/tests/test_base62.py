@@ -2,8 +2,8 @@
 
 import pytest
 
-from ksuid.base62 import decode, encode
-from ksuid.errors import Base62Error
+from langwatch_ksuid.base62 import decode, encode
+from langwatch_ksuid.errors import Base62Error
 
 
 class TestBase62:

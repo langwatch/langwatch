@@ -11,20 +11,20 @@ test: ## Run tests
 	uv run pytest tests/ -v
 
 test-coverage: ## Run tests with coverage
-	uv run pytest tests/ --cov=ksuid --cov-report=term-missing --cov-report=html
+	uv run pytest tests/ --cov=langwatch_ksuid --cov-report=term-missing --cov-report=html
 
 lint: ## Run linting
-	uv run ruff check ksuid/ tests/
-	uv run black --check ksuid/ tests/
-	uv run isort --check-only ksuid/ tests/
+	uv run ruff check langwatch_ksuid/ tests/
+	uv run black --check langwatch_ksuid/ tests/
+	uv run isort --check-only langwatch_ksuid/ tests/
 
 lint-fix: ## Fix linting issues
-	uv run ruff check --fix ksuid/ tests/
-	uv run black ksuid/ tests/
-	uv run isort ksuid/ tests/
+	uv run ruff check --fix langwatch_ksuid/ tests/
+	uv run black langwatch_ksuid/ tests/
+	uv run isort langwatch_ksuid/ tests/
 
 type-check: ## Run type checking
-	uv run mypy ksuid/
+	uv run mypy langwatch_ksuid/
 
 build: ## Build the package
 	uv run python -m build

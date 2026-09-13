@@ -51,7 +51,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["ksuid"]
+packages = ["langwatch_ksuid"]
 
 [tool.black]
 line-length = 88
@@ -86,7 +86,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["ksuid"]
+source = ["langwatch_ksuid"]
 omit = [
     "*/tests/*",
     "*/test_*",

@@ -373,7 +373,7 @@
           "hidden": false
         }
       ],
-      "extra-files": ["ksuid/__init__.py"]
+      "extra-files": ["langwatch_ksuid/__init__.py"]
     },
     ".": {
       "release-type": "simple",
