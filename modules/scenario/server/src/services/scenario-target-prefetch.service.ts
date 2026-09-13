@@ -1,9 +1,8 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { FieldMappingSchema } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
 import type {
@@ -30,7 +29,7 @@ export class ScenarioTargetPrefetchService {
   static create(options: {
     prompts: PromptApi;
     agents: AgentApi;
-    workflows: WorkflowService;
+    workflows: WorkflowApi;
     secrets: SecretApi;
     workflowHydrator: ScenarioWorkflowHydratorService;
     legacyDefaultModel: string;
@@ -42,7 +41,7 @@ export class ScenarioTargetPrefetchService {
     private readonly options: {
       prompts: PromptApi;
       agents: AgentApi;
-      workflows: WorkflowService;
+      workflows: WorkflowApi;
       secrets: SecretApi;
       workflowHydrator: ScenarioWorkflowHydratorService;
       legacyDefaultModel: string;

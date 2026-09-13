@@ -3,7 +3,7 @@
  * agent, through the same live dispatcher a simulation's connected column uses),
  * @see specs/agents/agent-test-run.feature
  */
-import type { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   AgentCallTimeoutError,
   AgentTestRefusedError,
@@ -54,7 +54,7 @@ import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.se
 export type AgentTestServiceOptions = {
   agents: AgentApi;
   projects: ProjectApi;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   prompts: PromptApi;
   secrets: SecretApi;
   modelProviders: ModelProviderApi;

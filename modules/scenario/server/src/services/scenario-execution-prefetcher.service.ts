@@ -1,4 +1,4 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -48,7 +48,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   suites: SuiteApi;
   prompts: PromptApi;
   agents: AgentApi;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   projects: ProjectApi;
   modelProviders: ModelProviderApi;
   secrets: SecretApi;
