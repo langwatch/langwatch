@@ -12,6 +12,7 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { openai } from "@ai-sdk/openai";
@@ -504,6 +505,24 @@ const PROVIDER = (process.env.LANGY_GUIDED_PROVIDER ??
 
 const AZURE_API_VERSION = process.env.AZURE_API_VERSION ?? "2024-10-21";
 
+/**
+ * The model LANGY itself answers from, when that is not the provider the
+ * organization connected. `provider/model`, empty for the ordinary case.
+ *
+ * LANGY_GUIDED_PROVIDER moves four things at once: the provider the takeover
+ * connects, the judge, the simulator and the demo application. Which model
+ * Langy is capable enough on is a different question, and answering it by
+ * moving all four would move the judge too and make the verdicts
+ * incomparable. This moves the one role and leaves the rest where they are.
+ *
+ * A provider that signs in rather than takes a key (Codex is a ChatGPT login)
+ * cannot be re-typed by a run: the token set is stored encrypted and tRPC
+ * hands it back masked. Such a row is copied in the database instead, from a
+ * row that is already signed in; the ciphertext stays ciphertext and nothing
+ * about the tokens is read, printed or written outside it.
+ */
+const LANGY_MODEL = process.env.LANGY_MODEL ?? "";
+
 /** The model the harness's judge and simulator use when the provider is OpenAI. */
 const HARNESS_OPENAI_MODEL = "gpt-5-mini";
 
@@ -746,12 +765,105 @@ async function attachProvider({
     path: "onboarding.recordProvider",
     input: { organizationId, provider: PROVIDER, model: MODEL },
   });
+  if (LANGY_MODEL) await pointLangyAt({ cookie, organizationId });
   const resolved = await trpcQuery<unknown>({
     cookie,
     path: "modelProvider.getResolvedDefault",
     input: { projectId, featureKey: "langy" },
   });
   console.log(`[guided] langy model resolves to ${JSON.stringify(resolved)}`);
+}
+
+/**
+ * Give the organization the provider behind LANGY_MODEL and point the Langy
+ * role at it, leaving the connected provider, the judge and the simulator on
+ * whatever LANGY_GUIDED_PROVIDER chose.
+ */
+async function pointLangyAt({
+  cookie,
+  organizationId,
+}: {
+  cookie: string;
+  organizationId: string;
+}): Promise<void> {
+  const provider = LANGY_MODEL.split("/")[0] ?? "";
+  if (!provider) {
+    throw new Error(`LANGY_MODEL=${LANGY_MODEL} is not provider/model`);
+  }
+  copyProviderRow({ provider, organizationId });
+  await trpcMutate({
+    cookie,
+    path: "modelProvider.setRoleAssignmentForScope",
+    input: {
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+      role: "LANGY",
+      model: LANGY_MODEL,
+    },
+  });
+  console.log(`[guided] langy answers from ${LANGY_MODEL}`);
+}
+
+/** Where the copy reads from and writes to. */
+const PG_URL =
+  process.env.LANGWATCH_PG_URL ??
+  "postgresql://postgres@localhost:5432/langwatch_db";
+
+/**
+ * Copy a signed-in provider row into this organization, once.
+ *
+ * Only for a provider a run cannot re-type: the credentials column is
+ * ciphertext and is copied as ciphertext, never selected into a log.
+ */
+function copyProviderRow({
+  provider,
+  organizationId,
+}: {
+  provider: string;
+  organizationId: string;
+}): void {
+  const psql = (sql: string): string =>
+    execFileSync("psql", [PG_URL, "-t", "-A", "-c", sql], {
+      encoding: "utf8",
+      timeout: 60_000,
+    }).trim();
+
+  const already = psql(
+    `select id from langwatch_db."ModelProvider"
+     where provider = '${provider}' and "organizationId" = '${organizationId}' limit 1`,
+  );
+  if (already) return;
+
+  const source = psql(
+    `select id from langwatch_db."ModelProvider"
+     where provider = '${provider}' and enabled
+     order by "createdAt" desc limit 1`,
+  );
+  if (!source) {
+    throw new Error(
+      `no enabled ${provider} row in this database; sign it in once on any organization first`,
+    );
+  }
+
+  const suffix = Math.random().toString(36).slice(2, 10);
+  psql(
+    `insert into langwatch_db."ModelProvider"
+       (id, provider, enabled, "customKeys", "deploymentMapping", "customModels",
+        "customEmbeddingsModels", "extraHeaders", name, "providerConfig",
+        "organizationId", "createdAt", "updatedAt")
+     select 'provider_copy_${suffix}', provider, true, "customKeys",
+            "deploymentMapping", "customModels", "customEmbeddingsModels",
+            "extraHeaders", name, "providerConfig", '${organizationId}',
+            now(), now()
+     from langwatch_db."ModelProvider" where id = '${source}'`,
+  );
+  psql(
+    `insert into langwatch_db."ModelProviderScope"
+       (id, "modelProviderId", "scopeType", "scopeId", "createdAt")
+     values ('mpscope_copy_${suffix}', 'provider_copy_${suffix}',
+             'ORGANIZATION', '${organizationId}', now())`,
+  );
+  console.log(`[guided] copied a ${provider} row into ${organizationId}`);
 }
 
 // ---------------------------------------------------------------------------
