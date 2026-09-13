@@ -2,6 +2,7 @@ import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   FEATURE_FLAG_REGISTRY,
   FeatureFlagApi,
+  resolveFeatureFlagConfig,
   type FeatureFlagApi as FeatureFlagApiContract,
   type AuthenticatedExperimentTarget,
   type AuthenticatedFeatureFlagTargetInput,
@@ -21,14 +22,16 @@ import {
   type OrganizationFeatureFlagsForCaller,
   type PublicAnonymousFlagMap,
 } from "@langwatch/feature-flag-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
 import { CachedFeatureFlagRowAdapter } from "../services/cached-feature-flag-row.service.ts";
+import { UncachedFeatureFlagCacheAdapter } from "../services/uncached-feature-flag-cache.service.ts";
 
 /** The operator row as the cache carries it. */
 export type FeatureFlagRow = { enabled: boolean; rules: FeatureFlagRules };
@@ -57,19 +60,20 @@ export interface FeatureFlagCache {
 }
 
 /**
- * What the process owns: the shared cache tier with its key prefix and TTL,
- * this deployment's environment overrides, and the clock.
+ * This deployment's environment overrides: the force-enable list plus every
+ * per-flag override `resolveFeatureFlagConfig` reads by env var name. Parsed
+ * straight from the process config the same way identity's `ADMIN_EMAILS`
+ * is, so a deployment's flag overrides need no wiring beyond its own `.env`.
  */
-export type FeatureFlagInfrastructure = Readonly<{
-  cache: FeatureFlagCache;
-  config: FeatureFlagConfig;
-  now?: () => number;
-}>;
+const featureFlagAppConfigSchema: FeatureConfigSchema<FeatureFlagConfig> = {
+  parse: (value: unknown): FeatureFlagConfig =>
+    resolveFeatureFlagConfig((value ?? {}) as Record<string, unknown>),
+};
 
 type FeatureFlagSetup = FeatureSetup<
   typeof FeatureFlagApp.dependencies,
-  FeatureFlagInfrastructure,
-  undefined,
+  MembersRead<typeof FeatureFlagApp.reads>,
+  FeatureFlagConfig,
   FeatureFlagRepositories
 >;
 
@@ -80,6 +84,14 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     projects: ProjectApi,
     organizations: OrganizationApi,
   };
+  static readonly configSchema = featureFlagAppConfigSchema;
+  /**
+   * No process member: the shared cache tier `installApiFeatureFlag` used to
+   * receive (deleted by b383462d96) was always the uncached stub in every
+   * deployment that wired it, so `create` builds that same no-op itself
+   * rather than reading a real member for a tier nothing ever populated.
+   */
+  static readonly reads = reads();
 
   readonly #flags: FeatureFlagService;
   readonly #permissions: AuthzApi;
@@ -97,16 +109,16 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
   }
 
   static create(setup: FeatureFlagSetup): FeatureFlagApp {
-    const now = setup.members.now ?? (() => nowInstant().epochMilliseconds);
+    const now = () => nowInstant().epochMilliseconds;
     const flags = FeatureFlagService.create({
       repository: setup.repositories.flags,
       experiments: setup.repositories.experiments,
       rows: CachedFeatureFlagRowAdapter.create({
         repository: setup.repositories.flags,
-        cache: setup.members.cache,
+        cache: UncachedFeatureFlagCacheAdapter.create(),
         now,
       }),
-      config: setup.members.config,
+      config: setup.config,
       registry: FEATURE_FLAG_REGISTRY,
       organizationAges: OrganizationCreatedAtCacheService.create({
         organizations: setup.dependencies.organizations,

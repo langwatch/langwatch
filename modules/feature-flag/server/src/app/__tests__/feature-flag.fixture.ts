@@ -132,7 +132,6 @@ export function createFeatureFlagTestApp(
   input: Readonly<{
     repositories?: FeatureFlagRepositories;
     config?: FeatureFlagConfig;
-    cache?: FeatureFlagCache;
     dependencies?: Partial<{
       permissions: AuthzApi;
       projects: ProjectApi;
@@ -142,16 +141,12 @@ export function createFeatureFlagTestApp(
 ): FeatureFlagApp {
   return FeatureFlagApp.create({
     repositories: input.repositories ?? MemoryFeatureFlagRepositories.create(),
-    members: {
-      cache: input.cache ?? new MemoryFeatureFlagCache(),
-      config: input.config ?? resolveFeatureFlagConfig({}),
-    },
     dependencies: {
       permissions: input.dependencies?.permissions ?? createFeatureFlagTestAuthz(),
       projects: input.dependencies?.projects ?? createFeatureFlagTestProjects(),
       organizations: input.dependencies?.organizations ?? TestOrganizations.create().api(),
     },
-    config: void 0,
+    config: input.config ?? resolveFeatureFlagConfig({}),
     resources: new ResourceScope(),
   });
 }
