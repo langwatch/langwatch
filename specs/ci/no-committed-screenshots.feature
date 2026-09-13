@@ -15,7 +15,7 @@ Feature: No committed screenshots check
   Background:
     Given the check judges only the image files a PR adds
     And renaming, moving, or deleting an existing image is not judged
-    And images are allowed under docs/images, docs/media, platform/app/public, assets, specs, and sdks/python/examples
+    And images are allowed under .github/readme, docs/images, docs/media, platform/app/public, assets, specs, and sdks/python/examples
 
   Scenario: A PR that adds no images passes
     Given the PR adds no image files
@@ -23,6 +23,10 @@ Feature: No committed screenshots check
 
   Scenario: A docs image in an allowed location passes
     Given the PR adds an image under docs/images
+    Then the check passes
+
+  Scenario: README cover art passes
+    Given the PR adds an image under .github/readme
     Then the check passes
 
   Scenario: A screenshot committed to the app tree fails
