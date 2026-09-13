@@ -5,6 +5,7 @@
  *
  * @see specs/coding-agent/trace-fidelity.feature
  */
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { describe, expect, it, vi } from "vitest";
 import type {
   PIIRedactionLevel,
@@ -65,7 +66,7 @@ function makeService(memo?: InMemoryAuxiliaryTraceMemo) {
 }
 
 /** One export batch, as codex's otlp-http exporter posts it. */
-function batch(spans: FixtureSpan[]) {
+function batch(spans: FixtureSpan[]): IExportTraceServiceRequest {
   return {
     resourceSpans: [
       {
@@ -73,7 +74,7 @@ function batch(spans: FixtureSpan[]) {
         scopeSpans: [{ scope: fixture.scope, spans: spans as OtlpSpan[] }],
       },
     ],
-  };
+  } as unknown as IExportTraceServiceRequest;
 }
 
 function recordedAttributeKeys(
