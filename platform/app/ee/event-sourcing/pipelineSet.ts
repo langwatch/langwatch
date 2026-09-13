@@ -103,19 +103,24 @@ function registerIngestionPullPipeline(
     }),
   );
   const ingestionPullCommands = mapCommands(pipeline.commands);
+  // Typed rather than cast. `IngestionPullOutcomeCommands` already names the
+  // envelope — `tenantId` and `occurredAt` — on every one of these, and the
+  // compiler confirms each is the payload its command takes, so an `as never`
+  // here buys nothing and costs the one check that matters: it is exactly what
+  // let a withdrawal missing both fields reach validation instead of the
+  // compiler on the sibling pipeline below (#8111). Do not reinstate it.
   outcomeCommands = {
     recordRunCompleted: (args) =>
-      ingestionPullCommands.recordRunCompleted(args as never),
-    recordRunFailed: (args) =>
-      ingestionPullCommands.recordRunFailed(args as never),
+      ingestionPullCommands.recordRunCompleted(args),
+    recordRunFailed: (args) => ingestionPullCommands.recordRunFailed(args),
     recordAgentsListed: (args) =>
-      ingestionPullCommands.recordAgentsListed(args as never),
+      ingestionPullCommands.recordAgentsListed(args),
     recordAgentsListingRefused: (args) =>
-      ingestionPullCommands.recordAgentsListingRefused(args as never),
+      ingestionPullCommands.recordAgentsListingRefused(args),
     recordPeopleListed: (args) =>
-      ingestionPullCommands.recordPeopleListed(args as never),
+      ingestionPullCommands.recordPeopleListed(args),
     recordPeopleListingRefused: (args) =>
-      ingestionPullCommands.recordPeopleListingRefused(args as never),
+      ingestionPullCommands.recordPeopleListingRefused(args),
   };
 
   if (deps.runsWorkers) {
