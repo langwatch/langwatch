@@ -11,9 +11,11 @@ import {
   demoReposToPrune,
   judgeMessages,
   listeningPids,
+  pendingWaitDispatches,
   permissionAnswerNote,
   pidsRunningIn,
   questionAnswerNote,
+  type RecordWait,
   type StoredMessage,
   shareControlProfile,
   turnFailureMessage,
@@ -372,6 +374,94 @@ describe("shareControlProfile", () => {
   describe("the project key", () => {
     it("is unset, so the terminal acts as the person and not the project", () => {
       expect(profile()).toContain("unset LANGWATCH_API_KEY");
+    });
+  });
+});
+
+describe("pendingWaitDispatches", () => {
+  const wait = (over: Partial<RecordWait> = {}): RecordWait => ({
+    waitId: "wait_1",
+    kind: "permission",
+    status: "pending",
+    turnId: TURN,
+    summary: "pip install langwatch",
+    ...over,
+  });
+
+  describe("when the turn's stream ended before the card went up", () => {
+    it("still finds the card, because the record outlives the stream", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [wait()],
+        answered: new Set<string>(),
+      });
+      expect(dispatches).toHaveLength(1);
+      expect(dispatches[0]?.entry.summary).toBe("pip install langwatch");
+      expect(dispatches[0]?.turnId).toBe(TURN);
+    });
+
+    it("sends a question card and a permission card down their own paths", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [
+          wait({ waitId: "wait_1", kind: "permission" }),
+          wait({ waitId: "wait_2", kind: "question" }),
+        ],
+        answered: new Set<string>(),
+      });
+      expect(dispatches.map((dispatch) => dispatch.kind)).toEqual([
+        "permission",
+        "question",
+      ]);
+    });
+  });
+
+  describe("when a card needs nothing", () => {
+    it("leaves an answered card alone, so one answer is sent once", () => {
+      expect(
+        pendingWaitDispatches({
+          waits: [wait()],
+          answered: new Set(["wait_1"]),
+        }),
+      ).toEqual([]);
+    });
+
+    it("leaves a card that already settled alone", () => {
+      expect(
+        pendingWaitDispatches({
+          waits: [
+            wait({ waitId: "wait_1", status: "answered" }),
+            wait({ waitId: "wait_2", status: "expired" }),
+            wait({ waitId: "wait_3", status: "cancelled" }),
+          ],
+          answered: new Set<string>(),
+        }),
+      ).toEqual([]);
+    });
+
+    it("leaves a card with no id alone rather than answering nothing", () => {
+      expect(
+        pendingWaitDispatches({
+          waits: [wait({ waitId: "" })],
+          answered: new Set<string>(),
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("the order it hands them over", () => {
+    it("keeps the record's order, so the first card asked is answered first", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [
+          wait({ waitId: "wait_1" }),
+          wait({ waitId: "wait_2" }),
+          wait({ waitId: "wait_3" }),
+        ],
+        answered: new Set<string>(),
+      });
+      expect(dispatches.map((dispatch) => dispatch.entry.waitId)).toEqual([
+        "wait_1",
+        "wait_2",
+        "wait_3",
+      ]);
     });
   });
 });

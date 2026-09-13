@@ -1681,6 +1681,54 @@ interface StreamEntry {
   [key: string]: unknown;
 }
 
+/** One card as the conversation's durable record holds it. */
+export interface RecordWait {
+  waitId: string;
+  kind: string;
+  status: string;
+  turnId: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The cards on the record that still need an answer, oldest first.
+ *
+ * A turn's live stream is one fetch with no reconnect, so a stream that ends
+ * before its turn does takes every card raised after it: the card stays on
+ * screen, nothing answers it, and the run sits there until a step times out.
+ * That is not hypothetical, it is what happened when a folder connected, the
+ * app restarted on the .env write, and the next card went up half a second
+ * later.
+ *
+ * Every card is also written to the conversation's record, which no stream can
+ * end, so the watcher reads the pending ones from there on each poll. The
+ * fields a card carries are the same on the record as on the stream, so the
+ * same two answer paths take either without knowing which it came from.
+ */
+export function pendingWaitDispatches({
+  waits,
+  answered,
+}: {
+  waits: RecordWait[];
+  answered: ReadonlySet<string>;
+}): Array<{ entry: StreamEntry; turnId: string; kind: string }> {
+  const dispatches: Array<{
+    entry: StreamEntry;
+    turnId: string;
+    kind: string;
+  }> = [];
+  for (const wait of waits) {
+    if (!wait.waitId || wait.status !== "pending") continue;
+    if (answered.has(wait.waitId)) continue;
+    dispatches.push({
+      entry: wait as StreamEntry,
+      turnId: wait.turnId,
+      kind: wait.kind,
+    });
+  }
+  return dispatches;
+}
+
 /**
  * Reads one turn's live stream and reports its entries.
  *
@@ -1932,6 +1980,19 @@ export function watchLangyConversation({
     });
   };
 
+  /** Every card this conversation's record holds, answered ones included. */
+  const readRecordWaits = async (): Promise<RecordWait[]> => {
+    const conversationId = adapter.state.conversationId;
+    if (!conversationId) return [];
+    const cookie = await getSessionCookie();
+    const record = await trpcQuery<{ waits?: RecordWait[] }>({
+      cookie,
+      path: "langy.localRecord",
+      input: { projectId: PROJECT_ID, conversationId },
+    });
+    return record?.waits ?? [];
+  };
+
   void (async () => {
     while (!stopped) {
       try {
@@ -1939,6 +2000,22 @@ export function watchLangyConversation({
         if (snapshot?.currentTurnId) watchTurn(snapshot.currentTurnId);
         if (adapter.state.currentTurnId) {
           watchTurn(adapter.state.currentTurnId);
+        }
+        // Cards come off the record, not off the stream. The record folds the
+        // whole event log per call, so it is read while a turn is in flight and
+        // not between turns, which is also the only time a card can be up.
+        if (snapshot?.currentTurnId ?? adapter.state.currentTurnId) {
+          const dispatches = pendingWaitDispatches({
+            waits: await readRecordWaits(),
+            answered: answeredWaits,
+          });
+          for (const dispatch of dispatches) {
+            if (dispatch.kind === "question") {
+              void answerQuestionCard(dispatch.entry, dispatch.turnId);
+            } else {
+              void answerPermission(dispatch.entry, dispatch.turnId);
+            }
+          }
         }
       } catch {
         // The conversation may not exist yet, or the app may be busy.
