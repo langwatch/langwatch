@@ -258,10 +258,22 @@ describe("given a config with every secret-shaped field populated", () => {
       expect(stdout).toHaveLength(1);
       const document = JSON.parse(stdout[0]!) as {
         ok: boolean;
-        error: { message: string };
+        error: { code: string; message: string };
       };
       expect(document.ok).toBe(false);
       expect(document.error.message).toContain("Not logged in");
+    });
+
+    /** @scenario "whoami -o json when logged out emits a structured error and exits 1" */
+    it("reports a not_authenticated code, not network_error", async () => {
+      await runWhoami(["-o", "json"]);
+
+      const document = JSON.parse(stdout[0]!) as {
+        error: { code: string; kind: string };
+      };
+      expect(document.error.code).toBe("not_authenticated");
+      expect(document.error.kind).toBe("not_authenticated");
+      expect(document.error.code).not.toBe("network_error");
     });
 
     /** @scenario "whoami -o json when logged out emits a structured error and exits 1" */

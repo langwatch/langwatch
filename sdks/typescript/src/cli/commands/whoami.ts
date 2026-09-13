@@ -3,6 +3,7 @@ import {
   isLoggedIn,
   type GovernanceConfig,
 } from "@/cli/utils/governance/config";
+import { commandAuthError } from "@/cli/utils/errorOutput";
 import type { CommandResult } from "@/cli/utils/output";
 
 /**
@@ -110,12 +111,16 @@ export const whoamiCommand = async (): Promise<CommandResult> => {
   if (!isLoggedIn(cfg)) {
     // Thrown, not returned: the port's registration in `program.ts` catches it
     // and renders it through `reportCommandError`, so `-o json` gets a
-    // structured error rather than chalk prose. A plain Error is the same
-    // shape `report` and the other emitsResult commands raise for a
-    // precondition failure.
-    throw new Error(
-      "Not logged in. Run `langwatch login --device` to sign in via your company SSO.",
-    );
+    // structured error rather than chalk prose. `Object.assign`ed onto a real
+    // Error so eslint's only-throw-error is satisfied while
+    // `handledErrorFromThrown` still reads the `not_authenticated` brand off
+    // the thrown value — a bare `new Error(...)` here has no code the wire
+    // shape recognises, so it was falling through to a guessed
+    // `network_error` (wrong code, wrong "check your connection" advice for a
+    // login precondition the CLI checked locally).
+    const message =
+      "Not logged in. Run `langwatch login --device` to sign in via your company SSO.";
+    throw Object.assign(new Error(message), commandAuthError(message));
   }
 
   return {
