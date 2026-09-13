@@ -26,7 +26,9 @@ export type TurnContext = {
   calls: readonly SettledCall[];
   /**
    * The conversation is on the guided path: the turn in flight carries the
-   * kickoff brief, or the transcript does. False between turns.
+   * kickoff brief, in its message or in the seed of a resumed conversation,
+   * or the transcript does. Read once per turn by the runner, before the
+   * prompt goes out. False between turns.
    */
   guided: boolean;
 };

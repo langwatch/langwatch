@@ -43,6 +43,45 @@ export function isGuidedKickoffPrompt(prompt: string): boolean {
   return GUIDED_KICKOFF_CONTINUATION.test(first) && second.startsWith(GUIDED_KICKOFF_OPENER);
 }
 
+/** A conversation whose history carries the kickoff brief is on the guided path. */
+export function historyHasGuidedKickoff(messages: readonly unknown[]): boolean {
+  return messages.some((message) => {
+    if (typeof message !== "object" || message === null) return false;
+    const { role, content } = message as { role?: unknown; content?: unknown };
+    if (role !== "user") return false;
+    if (typeof content === "string") return content.includes(GUIDED_KICKOFF_OPENER);
+    if (!Array.isArray(content)) return false;
+    return content.some(
+      (block) =>
+        typeof block === "object" &&
+        block !== null &&
+        typeof (block as { text?: unknown }).text === "string" &&
+        (block as { text: string }).text.includes(GUIDED_KICKOFF_OPENER),
+    );
+  });
+}
+
+/**
+ * Whether the turn is on the guided path, read once per turn, before the
+ * prompt goes out, from the prompt the worker composed and the history at
+ * that moment. The skill tool and the turn end guard read that one value.
+ *
+ * The prompt is read whole, not from the last user-message label: a
+ * conversation resumed on a fresh worker arrives as a folded seed ahead of
+ * the message, and the seed carries the kickoff while the worker's own
+ * history is still empty. Read from the history alone at that moment, the
+ * kickoff conversation itself was refused its skill.
+ */
+export function isGuidedTurn({
+  prompt,
+  history,
+}: {
+  prompt: string;
+  history: readonly unknown[];
+}): boolean {
+  return prompt.includes(GUIDED_KICKOFF_OPENER) || historyHasGuidedKickoff(history);
+}
+
 /** The skill's body ahead of the message, framed the way the resume seed is. */
 export function prependSkillBody({
   prompt,

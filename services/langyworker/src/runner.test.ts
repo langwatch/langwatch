@@ -184,6 +184,64 @@ describe("TurnRunner", () => {
     });
   });
 
+  describe("when a resumed conversation reaches a fresh worker", () => {
+    const SEED_WITH_KICKOFF = [
+      "User: Guided onboarding kickoff.\nPath to set up now: llmops (Evals & LLM Ops).",
+      "Assistant: Hi Ada! Let's get Evals & LLM Ops set up.",
+    ].join("\n");
+    const SEED_PLAIN = "User: How do I add a trace?\nAssistant: Install the SDK and call setup.";
+
+    /** @scenario "A resumed guided conversation is guided on a fresh worker" */
+    it("reads the turn as guided off the seed's kickoff, for the skill tool and the guard alike", async () => {
+      const fake = makeFakeSession();
+      const turnContext = createTurnContext();
+      const { runner, events } = makeRunner({ session: fake.session, options: { turnContext } });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: "Go ahead, keep going.",
+        resumeToken: SEED_WITH_KICKOFF,
+      });
+      await until(() => fake.promptCalls.length === 1);
+      expect(fake.session.agent.state.messages).toEqual([]);
+      expect(turnContext.guided).toBe(true);
+      settle(runner, { id: "s1", name: "say", input: { text: "Continuing the setup." }, output: "Said." });
+      fake.finish();
+      await until(() => fake.promptCalls.length === 2);
+      expect(events).toContainEqual({
+        type: "guided_turn",
+        turnId: "t1",
+        event: "guided_turn_continued",
+        segment: 1,
+        missing: ["the next step"],
+      });
+      expect(turnContext.guided).toBe(true);
+      endOnCard(runner);
+      fake.finish();
+      await done;
+      expect(turnContext.guided).toBe(false);
+    });
+
+    it("reads a plain conversation as not guided, for the skill tool and the guard alike", async () => {
+      const fake = makeFakeSession();
+      const turnContext = createTurnContext();
+      const { runner, events } = makeRunner({ session: fake.session, options: { turnContext } });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: "Go ahead, keep going.",
+        resumeToken: SEED_PLAIN,
+      });
+      await until(() => fake.promptCalls.length === 1);
+      expect(turnContext.guided).toBe(false);
+      settle(runner, { id: "s1", name: "say", input: { text: "Sure." }, output: "Said." });
+      fake.finish();
+      await done;
+      expect(fake.promptCalls).toHaveLength(1);
+      expect(events.filter((event) => event.type === "guided_turn")).toEqual([]);
+    });
+  });
+
   describe("when a turn completes cleanly", () => {
     it("emits turn_started then turn_done ok, with the recomposed system prompt applied", async () => {
       const fake = makeFakeSession();

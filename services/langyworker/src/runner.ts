@@ -27,6 +27,7 @@ import {
 import {
   GUIDED_ONBOARDING_SKILL_NAME,
   isGuidedKickoffPrompt,
+  isGuidedTurn,
   prependSkillBody,
 } from "./guided-kickoff.js";
 import {
@@ -35,7 +36,6 @@ import {
   TurnCallLog,
   decideGuidedContinuation,
   guidedSegment,
-  historyHasGuidedKickoff,
 } from "./guided-turn-end.js";
 import { prependResumeSeed } from "./system-prompt.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -61,6 +61,12 @@ type TurnState = {
   mapper: TurnEventMapper;
   /** The turn's settled calls, read by the guided turn end guard. */
   calls: TurnCallLog;
+  /**
+   * The turn is on the guided path, read once from the composed prompt and
+   * the history before the prompt goes out; the skill tool and the guard
+   * read this one value.
+   */
+  guided: boolean;
   /** The segment of the turn the guard last read: 1, plus one per card answered inside the turn. */
   segment: number;
   /** Continuation messages appended to that segment so far; one is the limit. */
@@ -204,6 +210,7 @@ export class TurnRunner {
       terminalEmitted: false,
       mapper: new TurnEventMapper(command.turnId),
       calls: new TurnCallLog(),
+      guided: false,
       segment: 1,
       continuations: 0,
       turnContinuations: 0,
@@ -212,7 +219,6 @@ export class TurnRunner {
     if (this.options.turnContext) {
       this.options.turnContext.turnId = command.turnId;
       this.options.turnContext.calls = state.calls.calls;
-      this.options.turnContext.guided = this.isGuidedTurn(command);
     }
 
     let terminal: TerminalEvent;
@@ -225,6 +231,8 @@ export class TurnRunner {
       await writer.emit({ type: "turn_started", turnId: command.turnId });
 
       const prompt = this.composePrompt(command);
+      state.guided = isGuidedTurn({ prompt, history: session.agent.state.messages });
+      if (this.options.turnContext) this.options.turnContext.guided = state.guided;
 
       let thrown: unknown;
       try {
@@ -258,14 +266,6 @@ export class TurnRunner {
     }
     // The terminal is flushed to the pipe before anything else can run.
     await writer.emit(terminal);
-  }
-
-  /** The turn is on the guided path: it carries the kickoff brief, or the transcript does. */
-  private isGuidedTurn(command: TurnCommand): boolean {
-    return (
-      isGuidedKickoffPrompt(command.prompt) ||
-      historyHasGuidedKickoff(this.options.session.agent.state.messages)
-    );
   }
 
   /**
@@ -313,7 +313,6 @@ export class TurnRunner {
     terminal: TerminalEvent;
   }): Promise<TerminalEvent> {
     if (terminal.type !== "turn_done" || terminal.outcome !== "ok") return terminal;
-    const guided = this.isGuidedTurn(command);
     const segment = guidedSegment(state.calls.calls).index;
     if (segment !== state.segment) {
       state.segment = segment;
@@ -321,7 +320,7 @@ export class TurnRunner {
     }
     const decision = decideGuidedContinuation({
       calls: state.calls.calls,
-      guided,
+      guided: state.guided,
       continuations: state.continuations,
       turnContinuations: state.turnContinuations,
     });

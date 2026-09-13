@@ -20,7 +20,6 @@ import {
   decideGuidedContinuation,
   guidedSegment,
   guidedTurnEnding,
-  historyHasGuidedKickoff,
   missingStep2Lines,
   templatePattern,
   type TurnCall,
@@ -342,17 +341,6 @@ describe("the guided turn end guard", () => {
         result: { content: [{ type: "text", text: "Said." }] },
       });
       expect(log.calls).toEqual([{ name: "say", input: { text: FRAMEWORK }, isError: false, output: "Said." }]);
-    });
-
-    it("reads the guided path off a kickoff brief in the history", () => {
-      expect(historyHasGuidedKickoff([{ role: "user", content: "Guided onboarding kickoff.\nPath: llmops." }])).toBe(true);
-      expect(
-        historyHasGuidedKickoff([
-          { role: "user", content: [{ type: "text", text: '[Skill "guided-onboarding"]\nGuided onboarding kickoff.' }] },
-        ]),
-      ).toBe(true);
-      expect(historyHasGuidedKickoff([{ role: "assistant", content: "Guided onboarding kickoff." }])).toBe(false);
-      expect(historyHasGuidedKickoff([{ role: "user", content: "How do I add a trace?" }])).toBe(false);
     });
   });
 });

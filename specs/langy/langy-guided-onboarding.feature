@@ -272,6 +272,19 @@ Feature: Langy guides the first setup after sign-up
       Then the load is refused with the skill's own rule, and none of the script is returned
       And a kickoff turn, or a later turn of a conversation whose transcript carries the kickoff, loads it
 
+    # A conversation resumed on a fresh worker arrives as a folded seed ahead
+    # of the message, and the worker's own history is empty until the prompt
+    # goes out. Read from the history alone at that moment, the kickoff
+    # conversation itself was refused its skill, while the guard, reading
+    # again after the prompt, continued the turn the skill tool had refused.
+    @unit
+    Scenario: A resumed guided conversation is guided on a fresh worker
+      Given a conversation whose transcript carries the kickoff reaches a fresh worker as a folded seed
+      When its next turn runs
+      Then the worker reads the turn as guided once, from the seed, the message and the history, before the prompt goes out
+      And the skill tool loads the guided-onboarding skill and the turn end guard reads the same value
+      And a plain conversation resumed the same way is refused the skill and left alone by the guard
+
   Rule: The kickoff conversation is called Getting started, never after the brief
 
     @unit

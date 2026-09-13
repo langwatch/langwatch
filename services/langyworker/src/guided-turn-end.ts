@@ -29,7 +29,6 @@
  */
 
 import { contentText } from "./events.js";
-import { GUIDED_KICKOFF_OPENER } from "./guided-kickoff.js";
 import {
   CODE_ACCESS_TOOL_NAME,
   LOCAL_TOOL_NAMES,
@@ -278,24 +277,6 @@ export function missingStep2Lines(calls: readonly TurnCall[]): string[] {
     missing.push("the pull request line or the no-remote line");
   }
   return missing;
-}
-
-/** A conversation whose history carries the kickoff brief is on the guided path. */
-export function historyHasGuidedKickoff(messages: readonly unknown[]): boolean {
-  return messages.some((message) => {
-    if (typeof message !== "object" || message === null) return false;
-    const { role, content } = message as { role?: unknown; content?: unknown };
-    if (role !== "user") return false;
-    if (typeof content === "string") return content.includes(GUIDED_KICKOFF_OPENER);
-    if (!Array.isArray(content)) return false;
-    return content.some(
-      (block) =>
-        typeof block === "object" &&
-        block !== null &&
-        typeof (block as { text?: unknown }).text === "string" &&
-        ((block as { text: string }).text).includes(GUIDED_KICKOFF_OPENER),
-    );
-  });
 }
 
 function listed(names: readonly string[]): string {

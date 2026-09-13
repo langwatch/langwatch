@@ -4,7 +4,9 @@ import {
   GUIDED_ONBOARDING_SKILL_NAME,
   GUIDED_SKILL_REFUSAL,
   guidedSkillRefusal,
+  historyHasGuidedKickoff,
   isGuidedKickoffPrompt,
+  isGuidedTurn,
   prependSkillBody,
 } from "./guided-kickoff.js";
 
@@ -55,6 +57,43 @@ describe("isGuidedKickoffPrompt", () => {
       expect(isGuidedKickoffPrompt("show me traces")).toBe(false);
       expect(isGuidedKickoffPrompt(`Tell me about the ${GUIDED_KICKOFF_OPENER}`)).toBe(false);
     });
+  });
+});
+
+describe("historyHasGuidedKickoff", () => {
+  it("reads the guided path off a kickoff brief in the history", () => {
+    expect(historyHasGuidedKickoff([{ role: "user", content: "Guided onboarding kickoff.\nPath: llmops." }])).toBe(true);
+    expect(
+      historyHasGuidedKickoff([
+        { role: "user", content: [{ type: "text", text: '[Skill "guided-onboarding"]\nGuided onboarding kickoff.' }] },
+      ]),
+    ).toBe(true);
+    expect(historyHasGuidedKickoff([{ role: "assistant", content: "Guided onboarding kickoff." }])).toBe(false);
+    expect(historyHasGuidedKickoff([{ role: "user", content: "How do I add a trace?" }])).toBe(false);
+  });
+});
+
+describe("isGuidedTurn", () => {
+  const SEED_WITH_KICKOFF = [
+    "[Resumed conversation: digest of the previous worker's session. Newest messages last; the oldest may be truncated.]",
+    `User: ${BRIEF}`,
+    "Assistant: Hi Ada! Let's get Gateway set up.",
+    "[End of digest. The user's current message follows.]",
+    "",
+    "Go ahead, keep going.",
+  ].join("\n");
+  const SEED_PLAIN = SEED_WITH_KICKOFF.replace(`User: ${BRIEF}`, "User: How do I add a trace?");
+
+  /** @scenario "A resumed guided conversation is guided on a fresh worker" */
+  it("reads the kickoff off the folded seed of a resumed conversation while the history is still empty", () => {
+    expect(isGuidedTurn({ prompt: SEED_WITH_KICKOFF, history: [] })).toBe(true);
+    expect(isGuidedTurn({ prompt: SEED_PLAIN, history: [] })).toBe(false);
+  });
+
+  it("reads the kickoff off the brief, or off the history, and nothing off a plain message", () => {
+    expect(isGuidedTurn({ prompt: BRIEF, history: [] })).toBe(true);
+    expect(isGuidedTurn({ prompt: "Go ahead.", history: [{ role: "user", content: BRIEF }] })).toBe(true);
+    expect(isGuidedTurn({ prompt: "Go ahead.", history: [{ role: "user", content: "show me traces" }] })).toBe(false);
   });
 });
 
