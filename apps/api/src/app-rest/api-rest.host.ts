@@ -29,6 +29,7 @@ import {
 } from "@langwatch/api/rest";
 import { ApiKeyApi, type ResolvedApiKeyCredential, type ResolvedOrganizationApiKeyToken } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -39,33 +40,121 @@ import type {
   TransportPeers,
 } from "@langwatch/runtime-composition";
 import { z } from "zod";
+import {
+  composeApiBrowserSession,
+  type ApiBrowserSessionResolver,
+  type ApiBrowserSessionTransport,
+} from "../app/api-auth.composition.ts";
 import { apiClientAddress } from "../app/api-client-address.ts";
 import { canonicalErrorResponse } from "../app/api-canonical-error.ts";
-import { ApiRestCredentials } from "./api-rest.credentials.ts";
 import {
+  ApiRestCredentials,
+  type ApiOrganizationCredential,
+  type ApiProjectCredential,
+} from "./api-rest.credentials.ts";
+import {
+  ApiRestCapabilityUnavailableError,
   ApiRestDoorUnconfiguredError,
   ApiRestDoorUnverifiedError,
 } from "./api-rest.refusals.ts";
 
 /**
- * What this process knows about a caller that no module can: the address a
- * request actually came from, behind the deployment's trusted proxies. Bound
- * by NAME for every mount, so a module's own same-named declaration is
- * answered without the process importing the module's token - the same
- * arrangement the tRPC host documents for its identity facts.
+ * Every fact this process answers for a module, DECLARED HERE by name rather
+ * than imported from the module that reads it: binding is by name and the
+ * value is parsed by the ROUTE's own schema, so no value-import is needed.
  */
-const processRestFacts: readonly RestTransportMiddlewareBinding[] = [
-  bindRestMiddleware(
-    defineRestMiddleware("unsubscribeCallerAddress", z.string().nullable()),
-    (context) => apiClientAddress(context) ?? null,
-  ),
-];
+const unsubscribeCallerAddress = defineRestMiddleware(
+  "unsubscribeCallerAddress",
+  z.string().nullable(),
+);
+
+/** The impersonator the back office renders beside the person being acted as. */
+const operatorImpersonator = z.object({
+  id: z.string().optional(),
+  name: z.string().nullish(),
+  email: z.string().nullish(),
+  image: z.string().nullish(),
+});
+
+/** `modules/ops` — the signed-in operator, impersonation included. */
+const adminActor = defineRestMiddleware(
+  "adminActor",
+  z
+    .object({
+      id: z.string(),
+      name: z.string().nullish(),
+      email: z.string().nullish(),
+      impersonator: operatorImpersonator.optional(),
+    })
+    .nullable(),
+);
+
+/** `modules/ops` — the RAW auth session an impersonation is started against. */
+const adminAuthSession = defineRestMiddleware(
+  "adminAuthSession",
+  z.object({ id: z.string() }).nullable(),
+);
+
+/** `modules/hosted-mcp` — who is approving an OAuth consent, if anyone. */
+const mcpAuthorizeApprover = defineRestMiddleware(
+  "mcpAuthorizeApprover",
+  z.object({ user: z.object({ id: z.string() }) }).nullable(),
+);
+
+/** `modules/user` — which credential the avatar read is counted against. */
+const userAvatarCaller = defineRestMiddleware(
+  "userAvatarCaller",
+  z.object({ apiKeyProjectId: z.string().nullable(), userId: z.string().nullable() }),
+);
+
+/** `modules/model-provider` — the playground's own 401 and 403, as one fact. */
+const playgroundRestCaller = defineRestMiddleware(
+  "playgroundRestCaller",
+  z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("anonymous") }),
+    z.object({ kind: z.literal("signedIn"), userId: z.string(), permitted: z.boolean() }),
+  ]),
+);
+
+/** `modules/model-provider` — the OpenAI-compatible proxy the playground dials. */
+const playgroundRestExecutionProxy = defineRestMiddleware(
+  "playgroundRestExecutionProxy",
+  z.string(),
+);
+
+/** The permission the playground asks of a signed-in person, on one project. */
+const PLAYGROUND_PERMISSION = "playground:view" as const;
 
 /** Every door a REST declaration may name, opened by this process or not. */
 export type ApiRestDoor = RestDoorCredential | "public";
 
-/** What the byte door's verifier left on a request it let through. */
-export type ApiRestBrowserCaller = Readonly<{ userId?: string | undefined }>;
+/**
+ * What this process's session verifier left on a request it resolved.
+ *
+ * Every field is optional and each answers a different question, because the
+ * two halves of verification fail apart: a cookie Better Auth accepted whose
+ * live session the auth module cannot resolve carries `authSessionId` and no
+ * `userId`, and reaches no handler.
+ */
+export type ApiRestBrowserCaller = Readonly<{
+  /** The signed-in person, absent for a verified cookie with no live session. */
+  userId?: string | undefined;
+  /** Their address, where the resolved session carried one. */
+  email?: string | undefined;
+  /** Who is acting as them, where somebody is. */
+  impersonator?:
+    | Readonly<{
+        id?: string | undefined;
+        name?: string | null | undefined;
+        email?: string | null | undefined;
+        image?: string | null | undefined;
+      }>
+    | undefined;
+  /** The project a key-credentialled byte caller stands for, where one did. */
+  apiKeyProjectId?: string | undefined;
+  /** The RAW verified auth-session id, before any live-session lookup. */
+  authSessionId?: string | undefined;
+}>;
 
 /**
  * The deployment secret that guards each internal family, by the family's own
@@ -86,7 +175,21 @@ export type ApiRestDoorConfig = Readonly<{
    * Absent, the byte door still MOUNTS - the routes exist and answer 401 -
    * rather than letting an unverified caller through.
    */
-  browserSession?: ((request: Request) => Promise<ApiRestBrowserCaller | null>) | undefined;
+  browserSession?: ApiBrowserSessionResolver | undefined;
+  /**
+   * The deployment's own Better Auth request boundary, where it composed one.
+   * Taken instead of a resolver: the live-session half is a module peer boot
+   * holds, so the process supplies only the half no module can - whether the
+   * cookie verifies. An explicit `browserSession` wins, for a host that
+   * composed the whole answer itself.
+   */
+  browserSessions?: ApiBrowserSessionTransport | undefined;
+  /**
+   * Where the OpenAI-compatible execution proxy answers, for the playground.
+   * Absent where this deployment named no NLP engine, and the playground then
+   * refuses by name rather than streaming at an address that is not there.
+   */
+  executionProxyBaseUrl?: string | undefined;
   /**
    * The process's ONE receipt ledger, behind every create a route declared
    * replayable. Absent on a deployment with no database, where a route
@@ -103,15 +206,33 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     config: ApiRestDoorConfig;
   }): ApiRestHost {
     const { peers, config } = options;
+    const authz = peers.app(AuthzApi);
     const credentials = ApiRestCredentials.create({
       apiKeys: peers.app(ApiKeyApi),
-      authz: peers.app(AuthzApi),
+      authz,
       organizations: peers.app(OrganizationApi),
     });
 
+    // The ONE session answer this process gives. The verifying half is the
+    // deployment's, the live-session half is the auth module's, and they are
+    // joined here so no door can compose a second pair.
+    const auth = peers.find(AuthApi);
+    const browserSession =
+      config.browserSession ??
+      (config.browserSessions && auth
+        ? composeApiBrowserSession({ sessions: config.browserSessions, auth })
+        : undefined);
+
     // The directory bearer is an ENTERPRISE module's, so a build without it
     // still mounts the SCIM family and admits nobody through it.
-    return new ApiRestHost(credentials, config, peers.find(ScimApi), peers.app(AuditLogApi));
+    return new ApiRestHost(
+      credentials,
+      config,
+      browserSession,
+      authz,
+      peers.find(ScimApi),
+      peers.app(AuditLogApi),
+    );
   }
 
   /** The project credential this door resolved, for the facts it binds. */
@@ -122,10 +243,20 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
    */
   private readonly callerCredentials = new WeakMap<RestCaller, ResolvedOrganizationApiKeyToken>();
   private readonly browserCallers = new WeakMap<Request, ApiRestBrowserCaller>();
+  /**
+   * The session answer for one request, resolved ONCE however many doors and
+   * facts ask for it. Three of this process's facts read a session on routes
+   * whose door resolves nobody, and a cookie verified four times per request
+   * is four round trips to the session store.
+   */
+  private readonly sessions = new WeakMap<Request, Promise<ApiRestBrowserCaller | null>>();
 
   private constructor(
     private readonly credentials: ApiRestCredentials,
     private readonly config: ApiRestDoorConfig,
+    /** This process's ONE session answer, where it composed a verifier. */
+    private readonly browserSession: ApiBrowserSessionResolver | undefined,
+    private readonly authz: AuthzApi,
     private readonly scim: Pick<ScimApi, "authenticateDirectory"> | undefined,
     private readonly auditLog: AuditLogApi,
   ) {}
@@ -176,7 +307,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       app,
       onError: familyErrors,
       facts: [
-        ...processRestFacts,
+        ...this.processFacts(),
         ...(door === "project" ? [this.projectFacts()] : []),
         ...((options?.facts ?? []) as readonly RestTransportMiddlewareBinding[]),
       ],
@@ -356,10 +487,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
    * describes, and nobody reaches a handler without a session.
    */
   private browserDoor(): RestIdentity {
-    const resolve = this.config.browserSession;
-    const session = async (request: Request): Promise<RestCaller> => {
-      const caller = await resolve?.(request);
-      if (!caller?.userId) throw refusalFor("browser");
+    const admit = async (request: Request): Promise<RestCaller | null> => {
+      const caller = await this.sessionOf(request);
+      if (!caller?.userId) return null;
       this.browserCallers.set(request, caller);
       recordBrowserCaller(request, { userId: caller.userId });
 
@@ -370,16 +500,113 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       authenticate: () => {
         throw new Error("The byte door asks no permission of the credential it was opened on.");
       },
-      identify: ({ request }) => session(request),
-      identifyOptional: async ({ request }) => {
-        const caller = await resolve?.(request);
-        if (!caller?.userId) return null;
-        this.browserCallers.set(request, caller);
-        recordBrowserCaller(request, { userId: caller.userId });
-
-        return { actor: { type: "user", id: caller.userId }, scope: null };
-      },
+      identify: async ({ request }) => (await admit(request)) ?? refuse("browser"),
+      identifyOptional: ({ request }) => admit(request),
     };
+  }
+
+  /**
+   * This process's session answer for one request, resolved once and shared by
+   * every door and fact that asks. A deployment that composed no verifier
+   * answers null for every request: the routes still MOUNT and each reader
+   * takes its own refusing branch.
+   */
+  private sessionOf(request: Request): Promise<ApiRestBrowserCaller | null> {
+    const resolved = this.sessions.get(request);
+    if (resolved) return resolved;
+
+    const resolving = this.browserSession?.(request) ?? Promise.resolve(null);
+    this.sessions.set(request, resolving);
+
+    return resolving;
+  }
+
+  /**
+   * Every fact this process answers on behalf of a module, for every mount.
+   * The six session-bearing ones are bound here because no module can verify a
+   * cookie, and three of them sit on routes whose door resolves nobody - so
+   * they read {@link sessionOf} directly, which is why the memo exists.
+   */
+  private processFacts(): readonly RestTransportMiddlewareBinding[] {
+    return [
+      // What this process knows about a caller that no module can: the address
+      // a request actually came from, behind the deployment's trusted proxies.
+      bindRestMiddleware(unsubscribeCallerAddress, (context) => apiClientAddress(context) ?? null),
+
+      bindRestMiddleware(adminActor, async (context) => {
+        const caller = await this.sessionOf(context.req.raw);
+        if (!caller?.userId) return null;
+
+        return {
+          id: caller.userId,
+          ...(caller.email ? { email: caller.email } : {}),
+          ...(caller.impersonator ? { impersonator: caller.impersonator } : {}),
+        };
+      }),
+      // A SEPARATE question from the actor's, and answered from the verified
+      // cookie alone: a process that conflated the two would start an
+      // impersonation against a session that had already expired.
+      bindRestMiddleware(adminAuthSession, async (context) => {
+        const caller = await this.sessionOf(context.req.raw);
+
+        return caller?.authSessionId ? { id: caller.authSessionId } : null;
+      }),
+
+      // The consent route is PUBLIC - no door runs on it - so the approver is
+      // read off the session directly, and the route answers its own 401.
+      bindRestMiddleware(mcpAuthorizeApprover, async (context) => {
+        const caller = await this.sessionOf(context.req.raw);
+
+        return caller?.userId ? { user: { id: caller.userId } } : null;
+      }),
+
+      // Who the byte door let in, read off the door's own answer: the read is
+      // counted against the key or the person.
+      bindRestMiddleware(userAvatarCaller, async (context) => {
+        const caller =
+          this.browserCallers.get(context.req.raw) ?? (await this.sessionOf(context.req.raw));
+
+        return {
+          apiKeyProjectId: caller?.apiKeyProjectId ?? null,
+          userId: caller?.userId ?? null,
+        };
+      }),
+
+      // The playground's door resolves nobody: the project travels in a
+      // header, so the signed-in person and their standing on it arrive as one
+      // fact and the route answers its own 401 and 403 from it.
+      bindRestMiddleware(playgroundRestCaller, (context) => this.playgroundCaller(context.req.raw)),
+      bindRestMiddleware(playgroundRestExecutionProxy, () => this.executionProxy()),
+    ];
+  }
+
+  /** The signed-in person and their standing on the project a header names. */
+  private async playgroundCaller(
+    request: Request,
+  ): Promise<
+    { kind: "anonymous" } | { kind: "signedIn"; userId: string; permitted: boolean }
+  > {
+    const caller = await this.sessionOf(request);
+    if (!caller?.userId) return { kind: "anonymous" };
+
+    const projectId = request.headers.get("x-project-id");
+    const permitted = projectId
+      ? await this.authz.hasPermission({
+          userId: caller.userId,
+          permission: PLAYGROUND_PERMISSION,
+          projectId,
+        })
+      : false;
+
+    return { kind: "signedIn", userId: caller.userId, permitted };
+  }
+
+  /** Where the playground streams through, or a refusal naming what is absent. */
+  private executionProxy(): string {
+    const proxy = this.config.executionProxyBaseUrl;
+    if (!proxy) throw new ApiRestCapabilityUnavailableError("NLP engine to proxy through");
+
+    return proxy;
   }
 
   /**
@@ -421,6 +648,11 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
 
 function refusalFor(door: string): ApiRestDoorUnverifiedError {
   return new ApiRestDoorUnverifiedError(door);
+}
+
+/** The same refusal, where the caller is an expression rather than a statement. */
+function refuse(door: string): never {
+  throw refusalFor(door);
 }
 
 /**

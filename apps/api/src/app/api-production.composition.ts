@@ -28,7 +28,9 @@ import {
   type BootedRuntime,
   type TransportPeers,
 } from "@langwatch/runtime-composition";
+import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import { ApiRestHost, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
+import type { ApiBrowserSessionTransport } from "./api-auth.composition.ts";
 import {
   ApiTrpcHost,
   type ApiTrpcNamespace,
@@ -162,6 +164,8 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
+    /** The address a prompt's deep link is built under: this deployment's public one. */
+    prompt: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl },
     /** Where a Studio graph runs; absent, workflow's runs refuse by name. */
     workflow: { nlpServiceUrl: config.infrastructure.modelProvider.nlpServiceUrl },
     /** The blob backends, as the api already parses them; a Map becomes the JSON shape the schema reads. */
@@ -353,6 +357,12 @@ export async function bootApiProcess(options: {
     | ((request: Request) => Promise<ApiRestBrowserCaller | null>)
     | undefined;
   /**
+   * The deployment's Better Auth request boundary, where it composed one. Boot
+   * joins it to the auth module's own live-session lookup, so a host supplies
+   * the one half no module can answer rather than the whole resolver.
+   */
+  readonly browserSessions?: ApiBrowserSessionTransport | undefined;
+  /**
    * The same cookie, resolved to the whole signed-in person, for the tRPC door.
    * A narrower answer than REST's on purpose: a procedure renders the person,
    * a byte route only needs to know there is one.
@@ -403,6 +413,11 @@ export async function bootApiProcess(options: {
 
   const idempotency = apiIdempotencyLedger({ config: processConfig, members });
 
+  const nlpServiceUrl = config.infrastructure.execution.nlpServiceUrl;
+  const executionProxyBaseUrl = nlpServiceUrl
+    ? HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: nlpServiceUrl })
+    : undefined;
+
   const runtime = await createApp<ProcessMembers>({
     role: "api",
     config: apiModuleConfig(config),
@@ -428,6 +443,10 @@ export async function bootApiProcess(options: {
           instanceAdminKey: config.instanceAdminApiKey,
           ...(idempotency ? { idempotency } : {}),
           ...(options.browserSession ? { browserSession: options.browserSession } : {}),
+          ...(options.browserSessions ? { browserSessions: options.browserSessions } : {}),
+          // The engine's address plus the proxy path, joined here because the
+          // path is the WORKFLOW module's and the address is the deployment's.
+          ...(executionProxyBaseUrl ? { executionProxyBaseUrl } : {}),
         },
       }),
       trpc: (trpc = ApiTrpcHost.create({
