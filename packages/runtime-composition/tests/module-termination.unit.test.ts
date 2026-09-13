@@ -13,10 +13,9 @@ import { defineRepositories } from "../src/repository-registry.ts";
  *
  * `withTransports`, `withWorkers`, `withTasks`, `withEventing` and
  * `withTransportFacts` all answer something a process can install as it
- * stands. `.build()` survives on that value as the identity, so an installer
- * written before that was true still compiles and still installs the same
- * module. Both spellings are asserted here, because a regression in either is
- * a regression in 49 installers at once.
+ * stands. There is nothing left to build past that point, so the value
+ * carries no `.build()` at all - the deprecated identity that once stood in
+ * for it is gone now that every installer states its own terminator.
  */
 
 type Equal<Left, Right> =
@@ -60,10 +59,6 @@ const catalogueRest = {
 const withoutBuild = defineServerModule("annotation")
   .withApp(CatalogueApp)
   .withTransports(catalogueRest);
-const withBuild = defineServerModule("annotation")
-  .withApp(CatalogueApp)
-  .withTransports(catalogueRest)
-  .build();
 
 describe("given a module that states its doors", () => {
   describe("when it is spelled without a terminator", () => {
@@ -91,26 +86,11 @@ describe("given a module that states its doors", () => {
     });
   });
 
-  describe("when it is spelled with the vestigial terminator", () => {
-    it("infers exactly what the terminator-free spelling infers", () => {
-      type _config = Expect<
-        Equal<ModuleConfigFor<[typeof withBuild]>, ModuleConfigFor<[typeof withoutBuild]>>
-      >;
-      type _name = Expect<Equal<(typeof withBuild)["name"], (typeof withoutBuild)["name"]>>;
-      type _transports = Expect<
-        Equal<(typeof withBuild)["transports"], (typeof withoutBuild)["transports"]>
-      >;
-      const installable: InstallableServerFeature<Members, "annotation", Config> = withBuild;
+  describe("when the vestigial terminator is looked for", () => {
+    it("is not there to find", () => {
+      type _noBuild = Expect<Equal<"build" extends keyof typeof withoutBuild ? true : false, false>>;
 
-      expect(installable.name).toBe("annotation");
-    });
-
-    it("answers the very value it was called on, so it installs the same module", () => {
-      const terminated = withoutBuild.build();
-
-      expect(terminated).toBe(withoutBuild);
-      expect(terminated.build()).toBe(withoutBuild);
-      expect(terminated.install).toBe(withoutBuild.install);
+      expect("build" in withoutBuild).toBe(false);
     });
   });
 
@@ -127,7 +107,7 @@ describe("given a module that states its doors", () => {
       expect(installable.name).toBe("annotation");
       expect(contributed.workers).toEqual(["consumer"]);
       expect(contributed.tasks).toEqual(["backfill"]);
-      expect(contributed.build()).toBe(contributed);
+      expect("build" in contributed).toBe(false);
     });
   });
 });
@@ -177,6 +157,6 @@ describe("given a module that owns repositories", () => {
     const installable: InstallableServerFeature<Members, "annotation", Config> = stored;
 
     expect(installable.name).toBe("annotation");
-    expect(stored.build()).toBe(stored);
+    expect("build" in stored).toBe(false);
   });
 });

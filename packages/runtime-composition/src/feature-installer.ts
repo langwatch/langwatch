@@ -1432,7 +1432,9 @@ class UnconfiguredAppBuilder<
  * This is the one termination rule: the moment a module states a contribution
  * - its doors, its workers, its tasks, its eventing, the facts it binds - it
  * is installable, and it stays installable through every further call. There
- * is nothing left to build, which is why `build()` below is the identity.
+ * is nothing left to build, which is why this type carries no `build()`: the
+ * deprecated identity that once stood in for the installers written before
+ * that was true is gone now that none of them call it.
  */
 export type ModuleContributions<
   Declaration,
@@ -1458,14 +1460,6 @@ export type ModuleContributions<
     withEventing<Definition>(
       eventing: FeatureEventing<Repositories, App, unknown, Definition>,
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
-    /**
-     * @deprecated Vestigial. Every `defineServerModule` call already answers
-     * something installable, so this is the identity: it returns the same
-     * declaration it was called on. It survives only so the installers written
-     * before that was true keep compiling, and it will be removed once they
-     * have dropped it.
-     */
-    build(): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
   }>;
 
 /** A built declaration, as the facts wrapper reads the two fields it needs. */
@@ -1530,9 +1524,6 @@ function withContributions<
     withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
       withContributions(bindingTransportFacts(declaration, bind), workers, tasks, eventing),
     withEventing: (next: FeatureEventing) => withContributions(declaration, workers, tasks, next),
-    // The one termination rule: there is nothing left to build, so `.build()`
-    // hands back what it was called on. See the deprecation on the type.
-    build: () => contributions,
   } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
 
   return contributions;

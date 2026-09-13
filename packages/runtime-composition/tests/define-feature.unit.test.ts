@@ -43,8 +43,7 @@ const directoryApis = [
 ] as const;
 const directoryWithTransports = defineServerModule("annotation")
   .withApp(ComposedDirectoryApp)
-  .withTransports(...directoryApis)
-  .build();
+  .withTransports(...directoryApis);
 
 describe("defineServerModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {

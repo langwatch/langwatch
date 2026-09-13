@@ -74,8 +74,7 @@ describe("given a feature whose server declares transports", () => {
     it("mounts every declared family on the REST door", async () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueRest)
-        .build();
+        .withTransports(catalogueRest);
       const rest = recordingRestHost();
 
       const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
@@ -90,8 +89,7 @@ describe("given a feature whose server declares transports", () => {
     it("binds the handler's application to the feature's own app", async () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueTrpc)
-        .build();
+        .withTransports(catalogueTrpc);
 
       const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ trpc: recordingTrpcHost() })
@@ -106,8 +104,7 @@ describe("given a feature whose server declares transports", () => {
     it("keys each mounted namespace by the name its declaration carries", async () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueTrpc)
-        .build();
+        .withTransports(catalogueTrpc);
 
       const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ trpc: recordingTrpcHost() })
@@ -121,8 +118,7 @@ describe("given a feature whose server declares transports", () => {
       const rest = recordingRestHost();
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueRest)
-        .build();
+        .withTransports(catalogueRest);
 
       await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
@@ -139,8 +135,7 @@ describe("given a feature whose server declares transports", () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
-        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }])
-        .build();
+        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }]);
 
       await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
@@ -157,8 +152,7 @@ describe("given a feature whose server declares transports", () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
-        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }])
-        .build();
+        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }]);
 
       await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
@@ -181,8 +175,7 @@ describe("given a feature whose server declares transports", () => {
           bound += 1;
 
           return [];
-        })
-        .build();
+        });
 
       await createApp({ role: "worker", members: memberSourceOf({}) })
         .withModules([server])
@@ -196,8 +189,7 @@ describe("given a feature whose server declares transports", () => {
     it("refuses at boot, naming the feature and the protocol", async () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueTrpc)
-        .build();
+        .withTransports(catalogueTrpc);
 
       await expect(
         createApp({ role: "api", members: memberSourceOf({}) })
@@ -212,8 +204,7 @@ describe("given a feature whose server declares transports", () => {
     it("refuses at boot, naming both", async () => {
       const dataset = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueTrpc)
-        .build();
+        .withTransports(catalogueTrpc);
       const monitor = defineServerModule("monitor")
         .withApp(
           class MonitorApp {
@@ -224,8 +215,7 @@ describe("given a feature whose server declares transports", () => {
             }
           },
         )
-        .withTransports(catalogueTrpc)
-        .build();
+        .withTransports(catalogueTrpc);
 
       await expect(
         createApp({ role: "api", members: memberSourceOf({}) })
@@ -240,8 +230,7 @@ describe("given a feature whose server declares transports", () => {
     it("mounts nothing, because a worker serves no door", async () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
-        .withTransports(catalogueRest, catalogueTrpc)
-        .build();
+        .withTransports(catalogueRest, catalogueTrpc);
       const rest = recordingRestHost();
 
       const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })

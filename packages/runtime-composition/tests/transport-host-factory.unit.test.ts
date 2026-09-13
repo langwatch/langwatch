@@ -44,8 +44,7 @@ function doorFrom(peers: TransportPeers): FeatureRestHost<MountedRest> {
 
 const datasetModule = defineServerModule("dataset")
   .withApp(CatalogueApp)
-  .withTransports(catalogueRest)
-  .build();
+  .withTransports(catalogueRest);
 
 describe("given a process whose doors are built from its own modules", () => {
   describe("when the application names its doors as a factory", () => {
