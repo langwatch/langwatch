@@ -6,8 +6,8 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
-import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
 import type { CallRecord } from "./call-record.ts";
+import type { VoiceTransport } from "./voice-transport.ts";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport.ts";
 import { phoneTransport } from "./transports/phone.transport.ts";
 

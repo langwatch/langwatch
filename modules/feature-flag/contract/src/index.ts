@@ -129,4 +129,5 @@ export {
   publicAnonymousFlagMapSchema,
 } from "./public-anonymous-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags.ts";
+export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voiceAgents.message.ts";
 export * from "./feature-flag.api.ts";

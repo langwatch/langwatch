@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "../../scenario-run.ts";
 import type { CallRecord } from "../call-record";
 import {
   phoneTransport,

@@ -11,9 +11,9 @@
 
 import { HandledError } from "@langwatch/handled-error";
 
-import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
-import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "@langwatch/feature-flag-contract";
+import { ScenarioRunStatus } from "../scenario-run.ts";
+import type { VoiceTransport } from "./voice-transport.ts";
 import {
   type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,

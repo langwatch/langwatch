@@ -8,7 +8,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
+import type { VoiceTransport } from "./voice-transport.ts";
 
 export type CallTurnRole = "caller" | "agent";
 

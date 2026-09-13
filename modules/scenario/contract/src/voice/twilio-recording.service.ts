@@ -13,8 +13,18 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
-import type { TwilioCredential } from "~/server/gateway/twilioCredential.service";
 import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";
+
+/**
+ * The subset of the stored Twilio account credential this file reads to
+ * authenticate a REST call. The full shape (also carrying the origination
+ * number) lives server-side in `modules/gateway/server`, which has no
+ * contract-legal home to publish it from yet — see the handoff's Risks.
+ */
+export interface TwilioCredential {
+  accountSid: string;
+  authToken: string;
+}
 
 /** The Twilio REST API host. Recording `uri`s come back relative to it. */
 const TWILIO_API_BASE = "https://api.twilio.com";

@@ -28,10 +28,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import {
-  VOICE_TRANSPORTS,
-  type VoiceTransport,
-} from "~/server/agents/voice/voice-agent.config";
+import { VOICE_TRANSPORTS, type VoiceTransport } from "./voice-transport.ts";
 
 /** The claims carried in a signed voice session token. */
 export interface VoiceSessionTokenPayload {
