@@ -25,6 +25,7 @@
  */
 import { PULLED_USAGE_EVENT_TYPES } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
 import type { PulledUsageProcessingEvent } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import { GOVERNANCE_COST_SOURCE } from "@ee/governance/projections/governanceCostRollup.constants";
 import { nanoid } from "nanoid";
 import { beforeEach, vi } from "vitest";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
@@ -84,7 +85,18 @@ function buildDefinition(compareDay: ReturnType<typeof vi.fn>) {
 
 /** The runtime as a fresh `beforeEach` leaves it. */
 function freshRuntime(): WatchRuntime {
-  const compareDay = vi.fn().mockResolvedValue(undefined);
+  // Agreement, not `undefined`: the handler reads the mismatches back to
+  // decide whether to look again, so a stub that answers nothing is a stub the
+  // handler cannot use. These suites are about which comparisons are ASKED
+  // for; what the ladder does with a disagreement is next door, in
+  // `costRollupWatch.settling.unit.test.ts`.
+  const compareDay = vi.fn().mockResolvedValue({
+    day: "",
+    costSource: GOVERNANCE_COST_SOURCE.PULLED,
+    mismatches: [],
+    lagMs: 0,
+    behind: [],
+  });
   const definition = buildDefinition(compareDay);
   const store = new InMemoryProcessStore();
   return {

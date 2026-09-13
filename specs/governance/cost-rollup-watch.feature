@@ -281,7 +281,7 @@ Feature: The daily cost check is driven by the charges, not by a clock
       Then the second has nothing marked
       And the second has no check armed
 
-  Rule: A check waits for the summary to catch up rather than calling it drift
+  Rule: A disagreement is drift only once it has survived every look
 
     # The summary and the check are driven by two separate queues, and nothing
     # orders one against the other. A charge landing shortly before the slot
@@ -291,10 +291,57 @@ Feature: The daily cost check is driven by the charges, not by a clock
     # day cleared, because a comparison that answers is a comparison that
     # happened and nothing marks the day again.
     #
-    # Every summary row already carries the newest charge moment folded into
-    # it, and the check re-derives the same figure from the day's charges, so
-    # "the summary has not caught up" is a question the two sides can answer
-    # between themselves without anything new being stored.
+    # At the moment of looking, a summary that is behind and a summary that is
+    # wrong are the same picture. What tells them apart is time: a fold that is
+    # behind catches up, and drift does not. So a disagreement costs a rung of
+    # the check's retry ladder instead of an alert, and only one still standing
+    # on the last rung — some seven and a half minutes of looking later — is
+    # counted and logged.
+    #
+    # The ladder already existed, for comparisons that fail outright. This
+    # spends it on comparisons that merely disagree, which costs nothing: a
+    # comparison is a read.
+
+    @unit
+    Scenario: A disagreement found before the last look is looked at again
+      Given a day whose summary and charges state different money
+      And the check has looks left
+      When the check compares that day
+      Then no drift is counted for that day
+      And the comparison is left to be attempted again
+
+    @unit
+    Scenario: A disagreement over a charge older than the summary's newest is looked at again
+      Given a charge the summary has not folded that is older than the ones it has
+      When the check compares that day
+      Then no drift is counted for that day
+      And the comparison is left to be attempted again
+      # A late arrival stamped before the newest charge already folded cannot
+      # move the summary's own watermark, so the summary reads as current. The
+      # fold is order-independent by design, so this is ordinary rather than
+      # pathological — and it is why looking again is not optional.
+
+    @unit
+    Scenario: A disagreement that survives every look is counted and logged
+      Given a day whose summary and charges state different money
+      And the check is on its last look
+      When the check compares that day
+      Then the drift is counted
+      And the detail is in the log
+      And the comparison is recorded as answered rather than given up
+      # Answered, not dead. A comparison that gave up is filed as an outbox
+      # failure, where nobody reads it — and real drift is the one finding this
+      # whole process exists to surface.
+
+    @unit
+    Scenario: A disagreement the summary settles between looks is never reported
+      Given a day whose summary and charges state different money
+      And the summary catches up before the next look
+      When the check compares that day again
+      Then no drift is counted for that day
+      And nothing is written to the log about that day
+      # The guard on all of the above. Without it, a check that simply reported
+      # every disagreement on its last look would satisfy the rest.
 
     @integration
     Scenario: A charge the summary has not folded yet is waited for rather than counted as drift
@@ -306,33 +353,61 @@ Feature: The daily cost check is driven by the charges, not by a clock
       When the summary catches up with that charge
       Then the next attempt compares the day once and finds it agrees
 
+  Rule: What one comparison can see of a summary that is still folding
+
+    # Every summary row carries the newest charge moment folded into it, and
+    # the check re-derives the same figure from the day's charges, so a summary
+    # strictly behind its charges says so in its own numbers. That is the cheap
+    # signal, and it puts a named reason on the first retry.
+    #
+    # It is one-sided, and the asymmetry is the point: a maximum cannot count.
+    # Two charges sharing one moment leave it unmoved, so a summary that folded
+    # one of them reads as level with a check that folded both. Nothing else in
+    # the row does better, and an exact count of applied events would be a new
+    # column every existing row lacks. So nothing may read this signal's
+    # silence as permission to call a disagreement drift — that is the ladder's
+    # judgment, above, and this only ever explains it.
+
     @unit
-    Scenario: A summary that already covers every charge of the day is compared as before
+    Scenario: A charge the summary has not folded yet is named as still folding
+      Given a pulled charge landed after the newest one the summary has folded
+      When the check compares that day
+      Then the cell is named as still folding, with both moments on it
+
+    @unit
+    Scenario: A summary that covers every charge of the day is named as behind by nothing
       Given a day whose summary covers every charge it holds
       When the check compares that day
-      Then drift between the two figures is reported as before
-      # The guard on the guard. Without it, a check that refused to compare
-      # anything at all would satisfy every scenario above.
+      Then nothing is named as still folding
+      And the difference between the two figures is stated
 
     @unit
-    Scenario: A cell the summary holds nothing for is waited for
+    Scenario: A cell the summary holds nothing for is named as still folding
       Given a pulled charge whose rollup cell the summary holds no row for
       When the check compares that day
-      Then no drift is reported for that day
-      And the comparison is left to be attempted again
+      Then the cell is named as still folding, with nothing folded into it
       # A cell the charges describe and the summary has never heard of is the
-      # strongest form of behind, not a separate condition. Only time tells it
-      # apart from a fold that will never run, and the retry ladder is how that
-      # time is spent.
+      # strongest form of behind, not a separate condition.
 
     @unit
-    Scenario: A charge carrying no usable moment never parks the check
+    Scenario: A charge carrying no usable moment is never named as still folding
       Given a pulled charge that carries no moment the summary can be measured against
       When the check compares that day
-      Then the day is compared rather than waited on
+      Then nothing is named as still folding
       # There is no evidence the summary is behind anything, and reading "we
-      # cannot tell" as "wait" would park that day in the retry ladder until it
-      # died, on every run, forever.
+      # cannot tell" as "behind" would put every such day on the slowest path
+      # it has, on every run, forever.
+
+    @unit
+    Scenario: A charge sharing its moment with a folded one leaves the watermarks level
+      Given two charges on one cell stamped with the same moment
+      And the summary has folded only one of them
+      When the check compares that day
+      Then nothing is named as still folding
+      And the difference between the two figures is stated
+      # The blind spot, pinned so nobody builds on this signal again. Provider
+      # exports commonly bucket timestamps, so this is the ordinary case rather
+      # than a contrived one.
 
   Rule: A failing comparison is retried, and never holds up the money
 
@@ -365,13 +440,14 @@ Feature: The daily cost check is driven by the charges, not by a clock
       # to the money rather than to the confidence in it.
 
     @integration
-    Scenario: Drift found by a comparison is counted and logged, exactly as before
+    Scenario: Drift that outlives every look is counted and logged
       Given a day's summary no longer matches its recorded charges
-      When the comparison for that day runs
+      When the comparison for that day runs out of looks
       Then the drift is counted
       And the detail is in the log
-      # The comparison itself is untouched by this change. Stated here so a
-      # rewrite of how it is triggered cannot quietly change what it reports.
+      # What the comparison REPORTS is untouched by any of this — the counter
+      # and both figures on the line. Stated here so a rewrite of when it is
+      # trusted cannot quietly change what it says.
 
     @integration
     Scenario: A comparison that gave up is not picked up by a later check

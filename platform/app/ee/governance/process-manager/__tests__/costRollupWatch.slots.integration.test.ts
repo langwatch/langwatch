@@ -19,6 +19,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { COST_ROLLUP_WATCH_MAX_ATTEMPTS } from "../costRollupWatch.process";
 import { createWatchHarness } from "./costRollupWatch.integration.harness";
 import {
   NOW,
@@ -38,9 +39,18 @@ describe("recognising a repeat of one check slot", () => {
       await h.writeSummary({ amountNanoMinor: 9_999_000_000 });
       await h.record(h.charge());
       await h.runDueCheck();
-      await h.drainOutbox();
+      // Through the whole ladder, so the drift is actually reported once: a
+      // count taken before the last look would be unchanged either way, and
+      // the assertion at the end of this test would then hold whether or not
+      // the replay reported a second time.
+      await h.drainThroughRetries({ passes: COST_ROLLUP_WATCH_MAX_ATTEMPTS });
       const driftAfterFirst = await h.mismatchCount();
-      expect(h.daysComparedFor()).toEqual([TODAY]);
+      // One entry per look, all of them the same day: the ladder asks again,
+      // it does not ask about something else.
+      const everyLook = Array<string>(COST_ROLLUP_WATCH_MAX_ATTEMPTS).fill(
+        TODAY,
+      );
+      expect(h.daysComparedFor()).toEqual(everyLook);
 
       // The redelivery this design expects: the slot comes round again — a
       // check that ran and crashed before being recorded as done — so the
@@ -71,7 +81,7 @@ describe("recognising a repeat of one check slot", () => {
       expect(replay.duplicateMessageKeys).toEqual([
         h.outboxKey(`compare:${TODAY}:${TONIGHT}:${marks}`),
       ]);
-      expect(h.daysComparedFor()).toEqual([TODAY]);
+      expect(h.daysComparedFor()).toEqual(everyLook);
       // Asserted alongside the run because a second pass of a read-only
       // comparison is otherwise invisible while it doubles what we report.
       expect(await h.mismatchCount()).toBe(driftAfterFirst);

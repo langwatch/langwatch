@@ -87,65 +87,30 @@ export interface CostRollupCellMismatch {
   derivedNanoMinor: number | null;
 }
 
+/**
+ * What one comparison saw. An observation, not a verdict.
+ *
+ * Nothing here is logged or counted by the act of producing it. Whether a
+ * disagreement is drift or a summary the fold has not caught up with is not
+ * knowable from one look — see `costRollupWatch.process.ts`, which decides it
+ * by asking again — so this reports the figures and leaves the judging to the
+ * caller that knows how many looks it has left.
+ */
 export interface CostRollupComparison {
   day: string;
   costSource: ComparedCostSource;
   mismatches: CostRollupCellMismatch[];
   lagMs: number;
-}
-
-/**
- * The day's summary has not folded every charge the day holds yet, so there is
- * nothing honest to compare it against.
- *
- * A refusal to answer rather than an answer of "drift". The fold and the check
- * run on independent queues, so a charge landing shortly before the check's
- * slot can be re-derived here while its own projection job is still queued —
- * and the only thing that fixes that is waiting. Throwing is how this asks to
- * be asked again: the caller is the process manager's outbox, whose retry
- * ladder (`costRollupWatch.process.ts`) is exactly that wait. Returning a
- * comparison instead would publish a false alarm AND clear the day, because a
- * comparison that returns is a comparison that happened.
- *
- * A plain `Error`, not a `HandledError`: nothing here reaches a customer, and
- * dressing an internal wait up as a handled fault would promise a reader an
- * action they do not have. What an operator needs is on the warn line and on
- * the lag gauge, both written before this is raised.
- *
- * If every attempt in the ladder sees the summary still behind, the row dies
- * in the outbox and the day goes uncompared — reported as lag, which is what a
- * projection that stopped folding actually is, rather than as drift.
- */
-export class CostRollupSummaryBehindError extends Error {
-  readonly tenantId: string;
-  readonly day: string;
-  readonly costSource: ComparedCostSource;
-  readonly cells: readonly CostRollupCellBehind[];
-  readonly lagMs: number;
-
-  constructor({
-    tenantId,
-    day,
-    costSource,
-    cells,
-    lagMs,
-  }: {
-    tenantId: string;
-    day: string;
-    costSource: ComparedCostSource;
-    cells: readonly CostRollupCellBehind[];
-    lagMs: number;
-  }) {
-    super(
-      `Governance cost rollup for ${day} is still catching up: ${cells.length} cell(s) behind the events of that day`,
-    );
-    this.name = "CostRollupSummaryBehindError";
-    this.tenantId = tenantId;
-    this.day = day;
-    this.costSource = costSource;
-    this.cells = cells;
-    this.lagMs = lagMs;
-  }
+  /**
+   * Cells whose summary row demonstrably has not folded every charge this
+   * comparison re-derived.
+   *
+   * Evidence, not a gate. Empty does NOT mean the summary is complete — the
+   * watermark it rests on is a maximum of provider timestamps, so two charges
+   * sharing one timestamp leave it unmoved. A non-empty list is proof of
+   * catching-up; an empty one is merely the absence of that proof.
+   */
+  behind: CostRollupCellBehind[];
 }
 
 /**
@@ -155,8 +120,14 @@ export class CostRollupSummaryBehindError extends Error {
  * It does NOT self-heal, and that is the decision rather than an omission. A
  * comparator that quietly rewrote the row it disagreed with would erase the
  * only evidence of why the two ever diverged, and the next divergence would
- * look like the first. So a mismatch increments a counter, names both figures
- * on a log line, and leaves the row exactly as it found it.
+ * look like the first. So a mismatch is named on a log line and the row is
+ * left exactly as it was found.
+ *
+ * It does not decide, either. Looking is cheap and safe to repeat; declaring
+ * drift is neither, and a single look cannot tell drift from a fold that is
+ * seconds behind. So `compareDay` only ever reports what it saw, and
+ * `reportCostRollupDrift` — the counter and the error line — is left for the
+ * caller that knows whether the disagreement has outlived its retries.
  *
  * It reads both sides through the SAME repository the fold writes with, so the
  * watchdog cannot be right about a read the product does differently.
@@ -192,9 +163,10 @@ export class CostRollupComparatorService {
       ),
     );
 
-    // Stated before the check can either refuse or report, because the lag is
-    // what an operator reads in both cases: it is the gauge that tells a
-    // summary catching up apart from a summary that has stopped.
+    // Stated on every comparison, including the ones the caller goes on to
+    // retry, because the lag is what tells a summary catching up apart from a
+    // summary that has stopped — and the retried looks are exactly where an
+    // operator needs to see which of the two is happening.
     const lagMs = computeCostRollupLagMs({
       latestEventOccurredAtMs,
       latestSummarizedOccurredAtMs: latestSummarizedMs,
@@ -206,77 +178,19 @@ export class CostRollupComparatorService {
       seconds: lagMs / 1000,
     });
 
-    // Refusing costs one retry; reporting would cost a false alarm AND clear
-    // the day, because a comparison that returns is a comparison that happened
-    // and nothing marks the day again.
-    const behind = cellsBehindTheirEvents({
-      derived,
-      summarized: summarizedByKey,
-    });
-    if (behind.length > 0) {
-      logger.warn(
-        {
-          tenantId,
-          day,
-          cost_source: costSource,
-          cells_behind: behind.length,
-          lag_ms: lagMs,
-          derived_last_event_occurred_at_ms:
-            behind[0]?.derivedLastEventOccurredAtMs,
-          summarized_last_event_occurred_at_ms:
-            behind[0]?.summarizedLastEventOccurredAtMs,
-        },
-        "Governance cost rollup has not folded every charge of the day being checked; waiting rather than reporting drift",
-      );
-      throw new CostRollupSummaryBehindError({
-        tenantId,
-        day,
-        costSource,
-        cells: behind,
-        lagMs,
-      });
-    }
-
-    const mismatches = collectMismatches({
-      derived,
-      summarized: summarizedByKey,
-    });
-    this.report({ tenantId, day, costSource, mismatches });
-
-    return { day, costSource, mismatches, lagMs };
-  }
-
-  /** Counts each mismatch and names both figures on a line, one cell at a time. */
-  private report({
-    tenantId,
-    day,
-    costSource,
-    mismatches,
-  }: {
-    tenantId: string;
-    day: string;
-    costSource: ComparedCostSource;
-    mismatches: readonly CostRollupCellMismatch[];
-  }): void {
-    for (const mismatch of mismatches) {
-      incrementGovernanceCostRollupMismatch(costSource);
-      logger.error(
-        {
-          tenantId,
-          day,
-          cost_source: costSource,
-          provider: mismatch.cell.provider,
-          model: mismatch.cell.model,
-          raw_actor_id: mismatch.cell.rawActorId,
-          // The currency is on the line because the two amounts below are in
-          // it, and a figure without its denomination is not a figure.
-          currency_code: mismatch.cell.currencyCode,
-          summarized_nano_minor: mismatch.summarizedNanoMinor,
-          derived_nano_minor: mismatch.derivedNanoMinor,
-        },
-        "Governance cost rollup disagrees with the events it was derived from",
-      );
-    }
+    return {
+      day,
+      costSource,
+      mismatches: collectMismatches({
+        derived,
+        summarized: summarizedByKey,
+      }),
+      lagMs,
+      behind: cellsBehindTheirEvents({
+        derived,
+        summarized: summarizedByKey,
+      }),
+    };
   }
 
   /**
@@ -302,6 +216,55 @@ export class CostRollupComparatorService {
       cells.set(key, projection.apply(state, event as never));
     }
     return cells;
+  }
+}
+
+/**
+ * Says, once and for the record, that a comparison's disagreement is real.
+ *
+ * Separate from `compareDay` because comparing is cheap and repeatable while
+ * saying so is neither: this increments the mismatch counter an alert reads
+ * and writes the error line an operator is paged on. Only the caller holding
+ * the retry ladder knows whether a disagreement has been looked at enough
+ * times to deserve that, so only it may call this — see the intent handler in
+ * `costRollupWatch.process.ts`. Calling it on every look would count one
+ * fold-lag several times over and page on a number that was about to settle.
+ *
+ * Counts and names every mismatch one cell at a time; a comparison that found
+ * none is a no-op, so the caller need not guard it.
+ */
+export function reportCostRollupDrift({
+  tenantId,
+  comparison,
+}: {
+  tenantId: string;
+  comparison: CostRollupComparison;
+}): void {
+  const { day, costSource } = comparison;
+  for (const mismatch of comparison.mismatches) {
+    incrementGovernanceCostRollupMismatch(costSource);
+    logger.error(
+      {
+        tenantId,
+        day,
+        cost_source: costSource,
+        provider: mismatch.cell.provider,
+        model: mismatch.cell.model,
+        raw_actor_id: mismatch.cell.rawActorId,
+        // The currency is on the line because the two amounts below are in
+        // it, and a figure without its denomination is not a figure.
+        currency_code: mismatch.cell.currencyCode,
+        summarized_nano_minor: mismatch.summarizedNanoMinor,
+        derived_nano_minor: mismatch.derivedNanoMinor,
+        lag_ms: comparison.lagMs,
+        // Present on a line that reports drift because it is the first thing
+        // that makes a reader doubt it: a summary still visibly behind here
+        // has been behind for the whole ladder, which is a stopped fold
+        // wearing drift's clothes.
+        cells_behind: comparison.behind.length,
+      },
+      "Governance cost rollup disagrees with the events it was derived from",
+    );
   }
 }
 
@@ -365,11 +328,16 @@ function governanceCostRollupKeyOfRow(row: GovernanceCostRollupRow): string {
   });
 }
 
-/** The slice of the comparator a caller that only checks a day needs. */
+/**
+ * The slice of the comparator a caller that only checks a day needs.
+ *
+ * The comparison comes back rather than being swallowed: the caller has to
+ * read the mismatches to decide whether to accept them or look again.
+ */
 export interface CostRollupComparatorDayComparer {
   compareDay(params: {
     tenantId: string;
     day: string;
     costSource: ComparedCostSource;
-  }): Promise<unknown>;
+  }): Promise<CostRollupComparison>;
 }

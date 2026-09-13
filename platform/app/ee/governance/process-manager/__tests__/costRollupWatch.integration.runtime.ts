@@ -103,7 +103,7 @@ export interface WatchRuntime {
    * the recorder around it stays the same, so "which comparisons were asked
    * for" reads the same way in every scenario.
    */
-  compareDayImpl: (params: CompareParams) => Promise<unknown>;
+  compareDayImpl: (params: CompareParams) => Promise<CostRollupComparison>;
   compareDayCalls: CompareParams[];
   comparisons: CostRollupComparison[];
   config: WatchConfig;
@@ -256,7 +256,7 @@ export function outboxKey(
 export async function compareForReal(
   runtime: WatchRuntime,
   params: CompareParams,
-): Promise<unknown> {
+): Promise<CostRollupComparison> {
   const comparison = await runtime.realComparator.compareDay({
     tenantId: params.tenantId,
     day: params.day,
@@ -266,6 +266,24 @@ export async function compareForReal(
   return comparison;
 }
 
+/**
+ * What a stub comparator answers when the test does not care what was found:
+ * agreement.
+ *
+ * A bare `undefined` would have done while the handler only ever called the
+ * comparator, but it now READS the answer to decide whether to look again, so
+ * a stub has to say something a real comparison could have said.
+ */
+export function agreedComparison(params: CompareParams): CostRollupComparison {
+  return {
+    day: params.day,
+    costSource: GOVERNANCE_COST_SOURCE.PULLED,
+    mismatches: [],
+    lagMs: 0,
+    behind: [],
+  };
+}
+
 /** Everything a fresh test starts from, applied onto the stable runtime box. */
 export function resetPerTest(runtime: WatchRuntime): void {
   runtime.tenantSeq += 1;
@@ -273,7 +291,7 @@ export function resetPerTest(runtime: WatchRuntime): void {
   runtime.clock = NOW;
   runtime.compareDayCalls = [];
   runtime.comparisons = [];
-  runtime.compareDayImpl = async () => undefined;
+  runtime.compareDayImpl = async (params) => agreedComparison(params);
 
   const { config } = buildDefinition(runtime.comparator);
   runtime.config = config as WatchConfig;

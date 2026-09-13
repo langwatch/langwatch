@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Whether a day's summary has folded everything the day's events hold.
+ * Cheap, one-sided evidence that a day's summary has not folded everything the
+ * day's events hold.
  *
  * The fold and the drift check are driven by two independent queues — the
  * projection queue keyed by rollup cell, the process manager's subscriber
@@ -12,12 +13,34 @@
  * and report the difference as drift: a false alarm on a rollup that is
  * perfectly correct and merely seconds behind.
  *
- * The watermark that settles it is already on every row. `LastEventOccurredAt`
- * is the running maximum of the `occurredAt` of every event the fold applied to
+ * `LastEventOccurredAt` is the cheapest signal that this is happening. It is
+ * the running maximum of the `occurredAt` of every event the fold applied to
  * that cell (`AbstractFoldProjection.apply`), and the re-fold the comparator
- * runs maintains the very same field on the state it derives. So both sides
- * carry the same quantity computed by the same code, and a summary strictly
- * behind its events says so in its own numbers.
+ * runs maintains the very same field on the state it derives — the same
+ * quantity from the same code on both sides. A summary strictly behind its
+ * events therefore says so in its own numbers.
+ *
+ * ONE-SIDED, and the asymmetry is the whole point. A maximum cannot count, so
+ * a non-empty answer proves the summary is behind while an empty one proves
+ * nothing at all:
+ *
+ *   - two events on the same cell carrying the SAME `occurredAt` (provider
+ *     exports commonly bucket timestamps) leave the maximum unmoved, so the
+ *     side that folded one of them and the side that folded both read as level;
+ *   - an event arriving late but stamped OLDER than the maximum cannot move it
+ *     either, and the fold is explicitly order-independent
+ *     (`governanceCostRollup.foldProjection.ts`), so this is ordinary, not
+ *     pathological.
+ *
+ * Nothing else in the row does better: `lastObservedAt` and `revisionCount` are
+ * a maximum and an admitted under-count. An exact per-cell applied-event count
+ * would settle it, but it is a new ClickHouse column that no existing row
+ * carries, and every one of them would read as behind forever until a rebuild.
+ *
+ * So this stays the fast path, and the real judgment is elsewhere: a
+ * disagreement is drift only once it has survived the check's retry ladder
+ * (`costRollupWatch.process.ts`). What this buys is a named reason on the first
+ * retry instead of a shrug.
  *
  * Pure, and deliberately says nothing about what a caller should do with the
  * answer — the waiting belongs at the seam that can retry.
@@ -48,9 +71,12 @@ interface HasEventWatermark {
 }
 
 /**
- * The cells the summary is still catching up on, in the order the re-fold
- * produced them. Empty means the summary covers every event of the day, so its
- * figures can be held against them.
+ * The cells the summary is PROVABLY still catching up on, in the order the
+ * re-fold produced them.
+ *
+ * Empty does not mean caught up — see the asymmetry at the top of this file.
+ * It means this signal has nothing to say, which is why no caller may read it
+ * as permission to call a disagreement drift.
  *
  * A derived watermark of zero is never reported. It means the day's events for
  * that cell carried no usable moment, so there is no evidence the summary is

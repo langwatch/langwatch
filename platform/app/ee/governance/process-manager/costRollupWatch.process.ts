@@ -10,12 +10,134 @@ import { GOVERNANCE_COST_SOURCE } from "../projections/governanceCostRollup.cons
 import {
   COMPARED_COST_SOURCES,
   type CostRollupComparatorDayComparer,
+  reportCostRollupDrift,
 } from "../services/costRollupComparator.service";
 
 const logger = createLogger("langwatch:governance:cost-rollup:watch");
 
 /** The registered process name. Instance, inbox and outbox rows key on it. */
 export const COST_ROLLUP_WATCH_PROCESS_NAME = "costRollupWatch" as const;
+
+/**
+ * How many looks one day's comparison gets before the outbox retires it.
+ *
+ * Named rather than inlined into `.outbox()` because the intent handler reads
+ * it too: the handler has to know which look is its LAST one, since that is the
+ * look whose disagreement it is willing to call drift. Two literals would let
+ * the two notions of "last" drift apart silently, and the failure mode is
+ * either drift that is never reported or drift reported a look early.
+ *
+ * The dispatcher retires a message when `attempt >= maxAttempts`
+ * (`outboxDispatcherService.ts`), so attempt 5 of 5 is both the last delivery
+ * and the one this must not throw from.
+ */
+export const COST_ROLLUP_WATCH_MAX_ATTEMPTS = 5;
+
+/**
+ * A comparison disagreed, and there are looks left, so it is not drift yet.
+ *
+ * Thrown to spend a rung of the outbox ladder: the ladder is the wait, and a
+ * quiet return would clear the day for good — nothing marks it again once the
+ * fold catches up. The alternative, reporting the disagreement on sight, is
+ * what this whole design exists to avoid, because a summary the fold is
+ * seconds behind on is indistinguishable from drift at the moment you look.
+ *
+ * The watermark check (`costRollupSummaryFreshness.ts`) can sometimes PROVE
+ * the fold is behind, and when it does its count rides on the warn line. It
+ * cannot prove the opposite, though — it is a maximum of provider timestamps,
+ * and two charges sharing one timestamp move it not at all — so level
+ * watermarks buy no confidence and this is thrown either way.
+ *
+ * A plain `Error`, not a `HandledError`: nothing here reaches a customer, and
+ * dressing a deliberate wait up as a handled fault would promise a reader an
+ * action they do not have. What an operator needs is on the warn line and the
+ * lag gauge, both written before this is raised.
+ */
+export class CostRollupCheckUnsettledError extends Error {
+  readonly day: string;
+  readonly attempt: number;
+  readonly mismatchCount: number;
+
+  constructor({
+    day,
+    attempt,
+    mismatchCount,
+  }: {
+    day: string;
+    attempt: number;
+    mismatchCount: number;
+  }) {
+    super(
+      `Governance cost rollup for ${day} disagrees on ${mismatchCount} cell(s) after look ${attempt} of ${COST_ROLLUP_WATCH_MAX_ATTEMPTS}; looking again`,
+    );
+    this.name = "CostRollupCheckUnsettledError";
+    this.day = day;
+    this.attempt = attempt;
+    this.mismatchCount = mismatchCount;
+  }
+}
+
+/**
+ * One look at one day, and what the look is worth.
+ *
+ * This is where a disagreement becomes drift, or does not. It reads the
+ * attempt number because that is the only thing separating the two: a fold
+ * that is behind catches up between looks, and drift does not, so the answer
+ * to "is this real" is "ask again" until there is nothing left to ask.
+ *
+ * Failures propagate so the outbox retries — a swallowed one is a check that
+ * silently did not happen.
+ */
+async function lookAtDay({
+  comparator,
+  payload,
+  attempt,
+}: {
+  comparator: CostRollupComparatorDayComparer;
+  payload: CompareDayPayload;
+  attempt: number;
+}): Promise<void> {
+  const comparison = await comparator.compareDay({
+    tenantId: payload.tenantId,
+    day: payload.day,
+    costSource: payload.costSource,
+  });
+
+  // Agreement is final on sight. Nothing that arrives later can make two
+  // numbers that matched stop matching, so there is no reason to look again.
+  if (comparison.mismatches.length === 0) return;
+
+  if (attempt < COST_ROLLUP_WATCH_MAX_ATTEMPTS) {
+    logger.warn(
+      {
+        tenantId: payload.tenantId,
+        day: payload.day,
+        cost_source: payload.costSource,
+        attempt,
+        of_attempts: COST_ROLLUP_WATCH_MAX_ATTEMPTS,
+        mismatched_cells: comparison.mismatches.length,
+        // Non-zero names the reason outright; zero means the watermarks look
+        // level, which proves nothing (see the freshness module) and is
+        // precisely why this waits anyway.
+        cells_behind: comparison.behind.length,
+        lag_ms: comparison.lagMs,
+      },
+      "Governance cost rollup disagrees with its events; looking again before calling it drift",
+    );
+    throw new CostRollupCheckUnsettledError({
+      day: payload.day,
+      attempt,
+      mismatchCount: comparison.mismatches.length,
+    });
+  }
+
+  // The last look. The disagreement has now outlived the whole ladder, which
+  // is the only evidence available that it is not the fold running behind — so
+  // it is named, counted, and the intent COMPLETES. Throwing here instead
+  // would retire the row as dead and file real drift under "the outbox broke",
+  // where nobody reads it.
+  reportCostRollupDrift({ tenantId: payload.tenantId, comparison });
+}
 
 /**
  * When the day's drift check falls, as a cron in UTC.
@@ -183,10 +305,16 @@ export interface CostRollupWatchProcessDeps {
  * week puts last week back on the list.
  *
  * What it deliberately does NOT do: repair anything. Finding drift counts it
- * and logs it, exactly as before. The summary is a consequence of the event
- * history, so a repair that only reached storage would be undone by the next
- * rebuild and one that reached the history is a restatement somebody has to
- * stand behind.
+ * and logs it. The summary is a consequence of the event history, so a repair
+ * that only reached storage would be undone by the next rebuild and one that
+ * reached the history is a restatement somebody has to stand behind.
+ *
+ * What counts AS finding drift is the outbox ladder, not one comparison. The
+ * fold and this check run on independent queues, so at the moment of looking a
+ * summary that is seconds behind and a summary that is wrong are the same
+ * picture. A disagreement therefore costs a rung of the ladder instead of an
+ * alert, and only one that is still there on the last rung — some seven and a
+ * half minutes of looking later — is reported.
  */
 export function costRollupWatchPM(
   deps: CostRollupWatchProcessDeps,
@@ -207,23 +335,13 @@ export function costRollupWatchPM(
   return (pm) =>
     pm
       .state<CostRollupWatchState>(INITIAL_COST_ROLLUP_WATCH_STATE)
-      .intent("compareDay", compareDaySchema, async (payload) => {
-        // Rethrown on failure so the outbox retries. Everything this reports
-        // lives inside `compareDay` — the count and the log line — so a
-        // swallowed failure is a check that silently did not happen.
-        //
-        // One of those throws is not a failure at all: the comparison refuses
-        // while the rollup summary is still folding the day's charges
-        // (`CostRollupSummaryBehindError`). The ladder below IS the wait for
-        // it, which is why the refusal is expressed as a throw rather than as
-        // a quiet return — a return would clear the day, and nothing marks it
-        // again once the summary catches up.
-        await deps.comparator.compareDay({
-          tenantId: payload.tenantId,
-          day: payload.day,
-          costSource: payload.costSource,
-        });
-      })
+      .intent("compareDay", compareDaySchema, (payload, ctx) =>
+        lookAtDay({
+          comparator: deps.comparator,
+          payload,
+          attempt: ctx.attempt,
+        }),
+      )
       .on(PULLED_USAGE_EVENT_TYPES.OBSERVED, (state, data, ctx) =>
         mark(state, data, ctx.now),
       )
@@ -280,7 +398,7 @@ export function costRollupWatchPM(
         };
       })
       .outbox({
-        maxAttempts: 5,
+        maxAttempts: COST_ROLLUP_WATCH_MAX_ATTEMPTS,
         // ~30s, 1m, 2m, 4m: long enough to ride out a ClickHouse restart,
         // short enough that a night's checks finish inside the night. A
         // comparison is a read, so a slow retry costs nothing but the wait.

@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 
 import { createWatchHarness } from "./costRollupWatch.integration.harness";
+import { agreedComparison } from "./costRollupWatch.integration.runtime";
 import {
   NOW,
   TODAY,
@@ -110,7 +111,7 @@ describe("retrying a comparison that fails", () => {
       expect((await h.messagesFor())[0]?.status).toBe("dead");
 
       // Whatever was wrong is over, and a charge lands on a DIFFERENT day.
-      h.compareWith(async () => undefined);
+      h.compareWith(async (params) => agreedComparison(params));
       h.forgetComparisons();
       h.clock = TONIGHT + 3_600_000;
       await h.record(h.charge({ occurredAtMs: YESTERDAY_MS }));

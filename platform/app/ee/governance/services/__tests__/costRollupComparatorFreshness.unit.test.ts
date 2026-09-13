@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * The watchdog against a summary that is merely behind, rather than wrong.
+ * What a comparison can and cannot see about a summary that is merely behind,
+ * rather than wrong.
  *
  * The rollup fold and the check that reads it run on independent queues, so a
  * charge landing shortly before the check can be re-derived here while its own
  * projection job is still waiting to run. Both sides carry the newest charge
- * moment they have folded, which is what lets the check tell "these figures
- * disagree" apart from "this summary has not caught up yet" — and wait instead
- * of raising a false alarm on money that is perfectly correct.
+ * moment they have folded, and where those two differ the comparison can say
+ * outright that the summary has not caught up.
+ *
+ * Where they AGREE it can say nothing, and the last case here is the proof: a
+ * maximum cannot count, so a charge sharing its moment with one already folded
+ * leaves the two watermarks level while the money differs. That is why nothing
+ * in this file decides anything — the deciding is the retry ladder's, over in
+ * `costRollupWatch.settling.unit.test.ts`.
  *
  * Spec: specs/governance/cost-rollup-watch.feature
  * Decision: ADR-128.
@@ -16,10 +22,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GOVERNANCE_COST_SOURCE } from "../../projections/governanceCostRollup.constants";
-import {
-  CostRollupComparatorService,
-  CostRollupSummaryBehindError,
-} from "../costRollupComparator.service";
+import { CostRollupComparatorService } from "../costRollupComparator.service";
 import type {
   GovernanceCostRollupClickHouseRepository,
   GovernanceCostRollupRow,
@@ -142,11 +145,11 @@ function compare({
   });
 }
 
-describe("the cost rollup watchdog on a summary that is still catching up", () => {
+describe("what a comparison sees of a summary that is still catching up", () => {
   describe("when a charge landed after the newest one the summary has folded", () => {
-    /** @scenario A charge the summary has not folded yet is waited for rather than counted as drift */
-    it("refuses to compare the day instead of reporting the difference as drift", async () => {
-      const rejection = compare({
+    /** @scenario A charge the summary has not folded yet is named as still folding */
+    it("names the cell as behind alongside the difference in the money", async () => {
+      const comparison = await compare({
         events: [
           loggedEvent({ costNanoMinor: 1_000_000_000, occurredAt: FOLDED_AT }),
           loggedEvent({ costNanoMinor: 2_000_000_000, occurredAt: LATE_AT }),
@@ -160,19 +163,18 @@ describe("the cost rollup watchdog on a summary that is still catching up", () =
         ],
       });
 
-      await expect(rejection).rejects.toBeInstanceOf(
-        CostRollupSummaryBehindError,
-      );
-      await expect(rejection).rejects.toMatchObject({
-        day: DAY,
-        tenantId: TENANT,
+      expect(comparison.behind).toHaveLength(1);
+      expect(comparison.behind[0]).toMatchObject({
+        derivedLastEventOccurredAtMs: LATE_AT,
+        summarizedLastEventOccurredAtMs: FOLDED_AT,
       });
+      expect(comparison.mismatches).toHaveLength(1);
     });
   });
 
   describe("when the summary has folded every charge the day holds", () => {
-    /** @scenario A summary that already covers every charge of the day is compared as before */
-    it("compares the two figures and reports the drift between them", async () => {
+    /** @scenario A summary that covers every charge of the day is named as behind by nothing */
+    it("names nothing as behind and states the difference in the money", async () => {
       const comparison = await compare({
         events: [
           loggedEvent({ costNanoMinor: 1_000_000_000, occurredAt: FOLDED_AT }),
@@ -186,6 +188,7 @@ describe("the cost rollup watchdog on a summary that is still catching up", () =
         ],
       });
 
+      expect(comparison.behind).toEqual([]);
       expect(comparison.mismatches).toHaveLength(1);
       expect(comparison.mismatches[0]?.summarizedNanoMinor).toBe(999);
       expect(comparison.mismatches[0]?.derivedNanoMinor).toBe(3_000_000_000);
@@ -193,25 +196,23 @@ describe("the cost rollup watchdog on a summary that is still catching up", () =
   });
 
   describe("when the summary holds no row for the charge's cell at all", () => {
-    /** @scenario A cell the summary holds nothing for is waited for */
-    it("refuses to compare the day rather than reporting the whole cell as drift", async () => {
-      await expect(
-        compare({
-          events: [
-            loggedEvent({
-              costNanoMinor: 1_000_000_000,
-              occurredAt: FOLDED_AT,
-            }),
-          ],
-          rows: [],
-        }),
-      ).rejects.toBeInstanceOf(CostRollupSummaryBehindError);
+    /** @scenario A cell the summary holds nothing for is named as still folding */
+    it("names the missing cell as behind, with nothing folded into it", async () => {
+      const comparison = await compare({
+        events: [
+          loggedEvent({ costNanoMinor: 1_000_000_000, occurredAt: FOLDED_AT }),
+        ],
+        rows: [],
+      });
+
+      expect(comparison.behind).toHaveLength(1);
+      expect(comparison.behind[0]?.summarizedLastEventOccurredAtMs).toBeNull();
     });
   });
 
   describe("when the charge carries no moment the summary can be measured against", () => {
-    /** @scenario A charge carrying no usable moment never parks the check */
-    it("compares the day rather than waiting on a summary it cannot judge", async () => {
+    /** @scenario A charge carrying no usable moment is never named as still folding */
+    it("names nothing as behind, so a garbage moment cannot park the day forever", async () => {
       const comparison = await compare({
         events: [
           loggedEvent({ costNanoMinor: 1_000_000_000, occurredAt: undefined }),
@@ -219,8 +220,35 @@ describe("the cost rollup watchdog on a summary that is still catching up", () =
         rows: [],
       });
 
+      expect(comparison.behind).toEqual([]);
       expect(comparison.mismatches).toHaveLength(1);
       expect(comparison.mismatches[0]?.summarizedNanoMinor).toBeNull();
+    });
+  });
+
+  describe("when an unfolded charge shares its moment with one already folded", () => {
+    // The blind spot this signal has by construction, pinned so nobody builds
+    // on it again: two charges on one cell stamped with the same moment — an
+    // hourly export bucket, say — leave the maximum where it was, so the side
+    // that folded one and the side that folded both read as level.
+    /** @scenario A charge sharing its moment with a folded one leaves the watermarks level */
+    it("names nothing as behind even though the money plainly differs", async () => {
+      const comparison = await compare({
+        events: [
+          loggedEvent({ costNanoMinor: 1_000_000_000, occurredAt: FOLDED_AT }),
+          loggedEvent({ costNanoMinor: 2_000_000_000, occurredAt: FOLDED_AT }),
+        ],
+        rows: [
+          summaryRow({
+            amountNanoMinor: 1_000_000_000,
+            lastEventOccurredAtMs: FOLDED_AT,
+          }),
+        ],
+      });
+
+      expect(comparison.behind).toEqual([]);
+      expect(comparison.mismatches).toHaveLength(1);
+      expect(comparison.mismatches[0]?.derivedNanoMinor).toBe(3_000_000_000);
     });
   });
 });

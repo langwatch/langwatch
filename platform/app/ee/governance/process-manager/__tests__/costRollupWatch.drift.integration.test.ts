@@ -18,6 +18,7 @@
 import { createLogger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { COST_ROLLUP_WATCH_MAX_ATTEMPTS } from "../costRollupWatch.process";
 import { createWatchHarness } from "./costRollupWatch.integration.harness";
 import { NOW, TODAY, TONIGHT } from "./costRollupWatch.summary.fixtures";
 
@@ -37,7 +38,7 @@ describe("finding drift without changing anything", () => {
   });
 
   describe("given a day's summary that no longer matches its recorded charges", () => {
-    /** @scenario Drift found by a comparison is counted and logged, exactly as before */
+    /** @scenario Drift that outlives every look is counted and logged */
     it("counts the drift and names both figures in the log", async () => {
       await h.appendObserved({ costNanoMinor: 5_000_000_000 });
       await h.appendObserved({ costNanoMinor: 7_340_000_000 });
@@ -49,7 +50,10 @@ describe("finding drift without changing anything", () => {
       const before = await h.mismatchCount();
       await h.record(h.charge());
       await h.runDueCheck();
-      await h.drainOutbox();
+      // The whole ladder, because a disagreement is only drift once it has
+      // survived it: nothing here ever fixes the summary, so the last look
+      // finds what the first one did and that is what makes it reportable.
+      await h.drainThroughRetries({ passes: COST_ROLLUP_WATCH_MAX_ATTEMPTS });
 
       expect(await h.mismatchCount()).toBe(before + 1);
       const line = logged.mock.calls

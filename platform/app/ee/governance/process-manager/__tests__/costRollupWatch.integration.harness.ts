@@ -105,7 +105,9 @@ function observing(runtime: WatchRuntime) {
       runtime.compareDayCalls = [];
     },
     /** Swaps what the intent handler does on its next attempt. */
-    compareWith: (impl: (params: CompareParams) => Promise<unknown>) => {
+    compareWith: (
+      impl: (params: CompareParams) => Promise<CostRollupComparison>,
+    ) => {
       runtime.compareDayImpl = impl;
     },
   };

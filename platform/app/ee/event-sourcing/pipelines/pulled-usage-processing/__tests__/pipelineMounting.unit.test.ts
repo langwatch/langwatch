@@ -25,7 +25,13 @@ import { createPulledUsageProcessingPipeline } from "../pipeline";
  * dep, not by anything it does.
  */
 const comparator = {
-  compareDay: async () => undefined,
+  compareDay: async ({ day, costSource }) => ({
+    day,
+    costSource,
+    mismatches: [],
+    lagMs: 0,
+    behind: [],
+  }),
 } satisfies CostRollupComparatorDayComparer;
 const store = {} as FoldProjectionStore<GovernanceCostRollupState>;
 
