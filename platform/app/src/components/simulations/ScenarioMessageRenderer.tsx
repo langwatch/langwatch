@@ -61,6 +61,10 @@ interface ScenarioMessageRendererProps {
   projectId: string;
   /** Whose message the run is waiting for, drawn as dots under the thread. */
   typingRole?: NextSpeaker;
+  /** True when the run's "user" turns were spoken by a real person (a voice
+   *  "Call it myself" run), so they render as "You", not "User Simulator"
+   *  (#8020). */
+  isHumanCaller?: boolean;
 }
 
 export function ScenarioMessageRenderer({
@@ -69,6 +73,7 @@ export function ScenarioMessageRenderer({
   variant,
   projectId,
   typingRole,
+  isHumanCaller = false,
 }: ScenarioMessageRendererProps) {
   const smallerView = variant === "grid";
   const endRef = useRef<HTMLDivElement>(null);
@@ -116,7 +121,7 @@ export function ScenarioMessageRenderer({
         // (right/purple, flask icon).
         const visuals = getDisplayRoleVisuals(
           item.role === "assistant" ? "assistant" : "user",
-          { isScenario: true },
+          { isScenario: true, isHumanCaller },
         );
         const RoleIcon = visuals.Icon;
         return (

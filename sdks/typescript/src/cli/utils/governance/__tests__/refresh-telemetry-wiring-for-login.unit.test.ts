@@ -23,6 +23,9 @@ import {
 	toolMarkers,
 } from "../shell-rc";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
+import { runningCodeRestartNotice } from "../running-code";
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 import {
 	baseCfg,
 	CURRENT_ENDPOINT,
@@ -45,6 +48,32 @@ vi.mock("../cli-api", async () => {
 const temp = installTempHomeAndCwd();
 
 describe("refreshTelemetryWiringForLogin", () => {
+	describe("when login changes the instance used by an active langwatch code launcher", () => {
+		/** @scenario "Login refresh reports the same restart advice" */
+		it("returns restart advice with the successful wiring refresh", async () => {
+			const notice =
+				"Restart `langwatch code` to apply the updated telemetry settings.";
+			vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
+			persistBlockToRc(
+				"zsh",
+				buildScopedToolFunction(
+					"code",
+					buildOtelEnvBlock("code", STALE_ENDPOINT, STALE_TOKEN),
+					"zsh",
+				),
+				toolMarkers("code"),
+			);
+			vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+				token: CURRENT_TOKEN,
+				prefix: "ik-lw-test",
+				endpoint: CURRENT_ENDPOINT,
+			});
+
+			const result = await refreshTelemetryWiringForLogin(baseCfg());
+
+			expect(result).toMatchObject({ warnings: [notice] });
+		});
+	});
 	describe("given persisted wiring pointing at a previous instance", () => {
 		beforeEach(() => {
 			// claude → user-level settings env at the stale instance
@@ -160,6 +189,24 @@ describe("refreshTelemetryWiringForLogin", () => {
 				expect(result.labels.some((l) => l.includes("claude"))).toBe(true);
 				expect(result.labels.some((l) => l.includes("gemini"))).toBe(true);
 				expect(result.labels.some((l) => l.includes("codex"))).toBe(false);
+			});
+
+			/** @scenario "A codex pinned to a project still gets the guidance on login" */
+			it("still writes the declare guidance for a pinned codex", async () => {
+				const cfg = baseCfg({
+					tool_project_keys: { codex: { secret: "sk-lw-project-pin" } },
+				});
+				const agentsMd = path.join(temp.home, ".codex", "AGENTS.md");
+				expect(fs.existsSync(agentsMd)).toBe(false);
+
+				await refreshTelemetryWiringForLogin(cfg);
+
+				// The guidance names no endpoint and no key, so the pin has no
+				// reason to withhold it; the wiring the pin does own is untouched.
+				expect(fs.readFileSync(agentsMd, "utf8")).toContain(
+					"langwatch ingest context",
+				);
+				expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
 			});
 		});
 

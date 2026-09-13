@@ -94,16 +94,16 @@ describe("explainHandledError", () => {
       const { description } = explainHandledError(
         shape({
           code: "lwql_reserved_parameter_supplied",
-          meta: { parameters: ["period_granularity_seconds"] },
+          meta: { parameters: ["dashboard_context_granularity_seconds"] },
         }),
       );
 
-      expect(description).toContain("period_granularity_seconds");
+      expect(description).toContain("dashboard_context_granularity_seconds");
       // The bug this pins: the copy named the window pair unconditionally, so
       // a caller that sent only the step was told to remove two parameters it
       // had never sent.
-      expect(description).not.toContain("period_start");
-      expect(description).not.toContain("period_end");
+      expect(description).not.toContain("dashboard_context_period_start");
+      expect(description).not.toContain("dashboard_context_period_end");
     });
 
     /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
@@ -111,11 +111,18 @@ describe("explainHandledError", () => {
       const { description } = explainHandledError(
         shape({
           code: "lwql_reserved_parameter_supplied",
-          meta: { parameters: ["period_start", "period_end"] },
+          meta: {
+            parameters: [
+              "dashboard_context_period_start",
+              "dashboard_context_period_end",
+            ],
+          },
         }),
       );
 
-      expect(description).toContain("period_start and period_end");
+      expect(description).toContain(
+        "dashboard_context_period_start and dashboard_context_period_end",
+      );
       expect(description).toContain("come from");
       expect(description).toContain("Remove them");
     });

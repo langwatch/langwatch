@@ -74,6 +74,15 @@ describe("PipelineRegistry.registerAll", () => {
         );
       });
 
+      it("mounts the CLI login key reaper", () => {
+        // A session the CLI stops refreshing leaves Redis by TTL, which runs
+        // no code, so an unmounted sweep leaves its login key and every
+        // ingest key under it live for good.
+        expect(registeredPipelineNames()).toContain(
+          "cli_login_key_maintenance",
+        );
+      });
+
       it("mounts the blob-maintenance sweep alongside it", () => {
         // Same class of defect, same guard: a scheduled sweep with no caller
         // is indistinguishable from a working one until the thing it protects

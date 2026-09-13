@@ -70,6 +70,7 @@ import {
 } from "./session-context-hooks";
 import {
 	extractLookupIdFromToken,
+	isExpiredSession,
 	listIngestionKeys,
 	mintIngestionKey,
 } from "./cli-api";
@@ -80,6 +81,7 @@ import {
 	telemetryEnvVarNames,
 } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { runningCodeRestartNotice } from "./running-code";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	buildScopedToolFunction,
@@ -130,6 +132,17 @@ export interface IngestionKeyResolution {
 	endpoint: string;
 	/** True when a fresh key was minted (vs a cached one reused). */
 	minted: boolean;
+	/**
+	 * True when the platform rejected this device's session, so the cached
+	 * key was reused without anything confirming it is still live.
+	 *
+	 * A device that cannot authenticate can neither check its key nor mint a
+	 * replacement, and the key it holds may have been revoked weeks ago. The
+	 * resolution still carries that key, because wiring the tool with a key
+	 * that may work beats wiring it with nothing, but the caller must say so
+	 * instead of reporting a working setup.
+	 */
+	sessionExpired?: boolean;
 }
 
 /**
@@ -190,6 +203,7 @@ export async function resolveLiveIngestionKey({
 			};
 		}
 		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
+		let sessionExpired = false;
 		try {
 			const liveKeys = await listIngestionKeys(cfg);
 			// Server resolved - verify the cached lookupId is still present
@@ -201,12 +215,17 @@ export async function resolveLiveIngestionKey({
 				// Key was revoked or rotated on the platform - treat as no cache.
 				cacheIsLive = false;
 			}
-		} catch {
+		} catch (error) {
 			// Network error / older server without the endpoint: reuse cache
-			// as-is (offline-first fallback - hard-cut rotation is a
-			// re-mint-kills-old invariant, so a genuinely revoked key will
-			// self-correct next time the device is online) - unless the
-			// caller disabled that fallback.
+			// as-is (offline-first fallback - a device that is merely offline
+			// keeps exporting with the key it has) - unless the caller
+			// disabled that fallback.
+			//
+			// A session the platform rejected is not that case. Nothing about
+			// the cached key was confirmed and nothing can replace it, so the
+			// fallback still hands the key back but marks the resolution: the
+			// key may have been dead for weeks and only the caller can say so.
+			sessionExpired = isExpiredSession(error);
 			cacheIsLive = allowOfflineFallback;
 		}
 		if (cacheIsLive) {
@@ -215,6 +234,7 @@ export async function resolveLiveIngestionKey({
 				prefix: cached.prefix,
 				endpoint: otlpEndpointFor(cfg.control_plane_url),
 				minted: false,
+				...(sessionExpired ? { sessionExpired: true } : {}),
 			};
 		}
 	}
@@ -547,6 +567,8 @@ export interface LoginTelemetryRefreshResult {
 	 * cfg.default_personal_ingest_keys) - the caller should saveConfig.
 	 */
 	mintedAny: boolean;
+	/** Restart advice when a live launcher predates successfully changed wiring. */
+	warnings?: string[];
 }
 
 /**
@@ -567,28 +589,32 @@ export async function refreshTelemetryWiringForLogin(
 ): Promise<LoginTelemetryRefreshResult> {
 	const labels: string[] = [];
 	let mintedAny = false;
+	const warnings: string[] = [];
 	const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
 
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
 		try {
-			if (cfg.tool_project_keys?.[tool]?.secret) {
-				// Project-pinned wiring is deliberate scope, not stale personal
-				// wiring; a new login never re-points it at the personal path.
-				continue;
-			}
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
-			// codex's notify hook is what recovers the conversation, and it does
-			// not depend on the exporter endpoint. A config already pointing at
-			// this login skips the refresh below, so a device whose [otel] block
-			// predates the hook would never be given one. Idempotent and quiet
-			// when the hook is already in place.
+			// codex's notify hook is what recovers the conversation, and the
+			// guidance beside it is what tells a session to declare the checkout
+			// it moved to. Neither names an endpoint or a key, so both stand
+			// ahead of the pin check: a pinned codex needs them exactly as a
+			// personal one does, and only the mint and the rewiring below are a
+			// pin's to refuse. A config already pointing at this login skips the
+			// refresh below, so a device whose [otel] block predates either would
+			// never be given one. Idempotent and quiet when they are in place.
 			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
 				assertCodexTurnHarvest();
 				assertCodexAgentGuidance();
+			}
+			if (cfg.tool_project_keys?.[tool]?.secret) {
+				// Project-pinned wiring is deliberate scope, not stale personal
+				// wiring; a new login never re-points it at the personal path.
+				continue;
 			}
 			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
@@ -619,7 +645,12 @@ export async function refreshTelemetryWiringForLogin(
 				});
 				if (label) labels.push(label);
 			} else {
-				labels.push(...refreshScopedShellFunctions({ tool, vars }));
+				const refreshed = refreshScopedShellFunctions({ tool, vars });
+				labels.push(...refreshed);
+				if (tool === "code" && refreshed.length > 0) {
+					const notice = runningCodeRestartNotice();
+					if (notice) warnings.push(notice);
+				}
 			}
 		} catch {
 			// Best-effort per tool: one failed mint must not block the login
@@ -641,5 +672,5 @@ export async function refreshTelemetryWiringForLogin(
 		// Best-effort, same as above.
 	}
 
-	return { labels, mintedAny };
+	return { labels, mintedAny, ...(warnings.length > 0 ? { warnings } : {}) };
 }

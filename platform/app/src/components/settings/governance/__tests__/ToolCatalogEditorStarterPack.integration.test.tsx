@@ -99,7 +99,7 @@ describe("<ToolCatalogEditor /> starter pack import", () => {
       await user.click(toggle);
 
       expect(
-        await screen.findByText(/Adds starter tiles the catalog never had/i),
+        await screen.findByText(/Adds starter tools the catalog never had/i),
       ).toBeInTheDocument();
       expect(screen.getByText("Codex")).toBeInTheDocument();
     });

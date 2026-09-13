@@ -78,6 +78,12 @@ export const DEFAULT_CLIENTS_PER_PROCESS = 1;
  * Used only when the fleet size is unknown, which is the case for any process
  * that has not been told its replica count. Preserves the historical value so
  * adopting this package changes nothing until the deployment opts in.
+ *
+ * A MAXIMUM, not a floor: when the deployment states the server's own
+ * `max_concurrent_queries` without a replica count, the fallback still clamps
+ * to what one process alone may safely claim of that budget — a single pod
+ * holding 64 sockets against a server that admits 32 queries needs no sibling
+ * pods to melt it.
  */
 export const FALLBACK_POOL_SIZE = 64;
 
@@ -108,9 +114,11 @@ export interface PoolSizingDecision {
   size: number;
   source: PoolSizeSource;
   /**
-   * What the fleet budget would have allowed, when it is knowable. Present
+   * The strictest knowable ceiling: the fleet budget when the fleet size is
+   * stated, otherwise one process's share of a stated server cap. Present
    * even for an override so the caller can report a conflict rather than
-   * discovering it as rejected queries.
+   * discovering it as rejected queries. Null when nothing about the server's
+   * capacity was stated at all.
    */
   derivedCeiling: number | null;
   /**
@@ -179,6 +187,36 @@ function rawFleetPoolCeiling(input: PoolSizingInput): number | null {
 }
 
 /**
+ * What one process alone may claim of a server budget the deployment has
+ * actually stated. Null when the deployment said nothing about the cap — the
+ * built-in default must not masquerade as knowledge, or every deployment
+ * would suddenly "know" a budget nobody measured.
+ *
+ * Used when the fleet size is unknown - to clamp the fallback, and to judge
+ * an override: it cannot keep the whole fleet inside the budget (that needs
+ * the replica count), but it does catch a single process set up to exceed
+ * the server on its own.
+ */
+function singleProcessBudget(input: PoolSizingInput): number | null {
+  const serverMax = input.serverMaxConcurrentQueries;
+  if (
+    serverMax === undefined ||
+    !Number.isInteger(serverMax) ||
+    serverMax <= 0
+  ) {
+    return null;
+  }
+
+  const clients = positiveIntegerOr(
+    input.clientsPerProcess,
+    DEFAULT_CLIENTS_PER_PROCESS,
+  );
+  const nodes = positiveIntegerOr(input.serverNodes, DEFAULT_SERVER_NODES);
+
+  return Math.floor((serverMax * nodes * FLEET_SAFETY_FACTOR) / clients);
+}
+
+/**
  * The largest per-client pool that keeps every pool on every pod inside the
  * server's budget. Null when the fleet size is unknown, because a pod cannot
  * infer how many siblings it has.
@@ -207,13 +245,18 @@ export function resolvePoolSize(
   const infeasible = raw !== null && raw < MIN_POOL_SIZE;
 
   if (input.override !== undefined && isUsableInteger(input.override)) {
+    // With the fleet size unknown, a stated server cap is still the
+    // strictest knowable bound: one process's share of it. The override
+    // wins either way - this only decides whether to report a conflict.
+    const overrideCeiling =
+      derivedCeiling !== null ? derivedCeiling : singleProcessBudget(input);
     return {
       size: input.override,
       source: "override",
-      derivedCeiling,
+      derivedCeiling: overrideCeiling,
       exceedsBudget:
         infeasible ||
-        (derivedCeiling !== null && input.override > derivedCeiling),
+        (overrideCeiling !== null && input.override > overrideCeiling),
       rejectedOverride: undefined,
     };
   }
@@ -233,10 +276,27 @@ export function resolvePoolSize(
     };
   }
 
+  // The fleet size is unknown, but a stated server cap still binds: one
+  // process must not exceed the server alone. The clamp always reports the
+  // budget as exceeded — siblings this process cannot count share the same
+  // budget, and the warning is what tells the operator to state the fleet
+  // size so the real derivation can take over.
+  const budget = singleProcessBudget(input);
+  if (budget !== null && budget < FALLBACK_POOL_SIZE) {
+    const size = Math.max(MIN_POOL_SIZE, budget);
+    return {
+      size,
+      source: "fallback",
+      derivedCeiling: size,
+      exceedsBudget: true,
+      rejectedOverride,
+    };
+  }
+
   return {
     size: FALLBACK_POOL_SIZE,
     source: "fallback",
-    derivedCeiling: null,
+    derivedCeiling: budget,
     exceedsBudget: false,
     rejectedOverride,
   };

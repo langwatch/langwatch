@@ -73,6 +73,10 @@ const SIGNED_OUT_FLAGS = ["release_ui_identity_front_door_enabled"];
 const FRONTEND_SYSTEM_FLAGS = [
   "release_langy_enabled",
   "release_langy_ui_actions",
+  // envOverridable:false, internal-store-only kill switch that gates the
+  // custom-chart-playground surface — SYSTEM by the same design as the
+  // Langy levers above, so it is declared here rather than discovered.
+  "release_custom_chart_playground",
 ];
 
 describe("frontend feature flags", () => {
@@ -109,6 +113,7 @@ describe("frontend feature flags", () => {
       expect(FRONTEND_SYSTEM_FLAGS).toEqual([
         "release_langy_enabled",
         "release_langy_ui_actions",
+        "release_custom_chart_playground",
       ]);
     });
   });

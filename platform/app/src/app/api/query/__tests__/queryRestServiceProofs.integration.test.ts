@@ -632,7 +632,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     // gateway sends — if the two ever disagreed, every query would succeed and
     // return nothing, which reads exactly like a tenant with no data.
     await harness.admin.insert({
-      table: `${database}.${harness.names.keyMapTable}`,
+      table: `${facts}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [openProject, gatedProject].map((project) => ({
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
@@ -825,7 +825,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
 
     const PERIOD_SQL = () =>
       `SELECT count() AS value FROM ${database}.traces ` +
-      `WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}`;
+      `WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}`;
 
     /** Rows a period-aware statement returns for one window. */
     const countFor = async (timeWindow: { start: Date; end: Date }) => {
@@ -893,7 +893,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       const response = await post(
         {
           sql: PERIOD_SQL(),
-          parameters: { period_start: "2020-01-01 00:00:00" },
+          parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
           timeWindow: { start: second(-60), end: second(60) },
         },
         { token: openProject.apiKey },

@@ -218,9 +218,10 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
  * header. Do not replace this with `Object.values(Resources).filter(...)`;
  * doing so is precisely the fail-open the old allowlist was built to prevent.
  *
- * SIX OF THESE ARE INERT AT PROJECT SCOPE and their presence here is a
+ * SEVEN OF THESE ARE INERT AT PROJECT SCOPE and their presence here is a
  * classification, not an access grant: `governance`, `anomalyRules`,
- * `aiTools`, `activityMonitor`, `gatewaySpend`, and `ingestionSources` are in
+ * `aiTools`, `activityMonitor`, `gatewaySpend`, `governanceCost`, and
+ * `ingestionSources` are in
  * `ORG_EXCLUSIVE_RESOURCES` (rbac.ts), so `langyCandidatePermissions` drops
  * every grain of them and the minted key holds nothing. The org-exclusive
  * filter was built for ADR-021 scope escalation, not for Langy — several of
@@ -248,6 +249,7 @@ const FULL_ACCESS_FAMILIES = new Set([
   "gatewaySpend",
   "gatewayUsage",
   "governance",
+  "governanceCost",
   "ingestionSources",
   "playground",
   "prompts",

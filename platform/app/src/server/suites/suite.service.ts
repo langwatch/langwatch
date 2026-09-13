@@ -19,6 +19,7 @@ import type {
   SuiteRunResult,
   SuiteRunService,
 } from "~/server/app-layer/suites/suite-run.service";
+import { isVoiceAgentsEnabledForProject } from "~/server/featureFlag/voiceAgents";
 import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import { slugify } from "~/utils/slugify";
 import {
@@ -78,6 +79,7 @@ import {
   SuiteScopeEmptyError,
   SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
+  VoiceAgentsDisabledError,
 } from "./errors";
 import {
   duplicateSuiteTargets,
@@ -1361,6 +1363,29 @@ export class SuiteService {
   }
 
   /**
+   * A voice target reaches the browser call panel and the ElevenLabs adapter,
+   * both gated by `release_voice_agents_enabled`; refuse here too so the API
+   * cannot be used to bypass the UI's own gate.
+   *
+   * @throws {VoiceAgentsDisabledError} when a voice target is named and the
+   * project's flag is off.
+   */
+  private async assertVoiceTargetsAllowed(params: {
+    targets: SuiteTarget[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<void> {
+    if (!params.targets.some((target) => target.type === "voice")) return;
+    const voiceEnabled = await isVoiceAgentsEnabledForProject({
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+    });
+    if (!voiceEnabled) {
+      throw new VoiceAgentsDisabledError();
+    }
+  }
+
+  /**
    * Resolves everything a run needs, and refuses the run here when it cannot
    * start.
    *
@@ -1394,6 +1419,8 @@ export class SuiteService {
    *   value for this run
    * @throws {ScenarioParameterTemplateInvalidError} if a scenario that
    *   declares parameters has text that cannot be rendered
+   * @throws {VoiceAgentsDisabledError} if a voice target is named while the
+   *   project's `release_voice_agents_enabled` flag is off
    */
   private async prepareRun(params: {
     projectId: string;
@@ -1409,6 +1436,11 @@ export class SuiteService {
     if (params.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
+    await this.assertVoiceTargetsAllowed({
+      targets: params.targets,
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+    });
     // A connected agent may be named `<name>@<environment>`; from here on
     // every target names an id, so two spellings of one agent fold together.
     const namedTargets = await resolveConnectedReferences({

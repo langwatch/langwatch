@@ -358,6 +358,11 @@ describe("ttlReconciler", () => {
         "trace_analytics_rollup",
         "evaluation_analytics",
         "evaluation_analytics_rollup",
+        // ADR-128 governance cost tables. In this config but deliberately NOT
+        // in the customer retention cascade: their `_retention_days` defaults
+        // to 0 (keep forever) rather than to a category-resolved day count.
+        "governance_cost_rollup_1d",
+        "governance_cost_rollup_restatement_index",
       ]);
     });
 

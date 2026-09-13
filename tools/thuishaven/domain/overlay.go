@@ -53,6 +53,16 @@ func (s Stack) OverlayEnv() []string {
 	// client, langy) dial that loopback port directly — robust, no TLS/CA, no
 	// second public hostname to confuse anyone.
 	apiInternal := fmt.Sprintf("http://127.0.0.1:%d", s.APIPort)
+	// better-auth trusts only the origin it is told about via BASE_HOST/
+	// NEXTAUTH_URL. A stack exposed through a tunnel (tailscale serve,
+	// cloudflared) is reached by browsers at PublicURL, not app.URL — carry
+	// that origin on those two lines only, so sign-in from the tunnel passes
+	// the trusted-origin check while every other URL (LANGWATCH_ENDPOINT
+	// included) stays local.
+	authURL := app.URL
+	if s.PublicURL != "" {
+		authURL = s.PublicURL
+	}
 	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
@@ -61,8 +71,8 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
 		fmt.Sprintf("LANGWATCH_NLP_PORT=%d", nlp.Port),
 		fmt.Sprintf("WORKER_METRICS_PORT=%d", s.WorkerMetricsPort),
-		"BASE_HOST=" + app.URL,
-		"NEXTAUTH_URL=" + app.URL,
+		"BASE_HOST=" + authURL,
+		"NEXTAUTH_URL=" + authURL,
 		"LANGWATCH_ENDPOINT=" + app.URL,
 		"LANGWATCH_API_URL=" + apiInternal,
 		"LANGWATCH_NLP_SERVICE=" + nlp.URL,
@@ -179,6 +189,11 @@ func (s Stack) OverlayEnv() []string {
 		// haven's container, which has no backups, opts out explicitly. Otherwise
 		// every 15s stats tick would fail on a missing table for nothing.
 		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
+		// The app sizes its connection pool from the server's query cap and
+		// assumes a 300-query server when nobody states it. haven rendered this
+		// one, so haven says so; otherwise a 64-connection pool meets a 32-query
+		// server and the first burst is rejected mid-page (#8064).
+		env = append(env, fmt.Sprintf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES=%d", ClickHouseMaxConcurrentQueries))
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.

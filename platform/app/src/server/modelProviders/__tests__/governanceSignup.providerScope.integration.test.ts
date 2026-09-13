@@ -247,10 +247,22 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
     });
 
     it("still creates no shared project as a side effect", async () => {
+      // The population first, in the same query minus the predicate under
+      // test: the organization does hold a project, and it is the personal
+      // one. A count of zero from an organization holding no projects at all
+      // would pass the assertion below with the filter doing no work.
+      const allProjects = await prisma.project.count({
+        where: { team: { organizationId } },
+      });
+      const personalProjects = await prisma.project.count({
+        where: { team: { organizationId }, isPersonal: true },
+      });
       const sharedProjects = await prisma.project.count({
         where: { team: { organizationId }, isPersonal: false },
       });
 
+      expect(allProjects).toBe(1);
+      expect(personalProjects).toBe(1);
       expect(sharedProjects).toBe(0);
     });
   });

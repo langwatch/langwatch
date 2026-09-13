@@ -1069,3 +1069,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: The dedicated PG role is read-only at the PostgreSQL layer
 #   → Scenario: The restricted identity cannot write through a PG-engine mapped table
 #   → Scenario: Every approved view is named under the prefix the reader's grants match
+
+  # The self-provisioning DDL embeds the restricted identity's password and the
+  # named collection's PostgreSQL reader password, and a ClickHouse error echoes
+  # the statement that failed. Self-provisioning is non-fatal by contract (the
+  # pod boots, the endpoint stays refused), so the failure is logged, and what
+  # is logged must not carry either secret.
+  @unit
+  Scenario: A failed self-provisioning run is logged without leaking a password
+    Given the self-provisioned ClickHouse access model whose DDL embeds the restricted user's password
+    When a statement fails and the error echoes that DDL
+    Then the password and the connection strings are redacted from the logged error
+    And an empty or unset secret never matches

@@ -175,6 +175,28 @@ function errorMessage(error: unknown): string {
 }
 
 /**
+ * Replaces every occurrence of each secret with a fixed marker.
+ *
+ * A ClickHouse error echoes the statement that failed, and the access-model
+ * DDL embeds the restricted identity's password (`CREATE USER ... IDENTIFIED
+ * WITH sha256_password BY '...'`) and the named collection's PostgreSQL reader
+ * password; a connection error can surface the admin `CLICKHOUSE_URL` or
+ * `DATABASE_URL`. Everything logged out of a provisioning failure goes through
+ * here first. Literal `split`/`join` so no secret has to be escaped into a
+ * regexp; empty and undefined secrets are skipped rather than matched.
+ */
+export function redactSecrets(
+  text: string,
+  secrets: readonly (string | undefined)[],
+): string {
+  let redacted = text;
+  for (const secret of secrets) {
+    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
+  }
+  return redacted;
+}
+
+/**
  * One statement per round trip rather than a single batched command: a failure
  * here is an operator's problem to fix, and ClickHouse reports only that *the*
  * command failed. Sending them individually is what lets the log name which
@@ -184,9 +206,12 @@ function errorMessage(error: unknown): string {
 async function runClickHouseStatements({
   client,
   statements,
+  secrets = [],
 }: {
   client: ClickHouseClient;
   statements: string[];
+  /** Values to strip from the logged error — see {@link redactSecrets}. */
+  secrets?: readonly (string | undefined)[];
 }): Promise<void> {
   for (const [index, statement] of statements.entries()) {
     try {
@@ -194,7 +219,7 @@ async function runClickHouseStatements({
     } catch (error) {
       logger.error(
         {
-          error: errorMessage(error),
+          error: redactSecrets(errorMessage(error), secrets),
           statement: `${index + 1}/${statements.length}`,
         },
         "lwql provisioning failed creating ClickHouse objects",
@@ -224,6 +249,17 @@ async function selfProvisionAll({
     { database: names.database, sourceDatabase },
     "self-provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views (LWQL_SELF_PROVISION)",
   );
+
+  // Everything this path can log carries one of these somewhere: the access
+  // model DDL embeds the restricted password, the named collection embeds the
+  // PostgreSQL reader password, and a connection failure quotes the URL it
+  // dialled.
+  const secrets = [
+    selfProvision.connection.password,
+    selfProvision.postgresReaderPassword,
+    process.env.CLICKHOUSE_URL,
+    process.env.DATABASE_URL,
+  ];
 
   const endpoint = lwqlPostgresEndpointFromDatabaseUrl(
     process.env.DATABASE_URL,
@@ -261,6 +297,7 @@ async function selfProvisionAll({
       await withAdminClickHouseClient(async (client) => {
         await runClickHouseStatements({
           client,
+          secrets,
           statements: selfHostedClickHouseProvisioningStatements({
             names,
             restrictedPassword: selfProvision.connection.password,
@@ -279,7 +316,7 @@ async function selfProvisionAll({
           await backfillKeyMap({ client, names, sourceDatabase });
         } catch (error) {
           logger.error(
-            { error: errorMessage(error) },
+            { error: redactSecrets(errorMessage(error), secrets) },
             "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
           );
         }
@@ -288,7 +325,7 @@ async function selfProvisionAll({
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
     logger.error(
-      { error: errorMessage(error) },
+      { error: redactSecrets(errorMessage(error), secrets) },
       "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
     );
   }

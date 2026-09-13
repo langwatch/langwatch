@@ -237,8 +237,12 @@ export const apiKeyRouter = createTRPCRouter({
         ingestSourceType: apiKey.ingestSourceType,
         ingestionTemplateId: apiKey.ingestionTemplateId,
         // Human label of the CLI device session that minted this ingestion key
-        // ("Rogerio's MacBook Pro"); null for keys without device provenance.
+        // ("Design MacBook Pro"); null for keys without device provenance.
         createdByDeviceLabel: apiKey.createdByDeviceLabel,
+        // The CLI login key of the session that minted this ingestion key, so
+        // a key with no label of its own can still be shown against the
+        // machine it came from. Null for keys minted outside a CLI session.
+        parentApiKeyId: apiKey.parentApiKeyId,
         roleBindings: apiKey.roleBindings.map((rb) => ({
           id: rb.id,
           role: rb.role,

@@ -7,6 +7,7 @@ import type {
   SimulationProcessingEvent,
   SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
+  SimulationRunCutAtLimitRecordedEvent,
   SimulationRunDeletedEvent,
   SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
@@ -70,6 +71,12 @@ export function isSimulationRunAgentInstanceRecordedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunAgentInstanceRecordedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.AGENT_INSTANCE_RECORDED;
+}
+
+export function isSimulationRunCutAtLimitRecordedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunCutAtLimitRecordedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.CUT_AT_LIMIT_RECORDED;
 }
 
 export function isSimulationRunCancelRequestedEvent(

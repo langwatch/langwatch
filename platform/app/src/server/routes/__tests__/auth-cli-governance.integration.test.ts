@@ -270,6 +270,7 @@ describe("GET /api/auth/cli/governance/*", () => {
 
   describe("GET /governance/status", () => {
     describe("when called with a valid Bearer token", () => {
+      /** @scenario "setupState returns boolean OR for nav-promotion signal" */
       it("returns the org's setup-state OR-of-flags shape", async () => {
         const res = await callGovernance("/status", `Bearer ${TOKEN_A}`);
         expect(res.status).toBe(200);
@@ -480,26 +481,28 @@ describe("GET /api/auth/cli/governance/*", () => {
 
       // The mint path resolves the caller's personal workspace and refuses to
       // allocate one — create it first, as a real login would.
-      await new PersonalWorkspaceService(prisma).ensure({
+      const workspace = await new PersonalWorkspaceService(prisma).ensure({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
       });
 
       // Mint a live key via the service so we can verify it appears in the list
       const service = IngestionKeyService.create(prisma);
-      await service.ensureForPersonalProject({
-        userId: INGEST_KEY_USER,
+      await service.issueForProject({
+        callerUserId: INGEST_KEY_USER,
+        ownerUserId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
+        projectId: workspace.project.id,
         sourceType: "codex",
-        createdByDeviceLabel: null,
       });
 
       // Mint a second key then revoke it immediately — it must not appear
-      const revokedResult = await service.ensureForPersonalProject({
-        userId: INGEST_KEY_USER,
+      const revokedResult = await service.issueForProject({
+        callerUserId: INGEST_KEY_USER,
+        ownerUserId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
+        projectId: workspace.project.id,
         sourceType: "claude_code",
-        createdByDeviceLabel: null,
       });
       // Revoke by setting revokedAt directly to avoid needing full admin context
       await prisma.apiKey.updateMany({

@@ -18,27 +18,86 @@
  * into a base class four other adapters run on, for the sake of one, buys a
  * shared parent and pays for it in blast radius.
  *
- * What the customer has to set up, in full: one application registration, one
- * secret, one role grant in their Power Platform environment. No directory
- * permission of any kind — this never calls Microsoft Graph, which is only
- * true because author identities are stored as the raw account identifier and
- * resolved to names elsewhere.
+ * What the customer has to set up for the conversations alone: one application
+ * registration, one secret, one role grant in their Power Platform
+ * environment. No directory permission — nothing here resolves a person, which
+ * is only true because author identities are stored as the raw account
+ * identifier and named elsewhere.
+ *
+ * The source reads two further things beside the conversations, each under its
+ * own sign-in and each off until the customer asks for it: the environment's
+ * daily bill from Azure Cost Management, and the tenant's seat licences from
+ * Microsoft Graph. The Graph call is one read of `/subscribedSkus` — a count
+ * of pools bought and pools assigned, no user list and no directory read — and
+ * it happens only when `readSeats` is on, because it needs an admin consent
+ * the other two reads do not.
+ *
+ * The three reads do not hold each other hostage. Cost and licences are read
+ * first and degrade to "not this run" on any failure; the conversation half
+ * runs afterwards and is the only one that can report an error. That ordering
+ * is what lets a customer whose environment address is wrong still see what
+ * they are being billed.
  */
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  AZURE_AI_METER_CATEGORIES,
+  AZURE_COST_API_VERSION,
+  AZURE_MANAGEMENT_HOST,
+  azureCostEvents,
+  azureCostReadIsDue,
+  azureCostReadWindow,
+  azureCostRequestBody,
+  isAzureResourceManagerUrl,
+  nextAzureCostCursor,
+  readAzureCostRows,
+} from "./azureCostManagement";
+import {
+  type BotRecord,
+  botKey,
+  odataPageSchema,
+  readBotRows,
+  readCopilotBots,
+} from "./copilotBots";
 import { COPILOT_CONVERSATION_ACTION } from "./copilotStudioTraceMapper";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+  DATAVERSE_API_VERSION,
+  dataverseHeaders,
   isDataverseEnvironmentOrigin,
   isSameDataverseEnvironment,
 } from "./dataverseEnvironment";
-import type {
-  NormalizedPullEvent,
-  PullerAdapter,
-  PullResult,
-  PullRunOptions,
+import {
+  MAX_DIRECTORY_PAGES,
+  type MicrosoftDirectoryFailure,
+  walkMicrosoftDirectory,
+} from "./microsoftDirectoryRead";
+import {
+  type DirectoryUser,
+  directoryReadIsDue,
+  microsoftDirectoryEvents,
+  nextDirectoryCursor,
+} from "./microsoftGraphDirectory";
+import {
+  MICROSOFT_GRAPH_SCOPE,
+  microsoftSeatEvents,
+  nextSeatsCursor,
+  readSubscribedSkuRows,
+  seatsReadIsDue,
+  seatsReportDay,
+} from "./microsoftGraphSeats";
+import {
+  type NormalizedPullEvent,
+  ProviderSignInError,
+  type PullerAdapter,
+  type PullResult,
+  type PullRunOptions,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:puller:copilot_studio_dataverse");
@@ -70,17 +129,6 @@ const TRANSCRIPT_ORDER_BY = "createdon asc,conversationtranscriptid asc";
 const MAX_PAGES_PER_RUN = 50;
 
 /**
- * How many agents one run will name. A tenant holds tens of them, not
- * thousands, so this is a ceiling rather than a page size and the run does not
- * follow a second page of them — it says so in the log instead, because the
- * cost of going over is conversations with no agent name, not a failed run.
- */
-const MAX_BOTS = 500;
-
-/** Web API version this adapter's query shape is written against. */
-const API_VERSION = "v9.2";
-
-/**
  * Microsoft deletes transcripts on a schedule roughly a month out, so a first
  * run that tried to read further back would spend its time on rows that are
  * not there. Kept under the platform's own limit on how old a span may be.
@@ -105,6 +153,82 @@ export const copilotStudioDataversePullConfigSchema = z.object({
    * says why, instead of arriving as an opaque HTTP 400 on every run.
    */
   botIds: z.array(z.string().uuid()).default([]),
+  /**
+   * The Azure subscription the environment runs in, when the customer wants
+   * its bill read too.
+   *
+   * Optional, and the cost read is off without it. A customer who only wants
+   * transcripts must not have a second permission grant — a reader role on the
+   * subscription — forced on them to get them.
+   *
+   * A uuid because that is what an Azure subscription id is, and because it is
+   * interpolated into the request path: the shape that makes the request
+   * correct is the same shape that keeps anything else out of it.
+   */
+  azureSubscriptionId: z.string().uuid().optional(),
+  /**
+   * The customer's declaration that this Copilot runs on prepaid message
+   * packs (ADR-128 §21.4).
+   *
+   * Prepaid packs create no Azure resource, so the cost feed returns nothing
+   * — indistinguishable from a quiet pay-as-you-go month. The adapter never
+   * reads this field; it exists so the spend panel can explain an empty bill
+   * with the customer's own words rather than inferring a contract from
+   * silence. Optional because a source without a subscription has no bill to
+   * explain.
+   */
+  azureBillingIsPrepaid: z.boolean().optional(),
+  /**
+   * Whether the billing credential pair is a copy of the bot's, made by the
+   * create form's one-app switch (ADR-128 §21.1 form default), or a second
+   * app registration of its own.
+   *
+   * The adapter never reads this field; the billing token is minted from
+   * `billingClientId`/`billingClientSecret` either way. It exists because it
+   * is the only durable record of the choice — sealed credentials cannot be
+   * compared later — and the edit path (#7777) will need it to render the
+   * switch as the admin left it. Optional because a source without a
+   * subscription records no choice, and sources predate the switch.
+   */
+  azureBillingUsesSameApp: z.boolean().optional(),
+  /**
+   * Whether to read the tenant's seat licences beside the conversations.
+   *
+   * On unless switched off. Seats are the half of the money the conversations
+   * cannot show — a seat nobody sits in produces no usage at all — so a source
+   * that reads one and not the other answers "what is this costing us" wrong
+   * by default, and an admin who wanted the answer would have had to know the
+   * setting existed to get it.
+   *
+   * The consent is the reason this is a setting rather than a constant:
+   * `/subscribedSkus` needs `Organization.Read.All` granted on the tenant, and
+   * a tenant that never granted it refuses the call. That refusal is held and
+   * given up on rather than retried forever, and it never fails the run — so
+   * the cost of being on for a customer who does not want it is a setting they
+   * switch off, not a source that breaks.
+   */
+  readSeats: z.boolean().default(true),
+  /**
+   * Whether to read the tenant's user directory beside the conversations.
+   *
+   * On unless switched off, the same default as `readSeats`, and for the same
+   * reason: a transcript knows people only as directory ids, so a source that
+   * reads conversations and not the directory can say an agent was used four
+   * hundred times and cannot say by whom. Every screen in the pillar that
+   * names a person, a department or an agent's owner is downstream of this
+   * read, and off by default meant they were empty for every source the
+   * product created — with no page anywhere saying why.
+   *
+   * The consent is heavier than the seat read's and is the reason this stays
+   * a setting rather than becoming a constant: `/users` needs `User.Read.All`,
+   * which hands this source every name, address and department in the tenant
+   * rather than a list of licence pools. An admin who does not want that turns
+   * the switch off on the setup form, where it is offered on the way in. A
+   * tenant that never granted the permission refuses the call, and the refusal
+   * costs nothing — `readMicrosoftDirectory` holds the day rather than failing
+   * the run, exactly as the seat read does.
+   */
+  readDirectory: z.boolean().default(true),
 });
 
 export type CopilotStudioDataverseConfig = z.infer<
@@ -168,30 +292,6 @@ const transcriptRowSchema = cursorRowSchema
   .passthrough();
 
 /**
- * One row of the `bot` table, read once per run to put a name on each
- * conversation.
- */
-const botRowSchema = z
-  .object({
-    botid: z.string(),
-    name: z.string().nullable().optional(),
-    modifiedon: z.string().nullable().optional(),
-  })
-  .passthrough();
-
-/** The envelope every OData collection read comes back in. */
-const odataPageSchema = z.object({
-  value: z.array(z.unknown()).default([]),
-  "@odata.nextLink": z.string().optional(),
-});
-
-/** What the run knows about one agent, keyed by its lookup id. */
-interface BotRecord {
-  botName?: string;
-  botModifiedOn?: string;
-}
-
-/**
  * The cursor. `createdon` alone is not enough — rows written in the same
  * instant would either repeat forever or be skipped depending on which way
  * the comparison leaned, so the row id breaks the tie.
@@ -206,16 +306,282 @@ const cursorSchema = z.object({
 });
 type Cursor = z.infer<typeof cursorSchema>;
 
-function parseCursor(raw: string | null): Cursor | null {
-  if (!raw) return null;
+/**
+ * The whole stored position: where the transcript walk got to, how far the
+ * bill has been priced, and which day's licences were last reported.
+ *
+ * The transcript fields keep their original names at the TOP LEVEL rather than
+ * moving under a nest, and everything the later reads added is optional. Both
+ * halves of that are backward compatibility: a position written before cost or
+ * seats existed parses here unchanged, and a position written by this build is
+ * still readable by a build that only knows the transcript fields. Positions
+ * are read back on every scheduled run, so a shape the old value cannot
+ * survive would stall every already-configured source at once.
+ */
+const storedCursorSchema = z.object({
+  createdon: z.string().datetime({ offset: true }).optional(),
+  conversationtranscriptid: z.string().uuid().optional(),
+  /** The last day the bill was read through, `YYYY-MM-DD`. */
+  costPricedThroughDay: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
+  /** When the current unpriced window started being held. */
+  costHeldSinceMs: z.number().int().nonnegative().nullish(),
+  /** When a run last asked Cost Management anything, however it answered. */
+  costReadAtMs: z.number().int().nonnegative().nullish(),
+  /**
+   * The day the last month-deep cost read finished on. Absent on every
+   * position written before deep reads existed, which reads as never — so the
+   * first run after this ships goes a month back once, and then daily.
+   */
+  costDeepReadDay: z.string().nullish(),
+  /** The last day the seat licences were reported for, `YYYY-MM-DD`. */
+  seatsReportedThroughDay: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
+  /** When the current unreported day started being held. */
+  seatsHeldSinceMs: z.number().int().nonnegative().nullish(),
+  /** The last day the user directory was reported for, `YYYY-MM-DD`. */
+  directoryReportedThroughDay: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
+  /** When the current unreported directory day started being held. */
+  directoryHeldSinceMs: z.number().int().nonnegative().nullish(),
+});
+
+interface StoredCursor {
+  /** Null until a run has read at least one transcript row. */
+  transcript: Cursor | null;
+  cost: {
+    pricedThroughDay: string | null;
+    heldSinceMs: number | null;
+    readAtMs: number | null;
+    /** The day the last deep read finished, or null if none ever has. */
+    deepReadDay: string | null;
+  };
+  seats: { reportedThroughDay: string | null; heldSinceMs: number | null };
+  directory: { reportedThroughDay: string | null; heldSinceMs: number | null };
+}
+
+const NO_CURSOR: StoredCursor = {
+  transcript: null,
+  cost: {
+    pricedThroughDay: null,
+    heldSinceMs: null,
+    readAtMs: null,
+    deepReadDay: null,
+  },
+  seats: { reportedThroughDay: null, heldSinceMs: null },
+  directory: { reportedThroughDay: null, heldSinceMs: null },
+};
+
+/** The per-read sections of a stored position; absent and null read the same. */
+function sectionsOf(
+  data: z.infer<typeof storedCursorSchema>,
+): Pick<StoredCursor, "cost" | "seats" | "directory"> {
+  return {
+    cost: {
+      pricedThroughDay: data.costPricedThroughDay ?? null,
+      heldSinceMs: data.costHeldSinceMs ?? null,
+      // Absent on every position written before the ask was recorded, which
+      // reads as never asked and so asks at once.
+      readAtMs: data.costReadAtMs ?? null,
+      deepReadDay: data.costDeepReadDay ?? null,
+    },
+    seats: {
+      reportedThroughDay: data.seatsReportedThroughDay ?? null,
+      heldSinceMs: data.seatsHeldSinceMs ?? null,
+    },
+    directory: {
+      reportedThroughDay: data.directoryReportedThroughDay ?? null,
+      heldSinceMs: data.directoryHeldSinceMs ?? null,
+    },
+  };
+}
+
+function parseCursor(raw: string | null): StoredCursor {
+  if (!raw) return NO_CURSOR;
   try {
-    const parsed = cursorSchema.safeParse(JSON.parse(raw));
-    if (parsed.success) return parsed.data;
+    const parsed = storedCursorSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return NO_CURSOR;
+    const { createdon, conversationtranscriptid } = parsed.data;
+    return {
+      // Both or neither: the pair IS the position, and half of it would build
+      // a filter that either re-reads a window or skips one.
+      transcript:
+        createdon && conversationtranscriptid
+          ? { createdon, conversationtranscriptid }
+          : null,
+      ...sectionsOf(parsed.data),
+    };
   } catch {
     // A cursor we cannot read is treated as no cursor: re-reading a window is
     // survivable because identifiers are derived, but skipping one is not.
   }
-  return null;
+  return NO_CURSOR;
+}
+
+/**
+ * The two cost fields of a STORED position, for readers outside this puller —
+ * today the cost screen's Azure billing note.
+ *
+ * Exposed as a function over the same schema the puller itself reads back,
+ * rather than letting callers hand-parse the stored JSON: a hand-rolled
+ * reader accepts positions this schema refuses (a malformed day, a negative
+ * hold), and on exactly those rows the puller would start over while the
+ * panel claimed the bill had been read. One reader, one answer.
+ *
+ * The column is `Json?`: this build stores the encoded string, but older
+ * writers stored objects and an unpulled source holds null, so anything is
+ * accepted and anything unreadable answers "no read has completed" — the
+ * same collapse to `NO_CURSOR` a run applies.
+ */
+export function readStoredCostCursor(pollerCursor: unknown): {
+  costPricedThroughDay: string | null;
+  costHeldSinceMs: number | null;
+} {
+  const raw =
+    typeof pollerCursor === "string"
+      ? pollerCursor
+      : pollerCursor !== null && typeof pollerCursor === "object"
+        ? JSON.stringify(pollerCursor)
+        : null;
+  const cursor = parseCursor(raw);
+  return {
+    costPricedThroughDay: cursor.cost.pricedThroughDay,
+    costHeldSinceMs: cursor.cost.heldSinceMs,
+  };
+}
+
+/**
+ * The log line one directory failure earns.
+ *
+ * The walk itself neither logs nor decides — it lives in
+ * `microsoftDirectoryRead.ts` and is shared with the people listing, which
+ * answers the same failures in its own terms. These lines stay here and stay
+ * unchanged, so an operator's saved search for a tenant that has not consented
+ * keeps matching.
+ */
+function logDirectoryFailure(failure: MicrosoftDirectoryFailure): void {
+  if (failure.cause === "http") {
+    logger.warn(
+      { status: failure.status },
+      failure.status === 403
+        ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
+        : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
+    );
+    return;
+  }
+  if (failure.cause === "malformed") {
+    logger.warn(
+      "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
+    );
+    return;
+  }
+  logger.error(
+    { refusedHost: hostOf(failure.nextLink) },
+    "copilot studio dataverse: refusing a directory next-page link that is not Microsoft Graph; holding the day",
+  );
+}
+
+/** The finished list — unless nothing in it survived parsing. */
+function completeDirectoryList({
+  users,
+  unreadableRows,
+}: {
+  users: DirectoryUser[];
+  unreadableRows: number;
+}): DirectoryUser[] | null {
+  if (users.length === 0 && unreadableRows > 0) {
+    // Nothing survived. Recording the day would publish "this tenant
+    // lists nobody" for "nobody could be read" — permanently.
+    logger.warn(
+      { unreadableRows },
+      "copilot studio dataverse: no directory row in Microsoft Graph's reply could be read; holding the day",
+    );
+    return null;
+  }
+  if (unreadableRows > 0) {
+    // Counted here and nowhere else, exactly as the licence read does:
+    // reaching the run's own error count would cost it its
+    // conversations.
+    logger.warn(
+      { unreadableRows },
+      "copilot studio dataverse: some directory rows could not be read; the rest of the list is recorded",
+    );
+  }
+  return users;
+}
+
+/**
+ * Whether the run's outgoing position differs from the one it started with.
+ *
+ * Any of the four reads counts, on a clean run and on a failing one alike. A
+ * run whose conversations broke but whose bill was read is a partial success:
+ * the worker persists the advance, keeps the figures, and warns. What such a
+ * run does to the source's recorded health is the fold projection's decision
+ * to make, not this gate's — refusing the advance here would buy that
+ * visibility by throwing away figures already in hand.
+ *
+ * What stops a dead environment reading as steady progress is that the seat
+ * and directory marks only move on the day roll, and the cost mark only on
+ * the few runs a day that are due to ask about the bill at all. On a
+ * five-minute schedule that is four runs out of two hundred and eighty-eight;
+ * the rest hand back the incoming cursor string verbatim, which the worker
+ * reads as no progress and fails. The signal is weaker than it was when
+ * nothing but the day roll moved these marks, and it still holds.
+ * `refusesNextLink` still fails or warns exactly as it did, because there the
+ * transcript cursor is what moved.
+ */
+function positionMoved({
+  previous,
+  next,
+}: {
+  previous: StoredCursor;
+  next: StoredCursor;
+}): boolean {
+  const transcriptMoved =
+    next.transcript !== null &&
+    (next.transcript.createdon !== previous.transcript?.createdon ||
+      next.transcript.conversationtranscriptid !==
+        previous.transcript?.conversationtranscriptid);
+  const costMoved =
+    next.cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
+    next.cost.heldSinceMs !== previous.cost.heldSinceMs ||
+    // The instant of the ask counts as movement in its own right. A run that
+    // asked and found the same figure moves neither of the two above, and
+    // dropping the record of the ask would leave the source due again on the
+    // very next run.
+    next.cost.readAtMs !== previous.cost.readAtMs ||
+    // A run that completed the month is movement even when it priced the same
+    // days: without this the day is never saved and every run goes deep.
+    next.cost.deepReadDay !== previous.cost.deepReadDay;
+  const seatsMoved =
+    next.seats.reportedThroughDay !== previous.seats.reportedThroughDay ||
+    next.seats.heldSinceMs !== previous.seats.heldSinceMs;
+  const directoryMoved =
+    next.directory.reportedThroughDay !==
+      previous.directory.reportedThroughDay ||
+    next.directory.heldSinceMs !== previous.directory.heldSinceMs;
+  return transcriptMoved || costMoved || seatsMoved || directoryMoved;
+}
+
+/** The position a run hands back, as the string that is stored. */
+function encodeCursor(cursor: StoredCursor): string {
+  return JSON.stringify({
+    ...(cursor.transcript ?? {}),
+    costPricedThroughDay: cursor.cost.pricedThroughDay,
+    costHeldSinceMs: cursor.cost.heldSinceMs,
+    costReadAtMs: cursor.cost.readAtMs,
+    costDeepReadDay: cursor.cost.deepReadDay,
+    seatsReportedThroughDay: cursor.seats.reportedThroughDay,
+    seatsHeldSinceMs: cursor.seats.heldSinceMs,
+    directoryReportedThroughDay: cursor.directory.reportedThroughDay,
+    directoryHeldSinceMs: cursor.directory.heldSinceMs,
+  });
 }
 
 /**
@@ -226,20 +592,39 @@ function parseCursor(raw: string | null): Cursor | null {
  * a token per page would multiply one sign-in across the whole walk for no
  * benefit, since the token outlives any single run.
  */
-async function resolveEnvironmentToken(params: {
+/** The audience the transcript and agent reads are signed in for. */
+function environmentScope(environmentUrl: string): string {
+  return `${environmentUrl.replace(/\/+$/, "")}/.default`;
+}
+
+/**
+ * The audience the Azure bill is read under.
+ *
+ * A different audience from the environment, and one token cannot stand in for
+ * the other: Dataverse and Azure Resource Manager are separate resources, and
+ * a token minted for one is refused by the other. So a source that reads cost
+ * signs in twice per run, once per audience.
+ */
+export const AZURE_MANAGEMENT_SCOPE = `https://${AZURE_MANAGEMENT_HOST}/.default`;
+
+export async function resolveEnvironmentToken(params: {
   credentials: Record<string, string> | undefined;
   environmentUrl: string;
+  /** Which audience to mint for. Defaults to the environment itself. */
+  scope?: string;
   signal?: AbortSignal;
 }): Promise<string> {
   const { credentials, environmentUrl, signal } = params;
+  const scope = params.scope ?? environmentScope(environmentUrl);
   const tenantId = credentials?.tenantId;
   const clientId = credentials?.clientId;
   const clientSecret = credentials?.clientSecret;
 
   if (!tenantId || !clientId || !clientSecret) {
-    throw new Error(
+    throw new ProviderSignInError(
       "copilot studio dataverse puller needs credentials.tenantId, " +
         "credentials.clientId and credentials.clientSecret from the app registration",
+      { reason: "not_configured" },
     );
   }
 
@@ -247,7 +632,7 @@ async function resolveEnvironmentToken(params: {
     grant_type: "client_credentials",
     client_id: clientId,
     client_secret: clientSecret,
-    scope: `${environmentUrl.replace(/\/+$/, "")}/.default`,
+    scope,
   });
   const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
 
@@ -268,9 +653,10 @@ async function resolveEnvironmentToken(params: {
   if (!response.ok) {
     // The status alone, never the body: a token endpoint may echo the request
     // back, and this reason is logged and shown on the source.
-    throw new Error(
+    throw new ProviderSignInError(
       "copilot studio dataverse puller could not sign in: Microsoft refused " +
         `the application's credentials (HTTP ${response.status})`,
+      { reason: "refused", status: response.status },
     );
   }
 
@@ -279,9 +665,10 @@ async function resolveEnvironmentToken(params: {
     // A proxy or captive portal answering 200 with something that is not a
     // token must not be carried forward as one — it would fail later as an
     // unauthorised Dataverse call and read as a permissions problem.
-    throw new Error(
+    throw new ProviderSignInError(
       "copilot studio dataverse puller could not sign in: Microsoft answered " +
         "the sign-in without an access token",
+      { reason: "malformed_response" },
     );
   }
   return parsed.data.access_token;
@@ -317,7 +704,7 @@ function buildFirstPageUrl(params: {
   now: number;
 }): string {
   const { environmentUrl, config, cursor, now } = params;
-  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
+  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/conversationtranscripts`;
 
   const filters = cursor
     ? continuationFilters(cursor)
@@ -358,31 +745,6 @@ function buildFirstPageUrl(params: {
   return `${base}?${query
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join("&")}`;
-}
-
-/**
- * Dataverse writes lookup ids in one case and there is no promise both sides of
- * a join agree on it, so the key is folded before it is stored or read. A miss
- * here is silent — a conversation with no agent name — which is exactly the
- * kind of fault that survives a review.
- */
-function botKey(id: string): string {
-  return id.toLowerCase();
-}
-
-/** The agents on one page of the `bot` table, keyed by folded lookup id. */
-function readBotRows(rows: unknown[]): Map<string, BotRecord> {
-  const bots = new Map<string, BotRecord>();
-  for (const raw of rows) {
-    const parsed = botRowSchema.safeParse(raw);
-    if (!parsed.success) continue;
-    const row = parsed.data;
-    bots.set(botKey(row.botid), {
-      botName: row.name ?? undefined,
-      botModifiedOn: row.modifiedon ?? undefined,
-    });
-  }
-  return bots;
 }
 
 /**
@@ -450,6 +812,15 @@ interface TranscriptWalk {
   events: NormalizedPullEvent[];
   errorCount: number;
   last: Cursor | null;
+  /**
+   * Whether the walk stopped at a limit with pages still waiting.
+   *
+   * Not an error and not a failure — the rows already read are kept and the
+   * position still advances over them. It is the only thing that separates an
+   * environment permanently stuck on a fraction of its conversations from a
+   * quiet one, and without it both leave through the same exit.
+   */
+  isTruncated: boolean;
 }
 
 /**
@@ -614,16 +985,6 @@ function refusesNextLink(params: {
   return true;
 }
 
-/** The headers every read of this environment carries. */
-function dataverseHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "OData-MaxVersion": "4.0",
-    "OData-Version": "4.0",
-  };
-}
-
 /** A URL's host for logging, never throwing on one that will not parse. */
 function hostOf(value: string): string {
   try {
@@ -655,7 +1016,42 @@ export class CopilotStudioDataversePuller
     options: PullRunOptions,
     config: CopilotStudioDataverseConfig,
   ): Promise<PullResult> {
-    const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
+    const walk: TranscriptWalk = {
+      events: [],
+      errorCount: 0,
+      last: null,
+      isTruncated: false,
+    };
+    const previous = parseCursor(options.cursor);
+
+    // Both money reads happen BEFORE the environment is signed in to, and the
+    // order is the whole reason a wrong environment address no longer hides
+    // the bill. Neither throws and neither counts an error — put either of
+    // them after the sign-in and a customer with a broken environment would
+    // stop seeing figures that were sitting there to be read.
+    const costRead = await this.readAzureCost({
+      config,
+      options,
+      previous: previous.cost,
+    });
+    walk.events.push(...costRead.events);
+    const cost = costRead.cost;
+
+    const seatsRead = await this.readMicrosoftSeats({
+      config,
+      options,
+      previous: previous.seats,
+    });
+    walk.events.push(...seatsRead.events);
+    const seats = seatsRead.seats;
+
+    const directoryRead = await this.readMicrosoftDirectory({
+      config,
+      options,
+      previous: previous.directory,
+    });
+    walk.events.push(...directoryRead.events);
+    const directory = directoryRead.directory;
 
     try {
       const token = await resolveEnvironmentToken({
@@ -668,39 +1064,650 @@ export class CopilotStudioDataversePuller
         token,
         signal: options.signal,
       });
+
       await this.walkTranscriptPages({ walk, options, config, token, bots });
     } catch (error) {
+      // A provider asking for silence leaves by the error path, and only it.
+      // The wait it named reaches the connection off the thrown error, so
+      // absorbing it into an error count strands the one number saying when it
+      // is safe to come back — and on a walk that read some pages the run
+      // would then report partial success and the next wake would ask again
+      // inside the window just closed. Nothing is lost by leaving here: the
+      // cursor is never persisted on a throw, so the bill, the licences and
+      // the directory above are read again by the run that follows.
+      if (error instanceof DispatchError) {
+        logger.warn(
+          { retryAfterMs: error.retryAfterMs },
+          "copilot studio dataverse: the environment asked for fewer requests; ending the run with its wait",
+        );
+        throw error;
+      }
       walk.errorCount += 1;
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse pull failed",
       );
-      // The cursor is deliberately not advanced: the next run retries the
-      // same window, and re-reading is safe because identifiers are derived
-      // from the conversation rather than minted per pull.
+      // Falls through to the cursor computation rather than returning here.
+      // The bill and the licences above already landed, and abandoning the
+      // result for a failure in an unrelated half would throw away figures the
+      // run genuinely obtained. The transcript position is untouched either
+      // way, so the next run retries the same window; re-reading is safe
+      // because identifiers are derived from the conversation rather than
+      // minted per pull.
       //
-      // The events already read are handed back, but the worker will not
-      // write them — an error count with an unchanged cursor is the "made no
-      // progress" half of the `PullResult` contract, and it fails the run.
-      // That is the intended answer: a walk that threw part-way through a page
-      // cannot say which rows it got, so keeping some of them would persist a
-      // window nobody can describe. They are returned anyway because the caller
-      // is what decides, and a run that reports zero events reads as a source
-      // with nothing in it rather than one that fell over.
-      return {
-        events: walk.events,
-        cursor: options.cursor,
-        errorCount: walk.errorCount,
-      };
+      // The rows this walk did read are kept, and the position it reached
+      // describes them exactly: pages arrive in `TRANSCRIPT_ORDER_BY` order and
+      // a page that throws is parsed as a whole or not at all, so `walk.last`
+      // is the last row of the last page that came back complete.
     }
+
+    // Only advance past rows this run actually read: a walk that read nothing
+    // keeps the position it started from, so the same window is retried. The
+    // cost and licence halves advance independently — each is its own window
+    // with its own watermark, and holding one for another would make an
+    // environment with no new conversations never price its bill, or a bill
+    // that cannot be read stall the transcripts.
+    const advanced = walk.last?.createdon ? walk.last : previous.transcript;
+    const next: StoredCursor = { transcript: advanced, cost, seats, directory };
 
     return {
       events: walk.events,
-      // Only advance past rows this run actually read. A run that read
-      // nothing leaves the cursor alone so the same window is retried.
-      cursor: walk.last?.createdon ? JSON.stringify(walk.last) : options.cursor,
+      // The INCOMING string verbatim when nothing moved, never a re-encoding
+      // of it. The worker decides whether a run that reported errors made
+      // progress by comparing these two strings, and re-encoding an unchanged
+      // position yields a different string — the cost fields now spelled out
+      // — which it would read as an advance and persist. That is the whole
+      // reason this is a string comparison and not a deep one.
+      cursor: positionMoved({ previous, next })
+        ? encodeCursor(next)
+        : options.cursor,
       errorCount: walk.errorCount,
+      ...(walk.isTruncated ? { completeness: "truncated" as const } : {}),
     };
+  }
+
+  /**
+   * The environment's daily bill, or nothing at all.
+   *
+   * NEVER throws and NEVER counts an error, and that is the whole contract.
+   * `assertRunMadeProgress` in the worker turns any error count with an
+   * unmoved cursor into a failed run whose events are DISCARDED — so a cost
+   * read that reported a failure would throw away the conversations this
+   * source exists to collect. Modelled on `fetchBots`, which degrades the same
+   * way and for the same reason.
+   *
+   * A failure is a HOLD rather than a zero. Being throttled, or unable to
+   * reach Azure, says nothing about what the window cost; recording zero for
+   * it would be a confident wrong number that the summarizing step would
+   * faithfully honour over a real figure.
+   */
+  private async readAzureCost(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: {
+      pricedThroughDay: string | null;
+      heldSinceMs: number | null;
+      readAtMs: number | null;
+      deepReadDay: string | null;
+    };
+  }): Promise<{
+    events: NormalizedPullEvent[];
+    cost: {
+      pricedThroughDay: string | null;
+      heldSinceMs: number | null;
+      readAtMs: number | null;
+      deepReadDay: string | null;
+    };
+  }> {
+    const { config, options, previous } = params;
+    const subscriptionId = config.azureSubscriptionId;
+    // Opt-in. Without a subscription there is no bill to read and no second
+    // permission grant to ask the customer for.
+    if (!subscriptionId) return { events: [], cost: previous };
+
+    // The bill is read with its own registered app or not at all (ADR-128
+    // §21.1). Falling back to the bot's credential here would quietly
+    // re-create the one broad grant the split exists to break — and would do
+    // it precisely for the customer who declined to hand out billing access.
+    const billingClientId = options.credentials?.billingClientId;
+    const billingClientSecret = options.credentials?.billingClientSecret;
+    if (!billingClientId || !billingClientSecret) {
+      return { events: [], cost: previous };
+    }
+
+    const nowMs = Date.now();
+    // Neither of the two skips above and below is a failed read. Azure
+    // publishes this bill once a day and refuses a caller that asks too often,
+    // so a source on a five-minute schedule that asked every run would be
+    // throttled into never reading it at all. Handing back the position
+    // untouched leaves the hold anchored where it was and leaves the decision
+    // to give up to a run that actually asked.
+    if (!azureCostReadIsDue({ nowMs, readAtMs: previous.readAtMs })) {
+      return { events: [], cost: previous };
+    }
+    const held = () => ({
+      events: [],
+      cost: {
+        ...nextAzureCostCursor({ nowMs, previous, outcome: "held" as const }),
+        // A deep read that broke off wrote no day, so the day already held
+        // carries forward unchanged and the next run of this day still owes
+        // the month. That is the whole of "tried again on the next run".
+        deepReadDay: previous.deepReadDay,
+      },
+    });
+
+    try {
+      const token = await resolveEnvironmentToken({
+        // Same tenant, different registered app: the billing identity holds
+        // Cost Management Reader and nothing an employee ever typed.
+        credentials: {
+          tenantId: options.credentials?.tenantId ?? "",
+          clientId: billingClientId,
+          clientSecret: billingClientSecret,
+        },
+        environmentUrl: config.environmentUrl,
+        scope: AZURE_MANAGEMENT_SCOPE,
+        signal: options.signal,
+      });
+
+      const window = azureCostReadWindow({
+        nowMs,
+        pricedThroughDay: previous.pricedThroughDay,
+        deepReadDay: previous.deepReadDay,
+      });
+      const days = await this.fetchAzureCostPages({
+        subscriptionId,
+        token,
+        window,
+        options,
+      });
+      if (days === null) return held();
+
+      // Belt and braces over the request-side category filter, and it belongs
+      // HERE rather than one layer down. `azureCostEvents` promises in its own
+      // doc comment exactly one event per day the reply actually named, and
+      // `readAzureCostRows` promises a faithful record of what Azure said;
+      // dropping rows inside either falsifies a stated contract, and dropping
+      // them inside the parser is what turns a reader into a policy engine.
+      //
+      // This is the step that decides what BECOMES recorded cost, so the
+      // guard's whole intent survives: if Azure ignores the category filter on
+      // the request, the load balancer still never lands in anyone's AI spend.
+      // The ask and the answer are separate trust boundaries and each needs
+      // its own filter.
+      const aiDays = days.filter((day) =>
+        AZURE_AI_METER_CATEGORIES.some(
+          (category) => category === day.meterCategory,
+        ),
+      );
+
+      const priced = nextAzureCostCursor({
+        nowMs,
+        previous,
+        outcome: "priced",
+        wasDeepRead: window.isDeepRead,
+      });
+      return {
+        events: azureCostEvents({ days: aiDays, subscriptionId }),
+        cost: {
+          ...priced,
+          // Merged rather than carried through the advance, which says only
+          // what THIS run established. An ordinary run establishes no deep
+          // read and keeps the day already held.
+          deepReadDay: priced.deepReadDay ?? previous.deepReadDay,
+        },
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the Azure bill; holding the window and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  /**
+   * Every page of one cost read, or null when the window could not be read.
+   *
+   * Null rather than an empty list, because the two mean opposite things: an
+   * empty list is "Azure says this window cost nothing", which is a real
+   * answer, and null is "we could not ask", which must hold the window.
+   *
+   * A page that fails abandons the WHOLE read rather than keeping the pages
+   * before it. A half-read window would be emitted as if complete, and since
+   * a re-read replaces rather than adds, the missing meters' days would be
+   * left showing whatever they showed before with nothing saying they are
+   * stale.
+   */
+  private async fetchAzureCostPages(params: {
+    subscriptionId: string;
+    token: string;
+    window: { fromDay: string; toDay: string };
+    options: PullRunOptions;
+  }): Promise<ReturnType<typeof readAzureCostRows>["days"] | null> {
+    const { subscriptionId, token, window, options } = params;
+    const days: ReturnType<typeof readAzureCostRows>["days"] = [];
+
+    let url: string | null =
+      `https://${AZURE_MANAGEMENT_HOST}/subscriptions/${encodeURIComponent(subscriptionId)}` +
+      `/providers/Microsoft.CostManagement/query?api-version=${AZURE_COST_API_VERSION}`;
+    let pageCount = 0;
+
+    // The run's deadline and abort signal are read in the loop's own condition
+    // rather than inside its body, so that leaving the loop always means the
+    // same thing: a page is still owed, and the window is held.
+    while (url && pageCount < MAX_PAGES_PER_RUN && !runIsOver(options)) {
+      pageCount += 1;
+
+      const page = await this.readAzureCostPage({
+        url,
+        token,
+        window,
+        options,
+        subscriptionId,
+      });
+      if (page === null) return null;
+      days.push(...page.days);
+
+      if (page.nextLink === null) return days;
+
+      const next = this.azureCostNextPageUrl({
+        nextLink: page.nextLink,
+        subscriptionId,
+      });
+      if (next === null) return null;
+      url = next;
+    }
+
+    // Fell out of the loop with a page still owed — the page cap, the run's
+    // deadline, or the abort signal. Same reasoning as the refused link: a
+    // partial window is not a priced one.
+    logger.warn(
+      { pageCount, subscriptionId },
+      "copilot studio dataverse: the Azure cost read ran out of run before it ran out of pages; holding the window",
+    );
+    return null;
+  }
+
+  /**
+   * Ask Azure for one page of the cost window and read it.
+   *
+   * Returns null for every refusal — an HTTP one, or a body that is not the
+   * shape this reads — because they all mean the same thing to the caller:
+   * the window is held for the next run.
+   */
+  private async readAzureCostPage(params: {
+    url: string;
+    token: string;
+    window: { fromDay: string; toDay: string };
+    options: PullRunOptions;
+    subscriptionId: string;
+  }): Promise<ReturnType<typeof readAzureCostRows> | null> {
+    const { url, token, window, options, subscriptionId } = params;
+
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const response = await ssrfSafeFetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(azureCostRequestBody(window)),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, timeout])
+        : timeout,
+      // Carries a token minted from the customer's secret, so a redirect
+      // must not hand it to whoever answers.
+      followRedirects: false,
+    });
+
+    if (!response.ok) {
+      // 429 is ordinary operation here, not an exception: the very first
+      // real request against a live subscription was throttled. Every
+      // refusal holds the window either way — the next scheduled run is the
+      // retry, and sleeping in place would burn this run's deadline and
+      // risk it being killed holding the transcripts it already read.
+      logger.warn(
+        { status: response.status, subscriptionId },
+        response.status === 429
+          ? "copilot studio dataverse: Azure asked the cost read to retry later (HTTP 429); holding the window for the next run"
+          : "copilot studio dataverse: Azure refused the cost read; holding the window for the next run",
+      );
+      return null;
+    }
+
+    const read = readAzureCostRows({ response: await response.json() });
+    if (read.malformed) {
+      // An HTTP 200 whose body is not the shape this reads. Held, not
+      // recorded: taken as an empty window it would read as a genuinely
+      // free week and be marked priced, which is the exact confusion the
+      // row-level count below exists to prevent one level down.
+      logger.warn(
+        { subscriptionId },
+        "copilot studio dataverse: Azure answered the cost read with an unrecognised body; holding the window for the next run",
+      );
+      return null;
+    }
+
+    if (read.unreadableRows > 0) {
+      // Counted here and nowhere else. It must never reach the run's own
+      // error count, which would cost the run its conversations.
+      logger.warn(
+        { unreadableRows: read.unreadableRows, subscriptionId },
+        "copilot studio dataverse: some Azure cost rows could not be read; the rest of the window is recorded",
+      );
+    }
+
+    return read;
+  }
+
+  /**
+   * Accept the next-page link only if Azure Resource Manager itself served it.
+   *
+   * The link arrives inside a reply and is followed carrying the ARM bearer
+   * token, so the host is decided by parsing rather than by comparing text.
+   * Text comparison can be correct and still be fragile: a prefix ending in a
+   * slash does pin the host, because a URL's authority ends at its first
+   * slash — but only for exactly as long as nobody tidies the slash away, and
+   * nothing about the string says it is load-bearing. Parsing states the rule
+   * it means and cannot be edited into a weaker one by accident.
+   *
+   * A next page the run will not follow means the window was read in part, and
+   * a partial window must never be reported as priced: the meters that live on
+   * the pages behind it would keep their previous figures with nothing marking
+   * them stale. Null instead, so the next run asks again from the top.
+   */
+  private azureCostNextPageUrl(params: {
+    nextLink: string;
+    subscriptionId: string;
+  }): string | null {
+    const { nextLink, subscriptionId } = params;
+
+    if (!isAzureResourceManagerUrl(nextLink)) {
+      // The refused link carries the ARM token if followed. Logged like the
+      // transcript walk's own refusal, because a silent stall here is
+      // indistinguishable from a permissions problem.
+      logger.error(
+        { refusedHost: hostOf(nextLink), subscriptionId },
+        "copilot studio dataverse: refusing an Azure cost next-page link that is not Azure Resource Manager; holding the window",
+      );
+      return null;
+    }
+
+    return nextLink;
+  }
+
+  /**
+   * The tenant's seat licences, or nothing at all.
+   *
+   * The same contract as `readAzureCost` and for the same reason: it NEVER
+   * throws and NEVER counts an error. An error count against an unmoved cursor
+   * is what `assertRunMadeProgress` fails a run on, and it discards the run
+   * WHOLE — so a refused licence read would cost the customer the
+   * conversations this source exists to collect.
+   *
+   * A failure holds the day rather than recording zero. Being refused says
+   * nothing about how many seats a tenant holds, and a zero would be a
+   * confident wrong number that everything reading it downstream would honour
+   * over a real one.
+   */
+  private async readMicrosoftSeats(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: { reportedThroughDay: string | null; heldSinceMs: number | null };
+  }): Promise<{
+    events: NormalizedPullEvent[];
+    seats: { reportedThroughDay: string | null; heldSinceMs: number | null };
+  }> {
+    const { config, options, previous } = params;
+
+    // Neither of the two skips below is a hold. Nothing was attempted, so
+    // there is nothing to hold: the position is handed back untouched, which
+    // is also what keeps `seatsMoved` false on a run whose only progress was
+    // elsewhere.
+    if (!config.readSeats) return { events: [], seats: previous };
+
+    const nowMs = Date.now();
+    const due = seatsReadIsDue({
+      nowMs,
+      reportedThroughDay: previous.reportedThroughDay,
+    });
+    if (!due) return { events: [], seats: previous };
+
+    const held = () => ({
+      events: [],
+      seats: nextSeatsCursor({ nowMs, previous, outcome: "held" as const }),
+    });
+
+    try {
+      const token = await resolveEnvironmentToken({
+        credentials: options.credentials,
+        environmentUrl: config.environmentUrl,
+        scope: MICROSOFT_GRAPH_SCOPE,
+        signal: options.signal,
+      });
+
+      const read = await this.fetchSubscribedSkus({ token, options });
+      if (read === null) return held();
+
+      return {
+        events: microsoftSeatEvents({
+          skus: read.skus,
+          day: seatsReportDay({ nowMs }),
+        }),
+        seats: nextSeatsCursor({ nowMs, previous, outcome: "reported" }),
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the tenant's seat licences; holding the day and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  /**
+   * The one read of the tenant's licence pools, or null when it could not be
+   * read.
+   *
+   * One request and no page loop. `/v1.0/subscribedSkus` answers with the
+   * whole list — it publishes no next link and documents `$top` as ignored —
+   * so unlike the cost read there is no half-read list to guard against.
+   *
+   * Null rather than an empty list, because the two mean opposite things: an
+   * empty list is "this tenant holds no licences", which is a real answer, and
+   * null is "we could not ask", which holds the day.
+   */
+  private async fetchSubscribedSkus(params: {
+    token: string;
+    options: PullRunOptions;
+  }): Promise<ReturnType<typeof readSubscribedSkuRows> | null> {
+    const { token, options } = params;
+
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const response = await ssrfSafeFetch(
+      "https://graph.microsoft.com/v1.0/subscribedSkus",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        signal: options.signal
+          ? AbortSignal.any([options.signal, timeout])
+          : timeout,
+        // Carries a token minted from the customer's secret, so a redirect
+        // must not hand it to whoever answers.
+        followRedirects: false,
+      },
+    );
+
+    if (!response.ok) {
+      // A 403 is the ordinary shape of "the consent was never granted", and it
+      // is worth saying so by name: every other reading of a 403 sends an
+      // admin to check a role assignment that was never the problem.
+      logger.warn(
+        { status: response.status },
+        response.status === 403
+          ? "copilot studio dataverse: the tenant has not consented to the licence read (HTTP 403); holding the day"
+          : "copilot studio dataverse: Microsoft Graph refused the licence read; holding the day",
+      );
+      return null;
+    }
+
+    const read = readSubscribedSkuRows({ response: await response.json() });
+    if (read.malformed) {
+      // An HTTP 200 whose body is not the shape this reads. Held, not
+      // recorded: taken as an empty list it would publish a tenant that holds
+      // no licences at all and mark the day reported.
+      logger.warn(
+        "copilot studio dataverse: Microsoft Graph answered the licence read with an unrecognised body; holding the day",
+      );
+      return null;
+    }
+
+    if (read.unreadableRows > 0) {
+      // Counted here and nowhere else. It must never reach the run's own error
+      // count, which would cost the run its conversations.
+      logger.warn(
+        { unreadableRows: read.unreadableRows },
+        "copilot studio dataverse: some licence pools could not be read; the rest of the list is recorded",
+      );
+    }
+
+    if (read.skus.length === 0 && read.unreadableRows > 0) {
+      // Nothing survived the read. The same reasoning the malformed body gets
+      // above, one level down: a list that yielded no pool and a tenant that
+      // holds no licences arrive as the same empty list, and reporting the day
+      // publishes the second answer for the first — permanently, because a day
+      // already marked reported is never asked about again.
+      //
+      // Only when NOTHING was read. A list that yielded some pools is recorded
+      // as it stands, because one bad pool must not cost the tenant the rest.
+      logger.warn(
+        { unreadableRows: read.unreadableRows },
+        "copilot studio dataverse: no licence pool in Microsoft Graph's reply could be read; holding the day",
+      );
+      return null;
+    }
+
+    return read;
+  }
+
+  /**
+   * The tenant's user directory, as directory-report events, or none.
+   *
+   * The licence read's contract exactly — NEVER throws, NEVER counts an
+   * error, a failed or refused read HOLDS the day rather than reporting it —
+   * because the same `assertRunMadeProgress` economics apply: an error count
+   * against an unmoved cursor discards the run whole, conversations and all.
+   */
+  private async readMicrosoftDirectory(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: { reportedThroughDay: string | null; heldSinceMs: number | null };
+  }): Promise<{
+    events: NormalizedPullEvent[];
+    directory: {
+      reportedThroughDay: string | null;
+      heldSinceMs: number | null;
+    };
+  }> {
+    const { config, options, previous } = params;
+
+    // Neither skip is a hold — nothing was attempted, so the position is
+    // handed back untouched, and `directoryMoved` stays false.
+    if (!config.readDirectory) return { events: [], directory: previous };
+
+    const nowMs = Date.now();
+    const due = directoryReadIsDue({
+      nowMs,
+      reportedThroughDay: previous.reportedThroughDay,
+    });
+    if (!due) return { events: [], directory: previous };
+
+    const held = () => ({
+      events: [],
+      directory: nextDirectoryCursor({
+        nowMs,
+        previous,
+        outcome: "held" as const,
+      }),
+    });
+
+    try {
+      const token = await resolveEnvironmentToken({
+        credentials: options.credentials,
+        environmentUrl: config.environmentUrl,
+        scope: MICROSOFT_GRAPH_SCOPE,
+        signal: options.signal,
+      });
+
+      const users = await this.fetchDirectoryUsers({ token, options });
+      if (users === null) return held();
+
+      return {
+        events: microsoftDirectoryEvents({
+          users,
+          day: seatsReportDay({ nowMs }),
+        }),
+        directory: nextDirectoryCursor({
+          nowMs,
+          previous,
+          outcome: "reported",
+        }),
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the tenant's directory; holding the day and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  /**
+   * The whole user list across however many pages Graph serves it in, or null
+   * when it could not all be read.
+   *
+   * All or nothing, where the licence read is one page by nature: a directory
+   * reported from half its pages would list half the tenant, and the day
+   * would be marked read with nothing marking the other half missing. Any
+   * page failing — or serving a next link that is not Microsoft Graph, which
+   * would otherwise be followed carrying the Graph bearer — holds the day.
+   */
+  private async fetchDirectoryUsers(params: {
+    token: string;
+    options: PullRunOptions;
+  }): Promise<DirectoryUser[] | null> {
+    const { token, options } = params;
+
+    const read = await walkMicrosoftDirectory({
+      token,
+      signal: options.signal,
+      maxPages: MAX_DIRECTORY_PAGES,
+    });
+    if (!read.ok) {
+      logDirectoryFailure(read.failure);
+      return null;
+    }
+    if (read.truncated) {
+      // Ran out of page budget with a next link still standing. Held, not
+      // recorded — see the all-or-nothing note above — and said out loud with
+      // the cap in the line, so a tenant bigger than the budget reads as a
+      // limit to raise rather than a silent stall.
+      logger.error(
+        { pagesRead: MAX_DIRECTORY_PAGES, usersRead: read.users.length },
+        "copilot studio dataverse: the directory did not fit the page budget; holding the day",
+      );
+      return null;
+    }
+
+    return completeDirectoryList({
+      users: read.users,
+      unreadableRows: read.unreadableRows,
+    });
   }
 
   /**
@@ -721,14 +1728,19 @@ export class CopilotStudioDataversePuller
     let url: string | null = buildFirstPageUrl({
       environmentUrl: config.environmentUrl,
       config,
-      cursor: parseCursor(options.cursor),
+      cursor: parseCursor(options.cursor).transcript,
       now: Date.now(),
     });
     let pageCount = 0;
 
     while (url && pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (runIsOver(options)) break;
+      if (runIsOver(options)) {
+        // A link still in hand and no time left to follow it: the same
+        // half-read window the page cap leaves, reached the other way.
+        walk.isTruncated = true;
+        break;
+      }
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
       readPageRows({ page, walk, bots });
@@ -747,6 +1759,7 @@ export class CopilotStudioDataversePuller
     }
 
     if (url && pageCount >= MAX_PAGES_PER_RUN) {
+      walk.isTruncated = true;
       logger.warn(
         { pageCount },
         "copilot studio dataverse hit the page cap; the next run resumes from the cursor",
@@ -772,61 +1785,29 @@ export class CopilotStudioDataversePuller
     token: string;
     signal?: AbortSignal;
   }): Promise<Map<string, BotRecord>> {
-    const { environmentUrl, token, signal } = params;
+    const read = await readCopilotBots(params);
 
-    try {
-      const page = await this.fetchBotsPage({ environmentUrl, token, signal });
-      if (!page) return new Map();
-
-      const bots = readBotRows(page.value);
-      warnAboutIncompleteBotList({
-        botCount: bots.size,
-        hasMorePages: Boolean(page["@odata.nextLink"]),
-      });
-      return bots;
-    } catch (error) {
+    // The refusal is discarded ON PURPOSE, and only here. `readCopilotBots`
+    // reports which of the three things happened so the on-demand agent
+    // listing can show an admin the difference between a tenant with no agents
+    // and a credential that may not enumerate them. This caller genuinely
+    // cannot use that: an empty Map is the only thing the walk below can
+    // proceed with, and anything louder would fail a transcript pull over a
+    // missing label.
+    if (!read.ok) {
       logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { reason: read.refusal.reason, status: read.refusal.status },
         "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
       );
       return new Map();
     }
-  }
 
-  /**
-   * The one read of the `bot` table, or null when the environment refused it.
-   *
-   * A refusal is null rather than a throw because it is the ordinary case
-   * here: the caller treats "no list" and "an unreadable list" the same way,
-   * and neither is worth an error count.
-   */
-  private async fetchBotsPage(params: {
-    environmentUrl: string;
-    token: string;
-    signal?: AbortSignal;
-  }): Promise<z.infer<typeof odataPageSchema> | null> {
-    const { environmentUrl, token, signal } = params;
-    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
-    const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
-    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
-    const response = await ssrfSafeFetch(`${base}?${query}`, {
-      method: "GET",
-      headers: dataverseHeaders(token),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      // Same reasoning as the transcript read: this request carries the
-      // token, and a redirect would hand it to whoever answers.
-      followRedirects: false,
+    const bots = readBotRows(read.rows);
+    warnAboutIncompleteBotList({
+      botCount: bots.size,
+      hasMorePages: read.hasMorePages,
     });
-
-    if (!response.ok) {
-      logger.warn(
-        { status: response.status },
-        "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
-      );
-      return null;
-    }
-    return odataPageSchema.parse(await response.json());
+    return bots;
   }
 
   private async fetchPage(params: {
@@ -838,7 +1819,21 @@ export class CopilotStudioDataversePuller
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await ssrfSafeFetch(url, {
       method: "GET",
-      headers: dataverseHeaders(token),
+      headers: {
+        ...dataverseHeaders(token),
+        // Dataverse's own way of being asked for a page size. `$top` alone
+        // names a row count without stating it as a preference, and this
+        // provider stays free to answer with its own far larger page — so the
+        // cap on how many pages one run may take was bounding a much bigger
+        // read than intended.
+        //
+        // At the CALL SITE rather than inside `dataverseHeaders`, which is
+        // shared with a listing walk that pages differently. A page-size
+        // preference baked into the shared builder would silently apply to
+        // that walk too. It is written off `PAGE_SIZE`, the same constant the
+        // query's `$top` is built from, so the two cannot disagree.
+        Prefer: `odata.maxpagesize=${PAGE_SIZE}`,
+      },
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends
@@ -846,6 +1841,20 @@ export class CopilotStudioDataversePuller
       followRedirects: false,
     });
 
+    if (response.status === 429) {
+      // The page walk stops here rather than asking for the next page. Both
+      // halves matter: one more request at a provider that has just asked for
+      // silence is the thing being paid for, and the wait it named is the
+      // thing that used to be dropped on the way out. Draining the body is
+      // housekeeping for the connection pool and must never replace the throw.
+      await response.body?.cancel().catch(() => void 0);
+      throw new DispatchError({
+        message:
+          "copilot studio dataverse puller: the environment asked for fewer requests (HTTP 429)",
+        retryable: true,
+        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+      });
+    }
     if (!response.ok) {
       throw new Error(
         `copilot studio dataverse puller: the environment refused the read (HTTP ${response.status})`,

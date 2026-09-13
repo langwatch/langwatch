@@ -20,7 +20,14 @@
  * the row, and mounting the real Vega and tRPC stacks to prove it would test the
  * harness instead.
  *
+ * A dashboard widget (`dashboard_srcdoc`) is the same shape of claim once
+ * more: its sandboxed frame reads `{ code, queries }`, not a builder payload
+ * or a saved statement, and its author code has no `series` either — the
+ * alert bell has to stay excluded here for the identical reason it stays
+ * excluded for a workbench row.
+ *
  * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -37,17 +44,6 @@ vi.mock("~/utils/compat/next-router", () => {
   const router = { query: {}, asPath: "/", push: vi.fn(), replace: vi.fn() };
   return { useRouter: () => router, default: router };
 });
-
-vi.mock("@dnd-kit/sortable", () => ({
-  useSortable: () => ({
-    attributes: {},
-    listeners: undefined,
-    setNodeRef: vi.fn(),
-    transform: null,
-    transition: undefined,
-    isDragging: false,
-  }),
-}));
 
 vi.mock("~/components/analytics/CustomGraph", () => ({
   CustomGraph: () => <div data-testid="builder-graph" />,
@@ -72,7 +68,57 @@ vi.mock(
   }),
 );
 
-import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
+// The card and its menu read tRPC hooks at render (rename/save, "Add to
+// dashboard"), and the dashboard's period comes from the page's selector.
+// None of these scenarios exercise them, so both are stubbed rather than
+// provided — the claim here is which body a card draws.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useUtils: () => ({
+      dashboardWidgets: { list: { invalidate: vi.fn() } },
+      graphs: { getAll: { invalidate: vi.fn() } },
+    }),
+    dashboards: {
+      getOrCreateFirst: { useQuery: () => ({ data: undefined }) },
+    },
+    dashboardWidgets: {
+      assignDashboard: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      update: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+    },
+  },
+}));
+
+vi.mock("~/components/PeriodSelector", () => ({
+  usePeriodSelector: () => ({
+    period: { startDate: new Date(0), endDate: new Date(1) },
+  }),
+}));
+
+vi.mock(
+  "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor",
+  () => ({
+    DashboardWidgetInPlaceEditor: () => null,
+  }),
+);
+
+vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", () => ({
+  DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
+    <div
+      data-testid="dashboard-widget"
+      data-id={id}
+      data-graph={JSON.stringify(graph)}
+    />
+  ),
+}));
+
+import {
+  DASHBOARD_SRCDOC_CHART_KIND,
+  WORKBENCH_SQL_CHART_KIND,
+} from "~/server/analytics/chartKinds";
 
 import { DraggableGraphCard } from "../DraggableGraphCard";
 
@@ -112,7 +158,6 @@ function renderCard({
       projectSlug="proj"
       projectId="project_1"
       onDelete={vi.fn()}
-      onSizeChange={vi.fn()}
       isDeleting={false}
     />,
     { wrapper: Wrapper },
@@ -192,6 +237,77 @@ describe("a dashboard grid card", () => {
         "data-granularity",
         "unset",
       );
+    });
+  });
+
+  describe("given a dashboard widget", () => {
+    const DASHBOARD_WIDGET_PAYLOAD = {
+      version: 1,
+      code: "export default function Widget() { return null; }",
+      queries: [{ name: "main", sql: "SELECT 1" }],
+    };
+
+    /** @scenario "A dashboard widget card draws the sandboxed widget, not the builder" */
+    it("draws the sandboxed dashboard widget frame rather than the builder renderer", () => {
+      render(
+        <DraggableGraphCard
+          graph={{
+            id: "graph_1",
+            name: "Error rate",
+            graph: DASHBOARD_WIDGET_PAYLOAD,
+            filters: {},
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+            kind: DASHBOARD_SRCDOC_CHART_KIND,
+            trigger: null,
+          }}
+          projectSlug="proj"
+          projectId="project_1"
+          onDelete={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const widget = screen.getByTestId("dashboard-widget");
+      expect(widget).toBeInTheDocument();
+      expect(widget).toHaveAttribute("data-id", "graph_1");
+      expect(JSON.parse(widget.getAttribute("data-graph") ?? "null")).toEqual(
+        DASHBOARD_WIDGET_PAYLOAD,
+      );
+      expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A dashboard widget card is not offered an alert it cannot evaluate" */
+    it("offers no alert bell", () => {
+      render(
+        <DraggableGraphCard
+          graph={{
+            id: "graph_1",
+            name: "Error rate",
+            graph: DASHBOARD_WIDGET_PAYLOAD,
+            filters: {},
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+            kind: DASHBOARD_SRCDOC_CHART_KIND,
+            trigger: null,
+          }}
+          projectSlug="proj"
+          projectId="project_1"
+          onDelete={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /Add alert/ }),
+      ).not.toBeInTheDocument();
     });
   });
 });

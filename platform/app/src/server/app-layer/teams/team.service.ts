@@ -7,6 +7,7 @@ import { UserNotInOrganizationError } from "~/server/role-bindings/errors";
 import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
+  TeamProjectListing,
   TeamRepository,
 } from "./repositories/team.repository";
 
@@ -218,6 +219,20 @@ export class TeamRestService {
     limit: number;
   }): Promise<PaginatedResult<Team>> {
     return this.repo.findAllByOrganization(params);
+  }
+
+  /**
+   * The team's projects, minus the organization's hidden governance home.
+   *
+   * The caller has already established that the team belongs to its
+   * organization; this only widens from team to projects.
+   */
+  async listProjects({
+    teamId,
+  }: {
+    teamId: string;
+  }): Promise<TeamProjectListing[]> {
+    return this.repo.findProjectsInTeam({ teamId });
   }
 
   async create({

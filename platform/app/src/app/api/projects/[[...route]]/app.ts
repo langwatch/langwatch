@@ -13,6 +13,8 @@ import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
 import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   DestinationTeamNotFoundError,
+  GovernanceProjectProtectedError,
+  governanceProjectRouteViolation,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
@@ -235,6 +237,36 @@ secured
     },
   );
 
+/**
+ * One project of this organization, addressed by id — and never the hidden
+ * governance project.
+ *
+ * The governance project is excluded from every listing surface, so answering a
+ * read about it is the one thing left that would confirm it exists. It reads as
+ * not found, which is what it is as far as this API is concerned: the id
+ * belongs to an internal tenancy record, not to a workspace anybody can open
+ * (ADR-128 §11).
+ */
+async function readableProject({
+  id,
+  organizationId,
+  service,
+}: {
+  id: string;
+  organizationId: string;
+  service: ProjectService;
+}) {
+  const project = await service.getWithTeam(id);
+  if (
+    !project ||
+    project.team.organizationId !== organizationId ||
+    governanceProjectRouteViolation(project.kind)
+  ) {
+    throw new NotFoundError("Project not found");
+  }
+  return project;
+}
+
 secured
   .access(requires("project:view"))
   .get(
@@ -246,10 +278,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
+      const project = await readableProject({
+        id,
+        organizationId: organization.id,
+        service,
+      });
 
       return c.json(projectResponse(project));
     },
@@ -264,6 +297,12 @@ function asProjectUpdateHttpError(error: unknown): unknown {
     return new BadRequestError(error.message);
   }
   if (error instanceof PersonalWorkspaceBoundaryError) {
+    return new ForbiddenError(error.message);
+  }
+  // A write names an id the caller already holds, so the refusal says what the
+  // record is rather than pretending it is missing — a mystery 404 on a project
+  // an admin can see the id of is a support ticket.
+  if (error instanceof GovernanceProjectProtectedError) {
     return new ForbiddenError(error.message);
   }
   return error;
@@ -323,7 +362,10 @@ secured
         if (error instanceof ProjectNotFoundError) {
           throw new NotFoundError("Project not found");
         }
-        if (error instanceof PersonalProjectProtectedError) {
+        if (
+          error instanceof PersonalProjectProtectedError ||
+          error instanceof GovernanceProjectProtectedError
+        ) {
           throw new ForbiddenError(error.message);
         }
         throw error;
@@ -356,10 +398,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
+      const project = await readableProject({
+        id,
+        organizationId: organization.id,
+        service,
+      });
 
       return c.json({ apiKey: project.apiKey });
     },
@@ -376,10 +419,9 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
+      // Re-keying the governance project would break the receiver's own
+      // ingestion path, so the same guard the mutations carry applies here.
+      await readableProject({ id, organizationId: organization.id, service });
 
       const newApiKey = generateApiKey();
       await prisma.project.update({
