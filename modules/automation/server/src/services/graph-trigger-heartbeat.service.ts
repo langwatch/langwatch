@@ -289,7 +289,7 @@ export class GraphTriggerHeartbeatService {
       // ADR-034 Phase 6 source classification. Unknown-source defaults to
       // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
       // metrics aren't in `field-availability`.
-      const lookedUp = await deps.triggerSent.tryFindGraphTriggerSource({
+      const lookedUp = await deps.triggerSent.findGraphTriggerSource({
         triggerId: trigger.id,
         customGraphId: trigger.customGraphId,
         projectId,
@@ -340,7 +340,7 @@ export class GraphTriggerHeartbeatService {
   }): Promise<ProjectRecency> {
     let client: ClickHouseClient | null;
     try {
-      client = await deps.heartbeat.tryResolveClickHouseClient(projectId);
+      client = await deps.heartbeat.findClickHouseClient(projectId);
     } catch (error) {
       deps.logger.warn(
         {

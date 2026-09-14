@@ -38,11 +38,11 @@ function harness(
       updateLastRunAt: async () => undefined,
     },
     projects: {
-      tryGetById: async () =>
+      findById: async () =>
         options.project === undefined ? { id: "p", slug: "s" } : options.project,
     },
     traces: {
-      tryGetSummary: async ({ traceId }: { traceId: string }) => {
+      findSummary: async ({ traceId }: { traceId: string }) => {
         seen.summaries.push(traceId);
         return options.fold === undefined ? FOLD : options.fold;
       },

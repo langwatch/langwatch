@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildReportTriggerData,
-  extractReportFromTriggerRow,
+  findReportFromTriggerRow,
   type ReportActionParams,
   reportScheduleSchema,
   reportSourceSchema,
@@ -119,11 +119,11 @@ describe("reportSourceSchema", () => {
   });
 });
 
-describe("extractReportFromTriggerRow", () => {
+describe("findReportFromTriggerRow", () => {
   describe("given a report-shaped actionParams", () => {
     it("round-trips the source+schedule and preserves destination keys", () => {
       const row = { ...traceQueryParams, members: ["a@b.co"] };
-      const out = extractReportFromTriggerRow(row);
+      const out = findReportFromTriggerRow(row);
       expect(out?.source.kind).toBe("traceQuery");
       expect(out?.schedule.cron).toBe("0 9 * * 1");
       expect(out?.members).toEqual(["a@b.co"]);
@@ -132,8 +132,8 @@ describe("extractReportFromTriggerRow", () => {
 
   describe("given a non-report actionParams", () => {
     it("returns null", () => {
-      expect(extractReportFromTriggerRow({ threshold: 10 })).toBeNull();
-      expect(extractReportFromTriggerRow(null)).toBeNull();
+      expect(findReportFromTriggerRow({ threshold: 10 })).toBeNull();
+      expect(findReportFromTriggerRow(null)).toBeNull();
     });
   });
 });

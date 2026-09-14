@@ -154,8 +154,8 @@ export class AutomationService {
     return this.triggers.findByIdOrThrow(input);
   }
 
-  tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    return this.triggers.tryFindById(input);
+  findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+    return this.triggers.findById(input);
   }
 
   getAllForProject(input: { projectId: string }): Promise<Trigger[]> {
@@ -204,7 +204,7 @@ export class AutomationService {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {
-    return this.triggers.tryFindByCustomGraphId(input);
+    return this.triggers.findByCustomGraphId(input);
   }
 
   getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {
@@ -336,17 +336,17 @@ export class AutomationService {
     }));
   }
 
-  async tryResolveUnsubscribeView(input: { token: string }): Promise<{
+  async findUnsubscribeView(input: { token: string }): Promise<{
     projectName: string;
     triggerName: string | null;
     email: string;
   } | null> {
-    const payload = this.verifier.tryVerify(input.token);
+    const payload = this.verifier.findVerifiedPayload(input.token);
     if (!payload) {
       return null;
     }
 
-    const names = await this.names.tryLookupNames(payload);
+    const names = await this.names.findNames(payload);
     if (!names) {
       return null;
     }
@@ -359,7 +359,7 @@ export class AutomationService {
   }
 
   async confirmUnsubscribe(input: { token: string; scope: "trigger" | "project" }): Promise<void> {
-    const payload = this.verifier.tryVerify(input.token);
+    const payload = this.verifier.findVerifiedPayload(input.token);
     if (!payload) {
       throw new InvalidUnsubscribeTokenError();
     }
@@ -400,11 +400,11 @@ export class AutomationService {
     return input.emails.filter((email) => !blocked.has(normalize(email)));
   }
 
-  tryGetCustomGraph(input: {
+  findCustomGraph(input: {
     customGraphId: string;
     projectId: string;
   }): Promise<CustomGraph | null> {
-    return this.customGraphs.tryFindById(input);
+    return this.customGraphs.findById(input);
   }
 
   customGraphExistsInProject(input: {

@@ -33,12 +33,12 @@ describe("UnsubscribeTokenService", () => {
 
     /** @scenario "A token the application signed verifies here" */
     it("reads back the project, the automation and the recipient", () => {
-      expect(tokens.tryVerify(APPLICATION_TRIGGER_TOKEN)).toEqual({
+      expect(tokens.findVerifiedPayload(APPLICATION_TRIGGER_TOKEN)).toEqual({
         projectId: "project-1",
         triggerId: "trigger-1",
         email: "ada@example.com",
       });
-      expect(tokens.tryVerify(APPLICATION_PROJECT_TOKEN)).toEqual({
+      expect(tokens.findVerifiedPayload(APPLICATION_PROJECT_TOKEN)).toEqual({
         projectId: "project-1",
         triggerId: null,
         email: "ada@example.com",
@@ -75,15 +75,15 @@ describe("UnsubscribeTokenService", () => {
         }),
       ).toString("base64url")}.${APPLICATION_TRIGGER_TOKEN.split(".")[1]!}`;
 
-      expect(tokens.tryVerify(forged)).toBeNull();
-      expect(tokens.tryVerify(`${APPLICATION_TRIGGER_TOKEN}0`)).toBeNull();
-      expect(tokens.tryVerify("not-a-token")).toBeNull();
+      expect(tokens.findVerifiedPayload(forged)).toBeNull();
+      expect(tokens.findVerifiedPayload(`${APPLICATION_TRIGGER_TOKEN}0`)).toBeNull();
+      expect(tokens.findVerifiedPayload("not-a-token")).toBeNull();
     });
 
     /** @scenario "The address is bound to the recipient it was minted for" */
     it("refuses a token minted under a different key", () => {
       expect(
-        UnsubscribeTokenService.create({ secret: "ab".repeat(32) }).tryVerify(
+        UnsubscribeTokenService.create({ secret: "ab".repeat(32) }).findVerifiedPayload(
           APPLICATION_TRIGGER_TOKEN,
         ),
       ).toBeNull();
@@ -98,7 +98,7 @@ describe("UnsubscribeTokenService", () => {
       expect(() =>
         tokens.sign({ projectId: "project-1", triggerId: null, email: "ada@example.com" }),
       ).toThrow(/NEXTAUTH_SECRET/);
-      expect(() => tokens.tryVerify(APPLICATION_TRIGGER_TOKEN)).toThrow(/NEXTAUTH_SECRET/);
+      expect(() => tokens.findVerifiedPayload(APPLICATION_TRIGGER_TOKEN)).toThrow(/NEXTAUTH_SECRET/);
     });
   });
 });

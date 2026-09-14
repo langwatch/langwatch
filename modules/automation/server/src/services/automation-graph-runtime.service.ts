@@ -10,7 +10,7 @@ export abstract class AutomationLogger {
 
 /** Technical ClickHouse resolver used only by the heartbeat recency query. */
 export abstract class AutomationHeartbeat {
-  abstract tryResolveClickHouseClient(projectId: string): Promise<ClickHouseClient | null>;
+  abstract findClickHouseClient(projectId: string): Promise<ClickHouseClient | null>;
 }
 
 /** Host transport semantics for retryable and terminal delivery failures. */

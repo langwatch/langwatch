@@ -46,7 +46,7 @@ function mount(options: { live?: Trigger | null } = {}) {
   const updates: unknown[] = [];
   const app: Partial<AutomationApi> = {
     getAllForProject: async () => [storedTrigger],
-    tryGetLiveById: async () => (options.live === undefined ? storedTrigger : options.live),
+    findLiveById: async () => (options.live === undefined ? storedTrigger : options.live),
     assertConditionSurvivesEdit: (input) => fixture.app.assertConditionSurvivesEdit(input),
     createTraceAutomation: (command) => fixture.app.createTraceAutomation(command),
     update: vi.fn(async (command: unknown) => {

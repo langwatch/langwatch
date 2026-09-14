@@ -16,7 +16,7 @@ export class PrismaEmailSuppressionNameRepository extends EmailSuppressionNameRe
   static create(database: EmailSuppressionNameDatabase): PrismaEmailSuppressionNameRepository {
     return new PrismaEmailSuppressionNameRepository(database);
   }
-  async tryLookupNames(input: {
+  async findNames(input: {
     projectId: string;
     triggerId: string | null;
   }): Promise<UnsubscribeNames | null> {

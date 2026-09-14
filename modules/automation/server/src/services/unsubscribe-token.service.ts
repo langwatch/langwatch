@@ -7,7 +7,7 @@ export type UnsubscribeTokenPayload = {
 };
 
 export abstract class UnsubscribeTokenVerifier {
-  abstract tryVerify(token: string): UnsubscribeTokenPayload | null;
+  abstract findVerifiedPayload(token: string): UnsubscribeTokenPayload | null;
 }
 
 /**
@@ -67,7 +67,7 @@ export class UnsubscribeTokenService {
   }
 
   /** The payload a well-formed, correctly signed token carries, or nothing. */
-  tryVerify(token: string): UnsubscribeTokenPayload | null {
+  findVerifiedPayload(token: string): UnsubscribeTokenPayload | null {
     const dot = token.lastIndexOf(".");
     if (dot <= 0) {
       return null;
@@ -166,7 +166,7 @@ export class HmacUnsubscribeTokenAdapter extends UnsubscribeTokenVerifier {
     super();
   }
 
-  tryVerify(token: string): UnsubscribeTokenPayload | null {
-    return this.tokens.tryVerify(token);
+  findVerifiedPayload(token: string): UnsubscribeTokenPayload | null {
+    return this.tokens.findVerifiedPayload(token);
   }
 }

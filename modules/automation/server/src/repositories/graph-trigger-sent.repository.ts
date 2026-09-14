@@ -15,28 +15,28 @@ export abstract class GraphTriggerSentRepository {
    * composition root never reconstructs graph-alert persistence queries. */
   abstract findProjectsWithGraphTriggers(): Promise<string[]>;
   abstract findProjectsWithOpenGraphTriggerSent(): Promise<Set<string>>;
-  abstract tryFindGraphTriggerSource(params: {
+  abstract findGraphTriggerSource(params: {
     triggerId: string;
     customGraphId: string;
     projectId: string;
     seriesName?: string;
   }): Promise<AnalyticsMetricSource | undefined>;
   abstract findOpenTriggerIdsForProject(projectId: string): Promise<Set<string>>;
-  abstract tryFindOpenForGraphAlert(params: {
+  abstract findOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
   }): Promise<OpenGraphTriggerSent | null>;
-  abstract tryFindLatestForGraphAlert(params: {
+  abstract findLatestForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
   }): Promise<{ id: string } | null>;
-  abstract tryClaimOpenForGraphAlert(params: {
+  abstract claimOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent | null>;
+  }): Promise<OpenGraphTriggerSent | "already-claimed">;
   abstract deleteOpenClaim(params: { id: string; projectId: string }): Promise<void>;
   abstract markResolvedById(params: { id: string; projectId: string; now: Instant }): Promise<void>;
 }

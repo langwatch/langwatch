@@ -37,6 +37,7 @@ import {
   type AutomationWebhookProvider,
   type AutomationWebhookStoredParams,
 } from "#services/automation-webhook-secrets.service";
+import type { ZodTypeAny } from "zod";
 
 /** What a channel's persist hook is handed. */
 export interface PersistActionParamsArgs {
@@ -110,7 +111,7 @@ export class AutomationProviderRegistryService {
    * The Zod schema for one action's `actionParams`. The upsert procedure
    * parses against it, so a malformed payload is refused per action type.
    */
-  actionParamsSchemaFor(action: TriggerAction) {
+  actionParamsSchemaFor(action: TriggerAction): ZodTypeAny {
     return this.providers[action].shared.actionParamsSchema;
   }
 
@@ -139,8 +140,8 @@ export class AutomationProviderRegistryService {
   }
 
   /** The Slack bot token behind a delivery, or null when none is stored. */
-  decryptSlackBotToken(actionParams: unknown): string | null {
-    return this.slack.tryDecrypt((actionParams ?? {}) as SlackActionParams);
+  findDecryptedSlackBotToken(actionParams: unknown): string | null {
+    return this.slack.findDecryptedToken((actionParams ?? {}) as SlackActionParams);
   }
 
   /** The custom headers a webhook delivery carries. */

@@ -168,7 +168,7 @@ export class BreachingAnalytics {
 }
 
 export class OneProject implements AutomationProjectIdentityPort {
-  async tryGetById(
+  async findById(
     projectId: string,
   ): Promise<{ id: string; name: string; slug: string } | null> {
     return { id: projectId, name: "Acme", slug: "acme" };

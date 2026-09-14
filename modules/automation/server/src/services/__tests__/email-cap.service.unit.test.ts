@@ -15,8 +15,8 @@ const redisMock = vi.hoisted(() => ({
 
 function makeStore(overrides: Partial<AutomationEmailCapRepository>): AutomationEmailCapRepository {
   return {
-    trySet: vi.fn().mockResolvedValue("OK"),
-    tryGet: vi.fn().mockResolvedValue(null),
+    claim: vi.fn().mockResolvedValue("claimed"),
+    findValue: vi.fn().mockResolvedValue(null),
     incr: vi.fn().mockResolvedValue(1),
     incrby: vi.fn().mockResolvedValue(1),
     eval: vi.fn().mockResolvedValue(null),
@@ -76,8 +76,8 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
     describe("when incr throws", () => {
       it("falls back to the in-memory counter and still returns a sane slot", async () => {
         redisMock.connection = makeStore({
-          trySet: vi.fn().mockResolvedValue("OK"),
-          tryGet: vi.fn(),
+          claim: vi.fn().mockResolvedValue("claimed"),
+          findValue: vi.fn(),
           incr: vi.fn().mockRejectedValue(new Error("READONLY blip")),
           eval: vi.fn(),
         });
@@ -104,8 +104,8 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         // call ensures each fallback consumption wins its claim (no retry
         // collapse) — we are proving the counter accumulates, not the claim.
         redisMock.connection = makeStore({
-          trySet: vi.fn().mockRejectedValue(new Error("connection refused")),
-          tryGet: vi.fn().mockRejectedValue(new Error("connection refused")),
+          claim: vi.fn().mockRejectedValue(new Error("connection refused")),
+          findValue: vi.fn().mockRejectedValue(new Error("connection refused")),
           incr: vi.fn().mockRejectedValue(new Error("connection refused")),
           eval: vi.fn().mockRejectedValue(new Error("connection refused")),
         });
@@ -146,8 +146,8 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         let counter = 0;
         redisMock.connection = makeStore({
           // Distinct dedupKeys → both claims win → both reach INCR + expire.
-          trySet: vi.fn().mockResolvedValue("OK"),
-          tryGet: vi.fn().mockResolvedValue(null),
+          claim: vi.fn().mockResolvedValue("claimed"),
+          findValue: vi.fn().mockResolvedValue(null),
           incr: vi.fn().mockImplementation(async () => ++counter),
           eval: evalFn,
         });
@@ -190,10 +190,10 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         const incr = vi.fn().mockResolvedValue(1);
         // SET NX: first call wins ("OK"), retry loses (null). The retry must
         // GET the current count instead of INCR-ing it again.
-        const set = vi.fn().mockResolvedValueOnce("OK").mockResolvedValueOnce(null);
+        const set = vi.fn().mockResolvedValueOnce("claimed").mockResolvedValueOnce("already-claimed");
         redisMock.connection = makeStore({
-          trySet: set,
-          tryGet: vi.fn().mockResolvedValue("1"),
+          claim: set,
+          findValue: vi.fn().mockResolvedValue("1"),
           incr,
           eval: vi.fn().mockResolvedValue(null),
         });
@@ -479,8 +479,8 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
       it("advances the counter via INCRBY recipientCount, not a plain INCR", async () => {
         const incrby = vi.fn().mockResolvedValue(8);
         redisMock.connection = makeStore({
-          trySet: vi.fn().mockResolvedValue("OK"),
-          tryGet: vi.fn().mockResolvedValue(null),
+          claim: vi.fn().mockResolvedValue("claimed"),
+          findValue: vi.fn().mockResolvedValue(null),
           incr: vi.fn(),
           incrby,
           eval: vi.fn().mockResolvedValue(null),
@@ -523,10 +523,10 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     describe("when the SAME dispatch is retried (claim already won)", () => {
       it("re-reads the counter via GET without a second INCRBY", async () => {
         const incrby = vi.fn().mockResolvedValue(4);
-        const set = vi.fn().mockResolvedValueOnce("OK").mockResolvedValueOnce(null);
+        const set = vi.fn().mockResolvedValueOnce("claimed").mockResolvedValueOnce("already-claimed");
         redisMock.connection = makeStore({
-          trySet: set,
-          tryGet: vi.fn().mockResolvedValue("4"),
+          claim: set,
+          findValue: vi.fn().mockResolvedValue("4"),
           incr: vi.fn(),
           incrby,
           eval: vi.fn().mockResolvedValue(null),
@@ -560,8 +560,8 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
         loggerMock.warn.mockClear();
         loggerMock.error.mockClear();
         redisMock.connection = makeStore({
-          trySet: vi.fn().mockRejectedValue(new Error("connection refused")),
-          tryGet: vi.fn().mockRejectedValue(new Error("connection refused")),
+          claim: vi.fn().mockRejectedValue(new Error("connection refused")),
+          findValue: vi.fn().mockRejectedValue(new Error("connection refused")),
           incr: vi.fn(),
           incrby: vi.fn().mockRejectedValue(new Error("connection refused")),
           eval: vi.fn().mockRejectedValue(new Error("connection refused")),

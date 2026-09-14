@@ -88,12 +88,12 @@ function makeTriggerSentStub(
   return {
     findProjectsWithGraphTriggers: async () => [],
     findProjectsWithOpenGraphTriggerSent: async () => new Set(),
-    tryFindGraphTriggerSource: async () => "trace",
+    findGraphTriggerSource: async () => "trace",
     findOpenTriggerIdsForProject: async (projectId) =>
       new Set(perProjectOpenTriggers[projectId] ?? []),
-    tryFindOpenForGraphAlert: async () => null,
-    tryFindLatestForGraphAlert: async () => null,
-    tryClaimOpenForGraphAlert: async () => null,
+    findOpenForGraphAlert: async () => null,
+    findLatestForGraphAlert: async () => null,
+    claimOpenForGraphAlert: async () => "already-claimed" as const,
     deleteOpenClaim: async () => undefined,
     markResolvedById: async () => undefined,
   };
@@ -135,7 +135,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { tryResolveClickHouseClient: async () => chStub.client },
+        heartbeat: { findClickHouseClient: async () => chStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -163,7 +163,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { tryResolveClickHouseClient: async () => chStub.client },
+        heartbeat: { findClickHouseClient: async () => chStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -192,7 +192,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { tryResolveClickHouseClient: async () => chStub.client },
+        heartbeat: { findClickHouseClient: async () => chStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -225,7 +225,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { tryResolveClickHouseClient: async () => chStub.client },
+        heartbeat: { findClickHouseClient: async () => chStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -256,7 +256,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { tryResolveClickHouseClient: async () => chStub.client },
+        heartbeat: { findClickHouseClient: async () => chStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -299,7 +299,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { tryResolveClickHouseClient: async () => chStub.client },
+        heartbeat: { findClickHouseClient: async () => chStub.client },
         logger: new SilentAutomationLogger(),
       };
 

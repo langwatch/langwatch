@@ -42,7 +42,7 @@ function makeDeps({
   timeseries: AnalyticsTimeseriesResult;
 }): ReportChartDeps {
   return {
-    loadCustomGraph: vi.fn(async () => graphs[0] ?? null),
+    findCustomGraph: vi.fn(async () => graphs[0] ?? null),
     loadDashboardGraphs: vi.fn(async () => graphs),
     getTimeseries: vi.fn(async () => timeseries),
   };
@@ -224,7 +224,7 @@ describe("ReportChartService.loadReportCharts", () => {
       let inFlight = 0;
       let maxInFlight = 0;
       const deps: ReportChartDeps = {
-        loadCustomGraph: vi.fn(async () => null),
+        findCustomGraph: vi.fn(async () => null),
         loadDashboardGraphs: vi.fn(async () => graphs),
         getTimeseries: vi.fn(async () => {
           inFlight++;

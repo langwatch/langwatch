@@ -32,7 +32,7 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
     );
   }
 
-  tryFindGraphTriggerSource(params: {
+  findGraphTriggerSource(params: {
     triggerId: string;
     customGraphId: string;
     projectId: string;
@@ -57,7 +57,7 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
     );
   }
 
-  tryFindOpenForGraphAlert(params: {
+  findOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
@@ -66,7 +66,7 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
     return Promise.resolve(incident === undefined ? null : this.asOpen(incident));
   }
 
-  tryFindLatestForGraphAlert(params: {
+  findLatestForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
@@ -80,12 +80,14 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
    * Opens the incident when there is none: the claim is what makes one
    * evaluator the sender, so a second caller finding an open row gets nothing.
    */
-  tryClaimOpenForGraphAlert(params: {
+  claimOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent | null> {
-    if (this.open().some((row) => this.matches(row, params))) return Promise.resolve(null);
+  }): Promise<OpenGraphTriggerSent | "already-claimed"> {
+    if (this.open().some((row) => this.matches(row, params))) {
+      return Promise.resolve("already-claimed");
+    }
     const incident = {
       id: generate("graphtriggersent").toString(),
       triggerId: params.triggerId,

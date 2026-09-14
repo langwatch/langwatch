@@ -169,10 +169,10 @@ async function readAutomation(args: {
   id: string;
   projectId: string;
   project: ProjectFacts;
-}) {
+}): Promise<typeof NOT_FOUND | { status: 200; body: AutomationRestResponse }> {
   logger.info({ projectId: args.projectId, triggerId: args.id }, "Getting trigger");
 
-  const trigger = await args.app.tryGetLiveById({
+  const trigger = await args.app.findLiveById({
     triggerId: args.id,
     projectId: args.projectId,
   });
@@ -200,7 +200,7 @@ async function editAutomation(args: {
   input: { id: string } & z.infer<typeof automationRestUpdateInputSchema>;
   projectId: string;
   project: ProjectFacts;
-}) {
+}): Promise<typeof NOT_FOUND | { status: 200; body: AutomationRestResponse }> {
   const { app, input, projectId } = args;
 
   if (input.actionParams !== undefined) {
@@ -212,7 +212,7 @@ async function editAutomation(args: {
 
   logger.info({ projectId, triggerId: input.id }, "Updating trigger");
 
-  const existing = await app.tryGetLiveById({ triggerId: input.id, projectId });
+  const existing = await app.findLiveById({ triggerId: input.id, projectId });
 
   if (!existing) return NOT_FOUND;
 
@@ -250,10 +250,14 @@ function updateCommandFor(args: {
  * calendar entry belong together, and a door that did one without the other
  * left the scheduler waking forever.
  */
-async function removeAutomation(args: { app: AutomationApi; id: string; projectId: string }) {
+async function removeAutomation(args: {
+  app: AutomationApi;
+  id: string;
+  projectId: string;
+}): Promise<typeof NOT_FOUND | { status: 200; body: { id: string; deleted: true } }> {
   logger.info({ projectId: args.projectId, triggerId: args.id }, "Deleting trigger");
 
-  const existing = await args.app.tryGetLiveById({
+  const existing = await args.app.findLiveById({
     triggerId: args.id,
     projectId: args.projectId,
   });

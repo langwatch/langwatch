@@ -71,18 +71,18 @@ export class MemoryTriggerRepository extends TriggerRepository {
   }
 
   async updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void> {
-    const row = await this.tryFindById(input);
+    const row = await this.findById(input);
     if (row === null) return;
     this.write({ ...row, lastRunAt: new Date() });
   }
 
   async findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
-    const row = await this.tryFindById(input);
+    const row = await this.findById(input);
     if (row === null) throw new TriggerNotFoundError();
     return row;
   }
 
-  tryFindById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+  findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const row = this.memory.triggers.get(input.triggerId);
     return Promise.resolve(row?.projectId === input.projectId ? row : null);
   }
@@ -95,7 +95,7 @@ export class MemoryTriggerRepository extends TriggerRepository {
     );
   }
 
-  tryFindByCustomGraphId(input: {
+  findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {

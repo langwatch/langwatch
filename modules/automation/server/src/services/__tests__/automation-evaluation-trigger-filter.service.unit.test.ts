@@ -56,7 +56,7 @@ class TestTraceService extends TraceService {
     return Promise.reject(new Error("unused trace capability"));
   }
 
-  tryGetSummary(): Promise<null> {
+  findSummary(): Promise<null> {
     return Promise.resolve(null);
   }
 }

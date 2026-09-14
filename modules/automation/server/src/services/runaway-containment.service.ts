@@ -47,10 +47,10 @@ export class RunawayContainmentService {
         "Automation passed its daily ceiling on confirmed matches; further matches are being skipped for the rest of the UTC day",
       );
       if (
-        !(await this.runaway.tryClaimOnce(
+        (await this.runaway.claimOnce(
           `automation-containment-check:${trigger.id}`,
           CONTAINMENT_CHECK_CLAIM_SECONDS,
-        ))
+        )) === "already-claimed"
       ) {
         return;
       }
@@ -98,10 +98,10 @@ export class RunawayContainmentService {
     dayBucket: number,
   ): Promise<void> {
     if (
-      !(await this.runaway.tryClaimOnce(
+      (await this.runaway.claimOnce(
         `automation-pause:${input.trigger.id}`,
         PAUSE_ATTEMPT_CLAIM_SECONDS,
-      ))
+      )) === "already-claimed"
     ) {
       return;
     }
@@ -135,8 +135,8 @@ export class RunawayContainmentService {
     kind: "ceiling_reached" | "paused",
     claimKey: string,
   ): Promise<void> {
-    const lease = await this.runaway.tryClaimOnce(claimKey);
-    if (!lease) {
+    const lease = await this.runaway.claimOnce(claimKey);
+    if (lease === "already-claimed") {
       return;
     }
 
@@ -169,7 +169,7 @@ export class RunawayContainmentService {
     // A paused automation is a mistake in the customer's own condition, so the
     // upgrade offer is gated on the kind rather than on whether it resolved.
     const nextStep =
-      kind === "ceiling_reached" ? await this.runaway.resolveNextStep(input.projectId) : undefined;
+      kind === "ceiling_reached" ? await this.runaway.findNextStep(input.projectId) : undefined;
 
     await this.runaway.sendLimitEmail({
       to,

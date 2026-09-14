@@ -31,17 +31,17 @@ import { type Instant, Temporal, fromDate, toDate } from "@langwatch/time";
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
   findProjectsWithGraphTriggers = async () => [];
   findProjectsWithOpenGraphTriggerSent = async () => new Set<string>();
-  tryFindGraphTriggerSource = async () => undefined;
+  findGraphTriggerSource = async () => undefined;
   findOpenTriggerIdsForProject = async () => new Set<string>();
-  tryFindOpenForGraphAlert = async () => null;
-  tryFindLatestForGraphAlert = async () => null;
-  tryClaimOpenForGraphAlert = async () => null;
+  findOpenForGraphAlert = async () => null;
+  findLatestForGraphAlert = async () => null;
+  claimOpenForGraphAlert = async () => "already-claimed" as const;
   deleteOpenClaim = async () => undefined;
   markResolvedById = async () => undefined;
 }
 
 class EmptyCustomGraphs extends CustomGraphRepository {
-  tryFindById(): Promise<null> {
+  findById(): Promise<null> {
     return Promise.resolve(null);
   }
   existsInProject(): Promise<boolean> {
@@ -110,7 +110,7 @@ class Suppressions extends EmailSuppressionRepository {
   }
 }
 class Names extends EmailSuppressionNameRepository {
-  tryLookupNames() {
+  findNames() {
     return Promise.resolve(null);
   }
   findTriggerNames() {
@@ -118,7 +118,7 @@ class Names extends EmailSuppressionNameRepository {
   }
 }
 class Verifier extends UnsubscribeTokenVerifier {
-  tryVerify() {
+  findVerifiedPayload() {
     return null;
   }
 }
@@ -196,13 +196,13 @@ class Triggers extends TriggerRepository {
     if (!row) return Promise.reject(new Error("automation not found in this project"));
     return Promise.resolve(row);
   }
-  tryFindById() {
+  findById() {
     return Promise.resolve(null);
   }
   findAllByProjectId(): Promise<Trigger[]> {
     return Promise.resolve([]);
   }
-  tryFindByCustomGraphId() {
+  findByCustomGraphId() {
     return Promise.resolve(null);
   }
   findByCustomGraphIds() {

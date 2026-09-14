@@ -13,7 +13,7 @@ export const webhookDeliveryPruneIntentSchema = z.object({
 export function runWebhookDeliveryPrune(
   scheduledIntents: AutomationScheduledIntent,
   retention: AutomationIntentRetention,
-) {
+): (input: z.infer<typeof webhookDeliveryPruneIntentSchema>) => Promise<void> {
   return async (input: z.infer<typeof webhookDeliveryPruneIntentSchema>): Promise<void> => {
     const deleted = await scheduledIntents.pruneWebhookDeliveries();
     if (deleted > 0) {

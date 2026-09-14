@@ -49,7 +49,7 @@ describe("PrismaGraphTriggerSentRepository candidate discovery", () => {
     } as never);
 
     expect(
-      await repository.tryFindGraphTriggerSource({
+      await repository.findGraphTriggerSource({
         triggerId: "trigger-1",
         customGraphId: "graph-1",
         projectId: "project-1",

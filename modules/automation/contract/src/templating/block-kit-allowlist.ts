@@ -130,8 +130,8 @@ function capText(text: string, max: number): string {
   return `${text.slice(0, max - TRUNCATION_MARKER.length)}${TRUNCATION_MARKER}`;
 }
 
-function capTextObject(value: unknown, max: number): Record<string, unknown> | null {
-  const text = sanitizeTextObject(value);
+function findCappedTextObject(value: unknown, max: number): Record<string, unknown> | null {
+  const text = findSanitizedTextObject(value);
   if (!text) return null;
   return { ...text, text: capText(text.text as string, max) };
 }
@@ -143,12 +143,12 @@ function capTextObject(value: unknown, max: number): Record<string, unknown> | n
  * section instead of a rejected message. A section left with neither text nor a
  * field is unusable, so it is dropped (→ the caller's fallback delivers).
  */
-function sanitizeSection(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedSection(block: Record<string, unknown>): Record<string, unknown> | null {
   const out = stripInteractiveAccessory(block);
-  const text = capTextObject(out.text, MAX_SECTION_TEXT_CHARS);
+  const text = findCappedTextObject(out.text, MAX_SECTION_TEXT_CHARS);
   const fields = Array.isArray(out.fields)
     ? out.fields
-        .map((field) => capTextObject(field, MAX_SECTION_FIELD_CHARS))
+        .map((field) => findCappedTextObject(field, MAX_SECTION_FIELD_CHARS))
         .filter((x): x is Record<string, unknown> => x !== null)
         .slice(0, MAX_SECTION_FIELDS)
     : [];
@@ -167,7 +167,7 @@ function sanitizeSection(block: Record<string, unknown>): Record<string, unknown
  * (an image element, say) is DROPPED rather than emitted empty — an empty
  * `elements` array fails the whole message with `invalid_blocks`.
  */
-function sanitizeContext(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedContext(block: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(block.elements)) return null;
   const elements = block.elements
     .filter(
@@ -185,7 +185,7 @@ function isSafeLinkUrl(url: unknown): url is string {
   return typeof url === "string" && /^https?:\/\//i.test(url);
 }
 
-function sanitizeRichTextInline(el: unknown): Record<string, unknown> | null {
+function findSanitizedRichTextInline(el: unknown): Record<string, unknown> | null {
   if (!isBlock(el) || typeof el.type !== "string") return null;
   if (!ALLOWED_RICH_TEXT_INLINE_TYPES.has(el.type)) return null;
   // A link whose URL is not http(s) is dropped entirely rather than rewritten.
@@ -196,7 +196,7 @@ function sanitizeRichTextInline(el: unknown): Record<string, unknown> | null {
 // Every rich_text sub-block carries its own `elements` array, and Slack rejects
 // one that is empty — so a sub-block whose every child was filtered out (a
 // section holding only a mention, say) is DROPPED, not emitted empty.
-function sanitizeRichTextElement(el: unknown): Record<string, unknown> | null {
+function findSanitizedRichTextElement(el: unknown): Record<string, unknown> | null {
   if (!isBlock(el) || typeof el.type !== "string") return null;
   if (!ALLOWED_RICH_TEXT_ELEMENT_TYPES.has(el.type)) return null;
   if (!Array.isArray(el.elements)) return null;
@@ -205,10 +205,10 @@ function sanitizeRichTextElement(el: unknown): Record<string, unknown> | null {
   const elements =
     el.type === "rich_text_list"
       ? el.elements
-          .map(sanitizeRichTextElement)
+          .map(findSanitizedRichTextElement)
           .filter((x): x is Record<string, unknown> => x !== null)
       : el.elements
-          .map(sanitizeRichTextInline)
+          .map(findSanitizedRichTextInline)
           .filter((x): x is Record<string, unknown> => x !== null);
   if (elements.length === 0) return null;
   return { ...el, elements };
@@ -220,10 +220,10 @@ function sanitizeRichTextElement(el: unknown): Record<string, unknown> | null {
 // the nested rich_text tree (ADR-041) — including its empty-`elements` rule: a
 // rich_text block with nothing left is dropped so Slack never sees an empty
 // array (`invalid_blocks` fails the WHOLE message, it doesn't skip the block).
-function sanitizeRichText(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedRichText(block: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(block.elements)) return null;
   const elements = block.elements
-    .map(sanitizeRichTextElement)
+    .map(findSanitizedRichTextElement)
     .filter((x): x is Record<string, unknown> => x !== null);
   if (elements.length === 0) return null;
   return { ...block, elements };
@@ -249,7 +249,7 @@ function escapeMrkdwnControlChars(text: string): string {
  * `invalid_blocks` fails the whole message). Escaping before capping keeps the
  * final length under the cap.
  */
-function sanitizeMarkdown(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedMarkdown(block: Record<string, unknown>): Record<string, unknown> | null {
   if (typeof block.text !== "string" || block.text.length === 0) return null;
   const text = capText(escapeMrkdwnControlChars(block.text), MAX_MARKDOWN_TEXT_CHARS);
   const out: Record<string, unknown> = { type: "markdown", text };
@@ -264,8 +264,8 @@ function sanitizeMarkdown(block: Record<string, unknown>): Record<string, unknow
  * `invalid_blocks`, so the text object is coerced to `plain_text` and capped; a
  * header with no valid text object is dropped (→ fallback delivers).
  */
-function sanitizeHeader(block: Record<string, unknown>): Record<string, unknown> | null {
-  const parsed = sanitizeTextObject(block.text);
+function findSanitizedHeader(block: Record<string, unknown>): Record<string, unknown> | null {
+  const parsed = findSanitizedTextObject(block.text);
   if (!parsed) return null;
   // Header text is a single-line plain_text field — the multi-line truncation
   // marker would itself make Slack reject the block as invalid_blocks.
@@ -281,23 +281,25 @@ function sanitizeHeader(block: Record<string, unknown>): Record<string, unknown>
   return out;
 }
 
-function sanitizeVerifiedBlock(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedVerifiedBlock(
+  block: Record<string, unknown>,
+): Record<string, unknown> | null {
   switch (block.type) {
     // `card` is allowlisted for delivery but still needs its own sanitiser to
     // drop fetch-on-render icons and callback actions (returns null if the card
     // has neither a title nor a body).
     case "card":
-      return sanitizeCard(block);
+      return findSanitizedCard(block);
     case "section":
-      return sanitizeSection(block);
+      return findSanitizedSection(block);
     case "context":
-      return sanitizeContext(block);
+      return findSanitizedContext(block);
     case "rich_text":
-      return sanitizeRichText(block);
+      return findSanitizedRichText(block);
     case "markdown":
-      return sanitizeMarkdown(block);
+      return findSanitizedMarkdown(block);
     case "header":
-      return sanitizeHeader(block);
+      return findSanitizedHeader(block);
     // `divider` is the only remaining allowlisted type — it carries no content,
     // so it passes through unchanged.
     default:
@@ -307,7 +309,7 @@ function sanitizeVerifiedBlock(block: Record<string, unknown>): Record<string, u
 
 // A text composition object, trimmed to its shape + boolean flags. Anything not
 // a valid `plain_text` / `mrkdwn` object with a string `text` yields null.
-function sanitizeTextObject(value: unknown): Record<string, unknown> | null {
+function findSanitizedTextObject(value: unknown): Record<string, unknown> | null {
   if (!isBlock(value)) return null;
   if (typeof value.type !== "string" || !ALLOWED_TEXT_OBJECT_TYPES.has(value.type)) return null;
   if (typeof value.text !== "string") return null;
@@ -320,8 +322,8 @@ function sanitizeTextObject(value: unknown): Record<string, unknown> | null {
 // `alert` — a coloured banner. Text-only, no fetch vectors. An out-of-range
 // `level` is dropped (Slack defaults to "default"); a missing/invalid `text`
 // makes the block unusable, so it is dropped entirely (→ fallback delivers).
-function sanitizeAlert(block: Record<string, unknown>): Record<string, unknown> | null {
-  const text = sanitizeTextObject(block.text);
+function findSanitizedAlert(block: Record<string, unknown>): Record<string, unknown> | null {
+  const text = findSanitizedTextObject(block.text);
   if (!text) return null;
   const out: Record<string, unknown> = { type: "alert", text };
   if (typeof block.level === "string" && ALERT_LEVELS.has(block.level)) out.level = block.level;
@@ -334,11 +336,11 @@ function sanitizeAlert(block: Record<string, unknown>): Record<string, unknown> 
 // `image` is banned for), and `actions` is STRIPPED (interactive callback
 // vector — the exact class ADR-036 bans). Only the text fields survive; a card
 // with no surviving text field is dropped (→ fallback delivers).
-function sanitizeCard(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedCard(block: Record<string, unknown>): Record<string, unknown> | null {
   const out: Record<string, unknown> = { type: "card" };
   let hasContent = false;
   for (const field of ["title", "subtitle", "body", "subtext"] as const) {
-    const text = sanitizeTextObject(block[field]);
+    const text = findSanitizedTextObject(block[field]);
     if (text) {
       out[field] = text;
       if (field === "title" || field === "body") hasContent = true;
@@ -349,18 +351,18 @@ function sanitizeCard(block: Record<string, unknown>): Record<string, unknown> |
   return out;
 }
 
-function toLabel(value: unknown): string | null {
+function findLabel(value: unknown): string | null {
   if (typeof value === "string") return value;
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return null;
 }
 
-function sanitizePieChart(chart: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedPieChart(chart: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(chart.segments)) return null;
   const segments = chart.segments
     .map((seg) => {
       if (!isBlock(seg)) return null;
-      const label = toLabel(seg.label);
+      const label = findLabel(seg.label);
       const value = seg.value;
       if (label === null || typeof value !== "number" || !(value > 0)) return null;
       return { label, value };
@@ -371,7 +373,7 @@ function sanitizePieChart(chart: Record<string, unknown>): Record<string, unknow
   return { type: "pie", segments };
 }
 
-function sanitizeSeriesChart(chart: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedSeriesChart(chart: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(chart.series) || !isBlock(chart.axis_config)) return null;
   const series = chart.series
     .map((s) => {
@@ -379,7 +381,7 @@ function sanitizeSeriesChart(chart: Record<string, unknown>): Record<string, unk
       const data = s.data
         .map((point) => {
           if (!isBlock(point)) return null;
-          const label = toLabel(point.label);
+          const label = findLabel(point.label);
           if (label === null || typeof point.value !== "number") return null;
           return { label, value: point.value };
         })
@@ -394,7 +396,7 @@ function sanitizeSeriesChart(chart: Record<string, unknown>): Record<string, unk
 
   const categories = Array.isArray(chart.axis_config.categories)
     ? chart.axis_config.categories
-        .map(toLabel)
+        .map(findLabel)
         .filter((x): x is string => x !== null)
         .slice(0, MAX_CHART_CATEGORIES)
     : [];
@@ -413,12 +415,16 @@ function sanitizeSeriesChart(chart: Record<string, unknown>): Record<string, unk
 // strings and series / segments / points / categories are capped at Slack's
 // documented maxima. A chart that can't produce a valid `chart` payload is
 // dropped (→ fallback delivers).
-function sanitizeDataVisualization(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedDataVisualization(
+  block: Record<string, unknown>,
+): Record<string, unknown> | null {
   if (typeof block.title !== "string") return null;
   if (!isBlock(block.chart) || typeof block.chart.type !== "string") return null;
   if (!CHART_TYPES.has(block.chart.type)) return null;
   const chart =
-    block.chart.type === "pie" ? sanitizePieChart(block.chart) : sanitizeSeriesChart(block.chart);
+    block.chart.type === "pie"
+      ? findSanitizedPieChart(block.chart)
+      : findSanitizedSeriesChart(block.chart);
   if (!chart) return null;
   const out: Record<string, unknown> = {
     type: "data_visualization",
@@ -443,14 +449,14 @@ function sanitizeTableCell(cell: unknown): Record<string, unknown> {
   }
   if (cell.type === "raw_number") {
     const text =
-      typeof cell.text === "string" && cell.text.length > 0 ? cell.text : toLabel(cell.value);
+      typeof cell.text === "string" && cell.text.length > 0 ? cell.text : findLabel(cell.value);
     if (typeof cell.value !== "number" || text === null) return placeholder;
     return { type: "raw_number", value: cell.value, text };
   }
   if (cell.type === "rich_text") {
     // A cell whose content was entirely stripped (only an image / a mention)
     // becomes the placeholder — the row must keep its column count.
-    return sanitizeRichText(cell) ?? placeholder;
+    return findSanitizedRichText(cell) ?? placeholder;
   }
   return placeholder;
 }
@@ -460,7 +466,7 @@ function sanitizeTableCell(cell: unknown): Record<string, unknown> {
 // equal-width-rows rule holds, `rich_text` cells are recursively sanitised, and
 // the aggregate character budget is enforced. A table without at least a header
 // and one data row is dropped (→ fallback delivers).
-function sanitizeDataTable(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedDataTable(block: Record<string, unknown>): Record<string, unknown> | null {
   if (typeof block.caption !== "string") return null;
   if (!Array.isArray(block.rows) || block.rows.length < 2) return null;
   const rawRows = block.rows.filter(Array.isArray).slice(0, MAX_TABLE_ROWS);
@@ -497,14 +503,16 @@ function sanitizeDataTable(block: Record<string, unknown>): Record<string, unkno
   return out;
 }
 
-function sanitizeGatedBlock(block: Record<string, unknown>): Record<string, unknown> | null {
+function findSanitizedGatedBlock(
+  block: Record<string, unknown>,
+): Record<string, unknown> | null {
   switch (block.type) {
     case "alert":
-      return sanitizeAlert(block);
+      return findSanitizedAlert(block);
     case "data_visualization":
-      return sanitizeDataVisualization(block);
+      return findSanitizedDataVisualization(block);
     case "data_table":
-      return sanitizeDataTable(block);
+      return findSanitizedDataTable(block);
     default:
       return null;
   }
@@ -536,10 +544,10 @@ export function filterBlockKit(
   for (const block of blocks) {
     if (!isBlock(block)) continue;
     if (isAllowedType(block.type)) {
-      const sanitized = sanitizeVerifiedBlock(block);
+      const sanitized = findSanitizedVerifiedBlock(block);
       if (sanitized) out.push(sanitized);
     } else if (allowGatedBlocks && isGatedType(block.type)) {
-      const sanitized = sanitizeGatedBlock(block);
+      const sanitized = findSanitizedGatedBlock(block);
       if (sanitized) out.push(sanitized);
     }
   }

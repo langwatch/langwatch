@@ -74,9 +74,9 @@ function runtime(
   const service = TriggerSettlementPersistenceService.create({
     automation,
     projects: {
-      tryGetById: vi.fn().mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
+      findById: vi.fn().mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
     } as never,
-    traces: { tryGetSummary: vi.fn().mockResolvedValue(fold) } as never,
+    traces: { findSummary: vi.fn().mockResolvedValue(fold) } as never,
     confirmation: { confirms: vi.fn().mockResolvedValue(true) } as never,
     persistActions: { dispatch } as never,
     clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,

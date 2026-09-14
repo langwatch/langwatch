@@ -86,7 +86,7 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
     super();
   }
 
-  tryGetSummary(input: { projectId: string; traceId: string }): Promise<TraceSummaryData | null> {
+  findSummary(input: { projectId: string; traceId: string }): Promise<TraceSummaryData | null> {
     return this.summaries.tryGet(input.traceId, {
       aggregateId: input.traceId,
       tenantId: createTenantId(input.projectId),
@@ -323,11 +323,11 @@ export class WorkerAutomationHeartbeat extends AutomationHeartbeat {
     super();
   }
 
-  tryResolveClickHouseClient(projectId: string): Promise<AutomationClickHouseClient | null> {
+  findClickHouseClient(projectId: string): Promise<AutomationClickHouseClient | null> {
     return this.resolveClient(projectId);
   }
 }
 
 type AutomationClickHouseClient = Awaited<
-  ReturnType<AutomationHeartbeat["tryResolveClickHouseClient"]>
+  ReturnType<AutomationHeartbeat["findClickHouseClient"]>
 >;

@@ -21,13 +21,13 @@ export class GraphTriggerEvaluationPlanService {
   async createPlan(
     request: GraphEvaluationRequest,
   ): Promise<GraphEvaluationPlan | GraphTriggerEvaluationResult> {
-    const trigger = await request.deps.triggers.tryFindById(request);
+    const trigger = await request.deps.triggers.findById(request);
     const ready = this.validateTrigger(request, trigger);
     if ("status" in ready) {
       return ready;
     }
 
-    const graph = await request.deps.customGraphs.tryFindById({
+    const graph = await request.deps.customGraphs.findById({
       customGraphId: ready.customGraphId,
       projectId: request.projectId,
     });

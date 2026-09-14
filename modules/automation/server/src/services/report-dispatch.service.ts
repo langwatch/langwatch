@@ -7,7 +7,7 @@ import {
   type ReportChart,
   type ReportTraceRow,
   type ReportSource,
-  extractReportFromTriggerRow,
+  findReportFromTriggerRow,
   type Trigger,
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
@@ -20,8 +20,8 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 const logger = createLogger("langwatch:report-dispatch");
 
 export interface ReportDispatchDeps {
-  loadTrigger(params: { projectId: string; triggerId: string }): Promise<Trigger | null>;
-  loadProject(projectId: string): Promise<ReportProject | null>;
+  findTrigger(params: { projectId: string; triggerId: string }): Promise<Trigger | null>;
+  findProject(projectId: string): Promise<ReportProject | null>;
   /**
    * The same outbound provider surface every other automation notification
    * goes through, so a report email carries the ADR-031 unsubscribe footer and
@@ -161,7 +161,7 @@ export class ReportDispatchService {
     deps: ReportDispatchDeps;
     fire: ScheduledJobFire;
   }): Promise<void> {
-    const loaded = await tryLoadDispatch({ deps, fire });
+    const loaded = await findDispatch({ deps, fire });
     if (!loaded) {
       return;
     }
@@ -363,7 +363,7 @@ async function deliverReportSlackBot({
   templateType: SlackTemplateType | null;
   slackParams: SlackActionParams;
 }): Promise<boolean> {
-  const token = deps.slackProvider.tryDecrypt(slackParams);
+  const token = deps.slackProvider.findDecryptedToken(slackParams);
   const channel = slackParams.slackChannelId?.trim();
   if (!token || !channel) {
     return false;
@@ -447,11 +447,11 @@ async function recordReportFire({
 }
 
 /**
- * The trigger, its parsed report and the project it belongs to — or null when the fire has
+ * Finds the trigger, its parsed report and the project it belongs to — or null when the fire has
  * nothing to send: an inactive or deleted trigger, action parameters that did not parse, or a
  * project that is no longer there.
  */
-async function tryLoadDispatch({
+async function findDispatch({
   deps,
   fire,
 }: {
@@ -459,10 +459,10 @@ async function tryLoadDispatch({
   fire: ScheduledJobFire;
 }): Promise<{
   trigger: Trigger;
-  report: NonNullable<ReturnType<typeof extractReportFromTriggerRow>>;
+  report: NonNullable<ReturnType<typeof findReportFromTriggerRow>>;
   project: ReportProject;
 } | null> {
-  const trigger = await deps.loadTrigger({
+  const trigger = await deps.findTrigger({
     projectId: fire.projectId,
     triggerId: fire.targetId,
   });
@@ -475,7 +475,7 @@ async function tryLoadDispatch({
     return null;
   }
 
-  const report = extractReportFromTriggerRow(trigger.actionParams);
+  const report = findReportFromTriggerRow(trigger.actionParams);
   if (!report) {
     logger.warn(
       { triggerId: trigger.id, projectId: fire.projectId },
@@ -485,7 +485,7 @@ async function tryLoadDispatch({
     return null;
   }
 
-  const project = await deps.loadProject(fire.projectId);
+  const project = await deps.findProject(fire.projectId);
 
   return project ? { trigger, report, project } : null;
 }

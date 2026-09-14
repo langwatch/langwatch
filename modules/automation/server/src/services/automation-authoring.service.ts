@@ -12,7 +12,7 @@ import {
   buildGraphAlertTriggerData,
   buildReportTriggerData,
   DEFAULT_TRACE_DEBOUNCE_MS,
-  extractReportFromTriggerRow,
+  findReportFromTriggerRow,
   GraphAlertChannelUnsupportedError,
   GraphAlertSeverityRequiredError,
   GraphAlertThresholdRequiredError,
@@ -124,7 +124,7 @@ export class AutomationAuthoringService {
     triggerId: string;
     projectId: string;
   }): Promise<Trigger | null> {
-    const trigger = await this.collaborators.automation.tryGetById(input);
+    const trigger = await this.collaborators.automation.findById(input);
 
     // Never return the encrypted bot token to the browser (ADR-041).
     return trigger ? this.redactForRead(trigger) : null;
@@ -270,7 +270,7 @@ export class AutomationAuthoringService {
     });
 
     const isReport = existing.triggerKind === "REPORT";
-    const report = isReport ? extractReportFromTriggerRow(existing.actionParams) : null;
+    const report = isReport ? findReportFromTriggerRow(existing.actionParams) : null;
 
     if (isReport && input.active && !report) throw new ReportScheduleMissingError();
 
@@ -403,7 +403,7 @@ export class AutomationAuthoringService {
         loadExisting: async () =>
           input.triggerId
             ? (
-                await this.collaborators.automation.tryGetById({
+                await this.collaborators.automation.findById({
                   triggerId: input.triggerId,
                   projectId: input.projectId,
                 })
@@ -660,7 +660,7 @@ export class AutomationAuthoringService {
         id: input.triggerId,
         projectId: input.projectId,
         ...data,
-        ...(cadence !== undefined ? { notificationCadence: cadence } : {}),
+        ...(cadence !== "unchanged" ? { notificationCadence: cadence.cadence } : {}),
         ...(input.traceDebounceMs !== undefined
           ? { traceDebounceMs: input.traceDebounceMs }
           : {}),
@@ -797,7 +797,7 @@ export class AutomationAuthoringService {
       let saved: Record<string, string> = {};
 
       if (input.automationId) {
-        const row = await this.collaborators.automation.tryGetById({
+        const row = await this.collaborators.automation.findById({
           triggerId: input.automationId,
           projectId: input.projectId,
         });
@@ -821,7 +821,7 @@ export class AutomationAuthoringService {
 
     if (!input.automationId) return destination;
 
-    const row = await this.collaborators.automation.tryGetById({
+    const row = await this.collaborators.automation.findById({
       triggerId: input.automationId,
       projectId: input.projectId,
     });
@@ -843,7 +843,7 @@ export class AutomationAuthoringService {
     if (typed) return typed;
     if (!args.automationId) return null;
 
-    const saved = await this.collaborators.automation.tryGetById({
+    const saved = await this.collaborators.automation.findById({
       triggerId: args.automationId,
       projectId: args.projectId,
     });

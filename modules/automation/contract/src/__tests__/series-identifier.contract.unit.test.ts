@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { deriveSeriesIdentifier } from "../graph-alert.ts";
+import { findSeriesIdentifier } from "../graph-alert.ts";
 
-describe("deriveSeriesIdentifier", () => {
+describe("findSeriesIdentifier", () => {
   it("uses a custom key before the metric and retains the aggregation", () => {
     expect(
-      deriveSeriesIdentifier(
+      findSeriesIdentifier(
         { series: [{ key: "vendor/model", metric: "ignored", aggregation: "avg" }] },
         0,
       ),
@@ -13,19 +13,19 @@ describe("deriveSeriesIdentifier", () => {
 
   it("uses metric, value, and count fallbacks for sparse series", () => {
     expect(
-      deriveSeriesIdentifier(
+      findSeriesIdentifier(
         { series: [{ metric: "performance.total_cost", aggregation: "sum" }] },
         0,
       ),
     ).toBe("0/performance.total_cost/sum");
-    expect(deriveSeriesIdentifier({ series: [{ aggregation: "p95" }] }, 0)).toBe("0/value/p95");
-    expect(deriveSeriesIdentifier({ series: [{ key: "trace_id" }] }, 0)).toBe("0/trace_id/count");
+    expect(findSeriesIdentifier({ series: [{ aggregation: "p95" }] }, 0)).toBe("0/value/p95");
+    expect(findSeriesIdentifier({ series: [{ key: "trace_id" }] }, 0)).toBe("0/trace_id/count");
   });
 
   it("declines malformed graphs and indexes outside the series array", () => {
-    expect(deriveSeriesIdentifier(null, 0)).toBeUndefined();
-    expect(deriveSeriesIdentifier("not-a-graph", 0)).toBeUndefined();
-    expect(deriveSeriesIdentifier({ series: {} }, 0)).toBeUndefined();
-    expect(deriveSeriesIdentifier({ series: [{ key: "a" }] }, 3)).toBeUndefined();
+    expect(findSeriesIdentifier(null, 0)).toBeUndefined();
+    expect(findSeriesIdentifier("not-a-graph", 0)).toBeUndefined();
+    expect(findSeriesIdentifier({ series: {} }, 0)).toBeUndefined();
+    expect(findSeriesIdentifier({ series: [{ key: "a" }] }, 3)).toBeUndefined();
   });
 });

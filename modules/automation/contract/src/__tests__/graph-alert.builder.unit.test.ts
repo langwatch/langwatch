@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AlertType,
   buildGraphAlertTriggerData,
-  extractGraphAlertFromTriggerRow,
+  findGraphAlertFromTriggerRow,
   GRAPH_ALERT_OPERATORS,
   GRAPH_ALERT_TIME_PERIODS,
   graphAlertActionParamsSchema,
@@ -202,10 +202,10 @@ describe("graphAlertActionParamsSchema", () => {
   });
 });
 
-describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
+describe("findGraphAlertFromTriggerRow (builder5015-004)", () => {
   describe("given a valid persisted actionParams shape", () => {
     it("returns the parsed threshold rule plus preserved destination keys", () => {
-      const parsed = extractGraphAlertFromTriggerRow({
+      const parsed = findGraphAlertFromTriggerRow({
         threshold: 250,
         operator: "gt",
         timePeriod: 60,
@@ -224,7 +224,7 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
 
   describe("given an actionParams with members[]", () => {
     it("preserves the members array alongside the parsed rule", () => {
-      const parsed = extractGraphAlertFromTriggerRow({
+      const parsed = findGraphAlertFromTriggerRow({
         threshold: 1000,
         operator: "gte",
         timePeriod: 1440,
@@ -238,13 +238,13 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
 
   describe("given null / non-object / malformed input", () => {
     it("returns null instead of throwing", () => {
-      expect(extractGraphAlertFromTriggerRow(null)).toBeNull();
-      expect(extractGraphAlertFromTriggerRow(undefined)).toBeNull();
-      expect(extractGraphAlertFromTriggerRow("not-json")).toBeNull();
-      expect(extractGraphAlertFromTriggerRow(42)).toBeNull();
-      expect(extractGraphAlertFromTriggerRow({})).toBeNull();
+      expect(findGraphAlertFromTriggerRow(null)).toBeNull();
+      expect(findGraphAlertFromTriggerRow(undefined)).toBeNull();
+      expect(findGraphAlertFromTriggerRow("not-json")).toBeNull();
+      expect(findGraphAlertFromTriggerRow(42)).toBeNull();
+      expect(findGraphAlertFromTriggerRow({})).toBeNull();
       expect(
-        extractGraphAlertFromTriggerRow({
+        findGraphAlertFromTriggerRow({
           threshold: 1,
           operator: "between",
           timePeriod: 60,
@@ -257,7 +257,7 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
   describe("given an out-of-window timePeriod", () => {
     it("returns null (matches the writer's schema)", () => {
       expect(
-        extractGraphAlertFromTriggerRow({
+        findGraphAlertFromTriggerRow({
           threshold: 1,
           operator: "gt",
           timePeriod: 7,
@@ -290,7 +290,7 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
             members: ["a@b.co"],
           },
         });
-        const extracted = extractGraphAlertFromTriggerRow(data.actionParams);
+        const extracted = findGraphAlertFromTriggerRow(data.actionParams);
         expect(extracted).toMatchObject({
           threshold: 42,
           operator,

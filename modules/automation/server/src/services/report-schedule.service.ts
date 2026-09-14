@@ -38,7 +38,7 @@ export class ReportScheduleService {
     return fromDate(next);
   }
 
-  static tryExtract(actionParams: unknown): ReportActionParams | null {
+  static findReportActionParams(actionParams: unknown): ReportActionParams | null {
     const parsed = reportActionParamsSchema.safeParse(actionParams);
 
     return parsed.success ? parsed.data : null;
@@ -102,7 +102,7 @@ export class ReportScheduleService {
         continue;
       }
 
-      const parsed = ReportScheduleService.tryExtract(report.actionParams);
+      const parsed = ReportScheduleService.findReportActionParams(report.actionParams);
       if (!parsed) {
         continue;
       }

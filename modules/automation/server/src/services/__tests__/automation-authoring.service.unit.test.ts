@@ -85,7 +85,7 @@ describe("given a trigger paused for runaway volume", () => {
     it("clears the pause reason and pause time in the same write", async () => {
       const update = vi.fn().mockResolvedValue(resumedTrigger());
       const service = authoring({
-        tryGetById: async () =>
+        findById: async () =>
           ({ id: "trigger-1", triggerKind: "AUTOMATION", actionParams: {}, deleted: false }) as never,
         update,
       });

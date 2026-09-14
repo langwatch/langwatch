@@ -92,11 +92,11 @@ function makeTriggerSentStub(
   return {
     findProjectsWithGraphTriggers: async () => [],
     findProjectsWithOpenGraphTriggerSent: async () => new Set(),
-    tryFindGraphTriggerSource: async ({ triggerId }) => sourceByTrigger[triggerId],
+    findGraphTriggerSource: async ({ triggerId }) => sourceByTrigger[triggerId],
     findOpenTriggerIdsForProject: async () => new Set(),
-    tryFindOpenForGraphAlert: async () => null,
-    tryFindLatestForGraphAlert: async () => null,
-    tryClaimOpenForGraphAlert: async () => null,
+    findOpenForGraphAlert: async () => null,
+    findLatestForGraphAlert: async () => null,
+    claimOpenForGraphAlert: async () => "already-claimed" as const,
     deleteOpenClaim: async () => undefined,
     markResolvedById: async () => undefined,
   };
@@ -160,7 +160,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       const deps: GraphTriggerHeartbeatDeps = {
         triggers,
         triggerSent: makeTriggerSentStub(sourceByTrigger),
-        heartbeat: { tryResolveClickHouseClient: async () => clickHouseStub.client },
+        heartbeat: { findClickHouseClient: async () => clickHouseStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -201,7 +201,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       const deps: GraphTriggerHeartbeatDeps = {
         triggers,
         triggerSent: makeTriggerSentStub({ [TRIGGER_EVAL]: "evaluation" }),
-        heartbeat: { tryResolveClickHouseClient: async () => clickHouseStub.client },
+        heartbeat: { findClickHouseClient: async () => clickHouseStub.client },
         logger: new SilentAutomationLogger(),
       };
 
@@ -233,7 +233,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       const deps: GraphTriggerHeartbeatDeps = {
         triggers,
         triggerSent: makeTriggerSentStub(),
-        heartbeat: { tryResolveClickHouseClient: async () => clickHouseStub.client },
+        heartbeat: { findClickHouseClient: async () => clickHouseStub.client },
         logger: new SilentAutomationLogger(),
       };
 

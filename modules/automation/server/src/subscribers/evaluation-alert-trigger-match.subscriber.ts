@@ -53,7 +53,7 @@ export async function handleEvaluationAlertTriggerMatch(
   }
   if (!evaluation.traceId) return;
   const traceId = evaluation.traceId;
-  const traceSummary = await deps.traces.tryGetSummary({
+  const traceSummary = await deps.traces.findSummary({
     projectId: context.tenantId,
     traceId,
   });

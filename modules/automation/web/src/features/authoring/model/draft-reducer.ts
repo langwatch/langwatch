@@ -1,7 +1,7 @@
 import {
   AlertType,
   DEFAULT_TRACE_DEBOUNCE_MS,
-  extractGraphAlertFromTriggerRow as parseGraphAlertRow,
+  findGraphAlertFromTriggerRow as parseGraphAlertRow,
   type AutomationFilterValue,
   type AutomationFilters,
   type GraphAlertOperator,

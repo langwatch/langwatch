@@ -136,7 +136,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   async findProjectsWithOpenGraphTriggerSent(): Promise<Set<string>> {
     return new Set([PROJECT_ID]);
   }
-  async tryFindGraphTriggerSource(): Promise<"trace" | "evaluation" | undefined> {
+  async findGraphTriggerSource(): Promise<"trace" | "evaluation" | undefined> {
     return "trace";
   }
   openRows: OpenGraphTriggerSent[] = [];
@@ -147,7 +147,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   deleteCalls: Array<{ id: string; projectId: string }> = [];
   resolveCalls: Array<{ id: string; projectId: string; now: Instant }> = [];
 
-  async tryFindOpenForGraphAlert(params: {
+  async findOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
@@ -162,7 +162,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     );
   }
 
-  async tryFindLatestForGraphAlert(params: {
+  async findLatestForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
@@ -180,13 +180,13 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   // Faithful to the DB: the atomic claim arbitrates on `openIncidentKey`
   // (= graphAlertIncidentKey(triggerId)). If an OPEN row already holds that
   // identity, the INSERT would hit the single-column unique — modelled here as
-  // returning null. The check-and-push has no `await` between them, so it is
+  // "already-claimed". The check-and-push has no `await` between them, so it is
   // atomic under Promise.all exactly as a Postgres INSERT is.
-  async tryClaimOpenForGraphAlert(params: {
+  async claimOpenForGraphAlert(params: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent | null> {
+  }): Promise<OpenGraphTriggerSent | "already-claimed"> {
     this.claimCalls++;
     const key = PrismaGraphTriggerSentRepository.graphAlertIncidentKey({
       triggerId: params.triggerId,
@@ -197,7 +197,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
           triggerId: r.triggerId,
         }) === key,
     );
-    if (held) return null;
+    if (held) return "already-claimed";
     const row: OpenGraphTriggerSent = {
       id: `sent-${this.allRows.length + 1}`,
       ...params,
@@ -259,12 +259,12 @@ function makeHarness({
 
   const deps: GraphTriggerEvaluationDeps = {
     triggers: {
-      tryFindById: loadTrigger,
+      findById: loadTrigger,
       updateLastRunAt,
     } as never,
-    customGraphs: { tryFindById: loadCustomGraph } as never,
+    customGraphs: { findById: loadCustomGraph } as never,
     projects: {
-      tryGetById: async () => project,
+      findById: async () => project,
     } as unknown as ProjectApi,
     analytics: {
       getTimeseries,
@@ -277,7 +277,7 @@ function makeHarness({
       info: () => undefined,
       warn: () => undefined,
     },
-    slackTokens: { tryDecrypt: () => null } as never,
+    slackTokens: { findDecryptedToken: () => null } as never,
     dispatchErrors: {
       isTerminal: (error: unknown) => (error as { retryable?: unknown }).retryable === false,
       createTerminal: (message: string) => new Error(message),
@@ -778,7 +778,7 @@ describe("evaluateGraphTrigger", () => {
       expect(harness.triggerSent.openRows).toHaveLength(0);
       // The pre-check is null again — the next evaluation can re-claim.
       expect(
-        await harness.triggerSent.tryFindOpenForGraphAlert({
+        await harness.triggerSent.findOpenForGraphAlert({
           triggerId: TRIGGER_ID,
           projectId: PROJECT_ID,
           customGraphId: GRAPH_ID,
@@ -1024,7 +1024,7 @@ describe("evaluateGraphTrigger", () => {
       // unique constraint's job.
       harness.getTimeseries.mockResolvedValue(timeseries(15));
       const findOpen = vi
-        .spyOn(harness.triggerSent, "tryFindOpenForGraphAlert")
+        .spyOn(harness.triggerSent, "findOpenForGraphAlert")
         .mockResolvedValue(null);
 
       const [a, b] = await Promise.all([

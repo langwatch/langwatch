@@ -121,7 +121,7 @@ export class TriggerSettlementPersistenceService {
   }
 
   private async dispatchTrace(page: PersistPage, traceId: string): Promise<void> {
-    const foldState = await this.composition.traces.tryGetSummary({
+    const foldState = await this.composition.traces.findSummary({
       projectId: page.projectId,
       traceId,
     });

@@ -49,7 +49,7 @@ type ParsedUrl = {
 };
 type UrlConstructor = new (url: string) => ParsedUrl;
 
-export function inspectWebhookUrlShape(
+export function findWebhookUrlProblem(
   url: string,
   { allowInsecureOrigin = false }: { allowInsecureOrigin?: boolean } = {},
 ): WebhookUrlProblem | null {
@@ -87,8 +87,8 @@ export function inspectWebhookUrlShape(
   return null;
 }
 
-export function validateWebhookUrlShape(url: string): string | null {
-  return inspectWebhookUrlShape(url)?.message ?? null;
+export function findWebhookUrlProblemMessage(url: string): string | null {
+  return findWebhookUrlProblem(url)?.message ?? null;
 }
 
 export const webhookActionParamsSchema = z.object({
@@ -97,7 +97,7 @@ export const webhookActionParamsSchema = z.object({
     .trim()
     .min(1, "A webhook URL is required.")
     .superRefine((url, context) => {
-      const problem = validateWebhookUrlShape(url);
+      const problem = findWebhookUrlProblemMessage(url);
       if (problem) context.addIssue({ code: "custom", message: problem });
     }),
   method: webhookMethodSchema.default("POST"),

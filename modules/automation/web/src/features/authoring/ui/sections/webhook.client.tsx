@@ -2,7 +2,7 @@ import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@ch
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import {
   isReservedWebhookHeader,
-  validateWebhookUrlShape,
+  findWebhookUrlProblemMessage,
   WEBHOOK_HEADER_VALUE_KEPT,
   WEBHOOK_METHODS,
   type WebhookActionParams,
@@ -85,7 +85,7 @@ function initialSlice(): WebhookSlice {
 }
 
 function isComplete(slice: WebhookSlice): boolean {
-  return validateWebhookUrlShape(slice.url.trim()) === null;
+  return findWebhookUrlProblemMessage(slice.url.trim()) === null;
 }
 
 function summary(slice: WebhookSlice, identity: SummaryIdentity): string {
@@ -360,7 +360,7 @@ function WebhookConfigForm({
   onChange,
   ctx,
 }: ConfigFormProps<WebhookSlice, WebhookPreview>) {
-  const urlProblem = slice.url.trim() === "" ? null : validateWebhookUrlShape(slice.url.trim());
+  const urlProblem = slice.url.trim() === "" ? null : findWebhookUrlProblemMessage(slice.url.trim());
   const defaults = defaultsForSourceKind(ctx.sourceKind);
   const templateValue = slice.template.value || defaults.webhookBody;
   const variables = useMemo(

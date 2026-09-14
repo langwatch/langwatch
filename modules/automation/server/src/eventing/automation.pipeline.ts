@@ -77,19 +77,9 @@ export interface AutomationsPipelineDeps {
   retention: AutomationIntentRetention;
 }
 
-export class AutomationsPipelineAdapter {
-  private constructor(private readonly deps: AutomationsPipelineDeps) {}
-
-  static create(deps: AutomationsPipelineDeps): AutomationsPipelineAdapter {
-    return new AutomationsPipelineAdapter(deps);
-  }
-
-  static createPipeline(deps: AutomationsPipelineDeps) {
-    return AutomationsPipelineAdapter.create(deps).build();
-  }
-
-  build() {
-    return definePipeline<AutomationEvent>({
+/** The whole process-manager topology, factored out so its inferred return type can be named. */
+const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
+  return definePipeline<AutomationEvent>({
       name: "automations",
       aggregate: defineAggregate({
         type: "trigger",
@@ -109,17 +99,17 @@ export class AutomationsPipelineAdapter {
           .intent(
             TRIGGER_SETTLEMENT_INTENT_TYPES.NOTIFY_DIGEST,
             notifyDigestIntentSchema,
-            (payload, context) => this.deps.settlement.notifyDigest(payload, context),
+            (payload, context) => deps.settlement.notifyDigest(payload, context),
           )
           .intent(
             TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
             persistMatchIntentSchema,
-            (payload, context) => this.deps.settlement.persistMatch(payload, context),
+            (payload, context) => deps.settlement.persistMatch(payload, context),
           )
           .intent(
             TRIGGER_SETTLEMENT_INTENT_TYPES.LOG_OVERFLOW,
             logOverflowIntentSchema,
-            (payload, context) => this.deps.settlement.logOverflow(payload, context),
+            (payload, context) => deps.settlement.logOverflow(payload, context),
           )
           .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
             const { state: nextState, flushed } = TriggerSettlement.addPending(state, data, ctx.at);
@@ -181,7 +171,7 @@ export class AutomationsPipelineAdapter {
                       ),
                     ]
                   : undefined,
-              nextWakeAt: TriggerSettlement.settleBoundary(nextState),
+              nextWakeAt: TriggerSettlement.findNextBoundary(nextState),
             };
           })
           .onWake((state, ctx) => {
@@ -222,7 +212,7 @@ export class AutomationsPipelineAdapter {
           .intent(
             "evaluateGraph",
             sweepSchema,
-            runGraphAlertSweep(this.deps.scheduledIntents, this.deps.retention),
+            runGraphAlertSweep(deps.scheduledIntents, deps.retention),
           ),
       )
       .withProcessManager("webhookDeliveryPrune", (pm) =>
@@ -233,10 +223,27 @@ export class AutomationsPipelineAdapter {
           .intent(
             "prune",
             pruneSchema,
-            runWebhookDeliveryPrune(this.deps.scheduledIntents, this.deps.retention),
+            runWebhookDeliveryPrune(deps.scheduledIntents, deps.retention),
           ),
       )
       .build();
+};
+
+export class AutomationsPipelineAdapter {
+  private constructor(private readonly deps: AutomationsPipelineDeps) {}
+
+  static create(deps: AutomationsPipelineDeps): AutomationsPipelineAdapter {
+    return new AutomationsPipelineAdapter(deps);
+  }
+
+  static createPipeline(
+    deps: AutomationsPipelineDeps,
+  ): ReturnType<typeof buildAutomationsPipeline> {
+    return AutomationsPipelineAdapter.create(deps).build();
+  }
+
+  build(): ReturnType<typeof buildAutomationsPipeline> {
+    return buildAutomationsPipeline(this.deps);
   }
 }
 

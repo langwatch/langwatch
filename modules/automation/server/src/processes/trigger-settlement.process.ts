@@ -151,7 +151,7 @@ export class TriggerSettlement {
     };
   }
 
-  static settleBoundary(state: SettlementState): number | null {
+  static findNextBoundary(state: SettlementState): number | null {
     return TriggerSettlement.nextWakeFrom(state);
   }
 
@@ -189,7 +189,15 @@ export class TriggerSettlement {
     return pages;
   }
 
-  static drainDue(state: SettlementState, at: number) {
+  static drainDue(
+    state: SettlementState,
+    at: number,
+  ): {
+    state: SettlementState;
+    boundaries: Array<{ key: number; traceIds: string[] }>;
+    persistPages: PersistPage[];
+    nextBoundary: number | null;
+  } {
     const remaining: SettlementState["pendingMatches"] = {};
     const notifyByBoundary = new Map<number, string[]>();
     const settledMatches: Array<{

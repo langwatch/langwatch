@@ -70,7 +70,7 @@ interface SlackApiResponse {
  * copy. Those get the registry's own "Check the destination and try again."
  * instead; the code still travels in the log line.
  */
-function explainSlackPostError(code: string): string | null {
+function findSlackPostErrorRemediation(code: string): string | null {
   switch (code) {
     case "not_in_channel":
       return "the bot isn't in that channel. Invite it with `/invite @LangWatch` in the channel, or reinstall the Slack app with the `chat:write.public` scope so it can post to any public channel";
@@ -154,13 +154,13 @@ async function postSlackChatMessage(
   const detail = body.response_metadata?.messages?.length
     ? ` (${body.response_metadata.messages.join("; ")})`
     : "";
-  const explanation = explainSlackPostError(code);
+  const explanation = findSlackPostErrorRemediation(code);
   throw new DispatchError({
     message: `${label}: ${explanation ?? `Slack rejected the message: ${code}`}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
     // Slack told us what the admin has to do; that sentence is the whole value
     // of this failure, so it travels to them. Capitalised because
-    // `explainSlackPostError` writes a clause to follow the label, and this is
+    // `findSlackPostErrorRemediation` writes a clause to follow the label, and this is
     // read on its own. `label` and `detail` stay behind: one names an internal
     // dispatcher, the other is raw provider metadata.
     //

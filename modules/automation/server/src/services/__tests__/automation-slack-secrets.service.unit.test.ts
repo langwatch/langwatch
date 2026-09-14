@@ -90,7 +90,7 @@ describe("AutomationSlackSecretsService", () => {
         expect(kept.slackBotToken).toBe(existing.slackBotToken);
         expect(sentinel.slackBotToken).toBe(existing.slackBotToken);
         expect(crypto.encrypted).toEqual([]);
-        expect(adapter.tryDecrypt(kept)).toBe("xoxb-plaintext");
+        expect(adapter.findDecryptedToken(kept)).toBe("xoxb-plaintext");
       });
     });
   });

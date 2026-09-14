@@ -13,8 +13,8 @@ export abstract class AutomationRunaway {
    * Where this project's organization can go for a higher ceiling. Called
    * only for a `ceiling_reached` breach, never for a pause.
    */
-  abstract resolveNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined>;
-  abstract tryClaimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | null>;
+  abstract findNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined>;
+  abstract claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed">;
   abstract releaseClaim(lease: ClaimLease): Promise<void>;
   abstract projectName(projectId: string): Promise<string>;
   abstract automationUrl(params: { projectId: string; triggerId: string }): Promise<string>;

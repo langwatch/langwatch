@@ -29,7 +29,7 @@ export type WorkerAutomationRunawayDirectories = Readonly<{
 }>;
 
 /** The routed client a project's traces are counted on. */
-export type WorkerRunawayClickHouseResolver = AutomationHeartbeat["tryResolveClickHouseClient"];
+export type WorkerRunawayClickHouseResolver = AutomationHeartbeat["findClickHouseClient"];
 
 /** Which addresses this project has already asked not to hear from again. */
 export type WorkerAutomationRunawaySuppression = Readonly<{
@@ -156,12 +156,13 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
     return sendAutomationLimitEmail({ mailer: this.input.mailer, ...params });
   }
 
-  async resolveNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined> {
+  async findNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined> {
     return this.input.nextStep?.resolve(projectId);
   }
 
-  tryClaimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | null> {
-    return claimOnce({ connection: this.input.redis, key, ttlSeconds, logger: this.logger });
+  async claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed"> {
+    const lease = await claimOnce({ connection: this.input.redis, key, ttlSeconds, logger: this.logger });
+    return lease ?? "already-claimed";
   }
 
   releaseClaim(lease: ClaimLease): Promise<void> {

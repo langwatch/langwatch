@@ -18,7 +18,7 @@ export class MemoryEmailSuppressionNameRepository extends EmailSuppressionNameRe
    * seen has no name to show, so the read answers nothing rather than an
    * invented one.
    */
-  tryLookupNames(input: {
+  findNames(input: {
     projectId: string;
     triggerId: string | null;
   }): Promise<UnsubscribeNames | null> {

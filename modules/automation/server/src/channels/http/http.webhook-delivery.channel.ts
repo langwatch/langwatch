@@ -53,7 +53,7 @@ const LOG_ERROR_CHARS = 500;
 /** How much of the receiver's failure response body the log row keeps. */
 const LOG_RESPONSE_CHARS = 4000;
 
-function captureFailureResponse({
+function findFailureResponse({
   result,
 }: {
   result: WebhookSendResult | undefined;
@@ -138,7 +138,7 @@ async function deliverWebhook({
       responseStatus: result?.status ?? null,
       latencyMs: nowInstant().epochMilliseconds - startedAt,
       error,
-      response: captureFailureResponse({ result }),
+      response: findFailureResponse({ result }),
       outcome: retryable ? "retryable" : "terminal",
     });
     throw err;

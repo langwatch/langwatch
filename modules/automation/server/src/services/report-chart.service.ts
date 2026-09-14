@@ -52,7 +52,7 @@ function formatBucketLabel({
  */
 
 export interface ReportChartDeps {
-  loadCustomGraph(params: {
+  findCustomGraph(params: {
     projectId: string;
     customGraphId: string;
   }): Promise<CustomGraph | null>;
@@ -134,7 +134,7 @@ async function loadGraphs({
   projectId: string;
 }): Promise<CustomGraph[]> {
   if (source.kind === "customGraph") {
-    const graph = await deps.loadCustomGraph({
+    const graph = await deps.findCustomGraph({
       projectId,
       customGraphId: source.customGraphId,
     });

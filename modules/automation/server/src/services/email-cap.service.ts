@@ -159,10 +159,10 @@ export class AutomationEmailCapService {
     }
 
     try {
-      const claimed = await this.store.trySet(input.claimKey, "1", "EX", input.ttlSeconds, "NX");
+      const claim = await this.store.claim(input.claimKey, "1", "EX", input.ttlSeconds, "NX");
 
-      if (!claimed) {
-        const rawCount = await this.store.tryGet(input.counterKey);
+      if (claim === "already-claimed") {
+        const rawCount = await this.store.findValue(input.counterKey);
         const count = rawCount ? Number(rawCount) : 0;
 
         return { allowed: count <= input.cap, count };

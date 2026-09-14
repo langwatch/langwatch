@@ -414,8 +414,8 @@ export class AutomationApp implements AutomationApi {
   }
 
   /** One automation, or null when the project does not have it. */
-  tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    return this.#automation.tryGetById(input);
+  findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+    return this.#automation.findById(input);
   }
 
   /** One automation with every secret stripped, for a browser to read. */
@@ -424,12 +424,12 @@ export class AutomationApp implements AutomationApi {
   }
 
   /** One LIVE automation, or null when the project does not have one. */
-  tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+  findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     return this.#rules.findLiveById(input);
   }
 
   /** One live automation, refusing when the project does not have it. */
-  requireById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+  getById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     return this.#rules.getById(input);
   }
 
@@ -446,7 +446,7 @@ export class AutomationApp implements AutomationApi {
   }
 
   /** Refuses a graph alert whose graph is not this project's. */
-  requireCustomGraphInProject(input: {
+  assertCustomGraphInProject(input: {
     customGraphId: string;
     projectId: string;
   }): Promise<void> {
@@ -663,12 +663,12 @@ export class AutomationApp implements AutomationApi {
   // -- email suppression (ADR-031) -------------------------------------------
 
   /** The masked recipient and names behind an unsubscribe token, or null. */
-  tryResolveUnsubscribeView(input: { token: string }): Promise<{
+  findUnsubscribeView(input: { token: string }): Promise<{
     projectName: string;
     triggerName: string | null;
     email: string;
   } | null> {
-    return this.#automation.tryResolveUnsubscribeView(input);
+    return this.#automation.findUnsubscribeView(input);
   }
 
   /**
@@ -688,7 +688,7 @@ export class AutomationApp implements AutomationApi {
       max: UNSUBSCRIBE_RESOLVE_MAX,
     });
 
-    const view = await this.#automation.tryResolveUnsubscribeView({ token: input.token });
+    const view = await this.#automation.findUnsubscribeView({ token: input.token });
 
     if (!view) {
       throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid or has expired.", 404);

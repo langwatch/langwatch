@@ -163,7 +163,7 @@ describe("given the trace reads automation settlement makes in this process", ()
         resolveClickHouseClient: clickHouse().resolve,
       });
 
-      await reader.tryGetSummary({ projectId: "project-1", traceId: "trace-1" });
+      await reader.findSummary({ projectId: "project-1", traceId: "trace-1" });
 
       expect(reads).toEqual([{ key: "trace-1", tenantId: "project-1" }]);
     });

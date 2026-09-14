@@ -225,7 +225,7 @@ export class TriggerSettlementNotificationService {
     const candidates: ConfirmedNotificationCandidate[] = [];
 
     for (const traceId of new Set(input.traceIds)) {
-      const foldState = await this.composition.traces.tryGetSummary({
+      const foldState = await this.composition.traces.findSummary({
         projectId: input.projectId,
         traceId,
       });
@@ -351,7 +351,7 @@ export class TriggerSettlementNotificationService {
     }
 
     if (slackDeliveryMethodOf(parsed.data) === "bot") {
-      const token = this.composition.slack.tryDecrypt(parsed.data);
+      const token = this.composition.slack.findDecryptedToken(parsed.data);
       const channel = parsed.data.slackChannelId?.trim();
       if (!token || !channel) {
         throw actionParamsError(input.trigger);

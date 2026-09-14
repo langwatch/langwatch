@@ -49,20 +49,20 @@ class TestLogger extends AutomationLogger {
   warn(): void {}
 }
 class TestHeartbeat extends AutomationHeartbeat {
-  async tryResolveClickHouseClient() {
+  async findClickHouseClient(): Promise<null> {
     return null;
   }
 }
 class TestSlackTokens extends AutomationSlackBotTokenDecryptor {
-  tryDecrypt() {
+  findDecryptedToken(): null {
     return null;
   }
 }
 class TestDispatchErrors extends AutomationDispatchError {
-  isTerminal() {
+  isTerminal(): boolean {
     return false;
   }
-  createTerminal(message: string) {
+  createTerminal(message: string): unknown {
     return new Error(message);
   }
 }
@@ -77,11 +77,11 @@ class TestRunaway
     return [];
   }
   async sendLimitEmail() {}
-  async resolveNextStep() {
+  async findNextStep() {
     return undefined;
   }
-  async tryClaimOnce() {
-    return null;
+  async claimOnce() {
+    return "already-claimed" as const;
   }
   async releaseClaim() {}
   async projectName() {
@@ -112,7 +112,19 @@ export function createAutomationTestFire(): AutomationTestFire {
 
 /** Complete deterministic graph capability for service tests that do not
  * exercise analytics/provider delivery. */
-export function createAutomationTestRuntime() {
+export function createAutomationTestRuntime(): {
+  emailCaps: AutomationEmailCapService;
+  projects: never;
+  analytics: never;
+  notifier: TestNotifier;
+  baseHost: string;
+  logger: TestLogger;
+  slackTokens: TestSlackTokens;
+  dispatchErrors: TestDispatchErrors;
+  heartbeat: TestHeartbeat;
+  runaway: TestRunaway;
+  testFire: TestFireDelivery;
+} {
   return {
     emailCaps: AutomationEmailCapService.create({ store: null }),
     projects: {} as never,

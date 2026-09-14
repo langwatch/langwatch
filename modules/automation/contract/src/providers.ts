@@ -49,10 +49,10 @@ export {
 export {
   WEBHOOK_HEADER_VALUE_KEPT,
   WEBHOOK_METHODS,
-  inspectWebhookUrlShape,
+  findWebhookUrlProblem,
   isReservedWebhookHeader,
   sanitizeWebhookHeaders,
-  validateWebhookUrlShape,
+  findWebhookUrlProblemMessage,
   webhookActionParamsSchema,
   webhookMethodSchema,
   type WebhookActionParams,

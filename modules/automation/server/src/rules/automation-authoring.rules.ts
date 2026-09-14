@@ -91,20 +91,20 @@ export function resolveCadenceForCreate(
 }
 
 /**
- * Persist actions always pin to `immediate`. Returning `undefined` when the
- * client omits the field would skip the column update and leak a stale
- * notify-class cadence onto a row edited from notify to persist, so the
- * boundary invariant is forced on every update.
+ * Persist actions always pin to `immediate`. `"unchanged"` when the client
+ * omits the field on a notify-class row, so the caller skips the column
+ * update rather than leaking a stale notify-class cadence onto a row edited
+ * from notify to persist — the boundary invariant is forced on every update.
  */
 export function resolveCadenceForUpdate(
   action: AutomationAction,
   requested: NotificationCadence | undefined,
   isGraphAlert = false,
-): NotificationCadence | undefined {
-  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
-  if (isGraphAlert) return "immediate";
+): { cadence: NotificationCadence } | "unchanged" {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return { cadence: "immediate" };
+  if (isGraphAlert) return { cadence: "immediate" };
 
-  return requested;
+  return requested === undefined ? "unchanged" : { cadence: requested };
 }
 
 /**

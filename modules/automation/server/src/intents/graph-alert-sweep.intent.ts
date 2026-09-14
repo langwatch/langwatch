@@ -15,7 +15,7 @@ export const graphAlertSweepIntentSchema = z.object({
 export function runGraphAlertSweep(
   scheduledIntents: AutomationScheduledIntent,
   retention: AutomationIntentRetention,
-) {
+): (input: z.infer<typeof graphAlertSweepIntentSchema>) => Promise<void> {
   return async (input: z.infer<typeof graphAlertSweepIntentSchema>): Promise<void> => {
     const startedAt = input.scheduledFor;
     const candidates = await scheduledIntents.decideGraphTriggerHeartbeat({

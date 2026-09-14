@@ -229,8 +229,8 @@ class ApiAutomationLogger implements AutomationLogger {
 class ApiAutomationSlackTokens implements AutomationSlackBotTokenDecryptor {
   constructor(private readonly providers: AutomationProviderRegistryService) {}
 
-  tryDecrypt(params: SlackActionParams): string | null {
-    return this.providers.decryptSlackBotToken(params);
+  findDecryptedToken(params: SlackActionParams): string | null {
+    return this.providers.findDecryptedSlackBotToken(params);
   }
 }
 
@@ -253,7 +253,7 @@ class ApiAutomationDispatchErrors implements AutomationDispatchError {
 
 /** The heartbeat's recency query has no endpoint here. */
 class UnmeasuredApiAutomationHeartbeat implements AutomationHeartbeat {
-  tryResolveClickHouseClient(): Promise<null> {
+  findClickHouseClient(): Promise<null> {
     return Promise.resolve(null);
   }
 }
@@ -282,12 +282,12 @@ class UncontainedApiAutomationRunaway
     return Promise.reject(new ApiAutomationUnavailableError("send automation limit mail"));
   }
 
-  resolveNextStep(): Promise<undefined> {
+  findNextStep(): Promise<undefined> {
     return Promise.resolve(undefined);
   }
 
-  tryClaimOnce(): Promise<null> {
-    return Promise.resolve(null);
+  claimOnce(): Promise<"already-claimed"> {
+    return Promise.resolve("already-claimed");
   }
 
   releaseClaim(): Promise<void> {
@@ -344,7 +344,7 @@ class UndeliverableApiTestFire extends AutomationTestFire {
 
 /**
  * {@link AutomationProviderSecrets} over the registry, renaming its
- * `decryptSlackBotToken` to the authoring surface's `findSlackBotToken` —
+ * `findDecryptedSlackBotToken` to the authoring surface's `findSlackBotToken` —
  * the same read, under the name the two callers agree on.
  */
 class AutomationProviderSecretsAdapter implements AutomationProviderSecrets {
@@ -369,7 +369,7 @@ class AutomationProviderSecretsAdapter implements AutomationProviderSecrets {
   }
 
   findSlackBotToken(actionParams: unknown): string | null {
-    return this.registry.decryptSlackBotToken(actionParams);
+    return this.registry.findDecryptedSlackBotToken(actionParams);
   }
 
   decryptWebhookHeaders(

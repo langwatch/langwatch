@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractGraphAlertFromTriggerRow, graphAlertActionParamsSchema } from "../graph-alert.ts";
+import { findGraphAlertFromTriggerRow, graphAlertActionParamsSchema } from "../graph-alert.ts";
 
 describe("graph-alert contract", () => {
   it("validates the portable threshold shape", () => {
@@ -15,7 +15,7 @@ describe("graph-alert contract", () => {
 
   it("preserves provider destination keys when reading a row", () => {
     expect(
-      extractGraphAlertFromTriggerRow({
+      findGraphAlertFromTriggerRow({
         threshold: 2,
         operator: "gte",
         timePeriod: 15,

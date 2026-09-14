@@ -35,7 +35,7 @@ describe("trigger settlement process", () => {
         const first = TriggerSettlement.addPending(initialState(), match(), 1_000);
         const second = TriggerSettlement.addPending(first.state, match(), 10_000);
 
-        expect(TriggerSettlement.settleBoundary(second.state)).toBe(40_000);
+        expect(TriggerSettlement.findNextBoundary(second.state)).toBe(40_000);
       });
     });
   });

@@ -46,7 +46,7 @@ export class AutomationRulesService {
    * and "here it is" at the other.
    */
   async findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    const trigger = await this.collaborators.automation.tryGetById(input);
+    const trigger = await this.collaborators.automation.findById(input);
 
     return !trigger || trigger.deleted ? null : trigger;
   }

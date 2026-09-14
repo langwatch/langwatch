@@ -123,7 +123,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
     if (row === null) throw new TriggerNotFoundError();
     return mapTriggerRow(row);
   }
-  async tryFindById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+  async findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const row = await this.database.trigger.findFirst({
       where: { id: input.triggerId, projectId: input.projectId },
     });
@@ -136,7 +136,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
     });
     return rows.map((row: unknown) => mapTriggerRow(row));
   }
-  async tryFindByCustomGraphId(input: {
+  async findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {

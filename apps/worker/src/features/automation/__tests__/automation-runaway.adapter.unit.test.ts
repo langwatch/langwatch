@@ -109,17 +109,17 @@ describe("given a worker holding an automation containment claim", () => {
           baseHost: "https://app.langwatch.test",
         });
 
-        const stale = await worker1.tryClaimOnce("automation-cap-mail:trigger-1:20454", 10);
-        expect(stale).not.toBeNull();
+        const stale = await worker1.claimOnce("automation-cap-mail:trigger-1:20454", 10);
+        if (stale === "already-claimed") throw new Error("expected the first claim to succeed");
 
         vi.setSystemTime(new Date("2026-01-01T00:00:11Z"));
-        const current = await worker1.tryClaimOnce("automation-cap-mail:trigger-1:20454", 10);
-        expect(current).not.toBeNull();
+        const current = await worker1.claimOnce("automation-cap-mail:trigger-1:20454", 10);
+        expect(current).not.toBe("already-claimed");
 
-        await worker1.releaseClaim(stale!);
+        await worker1.releaseClaim(stale);
 
-        const thirdAttempt = await worker1.tryClaimOnce("automation-cap-mail:trigger-1:20454", 10);
-        expect(thirdAttempt).toBeNull();
+        const thirdAttempt = await worker1.claimOnce("automation-cap-mail:trigger-1:20454", 10);
+        expect(thirdAttempt).toBe("already-claimed");
       } finally {
         vi.useRealTimers();
       }

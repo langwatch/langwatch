@@ -109,7 +109,7 @@ class TestTraceService extends TraceService {
     return Promise.reject(new Error("not used by this subscriber"));
   }
 
-  tryGetSummary(): Promise<TraceSummaryData> {
+  findSummary(): Promise<TraceSummaryData> {
     return Promise.resolve({
       traceId: "trace-1",
       spanCount: 1,

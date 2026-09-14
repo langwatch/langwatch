@@ -59,7 +59,7 @@ class FakeMailGateway extends AutomationNotificationDelivery {
 }
 
 class NoSlackTokens extends AutomationSlackProvider {
-  tryDecrypt(): string | null {
+  findDecryptedToken(): string | null {
     return null;
   }
 }
@@ -122,8 +122,8 @@ function makeDeps({
 }): ReportDispatchDeps & { recordFire: ReturnType<typeof vi.fn> } {
   const recordFire = vi.fn(async () => {});
   return {
-    loadTrigger: async () => trigger,
-    loadProject: async () => PROJECT,
+    findTrigger: async () => trigger,
+    findProject: async () => PROJECT,
     delivery: mail,
     slackProvider: new NoSlackTokens(),
     filterSuppressedRecipients: async ({ emails }) => emails,
@@ -197,7 +197,7 @@ function chartReader({
   return ({ projectId, source, from, to }): Promise<ReportChart[]> =>
     ReportChartService.loadReportCharts({
       deps: {
-        loadCustomGraph: async () => graphs[0] ?? null,
+        findCustomGraph: async () => graphs[0] ?? null,
         loadDashboardGraphs: async () => graphs,
         getTimeseries:
           getTimeseries ?? (async () => timeseries ?? { previousPeriod: [], currentPeriod: [] }),

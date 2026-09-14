@@ -21,7 +21,7 @@ export class GraphTriggerIncidentService {
       threshold: plan.threshold,
       operator: plan.operator,
     }).breached;
-    const open = await plan.request.deps.triggerSent.tryFindOpenForGraphAlert({
+    const open = await plan.request.deps.triggerSent.findOpenForGraphAlert({
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
       customGraphId: plan.customGraphId,

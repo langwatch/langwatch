@@ -43,7 +43,7 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
     return unavailable();
   }
 
-  tryFindById(): Promise<Trigger | null> {
+  findById(): Promise<Trigger | null> {
     return unavailable();
   }
 
@@ -51,7 +51,7 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
     return unavailable();
   }
 
-  tryFindByCustomGraphId(): Promise<Trigger | null> {
+  findByCustomGraphId(): Promise<Trigger | null> {
     return unavailable();
   }
 

@@ -111,7 +111,7 @@ class TestTraces extends TraceService {
   resolveIngestWaitTimeout(): never {
     return unavailable();
   }
-  tryGetSummary(): never {
+  findSummary(): never {
     return unavailable();
   }
 }

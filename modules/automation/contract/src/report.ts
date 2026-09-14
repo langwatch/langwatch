@@ -37,7 +37,7 @@ export const reportScheduleSchema = z
       return;
     }
 
-    const runs = tryNextRuns({ cron, timezone });
+    const runs = findNextRuns({ cron, timezone });
     if (!runs) {
       reject("cron", `"${cron}" is not a valid cron expression.`);
       return;
@@ -115,7 +115,7 @@ export function buildReportTriggerData(input: BuildReportTriggerDataInput): Repo
   };
 }
 
-export function extractReportFromTriggerRow(
+export function findReportFromTriggerRow(
   actionParams: unknown,
 ): (ReportActionParams & Record<string, unknown>) | null {
   if (typeof actionParams !== "object" || actionParams === null) return null;
@@ -128,10 +128,18 @@ export function extractReportFromTriggerRow(
 }
 
 /** The next few fires a cron would produce, or null when it does not parse. */
-function tryNextRuns({ cron, timezone }: { cron: string; timezone: string }) {
+function findNextRuns({
+  cron,
+  timezone,
+}: {
+  cron: string;
+  timezone: string;
+}): Date[] | null {
+  let scheduled: Cron;
   try {
-    return new Cron(cron, { timezone }).nextRuns(GAP_PROBE_RUNS, toDate(nowInstant()));
+    scheduled = new Cron(cron, { timezone });
   } catch {
     return null;
   }
+  return scheduled.nextRuns(GAP_PROBE_RUNS, toDate(nowInstant()));
 }

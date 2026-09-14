@@ -65,7 +65,7 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     return uniqueStrings(rows, "id");
   }
 
-  async tryFindGraphTriggerSource(input: {
+  async findGraphTriggerSource(input: {
     triggerId: string;
     customGraphId: string;
     projectId: string;
@@ -97,7 +97,7 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
       "metric" in series[index]
         ? series[index].metric
         : undefined;
-    return typeof metric === "string" ? metricSource(metric) : undefined;
+    return typeof metric === "string" ? findMetricSource(metric) : undefined;
   }
 
   async findOpenTriggerIdsForProject(projectId: string): Promise<Set<string>> {
@@ -118,7 +118,7 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     );
   }
 
-  async tryFindOpenForGraphAlert(input: {
+  async findOpenForGraphAlert(input: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
@@ -128,10 +128,10 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
       orderBy: { createdAt: "desc" },
       select: { id: true, triggerId: true, projectId: true, customGraphId: true },
     });
-    return toOpenRow(row);
+    return findOpenRow(row);
   }
 
-  async tryFindLatestForGraphAlert(input: {
+  async findLatestForGraphAlert(input: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
@@ -143,11 +143,11 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     })) as { id: string } | null;
   }
 
-  async tryClaimOpenForGraphAlert(input: {
+  async claimOpenForGraphAlert(input: {
     triggerId: string;
     projectId: string;
     customGraphId: string;
-  }): Promise<OpenGraphTriggerSent | null> {
+  }): Promise<OpenGraphTriggerSent | "already-claimed"> {
     try {
       const row = await this.database.triggerSent.create({
         data: {
@@ -160,9 +160,13 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
         },
         select: { id: true, triggerId: true, projectId: true, customGraphId: true },
       });
-      return toOpenRow(row);
+      const claimed = findOpenRow(row);
+      if (!claimed) {
+        throw new Error("Graph-alert claim row failed to parse after a successful create");
+      }
+      return claimed;
     } catch (error) {
-      if ((error as { code?: unknown })?.code === "P2002") return null;
+      if ((error as { code?: unknown })?.code === "P2002") return "already-claimed";
       throw error;
     }
   }
@@ -179,7 +183,7 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
   }
 }
 
-function toOpenRow(row: unknown): OpenGraphTriggerSent | null {
+function findOpenRow(row: unknown): OpenGraphTriggerSent | null {
   if (typeof row !== "object" || row === null) return null;
   const value = row as Partial<OpenGraphTriggerSent>;
   if (
@@ -210,7 +214,7 @@ function uniqueStrings(rows: unknown[], key: string): string[] {
   ];
 }
 
-function metricSource(metric: string): "trace" | "evaluation" | undefined {
+function findMetricSource(metric: string): "trace" | "evaluation" | undefined {
   if (metric.startsWith("evaluations.")) return "evaluation";
   if (
     metric.startsWith("metadata.") ||

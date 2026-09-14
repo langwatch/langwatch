@@ -72,7 +72,7 @@ export const graphSeriesCollectionSchema = z
   .passthrough();
 
 /** The persisted series key for a graph alert: `<index>/<metric>/<aggregation>`. */
-export function deriveSeriesIdentifier(graph: unknown, index: number): string | undefined {
+export function findSeriesIdentifier(graph: unknown, index: number): string | undefined {
   const parsed = graphSeriesCollectionSchema.safeParse(graph);
   if (!parsed.success) {
     return void 0;
@@ -190,7 +190,7 @@ export function buildGraphAlertTriggerData({
 }
 
 /** Parses an existing row while preserving provider destination keys. */
-export function extractGraphAlertFromTriggerRow(
+export function findGraphAlertFromTriggerRow(
   actionParams: unknown,
 ): (GraphAlertActionParams & Record<string, unknown>) | null {
   if (typeof actionParams !== "object" || actionParams === null) return null;

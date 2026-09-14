@@ -46,17 +46,17 @@ export interface AutomationApi {
   getAllForProject(input: { projectId: string }): Promise<Trigger[]>;
   /** Every automation the list renders: redacted, with its monitors and graph. */
   listAutomations(input: { projectId: string }): Promise<AutomationListRow[]>;
-  tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
+  findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   /** One automation with every secret stripped, for a browser to read. */
   findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
-  tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
-  requireById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
+  findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
+  getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
   findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null>;
   getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]>;
-  requireCustomGraphInProject(input: { customGraphId: string; projectId: string }): Promise<void>;
+  assertCustomGraphInProject(input: { customGraphId: string; projectId: string }): Promise<void>;
   customGraphExistsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean>;
   getCustomGraphNamesByIds(input: {
     customGraphIds: string[];
@@ -122,7 +122,7 @@ export interface AutomationApi {
     input: AutomationApiTestFireInput,
     author: AutomationTestFireAuthor,
   ): Promise<TestFireResult>;
-  tryResolveUnsubscribeView(input: {
+  findUnsubscribeView(input: {
     token: string;
   }): Promise<{ projectName: string; triggerName: string | null; email: string } | null>;
   /** The unsubscribe page's own read, throttled per caller (ADR-031). */

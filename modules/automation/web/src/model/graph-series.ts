@@ -1,5 +1,5 @@
 import {
-  deriveSeriesIdentifier,
+  findSeriesIdentifier,
   graphSeriesCollectionSchema,
 } from "@langwatch/automation-contract";
 
@@ -21,7 +21,7 @@ export function deriveSeriesOptionsFromGraph(graph: unknown): GraphSeriesOption[
   }
 
   return parsed.data.series.flatMap((series, index) => {
-    const key = deriveSeriesIdentifier(parsed.data, index);
+    const key = findSeriesIdentifier(parsed.data, index);
     if (!key) {
       return [];
     }

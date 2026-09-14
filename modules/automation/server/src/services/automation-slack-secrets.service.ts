@@ -11,12 +11,12 @@ export interface AutomationSecretCrypto {
 }
 
 export abstract class AutomationSlackProvider {
-  abstract tryDecrypt(params: { slackBotToken?: string }): string | null;
+  abstract findDecryptedToken(params: { slackBotToken?: string }): string | null;
 }
 
 /** Host crypto boundary for stored Slack bot credentials. */
 export abstract class AutomationSlackBotTokenDecryptor {
-  abstract tryDecrypt(params: SlackActionParams): string | null;
+  abstract findDecryptedToken(params: SlackActionParams): string | null;
 }
 
 function slackBotTokenMissing({
@@ -65,7 +65,7 @@ function redactSlackActionParams(params: SlackActionParams): SlackActionParams {
   return { ...rest, slackBotTokenSet: true };
 }
 
-function decryptSlackBotToken(
+function findDecryptedSlackBotToken(
   params: { slackBotToken?: string },
   crypto: AutomationSecretCrypto,
 ): string | null {
@@ -111,8 +111,8 @@ export class AutomationSlackSecretsService extends AutomationSlackProvider {
     return redactSlackActionParams(params);
   }
 
-  tryDecrypt(params: { slackBotToken?: string }): string | null {
-    return decryptSlackBotToken(params, this.crypto);
+  findDecryptedToken(params: { slackBotToken?: string }): string | null {
+    return findDecryptedSlackBotToken(params, this.crypto);
   }
 
   assertToken(incoming: SlackActionParams, existing: SlackActionParams | null | undefined): void {
@@ -133,7 +133,7 @@ export class AutomationSlackBotTokenDecryptorService extends AutomationSlackBotT
     super();
   }
 
-  tryDecrypt(params: SlackActionParams): string | null {
-    return this.provider.tryDecrypt(params);
+  findDecryptedToken(params: SlackActionParams): string | null {
+    return this.provider.findDecryptedToken(params);
   }
 }

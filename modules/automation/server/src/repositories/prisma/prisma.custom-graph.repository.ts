@@ -19,7 +19,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
     return new PrismaCustomGraphRepository(database);
   }
 
-  async tryFindById(input: {
+  async findById(input: {
     customGraphId: string;
     projectId: string;
   }): Promise<CustomGraph | null> {

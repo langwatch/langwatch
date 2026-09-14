@@ -260,7 +260,7 @@ export class SettlementProjectService extends TestProjectApi {
     return "organization-1";
   }
 
-  override async tryGetById(id: string): Promise<Project | null> {
+  override async findById(id: string): Promise<Project | null> {
     this.reads += 1;
     return id === this.project.id ? this.project : null;
   }
@@ -314,7 +314,7 @@ class SettlementTraceService extends TraceService {
     return [];
   }
 
-  async tryGetSummary(input: { traceId: string }): Promise<TraceSummaryData | null> {
+  async findSummary(input: { traceId: string }): Promise<TraceSummaryData | null> {
     return this.summaries.get(input.traceId) ?? null;
   }
 }
@@ -368,12 +368,12 @@ class SettlementEmailCapStore extends AutomationEmailCapRepository {
   readonly claimKeys: string[] = [];
   private readonly counts = new Map<string, number>();
 
-  async trySet(key: string): Promise<string> {
+  async claim(key: string): Promise<"claimed" | "already-claimed"> {
     this.claimKeys.push(key);
-    return "OK";
+    return "claimed";
   }
 
-  async tryGet(key: string): Promise<string | null> {
+  async findValue(key: string): Promise<string | null> {
     const count = this.counts.get(key);
     return count === void 0 ? null : String(count);
   }
@@ -431,7 +431,17 @@ class SettlementObservability extends AutomationSettlementObservability {
   }
 }
 
-export function createSettlementFixture(trigger: TriggerSummary) {
+export function createSettlementFixture(trigger: TriggerSummary): {
+  service: AutomationSettlementDispatchService;
+  automation: SettlementAutomationService;
+  projects: SettlementProjectService;
+  traces: SettlementTraceService;
+  confirmation: SettlementConfirmation;
+  delivery: SettlementDelivery;
+  writer: SettlementWriter;
+  observability: SettlementObservability;
+  emailCapStore: SettlementEmailCapStore;
+} {
   const automation = new SettlementAutomationService(trigger);
   const projects = new SettlementProjectService();
   const traces = new SettlementTraceService();

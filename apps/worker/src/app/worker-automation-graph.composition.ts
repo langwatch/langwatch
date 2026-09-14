@@ -290,9 +290,11 @@ function createWorkerAutomationEmailCapRepository(
   connection: RedisConnection,
 ): AutomationEmailCapRepository {
   return {
-    trySet: (key, value, expiry, seconds, condition) =>
-      connection.set(key, value, expiry, seconds, condition),
-    tryGet: (key) => connection.get(key),
+    claim: async (key, value, expiry, seconds, condition) =>
+      (await connection.set(key, value, expiry, seconds, condition)) === null
+        ? "already-claimed"
+        : "claimed",
+    findValue: (key) => connection.get(key),
     incr: (key) => connection.incr(key),
     incrby: (key, increment) => connection.incrby(key, increment),
     eval: (script, keyCount, key, seconds) => connection.eval(script, keyCount, key, seconds),

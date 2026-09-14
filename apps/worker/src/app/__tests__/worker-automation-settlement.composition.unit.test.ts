@@ -447,7 +447,7 @@ function compose(over: ComposeOverrides = {}) {
       findById: async () => ({ id: "project-1", name: "Acme", slug: "acme" }),
     } as never,
     traces: {
-      tryGetSummary: async () => ({
+      findSummary: async () => ({
         traceId: "trace-1",
         projectId: "project-1",
         input: "hello",
@@ -482,7 +482,7 @@ function compose(over: ComposeOverrides = {}) {
     evaluations: {
       findRunsByTraceId: async () => over.evaluationRuns ?? [],
     } as never,
-    heartbeat: { tryResolveClickHouseClient: async () => null } as never,
+    heartbeat: { findClickHouseClient: async () => null } as never,
     ...(over.datasets === true ? { datasets: recordingDatasets() } : {}),
     ...(over.annotations === true
       ? { annotations: recordingAnnotations(over.heldTraceIds ?? ["trace-1"]) }

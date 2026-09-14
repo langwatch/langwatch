@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { inspectWebhookUrlShape, type WebhookUrlProblem } from "@langwatch/automation-contract";
+import { findWebhookUrlProblem, type WebhookUrlProblem } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import {
   createSsrfUrlValidator,
@@ -36,7 +36,7 @@ import {
  * THE implementation, since 2026-09-02: the platform copy it was frozen
  * against was deleted with the webhook lane. The shape
  * half is not re-implemented but IMPORTED from `@langwatch/automation-contract`,
- * the same `inspectWebhookUrlShape` the authoring drawer validates with: a
+ * the same `findWebhookUrlProblem` the authoring drawer validates with: a
  * second copy of these rules is exactly how a URL comes to be accepted by the
  * form and refused by the sender.
  *
@@ -71,7 +71,7 @@ export function inspectWebhookUrl({
   url: string;
   allowInsecureLocal: boolean;
 }): WebhookUrlProblem | null {
-  return inspectWebhookUrlShape(url, { allowInsecureOrigin: allowInsecureLocal });
+  return findWebhookUrlProblem(url, { allowInsecureOrigin: allowInsecureLocal });
 }
 
 /**

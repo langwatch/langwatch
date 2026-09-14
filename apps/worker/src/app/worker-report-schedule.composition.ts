@@ -240,8 +240,8 @@ export function createWorkerReportSchedule(
   });
 
   const deps: ReportDispatchDeps = {
-    loadTrigger: ({ projectId, triggerId }) => triggers.tryFindById({ triggerId, projectId }),
-    loadProject: (projectId) => options.projects.findById(projectId),
+    findTrigger: ({ projectId, triggerId }) => triggers.findById({ triggerId, projectId }),
+    findProject: (projectId) => options.projects.findById(projectId),
     delivery: options.delivery.delivery,
     slackProvider: AutomationSlackSecretsService.create(options.delivery.crypto),
     filterSuppressedRecipients: (input) => graphDelivery.filterSuppressed(input),
@@ -249,8 +249,8 @@ export function createWorkerReportSchedule(
     loadReportCharts: ({ projectId, source, from, to }) =>
       ReportChartService.loadReportCharts({
         deps: {
-          loadCustomGraph: ({ projectId: project, customGraphId }) =>
-            customGraphs.tryFindById({ customGraphId, projectId: project }),
+          findCustomGraph: ({ projectId: project, customGraphId }) =>
+            customGraphs.findById({ customGraphId, projectId: project }),
           loadDashboardGraphs: ({ projectId: project, dashboardId }) =>
             customGraphs.findAllByDashboardId({ dashboardId, projectId: project }),
           getTimeseries: (input) => options.analytics.getTimeseries(input),

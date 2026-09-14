@@ -44,12 +44,12 @@ class TestRunawaySignals
     if (this.failEmail) throw new Error("mailer down");
     await this.emailed(input);
   }
-  async resolveNextStep(): Promise<AutomationLimitNextStep | undefined> {
+  async findNextStep(): Promise<AutomationLimitNextStep | undefined> {
     return this.nextStep();
   }
-  async tryClaimOnce(key: string): Promise<{ key: string; token: string } | null> {
+  async claimOnce(key: string): Promise<{ key: string; token: string } | "already-claimed"> {
     this.calls.push(`claim:${key}`);
-    if (this.claimed.has(key)) return null;
+    if (this.claimed.has(key)) return "already-claimed";
     this.claimed.add(key);
     return { key, token: key };
   }

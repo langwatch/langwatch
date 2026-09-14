@@ -73,15 +73,15 @@ function makeDeps({
     triggerSent: {
       findProjectsWithGraphTriggers: async () => [BROKEN, HEALTHY],
       findProjectsWithOpenGraphTriggerSent: async () => new Set(),
-      tryFindGraphTriggerSource: async () => "trace",
+      findGraphTriggerSource: async () => "trace",
       findOpenTriggerIdsForProject: async () => new Set(),
-      tryFindOpenForGraphAlert: async () => null,
-      tryFindLatestForGraphAlert: async () => null,
-      tryClaimOpenForGraphAlert: async () => null,
+      findOpenForGraphAlert: async () => null,
+      findLatestForGraphAlert: async () => null,
+      claimOpenForGraphAlert: async () => "already-claimed" as const,
       deleteOpenClaim: async () => undefined,
       markResolvedById: async () => undefined,
     } satisfies GraphTriggerSentRepository,
-    heartbeat: { tryResolveClickHouseClient: async () => clickHouse },
+    heartbeat: { findClickHouseClient: async () => clickHouse },
     logger: new SilentAutomationLogger(),
   };
 }

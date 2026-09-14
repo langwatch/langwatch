@@ -21,7 +21,7 @@ describe("given the memory automation repositories", () => {
       const repositories = MemoryAutomationRepositories.create();
       const created = await repositories.triggers.create(trigger);
 
-      const found = await repositories.triggers.tryFindById({
+      const found = await repositories.triggers.findById({
         triggerId: created.id,
         projectId: "project-1",
       });

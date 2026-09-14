@@ -3,7 +3,7 @@ export type UnsubscribeNames = {
   triggerName: string | null;
 };
 export abstract class EmailSuppressionNameRepository {
-  abstract tryLookupNames(input: {
+  abstract findNames(input: {
     projectId: string;
     triggerId: string | null;
   }): Promise<UnsubscribeNames | null>;

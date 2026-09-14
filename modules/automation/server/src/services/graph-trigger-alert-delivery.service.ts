@@ -29,7 +29,7 @@ function graphAlertFireDigest(input: {
 
 /** Why an evaluation was skipped, when the predicate is one that cannot fire
  *  on an empty result. */
-function tryNoDataDetail(operator: string, threshold: number): string | undefined {
+function findNoDataDetail(operator: string, threshold: number): string | undefined {
   return isNoDataPredicate({ operator, threshold }) ? "no-data predicate" : undefined;
 }
 
@@ -53,17 +53,17 @@ export class GraphTriggerAlertDeliveryService {
     }
 
     const botDestination = this.botDestination(plan);
-    const previousFire = await plan.request.deps.triggerSent.tryFindLatestForGraphAlert({
+    const previousFire = await plan.request.deps.triggerSent.findLatestForGraphAlert({
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
       customGraphId: plan.customGraphId,
     });
-    const claim = await plan.request.deps.triggerSent.tryClaimOpenForGraphAlert({
+    const claim = await plan.request.deps.triggerSent.claimOpenForGraphAlert({
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
       customGraphId: plan.customGraphId,
     });
-    if (!claim) {
+    if (claim === "already-claimed") {
       return this.alreadyFiring(plan, values.currentValue);
     }
 
@@ -80,7 +80,7 @@ export class GraphTriggerAlertDeliveryService {
       return null;
     }
 
-    const token = plan.request.deps.slackTokens.tryDecrypt(params);
+    const token = plan.request.deps.slackTokens.findDecryptedToken(params);
     const channel = params.slackChannelId?.trim();
     if (!token || !channel) {
       throw plan.request.deps.dispatchErrors.createTerminal(
@@ -210,7 +210,7 @@ export class GraphTriggerAlertDeliveryService {
       ...plan.request,
       status: "fired",
       value,
-      detail: tryNoDataDetail(plan.operator, plan.threshold),
+      detail: findNoDataDetail(plan.operator, plan.threshold),
       didSend: true,
       renderErrors: result.renderErrors,
       missingVariables: result.missingVariables,

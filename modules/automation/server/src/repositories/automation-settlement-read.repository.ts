@@ -37,7 +37,7 @@ export class AutomationTraceRecordUnavailableError extends Error {
 }
 
 export abstract class AutomationSettlementTraceReader {
-  abstract tryGetSummary(input: {
+  abstract findSummary(input: {
     projectId: string;
     traceId: string;
   }): Promise<TraceSummaryData | null>;

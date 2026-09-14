@@ -11,7 +11,7 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
     return new MemoryCustomGraphRepository(memory);
   }
 
-  tryFindById(input: { customGraphId: string; projectId: string }): Promise<CustomGraph | null> {
+  findById(input: { customGraphId: string; projectId: string }): Promise<CustomGraph | null> {
     const row = this.memory.customGraphs.find(
       (graph) => graph.id === input.customGraphId && graph.projectId === input.projectId,
     );
@@ -22,7 +22,7 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
     customGraphId: string;
     projectId: string;
   }): Promise<boolean> {
-    return (await this.tryFindById(input)) !== null;
+    return (await this.findById(input)) !== null;
   }
 
   findAllNamesByIds(input: {

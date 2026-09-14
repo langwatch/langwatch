@@ -88,7 +88,7 @@ export interface AutomationTriggerMatchRecorder {
  * structurally so an application composition is unchanged.
  */
 export interface AutomationEvaluationTraceSummary {
-  tryGetSummary(input: {
+  findSummary(input: {
     projectId: string;
     traceId: string;
   }): Promise<TraceSummaryData | null>;
@@ -276,8 +276,8 @@ export interface AutomationRunawayPort {
    * Where this project's organization can go for a higher ceiling. Called
    * only for a `ceiling_reached` breach, never for a pause.
    */
-  resolveNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined>;
-  tryClaimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | null>;
+  findNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined>;
+  claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed">;
   releaseClaim(lease: ClaimLease): Promise<void>;
   projectName(projectId: string): Promise<string>;
   automationUrl(params: { projectId: string; triggerId: string }): Promise<string>;
@@ -335,14 +335,14 @@ export interface TestFireWebhook {
 
 
 export interface AutomationEmailCapStore {
-  trySet(
+  claim(
     key: string,
     value: string,
     expiry: "EX",
     seconds: number,
     condition: "NX",
-  ): Promise<string | null>;
-  tryGet(key: string): Promise<string | null>;
+  ): Promise<"claimed" | "already-claimed">;
+  findValue(key: string): Promise<string | null>;
   incr(key: string): Promise<number>;
   incrby(key: string, increment: number): Promise<number>;
   eval(script: string, keyCount: number, key: string, seconds: string): Promise<unknown>;

@@ -55,7 +55,7 @@ export function createCanonicalAutomationApp(): {
     customGraphId: null,
   } satisfies PrismaTrigger);
   const verifier: UnsubscribeTokenVerifier = {
-    tryVerify: vi.fn(() => null),
+    findVerifiedPayload: vi.fn(() => null),
   };
   const jobs: AutomationScheduledJobRepository = {
     upsertForTarget: vi.fn(async () => undefined),
@@ -84,8 +84,8 @@ export function createCanonicalAutomationApp(): {
     countProjectTraces24h: vi.fn(async () => 0),
     notificationRecipients: vi.fn(async () => []),
     sendLimitEmail: vi.fn(async () => undefined),
-    resolveNextStep: vi.fn(async () => undefined),
-    tryClaimOnce: vi.fn(async () => null),
+    findNextStep: vi.fn(async () => undefined),
+    claimOnce: vi.fn(async () => "already-claimed" as const),
     releaseClaim: vi.fn(async () => undefined),
     projectName: vi.fn(async () => "Test project"),
     automationUrl: vi.fn(async () => "https://app.test/automations"),
@@ -103,7 +103,7 @@ export function createCanonicalAutomationApp(): {
   };
   const projects: ProjectApi = {
     isPresenceEnabled: vi.fn(),
-    tryGetById: vi.fn(),
+    findById: vi.fn(),
     getOrganizationId: vi.fn(),
     findSummaryById: vi.fn(async () => ({ name: "Test project", slug: "test-project" })),
     getWithTeam: vi.fn(),
@@ -173,9 +173,9 @@ export function createCanonicalAutomationApp(): {
     logger,
     runaway,
     testFire,
-    slackTokens: { tryDecrypt: vi.fn() },
+    slackTokens: { findDecryptedToken: vi.fn() },
     dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
-    heartbeat: { tryResolveClickHouseClient: vi.fn() },
+    heartbeat: { findClickHouseClient: vi.fn() },
     redis: null,
     providers: {
       actionParamsSchemaFor: vi.fn(() => ({ safeParse: (data: unknown) => ({ success: true, data }) })),

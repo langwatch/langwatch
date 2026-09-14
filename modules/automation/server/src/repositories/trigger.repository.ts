@@ -29,9 +29,9 @@ export abstract class TriggerRepository {
   }): Promise<Set<string>>;
   abstract updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void>;
   abstract findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger>;
-  abstract tryFindById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
+  abstract findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   abstract findAllByProjectId(input: { projectId: string }): Promise<Trigger[]>;
-  abstract tryFindByCustomGraphId(input: {
+  abstract findByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null>;
