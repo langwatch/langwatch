@@ -120,14 +120,8 @@ async function withActiveSpan<T>(
 }
 
 /**
- * How long the group's retry-chain counter survives without a refresh.
- *
- * It is re-set on every retry, so it only has to outlive ONE backoff — but it
- * MUST outlive the longest one. Derived from the retry config rather than
- * picked: a fixed 600s is exactly `maxBackoffMs`, so from roughly attempt 12
- * the counter would expire during the wait, the retry would read as a fresh
- * delivery, and the fold would re-apply the batch it had already folded.
- * Pinned by retryChainInvariants.unit.test.ts.
+ * TTL for retry-chain counter; must outlive the longest backoff interval,
+ * derived from retry config to prevent fresh-delivery misreads on re-expire.
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
 
@@ -144,13 +138,8 @@ function nonEmptyString(value: unknown): string | undefined {
 }
 
 /**
- * Configuration for the group queue.
- *
- * Exported because `activeTtlSec` and the heartbeat interval derived from it
- * set the floor on how soon a dead worker's group is redispatched, and the
- * poison guard's beacon TTL has to stay under that floor to be able to observe
- * the death at all. The two constants live in different modules, so the
- * inequality between them is pinned by a test rather than by proximity.
+ * Configuration for the group queue; exported because activeTtlSec sets the
+ * floor for poison guard beacon TTL (interdependency tested across modules).
  */
 export const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
@@ -169,15 +158,8 @@ export const GROUP_QUEUE_CONFIG = {
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
 /**
- * Default byte budget for a coalesced batch when a queue enables coalescing but
- * supplies no `coalesceMaxBytes` resolver (ADR-066 pillar 2).
- *
- * 4 MiB keeps a coalesced multi-row append inside the ClickHouse async-insert
- * flush budget, so producer-side coalescing collapses many tiny appends into one
- * insert without ever assembling an insert large enough to stall the flush. It
- * is generous enough that the fold/map batches that predate ADR-066 stay bounded
- * by their count limit (`coalesceMaxBatch`) in practice, so their behaviour is
- * unchanged — the byte bound only ever binds first for a genuinely large burst.
+ * Default byte budget for coalesced batches; keeps appends inside ClickHouse
+ * async-insert flush budget (ADR-066) and doesn't affect count-limited batches.
  */
 export const DEFAULT_COALESCE_MAX_BYTES = 4 * 1024 * 1024;
 
