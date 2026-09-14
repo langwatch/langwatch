@@ -4,8 +4,9 @@ import {
   type Plan,
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createTestLogger } from "@langwatch/test-harness";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { entitlementServer } from "../../entitlement.server.ts";
@@ -16,7 +17,6 @@ import { MemoryUsageMembershipRepository } from "../../repositories/memory/memor
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,
-  TestUsageCounter,
   TestUsageWarnings,
 } from "./entitlement.fixture.ts";
 
@@ -68,36 +68,62 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
 }
 
 describe("entitlement app installation", () => {
-  it("installs a working capability in the api role", async () => {
-    const runtime = await createApp({ role: "api", config: {} })
-      .withInfrastructure({
-        baseline: free,
-        counter: TestUsageCounter.create(120),
-        warnings: TestUsageWarnings.create(),
+  /**
+   * @scenario "The core baseline works without enterprise sources"
+   * `EntitlementApp` declares `reads("logger")` and no license/subscription
+   * dependency at all, so a plain boot — no Enterprise packages composed —
+   * still resolves a plan instead of crashing on an undefined baseline
+   * (the measured defect: `entitlement.service.ts:70`, "Cannot use 'in'
+   * operator to search for 'resolve' in undefined").
+   */
+  it.each(["api", "worker"] as const)(
+    "installs a working capability in the %s role, with no enterprise sources composed",
+    async (role) => {
+      const { logger } = createTestLogger();
+      const runtime = await createApp({
+        role,
+        config: { entitlement: { isSaas: true, processName: "test" } },
+        members: membersFrom({ logger }),
       })
-      .withProvided(UserApi, createEntitlementTestUsers())
-      .withModules([withMemoryRepositories(entitlementServer)])
-      .boot();
+        .withProvided(UserApi, createEntitlementTestUsers())
+        .withModules([withMemoryRepositories(entitlementServer)])
+        .boot();
 
-    try {
-      const app = runtime.service(EntitlementApi);
+      try {
+        const app = runtime.service(EntitlementApi);
 
-      expect(runtime.module(entitlementServer).provided).toBe(app);
+        expect(runtime.module(entitlementServer).provided).toBe(app);
 
-      await expect(app.getActivePlan({ organizationId: "organization-1" })).resolves.toMatchObject({
-        type: "FREE",
-        planSource: "free",
-      });
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({
+          type: "FREE",
+          planSource: "free",
+        });
 
-      await expect(app.getUsage({ organizationId: "organization-1" })).resolves.toMatchObject({
-        currentMonthMessagesCount: 120,
-        membersCount: 0,
-        usageUnit: "traces",
-      });
-    } finally {
-      await runtime.stop();
-    }
-  });
+        // The month's volume needs an Enterprise billing rollup this role
+        // never composes, so it answers the honest "could not count" (`null`
+        // on the wire) rather than a confident zero.
+        await expect(app.getUsage({ organizationId: "organization-1" })).resolves.toMatchObject({
+          currentMonthMessagesCount: null,
+          membersCount: 0,
+          usageUnit: "traces",
+        });
+
+        // The approaching-limit mail needs the same Enterprise gateway, so it
+        // refuses by name rather than reporting that it sent something.
+        await expect(
+          app.sendUsageLimitWarning({
+            organizationId: "organization-1",
+            currentMonthMessagesCount: 900,
+            maxMonthlyUsageLimit: 1_000,
+          }),
+        ).rejects.toMatchObject({ code: "service_unavailable" });
+      } finally {
+        await runtime.stop();
+      }
+    },
+  );
 
   describe("given a plan resolved for the operator behind a request", () => {
     /** @scenario "An impersonating operator is resolved through the user directory" */

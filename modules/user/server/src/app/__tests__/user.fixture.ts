@@ -1,7 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
@@ -134,7 +133,7 @@ export function createUserTestApp(
     }>;
   }> = {},
 ): UserApp {
-  return UserApp.create({
+  return UserApp.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
     members: createUserTestInfrastructure(input.members ?? {}),
     dependencies: {
@@ -142,7 +141,5 @@ export function createUserTestApp(
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       ops: input.dependencies?.ops ?? createUserTestOps(),
     },
-    config: void 0,
-    resources: new ResourceScope(),
   });
 }

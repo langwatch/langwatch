@@ -91,6 +91,16 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       virtualKeyPepper: config.virtualKeyPepper,
       spendSettlementGraceMs: config.spendSettlementGraceMs,
     },
+    /** The passkey offer and the budget deep link answer from the session door's own config. */
+    user: {
+      passkeysEnabled: config.browserSession?.passkeysEnabled ?? false,
+      baseUrl: config.browserSession?.publicBaseUrl ?? null,
+    },
+    /** Plan resolution's deployment facts: the hosted flag and the process's name in refusals. */
+    entitlement: {
+      processName: config.serviceName,
+      isSaas: config.infrastructure.modelProvider.isSaas,
+    },
     /** The address a dataset deep link is built under: this deployment's public one. */
     ...(config.infrastructure.execution.publicBaseUrl
       ? { dataset: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }

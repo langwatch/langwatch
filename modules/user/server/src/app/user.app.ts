@@ -8,10 +8,13 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
-import type { ProjectIdentity } from "@langwatch/project-contract";
+import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { passwordProblem } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { ValidationError } from "@langwatch/handled-error";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { z } from "zod";
+import { buildUserInfrastructure } from "./user-composition.build.ts";
 import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
@@ -343,27 +346,81 @@ interface UserAppDependencies {
   organizations: OrganizationApi;
 }
 
+/**
+ * Config schema: whether this deployment offers passkeys, and the public
+ * base URL a budget-increase deep link is built under. Both default to the
+ * "not configured" answer rather than refusing at boot, because a process
+ * that composes neither still composes every other user capability.
+ */
+const userAppConfigSchema = z
+  .object({
+    passkeysEnabled: z.boolean().default(false),
+    baseUrl: z.string().nullable().default(null),
+  })
+  .default({ passkeysEnabled: false, baseUrl: null });
+export type UserAppConfig = z.infer<typeof userAppConfigSchema>;
+
 type UserSetup = FeatureSetup<
-  {
-    auth: typeof AuthApi;
-    organizations: typeof OrganizationApi;
-    ops: typeof OpsApi;
-  },
-  UserInfrastructure,
-  undefined,
+  typeof UserApp.dependencies,
+  MembersRead<typeof UserApp.reads>,
+  UserAppConfig,
   UserRepositories
 >;
 
 export class UserApp implements UserApi {
   static readonly contract = UserApi;
-  static readonly configSchema = undefined;
+  static readonly configSchema = userAppConfigSchema;
+  static readonly reads = reads("prisma", "redis");
   static readonly dependencies: {
     auth: typeof AuthApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
-  } = { auth: AuthApi, organizations: OrganizationApi, ops: OpsApi };
+    projects: typeof ProjectApi;
+  } = { auth: AuthApi, organizations: OrganizationApi, ops: OpsApi, projects: ProjectApi };
 
-  static create({ members, dependencies, repositories }: UserSetup): UserApp {
+  static create(setup: UserSetup): UserApp {
+    const members = buildUserInfrastructure({
+      prisma: setup.members.prisma,
+      redis: setup.members.redis,
+      config: setup.config,
+      dependencies: {
+        auth: setup.dependencies.auth,
+        organizations: setup.dependencies.organizations,
+        projects: setup.dependencies.projects,
+      },
+    });
+
+    return UserApp.#build({
+      members,
+      dependencies: setup.dependencies,
+      repositories: setup.repositories,
+    });
+  }
+
+  /**
+   * The application over a hand-supplied infrastructure bag, for a suite
+   * that exercises the App directly rather than through a booted process.
+   * Nothing here builds `UserInfrastructure` — the caller supplies the whole
+   * shape, exactly as `create` itself did before this module built its own
+   * collaborators from declared reads.
+   */
+  static createForTesting(setup: {
+    repositories: UserRepositories;
+    dependencies: UserAppDependencies;
+    members: UserInfrastructure;
+  }): UserApp {
+    return UserApp.#build(setup);
+  }
+
+  static #build({
+    members,
+    dependencies,
+    repositories,
+  }: {
+    members: UserInfrastructure;
+    dependencies: UserAppDependencies;
+    repositories: UserRepositories;
+  }): UserApp {
     const now = members.now;
 
     return new UserApp(

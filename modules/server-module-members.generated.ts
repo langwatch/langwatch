@@ -21,7 +21,7 @@ export const serverModuleMembers = {
   "data-privacy": [],
   "data-retention": ["clickhouse"],
   dataset: [],
-  entitlement: [],
+  entitlement: ["logger"],
   evaluation: [],
   evaluator: ["prisma"],
   experiment: ["clickhouse", "logger", "prisma"],

@@ -5,15 +5,14 @@ import type {
   UsageLimitWarning,
   UsageUnit,
 } from "@langwatch/entitlement-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import {
   USAGE_UNKNOWN,
-  UsageCounter,
+  type UsageCounter,
   type UsageCount,
 } from "../entitlement.members.ts";
-import { UsageWarning } from "../entitlement.members.ts";
+import type { UsageWarning } from "../entitlement.members.ts";
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import { EntitlementApp, type EntitlementInfrastructure } from "../entitlement.app.ts";
@@ -77,7 +76,7 @@ export function createEntitlementTestApp(
     dependencies?: Partial<{ users: UserApi }>;
   }>,
 ): EntitlementApp {
-  return EntitlementApp.create({
+  return EntitlementApp.createForTesting({
     repositories: input.repositories ?? MemoryEntitlementRepositories.create(),
     members: {
       ...input.members,
@@ -85,7 +84,5 @@ export function createEntitlementTestApp(
       warnings: input.members.warnings ?? TestUsageWarnings.create(),
     },
     dependencies: { users: input.dependencies?.users ?? createEntitlementTestUsers() },
-    config: void 0,
-    resources: new ResourceScope(),
   });
 }

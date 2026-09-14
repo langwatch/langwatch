@@ -1,23 +1,55 @@
 import { AuthApi } from "@langwatch/auth-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
+import { hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
 
 import { userServer } from "../../user.server.ts";
 import {
   createUserTestAuth,
-  createUserTestInfrastructure,
   createUserTestOps,
   createUserTestOrganizations,
 } from "./user.fixture.ts";
 
+/**
+ * The narrow slice of a generated Prisma client the organization directory
+ * reads, faked so the installation test can boot `UserApp` on its `prisma`
+ * member without a real database. Nothing this test does reaches these
+ * tables, so every read answers "not found".
+ */
+function fakeUserPrisma(): PrismaClient {
+  return {
+    organizationUser: { findFirst: async () => null },
+    organization: { findUnique: async () => null },
+    project: { findFirst: async () => null },
+  } as unknown as PrismaClient;
+}
+
+/** The fixed-window counter's own three calls, faked to always allow. */
+function fakeUserRedis(): RedisConnection {
+  return {
+    incr: async () => 1,
+    expire: async () => undefined,
+    ttl: async () => -1,
+  } as unknown as RedisConnection;
+}
+
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
+  return createApp({
+    role,
+    config: { user: {} },
+    members: membersFrom({ prisma: fakeUserPrisma(), redis: fakeUserRedis() }),
+  })
     .withProvided(AuthApi, createUserTestAuth())
     .withProvided(OrganizationApi, createUserTestOrganizations())
     .withProvided(OpsApi, createUserTestOps())
+    .withProvided(ProjectApi, createApiFixture<ProjectApi>())
     .withModules([withMemoryRepositories(userServer)]);
 }
 
@@ -49,10 +81,13 @@ describe("user app installation", () => {
 
     try {
       const app = runtime.service(UserApi);
+      // The real bcrypt hasher this app builds from its own reads, not a
+      // fake one: a rotation must verify against the SAME stored format the
+      // credential row was minted with.
       const created = await app.createCredentialUser({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: "hashed:first",
+        passwordHash: await hash("first", 10),
       });
 
       await expect(

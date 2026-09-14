@@ -17,9 +17,12 @@ import {
   type UsageStats,
 } from "@langwatch/entitlement-contract";
 import type { PricingModel } from "@langwatch/entitlement-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
+import { z } from "zod";
+import { buildEntitlementInfrastructure } from "./entitlement-composition.build.ts";
 import type { UsageCounter } from "./entitlement.members.ts";
 import type { UsageWarning } from "./entitlement.members.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
@@ -92,17 +95,36 @@ export type EntitlementInfrastructure = Readonly<{
 /** How recent an end date has to be for the rollup to read it as "up to now". */
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
+/**
+ * Config schema: whether this is the hosted deployment, which picks the
+ * baseline (cloud free vs. self-hosted open-source) and whether a missing
+ * subscription is worth reporting; and this process's own name, which every
+ * refused capability names as the reason it cannot answer. Both default to
+ * the deleted composition's own absent-config answer.
+ */
+const entitlementAppConfigSchema = z.object({
+  isSaas: z.boolean().default(false),
+  processName: z.string().default("langwatch"),
+});
+export type EntitlementAppConfig = z.infer<typeof entitlementAppConfigSchema>;
+
 type EntitlementSetup = FeatureSetup<
   typeof EntitlementApp.dependencies,
-  EntitlementInfrastructure,
-  undefined,
+  MembersRead<typeof EntitlementApp.reads>,
+  EntitlementAppConfig,
   EntitlementRepositories
 >;
+
+/** What `dependencies` resolves to, for the direct-injection testing seam. */
+type EntitlementDependencies = EntitlementSetup["dependencies"];
 
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
   static readonly dependencies = { users: UserApi };
+  static readonly configSchema = entitlementAppConfigSchema;
+  /** The logger its absence report writes to. The literal call is what the members generator reads. */
+  static readonly reads = reads("logger");
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
@@ -126,8 +148,25 @@ export class EntitlementApp implements EntitlementApiContract {
     this.#users = dependencies.users;
   }
 
-  static create({ repositories, members, dependencies }: EntitlementSetup): EntitlementApp {
-    return new EntitlementApp(repositories, members, dependencies);
+  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementApp {
+    const infrastructure = buildEntitlementInfrastructure({ logger: members.logger, config });
+
+    return new EntitlementApp(repositories, infrastructure, dependencies);
+  }
+
+  /**
+   * Constructs the app directly over a hand-built {@link EntitlementInfrastructure},
+   * bypassing {@link buildEntitlementInfrastructure} entirely. For tests only:
+   * production always goes through `create`, so every collaborator this
+   * module composes for itself is exercised the same way a real boot
+   * exercises it.
+   */
+  static createForTesting(setup: {
+    repositories: EntitlementRepositories;
+    members: EntitlementInfrastructure;
+    dependencies: EntitlementDependencies;
+  }): EntitlementApp {
+    return new EntitlementApp(setup.repositories, setup.members, setup.dependencies);
   }
 
   async getActivePlan(input: ResolvePlanInput): Promise<Plan> {

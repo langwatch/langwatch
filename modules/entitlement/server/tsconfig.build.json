@@ -39,6 +39,12 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
