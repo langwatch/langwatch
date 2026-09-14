@@ -1,16 +1,5 @@
-/**
- * End-to-end (within one process) proof that closing the nonce-registration
- * gap actually closes it: a child's registration request, handled the exact
- * way scenario.processor.ts handles it, makes the real media listener accept
- * the matching Twilio upgrade instead of refusing it 403.
- *
- * This is deliberately NOT a mock of either half. It drives the real
- * `VoiceNonceRegistry`, the real `handleVoiceNonceRegisterMessage` (the
- * parent's IPC message handler), and the real `routeVoiceUpgrade` (the
- * listener's upgrade decision) — the same three things that must agree in
- * production for a Twilio call to connect.
- *
- * @see specs/features/agents/voice-phone.feature
+/** End-to-end nonce registration closes the gap: real child request and
+ * listener accept matching Twilio upgrade, not 403.
  */
 
 import type { ChildProcess } from "node:child_process";

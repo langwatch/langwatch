@@ -1,12 +1,5 @@
-/**
- * The queued job that grades one finished scenario run with its evaluators.
- *
- * Retries are the job's own: when the trace the run produced has not arrived
- * the worker throws `TraceDataPendingError`, and the handler queues the same
- * payload again with the next attempt number and a delay that doubles each
- * time. The last attempt records the missing data as failed results.
- *
- * @see specs/scenarios/scenario-evaluators.feature
+/** Queued job grading scenario runs; retries on TraceDataPendingError with
+ * exponential backoff until the attempt cap is reached.
  */
 
 import { createLogger } from "@langwatch/observability";

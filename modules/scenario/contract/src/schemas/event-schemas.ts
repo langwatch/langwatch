@@ -95,44 +95,18 @@ export const langwatchMetadataSchema = z.object({
    * @see specs/scenarios/scenario-version-on-runs.feature
    */
   scenarioVersion: z.number().int().optional(),
-  /**
-   * The simulation models the run plan was CONFIGURED with, stamped at queue
-   * time. Absent when the plan names none and the project default is used,
-   * and absent on runs recorded before this was stamped. Both read back as
-   * "this configuration named no model", which is what a person chose.
-   *
-   * Not the model the run resolved to: the same choice has to key the same
-   * way after a project default changes.
-   *
-   * @see specs/scenarios/run-configuration-on-runs.feature
+  /** Models configured at queue time; unchanged if project default later
+   * changes.
    */
   simulatorModel: z.string().optional(),
   judgeModel: z.string().optional(),
-  /**
-   * The simulation models the run RESOLVED, stamped at queue time: the run
-   * plan's choice, else the case's own choice, else the project default for
-   * that role.
-   *
-   * This is what a person reads back off the run. The project default changes
-   * over time, so a run that recorded only the configured value cannot say
-   * which model judged it a month later.
-   *
-   * Absent when the project had no model set for the role, and absent on runs
-   * recorded before this was stamped. Both read the same way.
-   *
-   * @see specs/scenarios/resolved-run-models-on-runs.feature
+  /** Resolved models at queue time: configured, case own choice, or project
+   * default; used in run history since project default drifts over time.
    */
   resolvedSimulatorModel: z.string().optional(),
   resolvedJudgeModel: z.string().optional(),
-  /**
-   * Who started the run: the platform user id, and the surface that person
-   * acted through. Stamped at queue time, and absent whenever the caller
-   * named no person, which is every project-key and SDK run.
-   *
-   * The id and not a name, so a run still points at the right person after
-   * they rename themselves.
-   *
-   * @see specs/scenarios/run-actor-on-runs.feature
+  /** Run starter's user id; absent for project-key and SDK runs; id not name
+   * so run still points right person after rename.
    */
   actorId: z.string().optional(),
   actorLabel: runActorLabelSchema.optional(),
@@ -173,21 +147,8 @@ export const langwatchMetadataSchema = z.object({
   isCutAtLimit: z.boolean().optional(),
 });
 
-/**
- * One participant of a run, as the code that pushed the run names it.
- *
- * The SDK reports every agent it wired into the run: the agent under test,
- * the user simulator and the judge. Only the `agent` role names what the run
- * was pointed at, so a run pushed from code can say which agent it tested
- * without the platform holding a target for it.
- *
- * `name` is the adapter's own name, or its class name when it was given none,
- * for example "AgnoAgentAdapter".
- *
- * It sits beside `name` and `description` on the metadata rather than inside
- * the reserved `langwatch` namespace, which only the platform writes.
- *
- * @see specs/features/agent-testing/results-atoms.feature
+/** One run participant: agent, user simulator, or judge. Only `agent` role
+ * names run target; lives in metadata, not langwatch namespace.
  */
 export const scenarioAgentSchema = z.object({
   name: z.string(),
@@ -207,17 +168,9 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
     .object({
       name: z.string().optional(),
       description: z.string().optional(),
-      /**
-       * One short line describing why the run was started. Any caller that can
-       * set run metadata can set it, platform or SDK.
-       *
-       * Trimmed, and dropped when it holds only spaces, so a note that arrives
-       * on an event reads the same as a note the platform stamped. The
-       * 200-character limit of the platform and CLI input paths is NOT applied
-       * here: an event is a record of a run that already happened, and
-       * refusing it over the length of its note would lose the run itself.
-       *
-       * @see specs/suites/run-note-metadata-convention.feature
+      /** Why the run started; trimmed and dropped when empty so event and
+       * platform-stamped notes read the same. No length limit: losing a run
+       * over note length is worse than unlimited notes.
        */
       note: z
         .string()
@@ -268,27 +221,8 @@ export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
   results: scenarioResultsSchema.optional().nullable(),
 });
 
-/**
- * Voice scenario `input_audio` content part — the missing WIRE leg of #4138
- * (tracked as #5149).
- *
- * Voice turns arrive as a mixed content array, e.g.
- *   `[ { type: "text", text }, { type: "input_audio", input_audio: { data, format } } ]`
- * — the shape the langwatch python-sdk emits, and the shape the typescript-sdk's
- * `convert-core-messages-to-agui-messages` translates AI-SDK audio parts to.
- *
- * Neither the AG-UI `MessageSchema` nor the tracer `chatMessageSchema` content
- * unions accept an `input_audio` part, so a voice MESSAGE_SNAPSHOT was
- * 400-rejected at the route validator (`zValidator("json", scenarioEventSchema)`
- * in `modules/scenario/server/src/transport/api-rest/scenario-event.api.ts`) BEFORE
- * `extractInlineMediaFromEvent` — which already externalizes `input_audio`
- * (`server/stored-objects/content-extractor.ts` `inputAudio`) — ever ran.
- * Accepting it here lets the payload reach that extractor so the UI render leg
- * shipped in #4138 finally has data to paint.
- *
- * Every `input_audio` field is optional so this validates BOTH the inbound
- * pre-extraction shape (`{ data, format }`) and the post-extraction rewrite
- * (`{ url, mimeType, data: undefined }`).
+/** Voice `input_audio` part: validates both pre-extraction shape
+ * `{ data, format }` and post-extraction `{ url, mimeType }`.
  */
 const inputAudioContentPartSchema = z.object({
   type: z.literal("input_audio"),
@@ -389,25 +323,8 @@ const anthropicRedactedThinkingBlockSchema = z.object({
   data: z.string(),
 });
 
-/**
- * A message in the Anthropic Messages API shape: an assistant turn made of
- * `thinking`, `text` and `tool_use` blocks, or a user turn that carries the
- * `tool_result` blocks answering those calls. An adapter that returns the
- * response of the Anthropic SDK, or the transcript of Claude Code, sends its
- * snapshots in this shape, and the transcript renderer already reads
- * `tool_use` and `tool_result` blocks.
- *
- * Neither the AG-UI message boundary nor the LangWatch `scenarioMessageSchema`
- * accepts a `tool_use` or `thinking` block, so every snapshot after the first
- * tool call was 400-rejected and the run kept only the turns before it. This
- * member sits before `scenarioMessageSchema` in the union on purpose: its `tool_result`
- * part carries `toolCallId` and `result`, so it would validate an Anthropic
- * `tool_result` block and strip its `tool_use_id` and `content`. The refine
- * keeps this member to messages that actually carry an Anthropic-only block,
- * so a plain text array keeps validating through the members that came before.
- * A text block with `citations` counts as one: no schema before this member
- * declares that field, so a cited turn routed to them would reach the
- * transcript with its citations stripped.
+/** Anthropic Messages API shape: thinking/text/tool_use blocks; validates
+ * before scenarioMessageSchema so tool_result and citations pass through.
  */
 const scenarioAnthropicMessageSchema = z.object({
   role: z.string().optional(),

@@ -37,17 +37,8 @@ export class ScenarioParameterError extends HandledError {
   }
 }
 
-/**
- * Thrown when a run supplies a value for a name nothing in it declares.
- *
- * A run reads two sets of declarations: what the scenarios in it declare, and
- * what the agent it goes against declares on its own. A name in neither is
- * refused, and the target is named because the same value can be right for
- * one agent of the run and unknown to the next.
- *
- * All three go on `meta` because the run dialog renders them: the rejected
- * names so the customer can see their typo, the declared ones so they can see
- * what they meant to type, and the target the run was refused for.
+/** Thrown when run supplies value for undeclared name; includes unknown keys,
+ * declared names, and target label on meta for the run dialog.
  */
 export class ScenarioParameterUnknownError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_unknown";
@@ -109,15 +100,8 @@ export class ScenarioParameterOptionInvalidError extends ScenarioParameterError 
   }
 }
 
-/**
- * Thrown when a parameter declared required resolved no value for the run.
- *
- * A connected agent declares one for every function parameter its own code
- * gives no default. The SDK refuses a call that carries none, so the run
- * would be queued only to fail on its first turn.
- *
- * The names are on `meta` because the run dialog renders them: the customer
- * reads which values the run still needs.
+/** Required parameter without value; declared by connected agent for
+ * parameters with no code default. Names on meta for run dialog.
  */
 export class ScenarioParameterRequiredError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_required";

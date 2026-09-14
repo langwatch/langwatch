@@ -1,18 +1,5 @@
-/**
- * Suite fields: the typed columns a test suite declares beyond situation and
- * criteria, and the value a scenario carries for each of them.
- *
- * A test suite reads like a dataset. The suite declares the fields
- * (`expected_tools`, `golden_sql`, `table_schema`), every scenario filed in it
- * carries one value per field, and an evaluator attached to the suite reads
- * those values through its mappings. A blank value is "no value": the
- * evaluator that reads it is skipped for that scenario, with a reason.
- *
- * Framework-free on purpose: the client, the domain and the run worker all
- * import it.
- *
- * @see specs/scenarios/scenario-fields.feature
- * @see specs/suites/test-suites.feature
+/** Suite fields: typed columns beyond situation/criteria; evaluators read them
+ * through mappings, blank values mean "skip this evaluator".
  */
 
 import { z } from "zod";
@@ -167,14 +154,8 @@ function coerceBooleanFieldValue(raw: unknown): boolean | undefined {
   return undefined;
 }
 
-/**
- * Turns what a person or a caller typed into the field's own type.
- *
- * `undefined` means "no value": an empty string, a blank string, and a value
- * that cannot be read as the field's type all come back as that. A number
- * field accepts a number or a numeric string; a boolean field accepts a
- * boolean or the words true, false, yes and no; a text field accepts any
- * scalar and stores its text.
+/** Coerce input to field type; undefined means no value (blank or unparseable).
+ * Number and boolean accept words; text accepts any scalar.
  */
 export function coerceFieldValue({
   definition,

@@ -1,17 +1,5 @@
-/**
- * The voice worker's per-call nonce registry.
- *
- * A phone job, running in the parent worker process, mints a single-use nonce
- * and registers it here against the scenario child it spawned, then tells Twilio
- * to dial back `wss://<host>/twilio/<nonce>`. When that upgrade arrives, the
- * media listener {@link ../workers/voice-ws-listener} consumes the nonce and
- * hands the raw socket to the owning child.
- *
- * Nonces are single-use and time-boxed: a call that never connects leaves no
- * open door, and a replayed nonce finds nothing. Registering the child is
- * slice 2's job (the phone runner); this registry and the listener that reads
- * it are slice 3, and both are inert until a phone job registers a nonce.
- */
+// Voice worker's per-call nonce registry. Phone jobs register nonces against spawned children;
+// media listener consumes nonce and hands socket to owning child. Single-use, time-boxed.
 
 import type { ChildProcess } from "node:child_process";
 

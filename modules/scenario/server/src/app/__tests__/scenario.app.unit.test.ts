@@ -223,8 +223,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("given a run carrying nothing but its target", () => {
     /**
-     * @scenario "A run queued without a note records metadata identical to
-     * before notes existed"
+     * @scenario "A run queued without a note records metadata identical to before notes existed"
      */
     it("records only the reserved namespace", async () => {
       const { queue, metadata } = harness();

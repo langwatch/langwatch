@@ -329,7 +329,9 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
     afterEach(() => vi.unstubAllGlobals());
 
     describe("when the conversation has no audio", () => {
-      /** @scenario "Recording unavailable leaves the transcript without a Play control or an error" */
+      /**
+       * @scenario "Recording unavailable leaves the transcript without a Play control or an error"
+       */
       it("normalises the transcript with no audio url and no error", async () => {
         mockFetchOnce({
           json: async () => ({

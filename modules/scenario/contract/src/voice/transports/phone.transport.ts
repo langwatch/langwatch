@@ -1,23 +1,5 @@
-/**
- * The phone (Twilio) transport.
- *
- * This is the ONE module in the codebase that names Twilio or touches the
- * Twilio SDK adapter. Everything above it speaks of a `VoiceTransport` and a
- * `VoiceTransportRunner`; the vendor coupling (the SDK `TwilioAgentAdapter`,
- * the a-leg outbound dial, the connect wrapping) is sealed in here, mirroring
- * {@link elevenLabsConvaiTransport}.
- *
- * A phone target is dialled from a headless scenario run in the pool child,
- * through {@link createAgentAdapter}: `connect()` starts the SDK's own local
- * media-stream server, then the wrapped connect originates the a-leg call to
- * the target number.
- *
- * There is no browser call over phone, so `assertAvailable`, `mintSession` and
- * `fetchCallRecord` throw {@link VoicePhoneTransportUnavailableError}. Those are
- * only ever reached through the browser-driven `voice-session.service.ts` flow,
- * which a phone target has no meaning in (a phone call has no browser leg and
- * the 1.7.0 SDK exposes no Twilio call-record REST surface). The headless dial
- * does NOT go through them.
+/** Twilio phone transport: vendor-specific module, one per headless run;
+ * no browser paths; headless dial through createAgentAdapter.
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -117,14 +99,8 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
   }): Promise<void>;
 };
 
-/**
- * Must return the SDK's own adapter instance, never a fresh wrapper object.
- * `withOutboundDial` below mutates a method on the instance in place for the
- * same reason: the run's role validation and the executor's voice-adapter
- * selection (`pickVoiceAdapters` / `startVoiceAdapters`) both read off THIS
- * instance's identity and its `role` property. A wrapper that copies only
- * connect/disconnect/placeCall onto a plain object silently strips `role` and
- * everything else the SDK adapter carries.
+/** SDK's own adapter instance, not a wrapper: role validation and adapter
+ * selection read instance identity and `role` property.
  */
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
   const sdk = scenarioVoice.twilioAgent(options) as unknown as SdkTwilioAdapter;
@@ -144,17 +120,8 @@ const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
  */
 export type PublicBaseUrlSource = "VOICE_PUBLIC_BASE_URL" | "BASE_HOST";
 
-/**
- * Thrown when a present `VOICE_PUBLIC_BASE_URL` or `BASE_HOST` value can't be
- * turned into an absolute `http:`/`https:` URL, even after normalization (see
- * {@link normalizeToHttpUrl}). The vendored SDK builds Twilio's media-stream
- * URL by a bare string replace (`publicBaseUrl.replace(/^https:/, "wss:")...`)
- * with no validation of its own, so a malformed base URL is not rejected here
- * — it is embedded as-is into the TwiML `<Stream url>` Twilio is told to
- * open, and only surfaces later as Twilio error 11100 ("Invalid URL format")
- * with a zero-duration call. Failing loudly at dial time, naming the
- * offending env var and value, is far better than that 120-second silent
- * timeout.
+/** Malformed VOICE_PUBLIC_BASE_URL or BASE_HOST: SDK has no validation so
+ * bad URL reaches Twilio as error 11100; fail early with env var name.
  */
 export class VoicePublicBaseUrlInvalidError extends Error {
   constructor(envVarName: PublicBaseUrlSource, value: string) {
@@ -179,16 +146,9 @@ function isValidHttpUrl(value: string): boolean {
   }
 }
 
-/**
- * Accepts an already-valid `http:`/`https:` URL unchanged. Otherwise, if
- * `value` looks like a bare host (optionally with a port and/or path, no
- * scheme, no spaces) — the shape `BASE_HOST` legitimately takes in CI
- * (`BASE_HOST: "localhost:3000"` in `langwatch-app-ci.yml`) and in local dev
- * — prepends a scheme and re-validates: `http://` for `localhost`,
- * `127.0.0.1`, or a `.localhost` hostname, `https://` for everything else.
- * Returns `undefined` when neither shape parses as an absolute http(s) URL,
- * so the caller can throw {@link VoicePublicBaseUrlInvalidError} naming the
- * original, unmodified value.
+/** Validates/normalizes URL: accepts valid http(s) as-is, prepends scheme to
+ * bare host (http for localhost, https for others), returns undefined if
+ * unparseable so caller can throw VoicePublicBaseUrlInvalidError.
  */
 function normalizeToHttpUrl(value: string): string | undefined {
   if (isValidHttpUrl(value)) return value;
@@ -203,19 +163,8 @@ function normalizeToHttpUrl(value: string): string | undefined {
   return isValidHttpUrl(candidate) ? candidate : undefined;
 }
 
-/**
- * The app's public HTTPS base URL the SDK routes Twilio's media stream to.
- * `VOICE_PUBLIC_BASE_URL` when set (the voice worker's own hostname), otherwise
- * the app's own `BASE_HOST`. Read from `process.env` directly, the same way
- * `voice-limits` reads its knobs, so the pool child and the worker both reach
- * it without threading the config object.
- *
- * A present value is normalized via {@link normalizeToHttpUrl} — a scheme-less
- * host like `localhost:3000` or `voice.example.com` is accepted and given a
- * scheme, not rejected. Only a value that still doesn't parse as an absolute
- * http(s) URL after that throws {@link VoicePublicBaseUrlInvalidError}: see
- * that error's doc comment for why. Neither variable set still resolves to
- * `undefined`, unchanged from before.
+/** App's public base URL for Twilio media stream: VOICE_PUBLIC_BASE_URL or
+ * BASE_HOST; normalized via normalizeToHttpUrl, throws if unparseable.
  */
 export function resolvePublicBaseUrl(
   processEnv: NodeJS.ProcessEnv = process.env,
@@ -298,14 +247,8 @@ function reasonOf(error: unknown): string {
   return String(error);
 }
 
-/**
- * Wrap `connect()` so connecting also originates the a-leg call to the target.
- * `connect()` alone never dials: `placeCall`'s `to` is not a constructor option,
- * so the dial is smuggled into the connect override exactly the way the
- * ElevenLabs runner smuggles its timeout handling. A connect or dial failure
- * releases the socket best-effort and surfaces with a clear prefix, so a
- * refused destination (the SDK's deny-by-default a-leg guard) or an unreachable
- * edge reads as the run's error rather than a raw socket throw.
+/** Wrap connect to also dial a-leg call; dial smuggled into override like
+ * ElevenLabs timeout; connect/dial failure releases socket, surfaces with prefix.
  */
 function withOutboundDial(
   adapter: TwilioAdapterLike,

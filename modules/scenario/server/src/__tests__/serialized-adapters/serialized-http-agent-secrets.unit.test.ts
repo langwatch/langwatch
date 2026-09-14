@@ -144,8 +144,8 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
   describe("given headers and auth fields that reference a project secret", () => {
     /**
-     * @scenario "Secret references resolve in header values and auth
-     * token, value, username, and password"
+     * @scenario "Secret references resolve in header values and auth token, value, username, and
+     * password"
      */
     it("carries the secret's value in the header value", async () => {
       const adapter = createMockHttpAgentAdapter({
@@ -160,8 +160,8 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
 
     /**
-     * @scenario "Secret references resolve in header values and auth
-     * token, value, username, and password"
+     * @scenario "Secret references resolve in header values and auth token, value, username, and
+     * password"
      */
     it("carries the secret's value in a bearer auth token", async () => {
       const adapter = createMockHttpAgentAdapter({
@@ -176,8 +176,8 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
 
     /**
-     * @scenario "Secret references resolve in header values and auth
-     * token, value, username, and password"
+     * @scenario "Secret references resolve in header values and auth token, value, username, and
+     * password"
      */
     it("carries the secret's value in an api key auth value", async () => {
       const adapter = createMockHttpAgentAdapter({
@@ -196,8 +196,8 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
 
     /**
-     * @scenario "Secret references resolve in header values and auth
-     * token, value, username, and password"
+     * @scenario "Secret references resolve in header values and auth token, value, username, and
+     * password"
      */
     it("carries the secret's value in basic auth username and password", async () => {
       const adapter = createMockHttpAgentAdapter({
@@ -217,8 +217,8 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
 
     /**
-     * @scenario "Secret references resolve in header values and auth
-     * token, value, username, and password"
+     * @scenario "Secret references resolve in header values and auth token, value, username, and
+     * password"
      */
     it("leaves the target's own auth config unresolved for the next turn", async () => {
       const agentConfig = config({

@@ -1,14 +1,5 @@
 /**
- * The one-off scenario that "Test agent" runs against an agent.
- *
- * No scenario row exists for it. The run carries a fixed scenario id, a fixed
- * conversation and its own internal set, so the execution path treats it
- * like any other run while the project gains no scenario, run plan or test
- * suite, and the results lists leave the run out.
- *
- * Pattern of the set id: __internal__${projectId}__agent-test
- *
- * @see specs/agents/agent-test-run.feature
+ * One-off scenario for agent test runs: internal set, no suite, excluded from results.
  */
 
 import { INTERNAL_SET_PREFIX } from "./scenario-set-id.ts";

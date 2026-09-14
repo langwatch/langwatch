@@ -1,25 +1,6 @@
 /**
- * The evaluators one scenario run is graded with, and whether it still owes
- * their results.
- *
- * The set is resolved once, when the run is queued, and travels on the run's
- * own events: queued carries it, finished carries it forward, the evaluation
- * job payload carries it to the worker. It holds the attachments, the
- * scenario's field values the mappings read and the definition of every
- * attached evaluator. Nothing downstream reads the suite, the run plan, the
- * scenario's fields or the saved evaluators again, so editing any of them
- * while a batch is executing changes the next runs and never the ones already
- * queued, and a retry of the evaluation job grades exactly what the first
- * attempt would have.
- *
- * A finished run that owes results is stored with the status
- * PENDING_EVALUATION, the way a scheduled run is stored QUEUED, until the
- * evaluated event records them and the gate writes the terminal status. A
- * grading job that is lost outright is recorded as errored evaluators by the
- * run execution process manager once its deadline passes, so a required
- * evaluator that never ran fails the run instead of leaving it pending.
- *
- * @see specs/scenarios/scenario-evaluation-pending.feature
+ * Evaluators a run is graded with, resolved at queue time and immutable.
+ * Owes results until evaluation job completes and gate writes terminal status.
  */
 
 import { z } from "zod";

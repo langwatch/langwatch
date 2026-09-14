@@ -1,15 +1,5 @@
-/**
- * The caller-voice configuration a scenario carries for a voice target.
- *
- * This is the simulated caller's own voice, interrupt behaviour and audio
- * effects — it lives on the SCENARIO, never on the agent, because the same
- * voice agent is phoned by different personas across scenarios.
- *
- * Client-importable (the ScenarioForm validates against the same schema the
- * server persists with), so this module stays free of server-only imports and
- * of any vendor name: the transport layer owns ElevenLabs, and the caller's
- * voice is a user-simulator TTS voice in `"provider/voice"` form (e.g.
- * `"openai/nova"`), independent of which transport reaches the agent.
+/** Caller-voice config on scenario (not agent): voice, interrupt behaviour,
+ * audio effects; client-importable, vendor-agnostic, transport-independent.
  */
 
 import { z } from "zod";
@@ -95,15 +85,8 @@ const OPENAI_CALLER_VOICE_NAMES = [
   "verse",
 ] as const;
 
-/**
- * The caller voices offered in the Voice picker, listed explicitly rather than
- * derived from the model catalog: the SDK maps a caller voice to a fixed TTS
- * model and reads only the voice name, so a catalog model id (e.g.
- * `openai/tts-1`) is the wrong shape and would be sent as a nonexistent voice.
- *
- * ElevenLabs caller voices are per-account voice ids, so they are not listed
- * here; offering them is a follow-up that resolves them from the project's
- * ElevenLabs account.
+/** Explicit caller voice list (not derived from catalog): SDK needs voice name,
+ * not model id; ElevenLabs voices are per-account, not listed here.
  */
 export const CALLER_VOICES: CallerVoiceOption[] = OPENAI_CALLER_VOICE_NAMES.map(
   (name) => ({

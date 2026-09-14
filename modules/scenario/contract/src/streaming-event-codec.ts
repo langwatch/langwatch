@@ -1,18 +1,6 @@
 /**
- * Compact streaming event codec for SSE broadcasts.
- *
- * Minimises payload for high-frequency CONTENT events.
- * Single-letter keys keep JSON under 100 bytes per delta.
- *
- * Keys:
- *   e = event type  (S=start, C=content, E=end)
- *   r = scenarioRunId
- *   b = batchRunId
- *   m = messageId
- *   d = delta       (C only)
- *   c = content     (E only)
- *   l = role        (S only)
- *   i = messageIndex (S only, optional)
+ * Compact SSE streaming event codec: single-letter keys under 100 bytes per delta.
+ * Keys: e(type), r(runId), b(batchId), m(msgId), d(delta), c(content), l(role), i(index).
  */
 
 // ---------------------------------------------------------------------------

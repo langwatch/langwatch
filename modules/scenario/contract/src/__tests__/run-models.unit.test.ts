@@ -1,12 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The chain that picks the models a run runs on, and the metadata entries it
- * turns into. One definition serves the queue path and the execution prefetch,
- * so a break here makes a run say one model and run another.
- *
- * @see specs/scenarios/resolved-run-models-on-runs.feature
- * @see specs/scenarios/simulation-run-model-resolution.feature
+ * Model resolution chain for runs.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -57,7 +51,9 @@ describe("the models a run resolves", () => {
   });
 
   describe("when neither the plan nor the case names a model", () => {
-    /** @scenario "The project default answers when neither the plan nor the scenario names a model" */
+    /**
+     * @scenario "The project default answers when neither the plan nor the scenario names a model"
+     */
     it("reads the project default of each role", async () => {
       const models = await resolveRunModels({
         plan: {},

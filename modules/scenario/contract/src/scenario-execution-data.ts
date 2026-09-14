@@ -174,15 +174,8 @@ export const CodeAgentDataSchema = z.object({
    * leaves every turn doing its own work.
    */
   sandboxApiKey: z.string().optional(),
-  /**
-   * Wall-clock budget for the agent's Python, in milliseconds, sent to the
-   * engine as the code node's `timeout_ms` parameter.
-   *
-   * It can only SHORTEN the run: the code executor clamps every per-node
-   * request to the operator's ceiling
-   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset), so a value
-   * above that ceiling is silently ignored. Absent leaves the engine on the
-   * operator default.
+  /** Wall-clock budget (ms) for agent Python, clamped to engine ceiling if
+   * exceeding operator's limit.
    */
   timeoutMs: z.number().int().positive().optional(),
 });
@@ -246,18 +239,8 @@ export const ConnectedAgentDataSchema = z.object({
 });
 export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
 
-/**
- * What a voice run carries to the child: the transport, the agent id on that
- * transport (the ElevenLabs agent id, or the phone number for a phone target),
- * and the project's provider credential resolved from the model-provider row
- * (never stored on the agent). A discriminated union on `transport` so each
- * transport carries only the credential shape it can use: ElevenLabs an API key
- * and host, phone the Twilio account SID, auth token and from-number. The
- * credential is `null` when the project has no key for the transport, so the
- * child fails the run with a named reason rather than reaching the vendor with
- * an empty credential — the same way the http data carries its secrets to the
- * child.
- */
+// Voice run carries transport, agent id, and provider credential (never stored on agent).
+// When project lacks a key, child fails with a named reason instead of an empty credential.
 export const ElevenLabsVoiceTargetSchema = z.object({
   transport: z.literal("elevenlabs_convai"),
   agentId: z.string(),
@@ -292,18 +275,9 @@ export const VoiceAgentDataSchema = z.object({
   type: z.literal("voice"),
   agentId: z.string(),
   voiceTarget: VoiceTargetSchema,
-  /**
-   * Environment the SDK builds its own OpenAI client from for the simulated
-   * caller's text-to-speech and for the transcription the judge uses. Only
-   * `OPENAI_API_KEY` — transcription runs on OpenAI for every voice run, and
-   * `CALLER_VOICES` offers no ElevenLabs voice today, so no ElevenLabs key
-   * travels here. Resolved from the project's model provider rows and merged
-   * into the child env for a voice target only, mirroring the transport
-   * credential's ride-in-job-data-only handling: never logged, never in an
-   * event. Empty when the project has no OpenAI key, which the child surfaces
-   * as a named failure. Defaulted so a job queued before it existed still
-   * parses.
-   */
+  // OpenAI env for caller's TTS and transcription; merged for voice targets only.
+  // Empty when no key, surfaces as named failure. Defaulted for backward compatibility.
+
   callerEnv: z.record(z.string(), z.string()).default({}),
   /**
    * The whole-call budget in seconds (VOICE_CALL_MAX_SECONDS). The transport
@@ -435,23 +409,10 @@ export const ScriptedRunSchema = z.object({
 });
 export type ScriptedRun = z.infer<typeof ScriptedRunSchema>;
 
-/**
- * Complete data package for child process execution.
- * Contains everything needed to run a scenario without DB access.
- *
- * All three model-params fields are individually optional because the
- * producer and the consumer of a job payload can be on different builds: a
- * job queued just before the simulator/judge model split carries only
- * `modelParams`, and it must still parse and run after the deploy that
- * introduced the split. What is NOT optional is that every role ends up with
- * a model — the refinement below rejects a payload from which the simulator
- * or the judge could not be built, so that failure is a named schema error at
- * the process boundary rather than an opaque "undefined has no properties"
- * crash three layers into model construction (issue #6634).
- *
- * `selectRoleModelParams` (job-model-params.ts) applies the fallback the
- * refinement guarantees is available.
- */
+// Complete job data for child process: everything needed to run without DB access.
+// Model params are optional per role (job/consumer may be on different builds);
+// refinement ensures all roles get a model.
+
 export const ChildProcessJobDataSchema = z
   .object({
     context: ExecutionContextSchema,
@@ -466,16 +427,9 @@ export const ChildProcessJobDataSchema = z
     /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
     scenarioRunId: z.string().optional(),
     adapterData: TargetAdapterDataSchema,
-    /**
-     * Model params for the target adapter (the prompt under test). Only a
-     * prompt target ever resolves one — workflow / code / http targets send
-     * the project's platform API key instead (see
-     * serialized-adapter.registry.ts) and never consume an LLM key for the
-     * agent under test, so this is absent for them.
-     *
-     * Doubles as the legacy fallback for the two fields below: before the
-     * model split this single value drove all three agents.
-     */
+    // Model params for prompt adapter only. Legacy fallback: pre-split this drove all
+    // three roles.
+
     modelParams: LiteLLMParamsSchema.optional(),
     /**
      * Model params for the user-simulator agent. Resolved from the run-plan /

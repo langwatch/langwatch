@@ -1,42 +1,13 @@
-/**
- * Evaluator attachments: which saved evaluators a suite or a run plan runs
- * after each scenario, and where each evaluator input reads its value from.
- *
- * A mapping is stored in the shape the variable mapping picker edits, with no
- * converter between the two: `{ type: "source", sourceId, path }` or
- * `{ type: "value", value }`. The three sources are the conversation, the
- * scenario (its situation, its criteria, or one of the suite's fields) and the
- * trace the run produced (retrieved contexts, a tool call's input or output,
- * or every span of its traces as JSON).
- *
- * Mappings are inferred when an evaluator is attached. Tool calls and the
- * spans are never inferred: a wrong guess there reads the wrong call and
- * grades it, and the spans are a deliberate choice. A plan
- * level attachment never reads scenario fields, because a run plan may cover
- * scenarios from several suites with different fields.
- *
- * Framework-free on purpose: the client, the domain and the run worker all
- * import it. The one component type it names is imported as a type only.
- *
- * @see specs/suites/test-suites.feature
- * @see specs/scenarios/scenario-evaluators.feature
+/** Evaluator attachments map inputs to conversation, scenario, or trace
+ * sources; framework-free so client, domain, and worker can all import it.
  */
 
 import { z } from "zod";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
 import type { SuiteFieldDefinition } from "./suite-fields.ts";
 
-/**
- * What the variable mapping picker offers, declared here rather than imported
- * from the component that draws it. A contract that reaches into a web package
- * for a shape inverts the dependency: the picker renders what this module
- * describes, not the other way round. The underlying unions still come from
- * the workflow contract, so the two cannot drift on what a field type is.
- *
- * `modules/prompt/web/src/ui/sections/variables/variable-mapping-input.tsx`
- * declares the same two shapes for its props today. They are structurally
- * identical; pointing that component at these is a separate change, owned by
- * whoever owns that seam.
+/** Mapping picker's contract, declared here to avoid web package dependency
+ * inversion; see variable-mapping-input.tsx for alignment.
  */
 
 /** Source types aligned with DSL ComponentType + dataset. */
@@ -313,14 +284,8 @@ export function isExpectedLikeInput(id: string): boolean {
 const wordsOf = (identifier: string): string[] =>
   identifier.toLowerCase().split("_").filter(Boolean);
 
-/**
- * The one field an expected-like input reads, or none.
- *
- * An exact identifier match wins. Otherwise the input's word list is compared
- * with each field's words and a single candidate is taken; two candidates
- * mean a guess, and a guess is worse than an empty mapping the person fills
- * in. With no word match at all, a suite with exactly one field maps to it:
- * there is nothing else the input could mean.
+/** Finds field for expected-like input via exact match, word similarity, or
+ * single-field fallback.
  */
 function inferExpectedField({
   inputId,

@@ -1,14 +1,8 @@
 /**
  * @vitest-environment node
  *
- * The declared `scenarios.*` transport, exercised through the real runtime:
- * what a read-only role reaches, what a run refuses before anything is queued,
- * and what the run that survives hands the application.
- *
- * @see specs/scenarios/simulation-runner.feature
- * @see specs/scenarios/scenario-versioning.feature
- * @see specs/scenarios/scenario-version-restore.feature
- * @see specs/scenarios/scenario-test-suite-assignment.feature
+ * scenarios.* transport through real runtime: read-only reaches, run refuses queueing.
+ * See simulation-runner.feature and related scenario versioning/restore/suite features.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -201,7 +195,9 @@ describe("the scenarios tRPC transport", () => {
       expect(queued(queueSimulationRun).name).toBe("Login flow");
     });
 
-    /** @scenario "A run of a single scenario records the models the validation prefetch resolved" */
+    /**
+     * @scenario "A run of a single scenario records the models the validation prefetch resolved"
+     */
     it("hands the queued run the models the prefetch resolved", async () => {
       const { app, queueSimulationRun } = runnableApp();
       const { caller } = harness(app);

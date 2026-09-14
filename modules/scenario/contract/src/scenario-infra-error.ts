@@ -1,18 +1,6 @@
 /**
- * Classifies raw scenario-runner failures into a handled error the drawer can
- * render cleanly, instead of dumping a raw child-process stack trace at the
- * user.
- *
- * This is the persisted Scenario projection of the shared handled-error
- * model. A stable code is the discriminant; the message and optional hint are
- * safe to show.
- *
- * The module is intentionally PURE (no OpenTelemetry, no server-only imports)
- * so it is safe to import from the run drawer on the client — it only needs to
- * decode + title the envelope. The failure path (server) does the classifying
- * and encoding; the drawer (client) decodes and renders.
- *
- * @see specs/scenarios/scenario-infra-error-surfacing.feature
+ * Classifies scenario-runner failures into handled errors for client rendering.
+ * Pure module safe to import from drawer; server classifies and encodes.
  */
 
 export const CODING_ASSISTANT_SURFACES_ONLY_NEEDLE = "serves the coding-assistant surfaces only";
@@ -26,7 +14,7 @@ export const ScenarioInfraErrorCode = {
   ModelProviderError: "scenario_model_provider_error",
   /** The provider answered, but the model wrote no text at all. */
   ModelEmptyResponse: "scenario_model_empty_response",
-  /** The resolved model is licensed for the coding-assistant surfaces only and can't run this simulation. */
+  /** Model licensed for coding-assistant only, can't run other simulations. */
   ModelNotAllowedForSurface: "scenario_model_not_allowed_for_surface",
   /** The judge combined a forced function tool with incompatible reasoning. */
   ModelToolReasoningConflict: "scenario_model_tool_reasoning_conflict",
@@ -124,15 +112,8 @@ function extractProviderMessage(raw: string): string | undefined {
 }
 
 /**
- * Lines that carry no meaning for a user and expose our internals: stack
- * frames, the interpreter's own source locations, the `throw err; ^` preamble
- * Node prints above an uncaught throw, `Require stack:` path lists, and the
- * trailing runtime-version footer.
- *
- * The generic fallback picks the first line that survives this filter, so an
- * unclassified crash dump degrades to a plain sentence rather than leaking a
- * path like `node:internal/modules/cjs/loader:1520` — which is what the
- * fallback used to show for a runner that failed to boot.
+ * Filter internal stack frames and interpreter locations from crash dumps.
+ * Fallback uses first line surviving filter to avoid leaking internal paths.
  */
 const NOISE_LINE_PATTERNS = [
   /^at\s/,
@@ -156,23 +137,8 @@ function isNoiseLine(line: string): boolean {
   return NOISE_LINE_PATTERNS.some((pattern) => pattern.test(line));
 }
 
-/**
- * Anything that betrays where OUR code lives or how it is built: an
- * interpreter source location, a stack frame, our container root, or our build
- * tree and bundle filenames.
- *
- * This is the final guard on the generic bucket — the line filter above works
- * by enumeration, and enumeration always lags the next crash shape, so a
- * candidate that still matches here is dropped for a generic sentence rather
- * than shown.
- *
- * These name our own artefacts deliberately. An earlier cut matched ANY
- * two-segment slash path, which also swallowed the single most diagnostic
- * string the runner produces — the HTTP adapter's
- * `HTTP 502: … from <url> (request-id: …): <body>` (http-agent.adapter.ts).
- * That line is all the customer's own data, so suppressing it cost them the
- * status, the URL, the request id and their own error body to hide nothing.
- * A path is only an internal when it is ours.
+/** Blocks output revealing internal paths; final guard against leaking our
+ * build, container, or stack frames.
  */
 const INTERNALS_PATTERNS = [
   /\bnode:[a-z_]+/,
@@ -195,18 +161,8 @@ function bracketDelta(line: string): number {
   return (line.match(/[{[]/g)?.length ?? 0) - (line.match(/[}\]]/g)?.length ?? 0);
 }
 
-/**
- * The first line of a crash dump that reads as a human explanation.
- *
- * Node prints the error's own properties as a brace block under the stack
- * (`{ code: 'MODULE_NOT_FOUND', requireStack: [ '/app/…' ] }`). Skipping only
- * the opening brace would leave its inner lines as candidates, so the block is
- * skipped whole by depth.
- *
- * A block opens ONLY on a line that starts with `{`, which is how Node prints
- * it. Counting brackets on every line instead let a stray `[` in prose — or
- * the truncated JSON the HTTP adapter's body preview can emit — open a block
- * that never closed, swallowing the real sentence underneath it.
+/** First human-readable line of crash dump, skipping Node's brace blocks
+ * by bracket depth and stray syntax in prose.
  */
 function findMeaningfulLine(text: string): string | undefined {
   const lines = text.split("\n").map((line) => line.trim());
@@ -271,15 +227,8 @@ function extractUserCodeDetail(raw: string): string {
       !contains(line, "user code error:"),
   );
 
-  // Prefer the exception line, then the declared type, then the remaining
-  // body. `summarize` returns undefined when a candidate is nothing but
-  // noise OR when it exposes our internals, so fall through to the next
-  // candidate and, last, to the same safe generic sentence every other
-  // unreadable failure gets. Returning the raw blob here would bypass both
-  // `summarize`'s truncation and its INTERNALS_PATTERNS check — the exact
-  // leak this file exists to stop — the moment a customer's own code
-  // happens to mention something like a stack frame or a "/app/" path in
-  // its own message and every candidate above gets vetoed for it.
+  // Try exception, then type, then body; fall back to generic when all fail
+  // sanitization or contain internals patterns that would leak our infrastructure.
   for (const candidate of [
     exceptionLine,
     declaredType,
@@ -292,14 +241,8 @@ function extractUserCodeDetail(raw: string): string {
   return UNREADABLE_FAILURE_MESSAGE;
 }
 
-/**
- * Collapse a raw error blob (often a multi-line child-process dump) into a
- * single concise line: strip the "Child process exited with code N:" wrapper
- * and any runtime noise, keep the first meaningful line, drop an inline HTML
- * error document, and cap the length.
- *
- * Returns undefined when nothing but noise is left, so the caller falls back to
- * a generic sentence instead of surfacing a stack frame.
+/** Collapse raw error blob into single line, strip process wrapper and noise,
+ * drop inline HTML, cap length; return undefined when nothing but noise remains.
  */
 function summarize(raw: string): string | undefined {
   const withoutWrapper = raw.replace(/^Child process exited with code \d+:\s*/i, "").trim();
@@ -390,17 +333,8 @@ const NODE_CRASH_MARKERS = ["node:internal/modules", "Require stack:", "at Modul
  */
 const CHILD_EXIT_WRAPPER = /Child process exited with code \d+/i;
 
-/**
- * True when OUR runner process died in Node's module loader.
- *
- * Both halves are load-bearing. A Node crash dump says a Node process failed
- * to load something, not WHICH process: `http-agent.adapter.ts` embeds the
- * customer's HTTP response body verbatim in the error it throws, so a customer
- * agent that boots with its own `Cannot find module` — stack frames,
- * `Require stack:` and all — reaches this classifier looking identical.
- * Claiming "the fault is on our side" for their missing dependency would send
- * them looking in the wrong place, so the crash must ALSO carry the wrapper
- * only our own dead child gets.
+/** Our runner crashed in module loader: requires both crash marker AND the
+ * wrapper only our child process gets (not a customer's own module error).
  */
 function isOurRunnerCrash(text: string): boolean {
   return (
@@ -558,35 +492,13 @@ function modelEndpointUnreachableRule(): ClassificationRule {
 }
 
 const CLASSIFICATION_RULES: ClassificationRule[] = [
-  // Connected agent failures. The child's adapter writes
-  // `Connected agent call failed (<code>): <message>`, so the code between
-  // the brackets is the classification and the message after it is what the
-  // customer reads: the relay's own sentence, or the function's own error.
-  //
-  // Ahead of every other rule: the function's own error travels inside the
-  // message, so a handler that says it timed out, that a key is invalid, or
-  // that a session is too large would otherwise read as a platform timeout, a
-  // model-provider rejection, or a session the platform itself refused.
+  // Connected agent failures with code in brackets; must precede user-code
+  // rule so agent function errors don't read as infrastructure failures.
   ...connectedAgentRules(),
   {
-    /**
-     * MUST stay ahead of every needle-scanning rule below. Those rules scan
-     * for needles like "timed out", "ECONNREFUSED" and "fetch failed" — all
-     * of which routinely appear inside a customer's own Python traceback. The
-     * reported lw#3439 case is literally `httpx.TimeoutException: The read
-     * operation timed out`, so without this rule the customer's bug is
-     * rendered back to them as "The simulation timed out before it finished" —
-     * our infrastructure taking the blame for their code, which is the exact
-     * inversion lw#3439 is about, one layer further down than the adapter.
-     *
-     * It sits just after the connected-agent rules only because those match a
-     * different, more specific prefix (`Connected agent call failed (<code>)`)
-     * and classify by that bracketed code; a code adapter's own user-code
-     * headline never carries it, so the two cannot collide.
-     *
-     * The needle is the adapter's own headline, which is a fixed string it
-     * controls (`format-execution-error.ts`), not a guess at user content.
-     */
+    // Must precede all needle rules: customer tracebacks contain "timed out",
+    // "ECONNREFUSED" etc., so user-code failures would false-match as infra
+    // failures (lw#3439). Uses fixed adapter headline, not user content.
     needles: ["user code raised an error during execution"],
     build: (text) => ({
       code: ScenarioInfraErrorCode.UserCodeError,
@@ -827,14 +739,8 @@ export function decodeScenarioError(raw: string | undefined | null): ScenarioErr
   };
 }
 
-/**
- * Pull the human-readable text out of a run's raw error string.
- *
- * Runs report errors in a few shapes: the scenario SDK stores a serialized
- * `{ name, message, stack }` JSON (via the ingest path), while a child crash may
- * be a plain string. We take the `message` (falling back to `stack`, then the
- * raw string) so the classifier sees the real failure text, never a bare
- * `{name,message,stack}` wrapper.
+/** Extract human text from run's error string: prefers `message` from JSON,
+ * falls back to `stack` then raw string (not bare `{name,message,stack}`).
  */
 export function extractScenarioErrorText(raw: string): string {
   const trimmed = raw.trim();

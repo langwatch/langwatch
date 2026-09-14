@@ -284,7 +284,9 @@ describe("phoneTransport", () => {
     });
 
     describe("when VOICE_PUBLIC_BASE_URL is unset", () => {
-      /** @scenario "VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host" */
+      /**
+       * @scenario "VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host"
+       */
       it("falls back to the app's own base host", () => {
         expect(
           resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" }),
@@ -450,7 +452,9 @@ describe("phoneTransport", () => {
         );
       });
 
-      /** @scenario "The default phone factory translates shouldRecord to the SDK's record option" */
+      /**
+       * @scenario "The default phone factory translates shouldRecord to the SDK's record option"
+       */
       it("translates shouldRecord to the SDK's record option on placeCall, without leaking shouldRecord through", async () => {
         const placeCall = vi.fn(async (_args: SdkPlaceCallArgs) => {});
         const sdkAdapter = {
@@ -479,7 +483,10 @@ describe("phoneTransport", () => {
         expect(call).not.toHaveProperty("shouldRecord");
       });
 
-      /** @scenario "The default phone factory still delegates connect and disconnect to the SDK adapter" */
+      /**
+       * @scenario "The default phone factory still delegates connect and disconnect to the SDK
+       * adapter"
+       */
       it("still delegates connect and disconnect to the SDK adapter", async () => {
         const connect = vi.fn(async () => {});
         const disconnect = vi.fn(async () => {});

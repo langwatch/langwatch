@@ -1,16 +1,5 @@
-/**
- * The one voice agent type, and the transports it can be reached through.
- *
- * The transport is a discriminated union inside the agent's `config`, so a
- * later transport (phone) is a new member here rather than a new agent type or
- * a new component. No vendor name leaks past this module: everything else
- * speaks of a "voice" agent and a {@link VoiceTransport}, and only the
- * transport members name ElevenLabs.
- *
- * Contract-legal: schemas and pure functions over a stored config value, with
- * no persistence, no credential and no transport of its own. Both the drawer
- * and the server validate an agent's config against this one schema.
- */
+// Voice agent type and transports. Transport is discriminated union inside config.
+// Contract-legal: schemas and pure functions only, no persistence/credential/transport.
 
 import { z } from "zod";
 import type { VoiceTransport } from "./voice-transport.ts";

@@ -1,19 +1,4 @@
-/**
- * Runs the evaluators attached to a finished scenario run and records their
- * results on the run.
- *
- * The worker behind the scenario evaluations job. It loads the scenario and
- * the run's own state, takes the attachments, the scenario's field values and
- * the evaluator definitions the job carries, resolves every mapping, runs
- * each evaluator through the shared evaluation runner, writes each evaluation
- * that ran on the run's last trace, and records one result per attachment
- * through the record evaluations command, which applies the gate.
- *
- * Every dependency is an interface the composition root fills in, so the
- * orchestration is testable with stubs.
- *
- * @see specs/scenarios/scenario-evaluators.feature
- */
+/** Runs scenario evaluators for a finished run and records their results. */
 
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -143,14 +128,8 @@ export class TraceDataPendingError extends Error {
   }
 }
 
-/**
- * The evaluators one run is graded with: the attachments of its suite and its
- * plan, the scenario's field values the mappings read and the definition of
- * every attached evaluator the project holds.
- *
- * Read when the run is queued, so what the run is graded with is fixed
- * before it executes, and again when a run that never passed through the
- * queue command finishes.
+/** Loads evaluators, attachments, field values, and evaluator definitions
+ * for a run; fixed at queue time before execution.
  */
 export async function loadRunAttachments({
   deps,
@@ -663,16 +642,8 @@ async function buildRunContext({
   };
 }
 
-/**
- * Runs the evaluators of one finished run and records the results.
- *
- * Every attachment's inputs are resolved before any evaluator runs. On any
- * attempt but the last, a trace that has not arrived throws
- * `TraceDataPendingError` before a single evaluator executes and before
- * anything is recorded, so the whole run is graded in one go once the data
- * is there and no evaluator is paid for twice. On the last attempt the
- * missing data is recorded as a failed result with its reason and every
- * other evaluator runs.
+/** Runs evaluators for a finished run; throws TraceDataPendingError if trace
+ * is missing on non-final attempts, records missing data as failed on final.
  */
 export async function runScenarioEvaluations({
   deps,

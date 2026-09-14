@@ -12,14 +12,8 @@ export const scenarioEvaluationsJobPayloadSchema = z.object({
   suiteId: z.string().nullable(),
   /** The suite or run plan the run was filed under, when it was. */
   planId: z.string().nullable(),
-  /**
-   * The evaluators the run is graded with, as they stood when it was queued.
-   * Carried on the payload so every retry grades the same set, and so an edit
-   * to the suite or the plan while the run executes never changes what an
-   * existing run is graded against.
-   *
-   * Optional for a job queued before this was carried; such a job reads the
-   * suite and the plan when it runs.
+  /** Evaluators as they stood at queue time, so retries grade consistently
+   * despite suite or plan edits while the run executes.
    */
   attachments: evaluatorAttachmentsSchema.optional(),
   /**

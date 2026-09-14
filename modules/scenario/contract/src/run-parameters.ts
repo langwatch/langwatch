@@ -1,19 +1,5 @@
-/**
- * Resolves the parameter values a run uses, and refuses the run when they
- * cannot produce a scenario the target and the judge can read.
- *
- * Every check happens here, before anything is scheduled: a run either starts
- * whole or is rejected whole. A batch that scheduled half its jobs and then
- * discovered a typo in a parameter name would leave the customer reading a
- * partially-executed run and guessing which half is real.
- *
- * Secret values are split out here too, before the first merge. What comes back
- * for a scenario is a pair: the plain values, which render its text and reach
- * the child as `params`, and the secret values, which reach the child as
- * `secrets` and are encrypted by the caller before anything is recorded.
- *
- * @see specs/scenarios/scenario-run-parameters.feature
- * @see specs/scenarios/secret-run-parameters.feature
+/** Resolves run parameters upfront; splits secrets before first merge. Fails
+ * whole if any parameter invalid, not partially.
  */
 
 import {
@@ -51,14 +37,8 @@ export type ResolvedScenarioParameters = {
   secretParameters: Record<string, string>;
 };
 
-/**
- * Refuses the run when the caller named something nothing in it declares.
- *
- * A name the run cannot act on is almost always a typo, and a run that
- * silently ignored it would report a pass for values the target never saw.
- * The declarations read are the scenarios' own plus the target's, so the
- * refusal names the target: the same value can be right for one agent of the
- * run and unknown to the next.
+/** Refuses run when caller names parameter nothing declares; likely typo that
+ * would silently pass with unseen values.
  */
 function assertEveryNameIsDeclared({
   declaredNames,
@@ -80,13 +60,8 @@ function assertEveryNameIsDeclared({
   });
 }
 
-/**
- * Refuses the run when a supplied value is outside the closed option list a
- * parameter declares.
- *
- * Checked on the supplied values alone: a default is one of the options by
- * construction, and a value the run never named cannot be wrong. The first
- * declaration of a name that lists options is the one that decides.
+/** Refuses run when supplied value violates closed option list; checks only
+ * supplied values, not defaults.
  */
 function assertEveryValueIsAnOption({
   definitions,
@@ -176,14 +151,8 @@ function assertEverySecretHasAValue({
   throw new ScenarioSecretParameterMissingError({ names: missing });
 }
 
-/**
- * Refuses the run when a scenario's own text cannot be rendered against the
- * values it resolved, naming which part of the scenario could not be.
- *
- * `declaredNames` still carries the secret names even though `parameters` does
- * not hold their values. That is what turns a `params.SECRET` reference into a
- * reported missing name here, which this then raises as the dedicated error
- * instead of asking the customer for a value that would be refused anyway.
+/** Refuses run when scenario text cannot render against resolved values;
+ * catches secrets referenced in text as dedicated error.
  */
 async function assertScenarioTextRenders({
   scenario,
@@ -235,24 +204,8 @@ function secretValuesFor({
   return resolved;
 }
 
-/**
- * Merges the supplied values over each scenario's declared defaults, and takes
- * the secret ones out of that merge.
- *
- * @throws {ScenarioParameterUnknownError} when a supplied name is declared by
- *   no scenario in the run and by no target of it.
- * @throws {ScenarioSecretParameterConflictError} when one name is declared
- *   secret by one scenario in the run and plain by another.
- * @throws {ScenarioSecretParameterMissingError} when a declared secret has no
- *   text value for this run.
- * @throws {ScenarioParameterRequiredError} when a parameter declared required
- *   resolved no value for this run.
- * @throws {ScenarioSecretParameterInTextError} when a scenario's own text
- *   reads a secret parameter.
- * @throws {ScenarioParameterMissingError} when a scenario's own text reads a
- *   parameter the run resolved no value for.
- * @throws {ScenarioParameterTemplateInvalidError} when a scenario that
- *   declares parameters has text the template engine cannot render.
+/** Merges supplied values over declared defaults, separates secrets, and
+ * validates all parameters for each scenario.
  */
 export async function resolveRunParameters({
   scenarios,

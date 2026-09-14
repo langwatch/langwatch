@@ -1,13 +1,5 @@
-/**
- * The service behind "Talk to it": mint a browser call session, and ingest the
- * finished call as a run.
- *
- * Written against injected infrastructure (credential lookup, run existence,
- * agent creation, run writer, clock, id) so the orchestration — no-key refusal,
- * idempotent ingestion, agent auto-create, provider-vs-browser record — is
- * unit-tested with fakes and the route wires the real ones. Nothing here names
- * a vendor: the transport does, behind {@link voiceTransportRegistry}.
- */
+// Service for "Talk to it": mint browser call sessions and ingest finished calls as runs.
+// Infrastructure injection enables unit testing with fakes; transports plugged via registry.
 
 import { HandledError } from "@langwatch/handled-error";
 
@@ -285,19 +277,8 @@ export interface MintResult {
   connect: { signedUrl: string };
 }
 
-/**
- * Ask the transport for a signed URL and return only what the browser needs to
- * open the call. When the drawer already has a saved agent row, the vendor
- * agent id is read off that row rather than trusted from the request, so a
- * mint against a saved agent can only ever open a call against the agent this
- * project actually saved there (AC13/AC29). When there is no row yet (an
- * unsaved draft — AC5's "Talk to it without saving first"), the vendor id
- * comes from the request body, exactly as before mint had a row to check
- * against; the row itself is created at finish. Throws
- * {@link VoiceAgentRowNotFoundError} when a named row is missing or not a
- * voice agent, {@link VoiceKeyMissingError} when the project has no key, or
- * {@link VoiceMintFailedError} when the provider refuses.
- */
+// Ask transport for signed URL. Vendor agent id from saved row if present; from request if draft.
+// Throws VoiceAgentRowNotFoundError, VoiceKeyMissingError, or VoiceMintFailedError.
 export async function mintVoiceSession({
   ports,
   projectId,
@@ -515,15 +496,8 @@ function assertProviderRecordMatchesToken(
   }
 }
 
-/**
- * The record the run is written from: the provider's when it holds turns, else
- * the browser transcript.
- *
- * A provider record with no turns loses the conversation: right after hang-up
- * ElevenLabs can answer with a finished-looking record whose transcript is
- * still empty. When the browser captured turns, keep them rather than write an
- * empty run the reader sees as "no response" (#8019).
- */
+// Record to write: provider's when it holds turns, else browser transcript.
+// Provider with empty turns loses conversation; prefer browser to avoid "no response" (#8019).
 function selectCallRecord({
   providerRecord,
   transcript,
@@ -658,16 +632,8 @@ async function ingestFinishedCall(
   return { record, hasFetchFailed, agentRowId, agentDisplayName, turnTraceIds };
 }
 
-/**
- * Finish a drawer "Talk to it" call. Every browser call records one trace per
- * exchange (3a), which is where the transcript and recording live; a drawer
- * call is scored against no scenario, so it is NOT written as a run (#8020).
- * Writing it as a SUCCESS run with no verdict is exactly the forever-"the judge
- * is reading the conversation" state this issue removes. The agent row is still
- * created on first hang-up (unrelated to run-writing, decision 3), deduped by
- * its identity key so a retried finish for a not-yet-saved agent reuses the
- * same row rather than creating a second one (decision 1).
- */
+// Finish drawer call: traces recorded (3a) but NOT written as run (#8020).
+// Agent row created on hang-up, deduped so retry reuses row rather than creating second.
 async function finishDrawerCall(
   input: {
     ports: VoiceSessionInfrastructure;
@@ -706,20 +672,8 @@ async function finishDrawerCall(
   };
 }
 
-/**
- * Ingest a finished call.
- *
- * Two shapes, split on whether the call names a scenario:
- *  - A drawer "Talk to it" call (no scenario id) records its traces and returns;
- *    it is never written as a run (#8020). See {@link finishDrawerCall}.
- *  - A "Call it myself" call (a scenario id) is written as a run and judged,
- *    idempotently on the conversation id: a second hang-up, a mid-call reload or
- *    a late webhook all resolve to the same run id. A fully written run
- *    (SUCCESS/FAILED) is returned untouched (AC14, #7973 AC1); a half-written or
- *    cancelled run is re-driven through `writeCallRun` (#7973 AC2). Falls back to
- *    the live transcript when the provider record is not ready or the fetch
- *    fails, marking the latter so the panel can say so (AC15).
- */
+// Ingest finished call: drawer (traces only) or scenario (run written and judged).
+// Fully written runs returned untouched (AC14); half-written re-driven (#7973).
 export async function finishVoiceSession(input: {
   ports: VoiceSessionInfrastructure;
   /** The verified session token: the project, transport, agent row and
@@ -752,15 +706,8 @@ export async function finishVoiceSession(input: {
     });
   }
 
-  // A terminal run is complete: a duplicate finish returns it untouched (AC14,
-  // #7973 AC1). A non-terminal run is half-written — startRun landed but a
-  // snapshot or the finish write failed — so the retry re-drives writeCallRun
-  // with the same scenarioRunId to complete it exactly once (#7973 AC2).
-  //
-  // Checked BEFORE resolving the scenario: a run that already finished must be
-  // returned untouched even when its scenario has since been archived, so a
-  // scenario lookup that would now throw scenario_not_found is never reached
-  // (#7973 AC1).
+  // Terminal run is complete (AC14, #7973 AC1); half-written re-driven with same id (#7973 AC2).
+  // Checked BEFORE scenario resolution so archived scenario cannot break retry (#7973 AC1).
   const existing = await ports.findExistingRun({
     projectId: input.projectId,
     scenarioRunId,
@@ -819,16 +766,8 @@ export async function finishVoiceSession(input: {
   };
 }
 
-/**
- * Whether a drawer call's recording belongs to this project. A drawer call is
- * never written as a run (#8020), so there is nothing to authorize its playback
- * against; instead the provider is asked which agent the conversation ran
- * against, and playback is allowed only when this project saved that voice
- * agent. A refused redirect, a not-yet-ready record or a fetch failure all read
- * the same way: not this project's to play. Traces are deliberately not
- * consulted, since a trace write goes through the ingest pipeline and can lag
- * the hang-up.
- */
+// Whether drawer call's recording belongs to this project. Drawer call not persisted (#8020), so
+// check provider agent against saved agents.
 async function drawerRecordingBelongsToProject(
   ports: VoiceSessionInfrastructure,
   {
@@ -862,17 +801,8 @@ async function drawerRecordingBelongsToProject(
   });
 }
 
-/**
- * Authorize a recording-playback request and return the provider credential the
- * route streams the audio with. A scenario "Call it myself" run authorizes
- * playback directly (a run for the conversation exists in this project). A
- * drawer call writes no run (#8020), so it is authorized only when the provider
- * conversation ran against a voice agent this project saved. Anything else
- * throws {@link VoiceRecordingUnavailableError}; the credential is returned only
- * on success, so it never leaks on a refusal. Throws
- * {@link VoiceRecordingKeyMissingError} when the project has no provider key.
- * Drawer calls only run on ElevenLabs today.
- */
+// Authorize recording playback and return provider credential. Scenario runs authorize directly;
+// drawer calls (#8020) authorized only if conversation ran against saved voice agent.
 export async function authorizeRecordingPlayback({
   ports,
   projectId,

@@ -1,13 +1,4 @@
-/**
- * The queued job that runs the evaluators attached to a scenario run.
- *
- * One job per run, registered on the simulation pipeline's global queue
- * (`registerJob`). While the trace the run produced is still arriving the
- * job queues itself again with a growing delay, up to the attempt cap; the
- * last attempt records what is missing as a failed result instead.
- *
- * @see specs/scenarios/scenario-evaluators.feature
- */
+/** Queued job running scenario evaluators; retries as trace data arrives. */
 export const SCENARIO_EVALUATIONS_JOB = {
   /** Job name on the global queue; the group key carries the run id. */
   NAME: "scenarioEvaluations",

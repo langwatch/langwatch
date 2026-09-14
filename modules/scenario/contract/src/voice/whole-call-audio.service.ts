@@ -1,19 +1,5 @@
-/**
- * Resolve the handle the whole-call audio player streams a run's recording by.
- *
- * A headless voice run — phone (Twilio) or ElevenLabs — records the whole call
- * with the vendor, and stamps the vendor's own handle on one of the run's trace
- * spans (`voice.twilio.call_sid` or `voice.elevenlabs.conversation_id`). This
- * reads the run's traces back, scans their spans for whichever key is present,
- * and returns the handle the route fetches the audio with. It never names the
- * vendor SDK or touches ClickHouse itself: both the trace-id lookup and the
- * span read are injected ports, so the scan is unit-tested with a fake reader.
- *
- * A run with neither key — a non-voice run, or one whose call never started —
- * resolves to `null`, and the caller renders no player.
- *
- * @see specs/features/agents/voice-phone.feature
- */
+// Resolve the handle the whole-call audio player streams a run's recording by.
+// Reads run's traces, scans spans for vendor handle (Twilio or ElevenLabs), null if missing.
 
 /** The span attribute a phone run stamps its Twilio call SID on. */
 export const TWILIO_CALL_SID_ATTR = "voice.twilio.call_sid";

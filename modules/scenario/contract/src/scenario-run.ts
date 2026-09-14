@@ -26,13 +26,7 @@ export const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
 ]);
 
 /**
- * Determines whether a scenario run with the given status can be cancelled.
- *
- * Only in-flight statuses (QUEUED, PENDING, IN_PROGRESS) are cancellable.
- * Terminal statuses (SUCCESS, FAILED, ERROR, CANCELLED, STALLED) are not.
- *
- * @param status - The current status of the scenario run
- * @returns true if the run is eligible for cancellation
+ * Checks if a run status is cancellable (in-flight: QUEUED, PENDING, IN_PROGRESS).
  */
 export function isCancellableStatus(status: ScenarioRunStatus): boolean {
   return CANCELLABLE_STATUSES.has(status);

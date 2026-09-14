@@ -1,12 +1,5 @@
-/**
- * Internal Set ID Utilities
- *
- * Provides functions for detecting and generating internal set IDs.
- * Internal sets use a distinct namespace to avoid collisions with user-created set names.
- *
- * Pattern: __internal__${projectId}__on-platform-scenarios
- *
- * @see specs/scenarios/internal-set-namespace.feature
+/** Internal Set ID Utilities: detects and generates internal set IDs using
+ * distinct namespace to avoid collisions with user-created names.
  */
 
 /** Prefix for all internal set IDs */
@@ -54,16 +47,7 @@ export function expandSetIdFilter(scenarioSetId: string): string[] {
   return [scenarioSetId];
 }
 
-/**
- * The set every voice call run is recorded under.
- *
- * Reads that list a project's own scenario sets exclude it, the way they
- * exclude the agent test set: a voice call is a run of the voice agent, not a
- * set somebody authored.
- *
- * Defined here rather than beside the voice agent's own configuration because
- * this is the only module that reads it today. The voice agent configuration
- * imports it from the scenario contract when it lands; it must not declare a
- * second copy.
+/** Set for voice call runs; excluded from project's scenario sets like
+ * agent test set. Defined here to avoid duplication with voice agent config.
  */
 export const VOICE_CALL_SCENARIO_SET_ID = "voice-calls";

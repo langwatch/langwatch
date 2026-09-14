@@ -1,29 +1,11 @@
 /**
  * @vitest-environment node
- *
- * Scenario field values against a real database: a scenario carries one
- * value per field its test suite declares, checked and stored in the field's
- * own type, and a blank value clears the field.
- *
- * @see specs/scenarios/scenario-fields.feature
+ * Scenario field values: stored by type, blank clears the field.
  */
 import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../../sdks/typescript/src/observability-sdk/__tests__/test-utils.ts";
-// DANGLING - CROSS-PACKAGE DECISIONS, not mechanical fixes:
-// - `prisma` (`../../db`): no shared Prisma test-client helper exists for
-//   this module; other modules (e.g. model-provider) hand-roll their own
-//   `createTestPrismaClient()` in a local test-support file - scenario has
-//   none yet.
-// - `ScenarioService` (`../scenario.service`): now lives at
-//   modules/scenario/server/src/services/scenario.service.ts
-//   (@langwatch/scenario-server), which @langwatch/scenario-contract does
-//   not and should not depend on - same class as
-//   evaluations/__tests__/scenarioEvaluations.integration.test.ts.
-// Also note (unflagged, file exists but does not export these):
-// `ScenarioFieldTypeInvalidError` / `ScenarioFieldUnknownError` from
-// ../../../web/src/behavior/errors.tsx.
-// See handoff merge-scenario-dangling-imports.
+// DANGLING: Imports need package boundary fixes. See merge-scenario-dangling-imports.
 import { prisma } from "../../db";
 import {
   ScenarioFieldTypeInvalidError,

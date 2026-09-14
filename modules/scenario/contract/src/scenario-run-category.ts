@@ -15,15 +15,7 @@ export type RunStatusCategory =
   | "queued";
 
 /**
- * Buckets a run status for counting and filtering.
- *
- * Single source of truth for run-history summaries, the sidebar, and CSV
- * export. Anything that needs to answer "did this pass?" calls this rather
- * than switching on the status itself — otherwise the number on screen and
- * the number in an exported file can drift apart.
- *
- * The switch is exhaustive over ScenarioRunStatus with no default, so adding a
- * status to the enum is a compile error here until it is categorised.
+ * Buckets run status for filtering. Single source of truth for export and display counts.
  */
 export function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
   switch (status) {

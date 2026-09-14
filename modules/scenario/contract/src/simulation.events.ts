@@ -158,15 +158,8 @@ export const SimulationRunFinishedEventSchema = simulationEventSchema.extend({
 });
 export type SimulationRunFinishedEvent = z.infer<typeof SimulationRunFinishedEventSchema>;
 
-/**
- * RunEvaluated event - emitted once the evaluators attached to the run have
- * produced their results, after the run finished.
- *
- * Carries the results and the verdict the run holds after the gate: a
- * required evaluator that failed turns it to failure, otherwise the judge's
- * verdict stands. The verdict and status the run held BEFORE ride along as
- * event-carried state, so the suite run subscriber can move its counts
- * without reading fold state, the way the finished event carries identity.
+/** RunEvaluated event after evaluators complete: carries verdict after gate
+ * (failing required evaluator flips failure), previous verdict/status as ECST.
  */
 export const simulationRunEvaluatedEventDataSchema = z.object({
   scenarioRunId: z.string(),
@@ -306,14 +299,8 @@ export type SimulationRunAgentInstanceRecordedEvent = z.infer<
   typeof SimulationRunAgentInstanceRecordedEventSchema
 >;
 
-/**
- * CutAtLimitRecorded event — emitted after a simulated voice run ended
- * because LangWatch cut it at the maximum call duration (AC28, #8021). The
- * fold sets `metadata.langwatch.isCutAtLimit = true` so the run header shows
- * "Cut at the call limit". It arrives after the run finished: the child learns
- * of the cut from its call-limit timer and the parent records it on exit, the
- * same post-exit path the served instance takes. The flag is implicit — the
- * event's existence is the fact — so the payload carries only the run id.
+/** CutAtLimitRecorded event after LangWatch ends voice run at max duration;
+ * fold sets `isCutAtLimit=true` on metadata, payload carries only run id.
  */
 export const simulationRunCutAtLimitRecordedEventDataSchema = z.object({
   scenarioRunId: z.string(),
@@ -346,17 +333,8 @@ export const SimulationRunDeletedEventSchema = simulationEventSchema.extend({
 });
 export type SimulationRunDeletedEvent = z.infer<typeof SimulationRunDeletedEventSchema>;
 
-/**
- * SetArchived event — emitted when a user archives a whole scenario set.
- * One user intent → one event carrying the affected runs, instead of N
- * independent `lw.simulation_run.deleted` events.
- *
- * Aggregate is the set (`scenarioSetId`). The fold projection for
- * `simulation_run` aggregates is currently per-run; wiring this event
- * through the dispatcher fan-out is tracked separately — see lw#3636.
- *
- * Idempotency keys on `(tenantId, scenarioSetId)` so that retrying the
- * same archive request collapses into a single event.
+/** SetArchived event: one user intent replaces N deleted events; idempotency
+ * on (tenantId, scenarioSetId); runs snapshotted so replay is consistent.
  */
 export const simulationSetArchivedEventDataSchema = z.object({
   scenarioSetId: z.string(),

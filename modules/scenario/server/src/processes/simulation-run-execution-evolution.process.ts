@@ -26,7 +26,7 @@ export const STALL_THRESHOLD_MS = 30 * 60 * 1000;
 
 /**
  * Simulation run execution process (ADR-052): pure state logic per run.
- * Replaces fire-and-forget subscriber; outbox owns retry, wake owns stall/cancel/deadline backstops.
+ * Replaces fire-and-forget subscriber; outbox owns retry, wake owns backstops.
  */
 
 type Ctx = ProcessHandlerContext<SimulationRunExecutionIntents>;
@@ -41,20 +41,8 @@ const recordEvaluationsLostKey = (scenarioRunId: string) =>
   `record_evaluations:${scenarioRunId}:lost`;
 
 /**
- * The content boundary (`toPayload`): narrows a committed pipeline event to
- * the identities/enums/timestamps view the process is allowed to persist.
- *
- * Everything else is dropped here, before the runtime builds the envelope —
- * messages, results, verdict reasoning, criteria text, message content, and
- * all of `metadata` except the run's resolved parameter values. The process
- * manager persists this payload verbatim into inbox and outbox rows, so
- * anything this function keeps becomes durable. It keeps nothing that is
- * conversation content: the parameter values are customer-chosen run
- * configuration, already durable on the queued event itself.
- *
- * Reads three things off the finished event: `status`, the evaluator ids and
- * required flags it carries, and whether its results carry evaluations of
- * their own. The rest of the enriched finished-event fields are not read.
+ * Content boundary: narrows pipeline event to identities/enums/timestamps.
+ * Keeps only parameter values, drops all conversation content and enriched fields.
  */
 type SimulationRunPayloadEvent = Pick<SimulationProcessingEvent, "type" | "occurredAt"> & {
   data: unknown;
@@ -184,19 +172,8 @@ export const handleCancelRequested: EventHandler<
 > = (state, _payload, ctx) => {
   switch (state.phase) {
     case "queued": {
-      // No child is running, so the run goes terminal now instead of waiting
-      // out the grace window.
-      //
-      // It still needs the broadcast if it was ever submitted. `queued` does
-      // not mean "not dispatched": the execute intent goes out the moment
-      // the run is queued, so the pool may already hold this job — buffered
-      // behind a busy slot, or in prefetch — and `pool.wasCancelled`, which
-      // is what stops it spawning, is set by the cancellation subscriber and
-      // by nothing else. Without the broadcast the run reads CANCELLED while
-      // the scenario runs to completion and bills for it.
-      //
-      // An uninitialized process (the cancel overtook the queued event) never
-      // emitted execute, so there is nothing to call off.
+      // No child running, go terminal now. Still need broadcast if submitted.
+      // Pool may hold job in prefetch; pool.wasCancelled stops it spawning.
       const wasSubmitted = state.scenarioRunId !== "";
       return {
         state: {
@@ -252,14 +229,8 @@ export const handleTerminal: EventHandler<
 });
 
 /**
- * FINISHED: the conversation is over. A run that owes its evaluator results is
- * not terminal yet: it waits in `evaluating` under the evaluation deadline,
- * carrying the evaluators it owes, until the evaluated event lands or the wake
- * records the lost job. Every other run goes terminal here.
- *
- * The rule is the fold's own (`runAwaitsEvaluations`), read off the same
- * fields of the same event, so a run stored PENDING_EVALUATION is exactly a
- * run this process is watching.
+ * FINISHED: conversation over. Run owing evaluator results waits in `evaluating`;
+ * others go terminal. Rule is runAwaitsEvaluations, matching PENDING_EVALUATION state.
  */
 export const handleRunFinished: EventHandler<
   SimulationRunExecutionProcessState,
@@ -333,17 +304,8 @@ export const simulationRunExecutionWake: WakeHandler<
     return { state, nextWakeAt: null, intents: [] };
   }
 
-  // A wake for a process no event ever touched decides nothing and must
-  // clear itself, or the wake worker re-finds it forever.
-  //
-  // `scenarioRunId` alone does not mean untouched: only handleRunQueued
-  // stamps it, and QUEUED is platform-only. A run reported from outside
-  // (an SDK batch on a customer machine) opens with STARTED, so its
-  // process carries real activity while the id stays blank — and the
-  // stall decision below needs nothing from state, the finish intent is
-  // built from the process key and project the wake carries. Requiring
-  // the id here disarmed the watchdog for every externally reported run,
-  // which then read IN_PROGRESS forever when its process died.
+  // Wake for untouched process must clear itself. scenarioRunId doesn't mean untouched;
+  // external runs open with STARTED; stall decision needs no state from id.
   if (state.scenarioRunId === "" && state.lastActivityAtMs === 0) {
     return { state, nextWakeAt: null, intents: [] };
   }
@@ -388,17 +350,8 @@ export const simulationRunExecutionWake: WakeHandler<
 };
 
 /**
- * How a simulation run's execution moves, and when it is given up on.
- *
- * A run reports activity while it works; the wake exists to notice one that
- * stopped reporting. Everything here is about that distinction — a run still
- * going, a run cancelled, and a run that can never start because what it needs
- * was never supplied.
- *
- * Every member is public because the event handlers below are module-level
- * consts the process builder registers, and they reach these from outside the
- * class. The handlers stay there rather than moving in: another module wires
- * them, so they are this module's surface, not its internals.
+ * Simulation run execution evolution: how it moves and when given up on.
+ * Members public: handlers registered by process builder from outside.
  */
 export class SimulationRunExecutionEvolution {
   /**

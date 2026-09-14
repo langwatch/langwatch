@@ -1,17 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for extensible metadata on scenario run events.
- *
- * Restores the backend-agnostic schema cases from the deleted
- * `scenarios/__tests__/extensible-metadata.unit.test.ts` (the ES-transformer
- * and ES-mapping describes were dropped with the Elasticsearch backend):
- * user metadata passes through via `.passthrough()`, the `langwatch`
- * namespace is strictly validated, and `scenarioSetId` coerces to "default"
- * at ingestion.
- *
- * @see specs/features/scenarios/extensible-scenario-metadata.feature
- * @see specs/suites/run-note-metadata-convention.feature
+ * Extensible metadata on scenario run events: passthrough, validation, defaults.
  */
 import { describe, expect, it } from "vitest";
 import {

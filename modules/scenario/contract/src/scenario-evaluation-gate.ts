@@ -15,14 +15,8 @@ export function evaluationFailsRun(evaluation: ScenarioEvaluationResult) {
   );
 }
 
-/**
- * The verdict a run holds once its evaluators have run.
- *
- * A required evaluator that failed or errored turns the verdict to failure.
- * Otherwise the judge's verdict stands, and a run the judge never graded
- * stays ungraded. Scores and skipped results never gate.
- *
- * @see specs/scenarios/scenario-run-evaluations.feature
+/** Returns verdict after evaluations; required failures or errors return
+ * "failure", otherwise judge's verdict.
  */
 export function gatedVerdict({
   evaluations,
@@ -61,22 +55,8 @@ export const UNGRADED_RUN_STATUSES: ReadonlySet<string> = new Set([
   ScenarioRunStatus.CANCELLED,
 ]);
 
-/**
- * Whether a run that has just finished still owes evaluator results.
- *
- * A run whose own results carry evaluations was graded by the code that ran
- * it. A run that errored or was cancelled has nothing to grade. Everything
- * else owes one result per attachment it was queued with.
- *
- * The fold, the subscriber that queues the job and the process manager that
- * watches for a lost job all read this, so the status a run is stored with,
- * the work queued for it and the deadline armed for it cannot disagree.
- *
- * It lives beside the gate rather than beside the run's evaluator payload
- * because the payload's schemas need an evaluator definition this package
- * does not depend on, and the fold needs this predicate today.
- *
- * @see specs/scenarios/scenario-evaluation-pending.feature
+/** Checks whether a finished run still owes evaluator results; false if
+ * already graded, cancelled, or errored.
  */
 export function runAwaitsEvaluations({
   status,

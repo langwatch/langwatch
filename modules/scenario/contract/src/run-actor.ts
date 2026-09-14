@@ -1,22 +1,5 @@
-/**
- * Who started a run.
- *
- * A run records the person who started it, never the machine that ran it. The
- * record is a stable id and the surface that person acted through, the same
- * pair a scenario version stores as `authorId` and `authorLabel`, so the two
- * records read the same way.
- *
- * The id is what makes the record stable: a person can rename themselves, and
- * a run from last month must still point at them, so no name is stored.
- *
- * It travels in the reserved `langwatch` namespace of the run metadata, beside
- * the scenario version, because it is platform context and not something an
- * SDK caller sets. That namespace passes through into the stored run metadata,
- * so it needs no column of its own.
- *
- * A caller that names no person records no actor. There is no placeholder.
- *
- * @see specs/scenarios/run-actor-on-runs.feature
+/** Who started a run: person id and surface (user/api/cli); travels in the
+ * reserved langwatch metadata namespace.
  */
 
 import { z } from "zod";

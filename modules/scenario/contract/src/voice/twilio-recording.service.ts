@@ -1,17 +1,5 @@
-/**
- * Resolve a phone call's whole-call recording from the Twilio REST API.
- *
- * Twilio publishes a call's recording shortly after the call ends, under
- * `GET /2010-04-01/Accounts/{sid}/Recordings.json?CallSid={callSid}`. This
- * lists them, takes the first, and returns the `.wav` media URL the route
- * streams through {@link proxyAudioStream}. Null when Twilio has none yet, so
- * the caller answers 404 and the player can retry.
- *
- * The auth token is basic-auth material only: it is never logged, and the
- * header it builds never leaves the request to Twilio.
- *
- * @see specs/features/agents/voice-phone.feature
- */
+// Resolve phone call's recording from Twilio REST API. Returns .wav media URL or null if not ready.
+// Auth token basic-auth only; never logged, never leaves request to Twilio.
 
 import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";
 

@@ -1,25 +1,10 @@
-/**
- * One evaluator result on a scenario run, and the statuses it can hold.
- *
- * Framework-free on purpose: `simulation.ts` (the run's own result shape) and
- * `schemas/event-schemas.ts` (the finished event's wire shape) both depend on
- * this leaf, and `event-schemas.ts` itself sits in a cycle back through
- * `scenario-run.ts` to `simulation.ts` — a schema declared inside that cycle
- * throws `Cannot read properties of undefined` at import time for whichever
- * side loads second. Keeping this shape dependency-free breaks the cycle.
- *
- * @see specs/scenarios/scenario-run-evaluations.feature
+/** Evaluator result shape; kept dependency-free to break import cycle with
+ * event-schemas and scenario-run.
  */
 import { z } from "zod";
 
-/**
- * The statuses one evaluator result can hold on a scenario run.
- *
- * - `passed` / `failed`: a pass/fail evaluator decided.
- * - `scored`: a score-only evaluator reported a number and no pass.
- * - `skipped`: the evaluator did not run, `details` says why (for example a
- *   blank field on the scenario).
- * - `error`: the evaluator ran and failed to produce a result.
+/** Evaluation statuses: passed/failed (pass/fail evaluators), scored, skipped,
+ * or error.
  */
 export const SCENARIO_EVALUATION_STATUSES = [
   "passed",
@@ -31,18 +16,8 @@ export const SCENARIO_EVALUATION_STATUSES = [
 export type ScenarioEvaluationStatus =
   (typeof SCENARIO_EVALUATION_STATUSES)[number];
 
-/**
- * One evaluator result on a scenario run.
- *
- * This is the wire shape of `results.evaluations` on the finished event and
- * on every read of a run. The scenario framework (Python and TypeScript)
- * mirrors this schema field for field, so a scenario run from code sends its
- * evaluations in exactly this shape and the platform stores them as sent.
- *
- * A `required` evaluator with the status `failed` or `error` fails the run.
- * Scores and skipped results never change the verdict.
- *
- * @see specs/scenarios/scenario-run-evaluations.feature
+/** Wire shape for `results.evaluations` on finished event; required evaluators
+ * with failed/error status fail the run.
  */
 export const scenarioEvaluationResultSchema = z
   .object({

@@ -1,12 +1,5 @@
-/**
- * Maps a scenario's caller-voice config to the SDK user-simulator voice config.
- *
- * Vendor-agnostic: the caller speaks through an OpenAI TTS voice (the
- * `"provider/voice"` string) and the SDK's own audio-effect functions — none of
- * this is ElevenLabs, which only reaches the agent under test via the transport.
- * Effects ARE supported by the SDK (1.3.0) through `audioEffects`, so each
- * vendor-agnostic effect name maps to a real effect function rather than being
- * persisted-and-ignored.
+/** Maps scenario caller-voice config to SDK user-simulator config; vendor
+ * agnostic OpenAI TTS with SDK audio effects (not ElevenLabs).
  */
 
 import * as ScenarioRunner from "@langwatch/scenario";

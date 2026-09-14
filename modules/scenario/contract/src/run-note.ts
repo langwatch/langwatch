@@ -1,14 +1,5 @@
 /**
- * The note a person leaves with a run.
- *
- * A note is one short line of free text, like a commit message or a hypothesis.
- * It belongs to one batch run, and every run in that batch carries the same
- * note. It travels as the top-level `note` key of the run metadata, outside the
- * reserved `langwatch` namespace, so a caller that can set run metadata can set
- * a note without holding any platform-only field.
- *
- * @see specs/suites/run-notes.feature
- * @see specs/suites/run-note-metadata-convention.feature
+ * Run note: free text per batch, travels in run metadata outside langwatch namespace.
  */
 
 import { z } from "zod";

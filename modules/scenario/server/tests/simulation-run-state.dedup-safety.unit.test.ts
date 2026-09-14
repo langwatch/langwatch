@@ -1,18 +1,6 @@
 /**
- * Structural regression test for the simulation-run-state projection read.
- *
- * tryGetProjection() reads the latest version of a single run from
- * simulation_runs (ReplacingMergeTree(UpdatedAt)). It must resolve the latest
- * version with a scalar `UpdatedAt = (SELECT max(...))` subquery, NOT the
- * `(TenantId, ScenarioRunId, UpdatedAt) IN (max-subquery)` tuple form: the
- * tuple form is not applied as a PREWHERE on the version, so ClickHouse read
- * the heavy Messages.* arrays across every version before discarding the stale
- * ones, exhausting the server memory limit (Code 241) for runs with many
- * snapshot versions.
- *
- * The behavioural proof lives in the integration test
- * (simulationRunState.clickhouse.repository.integration.test.ts); this guards
- * the query shape so the fix can't silently regress.
+ * Regression test: must use scalar max(UpdatedAt) subquery, not tuple form (OOM-prone).
+ * Tuple form not PREWHERE-able with many snapshot versions. See integration test.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

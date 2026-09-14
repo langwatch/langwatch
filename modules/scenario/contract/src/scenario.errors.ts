@@ -63,22 +63,8 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
   }
 }
 
-/**
- * Refuses a run addressed to a set the platform owns.
- *
- * The internal namespace holds two kinds of address. `__internal__<suiteId>__
- * suite` is a run plan's, and every read of that plan aggregates the runs
- * stored there, so a one-off run written into it moves that plan's pass rate,
- * cost and trend. `__internal__<projectId>__on-platform-scenarios` is the
- * one-off bucket, and only the project's own.
- *
- * A set name outside the namespace is the customer's own and stays free.
- *
- * Tenancy is enforced elsewhere. This refusal is about not corrupting a plan
- * the caller is otherwise entitled to read.
- *
- * @see specs/scenarios/reserved-set-write-guard.feature
- */
+// Refuses runs to internal platform-owned sets to avoid corrupting plan aggregates.
+// See specs/scenarios/reserved-set-write-guard.feature
 export class ScenarioReservedSetIdError extends HandledError {
   declare readonly code: "scenario_reserved_set_id";
 
@@ -112,15 +98,8 @@ export class ScenarioRunRejectedError extends HandledError {
   }
 }
 
-/**
- * Thrown when a scenario is saved with a value for a field its test suite does
- * not declare.
- *
- * Both lists are on `meta` because the editor renders them: the refused names
- * beside the ones the suite declares, so a typo is visible.
- *
- * @see specs/scenarios/scenario-fields.feature
- */
+// Thrown when a scenario has a field value the test suite doesn't declare.
+// Lists on meta so editor shows refused vs. declared names for typo visibility.
 export class ScenarioFieldUnknownError extends HandledError {
   declare readonly code: "scenario_field_unknown";
 

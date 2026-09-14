@@ -1,12 +1,5 @@
 /**
- * Builds the terminal `results` envelope for a run that failed for
- * members reasons rather than a judge verdict.
- *
- * Shared by the two writers of members failures so they render
- * identically in the drawer: ScenarioFailureHandlerService (in-process child
- * crashes/timeouts/prefetch errors) and FinishRunCommand (the process
- * manager's stall watchdog and cancel-grace paths, which supply only a
- * bare `error` string on the command).
+ * Builds terminal results envelope for members failures (not judge verdicts).
  */
 
 import { Verdict } from "./scenario-run.ts";

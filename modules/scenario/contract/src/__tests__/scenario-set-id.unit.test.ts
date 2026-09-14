@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for internal set ID utilities.
- *
- * These utilities enable distinguishing between:
- * - Internal sets: Created by the LangWatch platform (namespaced to avoid collisions)
- * - User sets: Created by users via SDK or UI
- *
- * @see specs/scenarios/internal-set-namespace.feature
+ * Internal vs user set IDs: platform sets namespaced to avoid collisions.
  */
 
 import { describe, expect, it } from "vitest";

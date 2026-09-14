@@ -47,17 +47,15 @@ import {
 const projectionLogger = createLogger("simulationRunState.foldProjection");
 
 /**
- * Per-message size cap for `Messages.Content`/`Rest`, set generously (64
- * KiB) so normal verbose replies are never truncated — exceeding it is
- * almost always an SDK shipping inline binary media the pipeline failed to externalise; truncating here surfaces the regression instead of silently blowing up the page.
+ * Per-message size cap (64 KiB): prevents truncation of verbose replies;
+ * exceeding it indicates SDK shipping binary media; truncation surfaces regression.
  */
 const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
 const MAX_MESSAGE_REST_BYTES = 64 * 1024;
 
 /**
- * Serialises a run's metadata for the stored column, without encrypted
- * secret values — the queued event carries those beside metadata, so this
- * is the second line, not the first (the started event's ingest route forwards caller metadata verbatim). `secretParameterNames` stays for readback.
+ * Serialise run metadata without encrypted secrets (queued event carries those).
+ * `secretParameterNames` stays for readback.
  */
 function storedMetadata(metadata: Record<string, unknown> | undefined): string | null {
   if (!metadata) return null;
@@ -154,7 +152,7 @@ function capOversizedString({
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
   // Array `content` is preserved in Rest so the renderer can route each
   // part through <MediaPart>; flat-string content goes to the top-level
-  // Content column instead. AG-UI's `parts` field is already covered by the ...restFields spread; only `content` needs this special-case.
+  // `parts` covered by restFields spread; only `content` needs special handling.
   const { id: _id, role: _role, content, trace_id: _traceId, ...restFields } = messageFields;
   const rest: Record<string, unknown> = { ...restFields };
   if (Array.isArray(content)) {
@@ -229,9 +227,8 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
 }
 
 /**
- * Guards a non-terminal Status transition once a run is finished — an
- * out-of-order event could otherwise clobber Status non-terminal while
- * FinishedAt stays set (an unrecoverable zombie); must run on EVERY non-terminal Status writer, alongside the finished handler's early-return and status refusal.
+ * Guard non-terminal Status transition once run finished (prevents out-of-order zombie).
+ * Must run on every non-terminal Status writer.
  */
 function statusAfter({
   state,
@@ -279,17 +276,8 @@ export function finishedStatusOf({
 }
 
 /**
- * The status and verdict a run is stored with when it finishes.
- *
- * A run whose suite or plan attached evaluators, and whose results have not
- * been recorded, is stored PENDING_EVALUATION with the judge's verdict until
- * the evaluated event lands and the gate writes the terminal status.
- *
- * An evaluated event that folded before the finished one (business time can
- * land it first) already recorded the results, so the gate runs here on the
- * judge's verdict, and the stored status and verdict match what the evaluated
- * handler stores in the other order. A run that sends its own evaluations is
- * stored as sent: the code that ran it applied its gate.
+ * Status and verdict a run stores on finish: PENDING_EVALUATION if pending results,
+ * else judge's verdict. Evaluated event first means gate runs on judge's verdict.
  */
 function settledOnFinish({
   state,
@@ -328,22 +316,8 @@ function settledOnFinish({
 }
 
 /**
- * Whether the fold has seen an event that DEFINES the run, and so whether the
- * state is worth a `simulation_runs` row.
- *
- * Every lifecycle event names the run it belongs to, and every handler for one
- * writes that name onto `ScenarioRunId`. The metrics event is the exception:
- * it carries a run id, a trace id and a cost, and no identity at all, so its
- * handler leaves `ScenarioRunId` empty. A non-empty `ScenarioRunId` is
- * therefore the exact statement "some event has said what this run is", and it
- * needs no extra column to carry.
- *
- * Cost alone must not mint a run. The metrics command is driven by a span
- * attribute, so a bad attribute value addresses an aggregate that no run ever
- * created; writing the row anyway produced a run with no name, no scenario, no
- * set and no end, whose cost grew with every trace that carried the same value.
- * The store consults this before it writes, so the metrics accumulate in the
- * fold state and reach the table with the run's first lifecycle event.
+ * Whether fold has seen an event that DEFINES the run (non-empty ScenarioRunId).
+ * Metrics events carry cost only; don't mint rows. Accumulate until lifecycle event.
  */
 export function hasRunDefiningEvent(state: SimulationRunStateData): boolean {
   return state.ScenarioRunId.length > 0;
@@ -407,7 +381,7 @@ export class SimulationRunStateFoldProjection
   /**
    * Whether the fold has seen an event that DEFINES the run, and so whether
    * the state is worth a `simulation_runs` row — every lifecycle event names
-   * its run, but the metrics event carries cost with no identity, so cost alone must not mint a run.
+   * its run; metrics event carries cost only, so cost alone must not mint rows.
    */
   static hasRunDefiningEvent(state: SimulationRunStateData): boolean {
     return state.ScenarioRunId.length > 0;
@@ -517,7 +491,7 @@ export class SimulationRunStateFoldProjection
         // Content is either a string (legacy, possibly Python-repr), an array of
         // rich-content parts (canonical AG-UI/OpenAI shape), or null/undefined
         // (tolerated as ""). Always serialized to a string for the parallel-array
-        // CH column; arrays are JSON.stringify'd, parsed back by flattenContent's safeJsonParseOrStringFallback.
+        // CH column; arrays are JSON.stringify'd, parsed by flattenContent.
         let content = "";
         if (typeof message.content === "string") {
           content = message.content;
@@ -729,15 +703,7 @@ export class SimulationRunStateFoldProjection
     event: SimulationRunEvaluatedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
-    // A second record replaces the first: the evaluators ran again and the
-    // run holds one result per evaluator, never a history of them. The gate
-    // reads the state's own status, so a run that errored or was cancelled
-    // keeps that status whatever the evaluators said, and the judge's
-    // reasoning and criteria stay as the judge wrote them.
-    //
-    // A run stored PENDING_EVALUATION holds the judge's verdict but not the
-    // judge's status, so that status is recomputed from the verdict first.
-    // Only a judged run ever goes pending, so the recomputation is exact.
+    // Second record replaces first; keeps status; recompute if PENDING_EVALUATION.
     const verdict = event.data.verdict;
     const judgeStatus =
       state.Status === ScenarioRunStatus.PENDING_EVALUATION
@@ -762,7 +728,7 @@ export class SimulationRunStateFoldProjection
     // The event carries a `scenarioRunId` and this handler deliberately does
     // not write it onto the state. The id is a span attribute the customer's
     // agent sent, so it names a run only if a run said so, and
-    // `SimulationRunStateFoldProjection.hasRunDefiningEvent` is what reads the difference. Copying it here would
+    // hasRunDefiningEvent reads the difference. Copying it here would
     // let a cost figure alone create a run in the simulations list.
 
     // Store per-trace breakdown, then recompute aggregates

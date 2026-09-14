@@ -1,21 +1,5 @@
-/**
- * Operator limits for voice runs, read from the environment.
- *
- * Two knobs, both with the defaults the AC names:
- *   - VOICE_CALL_MAX_SECONDS   (default 300): the wall-clock a single call may
- *     run before LangWatch ends it and the run is judged on what was said.
- *   - VOICE_RUNS_MAX_CONCURRENT (default 2, per execution process per project):
- *     how many voice runs a project may execute at once in a single execution
- *     process; the rest wait in the queue. The gate is an in-memory map local
- *     to that process's execution pool (see `voice-concurrency-gate.ts`), so
- *     it is not shared across processes or pods — the effective ceiling on a
- *     multi-process deployment is higher than this number.
- *
- * Read from `process.env` directly (with a tolerant parse) rather than the
- * validated env schema so the child process and the worker pool can both reach
- * them without threading the config object, the same way the child already
- * reads its telemetry env.
- */
+// Operator limits from environment: VOICE_CALL_MAX_SECONDS (default 300) and
+// VOICE_RUNS_MAX_CONCURRENT (default 2 per process/project). Read from process.env directly.
 
 export const VOICE_CALL_MAX_SECONDS_DEFAULT = 300;
 export const VOICE_RUNS_MAX_CONCURRENT_DEFAULT = 2;

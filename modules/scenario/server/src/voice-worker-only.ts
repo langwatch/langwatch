@@ -1,16 +1,6 @@
 /**
- * The VOICE_WORKER_ONLY job filter.
- *
- * There is one scenario queue, not a voice-specific one, so "consume only the
- * voice queue" is expressed as an admission predicate at the execution pool
- * rather than a separate BullMQ queue name: a voice worker's pool accepts a job
- * only when its target is a voice target, and refuses everything else. A refused
- * job is handed back to the process outbox (see
- * {@link ./execution-pool.JobNotAcceptedByPoolError}), which retries it on a pod
- * whose pool does accept it.
- *
- * The discriminator is the run's own `target.type`, the same field the pool's
- * voice concurrency gate already keys on, so the two agree by construction.
+ * VOICE_WORKER_ONLY job filter: admission predicate at execution pool.
+ * Voice pool accepts only voice targets; refused jobs retry on pod with accepting pool.
  */
 
 import type { ExecutionJobData } from "./__tests__/execution-pool.unit.test.ts";

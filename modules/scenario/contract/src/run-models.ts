@@ -1,20 +1,5 @@
-/**
- * Which models a run really used.
- *
- * A run plan can name the model that plays the person and the model that
- * decides the verdict. When it names neither, the project default answers, and
- * that default changes over time. A run that recorded only "the plan named no
- * model" therefore cannot tell a reader, a month later, which model judged it.
- *
- * So a run records BOTH: the models the plan was configured with, which is
- * what keys a configuration, and the models the run resolved, which is what a
- * person reads back off the run. The chain that picks them is written once
- * here and used by the queue path and by the execution prefetch, so the value
- * stamped on the run is the value the run ran on.
- *
- * @see specs/scenarios/resolved-run-models-on-runs.feature
- * @see specs/scenarios/run-configuration-on-runs.feature
- * @see specs/scenarios/simulation-run-model-resolution.feature
+/** Which models a run really used; runs record both plan config and resolved
+ * models so readers can see which model judged them months later.
  */
 
 import { expandLatestAlias } from "@langwatch/model-provider-contract";
@@ -35,25 +20,8 @@ export type ResolvedRunModels = {
   judgeModel: string;
 };
 
-/**
- * The model each simulation role runs on: the run plan's choice, else the
- * case's own choice, else the project default for that role.
- *
- * A run plan and a scenario store their model choice verbatim, so a virtual
- * alias such as `openai/latest` arrives here unexpanded. Providers only
- * understand concrete model ids, so both answers pass through
- * `expandLatestAlias`: the run executes on a concrete model, and the resolved
- * model stamped on the run names the same concrete model. Storage keeps the
- * alias, so the pick keeps tracking upstream releases. A concrete id passes
- * through unchanged, and the project-default path already expands its own
- * answer, so a second pass over it changes nothing.
- *
- * @param plan - What the run plan names, empty when it names nothing.
- * @param scenario - What the case names, empty when it names nothing.
- * @param resolveFeatureModel - Reads the project default for a feature key.
- *   It throws when the project has no model set for that key, and the caller
- *   decides what that means: the prefetch refuses the run, the queue path
- *   records no resolved model and lets the prefetch report the fault.
+/** Resolves models for each simulation role: plan choice > scenario > project
+ * default, passing aliases through expandLatestAlias.
  */
 export async function resolveRunModels({
   plan,

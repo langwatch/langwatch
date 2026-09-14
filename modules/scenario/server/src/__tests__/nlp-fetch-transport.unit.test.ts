@@ -132,8 +132,7 @@ describe("given a dispatcher built by the undici package", () => {
     // The agent whose code sleeps past undici's 300s default is the one the
     // dispatcher exists for, so the long deadline must survive a real request.
     /**
-     * @scenario "A code agent with a deadline past undici's own default
-     * still reaches the service"
+     * @scenario "A code agent with a deadline past undici's own default still reaches the service"
      */
     it("still reaches the service with a deadline past undici's 300s default", async () => {
       const adapter = new SerializedCodeAgentAdapter({

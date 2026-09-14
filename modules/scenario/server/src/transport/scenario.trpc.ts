@@ -1,12 +1,6 @@
 /**
- * The server half of `scenarios.*`. One flat namespace, as the browser has
- * always called it: `scenarios:view` reads, `scenarios:manage` writes, runs
- * and cancels.
- *
- * Every refusal travels as the handled error the application already raises -
- * a missing scenario is `scenario_not_found` at 404, a run this project cannot
- * start is `scenario_run_rejected` at 400 - rather than being flattened into a
- * transport code that drops what the client could act on.
+ * Server half of scenarios.*: scenarios:view reads, scenarios:manage writes/runs/cancels.
+ * Refusals travel as handled errors (scenario_not_found@404, scenario_run_rejected@400).
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { NotFoundError } from "@langwatch/handled-error";

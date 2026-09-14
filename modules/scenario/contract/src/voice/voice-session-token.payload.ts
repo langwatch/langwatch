@@ -1,15 +1,5 @@
-/**
- * The claims a signed voice session token carries between mint and finish.
- *
- * The shape is vocabulary both sides speak: the browser carries the token
- * back, the service reads the claims off it, and the web surface types against
- * them. Signing and verification are not here — they need `node:crypto` and
- * the deployment's own signing secret, so they live server-side
- * (`@langwatch/scenario-server`'s `voice-session-token.ts`).
- *
- * The token is short-lived (the call budget plus a grace window), and never
- * carries a provider key: only ids and the project it is scoped to.
- */
+// Claims a signed voice session token carries between mint and finish: only ids and project scope.
+// Signing/verification server-side (@langwatch/scenario-server). Short-lived (call budget + grace).
 
 import { z } from "zod";
 import { VOICE_TRANSPORTS, type VoiceTransport } from "./voice-transport.ts";

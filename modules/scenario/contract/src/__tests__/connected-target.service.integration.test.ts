@@ -1,13 +1,6 @@
-/**
- * @vitest-environment node
- *
- * The target of a single scenario run, resolved against a real database and
- * the presence registry: a connected agent no process is holding is refused
- * before the run is scheduled, one a process holds resolves to its id, and
- * an HTTP agent reads no presence at all.
- *
- * @see specs/agents/connected-agents.feature
- */
+/** @vitest-environment node */
+/** Connected target resolves against real database and presence registry. */
+/** @see specs/agents/connected-agents.feature */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";

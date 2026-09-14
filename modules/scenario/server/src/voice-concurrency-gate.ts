@@ -1,11 +1,6 @@
 /**
- * Per-project admission gate for voice runs.
- *
- * A voice run holds an ElevenLabs socket for the length of a call, so a project
- * may only run VOICE_RUNS_MAX_CONCURRENT of them at once; the rest wait in the
- * pool's queue with the ordinary queued status. This is a pure in-memory
- * semaphore keyed `voice:<projectId>`, consulted by the pool when it decides
- * whether a job may start. Text runs never touch it.
+ * Per-project admission gate for voice runs (ElevenLabs socket per call).
+ * In-memory semaphore `voice:<projectId>`, limits concurrent runs; text runs never touch it.
  */
 
 export class VoiceConcurrencyGate {

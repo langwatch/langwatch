@@ -1,15 +1,5 @@
-/**
- * Stream an upstream audio response through the app, so a provider credential
- * never reaches the browser (AC13/AC15).
- *
- * The shared body of every voice audio proxy route: the per-turn ElevenLabs
- * recording, and the whole-call recording for both transports. A timeout races
- * the connect/headers phase only — once the response arrives the body streams
- * uncut, so a long recording is never truncated — while the caller's own abort
- * (tab closed) still propagates the whole way through. Any connect failure,
- * refused redirect or non-ok upstream reads to the player the same way: no
- * recording to play, answered as {@link VoiceRecordingUnavailableError} (404)
- * rather than a 500.
+/** Stream upstream audio through app to hide provider credential; timeout on
+ * connect only, body streams uncut, caller abort propagates, failures = 404.
  */
 
 import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";

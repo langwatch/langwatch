@@ -1,13 +1,4 @@
-/**
- * Resolves the mapped inputs of one evaluator attachment from what a scenario
- * run left behind: its messages, its scenario, and the spans of its traces.
- *
- * Pure functions over plain values, so the rules are testable without a
- * store. Where a value is used comes from the run worker; what a mapping
- * reads and why it cannot is decided here.
- *
- * @see specs/scenarios/scenario-evaluators.feature
- */
+/** Resolves mapped inputs from scenario runs, messages, and traces. */
 
 import {
   extractChunkTextualContent,
@@ -378,17 +369,8 @@ function resolveAttachmentInput({
   }
 }
 
-/**
- * Resolves every input the evaluator declares through the attachment's
- * mappings.
- *
- * A blank scenario field wins over everything: the scenario has nothing to
- * grade, so there is no point waiting for the trace. Then a trace that has
- * not arrived (the worker retries), then a value the run cannot give at all.
- * An optional input with no mapping is left out; a required one with no
- * mapping is reported as skipped, since the evaluator cannot run without it.
- * An optional input the run cannot give is left out the same way, and one
- * whose trace has not arrived is left out on the last attempt.
+/** Resolves all inputs through the attachment's mappings, handling missing
+ * traces and blank fields by skipping optional inputs or failing required ones.
  */
 export function resolveAttachmentInputs({
   attachment,

@@ -103,14 +103,8 @@ async function withTimeout<T>(
   }
 }
 
-/**
- * Replace an adapter's `connect()` so a transport-level failure surfaces as the
- * run's error with the mandated prefix instead of a raw socket error, and can
- * never hang past `timeoutMs`. On the timeout path specifically, the adapter's
- * own socket is still open with nobody waiting on it, so `disconnect()` is
- * called best-effort to release it (#31); a disconnect failure is swallowed so
- * the customer-facing timeout message still wins. Exported so the exact
- * message is unit-tested against a throwing inner without a live socket.
+/** Wrap adapter connect to prefix transport failures; timeout with
+ * best-effort disconnect; exported so message is unit-tested.
  */
 export function wrapConnectRejection<
   T extends { connect: () => Promise<void> },
@@ -134,15 +128,8 @@ export function wrapConnectRejection<
   return adapter;
 }
 
-/**
- * The signed-URL mint and the conversation read talk to ElevenLabs directly
- * from the control plane, not through the AI Gateway data plane. Two reasons:
- * the gateway terminates virtual-key *traffic* (chat/completions), it has no
- * signed-URL door for the control plane to call with a project key; and "Talk
- * to it" is explicitly outside the gateway's guardrails (the panel says so),
- * so routing it through the gateway would misrepresent what it is. The key is
- * read server-side and only the short-lived signed URL is handed to the
- * browser — the credential never crosses the boundary either way.
+/** Signed-URL mint and conversation read call ElevenLabs direct from control
+ * plane, not gateway: gateway has no signed-URL door, routing misrepresents it.
  */
 const SIGNED_URL_PATH = "/v1/convai/conversation/get-signed-url";
 const CONVERSATION_PATH = "/v1/convai/conversations";

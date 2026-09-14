@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
- * What a run resolves before anything is scheduled, and what it refuses.
- *
- * The secret half is the point of most of these: a secret value must never
- * reach the plain record, the scenario text, or any error message.
- *
- * @see specs/scenarios/scenario-run-parameters.feature
- * @see specs/scenarios/secret-run-parameters.feature
+ * Run parameter resolution and secret protection before scheduling.
  */
 
 import { describe, expect, it } from "vitest";

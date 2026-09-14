@@ -104,7 +104,10 @@ const FINISH_BASE = {
 describe("mintVoiceSession", () => {
   describe("given the voice session ports", () => {
     describe("when the project has a key and the row is a voice agent", () => {
-      /** @scenario "Session mint returns only the signed URL, the conversation id and the max duration" */
+      /**
+       * @scenario "Session mint returns only the signed URL, the conversation id and the max
+       * duration"
+       */
       it("returns the signed URL, a signed session token and the max duration — never the key", async () => {
         const ports = fakePorts({ runner: fakeRunner() });
         const result = await mintVoiceSession({
@@ -910,7 +913,10 @@ describe("finishVoiceSession", () => {
     });
 
     describe("when the provider record is not ready (a failed status)", () => {
-      /** @scenario "A failed provider record keeps the live transcript without a fetch-failed notice" */
+      /**
+       * @scenario "A failed provider record keeps the live transcript without a fetch-failed
+       * notice"
+       */
       it("keeps the browser turns without flagging the fetch as failed", async () => {
         // The transport maps a "failed" status to null (not ready), so the
         // service sees no record and falls back to the live transcript.
@@ -959,7 +965,10 @@ describe("finishVoiceSession", () => {
     });
 
     describe("when the provider fetch throws", () => {
-      /** @scenario "A recording fetch failure keeps the live transcript and shows a fetch-failed notice" */
+      /**
+       * @scenario "A recording fetch failure keeps the live transcript and shows a fetch-failed
+       * notice"
+       */
       it("keeps the live transcript and flags the fetch as failed", async () => {
         const runner = fakeRunner({
           fetchCallRecord: vi.fn(async () => {
@@ -977,7 +986,10 @@ describe("finishVoiceSession", () => {
     });
 
     describe("when a fresh call is finished", () => {
-      /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
+      /**
+       * @scenario "A finished browser call writes one trace per exchange and every message links
+       * to its exchange's trace"
+       */
       it("records the call traces before writing the run and passes the ids through", async () => {
         const recordCallTraces = vi.fn<VoiceSessionInfrastructure["recordCallTraces"]>(
           async () => ({

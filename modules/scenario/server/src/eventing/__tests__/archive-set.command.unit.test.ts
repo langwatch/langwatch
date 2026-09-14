@@ -37,8 +37,8 @@ describe("ArchiveSetCommand (lw#3636)", () => {
   describe("given a tenant archives a set with three runs", () => {
     describe("when the ArchiveSetCommand handler runs", () => {
       /**
-       * @scenario "ArchiveSetCommand emits a SimulationSetArchived event
-       * with the snapshotted run ids"
+       * @scenario "ArchiveSetCommand emits a SimulationSetArchived event with the snapshotted run
+       * ids"
        */
       it("emits a single SimulationSetArchived event carrying the runs", async () => {
         const handler = new ArchiveSetCommand();

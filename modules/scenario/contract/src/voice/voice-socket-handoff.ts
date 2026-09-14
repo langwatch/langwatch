@@ -1,23 +1,5 @@
-/**
- * The parent -> child handoff of a Twilio media socket.
- *
- * The listener runs in the parent worker process and owns the public port; the
- * SDK adapter that speaks the Twilio Media Streams protocol runs in the scenario
- * child. Node's `ChildProcess.send(message, sendHandle)` is the one mechanism
- * that moves a live `net.Socket` across that boundary, so the parent takes the
- * raw socket off the HTTP upgrade (it does NOT complete the WebSocket handshake)
- * and sends it, with the bytes already read off the wire, to the owning child.
- * The child completes the handshake against its own `ws` server.
- *
- * This module is the whole seam between slice 3 (listener + handoff) and slice 2
- * (the Twilio adapter): slice 3 sends the socket, slice 2 installs a receiver
- * and drives the socket. Keeping the message shape here, shared by both sides,
- * is what lets slice 2 plug in without touching the listener.
- *
- * The child must be spawned with an `"ipc"` channel in its stdio for `send` to
- * carry a handle; that spawn change belongs to slice 2, which is the code that
- * registers a nonce against a child in the first place.
- */
+// Parent -> child handoff of Twilio media socket via Node's ChildProcess.send(message, sendHandle).
+// Parent takes raw socket off HTTP upgrade; child completes WebSocket handshake on own ws server.
 
 import type { ChildProcess } from "node:child_process";
 import type { Socket } from "node:net";
@@ -98,15 +80,8 @@ export interface ReceivedVoiceSocket {
   head: Buffer;
 }
 
-/**
- * Child side: the tiny shim slice 2 plugs its Twilio adapter into. Listens for
- * the parent's handoff message on the process IPC channel and invokes the
- * handler with the socket and the decoded head. Returns an unsubscribe.
- *
- * Behind an interface on purpose: slice 2 depends on this signature, not on the
- * listener, so the two slices compose without either importing the other's
- * internals.
- */
+// Child: shim for Twilio adapter. Listens for parent's handoff on IPC and invokes handler.
+// Behind interface so slices compose without importing each other's internals.
 export interface VoiceSocketReceiver {
   onVoiceSocket(handler: (received: ReceivedVoiceSocket) => void): () => void;
 }

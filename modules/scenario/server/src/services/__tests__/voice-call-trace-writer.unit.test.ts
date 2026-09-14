@@ -132,7 +132,10 @@ describe("recordVoiceCallTraces", () => {
   });
 
   describe("given a call with a greeting and one exchange", () => {
-    /** @scenario "Finished browser call writes one trace per exchange; messages link to exchange trace" */
+    /**
+     * @scenario "Finished browser call writes one trace per exchange; messages link to exchange
+     * trace"
+     */
     it("returns one trace id per turn, shared within an exchange", async () => {
       const record = fakeRecord({
         turns: [
@@ -323,7 +326,10 @@ describe("recordVoiceCallTraces", () => {
   });
 
   describe("when recordSpan fails", () => {
-    /** @scenario "Finished browser call writes one trace per exchange; messages link to exchange trace" */
+    /**
+     * @scenario "Finished browser call writes one trace per exchange; messages link to exchange
+     * trace"
+     */
     it("swallows the failure and still returns the ids", async () => {
       mockRecordSpan.mockRejectedValue(new Error("queue down"));
       const record = fakeRecord({

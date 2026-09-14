@@ -1,29 +1,6 @@
-/**
- * The voice worker's boot environment: the three infra knobs the operator sets
- * on the standalone voice worker deployment (#8014 env contract, issue comment
- * 5603665345).
- *
- *   - VOICE_WORKER_ONLY     the literal "true" turns this process into a voice
- *                           worker: it runs only voice scenario jobs and starts
- *                           the Twilio media listener. Anything else keeps the
- *                           current behaviour and starts no listener.
- *   - VOICE_WS_PORT         the TCP port the media listener binds (default 3300).
- *   - VOICE_PUBLIC_BASE_URL the public https origin Twilio dials back; the
- *                           worker derives wss://<host>/twilio/<nonce> from it.
- *                           Required when VOICE_WORKER_ONLY is on - the worker
- *                           refuses to start without it, because a listener no
- *                           call can reach is a silent misconfiguration.
- *
- * The Twilio account credentials are deliberately NOT here: the maintainer
- * ruled them per-project platform data (provider or agent config, encrypted at
- * rest) delivered to the worker with the job, never operator env (env contract,
- * revised 2026-09-10).
- *
- * Read from `process.env` with zod rather than the app-wide validated schema,
- * for the same reason {@link ./voice-limits} reads its knobs there: the boot
- * path resolves this before the app graph evaluates, and both the worker and a
- * test can reach it without threading a config object.
- */
+// Voice worker boot env: VOICE_WORKER_ONLY, VOICE_WS_PORT (default 3300), VOICE_PUBLIC_BASE_URL.
+// Twilio credentials are per-project platform data, not env.
+// Read from process.env before app graph evaluates (see voice-limits).
 
 import { z } from "zod";
 

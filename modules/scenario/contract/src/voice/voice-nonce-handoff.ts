@@ -1,24 +1,5 @@
-/**
- * The child -> parent Twilio stream-nonce registration handshake.
- *
- * The scenario child process runs the phone transport and is the one that
- * mints the per-call Twilio media-stream nonce (it drives `placeCall`,
- * {@link ../transports/phone.transport}). But the parent worker process owns
- * the public media listener and the registry it authenticates against
- * ({@link ./voice-nonce-registry}, read by
- * {@link ../../workers/voice-ws-listener}) — the process Twilio's dial-back
- * actually reaches. So before the child may dial, it tells the parent the
- * nonce over the process IPC channel and waits for an acknowledgement that
- * the parent has registered it against this child. Only then may `placeCall`
- * proceed: dialling before registration risks Twilio's socket arriving before
- * the parent knows the nonce, which the listener would refuse with 403 —
- * exactly the production gap this module closes.
- *
- * Mirrors the message-shape convention in {@link ../voice-socket-handoff}: a
- * type constant per message, a type guard, and a typed interface. That module
- * moves the socket itself (parent -> child, after the upgrade); this one
- * moves only the nonce (child -> parent, before the dial) and its ack.
- */
+// Child -> parent Twilio stream-nonce registration: prevent 403 by registering nonce before dial.
+// Mirrors voice-socket-handoff message shape: type constant, guard, interface.
 
 import type { ChildProcess } from "node:child_process";
 
@@ -65,16 +46,8 @@ export function isVoiceNonceRegisterMessage(
 export const VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE =
   "voice:media-upgrade-refused" as const;
 
-/**
- * Parent -> child: the listener refused Twilio's dial-back for a nonce this
- * child registered (currently sent only for an EXPIRED nonce — an unknown
- * nonce has no associated child to notify). Lets the child fail its dial
- * fast with the real cause instead of silently burning the SDK's full
- * connect-wait timeout and reporting a misleading "stream never connected".
- * Best-effort: if this never arrives (process died, message lost), the
- * child still eventually times out on its own — this only shortens the
- * common case, it is not required for correctness.
- */
+// Parent -> child: listener refused Twilio dial-back (e.g. expired nonce). Lets child fail fast.
+// Best-effort; if lost the child times out anyway.
 export interface VoiceMediaUpgradeRefusedMessage {
   type: typeof VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE;
   /** Human-readable cause, e.g. "nonce expired". Never customer-facing —
@@ -292,16 +265,8 @@ export class VoiceMediaUpgradeRefusedError extends Error {
   }
 }
 
-/**
- * Child side: race an in-flight `placeCall`-shaped wait against a parent's
- * upgrade-refusal notice. Resolves to `promise`'s outcome, or rejects with
- * {@link VoiceMediaUpgradeRefusedError} the moment a refusal notice arrives,
- * whichever comes first — so a nonce the listener already 403'd fails fast
- * instead of silently burning the SDK's full connect-wait timeout. Always
- * unsubscribes its listener before returning, win or lose, so a refusal
- * notice for an EARLIER, already-settled dial can never surface on a later
- * one sharing the same process.
- */
+// Child: race placeCall wait against parent's upgrade-refusal notice. Fails fast on refusal.
+// Unsubscribes listener to prevent stale refusal affecting later dials.
 export function raceAgainstUpgradeRefusal<T>(
   promise: Promise<T>,
   proc: VoiceNonceRegisterProcess = process as unknown as VoiceNonceRegisterProcess,

@@ -1,14 +1,5 @@
-/**
- * The grain the Results tab aggregates, and the shapes it answers with.
- *
- * One atom is one scenario, run once against one target, inside one run. Every
- * grouping is a fold over atoms and every filter is a cut of them, which is
- * what makes one filter move every number on the page.
- *
- * Types only, so the browser and the read side share one vocabulary without
- * either reaching for the other's code.
- *
- * @see specs/features/agent-testing/results-atoms.feature
+/** Result atoms: one scenario run against one target; shared vocabulary for
+ * browser and read side (types only).
  */
 
 import type { RunParameterValues } from "./scenario.parameters.ts";
@@ -18,22 +9,8 @@ import type { ScenarioEvaluationStatus } from "./schemas/event-schemas.ts";
 /** The target key a run carries when it names no platform target. */
 export const UNKNOWN_TARGET_KEY = "unknown";
 
-/**
- * Where an atom's cost came from.
- *
- * The four values exist because "no cost" means two different things on a
- * scenario run row, and a page that cannot tell them apart reports a total
- * that looks complete and is not.
- *
- * - `run`     the stored per-scenario total. The normal case.
- * - `traces`  the per-trace map on the same row, summed. The fold writes the
- *             stored total as NULL when the traces sum to zero, so this is what
- *             separates a run that was measured and cost nothing from one that
- *             was never measured.
- * - `none`    the run reached no trace at all, so it spent nothing. Known.
- * - `unknown` the run has traces but no cost was ever computed for them. This
- *             is the only value that means the number is missing, and it is the
- *             only one counted in `unknownAtoms`.
+/** Cost source: run (stored total), traces (per-trace sum), none (no trace),
+ * or unknown (no cost computed).
  */
 export type AtomCostSource = "run" | "traces" | "none" | "unknown";
 
@@ -62,16 +39,8 @@ export interface AtomEvaluation {
   label: string | null;
 }
 
-/**
- * One scenario, run once against one target, inside one run.
- *
- * This is the grain the Results tab aggregates: every grouping is a fold over
- * atoms and every filter is a cut of them, which is what makes one filter move
- * every number on the page.
- *
- * It maps one to one onto a deduped `simulation_runs` row, so the read grain
- * and the storage grain are the same. That is why cost needs no coarser total
- * to fall back to.
+/** Atom grain: one scenario run against one target, maps 1:1 to deduped
+ * simulation_runs rows.
  */
 /**
  * The most atoms one page may carry. The read clamps to it, and the Results
@@ -239,27 +208,13 @@ export interface ResultsOverview {
   groups: ResultGroup[];
 }
 
-/**
- * What is in scope. Both reads take the same filter so the overview and the
- * atom list can never disagree about what the page is showing.
- *
- * `scenarioIds` carries the resolution of a label or a test suite filter:
- * labels and test suites live in Postgres, so the caller turns them into
- * scenario ids
- * before the query runs.
+/** Scope filter for results; shared between overview and atom list to ensure
+ * consistent page views.
  */
 export interface ResultsFilter {
   projectId: string;
   startDate: number;
-  /**
-   * Optional upper bound, epoch ms.
-   *
-   * Leave it out for a live view. The period picker pins its end at mount, so
-   * sending it would filter on "started before the page loaded" and a run that
-   * begins while someone watches would never appear, on the one surface whose
-   * job is watching runs happen. Pass it only for a snapshot, such as an
-   * export, where the window must not move under the reader.
-   */
+  /** Optional end time (epoch ms); omit for live view, set for snapshots. */
   endDate?: number;
   scenarioIds?: string[];
   /**

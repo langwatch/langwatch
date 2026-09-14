@@ -80,7 +80,10 @@ describe("renderScenarioContent", () => {
     });
 
     describe("when a referenced name resolves to nothing", () => {
-      /** @scenario "A params reference with no resolved value fails the run request with scenario_parameter_missing" */
+      /**
+       * @scenario "A params reference with no resolved value fails the run request with
+       * scenario_parameter_missing"
+       */
       it("fails naming the missing name and the situation", async () => {
         const result = await renderScenarioContent({
           situation: "The customer is on the {{ params.account_tier }} plan",
@@ -97,7 +100,10 @@ describe("renderScenarioContent", () => {
         });
       });
 
-      /** @scenario "A params reference with no resolved value fails the run request with scenario_parameter_missing" */
+      /**
+       * @scenario "A params reference with no resolved value fails the run request with
+       * scenario_parameter_missing"
+       */
       it("fails naming the criterion that read it, by position", async () => {
         const result = await renderScenarioContent({
           situation: "The customer is on the {{ params.account_tier }} plan",

@@ -1,31 +1,5 @@
-/**
- * Lets a voice worker discover its own public HTTPS base URL at boot by
- * opening a free cloudflared "quick tunnel", instead of requiring
- * VOICE_PUBLIC_BASE_URL to be configured ahead of time. Deliberately
- * temporary/ephemeral infrastructure - a `*.trycloudflare.com` URL is torn
- * down and re-minted on every worker restart.
- *
- * Reuses the SDK's `openTwilioTunnel` (cloudflared provider) rather than
- * re-spawning cloudflared here - the same helper the JS a-leg e2e test uses to
- * open its own quick tunnel.
- *
- * NOTE the import shape. The SDK does NOT export this at its package root: its
- * root index does `export * as voice from "./voice"`, so the helper is reached
- * as `voice.openTwilioTunnel`, not as a flat named import. A flat import type
- * checks against the .d.ts but resolves to `undefined` at runtime, which fails
- * only when the real (non-injected) default is called - that is, at worker
- * boot in production, and never in a test that injects `openTunnel`. See the
- * "binds the real SDK helper" test, which exists to catch exactly that.
- *
- * A fresh `*.trycloudflare.com` hostname is NOT immediately globally
- * resolvable, and Twilio dials it within seconds of a call being placed, so
- * this module does not report the tunnel ready until the hostname actually
- * resolves publicly. This mirrors the `TunnelReadiness` gate the SDK's Twilio
- * a-leg e2e test builds for the same reason (`edgeReadiness` in
- * `twilio-a-leg-external.e2e.test.ts`) - that helper is test-local and not
- * exported, so the readiness wait is reimplemented here, with the DNS check
- * injectable so tests stay hermetic (no real network, no real cloudflared).
- */
+// Discover worker's public HTTPS URL via cloudflared quick tunnel instead of pre-configuring.
+// Ephemeral per restart; minted via SDK's openTwilioTunnel. Waits for DNS propagation before ready.
 
 import { voice as scenarioVoice } from "@langwatch/scenario";
 
@@ -77,16 +51,7 @@ export function tunnelHostFromUrl(url: string): string {
   return url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 }
 
-/**
- * How long one DNS-over-HTTPS probe may take before it is abandoned.
- *
- * Without this the probe inherits fetch's default of waiting for as long as
- * the peer keeps the socket open. `waitUntilTunnelResolvable` re-reads its own
- * deadline only BETWEEN probes, so a resolver that accepts the connection and
- * then stalls would park worker boot forever rather than failing at the
- * 300-second mark. An answer slower than this is useless to us anyway: the
- * next poll asks again.
- */
+// DNS-over-HTTPS probe timeout; prevents stalled resolver from parking boot forever.
 const DOH_REQUEST_TIMEOUT_MS = 5_000;
 
 /**
@@ -109,30 +74,8 @@ async function dohHasAnswer(endpoint: string, host: string): Promise<boolean> {
   return data.Status === 0 && (data.Answer?.length ?? 0) > 0;
 }
 
-/**
- * True once the hostname is resolvable on the public internet.
- *
- * Asks two public DNS-over-HTTPS resolvers and returns the instant either
- * answers. What this gate has to predict is whether TWILIO can find the
- * tunnel, and Twilio resolves from its own network, so a public resolver is
- * the right oracle.
- *
- * The local system resolver is deliberately NOT consulted, for two reasons
- * found the hard way:
- *
- * 1. Asking it before the name exists caches the NXDOMAIN, with a negative TTL
- *    of half an hour on this zone. It then keeps denying a name that is live
- *    everywhere else, so including it makes readiness slower and flakier, not
- *    safer.
- * 2. Its answer does not generalise. On one host it returned only AAAA records
- *    for a live tunnel while every public resolver returned A records; with no
- *    IPv6 route, everything local failed with ENETUNREACH even though the
- *    tunnel was perfectly healthy and reachable from the outside.
- *
- * Also deliberately a DNS check rather than an HTTPS round-trip: this machine's
- * own egress to the Cloudflare edge can be broken while Twilio's path to the
- * same tunnel is clean, so a failed GET here would prove nothing.
- */
+// Hostname resolvable on public internet. Asks two public DNS-over-HTTPS resolvers (not local).
+// DNS check, not HTTPS, predicts Twilio's reach.
 async function defaultResolveHost(host: string): Promise<boolean> {
   try {
     await Promise.any([

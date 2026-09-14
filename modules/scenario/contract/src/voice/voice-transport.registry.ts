@@ -1,9 +1,4 @@
-/**
- * Registry of voice transports: one server interface per transport, so a later
- * transport (phone) is a new entry here rather than a change to the adapter or
- * the child. Nothing outside `transports/` names a vendor — a runner is opaque
- * behind this interface.
- */
+// Registry of voice transports: one interface per transport. Vendors stay inside transports/.
 
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { CallRecord } from "./call-record.ts";
@@ -11,17 +6,8 @@ import type { VoiceTransport } from "./voice-transport.ts";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport.ts";
 import { phoneTransport } from "./transports/phone.transport.ts";
 
-/**
- * The provider credential a runner reads a conversation back with, or dials a
- * phone target with. Never reaches the browser — a runner keeps it and returns
- * only the signed URL (ElevenLabs) or drives the call itself (Twilio).
- *
- * A discriminated union rather than one flat shape: ElevenLabs signs a session
- * with an API key and host, Twilio dials from an account with a from-number, so
- * the two carry materially different fields. Each runner narrows on `kind` at
- * the top of its methods, so a credential built for the wrong transport fails
- * in that runner rather than being read as the shape it is not.
- */
+// Credential for reading/dialing. Never reaches browser (stays with runner).
+// Discriminated union: ElevenLabs (key + host) vs Twilio (SID + token + number).
 export type VoiceTransportCredential =
   | { kind: "elevenlabs"; apiKey: string; baseUrl: string }
   | {
@@ -47,15 +33,7 @@ export interface VoiceSessionConnect {
 }
 
 export interface VoiceTransportRunner {
-  /**
-   * Guard that runs before any credential lookup in the browser-driven mint
-   * and record flow, so a transport with no browser call fails with its own
-   * typed error rather than the generic
-   * {@link VoiceTransportRunner.missingKeyMessage} key-missing error. Left
-   * unimplemented by transports the browser can call; the phone runner throws
-   * here because a phone target has no browser call. It does NOT gate the
-   * headless scenario dial, which goes straight to {@link createAgentAdapter}.
-   */
+  // Guard before browser-driven mint/record. Phone throws; doesn't gate headless dial.
   assertAvailable?(): void;
   /** Build the SDK agent adapter the pool child drives for this transport. */
   createAgentAdapter(input: {

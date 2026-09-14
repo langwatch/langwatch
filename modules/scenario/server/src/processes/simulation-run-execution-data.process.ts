@@ -60,13 +60,8 @@ export const pendingEvaluatorSchema = z.object({
 export type PendingEvaluator = z.infer<typeof pendingEvaluatorSchema>;
 
 /**
- * Compact private process state (ADR-052): only what evolve() decisions
- * need. Run facts for the UI live in the run-state fold projection, not
- * here.
- *
- * HARD DATA BOUNDARY: this state is persisted in Postgres. It carries ids,
- * enums and timestamps only — never conversation content (messages, verdict
- * reasoning, criteria text).
+ * Private process state: only what evolve() decisions need. HARD DATA BOUNDARY:
+ * persisted in Postgres; ids, enums, timestamps only — never conversation content.
  */
 export interface SimulationRunExecutionProcessState {
   /** The tenant; needed by intent payloads (outbox rows persist them). */
@@ -172,13 +167,8 @@ export const recordEvaluationsIntentSchema = z.object({
 export type RecordEvaluationsIntent = z.infer<typeof recordEvaluationsIntentSchema>;
 
 /**
- * The content-stripped view of a pipeline event the process consumes.
- * Optional-at-the-source fields are null here (never undefined): the view is
- * persisted verbatim as the inbox payload, and undefined is not JSON-safe.
- *
- * Deliberately narrowed so this module does NOT depend on the enriched
- * finished-event fields landing: `status`, the evaluator ids the finished
- * event carries and whether its results carry evaluations are all it reads.
+ * Content-stripped view of pipeline event: optional fields are null (JSON-safe).
+ * Deliberately narrowed to status, evaluator ids, whether results carry evaluations.
  */
 export const simulationRunProcessEventViewSchema = z.object({
   eventType: z.string(),

@@ -258,8 +258,8 @@ describe("FinishRunCommand", () => {
     }
 
     /**
-     * @scenario "Caller-supplied results whose reasoning is the raw failure
-     * are classified before storage"
+     * @scenario "Caller-supplied results whose reasoning is the raw failure are classified before
+     * storage"
      */
     it("classifies results whose reasoning is the raw failure itself", async () => {
       const stored = await finishWith({
@@ -278,8 +278,8 @@ describe("FinishRunCommand", () => {
     });
 
     /**
-     * @scenario "Caller-supplied results with an error and no reasoning are
-     * classified before storage"
+     * @scenario "Caller-supplied results with an error and no reasoning are classified before
+     * storage"
      */
     it("classifies results that carry an error and no reasoning", async () => {
       const stored = await finishWith({

@@ -1,12 +1,6 @@
 /**
- * `/api/scenarios` - the scenarios (test cases) a project defines, and their
- * version history. `app.platformUrl(...)` resolves the deployment's own
- * origin, so this family declares no factory ports of its own.
- *
- * The family answers a miss in the bare `{ error }` body it has always had
- * - `errorEnvelope: "legacy"` on the pre-conversion family - so
- * `scenarioRestErrorHandler` stays the mount's own `onError`, composed over
- * the process's boundary handler.
+ * `/api/scenarios`: scenarios and version history (resolves platformUrl).
+ * Answers misses in legacy `{ error }` body; scenarioRestErrorHandler is mount's onError.
  */
 import { createLogger } from "@langwatch/observability";
 import {

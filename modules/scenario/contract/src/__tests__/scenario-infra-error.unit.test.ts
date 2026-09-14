@@ -48,7 +48,8 @@ function expectNoInternals(message: string): void {
   const leaked = INTERNAL_MARKERS.filter(({ pattern }) => pattern.test(message)).map(
     ({ label }) => label,
   );
-  // biome-ignore lint/suspicious/noMisplacedAssertion: one shared guard for every "no internals" case; the assertion belongs with the marker list it checks
+  // biome-ignore lint/suspicious/noMisplacedAssertion: one shared guard for every
+  // "no internals" case; assertion belongs with the marker list it checks
   expect(leaked).toEqual([]);
 }
 
@@ -670,7 +671,7 @@ describe("resolveScenarioError", () => {
       );
     });
 
-    /** @scenario An adapter that never got a response is an execution timeout, not a generic failure */
+    /** @scenario Adapter without response is execution timeout not generic error */
     it("still classifies a genuine infra timeout as an execution timeout", () => {
       // The guard must not swallow the real thing it sits in front of.
       const result = classifyScenarioInfraError(

@@ -82,7 +82,7 @@ export interface TestAgentTurnInput extends TestAgentRunInput {
   params?: Record<string, string | number | boolean>;
 }
 
-/** Folded in from the deleted `scenario.service.ts` contract-service: this capability's own vocabulary. */
+/** From deleted scenario.service.ts contract-service vocabulary. */
 export interface CancelScenarioRunInput {
   projectId: string;
   scenarioSetId: string;
