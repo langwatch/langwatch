@@ -81,6 +81,33 @@ const SESSION_FILE_SUFFIX = ".jsonl";
  */
 const MAX_PENDING_EVENTS = 20_000;
 
+/**
+ * How far before the run's start a file may claim to have been modified and
+ * still be offered to the reader.
+ *
+ * The run's start comes from `Date.now()`; a file's modification time comes
+ * from the kernel. On Linux those are not the same clock, and the second one
+ * runs behind: measured on a 6.x kernel, a file written IMMEDIATELY after a
+ * `Date.now()` carries an earlier mtime 98% of the time, by as much as 1.2ms.
+ * On macOS it never happens. So `mtime >= sinceMs` can be false for a file pi
+ * created after the spawn, and since this is a whole-file filter the run then
+ * captures nothing at all, exits 0, and says nothing — the failure has no
+ * symptom anywhere. That is not hypothetical: it is the CI-only flake in
+ * `pi-wrapper-capture.unit.test.ts`, where the margin between the stamp and
+ * the write is about 1.5ms, the same size as the skew.
+ *
+ * A grace is free here because this filter is not the run's boundary, only a
+ * prefilter for it. `readTurnsSince` compares each row's own clock — pi's, not
+ * the filesystem's — against the same `sinceMs`, and that comparison is what
+ * makes "only this run's turns" true. Every row a widened file window lets
+ * through is still dropped there. The cost is reading a session file the user
+ * last touched in the second before launch and sending none of it.
+ *
+ * A second is three orders of magnitude past the worst skew measured and still
+ * far too short to reach a previous session of any real length.
+ */
+const FS_CLOCK_SKEW_GRACE_MS = 1_000;
+
 export interface PiCapture {
   /**
    * Read every session this run has touched and post what is new.
@@ -122,7 +149,10 @@ async function sessionFilesTouchedSince({
     // descend. `maxDepth: 0` states that layout here, which is the whole
     // point of the shared walker taking it as an argument.
     maxDepth: 0,
-    sinceMs,
+    // Widened against the filesystem clock, never narrowed: see
+    // FS_CLOCK_SKEW_GRACE_MS. The run's real boundary is the row window in
+    // `readTurnsSince`, which this cannot loosen.
+    sinceMs: sinceMs - FS_CLOCK_SKEW_GRACE_MS,
     matchesName: (name) => name.endsWith(SESSION_FILE_SUFFIX),
   });
   // The shared walker yields newest-name-first, which is what a caller
