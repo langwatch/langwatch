@@ -1,15 +1,6 @@
 /**
- * The permission cache.
- *
- * Two ways this goes wrong and both are security bugs rather than performance
- * ones: a key that does not separate organizations serves one tenant's grants
- * to another, and an invalidation that does not fire keeps a revoked
- * permission working. The epoch is what makes a revocation take effect, and
- * the age bound is the backstop for when the epoch itself is not moving.
- *
- * Everything else here is a deliberate refusal to cache — anonymous callers,
- * a disabled cache, an unreadable epoch — and each has to fall through to a
- * fresh collection rather than to an empty answer.
+ * Permission cache security: keyed by organization + epoch, not by cache
+ * alone. Failures must fall through to fresh collect, not empty answer.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

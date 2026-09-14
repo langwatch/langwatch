@@ -1,21 +1,6 @@
 /**
- * A grant's PROVENANCE, which is two facts rather than one.
- *
- * `source` is WHICH SURFACE authored it — a SCIM reconciler and a
- * join-request approval both act as the platform, so the actor alone cannot
- * tell "the directory says so" from "the request was approved". The ACTOR is
- * who caused it, and for those same two surfaces that is nobody: a system
- * principal from the closed registry, not a person.
- *
- * These drive the real chain — AuthzGrantsService, over the eventing-backed
- * grant repository, over the ledger writer — and assert on the command the
- * writer actually emits, because a value that stops one layer short of the
- * fact is indistinguishable from one that never travelled at all. That is why
- * this file is not folded into `authz-grants.service.unit.test.ts`: that suite
- * stubs both the repository and the ledger, so it pins provenance as far as
- * the ledger writer call and no further.
- *
- * @see specs/rbac/authz-grants.feature
+ * Grant provenance: source (which surface) + actor (who caused it). Assert
+ * on ledger writer emit to catch values that stop short of the fact.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";

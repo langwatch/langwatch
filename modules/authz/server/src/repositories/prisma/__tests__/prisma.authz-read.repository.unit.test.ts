@@ -3,13 +3,8 @@ import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { PrismaAuthzReadRepository } from "../prisma.authz-read.repository.ts";
 
 /**
- * The adapter's contract with Prisma: exact query shapes. The POLICIES over
- * these rows are tested by the AuthZ server; what matters here is
- * that the queries filter what they claim to - above all that ShareLink
- * reads are keyed on the presented tokens (the possession gate's storage
- * half), that every binding read is fenced on CURRENT organization
- * membership, and that an API key's private permission role stays with the
- * key it was minted for.
+ * Adapter contract with Prisma: exact query shapes. ShareLink token-keyed,
+ * binding membership-fenced, API key roles bound to key.
  */
 describe("PrismaAuthzReadRepository", () => {
   describe("when reading organization membership", () => {

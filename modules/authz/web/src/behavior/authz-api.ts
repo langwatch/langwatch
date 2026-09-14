@@ -1,29 +1,6 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts`,
- * `governance-api.ts`, `automation-api.ts`, `ops-api.ts`, `agent-api.ts`,
- * `data-retention-api.ts`, `dataset-api.ts` and `model-provider-api.ts` say of
- * their own maps: the procedures are mounted by the process out of
- * `@langwatch/role-server`, which a web package may not import even for a type,
- * and the router type does not exist until a process instantiates it. Emitting
- * this file from the mounted router is the fix; writing it by hand is the
- * interim, and it is honest because every payload below is declared in
- * `@langwatch/role-contract` or `@langwatch/authz-contract`.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING, and here they say something worth
- * reading: this family's screens are AuthZ's, but its transport is the ROLE
- * feature's. `role` and `roleBinding` are mount points on the root router and
- * tRPC hashes that path into the React Query cache key, so spelling either
- * differently would quietly stop these hooks sharing a cache with the
- * `api.role.*` call sites that have not moved — the members page, the teams
- * page and the group binding editor all read `role.getAll`, and a stale list
- * after a role is created is exactly the bug that would follow.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE'S SCREEN
- * TREE. ADR-004 seals a screen's closure off from `@langwatch/api/web`,
- * and the import below is the only one of it here. Recorded so the finding it
- * raises is a decision rather than a surprise.
+ * Hand-written procedures/hooks (meant to be generated). Segment names are
+ * load-bearing for React Query cache key consistency (ADR-004 exception).
  */
 
 import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
@@ -48,14 +25,8 @@ export type AuthzApiMap = {
     getAll: { query: { input: OrganizationScope; output: Role[] } };
 
     /**
-     * One role with its full permission list, read when an editor or the
-     * permissions dialog opens.
-     *
-     * `getAll` already carries `permissions`, and the page still fetched this:
-     * the list read is a cache entry several other surfaces share, and opening
-     * an editor is the moment to be sure the permissions being edited are the
-     * ones on the server rather than the ones in a list that may have gone
-     * stale while the page sat open.
+     * One role with full permissions; ensure editor reads server state, not
+     * stale list.
      */
     getById: { query: { input: RoleScope; output: Role } };
 

@@ -1,13 +1,8 @@
 /** @vitest-environment node */
 
 /**
- * A revoke marks its row rather than deleting it, so a read that forgets to
- * exclude the marked ones authorizes revoked access — a mistake that fails
- * OPEN and is invisible in a diff.
- *
- * `liveGrants` / `liveRoles` make it unwriteable: they are the only way these
- * repositories reach the tables, and the fence is inside them. This checks
- * the one thing that could undo that — someone reaching past them.
+ * Revoke marks rows, not deletes them. liveGrants/liveRoles are the only
+ * access path to tables; assert nobody reaches past them.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

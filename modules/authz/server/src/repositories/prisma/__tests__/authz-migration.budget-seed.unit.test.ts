@@ -1,13 +1,8 @@
 /** @vitest-environment node */
 
 /**
- * The view-budget handover the authz-engine migration runs on every pass, and
- * the read that pairs with it. Both scale with an organization's share links,
- * which is what made a 428k-link organization unable to finish a pass at all.
- *
- * Prisma is a stub, so nothing here opens a socket. The guard is asserted as
- * SQL because that is what it is; whether Postgres honours it is the
- * integration lane's question.
+ * View-budget handover and read that pairs with it; both scale with share
+ * links. Assert guard as SQL.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { PrismaAuthzMigrationRepository } from "../prisma.authz-migration.repository.ts";

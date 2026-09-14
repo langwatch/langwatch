@@ -3,14 +3,8 @@ import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { PrismaAuthzListingRepository } from "../prisma.authz-listing.repository.ts";
 
 /**
- * The legacy reader's queries were moved verbatim from the services'
- * inline reads, and "byte-identical for a non-cut-over organization" is the
- * claim the whole seam rests on. The services' own copies are gone, so these
- * tests pin the moved WHERE / include / orderBy shapes directly — a drift
- * here is a behaviour change for every organization that has not cut over.
- *
- * The expected shapes are written out literally on purpose: importing the
- * module's own constants back would assert nothing.
+ * Legacy reader's queries moved verbatim; byte-identical claim for non-cutover
+ * orgs. Pin shapes directly; drift = behavior change.
  */
 
 const PRINCIPAL_FENCE = {

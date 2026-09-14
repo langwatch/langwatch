@@ -1,11 +1,6 @@
 /**
- * The grant writer's per-organization fork (ADR-092 decision 4), ledger side.
- *
- * An organization past the genesis import writes through the ledger: a
- * filtered revoke resolves the ids to revoke and hands them to the fold. The
- * legacy side lives in `ledger-write-fork.legacy.unit.test.ts`.
- *
- * @see specs/rbac/authz-grants.feature
+ * Ledger path: post-genesis imports write through ledger fork; filtered
+ * revoke resolves ids to fold (ADR-092 decision 4).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ACTOR, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";

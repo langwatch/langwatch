@@ -1,18 +1,6 @@
 /**
- * The three built-in roles, rebuilt on `@langwatch/authz-contract` instead of
- * `~/server/api/rbac`.
- *
- * WHAT THIS ACTUALLY PROTECTS. The dialog reads RAW membership — a permission
- * appears because the bag lists it, not because the engine would grant it — and
- * the bags DO lean on the hierarchy: every built-in role holds
- * `annotations:manage` without `annotations:create` beside it. That is not a
- * gap, because a resource showing `manage` is rendered as
- * "Manage (Create, Update, Delete)" and says the same thing. So the invariant
- * worth pinning is the one the reader actually depends on: nothing the engine
- * grants is missing from the dialog UNLESS the resource's `manage` is there to
- * say it, and nothing appears that the engine would not grant.
- *
- * Spec: specs/rbac/custom-role-permission-editing.feature
+ * Built-in roles rebuilt on authz-contract. Dialog reads raw membership; pin
+ * invariant: nothing engine grants is hidden, nothing appears that engine won't.
  */
 
 import { builtinRoleGrants, roleKeyForTeamRole } from "@langwatch/authz-contract";

@@ -1,17 +1,6 @@
 /**
- * The ledger-backed writer keeps the two typed failures it
- * documents (ADR-092 §13, `@throws` on `AuthzGrantsRepository`).
- *
- * The parent class raised them from its own Prisma calls; this one writes
- * through the ledger writer, whose legacy path, ledger path and synchronous
- * enforcement can each surface a duplicate or missing-row signal. Anything
- * that escapes as a raw Prisma error degrades to an unknown 500 at the
- * boundary, which silently breaks the REST contract's 409 and 404 — so every
- * mapping is asserted here, by `code`, because that is how callers match.
- *
- * Offboarding rides along: it is the one write whose correctness is a
- * POSTCONDITION rather than a shape, so what it enumerates and what it proves
- * against are the two things worth pinning.
+ * Ledger-backed writer preserves two typed failures across all write paths
+ * (ADR-092 §13); assert each mapping by code for REST contract correctness.
  */
 import type { LedgerActor } from "@langwatch/actor";
 import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
@@ -170,14 +159,8 @@ describe("given a replace whose broad grant has already gone", () => {
 
   describe("when the fold is lagging behind a grant that landed moments ago", () => {
     /**
-     * The existence pre-read found the row (it is genuinely there), but the
-     * lagging compat projection `revokeBindingsWhere` itself reads from can
-     * still answer 0 — its own docstring calls that count advisory. The old
-     * code derived "missing" from that count AFTER already appending a
-     * selector-only revoke, so the grant was swept away by the fold while
-     * the caller was told there was nothing to replace. The fix moves the
-     * existence check earlier, so this case now completes the replace
-     * instead of destroying access while reporting failure.
+     * Pre-read found row; lagging projection may answer 0 (advisory). Old code
+     * derived "missing" after revoking; pre-read now prevents access loss.
      */
     it("still completes the replace rather than appending a revoke and reporting missing", async () => {
       const { repository, writer } = harness({

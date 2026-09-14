@@ -98,15 +98,8 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
     actor: LedgerActor;
   }): Promise<void>;
   /**
-   * Delete every grant source for the user in one transaction, call
-   * `prove` with a reader bound to that transaction, and commit only if it
-   * returns. A throw from `prove` rolls the whole offboarding back
-   * (ADR-092 §10 step 7).
-   *
-   * Pending invites are keyed by email rather than by user id, so the
-   * implementation reads the address INSIDE its own transaction: a pre-read
-   * here would let an email change between the read and the deletes leave
-   * an invite behind that the proof cannot see.
+   * Delete user grants in one transaction; prove via txn-bound reader;
+   * rollback on prove throw (ADR-092 §10 step 7).
    */
   abstract offboardUser(args: {
     userId: string;

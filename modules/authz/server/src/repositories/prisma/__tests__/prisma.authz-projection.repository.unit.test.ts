@@ -1,17 +1,8 @@
 /** @vitest-environment node */
 
 /**
- * The store that applies the write projection's statements.
- *
- * This is where every safety property of the authorization read model lives —
- * the `occurredAt` guards, the columns a redelivered `attached` may NOT
- * restate, and the compat heads the legacy resolver still reads. It had no
- * tests at all, which is how the compat writes came to be deleted without
- * anything noticing.
- *
- * A unit test, and named one: Prisma is a stub, so nothing here opens a
- * socket. The raw-SQL guards are asserted as SQL because that is what they
- * are; whether Postgres honours them is the integration lane's question.
+ * Write projection store: safety properties (occurredAt guards, compat heads).
+ * Assert raw-SQL guards as SQL.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";

@@ -4,14 +4,8 @@ import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.t
 import { fromDate } from "@langwatch/time";
 
 /**
- * The grants-head adapter's contract with Prisma, the mirror of
- * authz-read.prisma.repository.unit.test.ts: the same questions, asked of
- * `Grant` / `Role` / `GrantUsage`. What matters here is that the answers stay
- * the ones the legacy heads gave - every binding read fenced on CURRENT
- * organization membership, an API key's private role staying with the key it
- * was minted for, share reads keyed on the presented tokens - and that the
- * facts a cut-over organization stores but does not yet act on (lite-member
- * and friends) are skipped rather than translated into a decision.
+ * Grants-head adapter contract: answers stay legacy-compatible (membership
+ * fence, API key role binding, token-keyed shares); skip cut-over facts.
  */
 const clientFor = (models: Record<string, unknown>) => models as unknown as AuthzDatabase;
 

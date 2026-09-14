@@ -1,12 +1,6 @@
 /**
- * The bounded read-your-writes hold, and what a caller can ask it to do when
- * the projection does not land inside the window.
- *
- * The append is durable either way, so most callers pass: the fold converges
- * and the rows appear. A caller whose next step hands out access those rows
- * decide asks for `requireProjection` and is refused instead.
- *
- * @see specs/rbac/authz-grants.feature
+ * Bounded read-your-writes hold; caller can require projection or pass if
+ * fold converges.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HandledError } from "@langwatch/handled-error";

@@ -2,15 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { PrismaAuthzGrantRepository } from "../prisma.authz-grant.repository.ts";
 
 /**
- * The tenancy lookups every write path validates with - the Prisma queries
- * this repository owns. The writes themselves live in
- * `EventingAuthzGrantRepository`, which composes this one for reads and emits
- * commands for everything it changes.
- *
- * Its provenance — the actor and source stamped on the emitted command — is
- * not covered anywhere: the service test asserts the CALL into the repository,
- * and the eventing repository's own tests assert neither. See
- * dev/docs/TESTING_PHILOSOPHY.md.
+ * Tenancy lookups this repository owns. Writes in EventingAuthzGrantRepository.
+ * Provenance covered elsewhere (TESTING_PHILOSOPHY.md).
  */
 
 describe("PrismaAuthzGrantRepository", () => {

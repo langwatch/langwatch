@@ -1,26 +1,8 @@
+/** @vitest-environment node */
+
 /**
- * @vitest-environment node
- *
- * An API-key permission check must not read the whole `Grant` table.
- *
- * `findCustomRolePermissions` asks who else holds a key's private role, and
- * that question is answered by `(organizationId, roleKey)`. No index carried
- * `roleKey`, so Postgres had nothing selective to descend and fell back to
- * reading every live grant the organization owns - on every check, to return
- * a handful of rows.
- *
- * The defect is invisible at demo scale and invisible in a unit test: it is a
- * planner decision, so proving it needs a real Postgres, real statistics, and
- * enough rows that "reads everything" and "reads what it needs" are different
- * numbers. So this suite seeds a lopsided organization, drives the real public
- * method, captures the SQL Prisma actually emitted, and asks the planner what
- * it did with it.
- *
- * The assertion is rows EXAMINED, not the name of an index or the absence of
- * a sequential scan. Those are shapes a future plan is allowed to change; the
- * promise is that a check for a few rows does not pay for the whole table.
- *
- * @see specs/rbac/unified-authorization-engine.feature
+ * API-key permission checks must not table-scan Grant. Assert rows examined
+ * via planner, not index names.
  */
 import type { AuthzPrincipalRef } from "@langwatch/authz-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";

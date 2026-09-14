@@ -1,17 +1,6 @@
 /**
- * ADR-114 (amended) — the pipeline actually DECLARES the ordered lane.
- *
- * The reasoning can be perfect and the change still be inert: an option that
- * never reaches the registry looks exactly like one that does, and the queue
- * quietly keeps its old shape. This file asserts the registration.
- *
- * It also travelled badly once. The guard used to live beside the pipeline in
- * the application, and when the pipeline moved into this package the three
- * command options were dropped while the guard stayed behind in a directory
- * whose sources no longer existed — so it could not even be imported, let
- * alone fail. It lives with the definition it guards now.
- *
- * @see packages/eventing/specs/authz-grant-command-lanes.feature
+ * Pipeline declares the ordered lane; assert registration to detect silent
+ * inertness (ADR-114 amended).
  */
 import { describe, expect, it } from "vitest";
 import {

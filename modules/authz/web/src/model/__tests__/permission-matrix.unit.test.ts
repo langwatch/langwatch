@@ -1,20 +1,6 @@
 /**
- * The five rules that decide what one click on the permission matrix does.
- *
- * These had NO test in `platform/app`, where they were closures inside a
- * component, and they are the part of this move most worth being sure about: a
- * custom role is what an organization delegates authority with, and a rule that
- * silently stopped adding `view` alongside `create` would produce roles that
- * grant a write nobody can see the result of.
- *
- * The move itself was measured rather than asserted: a differential harness
- * drove `platform/app`'s selector and this one through fifty-two click
- * sequences over four resource shapes — full CRUD plus manage, view-only, view
- * plus share, view plus manage — and compared the reported lists. It is not
- * kept, because keeping it means keeping the platform component; the table
- * below is what it established.
- *
- * Spec: specs/rbac/custom-role-permission-editing.feature
+ * Five rules that decide permission matrix clicks. Critical for role
+ * delegation; differential harness verified against platform/app closure.
  */
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
