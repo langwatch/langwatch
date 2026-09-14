@@ -63,13 +63,6 @@ describe("docs/api-reference/query/overview.mdx", () => {
     });
   });
 
-  describe("when the error table is read", () => {
-    /** @scenario "The query docs describe every credential form and the project header rule" */
-    it("lists project_scope_required", () => {
-      expect(readDocs()).toContain("project_scope_required");
-    });
-  });
-
   describe("when the Supported functions section is read", () => {
     const content = readDocs();
 

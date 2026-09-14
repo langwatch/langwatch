@@ -63,23 +63,6 @@ export type OrgResolution =
   | { ok: false; reason: "wrong_credential_class" | "unusable_credential" };
 
 /**
- * The outcome of resolving a token to a project, with the two failures kept
- * apart the same way {@link OrgResolution} keeps the org failures apart.
- *
- * `project_scope_required` is a working credential that verified but reaches no
- * single project — an organization key sent with no project hint. The caller
- * fixes it by naming a project (an `X-Project-Id` header or Basic auth), not by
- * swapping the key, so telling it apart from the rest is what makes the refusal
- * actionable. `unusable_credential` is everything else — unknown, revoked,
- * wrong secret, or a project the key cannot reach — and stays deliberately
- * vague, since distinguishing those for an unauthenticated caller would confirm
- * which secrets exist.
- */
-export type ProjectResolution =
-  | { ok: true; resolved: ResolvedToken }
-  | { ok: false; reason: "project_scope_required" | "unusable_credential" };
-
-/**
  * Strategy-based token resolver. Routes tokens to the correct verification
  * path based on prefix and structure:
  *   - pat-lw-* → API key lookup (old PAT format, backward compat)
@@ -107,9 +90,6 @@ export class TokenResolver {
    * X-Project-Id header, or URL). Ingestion keys are ordinary API keys —
    * the caller still supplies the project, and the key carries the
    * ingestSourceType the receiver stamps as provenance.
-   *
-   * @deprecated Use resolveProject(); remaining callers tracked in
-   * https://github.com/langwatch/langwatch/issues/8114
    */
   async resolve({
     token,
@@ -118,64 +98,27 @@ export class TokenResolver {
     token: string;
     projectId?: string | null;
   }): Promise<ResolvedToken | null> {
-    // The public contract is unchanged: every existing caller still gets
-    // `ResolvedToken | null`. {@link resolveProject} is the richer form that
-    // keeps "verified but no project scope" apart from "unusable", for the
-    // middleware that needs to answer them differently.
-    const resolution = await this.resolveProject({ token, projectId });
-    return resolution.ok ? resolution.resolved : null;
-  }
-
-  /**
-   * Resolves a token to a project, saying which of the two failures it hit.
-   *
-   * The `project_scope_required` branch is why this exists apart from
-   * {@link resolve}: a key that verifies but binds to no single project is a
-   * working credential the caller can fix by naming a project, and collapsing
-   * it into the same null every other miss returns is what left an
-   * organization key looking exactly like a revoked one.
-   */
-  async resolveProject({
-    token,
-    projectId,
-  }: {
-    token: string;
-    projectId?: string | null;
-  }): Promise<ProjectResolution> {
     const tokenType = getTokenType(token);
 
     switch (tokenType) {
       case "legacyProjectKey":
-        return this.legacyResolution(token);
+        return this.resolveLegacyProjectKey(token);
       case "apiKey": {
-        const resolution = await this.resolveApiKey(token, projectId ?? null);
-        if (resolution.ok) return resolution;
-        // A legacy project key can be shaped exactly like a new API key (its
-        // random body may contain an underscore), so when API key resolution
-        // MISSES for an sk-lw- token, fall back to the legacy lookup. Only an
-        // `unusable_credential` miss falls back: a `project_scope_required`
-        // token verified as an API key and is not a legacy key, so its refusal
-        // must survive rather than be masked by a legacy miss.
-        if (
-          resolution.reason === "unusable_credential" &&
-          token.startsWith(API_KEY_PREFIX)
-        ) {
-          return this.legacyResolution(token);
+        const resolved = await this.resolveApiKey(token, projectId ?? null);
+        // A legacy project key can be shaped exactly like a new API key
+        // (its random body may contain an underscore), so when API key
+        // resolution misses for an sk-lw- token, fall back to the legacy
+        // lookup. The fallback only grants access when the full token
+        // matches a stored project key, so misses stay a 401.
+        if (!resolved && token.startsWith(API_KEY_PREFIX)) {
+          return this.resolveLegacyProjectKey(token);
         }
-        return resolution;
+        return resolved;
       }
       default:
         // Unknown prefix — try legacy lookup as fallback
-        return this.legacyResolution(token);
+        return this.resolveLegacyProjectKey(token);
     }
-  }
-
-  /** The legacy-project-key lookup, as a {@link ProjectResolution}. */
-  private async legacyResolution(token: string): Promise<ProjectResolution> {
-    const resolved = await this.resolveLegacyProjectKey(token);
-    return resolved
-      ? { ok: true, resolved }
-      : { ok: false, reason: "unusable_credential" };
   }
 
   private async resolveLegacyProjectKey(
@@ -196,9 +139,9 @@ export class TokenResolver {
   private async resolveApiKey(
     token: string,
     projectId: string | null,
-  ): Promise<ProjectResolution> {
+  ): Promise<ResolvedToken | null> {
     const apiKey = await this.apiKeyService.verify({ token });
-    if (!apiKey) return { ok: false, reason: "unusable_credential" };
+    if (!apiKey) return null;
 
     // Single-project self-scoping: when the caller supplies no projectId — an
     // OTLP exporter that sends only the bearer token, or any client that can't
@@ -223,12 +166,7 @@ export class TokenResolver {
       }
     }
 
-    // Verified, but reaches no single project and the caller named none — a
-    // working organization (or multi-project) key with no project hint. Its own
-    // reason, so the caller is told to name a project rather than to swap a key
-    // that is not the problem.
-    if (!effectiveProjectId)
-      return { ok: false, reason: "project_scope_required" };
+    if (!effectiveProjectId) return null;
 
     // Look up the project and verify it belongs to the API key's organization
     const project = await this.prisma.project.findUnique({
@@ -238,24 +176,20 @@ export class TokenResolver {
       },
     });
 
-    if (!project) return { ok: false, reason: "unusable_credential" };
+    if (!project) return null;
 
     // Verify the project belongs to the same organization as the API key
-    if (project.team.organizationId !== apiKey.organizationId)
-      return { ok: false, reason: "unusable_credential" };
+    if (project.team.organizationId !== apiKey.organizationId) return null;
 
     return {
-      ok: true,
-      resolved: {
-        type: "apiKey",
-        apiKeyId: apiKey.id,
-        userId: apiKey.userId,
-        organizationId: apiKey.organizationId,
-        ingestSourceType: apiKey.ingestSourceType,
-        ingestionTemplateId: apiKey.ingestionTemplateId,
-        isLangySessionKey: apiKey.name === LANGY_SESSION_API_KEY_NAME,
-        project,
-      },
+      type: "apiKey",
+      apiKeyId: apiKey.id,
+      userId: apiKey.userId,
+      organizationId: apiKey.organizationId,
+      ingestSourceType: apiKey.ingestSourceType,
+      ingestionTemplateId: apiKey.ingestionTemplateId,
+      isLangySessionKey: apiKey.name === LANGY_SESSION_API_KEY_NAME,
+      project,
     };
   }
 

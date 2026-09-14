@@ -86,10 +86,9 @@ export async function sendCanary({
   authToken: string;
   /**
    * The project `authenticateProject` already resolved from the credential.
-   * Forwarded as `X-Project-Id` so an organization key accepted with a
-   * project selector stays scoped downstream — without it, the boundary
-   * behind `url` re-resolves the bare token and refuses an organization key
-   * with `project_scope_required`.
+   * Forwarded as `X-Project-Id` so an API key accepted via its single-project
+   * self-scope stays scoped downstream — without it, the boundary behind
+   * `url` re-resolves the bare token and cannot repeat the same resolution.
    */
   projectId: string;
   body: unknown;

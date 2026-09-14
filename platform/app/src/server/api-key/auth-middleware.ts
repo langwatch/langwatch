@@ -28,7 +28,6 @@ import {
 import {
   type OrgResolution,
   type OrgResolvedToken,
-  type ProjectResolution,
   type ResolvedToken,
   TokenResolver,
 } from "./token-resolver";
@@ -210,9 +209,9 @@ async function resolveProjectPrincipal({
     };
   }
 
-  let resolution: ProjectResolution;
+  let resolved: ResolvedToken | null;
   try {
-    resolution = await resolver.resolveProject({
+    resolved = await resolver.resolve({
       token: credentials.token,
       projectId: credentials.projectId,
     });
@@ -229,62 +228,31 @@ async function resolveProjectPrincipal({
     };
   }
 
-  if (!resolution.ok) {
+  if (!resolved) {
     logger.warn(
       {
         ...diag,
         hasToken: true,
         tokenType: getTokenType(credentials.token),
         hasProjectId: !!credentials.projectId,
-        reason: resolution.reason,
       },
-      "Authentication failed",
+      "Authentication failed: invalid credentials",
     );
     return {
       ok: false,
-      refusal: refusalForUnresolvedProject(resolution.reason),
-    };
-  }
-
-  return { ok: true, resolved: resolution.resolved };
-}
-
-/**
- * What to tell a caller whose token resolved to no single project.
- *
- * A key that verified but reaches no single project is a working credential:
- * the caller has to NAME a project, not swap the key, so it gets its own
- * `project_scope_required` code and the two mechanisms it can use — the same
- * split reasoning as {@link refusalForUnresolvedOrg}. Everything else stays the
- * exact `invalid_credentials` body unknown, revoked and wrong-secret keys have
- * always answered with, deliberately vague so it confirms nothing about which
- * secrets exist.
- */
-function refusalForUnresolvedProject(
-  reason: Extract<ProjectResolution, { ok: false }>["reason"],
-): AuthRefusal {
-  if (reason === "project_scope_required") {
-    return {
-      status: 401,
-      code: "project_scope_required",
-      legacyError: "Unauthorized",
-      message:
-        "This key reaches several projects; send X-Project-Id or Basic auth with the project id.",
-      meta: {
-        required: "project_scope",
-        accepted: ["X-Project-Id", "basic_auth_project_id"],
+      refusal: {
+        status: 401,
+        code: "invalid_credentials",
+        legacyError: "Unauthorized",
+        message: "Invalid credentials",
       },
     };
   }
-  return {
-    status: 401,
-    code: "invalid_credentials",
-    legacyError: "Unauthorized",
-    message: "Invalid credentials",
-  };
+
+  return { ok: true, resolved };
 }
 
-export { extractCredentials, refusalForUnresolvedProject };
+export { extractCredentials };
 
 /**
  * Variables set by the org-level auth middleware.
@@ -419,14 +387,9 @@ type AuthRefusal = {
   /**
    * Client-readable context for the refusal. Only fields a caller acts on:
    * the credential class a route needs against the one that arrived is the
-   * difference between swapping a key and hunting a typo, and the scoping
-   * mechanisms a `project_scope_required` refusal will accept.
-   *
-   * Narrowed to the two value shapes these fields actually carry — a single
-   * token, or a list of them — rather than `unknown`, so a refusal cannot
-   * smuggle an arbitrary object into a body a caller parses.
+   * difference between swapping a key and hunting a typo.
    */
-  meta?: Record<string, string | readonly string[]>;
+  meta?: Record<string, string>;
 };
 
 /**
