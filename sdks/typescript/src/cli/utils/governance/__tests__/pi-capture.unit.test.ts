@@ -426,21 +426,6 @@ describe("given a session captured by an earlier run", () => {
   const T3 = "2026-09-14T11:00:03.000Z";
   const T4 = "2026-09-14T11:00:04.000Z";
 
-  function rowAt(rowId: string, iso: string): string {
-    return `${JSON.stringify({
-      type: "message",
-      id: rowId,
-      parentId: null,
-      timestamp: iso,
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "hi" }],
-        timestamp: Date.parse(iso),
-        model: "openai/gpt-5-mini",
-      },
-    })}\n`;
-  }
-
   /** Each turn has its own second, so the entry clock identifies it. */
   function stampsSent(bodies: string[]): string[] {
     return bodies.flatMap((body) => {
@@ -467,7 +452,7 @@ describe("given a session captured by an earlier run", () => {
         id: SESSION_ID,
         version: 3,
         createdAt: "2026-09-14T10:00:00.000Z",
-      })}\n${rowAt("aaaaaaaa", T1)}${rowAt("bbbbbbbb", T2)}`,
+      })}\n${messageLine("aaaaaaaa", T1)}${messageLine("bbbbbbbb", T2)}`,
       "utf8",
     );
 
@@ -490,7 +475,7 @@ describe("given a session captured by an earlier run", () => {
     // it: no memory of the first run, and a modification time that has moved.
     await appendFile(
       file,
-      `${rowAt("cccccccc", T3)}${rowAt("dddddddd", T4)}`,
+      `${messageLine("cccccccc", T3)}${messageLine("dddddddd", T4)}`,
       "utf8",
     );
 
