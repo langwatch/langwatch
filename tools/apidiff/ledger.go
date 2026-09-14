@@ -90,7 +90,6 @@ type ledgerBuild struct {
 	order    []string
 	causes   map[string]*LedgerCause
 	baseline map[string]bool
-	hasBase  bool
 }
 
 // BuildLedger folds the union, the findings and the spec changes into one
@@ -100,7 +99,6 @@ func BuildLedger(union []Operation, report Report, baseline map[string]bool) Led
 		rows:     map[string]*LedgerRow{},
 		causes:   map[string]*LedgerCause{},
 		baseline: baseline,
-		hasBase:  baseline != nil,
 	}
 	build.seedRows(union)
 	build.applyTranscripts(report.Transcripts)
@@ -224,7 +222,7 @@ func (build *ledgerBuild) applySpecChanges(changes []SpecChange) {
 func (build *ledgerBuild) recordCause(cause, kind, operationKey string) {
 	group, ok := build.causes[cause]
 	if !ok {
-		group = &LedgerCause{RootCause: cause, Kind: kind, Known: build.baseline[cause]}
+		group = &LedgerCause{RootCause: cause, Kind: kind, Known: build.baseline[cause] || isAcceptedImprovement(cause)}
 		build.causes[cause] = group
 	}
 	group.Count++
@@ -252,7 +250,7 @@ func (build *ledgerBuild) finishRows() ([]LedgerRow, LedgerTotals) {
 	for _, key := range build.order {
 		row := build.rows[key]
 		sort.Strings(row.RootCauses)
-		row.Known = build.hasBase && len(row.RootCauses) > 0 && allKnown(row.RootCauses, build.baseline)
+		row.Known = len(row.RootCauses) > 0 && allKnown(row.RootCauses, build.baseline)
 		rows = append(rows, *row)
 		switch row.Classification {
 		case ClassificationDiffers, ClassificationMissingA, ClassificationMissingB:
@@ -291,9 +289,10 @@ func (build *ledgerBuild) finishCauses(totals *LedgerTotals) []LedgerCause {
 
 func allKnown(causes []string, baseline map[string]bool) bool {
 	for _, cause := range causes {
-		if !baseline[cause] {
-			return false
+		if baseline[cause] || isAcceptedImprovement(cause) {
+			continue
 		}
+		return false
 	}
 	return true
 }
@@ -359,6 +358,11 @@ func rootCauseOf(finding Finding) string {
 		return "body-value-diff"
 	case FindingErrorShapeDiff:
 		return "error-shape-diff"
+	case FindingErrorImproved:
+		if !hasStatus {
+			return "error-improved"
+		}
+		return withPair("error-improved", before, after)
 	case FindingProbeFailed:
 		return "probe-failed"
 	default:

@@ -14,6 +14,7 @@ const (
 	FindingBodyShapeDiff      = "body_shape_diff"
 	FindingBodyValueDiff      = "body_value_diff"
 	FindingErrorShapeDiff     = "error_shape_diff"
+	FindingErrorImproved      = "error_improved"
 	FindingOperationMissing   = "operation_missing"
 	FindingPermissionDiff     = "permission_diff"
 	FindingPermissionLeak     = "permission_leak"
@@ -107,6 +108,9 @@ func CompareResults(cmp Comparison, before, after SideResult) ComparisonOutcome 
 func (cmp Comparison) compareStatus(before, after SideResult) (Finding, bool, bool) {
 	beforeClass, afterClass := statusClass(before.Status), statusClass(after.Status)
 	if beforeClass != afterClass {
+		if finding, ok := classifyImprovedError(cmp, before, after); ok {
+			return finding, false, true
+		}
 		return cmp.finding(FindingStatusDiff, map[string][2]any{
 			"status": {before.Status, after.Status},
 			"class":  {beforeClass, afterClass},

@@ -97,6 +97,7 @@ func TestRootCauseSlugs(t *testing.T) {
 		{statusFinding(FindingStatusDiff, "GET", "/x", 200, 404), "route-absent-on-candidate:200-404"},
 		{statusFinding(FindingStatusDiff, "GET", "/x", 500, 200), "server-error-resolved:500-200"},
 		{statusFinding(FindingStatusDiff, "GET", "/x", 200, 302), "status-class-mismatch:200-302"},
+		{statusFinding(FindingErrorImproved, "GET", "/x", 500, 422), "error-improved:500-422"},
 		{statusFinding(FindingPermissionDiff, "GET", "/x", 403, 200), "permission-diff:403-200"},
 		{Finding{Kind: FindingBodyShapeDiff, Method: "GET", Path: "/x"}, "body-shape-diff"},
 		{Finding{Kind: FindingPermissionLeak, Method: "GET", Path: "/x"}, "permission-leak"},

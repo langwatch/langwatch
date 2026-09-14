@@ -61,7 +61,11 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 	}
 	report.Differences = len(changes)
 	for _, finding := range result.Findings {
-		if finding.Kind != FindingSkipped && finding.Kind != FindingUnverifiedShape {
+		// Skips are harness notes, unverified_shape is a coverage gap, and an
+		// improved-error finding is drift the tool grants on sight — see
+		// improved-error.go and the README's "Improved-error acceptance": none
+		// of the three is a behavioral regression to fail the run over.
+		if finding.Kind != FindingSkipped && finding.Kind != FindingUnverifiedShape && finding.Kind != FindingErrorImproved {
 			report.Differences++
 		}
 	}
@@ -77,6 +81,7 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 // findingKindOrder fixes the section order of the human summary.
 var findingKindOrder = []string{
 	FindingStatusDiff,
+	FindingErrorImproved,
 	FindingBodyShapeDiff,
 	FindingBodyValueDiff,
 	FindingErrorShapeDiff,
@@ -153,13 +158,20 @@ func writeTotalsLine(output *strings.Builder, report Report) {
 			report.Suppressed.SameClassStatus, report.Suppressed.ErrorBody)
 	}
 	unverified := 0
+	improved := 0
 	for _, finding := range report.Findings {
-		if finding.Kind == FindingUnverifiedShape {
+		switch finding.Kind {
+		case FindingUnverifiedShape:
 			unverified++
+		case FindingErrorImproved:
+			improved++
 		}
 	}
 	if unverified > 0 {
 		fmt.Fprintf(output, "unverified: %d list endpoints returned empty on both sides (item shape not exercised)\n", unverified)
+	}
+	if improved > 0 {
+		fmt.Fprintf(output, "improved: %d operation(s) replaced a base 5xx (or unhandled) failure with a branch handled 4xx — accepted, not counted as a difference\n", improved)
 	}
 }
 

@@ -45,9 +45,12 @@ nothing at all: no worktree, no haven command, no install.
 
 Exit status is `0` for no behavioral differences, `1` for differences found,
 and `2` for operational or usage errors. With `-ledger-baseline`, only a
-root cause the baseline does not name sets `1`. Progress (boot phases, per-operation
-probing) streams to stderr; stdout carries only the deterministic summary, or
-the machine report with `-json` (optionally to `-report FILE`).
+root cause the baseline does not name sets `1`. An improved-error finding
+(see "Improved-error acceptance" below) never sets `1`, with or without a
+baseline — it is the one difference the tool accepts on sight. Progress (boot
+phases, per-operation probing) streams to stderr; stdout carries only the
+deterministic summary, or the machine report with `-json` (optionally to
+`-report FILE`).
 
 ## Boot details
 
@@ -263,6 +266,51 @@ answers the same gate refusal, and that shows up as its own `entitled`-case
 finding: real signal that the gap is architectural, not a probe that forgot
 to check.
 
+## Improved-error acceptance
+
+One direction of drift is accepted by the tool itself rather than left for a
+human to baseline: **main answering a failure it does not attribute to any
+particular cause, and the branch answering a handled 4xx with its own stable
+code instead.** If it used to blow up and now it returns a 400 with a proper
+validation body, that is the fix working, not a regression to chase.
+
+A finding qualifies as `error_improved` iff BOTH hold:
+
+1. **Main's answer is unowned.** Status 5xx (unowned by construction,
+   whatever the body says — `apps/api/src/app/api-canonical-error.ts`'s
+   `handledErrorEnvelope` forces the generic `internal_error` code onto
+   every 5xx it emits, discarding even a `HandledError`'s own code), or a
+   body reporting that same generic code at some other status.
+2. **The branch's answer is a handled refusal at least as good.** A 4xx
+   whose body carries a stable code — either envelope shape apidiff probes:
+   the REST wrapper (`{"error":{"code":...}}`) or the flat shape
+   (`{"code":...}`) — and that code is not itself the generic placeholder.
+
+Every other direction keeps failing exactly as before. In particular:
+
+- **The reverse never qualifies.** Main answering a clean 4xx and the branch
+  degrading to a 5xx is `handled-refusal-degraded`, a defect, whichever
+  status pair it is — a 5xx is never auto-accepted on the candidate side,
+  even a named handled 503.
+- A main 2xx becoming anything else, a main 4xx becoming a *different* 4xx
+  (401→402), and a main 4xx becoming a 2xx are all still ordinary drift —
+  the last one is a permission/publication change for a human to decide,
+  not something this rule grants.
+- **Ambiguity resolves to NOT improved.** An unparsable or codeless body on
+  either side fails the qualification closed, not open; the finding is
+  reported as the ordinary `status_diff` it would have been anyway.
+
+An improved-error finding still lands in the report (its own section,
+`error_improved`, plus a one-line count in the summary: `improved: N
+operation(s) replaced a base 5xx (or unhandled) failure with a branch
+handled 4xx`) and in the ledger, under its own root-cause slug,
+`error-improved:<before-status>-<after-status>`. It never counts toward
+`report.Differences`, and its ledger cause is always reported `known` —
+neither needs `-ledger-baseline` to stop failing the run. An improved-error
+finding raised by the entitled pass (see "Entitled pass" above) carries the
+same `entitled:` namespace every other entitled-pass cause does:
+`entitled:error-improved:402-400`.
+
 ## The ledger
 
 A run's `-report` is the evidence; the **ledger** is the worklist. Every
@@ -301,14 +349,16 @@ There is **one row per operation in the union**, differing or not.
 Cause slugs: `not-found-as-500:<pair>`, `handled-refusal-degraded:<pair>`,
 `server-error-resolved:<pair>`, `route-absent-on-candidate:<pair>`,
 `route-absent-on-base:<pair>`, `status-class-mismatch:<pair>`,
-`operation-missing-on-candidate`, `operation-missing-on-base`,
-`permission-leak`, `permission-diff:<pair>`, `mutation-not-visible`,
-`body-shape-diff`, `body-value-diff`, `error-shape-diff`, `probe-failed`,
-`unresolvable-parameter`, `harness-symbol-table` (a harness artifact, not an
-API difference), `unverified-list-shape`, and `spec-<change kind>`. A finding
-from the entitled pass (see "Entitled pass" above) gets the SAME slug an
-identical finding would get from the main pass, prefixed with its own
-namespace — `entitled:handled-refusal-degraded:402-200`, never bare
+`error-improved:<pair>` (see "Improved-error acceptance" above — always
+reported `known`, baseline or not), `operation-missing-on-candidate`,
+`operation-missing-on-base`, `permission-leak`, `permission-diff:<pair>`,
+`mutation-not-visible`, `body-shape-diff`, `body-value-diff`,
+`error-shape-diff`, `probe-failed`, `unresolvable-parameter`,
+`harness-symbol-table` (a harness artifact, not an API difference),
+`unverified-list-shape`, and `spec-<change kind>`. A finding from the
+entitled pass (see "Entitled pass" above) gets the SAME slug an identical
+finding would get from the main pass, prefixed with its own namespace —
+`entitled:handled-refusal-degraded:402-200`, never bare
 `handled-refusal-degraded:402-200` — because "the gate disagrees" and
 "behavior behind the gate disagrees" are never the same fix.
 
@@ -316,7 +366,9 @@ namespace — `entitled:handled-refusal-degraded:402-200`, never bare
 of slugs) and marks those causes **known**: they are still reported, still
 counted, and no longer fail the run. Only a cause the baseline does not name
 exits `1`. That is how a branch ratchets from 40 causes to 0 without the tool
-being red the whole way.
+being red the whole way. Every `error-improved:<pair>` cause is marked known
+unconditionally, baseline present or not — it is the one cause that never
+needs to be named to stop failing the run.
 
 ## Findings stream
 
