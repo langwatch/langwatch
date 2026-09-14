@@ -6,11 +6,7 @@ import type { Protections } from "@langwatch/trace-contract";
  */
 import { TraceProjectionCompileService } from "../../../services/projection/trace-projection-compile.service.ts";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";
-import {
-  AnnotationService,
-  type ProjectionAnnotation,
-  type AnnotationApi,
-} from "@langwatch/annotation-contract";
+import { type ProjectionAnnotation, type AnnotationApi } from "@langwatch/annotation-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -177,7 +173,13 @@ function makeQueryInput(
 /** A fake AnnotationService — no Postgres testcontainer here, so the service's
  *  own mapping (id -> name remap, ProjectedAnnotation shape) is exercised
  *  against canned rows instead of a real join. */
-class FakeAnnotationService extends AnnotationService implements AnnotationApi {
+class FakeAnnotationService implements AnnotationApi {
+  createUnattributed(): never {
+    throw new Error("Not used by projection search tests: createUnattributed.");
+  }
+  getQueue(): never {
+    throw new Error("Not used by projection search tests: getQueue.");
+  }
   createReview(): never {
     throw new Error("Not used by projection search tests: createReview.");
   }

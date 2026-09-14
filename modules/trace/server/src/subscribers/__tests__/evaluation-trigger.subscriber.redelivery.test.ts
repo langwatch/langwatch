@@ -4,12 +4,12 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceEvaluationDispatch } from "../../app/trace.members.ts";
+import { type TraceEvaluationDispatch } from "../../app/trace.members.ts";
 import {
-  TraceEvaluationLoopMetrics,
+  type TraceEvaluationLoopMetrics,
   type TraceEvaluationLoopBlockReason,
 } from "../../app/trace.members.ts";
-import { TraceEvaluationMonitor } from "../../app/trace.members.ts";
+import { type TraceEvaluationMonitor } from "../../app/trace.members.ts";
 import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
 
 /**

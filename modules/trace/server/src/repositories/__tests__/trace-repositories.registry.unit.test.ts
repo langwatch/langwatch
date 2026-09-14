@@ -8,6 +8,7 @@
  */
 import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
+import { createInitState } from "../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
 
 import { traceRepositories } from "../trace-repositories.registry.ts";
 
@@ -54,7 +55,12 @@ describe("given the memory-backed trace repositories", () => {
       await repositories.editOverlay.upsert({
         projectId: "project-1",
         traceId: "trace-1",
-        patch: { input: { value: "corrected" } },
+        patch: {
+          version: 1,
+          trace: { input: { value: "corrected" } },
+          spans: [],
+          deletedSpanIds: [],
+        },
         userId: "user-1",
       });
 
@@ -73,7 +79,8 @@ describe("given the memory-backed trace repositories", () => {
 
       await repositories.summaryProjection.upsert({
         tenantId: "project-1",
-        data: { traceId: "trace-1" },
+        retentionDays: 30,
+        data: { ...createInitState(), traceId: "trace-1" },
       });
 
       await expect(

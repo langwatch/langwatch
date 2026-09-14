@@ -44,7 +44,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 
 import { TestCodingAgentService } from "../../../services/ingestion/__tests__/support/coding-agent.service.fake.ts";
-import { TracesV2TrpcApi } from "../traces-v2.api.ts";
+import { TraceTranscriptReadService } from "../../../services/read/trace-transcript-read.service.ts";
 import {
   createTranscriptApp,
   createTranscriptReadPorts,
@@ -188,7 +188,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
   /** The exact path the REST route takes: protections for a project, no session. */
   async function transcriptAsApiKeyCaller(logs: unknown[]) {
     getLogsByTraceId.mockResolvedValue(logs);
-    return TracesV2TrpcApi.readCodingAgentTranscript({
+    return TraceTranscriptReadService.readCodingAgentTranscript({
       app,
       ports,
       projectId: PROJECT_ID,

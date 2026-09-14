@@ -1,6 +1,6 @@
 import type { TraceClickHouseWriteClient } from "../../trace-clickhouse-client.repository.ts";
 import {
-  TraceWindowedReadMetrics,
+  type TraceWindowedReadMetrics,
   type TraceWindowedReadOutcome,
 } from "../../../app/trace.members.ts";
 

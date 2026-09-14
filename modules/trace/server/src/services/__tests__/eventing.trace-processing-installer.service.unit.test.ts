@@ -7,11 +7,11 @@ import {
 import { TRACE_PROCESSING_EVENT_TYPES, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventingTraceOriginAdapter } from "../eventing.trace-origin.service.ts";
-import { TraceDeferredOriginScheduler } from "../../app/trace.members.ts";
+import { type TraceDeferredOriginScheduler } from "../../app/trace.members.ts";
 import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.service.ts";
 import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.service.ts";
 import {
-  TraceProcessingPipeline,
+  type TraceProcessingPipeline,
   type TraceProcessingPipelineDefinition,
 } from "../../app/trace.members.ts";
 

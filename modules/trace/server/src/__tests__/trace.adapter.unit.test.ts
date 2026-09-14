@@ -1,7 +1,7 @@
 import {
   TraceQueryFieldValuesRepository,
   TracePayloadReaderRepository,
-  TraceFullIo,
+  type TraceFullIo,
   TraceSummaryReaderRepository,
 } from "../index.ts";
 // From the port that defines them: an in-package test does not need the

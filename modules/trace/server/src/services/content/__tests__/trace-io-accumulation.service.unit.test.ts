@@ -13,11 +13,11 @@ import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "../../canonicalisers/trace-canonicalisation.service.ts";
 import {
-  TraceMediaReferenceResolver,
+  type TraceMediaReferenceResolver,
   type TraceMediaReference,
 } from "../../../app/trace.members.ts";
 import {
-  TraceIoExtraction,
+  type TraceIoExtraction,
   type TraceIoSide,
   type TraceIoValue,
 } from "../../../app/trace.members.ts";

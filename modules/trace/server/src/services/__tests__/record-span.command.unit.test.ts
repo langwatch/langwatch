@@ -13,10 +13,10 @@ import { describe, expect, it, vi } from "vitest";
 import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
 import { applyOtlpReceiverPolicy } from "@langwatch/otlp";
 import {
-  TraceSpanContentDrop,
-  TraceSpanCostEnrichment,
-  TraceSpanPiiRedaction,
-  TraceSpanTokenEstimation,
+  type TraceSpanContentDrop,
+  type TraceSpanCostEnrichment,
+  type TraceSpanPiiRedaction,
+  type TraceSpanTokenEstimation,
 } from "../../app/trace.members.ts";
 import type { TraceSpanSpool, TraceSpanSpoolIdentity } from "../../app/trace.members.ts";
 

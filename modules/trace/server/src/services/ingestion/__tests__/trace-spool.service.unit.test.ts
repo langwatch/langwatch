@@ -2,8 +2,8 @@ import { Readable } from "node:stream";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  TraceSpoolLegacyObject,
-  TraceSpoolStorage,
+  type TraceSpoolLegacyObject,
+  type TraceSpoolStorage,
   type TraceSpoolObjectStore,
 } from "../../../app/trace.members.ts";
 import { SPOOL_REF_V2 } from "../../../rules/trace-spool-location.rules.ts";

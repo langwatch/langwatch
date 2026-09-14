@@ -5,7 +5,7 @@ import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract
 import { describe, expect, it } from "vitest";
 import { TraceMediaReferenceAdapter } from "../../trace-media-reference.service.ts";
 import {
-  TraceIoExtraction,
+  type TraceIoExtraction,
   type TraceIoSide,
   type TraceIoValue,
 } from "../../../app/trace.members.ts";

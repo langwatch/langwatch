@@ -47,7 +47,7 @@ function makeRepo() {
     }),
   } as unknown as ClickHouseClient;
   return {
-    repo: new TraceListClickHouseRepository(async () => client),
+    repo: TraceListClickHouseRepository.create(async () => client),
     queries,
   };
 }

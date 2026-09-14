@@ -26,10 +26,10 @@ import { TraceCanonicalisationService } from "../canonicalisers/trace-canonicali
 import { TraceSummaryFoldProjection } from "../../projections/trace-summary.projection.ts";
 import { createTestRuntime } from "../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
 import {
-  TraceSpanContentDrop,
-  TraceSpanCostEnrichment,
-  TraceSpanPiiRedaction,
-  TraceSpanTokenEstimation,
+  type TraceSpanContentDrop,
+  type TraceSpanCostEnrichment,
+  type TraceSpanPiiRedaction,
+  type TraceSpanTokenEstimation,
 } from "../../app/trace.members.ts";
 
 function policy({

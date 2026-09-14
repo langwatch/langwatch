@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { openProtections } from "../../../repositories/clickhouse/__tests__/open-protections.ts";
 import { TestCodingAgentService } from "../../../services/ingestion/__tests__/support/coding-agent.service.fake.ts";
-import { TracesV2TrpcApi } from "../traces-v2.api.ts";
+import { TraceTranscriptReadService } from "../../../services/read/trace-transcript-read.service.ts";
 import {
   createTranscriptApp,
   createTranscriptReadPorts,
@@ -63,7 +63,7 @@ describe("readCodingAgentTranscript", () => {
         ),
       ]);
 
-      const transcript = await TracesV2TrpcApi.readCodingAgentTranscript({
+      const transcript = await TraceTranscriptReadService.readCodingAgentTranscript({
         app,
         ports,
         projectId: PROJECT_ID,
@@ -96,7 +96,7 @@ describe("readCodingAgentTranscript", () => {
         },
       ]);
 
-      const transcript = await TracesV2TrpcApi.readCodingAgentTranscript({
+      const transcript = await TraceTranscriptReadService.readCodingAgentTranscript({
         app,
         ports,
         projectId: PROJECT_ID,
