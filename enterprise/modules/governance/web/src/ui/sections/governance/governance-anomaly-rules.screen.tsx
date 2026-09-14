@@ -2,9 +2,7 @@
 
 import { Heading, VStack } from "@chakra-ui/react";
 import { AnomalyRulesTab } from "../../../features/ingestion-sources/AnomalyRulesTab";
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 
 /**
  * The retired standalone address for anomaly rules. The rules now live in
@@ -26,10 +24,4 @@ function AnomalyRulesPage() {
   );
 }
 
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withPermissionGuard("governance:view", {
-    bypassOnboardingRedirect: true,
-  })(AnomalyRulesPage),
-);
+export default AnomalyRulesPage;
