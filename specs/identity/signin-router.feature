@@ -1,12 +1,13 @@
-Feature: The identifier-first sign-in router - one front door, routed by data
+Feature: The identifier-first sign-in router - one auth screen, routed by data
   As a person signing in to LangWatch
   I need my email to route me to the right identity provider or method set
-  So that every sign-in method works through one door, without the screen
-  ever revealing whether an account exists for the address I typed
+  So that every sign-in method works through one door and credential failures
+  never reveal whether the address or secret was wrong
 
   # D03 (ADR-117). The router is a pure decision engine over Postgres reads;
   # user-level resolution (any verified email, OAuth subject) is the
-  # ADR-116 storage adapter's job, so the router carries no per-user fork.
+  # ADR-116 storage adapter's job. The router consumes the account method
+  # answer through its lookup port; it does not read identity storage itself.
   #
   #   input                        decision                  reason code
   #   (self-hosted, 1 ACTIVE  →    redirect to the IdP       sole_active_connection
@@ -14,16 +15,18 @@ Feature: The identifier-first sign-in router - one front door, routed by data
   #   (?local=1)              →    local method picker       break_glass
   #   email → normalize       →    domain in ACTIVE conn?
   #     yes                   →    redirect to the IdP       domain_routed
-  #     no                    →    uniform method picker     no_domain_match
+  #     no, known account     →    account's method picker   account_methods
+  #     no, unknown account   →    continue to sign-up       identifier_unknown
+  #     lookup not wired      →    default method picker     no_domain_match
   #
   # The decision carries a reason code; the same codes drive the screens'
   # deny/guidance states (D13) and the ops surface's routing view (D05).
   # Domain lookup reads ssoDomain strings until D04's SsoConnection
   # projection takes over behind SSOCONN_ROUTING. The whole deliverable
-  # flips with D13 on IDENTITY_ROUTER_V2, shadow-compared first.
+  # ships with D13: the router decides, and the screens render what it decided.
 
   Background:
-    Given an installation with the identifier-first router available behind its flag
+    Given an installation with the identifier-first router
 
   # ── Routing decisions ──────────────────────────────────────────────────
 
@@ -35,19 +38,85 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
 
+  # RETIRED, and replaced by the four scenarios below (ADR-117, revision
+  # 2026-08-25). The router used to answer a known address and an unknown one
+  # identically, by construction. It no longer does, and the argument is in
+  # the ADR: the sign-up door already answers "does this address have an
+  # account" to anybody who asks, so the router's silence bought nothing an
+  # attacker could not get next door — and it cost every real customer a
+  # password box in front of a passkey-only account, or in front of no
+  # account at all. What survives is named below: one credential refusal, one
+  # rate limit, and no secret ever read.
+
   @unit
-  Scenario: An email with no domain match offers the uniform method picker
+  Scenario: A router that was never asked about accounts answers as it always did
     Given "home.net" belongs to no ACTIVE connection
+    And this deployment never wired the account lookup
     When "sam@home.net" is submitted to the router
     Then the decision is the instance's default method set
     And the decision carries the reason code "no_domain_match"
 
   @unit
-  Scenario: The decision never depends on whether an account exists
+  Scenario: An address with no account carries on as a sign-up
     Given "home.net" belongs to no ACTIVE connection
-    When an email with an account and an email without one are submitted
-    Then both decisions are the same decision, field for field
-    And nothing in either response names the account's existence
+    And no account holds "nobody@home.net"
+    When "nobody@home.net" is submitted to the router
+    Then the decision routes to sign-up with the reason code "identifier_unknown"
+    And the decision offers no method at all
+    And the routing log records the domain and never the address
+
+  @unit
+  Scenario: An account the sign-up form just made is not mistaken for no account
+    Given "home.net" belongs to no ACTIVE connection
+    And somebody registers "new@home.net" through the sign-up form
+    When "new@home.net" is submitted to the router
+    Then the decision offers the password
+    And the decision never routes to sign-up with the reason code "identifier_unknown"
+
+  @unit
+  Scenario: An account still waiting for identifier backfill keeps its way in
+    Given "home.net" belongs to no ACTIVE connection
+    And an existing account holds "legacy@home.net"
+    And that account's identifier backfill is not finalized
+    When "legacy@home.net" is submitted to the router
+    Then the decision offers the account's legacy sign-in method
+    And the decision never routes to sign-up with the reason code "identifier_unknown"
+
+  @unit
+  Scenario: The methods offered are the ones that account holds
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds a passkey and no password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the passkey and not the password
+    And the methods are ordered strongest first
+    And a method this deployment does not offer is never offered
+
+  @unit
+  Scenario: A connected domain routes before the account is consulted
+    Given "acme.com" belongs to a connection in state ACTIVE
+    And no account holds "newhire@acme.com"
+    When "newhire@acme.com" is submitted to the router
+    Then the decision redirects to that connection's identity provider
+    And the account is never looked up
+
+  @unit
+  Scenario: An account whose every method was turned off still gets a way in
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds only a method this deployment stopped offering
+    When "sam@home.net" is submitted to the router
+    Then the decision is the instance's default method set
+    And the decision is not a sign-up
+
+  # The half of the no-oracle that is NOT retired, and the reason the retirement
+  # is safe. Knowing an account exists is now cheap; knowing which half of a
+  # submitted pair was wrong is what turns credential stuffing from guessing
+  # pairs into guessing one field at a time, and that is still never told.
+  @unit
+  Scenario: A refused credential still refuses in one way
+    Given an account holds "sam@home.net"
+    When a wrong password for it and a password for an address nobody holds are submitted
+    Then both are refused with the code "identity_sign_in_refused"
+    And neither refusal says which half was wrong
 
   @unit
   Scenario: A suspended connection stops routing its domain
@@ -61,6 +130,57 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     When any email is submitted to the router
     Then the decision and its reason code are logged
     And the log carries the domain, never the local part of the address
+
+  # THE BUDGETS ARE THE DEFENCE, since the retirement above means any single
+  # answer tells the asker something. Two of them, because walking a user base
+  # and hounding one address are different shapes of the same abuse: the
+  # per-caller budget is what turns enumeration into months of work, and the
+  # per-address budget is what stops one address being probed from everywhere
+  # at once. Neither number is generous to a script and neither is reachable
+  # by a person signing in.
+  @unit
+  Scenario: Asking about address after address from one place is eventually refused
+    Given a visitor asking the sign-in router about a different address every time
+    When that visitor's budget for the hour is spent
+    Then the next question is refused and says how long to wait
+    And the router is never asked to decide it
+
+  @unit
+  Scenario: One address probed from many places is eventually refused
+    Given the same address is asked about from a new client each time
+    When that address's budget for the hour is spent
+    Then the next question about it is refused and says how long to wait
+    And a question about another address from that same client is still answered
+
+  @unit
+  Scenario: Auth throttles distinguish callers behind a trusted ingress
+    Given two callers reach the auth screen through the same configured trusted proxy
+    When each caller asks the sign-in router where an address should go
+    Then each caller spends a separate per-client budget
+    And a forwarding header received from an untrusted peer is ignored
+
+  @unit
+  Scenario: A caller on the public internet cannot choose its own throttle bucket
+    Given no trusted proxy is configured
+    And the caller reaches the app directly from a public address
+    When the caller sends a forwarding header naming a different address
+    Then the forwarding header is ignored
+    And the budget is spent against the address the caller connected from
+
+  @unit
+  Scenario: An in-cluster ingress does not collapse every visitor into one bucket
+    Given no trusted proxy is configured
+    And the app is reached through an ingress on a private address
+    When two visitors ask the sign-in router where an address should go
+    Then the ingress is read as the deployment's own hop
+    And each visitor spends a separate per-client budget
+
+  @unit
+  Scenario: Better Auth counts the same caller the platform counts
+    Given a request reaches an endpoint Better Auth throttles for itself
+    When the caller has been resolved from the connection
+    Then Better Auth is handed that caller as the canonical forwarding header
+    And no header written by the caller reaches its throttle
 
   # ── Self-hosted priority ───────────────────────────────────────────────
 
@@ -81,10 +201,31 @@ Feature: The identifier-first sign-in router - one front door, routed by data
   @unit
   Scenario: The provider env becomes the default method set
     Given a self-hosted installation configured with a single OAuth provider
-    And the identifier-first router is enforced
     When the sign-in page is requested
     Then the configured provider is the offered method, exactly as before
     And a second method can be added without ending the first
+
+  # ── Which social providers the door offers ─────────────────────────────
+  #
+  # A social button is an offer to dial a provider. An offer the deployment
+  # cannot honour is worse than no offer at all: the person presses Google,
+  # and the platform answers that it has never heard of Google. So the set the
+  # door offers is derived from the set the platform MOUNTED, and from nothing
+  # else — not from a hardcoded cloud list, and not from whether this happens
+  # to be a development build.
+
+  @unit
+  Scenario: Every social provider this deployment mounted is offered by name
+    Given a self-hosted installation that mounted a social identity provider
+    When the sign-in page is requested
+    Then that provider is one of the offered methods, under its own name
+    And it is offered exactly once, however many ways it was named
+
+  @unit
+  Scenario: A social provider this deployment never mounted is never offered
+    Given credentials are present for a social provider this deployment does not mount
+    When the sign-in page is requested
+    Then that provider is not one of the offered methods
 
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 
@@ -95,6 +236,17 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     Then no SSO method appears in any routing decision
     And the email and password method set is offered
     And a direct request to an SSO callback path is still refused
+
+  # ADR-027 Decision 2 scopes the gate to every non-email provider by name —
+  # google, github, gitlab, azure-ad, okta, auth0 — because login federation
+  # is the paid feature. A social provider is not a lesser class of federation
+  # that slips past it.
+  @unit
+  Scenario: A never-licensed installation offers no social provider either
+    Given a self-hosted installation whose license gate denies
+    And a social identity provider is mounted
+    When the sign-in page is requested
+    Then that provider is not one of the offered methods
 
   @unit
   Scenario: The license gate still freezes at startup
@@ -134,6 +286,36 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     Then a LinkProposed event is recorded and the sign-in is refused with guidance
     And confirming the proposal later attaches the identifier and admits the user
 
+  # WHERE THE RULE ABOVE ACTUALLY RUNS.
+  #
+  # The four scenarios above describe the callback service that owns the whole
+  # decision: resolve the person, then link, propose or provision. On every
+  # deployment we run, the identity library owns that resolution instead, and
+  # the only moment it offers before a sign-in method exists is one where the
+  # link has already been chosen. So the same rule is applied there, from the
+  # one shared refusal function, and these two scenarios bind THAT — a
+  # scenario bound only to the service above would be bound to code no
+  # deployment reaches.
+  #
+  # It judges an addition to an account that already signs in some way. A
+  # person with no sign-in method yet is covered by
+  # specs/auth/sso-orphan-user-linking.feature, which binds the same question
+  # against a real callback.
+
+  @unit
+  Scenario: The evidence rule also guards a method added to an established account
+    Given somebody who already signs in one way
+    And a second method whose identity provider says the address is not verified
+    When that method would be attached to their account
+    Then the attachment is refused and nothing is attached
+    And a link proposal is recorded for an admin to confirm
+
+  @unit
+  Scenario: An identity provider that asserts nothing refuses nothing
+    Given a second method whose identity provider makes no claim about the address
+    When that method would be attached to an established account
+    Then it is attached exactly as it was before this rule existed
+
   @unit
   Scenario: No match provisions just-in-time only where the connection allows
     Given a callback subject and email matching no user
@@ -141,22 +323,6 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     Then a user is provisioned and signed in
     But on a connection that forbids JIT the sign-in is refused
     And the refusal carries the reason code "jit_disabled"
-
-  # ── Cutover ────────────────────────────────────────────────────────────
-
-  @unit
-  Scenario: Shadow mode compares every login and changes nothing
-    Given the router flag is in shadow
-    When a user signs in through the legacy path
-    Then the router's decision is computed and compared against the legacy outcome
-    And a mismatch is logged with both decisions and the reason code
-    And the user's sign-in is untouched either way
-
-  @unit
-  Scenario: The flag off restores the legacy path entirely
-    Given the router flag is enforced and then turned off
-    When the sign-in page is requested
-    Then the legacy path answers exactly as before the flip
 
   @integration @unimplemented
   Scenario: The pending SSO setup flag is reconciled once and retired

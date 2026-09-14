@@ -1,5 +1,5 @@
-import { Button, Portal, Text } from "@chakra-ui/react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Button, HStack, Portal, Text } from "@chakra-ui/react";
+import { Building2, Check, ChevronsUpDown } from "lucide-react";
 import { useLocalStorage } from "usehooks-ts";
 import { Menu } from "~/components/ui/menu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -56,10 +56,18 @@ export function OrganizationSelect({
   if (!organization) return null;
 
   if (!isMultiOrg) {
+    // DELIBERATE, NOT LEFT OVER. Bare muted text in the slot where a control
+    // would be reads as a switcher that failed to render — the same size, the
+    // same colour, the chevron simply missing. A mark before it and the weight
+    // of a name make it the thing it is: a statement of which organization you
+    // are in, for somebody who is only ever in one.
     return (
-      <Text fontSize="13px" color="fg.muted" whiteSpace="nowrap">
-        {organization.name}
-      </Text>
+      <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
+        <Building2 size={13} aria-hidden />
+        <Text fontSize="13px" fontWeight="medium" color="fg">
+          {organization.name}
+        </Text>
+      </HStack>
     );
   }
 

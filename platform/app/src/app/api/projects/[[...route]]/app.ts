@@ -5,7 +5,6 @@ import {
   anyAuthenticated,
   createOrgApp,
   requires,
-  requiresOnProject,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
@@ -23,7 +22,6 @@ import {
   TeamNotInOrganizationError,
 } from "~/server/app-layer/projects/project.service";
 import { prisma } from "~/server/db";
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
@@ -381,56 +379,26 @@ secured
 
 // ── API Key management ───────────────────────────────────────────────────────
 
-/**
- * The base key is a project-level write credential, so reading it is gated
- * with `project:update` to match the access it grants — not `project:view`.
- * `requiresOnProject` resolves that at the named project's scope rather than
- * the organization's, so one org-wide grant does not reach every project.
- */
+function refuseLegacyProjectKeyApiToken(): never {
+  throw new ForbiddenError(
+    "A signed-in project administrator must manage the base API key in the browser",
+  );
+}
+
 secured
-  .access(requiresOnProject("project:update"))
+  .access(anyAuthenticated())
   .get(
     "/:id/api-key",
-    projectServiceMiddleware,
     describeRoute(GET_PROJECT_API_KEY),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("projectService") as ProjectService;
-
-      const project = await readableProject({
-        id,
-        organizationId: organization.id,
-        service,
-      });
-
-      return c.json({ apiKey: project.apiKey });
-    },
+    refuseLegacyProjectKeyApiToken,
   );
 
 secured
-  .access(requires("project:manage"))
+  .access(anyAuthenticated())
   .post(
     "/:id/regenerate-api-key",
-    projectServiceMiddleware,
     describeRoute(REGENERATE_PROJECT_API_KEY),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("projectService") as ProjectService;
-
-      // Re-keying the governance project would break the receiver's own
-      // ingestion path, so the same guard the mutations carry applies here.
-      await readableProject({ id, organizationId: organization.id, service });
-
-      const newApiKey = generateApiKey();
-      await prisma.project.update({
-        where: { id },
-        data: { apiKey: newApiKey },
-      });
-
-      return c.json({ apiKey: newApiKey });
-    },
+    refuseLegacyProjectKeyApiToken,
   );
 
 export const app = secured.hono;

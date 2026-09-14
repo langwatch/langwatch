@@ -52,7 +52,7 @@ export function InviteMemberDrawer({
     onInviteCreated: () => {},
     onClose: closeDrawer,
     refetchInvites: () =>
-      void queryClient.organization.getOrganizationPendingInvites.invalidate(),
+      void queryClient.invite.getOrganizationPendingInvites.invalidate(),
     pricingModel: (organization as { pricingModel?: string } | undefined)
       ?.pricingModel,
     activePlanFree: activePlan.data?.free ?? true,

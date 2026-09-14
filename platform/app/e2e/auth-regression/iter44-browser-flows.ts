@@ -10,7 +10,7 @@
  *     and after signin should bounce back to the invite page and
  *     accept it (or show the right error for a non-matching email).
  *  3. Settings page — an authenticated user can navigate to
- *     /settings/authentication and see the "Change Password" form.
+ *     /settings/security and see the "Change Password" form.
  *  4. Change password via tRPC — tests the iter-26 revokeOtherSessions
  *     wiring: sign in from TWO contexts, change password from one,
  *     verify the other context is signed out.
@@ -313,7 +313,7 @@ async function main() {
     // ─────────────────────────────────────────────────────────────
     // [4] Settings / authentication page loads for authenticated user
     // ─────────────────────────────────────────────────────────────
-    console.log("\n[4] /settings/authentication renders for auth'd user");
+    console.log("\n[4] /settings/security renders for auth'd user");
 
     const ctx4 = await browser.newContext();
     await signUp(ctx4, USER2_EMAIL, PASSWORD, "Iter44 User2");
@@ -339,13 +339,13 @@ async function main() {
     });
 
     const page4 = await ctx4.newPage();
-    await page4.goto(`${BASE_URL}/settings/authentication`, {
+    await page4.goto(`${BASE_URL}/settings/security`, {
       waitUntil: "networkidle",
     });
     await page4.waitForTimeout(2500);
     const settingsBody = (await page4.textContent("body")) ?? "";
     check(
-      "settings/authentication page mentions 'Change Password'",
+      "settings/security page mentions 'Change Password'",
       settingsBody.includes("Change Password") ||
         settingsBody.includes("Password"),
     );

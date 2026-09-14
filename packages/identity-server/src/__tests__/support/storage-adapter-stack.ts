@@ -2,30 +2,24 @@ import {
   type IdentityCommand,
   type IdentityFact,
   type IdentityFactInput,
-  normalizeIdentifierValue,
 } from "@langwatch/identity";
-import type { BetterAuthOptions } from "better-auth";
+import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { deriveNewbornUserId } from "../../crypto/identifier-identity";
-import {
-  birthAwareGate,
-  type IdentityBirthPort,
-  IdentityEngineUnavailableError,
-  runWithIdentityBirth,
-} from "../../better-auth/identity-birth";
 import {
   bridgeAccountCeremonies,
   IdentityCeremonies,
 } from "../../better-auth/identity-ceremonies";
-import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
+import {
+  createIdentityStorageAdapter,
+  type PasskeyRemovalPort,
+} from "../../better-auth/identity-storage-adapter";
 import type {
   IdentityAccountsPort,
   IdentityResolutionPort,
 } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
 import {
-  adoptUserEmailCommandId,
   newIdentityCommandId,
 } from "../../identity-command-id";
 import type { IdentityLedger } from "../../identity-ledger";
@@ -52,7 +46,42 @@ const emptyDb = (): MemoryDB => ({
   session: [],
   account: [],
   verification: [],
+  passkey: [],
 });
+
+/**
+ * The adapter tests exercise the passkey table without mounting the browser
+ * passkey endpoints. Keep the real plugin schema here so Better Auth validates
+ * those direct adapter calls against the same row shape as production.
+ */
+const passkeySchemaPlugin: BetterAuthPlugin = {
+  id: "passkey",
+  schema: {
+    passkey: {
+      fields: {
+        name: { type: "string", required: false },
+        publicKey: { type: "string", required: true },
+        userId: {
+          type: "string",
+          references: { model: "user", field: "id" },
+          required: true,
+          index: true,
+        },
+        credentialID: {
+          type: "string",
+          required: true,
+          index: true,
+        },
+        counter: { type: "number", required: true },
+        deviceType: { type: "string", required: true },
+        backedUp: { type: "boolean", required: true },
+        transports: { type: "string", required: false },
+        createdAt: { type: "date", required: false },
+        aaguid: { type: "string", required: false },
+      },
+    },
+  },
+};
 
 /**
  * One `betterAuth()` shape for both stacks, differing only in the engine.
@@ -67,6 +96,7 @@ function authOver(
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database,
+    plugins: [passkeySchemaPlugin],
     emailAndPassword: { enabled: true },
     ...(databaseHooks === undefined ? {} : { databaseHooks }),
   });
@@ -96,12 +126,11 @@ export interface IdentityStack {
    * this one first and then closes the gate.
    */
   finalized: { is: (userId: string) => boolean };
-  /** The migration-state rows the born-finalized entrance writes, by user
-   *  (ADR-116 §3). A newborn's says `finalized`; an entrance that failed
-   *  before its rows committed leaves the claim it wrote before the append. */
+  /** The migration-state rows the identifier backfill writes, by user
+   *  (ADR-116 §2). An adopted user's says `finalized`. */
   migrationState: Map<string, "migrated" | "finalized">;
-  /** The event-sourcing stack, as the entrance finds it. Turned off, the
-   *  append throws and the sign-up must fail rather than fall back. */
+  /** The event-sourcing stack, as a ceremony finds it. Turned off, the
+   *  append throws. */
   engine: { available: boolean };
   /** Every fact that LANDED, by its `commandId:index` key. A retry
    *  restates facts the store already holds and they are absorbed, so
@@ -124,10 +153,28 @@ export interface IdentityStack {
  * WRITE throw, so a closed gate that nevertheless put a row into identity
  * storage fails the suite rather than passing quietly.
  */
+/**
+ * The memory engine standing in for the current legacy Prisma account table.
+ * Account now has an issuer column; the wrapper remains the named fixture for
+ * tests that pin translation against that real schema rather than against an
+ * earlier, issuer-less version of it.
+ */
+function schemaBoundLegacyEngine(db: MemoryDB) {
+  return memoryAdapter(db);
+}
+
 export function identityStack({
   inert = false,
   withDatabaseHooks = false,
-}: { inert?: boolean; withDatabaseHooks?: boolean } = {}): IdentityStack {
+  schemaBoundLegacy = false,
+  passkeyRemoval,
+}: {
+  inert?: boolean;
+  withDatabaseHooks?: boolean;
+  /** Use the named fixture that represents the current Prisma account shape. */
+  schemaBoundLegacy?: boolean;
+  passkeyRemoval?: PasskeyRemovalPort;
+} = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
   const commands: IdentityCommand[] = [];
@@ -148,8 +195,8 @@ export function identityStack({
     events,
     commands,
     // The shape the app's ledger fails in when the event stack is down: a
-    // plain Error, which the entrance is what turns into a handled
-    // `identity_engine_unavailable`.
+    // plain Error, which degrades to "unknown" at the boundary and carries
+    // its trace id into the log.
     refuse: () =>
       engine.available
         ? null
@@ -200,54 +247,9 @@ export function identityStack({
     heads,
     users,
     identity,
-    // The ceremonies fork on the SAME question the adapter does, and a
-    // newborn whose adapter routed to identity while their ceremony declined
-    // would get a legacy `Account` row anyway (ADR-116 §3).
-    birthAwareGate(isUserOnIdentityWrites),
+    isUserOnIdentityWrites,
     { now: () => T0, newCommandId: newIdentityCommandId },
   );
-
-  /**
-   * The born-finalized entrance, in memory, in the legs ADR-116 §3 pins:
-   * the waited append first, then the row writes, then the projection.
-   *
-   * The ids are the entrance's own — the user id derived from the address so
-   * a retry converges, the command id the one the BACKFILL would have used
-   * for `User.email`, so the entrance and a later adoption pass state the
-   * same command and the store dedupes rather than duplicating.
-   */
-  const birth: IdentityBirthPort = {
-    async bear({ row, email, createdAtMs }) {
-      const normalizedValue = normalizeIdentifierValue(email);
-      const userId = deriveNewbornUserId({ normalizedValue });
-      migrationState.set(userId, "migrated");
-      try {
-        await identity.attachIdentifier({
-          tenantId: userId,
-          userId,
-          commandId: adoptUserEmailCommandId({ userId }),
-          accountId: null,
-          provider: "email",
-          providerId: null,
-          issuer: null,
-          providerAccountId: null,
-          value: email,
-          occurredAtMs: createdAtMs,
-          ceremony: { flow: "better-auth" },
-          actor: { type: "user", id: userId },
-        });
-      } catch (error) {
-        throw new IdentityEngineUnavailableError(
-          "the born-finalized entrance could not append the newborn's identity facts",
-          error,
-        );
-      }
-      const written = { ...row, id: userId };
-      db.user?.push(written);
-      migrationState.set(userId, "finalized");
-      return written;
-    },
-  };
 
   const accounts: IdentityAccountsPort = inert
     ? inertIdentityPorts.accounts
@@ -258,17 +260,29 @@ export function identityStack({
 
   const bridge = bridgeAccountCeremonies({
     ceremonies,
-    routesToIdentity: birthAwareGate(isUserOnIdentityWrites),
+    routesToIdentity: isUserOnIdentityWrites,
   });
   const auth = authOver(
     createIdentityStorageAdapter({
-      legacyEngine: memoryAdapter(db),
+      legacyEngine: schemaBoundLegacy
+        ? schemaBoundLegacyEngine(db)
+        : memoryAdapter(db),
+      passkeyRemoval: passkeyRemoval ?? {
+        deleteIfAnotherWayInRemains: async ({ passkeyId }) => {
+          const passkeys = db.passkey ?? [];
+          const index = passkeys.findIndex((row) => row.id === passkeyId);
+          if (index < 0) {
+            return "not_found";
+          }
+          passkeys.splice(index, 1);
+          return "deleted";
+        },
+      },
       accounts,
       resolution,
       ceremonies,
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
-      birth,
     }),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.
@@ -307,31 +321,3 @@ export async function signUp(
   return response.headers.get("set-cookie") ?? "";
 }
 
-/**
- * A sign-up whose request carries the identity-branch opt-in — what the auth
- * route boundary does once the backend feature-flag check passes (ADR-116
- * §3). Nothing below the marker re-decides the flag.
- */
-export function flaggedSignUp(
-  auth: AuthUnderTest,
-  email: string,
-): Promise<string> {
-  return runWithIdentityBirth(() => signUp(auth, email));
-}
-
-/**
- * The same sign-up, driven so that a failure THROWS rather than becoming a
- * response. `asResponse` turns better-auth's own error handling into a
- * status code, which is the wrong lens for asserting that a refusal kept its
- * handled code all the way out.
- */
-export function flaggedSignUpOrThrow(
-  auth: AuthUnderTest,
-  email: string,
-): Promise<unknown> {
-  return runWithIdentityBirth(() =>
-    auth.api.signUpEmail({
-      body: { email, password: PASSWORD, name: "Sam" },
-    }),
-  );
-}

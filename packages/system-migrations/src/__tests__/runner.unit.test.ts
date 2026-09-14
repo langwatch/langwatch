@@ -673,7 +673,7 @@ describe("SystemMigrationRunnerService", () => {
       expect((await runner.runPass()).advanced).toBe(1);
     });
 
-    /** @scenario "A held tenant that never advances does not loop forever" */
+    /** @scenario "A recurring reconciliation does not loop forever" */
     it("counts nothing for a held tenant re-proved into the same status", async () => {
       const migration = migrationOf("m1", async () => ({
         status: "migrated" as const,
@@ -698,7 +698,6 @@ describe("SystemMigrationRunnerService", () => {
       expect(second.advanced).toBe(0);
     });
 
-    /** @scenario "A held tenant that never advances does not loop forever" */
     it("counts nothing for a tenant that parks the same way twice", async () => {
       const migration = migrationOf("m1", async () => {
         throw new Error("still broken");

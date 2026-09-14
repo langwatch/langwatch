@@ -318,7 +318,7 @@ export const DashboardPageBody = ({
                   color="white"
                   asChild
                 >
-                  <Link href="/settings/authentication">
+                  <Link href="/settings/security">
                     <KeyRound size={14} />
                     Link SSO Account
                   </Link>

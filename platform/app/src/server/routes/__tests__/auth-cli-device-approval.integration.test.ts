@@ -38,6 +38,7 @@ const suffix = nanoid(8);
 const USER_ID = `usr-approval-${suffix}`;
 const ORG_ID = `org-approval-${suffix}`;
 const PROJECT_ID = `proj-approval-${suffix}`;
+const TEAM_ID = `team-approval-${suffix}`;
 const PROJECT_API_KEY = `sk-lw-approval-${suffix}-${"a".repeat(36)}`;
 
 async function mintDeviceCode(
@@ -134,11 +135,44 @@ describe("CLI device-approval stream", () => {
     await prisma.organizationUser.create({
       data: { userId: USER_ID, organizationId: ORG_ID, role: "ADMIN" },
     });
+    // The project-key branch re-derives the handout at exchange time — the
+    // project must exist and the user must hold project administration on it
+    // (the identity branch's hardening of legacy key exposure), so the racing
+    // polls below are contending for a credential that is genuinely theirs.
+    await prisma.team.create({
+      data: {
+        id: TEAM_ID,
+        name: `Approval Team ${suffix}`,
+        slug: `approval-team-${suffix}`,
+        organizationId: ORG_ID,
+      },
+    });
+    await prisma.teamUser.create({
+      data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
+    });
+    await prisma.project.create({
+      data: {
+        id: PROJECT_ID,
+        name: `Approval Project ${suffix}`,
+        slug: `approval-proj-${suffix}`,
+        apiKey: PROJECT_API_KEY,
+        teamId: TEAM_ID,
+        language: "typescript",
+        framework: "openai",
+      },
+    });
   });
 
   afterAll(async () => {
     await resetDeviceApprovalSubscriber().catch(() => {});
     await resetApp();
+    await prisma.project
+      .deleteMany({ where: { id: PROJECT_ID } })
+      .catch(() => {});
+    await prisma.teamUser
+      .deleteMany({ where: { userId: USER_ID, teamId: TEAM_ID } })
+      .catch(() => {});
+    await prisma.team.deleteMany({ where: { id: TEAM_ID } }).catch(() => {});
     await prisma.organizationUser
       .deleteMany({ where: { userId: USER_ID, organizationId: ORG_ID } })
       .catch(() => {});
@@ -329,6 +363,86 @@ describe("CLI device-approval stream", () => {
           PROJECT_API_KEY,
         );
         expect(((await loser.json()) as { error: string }).error).toBe(
+          "slow_down",
+        );
+      });
+    });
+
+    describe("when an exchange is refused before it consumes anything", () => {
+      /** @scenario "A refused exchange releases the claim so the CLI can retry" */
+      it("releases the claim, so the next poll is answered rather than slowed down", async () => {
+        // Approved for a project key the approval never stamped: the one
+        // refusal that consumes nothing, so the code stays redeemable and the
+        // CLI is expected to keep polling.
+        const deviceCode = await mintDeviceCode({
+          credential_type: "project_api_key",
+        });
+        await approveDeviceCode({
+          deviceCode,
+          userId: USER_ID,
+          organizationId: ORG_ID,
+        });
+
+        const refused = await callExchange(deviceCode);
+        expect(refused.status).toBe(428);
+
+        // Held to its timeout, the next poll would be told to slow down for
+        // thirty seconds for a retry the server itself asked for.
+        expect(
+          await redisConnection?.exists(`lwcli:device:claim:${deviceCode}`),
+        ).toBe(0);
+        expect((await callExchange(deviceCode)).status).toBe(428);
+      });
+    });
+
+    describe("when a second caller reaches a redemption that already happened", () => {
+      /** @scenario "A successful exchange keeps its claim until it expires on its own" */
+      it("is fenced out by the surviving claim instead of minting a second credential", async () => {
+        const deviceCode = await mintDeviceCode({
+          credential_type: "project_api_key",
+        });
+        await approveDeviceCode({
+          deviceCode,
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          projectApiKey: {
+            project_id: PROJECT_ID,
+            project_slug: `approval-proj-${suffix}`,
+            project_name: `Approval Project ${suffix}`,
+            api_key: PROJECT_API_KEY,
+          },
+        });
+        const recordTheRacerRead = await redisConnection?.get(
+          `lwcli:device:${deviceCode}`,
+        );
+        if (!recordTheRacerRead) {
+          throw new Error("the approved device code was not stored");
+        }
+
+        expect((await callExchange(deviceCode)).status).toBe(200);
+
+        // The winner deletes the device code and the poll window and leaves the
+        // claim alone. That is deliberate: the claim outliving what it guarded
+        // is the only thing standing between the loser and a second credential.
+        expect(
+          await redisConnection?.ttl(`lwcli:device:claim:${deviceCode}`),
+        ).toBeGreaterThan(0);
+
+        // A caller that read the record before the deletion still holds it, so
+        // its arrival is put back the way such a caller would see the world.
+        // Concurrency cannot be staged deterministically; the state it reaches
+        // can.
+        await redisConnection?.set(
+          `lwcli:device:${deviceCode}`,
+          recordTheRacerRead,
+          "EX",
+          60,
+        );
+
+        const second = await callExchange(deviceCode);
+
+        expect(second.status).toBe(429);
+        expect(((await second.json()) as { error: string }).error).toBe(
           "slow_down",
         );
       });

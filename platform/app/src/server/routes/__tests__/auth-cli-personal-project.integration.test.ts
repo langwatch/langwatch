@@ -23,6 +23,7 @@
  */
 import type { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const ids = vi.hoisted(() => {
   const s = Math.random().toString(36).slice(2, 10);
@@ -86,17 +87,29 @@ const SHARED_API_KEY = `sk-lw-mecred-shared-${suffix}-${"a".repeat(28)}`;
 const OTHER_PERSONAL_PROJECT_SLUG = `mecred-personal-other-${suffix}`;
 const OTHER_PERSONAL_API_KEY = `sk-lw-mecred-perso-${suffix}-${"b".repeat(28)}`;
 
-interface ExchangeSuccess {
-  kind: string;
-  access_token: string;
-  refresh_token: string;
-  personal_project?: {
-    id: string;
-    slug: string;
-    name: string;
-    api_key: string;
-  };
-}
+const exchangeSuccessSchema = z
+  .object({
+    kind: z.string(),
+    access_token: z.string(),
+    refresh_token: z.string(),
+    personal_project: z
+      .object({
+        id: z.string(),
+        slug: z.string(),
+        name: z.string(),
+        api_key: z.string(),
+      })
+      .optional(),
+  })
+  .passthrough();
+const personalProjectResponseSchema = z
+  .object({
+    project: z
+      .object({ id: z.string(), api_key: z.string().optional() })
+      .passthrough(),
+  })
+  .passthrough();
+type ExchangeSuccess = z.infer<typeof exchangeSuccessSchema>;
 
 interface DeviceFlowResult {
   approveStatus: number;
@@ -131,7 +144,7 @@ async function runDeviceFlow(): Promise<DeviceFlowResult> {
   return {
     approveStatus: approveRes.status,
     exchangeStatus: exchangeRes.status,
-    exchange: (await exchangeRes.json()) as ExchangeSuccess,
+    exchange: exchangeSuccessSchema.parse(await exchangeRes.json()),
   };
 }
 
@@ -354,6 +367,17 @@ describe("/me credentials delivery, given a completed device-session exchange", 
     expect(project?.apiKey).toBe(exchange.personal_project!.api_key);
   });
 
+  /** @scenario device-login exchange stays valid when the personal project key is withheld */
+  it("keeps the device login successful when project administration is absent", async () => {
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+    const flow = await runDeviceFlow();
+    expect(flow.approveStatus).toBe(200);
+    expect(flow.exchangeStatus).toBe(200);
+    expect(flow.exchange.kind).toBe("device_session");
+    expect(flow.exchange.personal_project).toBeUndefined();
+    expect(flow.exchange.access_token).toMatch(/^lw_at_/);
+  });
+
   /** @scenario the delivered personal key authenticates /api/me/usage */
   it("authenticates GET /api/me/usage with the delivered key", async () => {
     const res = await meApp.request("/api/me/usage", {
@@ -397,13 +421,26 @@ describe("/me credentials delivery, given the lazy personal-project exchange", (
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      project: { id: string; api_key: string };
-    };
+    const body = personalProjectResponseSchema.parse(await res.json());
     // ensure() is idempotent: the lazy exchange resolves the SAME workspace
     // the login exchange created, never a duplicate.
     expect(body.project.id).toBe(exchange.personal_project!.id);
     expect(body.project.api_key).toBe(exchange.personal_project!.api_key);
+  });
+
+  /** @scenario GET /api/auth/cli/personal-project withholds the key without breaking the session */
+  it("returns project identity without api_key and leaves the bearer valid", async () => {
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
+    const res = await app.request("/api/auth/cli/personal-project", {
+      headers: { authorization: `Bearer ${exchange.access_token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = personalProjectResponseSchema.parse(await res.json());
+    expect(body.project.id).toBe(exchange.personal_project!.id);
+    expect(body.project.api_key).toBeUndefined();
+    await expect(
+      redisConnection!.get(`lwcli:access:${exchange.access_token}`),
+    ).resolves.not.toBeNull();
   });
 
   it("rejects a missing or garbage bearer", async () => {
@@ -622,8 +659,8 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
     expect(json.api_key).toBe(exchange.personal_project!.api_key);
   });
 
-  /** @scenario the project-key endpoint refuses a project the caller cannot write to */
-  it("denies a project the caller cannot write, without leaking the key", async () => {
+  /** @scenario the project-key endpoint refuses a project the caller cannot manage */
+  it("denies a project the caller cannot manage, without leaking the key", async () => {
     vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
     const { status, json } = await projectKey(
@@ -633,6 +670,15 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
 
     expect(status).toBe(403);
     expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+    expect(probeProjectPermission).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          user: expect.objectContaining({ id: USER_ID }),
+        }),
+      }),
+      SHARED_PROJECT_ID,
+      "project:manage",
+    );
   });
 
   it("404s an unknown slug with an error envelope the CLI can distinguish", async () => {

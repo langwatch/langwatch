@@ -154,6 +154,7 @@ describe("ScimTokenService", () => {
   });
 
   describe("when a connection is torn down", () => {
+    /** @scenario "Tearing a connection down ends its tokens" */
     it("revokes only that connection's tokens and ends its sync", async () => {
       (
         prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>

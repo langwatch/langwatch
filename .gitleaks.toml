@@ -48,6 +48,36 @@ paths = [
 ]
 regexes = ['''^0123456789abcdef0123456789abcdef$''']
 
+# WebAuthn AAGUIDs are public model identifiers assigned to authenticators.
+# They identify products such as iCloud Keychain and YubiKey, not a device,
+# account or credential. The UI maps these registry values to readable labels.
+#
+# Scoped by VALUE, path and rule with AND. Every UUID is anchored, so a real
+# token that merely contains one of these public identifiers is still caught,
+# as is any other high-entropy value added to the source file.
+[[allowlists]]
+description = "Public WebAuthn authenticator model AAGUIDs, not credentials"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''platform/app/src/components/me/passkeyAuthenticators\.ts''']
+regexes = [
+  '''^fbfc3007-154e-4ecc-8c0b-6e020557d7bd$''',
+  '''^dd4ec289-e01d-41c9-bb89-70fa845d4bf2$''',
+  '''^adce0002-35bc-c60a-648b-0b25f1f05503$''',
+  '''^ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4$''',
+  '''^b93fd961-f2e6-462f-b122-82002247de78$''',
+  '''^bada5566-a7aa-401f-bd96-45619a55120d$''',
+  '''^d548826e-79b4-db40-a3d8-11116f7e8349$''',
+  '''^cb69481e-8ff7-4039-93ec-0a2729a154a8$''',
+  '''^ee882879-721c-4913-9775-3dfcce97072a$''',
+  '''^fa2b99dc-9e39-4257-8f92-4a30d23c4118$''',
+  '''^2fc0579f-8113-47ea-b116-bb5a8db9202a$''',
+  '''^73bb0cd4-e502-49b8-9c6f-b59445bf720b$''',
+  '''^c1f9a0bc-1dd2-404a-b27f-8e29047a43fd$''',
+  '''^d8522d9f-575b-4866-88a9-ba99fa02f35b$''',
+  '''^39a5647e-1853-446c-a1f6-a79bae9f5bc7$''',
+]
+
 [[allowlists]]
 description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
 targetRules = ["generic-api-key"]

@@ -1,12 +1,20 @@
 import {
+  emptyMfaEnrollment,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
   IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   IdentityCommandRefusedError,
+  type MfaEnrollmentState,
+  type MfaFact,
+  type MfaFactInput,
+  reduceMfaEnrollment,
+  remainingBackupCodes,
 } from "@langwatch/identity";
 import { describe, expect, it } from "vitest";
 import { IdentityGuards } from "../guards";
+import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository";
+import { MfaGuards } from "../mfa-guards";
 import {
   ACTOR,
   attachData,
@@ -75,6 +83,7 @@ describe("attachIdentifier guard", () => {
       expect(facts[0]?.data).toMatchObject({ identifierHash: null });
     });
 
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("attaches email-provider identifiers ATTACHED, awaiting the ceremony", async () => {
       const facts = await new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations()).attachIdentifier(
         attachData({
@@ -221,6 +230,7 @@ describe("attachIdentifier guard", () => {
 
   describe("when the heads already carry the identifier", () => {
     /** @scenario "A fact the heads already carry is not stated again" */
+    /** @scenario "Adding an address already on the account changes nothing" */
     it("states nothing, whatever the command id", async () => {
       const heads = new InMemoryHeads();
       const guards = new IdentityGuards(heads, users, new InMemoryReservations());
@@ -245,6 +255,44 @@ describe("attachIdentifier guard", () => {
       expect((another[0]!.data as { identifierId: string }).identifierId).not.toBe(
         (first[0]!.data as { identifierId: string }).identifierId,
       );
+    });
+  });
+
+  describe("when a newborn's heads hold the ledger's provisional row", () => {
+    /** @scenario "A newborn's provisional head does not silence its own attach" */
+    it("states the attach anyway, because nothing has folded for this user", async () => {
+      const heads = new InMemoryHeads();
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      const first = await guards.attachIdentifier(attachData());
+      // The ledger's provisional write: the row is there, the cursor is not.
+      heads.fold(USER, first);
+      heads.newborns.add(USER);
+
+      const rerun = await guards.attachIdentifier(attachData());
+
+      expect(rerun).toHaveLength(1);
+      expect((rerun[0]!.data as { identifierId: string }).identifierId).toBe(
+        (first[0]!.data as { identifierId: string }).identifierId,
+      );
+    });
+
+    /** @scenario "A provisional head with no event is restated by the next pass" */
+    it("keeps stating it for a later pass under another command id, until a fold lands", async () => {
+      const heads = new InMemoryHeads();
+      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      heads.fold(USER, await guards.attachIdentifier(attachData()));
+      heads.newborns.add(USER);
+
+      const nextPass = await guards.attachIdentifier(
+        attachData({ commandId: "backfill:acc_1" }),
+      );
+      expect(nextPass).toHaveLength(1);
+
+      heads.newborns.delete(USER);
+      const afterFold = await guards.attachIdentifier(
+        attachData({ commandId: "backfill:acc_1" }),
+      );
+      expect(afterFold).toEqual([]);
     });
   });
 });
@@ -341,6 +389,7 @@ describe("verifyIdentifier guard", () => {
   });
 
   describe("when the value is unheld", () => {
+    /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
     it("verifies the ATTACHED identifier with the ceremony's proof trail", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
@@ -783,6 +832,36 @@ describe("detachIdentifier strands guard", () => {
       ]);
     });
 
+    /** @scenario "Removing an address that is not the last way in" */
+    it("allows one verified email to be removed when another remains", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_email_old",
+            provider: "email",
+            value: "sam.old@acme.com",
+          }),
+          fact({
+            identifierId: "idf_email_keep",
+            provider: "email",
+            value: "sam.keep@acme.com",
+          }),
+        ),
+      );
+
+      expect(await detach(heads, "idf_email_old")).toEqual([
+        {
+          type: IDENTIFIER_DETACHED_EVENT_TYPE,
+          data: { identifierId: "idf_email_old", actor: ACTOR },
+        },
+      ]);
+      expect(heads.heads.get(USER)?.identifiers.idf_email_keep?.state).toBe(
+        "VERIFIED",
+      );
+    });
+
     it("does not refuse an unverified identifier, which strands nobody", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(
@@ -800,6 +879,116 @@ describe("detachIdentifier strands guard", () => {
       // Nobody could have signed in with it, so removing it takes nothing
       // away — the guard is about ways IN, not about rows.
       expect(await detach(heads, "idf_unverified")).toHaveLength(1);
+    });
+  });
+});
+
+/**
+ * The strands guard, asked about an account that also holds a second factor.
+ *
+ * The enrollment here is REAL — stated by the two-step guards and folded the
+ * way the projection folds them, with codes the consume guard will still spend
+ * — because the invariant is only worth pinning against an account that
+ * genuinely has some. A guard that counted them would read this account as
+ * holding two credentials, and it holds one way in and one extra step past it.
+ */
+describe("detachIdentifier strands guard, given a second factor with unspent backup codes", () => {
+  const ENROLLMENT = "mfaenr_backup";
+
+  /** An ENABLED enrollment holding ten unspent codes, and the guards that
+   *  answer for it, so the test can show the codes are really spendable. */
+  async function enrolledWithBackupCodes(): Promise<{
+    state: MfaEnrollmentState;
+    mfa: MfaGuards;
+  }> {
+    let state = emptyMfaEnrollment({ userId: USER });
+    const enrollments: MfaEnrollmentRepository = {
+      findEnrollment: async () => state,
+      findRequiringOrganizationSlugs: async () => [],
+    };
+    const mfa = new MfaGuards(enrollments);
+    const fold = (facts: MfaFactInput[]) => {
+      state = facts.reduce(
+        (current, fact) =>
+          reduceMfaEnrollment({
+            state: current,
+            fact: { ...fact, occurredAt: T0 } as MfaFact,
+          }),
+        state,
+      );
+    };
+
+    fold(
+      await mfa.enrollMfa({
+        tenantId: USER,
+        userId: USER,
+        commandId: "mfacmd_1",
+        enrollmentId: ENROLLMENT,
+        method: "totp",
+        occurredAtMs: T0,
+        actor: ACTOR,
+      }),
+    );
+    fold(
+      await mfa.confirmMfa({
+        tenantId: USER,
+        userId: USER,
+        commandId: "mfacmd_2",
+        enrollmentId: ENROLLMENT,
+        backupCodeCount: 10,
+        occurredAtMs: T0 + 60_000,
+        actor: ACTOR,
+      }),
+    );
+
+    return { state, mfa };
+  }
+
+  describe("when the account's one verified identifier is removed", () => {
+    /** @scenario "Backup codes never count as a way into the account" */
+    it("is still refused, because a backup code is not a way in", async () => {
+      const { state, mfa } = await enrolledWithBackupCodes();
+
+      // Spendable, not merely recorded: the consume guard accepts one, so
+      // these are codes the account could really use.
+      expect(state.state).toBe("ENABLED");
+      expect(remainingBackupCodes(state)).toBe(10);
+      await expect(
+        mfa.consumeBackupCode({
+          tenantId: USER,
+          userId: USER,
+          commandId: "mfacmd_3",
+          codeIndex: 0,
+          occurredAtMs: T0 + 120_000,
+        }),
+      ).resolves.toHaveLength(1);
+
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(fact({ identifierId: "idf_email", provider: "email" })),
+      );
+
+      const attempt = new IdentityGuards(
+        heads,
+        users,
+        new InMemoryReservations(),
+      ).detachIdentifier({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_d3",
+        identifierId: "idf_email",
+        occurredAtMs: T0 + 5000,
+        actor: ACTOR,
+      });
+
+      await expect(attempt).rejects.toMatchObject({
+        code: "identity_detach_strands_user",
+      });
+      // Refused before any fact exists, so the address still signs them in.
+      expect(heads.heads.get(USER)?.identifiers.idf_email?.state).toBe(
+        "VERIFIED",
+      );
     });
   });
 });

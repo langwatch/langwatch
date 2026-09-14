@@ -153,7 +153,8 @@ export function EvaluationManualIntegration({
   const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const canManageProject = hasPermission("project:manage");
   const isOutputMandatory =
     evaluatorDefinition.requiredFields.includes("output");
   const projectAPIKey = api.project.getProjectAPIKey.useQuery(
@@ -161,7 +162,7 @@ export function EvaluationManualIntegration({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project,
+      enabled: !!project && canManageProject,
     },
   );
 

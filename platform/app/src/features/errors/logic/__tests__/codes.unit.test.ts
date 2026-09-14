@@ -132,6 +132,24 @@ const PARAMETERIZED_CODES = new Set([
 ]);
 
 /**
+ * Codes MINTED BY BETTER-AUTH ITSELF, not by a `HandledError` subclass.
+ *
+ * `LastWayInGuard` (`src/server/better-auth/last-way-in.ts`) throws
+ * better-auth's own `APIError.from("BAD_REQUEST", { code: "LAST_WAY_IN", … })`
+ * on the mounted `/passkey/delete-passkey` and `/two-factor/disable` routes.
+ * Neither code passes through `HANDLED_BY_BETTER_AUTH_CODE`
+ * (`src/server/better-auth/handled-errors.ts`), so nothing in these trees
+ * writes `super("LAST_WAY_IN", …)` for `CODE_PATTERNS` to find — the throw
+ * site is better-auth's `APIError`, never ours. They still reach a customer,
+ * spelled exactly as better-auth sends them (SCREAMING_CASE, not our usual
+ * snake_case), so the orphan check must not call their copy dead.
+ */
+const BETTER_AUTH_PASSTHROUGH_CODES = new Set([
+  "LAST_WAY_IN",
+  "MFA_REQUIRED_BY_ORGANIZATION",
+]);
+
+/**
  * A path typo turns this whole guard into a no-op, and it reports that as a
  * pass. The exact number is noise, but "we read thousands of files" and "we
  * read none" are worlds apart, and only one of them is a working guard.
@@ -284,7 +302,8 @@ describe("APP_ERROR_CODES", () => {
           !PACKAGE_OWNED_CODES.has(code) &&
           !RELAYED_META_CODES.has(code) &&
           !CLIENT_MINTED_CODES.has(code) &&
-          !PARAMETERIZED_CODES.has(code),
+          !PARAMETERIZED_CODES.has(code) &&
+          !BETTER_AUTH_PASSTHROUGH_CODES.has(code),
       );
 
       expect(
