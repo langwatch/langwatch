@@ -1,4 +1,4 @@
-/** Which page key the Topic Clustering address answers: `project:manage`, the same grant the platform page framed. */
+/** Topic Clustering page key: `project:manage`. */
 
 import { topicScreens } from "@langwatch/topic-web/topic-clustering";
 import type { ComponentType } from "react";

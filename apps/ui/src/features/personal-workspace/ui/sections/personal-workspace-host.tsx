@@ -32,8 +32,7 @@ import {
 } from "../../behavior/personal-workspace-scope-lookup";
 
 /**
- * The deployment shape, read once. No config means a self-hosted
- * deployment with none stated, not a broken one — the install copy falls back to the CLI's own default.
+ * The deployment shape; missing config means self-hosted, not broken.
  */
 /** The grant and the release the assistant hand-off is behind, as the shell reads them. */
 const LANGY_CREATE_PERMISSION = "langy:create";
@@ -69,7 +68,7 @@ function readDeployment(): {
   }
 }
 
-/** Maps one organization's teams to the personal-workspace host's shape, stamping each project with its team's id. */
+/** Map teams to personal-workspace shape, stamping each project with team id. */
 function toPersonalWorkspaceTeams(
   teams: {
     id: string;
@@ -100,7 +99,7 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
     fallbackTitle: "Couldn't load your personal workspace",
   });
 
-  /** The graph, with each project stamped with its team id — the screens read a flat project and need it. */
+  /** The graph with each project stamped with its team id. */
   const organizationsWithTeamIds: readonly PersonalOrganization[] = useMemo(
     () =>
       (organizations.data ?? []).map((organization) => ({
@@ -116,7 +115,7 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
     [organizations.data],
   );
 
-  /** The reader's own role: `members` is narrowed to the caller, so the first row is theirs; `undefined` means still arriving, not "no role". */
+  /** The caller's own role; undefined means still arriving. */
   const organizationRole = useMemo(() => {
     const organizationId = scope.organizationId;
     if (!organizationId) return void 0;

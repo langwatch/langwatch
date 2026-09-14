@@ -1,10 +1,5 @@
 /**
- * What an offline connected agent says on hover where it cannot be used.
- *
- * A connected agent no process is holding can neither be tested nor picked as
- * a run target, so each place draws it disabled and says what starting the
- * process allows. The refusal a run itself answers with lives in the error
- * registry, not here.
+ * Copy for offline connected agents where they cannot be used.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */

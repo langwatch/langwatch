@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * `useVoiceAgentsEnabled` is the one read every voice surface shares — it
- * must never flash a voice control on before the flag resolves, and it must
- * hand `useFeatureFlag` the project/organization ids the same way every
- * time so a targeting rule matches consistently.
+ * `useVoiceAgentsEnabled` must resolve consistently across renders.
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */

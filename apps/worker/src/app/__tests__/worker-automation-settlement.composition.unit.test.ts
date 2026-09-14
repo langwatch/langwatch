@@ -29,16 +29,8 @@ import { type Instant, Temporal } from "@langwatch/time";
 
 /**
  * Spec: specs/automations/worker-automation-settlement-conversion.feature
- *
- * THE CONVERSION, asserted where it can actually fail. The definition used to
- * arrive from the application already registered, and nothing about
- * re-registering it could tell a graph that reaches its own collaborators from
- * one that was handed a finished object. So the assertions below build the real
- * definition from the composition root and drive its registered intent
- * handlers, observing the effect at the far end: a claim taken against this
- * process's own Postgres double, a digest that leaves through the transport it
- * was composed with, and the persist half refusing by name rather than dropping
- * a confirmed match.
+ * Conversion asserted at failure points; builds definition from composition
+ * root and drives intent handlers, observing claims, digests, and persist refusals.
  */
 
 const ENVIRONMENT = {
@@ -571,14 +563,8 @@ function recordingDatasets() {
 }
 
 /**
- * Annotation's own service and the existence check it asks somebody else for.
- *
- * Both are recorded rather than asserted here: what this file is proving is
- * that the composition reaches Annotation's PACKAGED call — which is what
- * parses the annotator references, drops the ids this project does not hold and
- * upserts the items — rather than a second queueing implementation written in
- * this process. The two doubles stand where the Postgres adapter and the
- * ClickHouse repository stand in production.
+ * Annotation's own service and existence check; composition reaches PACKAGED
+ * call, not a second queueing implementation in this process.
  */
 function recordingAnnotations(heldTraceIds: readonly string[]) {
   return {

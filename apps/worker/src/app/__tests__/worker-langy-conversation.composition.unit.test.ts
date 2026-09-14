@@ -14,15 +14,8 @@ import { createWorkerProcessDatabase } from "./support/worker-database.double.ts
 
 /**
  * Spec: specs/langy/worker-langy-conversation-conversion.feature
- *
- * THE CONVERSION, asserted where it can actually fail. The pipeline used to
- * arrive from the application as a definition this process merely re-registered;
- * nothing in that shape could tell a graph that reaches its collaborators from
- * one that was handed in. So every assertion here builds the real definition
- * from substrates and drives a registered handler, observing the effect at the
- * far end: a conversation update on the tenant's own channel, an analytics row
- * on ClickHouse with the columns the table actually has, and the two named
- * absences refusing where a silent answer would have been indistinguishable.
+ * Conversion asserted at failure points; builds real definitions and drives
+ * handlers, observing conversation updates and analytics rows.
  */
 
 const RECORDED: {

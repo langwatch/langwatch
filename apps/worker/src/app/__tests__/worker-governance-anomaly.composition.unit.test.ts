@@ -1,20 +1,8 @@
 /**
  * Spec: enterprise/modules/governance/specs/governance.feature
  *       ("Anomaly delivery delegates network safety")
- *
- * The spend-spike evaluator was composed by nothing. `startSpendSpikeAnomalyWorker`
- * and `SsrfSafeAnomalyAlertHttpAdapter` had zero callers anywhere in `apps/` or
- * `packages/`, so the whole delivery path — signed body, bounded retries, an
- * auditable outcome per destination — described behaviour no process started.
- * The platform's own root started the loop but built the evaluator over `prisma`
- * alone, which is why a fired alert recorded `log_only` even for an admin who
- * had configured a webhook.
- *
- * What these tests hold is the seam that changed: the fired decision reaches the
- * alert adapter, the adapter's address fence judges the destination BEFORE the
- * transport is reached, and a refused address is recorded as a failed outcome
- * rather than swallowed. The transport is a fake — the fence is the unit under
- * test, and a test that opened a socket would be testing the internet.
+ * Alert adapter's address fence judges destination before transport; refused
+ * addresses recorded as failed outcomes.
  */
 import { createHmac } from "node:crypto";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
@@ -65,13 +53,8 @@ function spendSpikeRuleRow(destinationUrl: string) {
 }
 
 /**
- * The four delegates the evaluator's repository touches, and a promise that
- * settles on the write it makes LAST.
- *
- * The dispatch outcome is recorded by `anomalyAlert.update`, after the alert row
- * exists and after every retry has been spent, so awaiting that call is what
- * makes the assertions deterministic under fake timers rather than a guess about
- * how many microtask turns the chain needs.
+ * Four delegates the evaluator touches; await anomalyAlert.update for dispatch
+ * outcome to make assertions deterministic under fake timers.
  */
 function anomalyDatabase(destinationUrl: string) {
   let settle: (detail: Record<string, unknown>) => void = () => void 0;

@@ -12,14 +12,8 @@ import { createWorkerProcessDatabase } from "./support/worker-database.double.ts
 
 /**
  * Spec: specs/ai-gateway/worker-gateway-spend-conversion.feature
- *
- * THE CONVERSION, asserted where it can actually fail. Both definitions used to
- * arrive from the application; re-registering one could not tell a graph that
- * reaches its own collaborators from one that was handed in. So the assertions
- * below build both real definitions from substrates, drive the debit path's
- * delivery into Governance's own commands, and hold the four absences to being
- * DECLARED rather than silently answered — every one of which is invisible in
- * production if it is not.
+ * Conversion asserted at failure points; builds real definitions from substrates
+ * and drives debit path into Governance commands.
  */
 
 const RECORDED: { governance: Array<{ command: string; data: unknown }>; absences: string[] } = {

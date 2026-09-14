@@ -13,18 +13,8 @@ import {
 
 /**
  * Spec: modules/trace/specs/span-storage-write.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
- * still registers the span-storage projection and nothing in this process
- * writes a span. What has to be true today is that this composition root can
- * build the whole write path — projection store, port, repository, client —
- * from the tenant-keyed ClickHouse client and the retention default this
- * process already holds, and that a batch crossing it stays one insert.
- *
- * The fake client is typed as the Eventing substrate's own client, which is
- * what the process actually resolves. That the composition accepts it without
- * a cast is half of what this test proves: a write path that only compiled
- * against a driver client would be unbuildable here.
+ * Composition builds whole write path from tenant-keyed ClickHouse client and
+ * retention default; batch stays one insert.
  */
 type Insert = Parameters<EventingClickHouseClient["insert"]>[0];
 

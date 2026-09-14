@@ -1,10 +1,5 @@
 /**
- * The "Talk to it" panel state machine, as a pure reducer.
- *
- * idle → connecting → live → saving → done, with error and needs-name
- * branches. Kept side-effect-free so every transition the ACs name — mic
- * denied, mint failure, cut at the limit, a fetch-failed post-call notice — is
- * unit-tested without a socket, a timer or React.
+ * State machine for the "Talk to it" panel, as a pure reducer.
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */

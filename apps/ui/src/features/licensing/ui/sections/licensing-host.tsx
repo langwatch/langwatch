@@ -1,7 +1,6 @@
 /**
- * What the License screen is mounted inside: the tRPC Provider its hooks
- * run on, and the host port for organization, deployment, purchase link,
- * cache drop and feedback. `refreshPlanDerivedState` drops every cached read, deliberately, replacing a full-page reload.
+ * License host: tRPC Provider for organization, deployment, purchase link and feedback;
+ * `refreshPlanDerivedState` clears all cached reads.
  */
 
 import {
@@ -14,7 +13,7 @@ import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
-/** The deployment and its purchase link: no config reads as unknown here, not a crash — right for a settings page, wrong for a boot boundary. */
+/** Deployment and purchase link; no config is unknown, not a crash — suited for settings pages. */
 function readDeployment(): { isSaaS: boolean; isSettled: boolean; purchaseUrl?: string } {
   try {
     const config = readPublicAppConfig();

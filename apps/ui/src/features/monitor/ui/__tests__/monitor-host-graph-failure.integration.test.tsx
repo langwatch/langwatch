@@ -1,5 +1,7 @@
 /**
- * `MonitorHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the online evaluations screen with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * `MonitorHost` didn't check for refusal on organization graph; failed
+ * `organization.getAll` left screen with no project and no error (see `TraceHost`,
+ * `OrganizationHost` for same gap).
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

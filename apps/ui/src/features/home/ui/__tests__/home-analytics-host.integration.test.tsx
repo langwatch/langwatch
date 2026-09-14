@@ -1,9 +1,5 @@
 /**
- * The project home draws analytics surfaces — the traces overview and the
- * briefing's vanity strip — and those read the analytics host. The home page
- * mounted only its own host, so `/` and `/<project>` threw
- * "The analytics screens must be mounted inside an AnalyticsHostProvider."
- * before anything rendered.
+ * The home page needs AnalyticsHostProvider to render its analytics surfaces.
  * @vitest-environment jsdom
  * Spec: specs/home/home-views.feature
  */

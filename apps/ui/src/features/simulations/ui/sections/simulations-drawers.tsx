@@ -35,7 +35,7 @@ export const AgentWorkflowTargetEditorDrawer = withScenarioDrawerHost(
   fromDrawerAddress(AgentWorkflowTargetEditor),
 );
 
-/** Reads its own open state via `drawerOpen("agentTestingCaseEditor")` rather than an `open` prop, so nothing here needs coercing. */
+/** Reads its own open state; no prop coercion needed. */
 export const AgentTestingCaseEditorDrawer = withScenarioDrawerHost(AgentTestingCaseEditor);
 
 /**

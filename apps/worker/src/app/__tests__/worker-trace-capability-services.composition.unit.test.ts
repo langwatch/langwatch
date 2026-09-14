@@ -24,16 +24,8 @@ import { TraceProductAnalytics, type TraceProductEvent } from "@langwatch/trace-
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
- *
- * A COMPOSITION-CAPABILITY test, and the one that closes the trace
- * conversion's second halt. Trace has not converted, so nothing in this process
- * reads a project or resolves a policy. What has to be true today is that the
- * four capability services `command:recordSpan` and its subscribers read
- * through can be built from a Prisma client and NOTHING else — no
- * `OrganizationService`, no `AuthzService`, no `EvaluatorApi`, no
- * credentials port, no LWQL key map, no S3 deleter. Each is driven through the
- * port its consumer names, because a service that composes and answers nothing
- * is exactly the failure this wave exists to prevent.
+ * Four capability services for recordSpan built from Prisma client alone;
+ * each driven through its consumer's port.
  */
 
 const NOW = new Date("2026-09-02T00:00:00.000Z");

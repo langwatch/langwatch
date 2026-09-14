@@ -1,5 +1,7 @@
 /**
- * A refused `organization.getAll` used to render an empty document: the host exposed only `isLoading`, which a 401 leaves false, so every screen inside the shell was told the graph had settled and held no organization.
+ * A refused `organization.getAll` used to render an empty document: the host exposed only
+ * `isLoading`, which a 401 leaves false, so every screen inside the shell was told the graph
+ * had settled and held no organization.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

@@ -1,4 +1,4 @@
-/** Writes a scope choice through the application's storage seam, broadcasting since same-origin `useLocalStorage` readers see a write only through that event. */
+/** Stores scope choice and broadcasts to same-origin useLocalStorage readers. */
 
 import type { NavigationScopeWrite } from "@langwatch/navigation-web/navigation";
 import { rememberUiScopeSelection } from "../../../behavior/ui-scope-storage";

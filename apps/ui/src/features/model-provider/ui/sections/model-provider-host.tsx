@@ -48,7 +48,8 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
     [organizations.data, activeScope.organizationId],
   );
 
-  /** The team the project in scope belongs to, and its slug (for the cost drawer's `/<slug>/traces` preview) — both derived from the one graph read. */
+  /** Team and project slug for scope, both from one graph read; slug for cost
+   * drawer's `/<slug>/traces` preview. */
   const { teamId, projectSlug } = useMemo(() => {
     if (!activeScope.projectId) return { teamId: void 0, projectSlug: void 0 };
     for (const team of organization?.teams ?? []) {

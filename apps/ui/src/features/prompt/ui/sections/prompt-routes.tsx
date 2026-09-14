@@ -1,4 +1,4 @@
-/** Which page key the Prompt Studio address answers: `prompts:view`, unchanged from the platform page. */
+/** Prompt Studio page key: `prompts:view`. */
 
 import { promptScreens } from "@langwatch/prompt-web/prompt-studio";
 import type { ComponentType } from "react";

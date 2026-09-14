@@ -16,7 +16,7 @@ export function openPlatformDrawer({
   drawer: ModelProviderPlatformDrawer;
   params?: Readonly<Record<string, string | undefined>>;
   query: Readonly<Record<string, string | undefined>>;
-  /** The query parameter that names which drawer is open (`features/drawers`'s `DRAWER_OPEN_PARAM`). */
+  /** Query param naming open drawer; see `features/drawers` `DRAWER_OPEN_PARAM`. */
   drawerOpenParam: string;
   setQuery: (next: Readonly<Record<string, string | undefined>>) => void;
 }): void {

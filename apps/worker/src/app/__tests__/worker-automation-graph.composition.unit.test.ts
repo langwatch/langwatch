@@ -21,13 +21,8 @@ import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-
 
 /**
  * Spec: modules/automation/specs/graph-alert-worker-composition.feature
- *
- * This is a COMPOSITION-CAPABILITY test, not a mounted pipeline. Trace's
- * real-time subscriber is still registered by the application, so nothing in
- * this process asks the vertical anything yet; what has to be true today is
- * that this composition root can build it from its own configuration and the
- * two capability services it is handed, and that an alert leaving it goes out
- * through the mail gateway this process owns.
+ * Composition root builds from config and capability services; alerts exit
+ * through the mail gateway.
  */
 
 const ENVIRONMENT = {

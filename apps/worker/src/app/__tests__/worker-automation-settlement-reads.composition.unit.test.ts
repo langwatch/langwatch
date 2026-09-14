@@ -11,12 +11,8 @@ import {
 
 /**
  * Spec: specs/automations/worker-automation-settlement-conversion.feature
- *
- * The four reads a settled match is confirmed from, asserted at the seam rather
- * than through the pipeline. Three of them answer for real from substrates this
- * process holds; the fourth refuses, and WHICH ERROR it refuses with is the
- * whole behaviour — a plain error fails the notification, while the named one
- * degrades the digest to the fold state it already has.
+ * Tests the four reads confirming a settled match; one refuses with a specific
+ * error that degrades the digest.
  */
 
 function clickHouse(rows: unknown[] = []) {

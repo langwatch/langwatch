@@ -16,21 +16,8 @@ import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
 
 /**
  * Spec: specs/worker/worker-capability-mount.feature
- *
- * THE LAST FIVE SYNTHESIZED WRAPPERS, asserted where they can actually fail.
- *
- * Until this slice `packagedWorkerCapabilities` handed this graph five
- * pre-built things: two sweep ports, an evaluation definition, Topic's whole
- * runtime, a governance runtime and an SSO definition. Every one of them was
- * built by the application, so nothing in this package could tell a graph that
- * composed a capability from a graph that received one and passed it through.
- *
- * The registry-parity assertion below is the oracle for that: it composes the
- * production graph with NO capability options at all, installs every feature,
- * and compares the routed keys against the byte-frozen `job-registry.json`. A
- * capability that is not composed here contributes no keys and the comparison
- * fails by name. The assertions after it drive the seams the parity check
- * cannot see — the ones where a collaborator is reached rather than counted.
+ * Last five synthesized wrappers; registry-parity assertion ensures each
+ * capability is composed and routed, not passed through.
  */
 
 class Lifecycle extends WorkerLifecycle {

@@ -13,10 +13,12 @@ import {
 import { withHost } from "../../../../ui/sections/ui-page";
 import { ModelProviderHost } from "./model-provider-host";
 
-/** `llmModelCost`. All four params optional: `id` edits, `cloneModel` seeds from a default, `prefillModel`/`prefillRegex` arrive from the trace drawer's unmapped-cost suggestion; none of them means "add a rule". */
+/** `llmModelCost`: four optional params — `id` edits, `cloneModel` seeds,
+ * `prefillModel`/`prefillRegex` from trace drawer's unmapped cost; none means add. */
 export const LLMModelCostDrawer = withHost(ModelProviderHost, LLMModelCost);
 
-/** `defaultModelOverride`. `editingId` names the policy being edited; its absence is the "+ Add config" case. Reads the policy from the table's own snapshot — no round trip. */
+/** `defaultModelOverride`: `editingId` names policy being edited (absent = Add case);
+ * reads from table snapshot, no round trip. */
 export const DefaultModelOverrideDrawer = withHost(ModelProviderHost, DefaultModelOverride);
 
 /**

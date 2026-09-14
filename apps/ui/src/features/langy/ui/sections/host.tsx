@@ -1,7 +1,6 @@
 /**
- * What the Langy layout is mounted inside: the tRPC Provider its hooks run
- * on, the vanilla client `langyChatTransport` drives, and the host port for
- * project, reader, grants, flags, address and feedback. One client, not two — a second would mean a second SSE lane and cookie story.
+ * Layout host: tRPC Provider via `langyChatTransport`; one client SSE lane for project,
+ * reader, grants, flags, address and feedback.
  */
 
 import {

@@ -1,4 +1,4 @@
-/** Which page key the License address answers: no guard, matching the platform page — every procedure behind it states its own policy. */
+/** License pages with no guard; each procedure handles its own authorization policy. */
 
 import { licensingScreens } from "@langwatch/enterprise-licensing-web/licensing";
 import type { ComponentType } from "react";

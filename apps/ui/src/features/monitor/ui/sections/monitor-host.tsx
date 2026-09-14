@@ -1,7 +1,6 @@
 /**
- * What the online evaluations screen is mounted inside: the tRPC Provider
- * its hooks run on, and the host port for project, grants, replication,
- * time zone, address and feedback. Time zone is read here — a browser read a governed screen may not take.
+ * Monitor host: tRPC for project, grants, replication, time zone, address and feedback.
+ * Time zone read here, not in governed screens.
  */
 
 import {

@@ -1,11 +1,5 @@
 /**
- * Whether voice agents are turned on for the current project.
- *
- * Wraps `useFeatureFlag(VOICE_AGENTS_FLAG_KEY)` with the ids from
- * `useOrganizationTeamProject`, so every voice surface reads the same flag
- * the same way instead of re-deriving projectId/organizationId at each call
- * site. Returns false while the ids or the flag are still loading, so a
- * voice surface never flashes on before the flag resolves.
+ * Feature flag for voice agents; consistent across surfaces.
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */

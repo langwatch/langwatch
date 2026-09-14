@@ -17,18 +17,8 @@ import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering
 
 /**
  * Spec: specs/worker/worker-capability-mount.feature
- *
- * THE MODEL GATEWAY IS THIS PROCESS'S OWN, and this suite drives the seams a
- * type cannot see: that a stored credential is decrypted with the deployment's
- * OWN cipher rather than read as ciphertext, that the two preconditions it can
- * miss are told apart by name, and that the one gateway it composes is the one
- * BOTH model-using paths resolve through.
- *
- * The Prisma client is a fake, because what is under test is the composition
- * and not the query: the three repositories behind the adapter narrow the
- * client themselves and refuse by name when a delegate is missing, so a fake
- * that answers the two reads the execution path makes is the whole of what
- * this composition needs from a database.
+ * Model gateway decrypts stored credentials with deployment cipher; both
+ * model-using paths resolve through the one composed gateway.
  */
 
 class RecordingAbsence extends WorkerModelProviderAbsenceReport {

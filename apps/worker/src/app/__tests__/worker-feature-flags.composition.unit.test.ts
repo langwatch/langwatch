@@ -9,14 +9,8 @@ import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
- *
- * A COMPOSITION-CAPABILITY test. Two of `command:recordSpan`'s four ports are
- * behind kill switches — `token-estimation-killswitch` and its per-project
- * sibling, and the redaction path's own flags — so a process that could not
- * read a flag would keep estimating and keep redacting after an operator threw
- * the switch. What has to be true today is that this process can install the
- * flag app over the client, the Redis and the three tenant directories it
- * already holds, and that an absent Redis degrades rather than refuses.
+ * Tests process can install flag app with Redis and tenant directories; absent
+ * Redis degrades rather than refuses.
  */
 
 /** Every row read refuses, which is what makes the two reads below evidence. */

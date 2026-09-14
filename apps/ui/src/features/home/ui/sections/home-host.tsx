@@ -48,7 +48,7 @@ type OrganizationsRead = ReadonlyArray<{
   }>;
 }>;
 
-/** What kind of deployment this is: a document with no config block reads as self-hosted, never a crash. */
+/** What kind of deployment: no config block means self-hosted, never a crash. */
 function readDeployment(): ProjectHomeDeployment {
   try {
     const config = readPublicAppConfig();

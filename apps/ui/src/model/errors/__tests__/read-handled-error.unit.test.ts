@@ -182,17 +182,8 @@ describe("readHandledError", () => {
     });
 
     /**
-     * The local Mintlify origin is accepted only by a runtime that is itself a
-     * local development client — it is not a constant member of the allowlist,
-     * because that put `http://localhost:3000` in every production bundle and
-     * `docsUrl` comes from a customer-configured upstream.
-     *
-     * Asserted in `readHandledError.docsOrigin.unit.test.ts` rather than here:
-     * the runtime is a property of the whole suite, so that file pins it with
-     * `@vitest-environment node` instead of inheriting whatever this one has.
-     * The other half — that a contributor's local docs still resolve — is
-     * `packages/config/src/__tests__/docs-url.unit.test.ts`, which drives the
-     * resolver by explicit inputs.
+     * Docs origin validated in separate tests for dev client and resolver.
+     * See `readHandledError.docsOrigin.unit.test.ts` and `docs-url.unit.test.ts`.
      */
   });
 
@@ -312,9 +303,7 @@ describe("handledShapeFromSerialized", () => {
   });
 
   /**
-   * This path skips `readHandledError` entirely, so it needs the same narrowing rather than inheriting it by
-   * luck: a relayed Go error's `docs_url` is parsed off an upstream body with a bare `z.string()`, and
-   * `ErrorActions` turns it into the href behind "Read the docs".
+   * Docs URL is relayed from Go errors; this path also needs narrowing.
    */
   describe("given a docs link on an event payload", () => {
     const serializedWith = (docsUrl: string) =>

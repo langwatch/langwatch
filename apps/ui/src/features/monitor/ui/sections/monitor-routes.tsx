@@ -1,4 +1,4 @@
-/** Which page key the online evaluations screen answers: `evaluations:view`, unchanged from the platform page. */
+/** Page key for the online evaluations screen: `evaluations:view` (unchanged). */
 
 import { monitorScreens } from "@langwatch/monitor-web/online-evaluations";
 

@@ -1,4 +1,5 @@
-/** The Langy dock: panel, composer, capability cards, tool activity and context chips, all in `@langwatch/langy-web`. */
+/** Langy dock: panel, composer, capability cards, tool activity, and context chips in
+ * `@langwatch/langy-web`. */
 
 import { langyApi } from "@langwatch/langy-web/langy";
 import { uiFeature } from "../../behavior/ui-feature";

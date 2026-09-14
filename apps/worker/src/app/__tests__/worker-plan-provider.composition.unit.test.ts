@@ -14,18 +14,8 @@ import { Temporal } from "@langwatch/time";
 
 /**
  * Spec: specs/automations/worker-plan-resolution.feature
- *
- * THE SAME ANSWER AS THE OTHER PROCESS, and now for a better reason than two
- * suites agreeing.
- *
- * Which baseline a deployment starts from, which paid source is consulted over
- * it and what that source is built from are `deploymentPlanSources`'s
- * (`@langwatch/enterprise-billing-server`), which both roots read and
- * `deployment-plan-sources.unit.test.ts` asserts. What this file pins is this
- * root's own half: the absences it names, and resolutions that prove it
- * actually reached the shared policy rather than composing a provider of its
- * own — the answers a background process reading a different plan from the
- * screen would get wrong.
+ * Tests this root's plan resolution reaches shared policy, not its own
+ * provider.
  */
 
 /**

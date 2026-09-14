@@ -1,4 +1,4 @@
-/** The organization drawers, mounted in the host their package asks for; both need `fromDrawerAddress`'s `open` coercion (see its docstring). */
+/** The organization drawers; both need fromDrawerAddress's open coercion. */
 
 import {
   CreateTeamDrawer as CreateTeam,

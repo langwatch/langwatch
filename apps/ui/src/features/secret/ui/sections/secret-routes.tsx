@@ -1,7 +1,4 @@
-/**
- * Which page key the Secrets address answers: no page-level grant —
- * `secrets:manage` is read inside the page, so a `secrets:view`-only reader sees the names with no way to change them.
- */
+/** Secrets management; permissions checked inside the page. */
 
 import { secretScreens } from "@langwatch/secret-web/secrets";
 import type { ComponentType } from "react";

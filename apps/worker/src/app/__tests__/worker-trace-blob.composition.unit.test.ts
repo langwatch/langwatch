@@ -14,18 +14,8 @@ import {
 
 /**
  * Spec: modules/trace/specs/trace-payload-claim-check.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
- * process reads a spool object or recalls an offloaded field. What has to be
- * true today is that this composition root can build both halves of the ADR-022
- * claim check out of the stored-objects runtime, the AWS client runtime and the
- * tenant-keyed ClickHouse client it already holds.
- *
- * Both are driven through the ports the conversion will actually call —
- * `TraceSpanSpool` and `TracePayloadReaderRepository` — rather than through the
- * service and repository underneath them: a graph that resolves correctly but
- * cannot be handed to `EventingRecordSpanAdapter` would pass a service-level test and
- * still be unusable here.
+ * Composition builds ADR-022 claim check halves from stored-objects and AWS
+ * runtimes; tests through ports conversion will call.
  */
 
 const AWS = {} as AwsClientProcessRuntime;

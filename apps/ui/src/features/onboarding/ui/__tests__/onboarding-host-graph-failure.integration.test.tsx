@@ -1,5 +1,5 @@
 /**
- * `OnboardingHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the onboarding screens with no organization and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * `OnboardingHost` didn't check for graph refusal, leaving the app without organization.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

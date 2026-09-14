@@ -1,4 +1,5 @@
-/** Online Evaluations: screen, table, performance preview and replicate dialog, all in `@langwatch/monitor-web`. */
+/** Online Evaluations: screen, table, performance preview, replicate dialog in
+ * `@langwatch/monitor-web`. */
 
 import { monitorApi } from "@langwatch/monitor-web/online-evaluations";
 import { uiFeature } from "../../behavior/ui-feature";

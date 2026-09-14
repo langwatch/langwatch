@@ -82,7 +82,7 @@ type OrganizationsRead = ReadonlyArray<{
   }>;
 }>;
 
-/** The graph, narrowed to the navigation package's own vocabulary — fields the package doesn't carry simply don't travel. */
+/** Filter to the navigation package's vocabulary, dropping unused fields. */
 function toNavigationOrganizations(organizations: OrganizationsRead): NavigationOrganization[] {
   return organizations.map((organization) => ({
     id: organization.id,
@@ -105,7 +105,7 @@ function toNavigationOrganizations(organizations: OrganizationsRead): Navigation
   }));
 }
 
-/** What kind of deployment this is: a document with no config block reads as self-hosted, never a crash. */
+/** Determine deployment type; missing config defaults to self-hosted. */
 function readDeployment(): NavigationDeployment {
   try {
     const config = readPublicAppConfig();
@@ -203,7 +203,7 @@ export function NavigationHostSection({
     [graph, activeScope.organizationId],
   );
 
-  /** The reader's role: `organization.getAll` narrows `members` to the caller's own row, so the first entry IS it. */
+  /** The caller's own role; organization.getAll returns only the caller's row. */
   const organizationRole = useMemo(
     () =>
       ((organizations.data ?? []) as OrganizationsRead).find(
@@ -252,7 +252,7 @@ export function NavigationHostSection({
   // may name the other, so the application reads it and answers the port.
   const prefersPreviousSimulationsScreens = useLegacySimulationsPreference(project?.id);
 
-  /** The assistant, as the palette's hand-off needs it; `null` is the gate — see the two constants above. */
+  /** The assistant for the palette; null means not available. */
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
   const canAskLangy = canAskLangyFor({ session, project, deployment });
@@ -307,7 +307,7 @@ export function NavigationHostSection({
       : [withoutHash.slice(0, queryAt), withoutHash.slice(queryAt)];
   }, [address]);
 
-  /** The segments a catch-all captured, joined: `/@project/<rest>` is the only address that asks. */
+  /** Extract catch-all segments from the @project route. */
   const catchAllPath = routeReading.pathname.replace(/^\/@project\/?/, "");
 
   /**

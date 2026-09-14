@@ -70,7 +70,7 @@ export function OrganizationHost({ children }: { children: ReactNode }) {
     };
   }, [organizations.data, activeScope.organizationId]);
 
-  /** The active project's slug, looked up in the graph already read; absent means the gateway deep-link's back link isn't offered. */
+  /** The active project's slug, or undefined if not in scope. */
   const activeProject = useMemo(() => {
     if (!activeScope.projectId) return void 0;
     for (const candidate of organizations.data ?? []) {

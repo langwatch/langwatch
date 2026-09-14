@@ -10,9 +10,8 @@ import { describe, expect, it } from "vitest";
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
- * The same three trees `codes.unit.test.ts` walks, for the same reason: a handled error declared in `ee/` or in a
- * workspace package reaches a customer exactly like one declared in `src/`, so a guard that only reads `src/` is
- * a guard that passes forever for everywhere else.
+ * Walk the same three trees as `codes.unit.test.ts`: errors from `ee/` and
+ * workspace packages reach customers like those from `src/`.
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),

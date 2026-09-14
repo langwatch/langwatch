@@ -1,7 +1,7 @@
 /**
  * What the five onboarding screens are mounted inside: the tRPC Provider
  * their hooks run on, and the host port for org graph, session, address,
- * flags, feedback, clipboard and the project's base key. No deployment on it — the package decodes the config tag itself.
+ * flags, feedback, clipboard and project key. The package decodes config itself.
  */
 
 import {

@@ -11,13 +11,8 @@ import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.compo
 
 /**
  * Spec: modules/data-privacy/specs/span-content-drop.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
- * process drops content. What has to be true today is that this composition
- * root can honour a customer's `drop` from the two things it already holds —
- * the scoped data-privacy service and the enforcement flag — and that it does
- * so THROUGH the port `EventingRecordSpanAdapter` names, because that port is the
- * whole reason the drop is composable outside the application.
+ * Composition honours drop from data-privacy service and enforcement flag
+ * through the port EventingRecordSpanAdapter names.
  */
 
 function dropInput(): ResolvedDataPrivacy {

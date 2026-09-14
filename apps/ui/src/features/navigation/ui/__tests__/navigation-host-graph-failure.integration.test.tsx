@@ -1,5 +1,5 @@
 /**
- * `NavigationHostSection` — the root shell every screen in the chrome mounts inside — read the organization graph without checking for a refusal, so a failed `organization.getAll` left the whole application with no scope and no error.
+ * `NavigationHostSection` failed to handle graph refusal, leaving the app without scope.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

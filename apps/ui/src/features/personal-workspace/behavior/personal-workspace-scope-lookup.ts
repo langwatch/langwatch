@@ -1,4 +1,4 @@
-/** Which organization and project the personal workspace address is about, resolved out of the graph already in hand rather than fetched again. */
+/** Resolve which organization and project the personal workspace address refers to. */
 import type {
   PersonalOrganization,
   PersonalProject,

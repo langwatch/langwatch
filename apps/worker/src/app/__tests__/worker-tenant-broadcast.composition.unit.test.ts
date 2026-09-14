@@ -4,11 +4,7 @@ import { tryCreateWorkerTenantBroadcast } from "../worker-tenant-broadcast.compo
 
 /**
  * Spec: modules/notification/specs/tenant-broadcast-twin.feature
- *
- * A COMPOSITION-CAPABILITY test: the three pipelines that will publish through
- * this are still registered by the application, so nothing in this process
- * broadcasts yet. What has to be true today is that this composition root can
- * build the publisher from the Redis it already holds, and that it says so when
+ * Composition root builds publisher from Redis it holds; reports absence when
  * it holds none.
  */
 class FakeRedis {

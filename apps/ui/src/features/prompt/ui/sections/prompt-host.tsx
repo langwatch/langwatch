@@ -19,13 +19,13 @@ import type { PromptTabCapabilities } from "../../behavior/prompt-tab-capabiliti
 import { promptCopyTargets } from "../../model/prompt-copy-targets";
 import { promptPlaygroundChatAvailability } from "../../model/prompt-playground-chat-availability";
 
-/** The browser services the packaged tab store runs on — a feature may not name a browser global, so these come from the global layer. */
+/** Browser services from the global layer. */
 const tabCapabilities: PromptTabCapabilities = {
   storage: browserUiStorage,
   logger: browserUiLogger,
 };
 
-/** The chat runtime this application serves (none), resolved once at module scope — a property of the composition, not the reader or address. */
+/** Chat runtime availability, resolved once at module scope. */
 const playgroundChat = promptPlaygroundChatAvailability();
 
 export function PromptHost({ children }: { children: ReactNode }) {

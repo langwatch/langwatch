@@ -540,9 +540,8 @@ describe("explainHandledError", () => {
 
   describe("given a validation error with no field to attach", () => {
     /**
-     * `unrecognized_keys` is the one zod issue whose message is built from the SCHEMA's identifiers rather than
-     * from anything the customer typed, and it is reported with an empty `path` — so `flatten()` files it under
-     * `formErrors`, where `USER_VISIBLE_FIELDS` never sees it.
+     * `unrecognized_keys` messages come from the schema, not customer input,
+     * and file under `formErrors` with empty `path`.
      */
     const unrecognizedKeysMeta = () => {
       const parsed = z

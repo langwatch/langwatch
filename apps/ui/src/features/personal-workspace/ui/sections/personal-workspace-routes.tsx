@@ -14,10 +14,10 @@ import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { PersonalWorkspaceHost } from "./personal-workspace-host";
 
-/** The one flag every `/me` and project-scoped page is behind — governance's, since the personal workspace shipped as part of AI Governance. */
+/** Feature flag for personal workspace pages (AI Governance). */
 const PERSONAL_WORKSPACE_FLAG = "release_ui_ai_governance_enabled";
 
-/** The browser tab's title: a screen may not reach the document, so this writes it via the capability and restores the previous one on unmount. */
+/** Set the browser tab title via capability, restoring on unmount. */
 function withDocumentTitle<P extends object>(
   title: string,
   Page: ComponentType<P>,

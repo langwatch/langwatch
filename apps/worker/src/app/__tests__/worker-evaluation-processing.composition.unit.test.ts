@@ -27,13 +27,8 @@ import {
 
 /**
  * Spec: specs/monitors/online-evaluator-loop-prevention.feature
- *
- * A COMPOSITION-CAPABILITY test for the ONLINE evaluation path. Everything the
- * path touches outside this process — the monitor row, the trace, the model
- * provider's environment, the evaluator service — is a fake, and what is under
- * test is that `command:executeEvaluation` reaches the Langevals transport
- * carrying the data the trace mappings produced, and comes back as a reported
- * event. Before this composition the same command refused by name.
+ * command:executeEvaluation reaches Langevals with trace-mapped data and
+ * returns as a reported event.
  */
 
 const OCCURRED_AT = 1_760_000_000_000;

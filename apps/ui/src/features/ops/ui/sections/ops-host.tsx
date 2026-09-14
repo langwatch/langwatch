@@ -32,7 +32,7 @@ export function OpsHost({ children }: { children: ReactNode }) {
     fallbackTitle: "Couldn't load ops",
   });
 
-  /** The project the address is about, and the key it ingests with — resolved from the one graph read, `undefined` with none in scope. */
+  /** The project for this address, or undefined if none in scope. */
   const project = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {

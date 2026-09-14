@@ -1,4 +1,4 @@
-/** Simulations: the run board, Scenario Library and Agent Testing, one product surface over one transport, in `@langwatch/scenario-web`. */
+/** Simulations feature; exported from `@langwatch/scenario-web`. */
 
 import { scenarioApi } from "@langwatch/scenario-web/simulations";
 import { lazyDrawer } from "@langwatch/ui-drawer";

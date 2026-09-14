@@ -1,5 +1,5 @@
 /**
- * `OpsHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the ops screens with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * `OpsHost` didn't check for graph refusal, leaving the app without project.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

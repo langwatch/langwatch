@@ -549,16 +549,8 @@ function useSaveVoiceAgent({
 }
 
 /**
- * All the voice-editor state and callbacks the drawer and its views render from.
- *
- * Mirrors {@link AgentHttpEditorDrawer}: same onSave resolution, the same
- * create/update mutations, and the same flow-callback forwarding so the run
- * dialog and the scenario editor can open it and be told about the saved agent.
- */
-/**
- * The drawer's resolved inputs, local state, and the data/form/mutation hooks
- * it composes. Kept apart from {@link useVoiceAgentEditor} so each stays a small
- * function; the editor hook layers the derived flags and callbacks on top.
+ * Drawer state and mutations, mirrored from {@link AgentHttpEditorDrawer}.
+ * Separate from the editor hook to keep both functions small.
  */
 function useVoiceEditorState(props: AgentVoiceEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();

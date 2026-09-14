@@ -36,7 +36,7 @@ export function TraceHost({ children }: { children: ReactNode }) {
     fallbackTitle: "Couldn't load your traces",
   });
 
-  /** The project, team and organization the address is about — from the one graph read rather than three queries. */
+  /** Project/team/org from one graph read. */
   const placement = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {

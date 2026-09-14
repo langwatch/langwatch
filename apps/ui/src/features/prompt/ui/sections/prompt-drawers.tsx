@@ -1,4 +1,4 @@
-/** The prompt drawers, mounted in the host their package asks for; a drawer travels with itself, not the address. */
+/** The prompt drawers; each drawer travels with itself, not the address. */
 
 import { PromptListDrawer as PromptList } from "@langwatch/prompt-web/drawers";
 

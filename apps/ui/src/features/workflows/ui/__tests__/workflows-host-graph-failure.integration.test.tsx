@@ -1,7 +1,8 @@
 /**
- * `WorkflowHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the workflows screens with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
  * @vitest-environment jsdom
- * Spec: specs/auth/session-failure.feature
+ * Regression: WorkflowHost's failure handling was missing; workflows
+ * displayed without project or error when org read failed.
+ * @see specs/auth/session-failure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

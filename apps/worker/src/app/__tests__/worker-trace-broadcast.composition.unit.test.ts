@@ -10,19 +10,8 @@ import { tryCreateWorkerTraceBroadcast } from "../worker-trace-broadcast.composi
 
 /**
  * Spec: modules/trace/specs/trace-tenant-broadcast-worker-composition.feature
- *
- * A COMPOSITION-CAPABILITY test driven THROUGH the port, not around it. Trace
- * has not converted — the application still registers both of these subscribers
- * — so nothing in this process publishes yet. What has to be true today is that
- * the real subscriber bodies, handed nothing but Trace's own
- * `TraceTenantBroadcast`, put the application's exact bytes on the wire.
- *
- * Channel and body are pinned by LITERAL. The subscriber on the far side is in
- * the application and compiles against none of this: it matches
- * `broadcast:trace_updated` by exact string and destructures `{ tenantId,
- * event }`. A drifted channel is accepted by Redis and delivered to nobody, and
- * a drifted body is dropped inside the far side's own `JSON.parse` handler —
- * neither raises anything anywhere, which is why they are read here as bytes.
+ * Tests subscriber bodies put application bytes on wire; channel and body
+ * pinned by literal.
  */
 
 class FakeRedis {

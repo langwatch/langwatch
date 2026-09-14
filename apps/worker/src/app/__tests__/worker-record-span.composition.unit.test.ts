@@ -13,15 +13,8 @@ import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
- *
- * A COMPOSITION-CAPABILITY test, and the one that answers the halt directly.
- * The step-(g) attempt stopped because `command:recordSpan` took four ports
- * that each took a capability service by parameter, and not one of the six was
- * constructible in this process. This builds the command from a Prisma client,
- * a resolved configuration and nothing else, and then FOLDS A REAL SPAN
- * through it — because a command that assembles and then drops a customer's
- * policy, or prices every span at zero, is structurally identical to one that
- * works.
+ * Builds command from Prisma client and configuration alone; folds real spans
+ * through to test assembly and policy handling.
  */
 
 const NOW = new Date("2026-09-02T00:00:00.000Z");

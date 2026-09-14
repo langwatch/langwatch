@@ -1,7 +1,8 @@
 /**
- * `TraceHost` reads the project, team and organization off `organization.getAll` the same way `ProjectHomeHostSection` does, but it did not carry the shell's failure handling: a refused read left `isLoading` false and `placement` forever undefined, so the trace explorer never resolved into a spinner, an error, or the page — it just sat there.
  * @vitest-environment jsdom
- * Spec: specs/auth/session-failure.feature
+ * Regression: TraceHost's failure handling was missing, leaving the explorer
+ * in an undefined state when org read failed.
+ * @see specs/auth/session-failure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

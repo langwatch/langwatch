@@ -17,8 +17,8 @@ import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fa
 import { resolveGovernanceOrganization } from "../../behavior/governance-organization-lookup";
 
 /**
- * The deployment shape, read once. No config means a self-hosted deployment
- * with none stated, not a broken one — the install card falls back to the CLI's own default endpoint.
+ * The deployment shape, read once. No config means a self-hosted deployment with none
+ * stated, not a broken one — the install card falls back to the CLI's own default endpoint.
  */
 function readDeployment(): { isSaas: boolean; appBaseUrl: string } {
   try {

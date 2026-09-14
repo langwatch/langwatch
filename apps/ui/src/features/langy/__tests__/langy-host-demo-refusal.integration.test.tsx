@@ -1,5 +1,6 @@
 /**
- * The Langy host answers "is this the demo project" from the deployment's own config leaf (`demoProjectSlug`) — the one fact a feature package may not read itself (ADR-101).
+ * Langy host answers "is this the demo project" from config (`demoProjectSlug`); feature
+ * packages cannot read this directly (ADR-101).
  * @vitest-environment jsdom
  * Spec: specs/security/api-endpoint-authorization.feature
  */

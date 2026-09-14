@@ -1,5 +1,7 @@
 /**
- * `ModelProviderHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the model provider screens with no scope and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * `ModelProviderHost` didn't check for refusal on organization graph; failed
+ * `organization.getAll` left screens with no scope and no error (see `TraceHost`,
+ * `OrganizationHost` for same gap).
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */
