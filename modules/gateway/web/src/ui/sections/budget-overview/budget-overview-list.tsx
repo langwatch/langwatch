@@ -7,16 +7,8 @@ import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
- * The /me rendering of `api.user.budgetOverview`: one row per budget
- * that binds the user's own keys, most binding first, each labelled
- * with exactly which budget it is ("whole organization budget",
- * "personal budget", "department budget (Engineering)").
- *
- * Visible copy stays minimal - amounts, window, scope phrase; the
- * budget's name, provider filter, per-member semantics, exact reset
- * time and top models live behind the (i) tooltip.
- *
- * Spec: specs/ai-gateway/budget-overview.feature
+ * The /me rendering of budgetOverview API: one row per budget binding
+ * the user, most binding first. Details in tooltip.
  */
 export type BudgetOverviewItemView = {
   id: string;

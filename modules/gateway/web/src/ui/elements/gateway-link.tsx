@@ -1,17 +1,4 @@
-/**
- * A link, inside a package that may not import a router.
- *
- * `~/components/ui/link` renders its internal href through the application's
- * `NextLink`, which is `react-router`'s Link underneath — an import ADR-004
- * seals off from a feature-web package. So this one keeps the anchor, which is
- * what makes a link a link (open in a new tab, copy the address, middle-click),
- * and hands an ordinary left-click to the host's navigate so the page still
- * changes without a full reload.
- *
- * The prop shape is the platform component's, so no call site changed. The
- * governance family carries the same element; it is eleven lines of policy
- * rather than a component worth a shared package of its own.
- */
+/** Uses an anchor element with host delegation to avoid importing a router. */
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";

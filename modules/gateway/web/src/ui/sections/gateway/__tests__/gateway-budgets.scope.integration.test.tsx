@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The Budgets list Scope column. Every scope kind renders as the one
- * shared scope chip the rest of settings uses, on a single line: the
- * kind's icon plus the target's name, with the identifier and any
- * member count moved into the chip's tooltip. A virtual-key target is
- * the same chip made clickable, so a budget capping one key can be
- * followed to it.
+ * Scope column: shared chip for each kind, clickable for virtual keys.
  */
 import { cleanup, screen, within } from "@testing-library/react";
 

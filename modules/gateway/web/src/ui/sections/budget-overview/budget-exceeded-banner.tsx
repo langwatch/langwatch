@@ -4,22 +4,8 @@ import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
 import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
 
 /**
- * Wire shape matches the 402 body that the gateway returns and
- * `services/cli/internal/wrapper/budget.go::CheckBudget` (now ported to
- * `sdks/typescript/src/cli/utils/governance/budget.ts`) consumes. The CLI
- * renders a bordered ASCII box with these same fields; this component
- * renders the equivalent Chakra banner so the cross-surface UX is
- * consistent end-to-end.
- *
- * Spec: specs/ai-gateway/governance/budget-exceeded.feature
- *       (web banner mirrors the CLI Screen 8 storyboard from gateway.md)
- *
- * The two contact links are plain anchors rather than the application's router
- * link. This is a SURFACE: it renders inside another feature's screens, so it
- * cannot ask a host of its own, and both addresses it links are either an
- * absolute URL the server minted or a `mailto:`. The one internal address —
- * the request-increase page — reloads the document rather than routing to it,
- * which is the cost of the surface being host-free.
+ * Mirrors the gateway's 402 response and CLI's budget-exceeded rendering.
+ * Links are plain anchors for this host-free surface.
  */
 export type BudgetExceededBannerProps = {
   /** Total spent in the period that triggered the block. */

@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The /me budgets block: every budget that binds the user renders as
- * one labelled row, so an organization-wide cap can never read as a
- * personal one.
- *
  * @see specs/ai-gateway/budget-overview.feature
+ * Every budget binds to a labelled row.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

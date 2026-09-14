@@ -1,22 +1,4 @@
-/**
- * The provider marks the gateway's two provider lists render.
- *
- * A family-local copy of the map in `platform/app/src/components/modelProviders/iconsMap.tsx`,
- * cut down to the map itself. What the platform module also carries — the
- * monochrome set, the `ProviderIconGlyph` wrapper that keeps a flat black mark
- * legible on the dark theme, and the fifteen consumers across the product —
- * stays there; the gateway calls neither, so neither travels.
- *
- * The four marks the Design System already publishes are imported rather than
- * copied. The remaining ten are drawn here because they are `platform/app`
- * components that the whole product still uses: promoting them means deleting
- * the platform copies and repointing fifteen call sites, which is an edit to
- * `platform/app` this slice may not make. When they reach the Design System
- * this file loses ten functions and keeps the map.
- *
- * The key set is the contract's, so a provider added to the registry fails the
- * typecheck here rather than rendering a blank cell.
- */
+/** Provider icon map: four from Design System, ten drawn inline pending promotion. */
 
 import { Box } from "@chakra-ui/react";
 import { AnthropicIcon, AWSIcon, CustomIcon, OpenAIIcon } from "@langwatch/design-system/icons";

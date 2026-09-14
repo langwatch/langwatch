@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The Scope column moved the target's identifier and a group's member
- * count off the visible line and into the chip's tooltip. The tooltip
- * itself renders into a portal on hover, so what is pinned here is the
- * detail string that feeds it, together with `scopeChipTooltip` on the
- * chip side, which composes the line the reader actually sees.
+ * The detail string that feeds the scope chip tooltip.
  */
 import { describe, expect, it } from "vitest";
 

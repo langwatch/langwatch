@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * RTL coverage for how the Budgets list renders a per-person template.
- *
- * A template is one row covering many people, so a single spend total
- * describes nobody. The cell has to headline the cap each person carries
- * and report a headcount underneath, and it has to say "0 of 0" for a
- * template nobody has used rather than a dash that reads as broken.
+ * Per-person template: each person gets their own cap and headcount.
  */
 import { cleanup, screen, within } from "@testing-library/react";
 

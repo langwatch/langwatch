@@ -1,36 +1,6 @@
 /**
- * The application an AI Gateway screen is mounted in, faked.
- *
- * Every screen in this package reads the world through `GatewayHostPort`: who
- * is here, what they may do, which flags are on, which plan the organization is
- * on, what the address says, and where a success or a failure is announced. A
- * test that mounts a screen therefore has to answer that port, and answering it
- * ad hoc per file is how a dozen suites come to disagree about what a viewer is.
- *
- * Two things live here. `fakeGatewayHost` builds the port from a small
- * configuration and records everything written through it, so an assertion
- * about a navigation or a toast reads off `host.recording` rather than off a spy
- * on a module. `renderWithGatewayHost` mounts a tree underneath it and owns the
- * one piece of state a static double cannot have: the query string. A screen
- * reads its own address back — a filter, a page, a selected tab — so a write has
- * to come back as a re-render or the test proves nothing.
- *
- * The routing policy editor is not one of them any more. It opens through the
- * drawer registry, which the composing application mounts above every page, so
- * what this double answers for it is `openDrawer`: it records which overlay was
- * asked for, and the address that carries the request is the application's to
- * spell.
- *
- * Permissions resolve through `permissionSatisfiedBy`, the authz contract's own
- * hierarchy rule (`<resource>:manage` satisfies `<resource>:view` on the same
- * resource), rather than through a set-membership check written here. A test
- * that passes against this double therefore cannot pass by disagreeing with the
- * rule the server applies — the property the platform suites had by importing
- * the real `hasPermissionWithHierarchy`, kept across the move.
- *
- * The same shape as `@langwatch/enterprise-governance-web`'s harness, because
- * the two host ports are the same shape. They converge if a third family
- * repeats them.
+ * Test double for GatewayHostPort: fakeGatewayHost for configuration and
+ * recording, renderWithGatewayHost for query-string state.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -301,15 +271,7 @@ export function recordingGatewayToaster(): RecordingGatewayToaster {
   };
 }
 
-/**
- * The address, held where React can see it change.
- *
- * `setQuery` replaces the whole query string — a key left out is a key removed —
- * which is the contract the port states and the one every screen that filters,
- * paginates or selects a tab relies on. The routing policy editor is no longer
- * among them: it opens through the drawer registry, so what the double answers
- * for it is `openDrawer`.
- */
+/** The address query string; a key left out is removed. */
 function GatewayHostHarness({ host, children }: { host: FakeGatewayHost; children: ReactNode }) {
   const [query, setQuery] = useState<GatewayQuery>(host.query);
   const live = useMemo(

@@ -1,23 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The routing policy editor is URL-routed (see
- * dev/docs/best_practices/drawers.md), and the address is the drawer registry's
- * again: the page names `routingPolicy` and its host writes
- * `?drawer.open=routingPolicy&drawer.policyId=<id>`, which is exactly the link
- * a virtual key's detail page already hands out for the policy that key routes
- * through. It kept a `?policy=<id>` key of its own for a while, on the reading
- * that a feature-web package may not reach the registry — true of the registry,
- * false of its ADDRESS, which is a query string the host already writes.
- *
- * SO THIS FILE SPLIT ALONG THAT SEAM. What the page does is name a drawer and
- * hand over the policy, which is asserted off the host's recording; what the
- * editor rebuilds from a policy id is asserted by rendering the editor with the
- * props the registry's adapter builds from the address. The address vocabulary
- * itself belongs to the composing application and its own suite pins it.
- *
- * Spec: specs/ai-gateway/governance/admin-routing-policies.feature
- *       (Rule: The routing policy editor opens from its own address)
+ * URL-routed editor; page side opens drawer, editor side rebuilds from policy id.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 
