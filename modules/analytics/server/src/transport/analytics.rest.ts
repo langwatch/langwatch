@@ -8,9 +8,9 @@ import {
   baseResponses,
   coerceToEpoch,
   defineRestRouter,
-  flexibleDateSchema,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
+import { flexibleDateSchema } from "@langwatch/api/dates";
 import { z } from "zod";
 
 /**

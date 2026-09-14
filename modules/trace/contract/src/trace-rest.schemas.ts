@@ -7,7 +7,7 @@
  * (it is built from that process's own list-input schema).
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
-import { flexibleDateSchema } from "@langwatch/api/rest";
+import { flexibleDateSchema } from "@langwatch/api/dates";
 import { z } from "zod";
 
 import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";

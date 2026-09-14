@@ -239,14 +239,6 @@ export function coerceToEpoch(value: string | number): number {
   return toEpochMs(value);
 }
 
-/** Zod schema that accepts either an epoch number or a valid ISO date string. */
-export const flexibleDateSchema = z.union([
-  z.number(),
-  z.string().refine((val) => !Number.isNaN(toEpochMs(val)), {
-    message: "Invalid date format",
-  }),
-]);
-
 /** Schema for successful operation responses */
 export const successSchema = z.object({ success: z.boolean() });
 

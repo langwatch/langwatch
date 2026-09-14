@@ -26,6 +26,10 @@
       "types": "./dist/contract/index.d.ts",
       "default": "./src/contract/index.ts"
     },
+    "./dates": {
+      "types": "./dist/dates.d.ts",
+      "default": "./src/dates.ts"
+    },
     "./rest": {
       "types": "./dist/rest/index.d.ts",
       "default": "./src/rest/index.ts"

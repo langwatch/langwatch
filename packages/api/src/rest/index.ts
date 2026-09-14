@@ -198,7 +198,6 @@ export {
   ENDPOINT_ROUTE,
   errorSchema,
   FALLBACK_API_ERROR_TYPE,
-  flexibleDateSchema,
   ForbiddenError,
   HttpError,
   InternalServerError,
