@@ -520,13 +520,16 @@ Out of scope, each with a filed follow-up:
 Start here, in this order. The first step is not the interesting one — it is the
 one that unblocks testing anything else.
 
-1. `otel-env-block.ts:11-25` — add `pi` to `SOURCE_TYPE_BY_TOOL`, and the `pi`
-   case to `tool-env.ts`. Until both exist, `langwatch pi` exits 501 and nothing
+1. `otel-env-block.ts:11-25` — add `pi` to `SOURCE_TYPE_BY_TOOL`. Until it
+   exists, `langwatch pi` exits 501 `otel_direct_unsupported` and nothing
    downstream can be exercised by hand. **Add a `case "pi": return {}` to
    `buildOtelEnvBlock` in the same change** — being in the slug table must not
    mean pi's child gets an env block. Skipping this hands a live ingest token to
    every process in the session; see Revision v9, which reverses the original
-   wording here.
+   wording here. `tool-env.ts` gets **no** `pi` case: with `allowVk: false` the
+   downgrade at `wrapper-mode.ts:269-277` reaches ingestion before the gateway
+   501 can fire, so that half of the problem is unreachable for pi rather than
+   something to fix — see Revision v10.
 2. `platform-tool-policy.ts:23-30` and `:49`, then the server twin
    `platformToolPolicy.service.ts:27-34` and `:45`.
 3. The registry matcher and its test — `agents/pi.ts`, appended last in

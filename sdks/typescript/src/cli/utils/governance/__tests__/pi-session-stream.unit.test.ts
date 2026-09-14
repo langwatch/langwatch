@@ -370,7 +370,9 @@ describe("tailing a pi session file across passes", () => {
         tailed.push(...(await stream.read(path)));
       }
 
-      const inOneGo = buildPiTurnEvents(parsePiSessionFile(whole));
+      const inOneGo = buildPiTurnEvents({
+        session: parsePiSessionFile(whole),
+      });
 
       // The cuts must actually tear rows, or this is three reads of three whole
       // files and the hard part was never exercised.
@@ -378,6 +380,86 @@ describe("tailing a pi session file across passes", () => {
       expect(whole[cuts[1] ?? 0]).not.toBe("\n");
       expect(inOneGo.length).toBeGreaterThan(100);
       expect(tailed).toEqual(inOneGo);
+    });
+  });
+
+  describe("given a file larger than one pass is allowed to read", () => {
+    /**
+     * Both tests here are deliberately unbound: the spec has no scenario for
+     * the size of a read, because the size of a read is not something a user
+     * can observe. What they can observe is a session arriving whole, which is
+     * what both assert.
+     *
+     * The cap is injected rather than reached, so these cost bytes instead of
+     * megabytes. The behaviour is the same at either size — the window is a
+     * byte count and knows nothing of which one it was given.
+     */
+    it("records the session whole across the passes the window forces", async () => {
+      // Padded so a handful of rows comfortably exceeds the window below, and
+      // so no single row does — that is the other test.
+      const pad = "x".repeat(120);
+      const whole = jsonl([
+        header(SESSION_A),
+        userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad }),
+        assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad }),
+        userRow({ id: "aaaa0003", at: "2026-09-13T15:38:15.000Z", pad }),
+        assistantRow({ id: "aaaa0004", at: "2026-09-13T15:38:16.000Z", pad }),
+        userRow({ id: "aaaa0005", at: "2026-09-13T15:38:17.000Z", pad }),
+      ]);
+      const path = write("big.jsonl", whole);
+      // Derived from the longest row rather than picked, so every row fits a
+      // window and this test turns on the cap alone. The long-row fallback is
+      // the next test's subject; if the two shared a fixture, breaking either
+      // would redden both and neither would name its own defect.
+      const longestLine = Math.max(
+        ...whole.trimEnd().split("\n").map((line) => line.length + 1),
+      );
+      const maxBytesPerRead = longestLine + 1;
+      const stream = createPiSessionStream({ maxBytesPerRead });
+
+      const first = await stream.read(path);
+      const rest = [];
+      // Bounded rather than `while`: a window that stops advancing must fail
+      // this test, not hang it.
+      for (let pass = 0; pass < 20; pass++) {
+        rest.push(...(await stream.read(path)));
+      }
+
+      const inOneGo = buildPiTurnEvents({ session: parsePiSessionFile(whole) });
+
+      // The window must actually have bitten, or this is one ordinary read and
+      // the cap was never exercised.
+      expect(whole.length).toBeGreaterThan(maxBytesPerRead);
+      expect(first.length).toBeLessThan(inOneGo.length);
+      expect([...first, ...rest]).toEqual(inOneGo);
+    });
+
+    it("records a row longer than the window rather than stalling on it", async () => {
+      // One row that cannot fit a window, so the window holding it contains no
+      // newline at all. Without the fallback the reader consumes nothing from
+      // it and every later pass reads the same bytes: the session stops here,
+      // silently, for the life of the process.
+      const whole = jsonl([
+        header(SESSION_A),
+        userRow({
+          id: "aaaa0001",
+          at: "2026-09-13T15:38:13.000Z",
+          pad: "x".repeat(2_000),
+        }),
+        assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z" }),
+      ]);
+      const path = write("long-row.jsonl", whole);
+      const stream = createPiSessionStream({ maxBytesPerRead: 400 });
+
+      const events = [];
+      for (let pass = 0; pass < 20; pass++) {
+        events.push(...(await stream.read(path)));
+      }
+
+      expect(names(events)).toEqual([
+        PI_EVENT.USER_PROMPT,
+        PI_EVENT.API_REQUEST,
+      ]);
     });
   });
 });

@@ -846,7 +846,7 @@ function CliPathsSection({
   // whatever the tile stores (resolveToolPolicyOverrides). Show that rather
   // than a switch an admin can turn on to no effect. Same shape as the
   // cursor case on the direct-ingestion row below.
-  const ingestionOnly = form.assistantKind === "pi";
+  const isIngestionOnly = form.assistantKind === "pi";
   return (
     <FormSection
       label="CLI paths"
@@ -857,14 +857,14 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
-              {ingestionOnly
+              {isIngestionOnly
                 ? "pi always calls its model provider directly, so the gateway route never applies."
                 : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
           <Switch
-            checked={ingestionOnly ? false : form.allowVk}
-            disabled={ingestionOnly}
+            checked={isIngestionOnly ? false : form.allowVk}
+            disabled={isIngestionOnly}
             onCheckedChange={({ checked }) =>
               setForm({ ...form, allowVk: checked })
             }

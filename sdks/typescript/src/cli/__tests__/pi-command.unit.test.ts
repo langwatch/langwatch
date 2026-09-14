@@ -11,7 +11,7 @@
 import type { Command } from "commander";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const wrapPi = vi.fn(async () => {});
+const wrapPi = vi.fn(async () => undefined);
 vi.mock("../commands/wrap.js", () => ({
   wrapPi,
   // The other shims are unused here but the module is imported as a whole by

@@ -49,11 +49,11 @@ import {
   IngestionKeySessionRevokedError,
   IngestionKeySourceNotAllowedError,
 } from "../ingestionKey.errors";
+import { IngestionKeyService } from "../ingestionKey.service";
 import {
   CODING_AGENT_ORIGIN_VALUE,
   originForIngestSourceType,
 } from "../ingestKeyProvenance.utils";
-import { IngestionKeyService } from "../ingestionKey.service";
 
 const USER = "user_1";
 const ORG = "org_1";

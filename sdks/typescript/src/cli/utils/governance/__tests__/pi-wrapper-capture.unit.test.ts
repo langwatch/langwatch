@@ -95,7 +95,7 @@ vi.mock("../shell-rc", () => ({
   SHELL_FUNCTION_TOOLS: [] as string[],
   maybeOfferIngestionShellRcPersist: async () => undefined,
 }));
-vi.mock("../spinner", () => ({
+vi.mock("../../spinner", () => ({
   createSpinner: () => ({ start: () => undefined, stop: () => undefined }),
 }));
 
@@ -429,6 +429,143 @@ describe("given a pi session launched through the wrapper", () => {
       // as records, because a row id is not something pi's events carry.
       expect(recordsSent()).toBe(2);
     }, 20_000);
+
+    /**
+     * The exit sweep waits for the tick it is exiting on top of.
+     *
+     * The tick guard above cannot cover this one: it lives inside the interval
+     * callback, and the final sweep is not a tick. `clearInterval` retires the
+     * timer and leaves whatever a tick already started still running, so the
+     * two overlap on the way out — and the way out is where it costs most.
+     * These are the last turns of the session, the process is about to exit,
+     * and the loss report is read from counters the running pass has not
+     * written to yet.
+     *
+     * Asserted as concurrency rather than as a lost turn, for the same reason
+     * the tick test is: the reader's own de-duplication hides most of the
+     * damage from a count, so a records assertion goes green either way. What
+     * is unambiguous is whether two passes were on the wire at once.
+     *
+     * Unbound: no scenario describes the exit sweep's overlap with a poll.
+     */
+    it("waits for a running poll pass before the final sweep", async () => {
+      child.state.holdOpen = true;
+      let concurrent = 0;
+      let maxConcurrent = 0;
+      let releaseSlowPost: (() => void) | null = null;
+
+      vi.mocked(globalThis.fetch).mockImplementation((async (
+        _url: unknown,
+        init?: { body?: string },
+      ) => {
+        concurrent++;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        if (init?.body) posted.push(init.body);
+        // The tick's post hangs across the child's exit, which is the whole
+        // arrangement: without it the pass is over before the sweep starts and
+        // there is nothing to overlap.
+        if (releaseSlowPost === null) {
+          await new Promise<void>((resolve) => {
+            releaseSlowPost = resolve;
+          });
+        }
+        concurrent--;
+        return { ok: true, status: 200 } as Response;
+      }) as unknown as typeof fetch);
+
+      const run = launchPi();
+      await waitUntil(() => child.state.close !== null, "the child to be spawned");
+
+      const own = join(dir, "own.jsonl");
+      await writeFile(
+        own,
+        `${headerLine({ id: OWN_ID })}\n${assistantRow("33333333")}\n`,
+        "utf8",
+      );
+      await waitUntil(() => posted.length === 1, "the tick's pass to start");
+
+      // A turn the tick's pass has already read past, so the final sweep has
+      // real work and its post is a real second request rather than a pass
+      // that finds nothing and returns early.
+      await writeFile(own, `${assistantRow("44444444")}\n`, { flag: "a" });
+
+      // pi exits while that post is still hanging.
+      child.state.close?.();
+      // Long enough for an unguarded sweep to have walked the directory, read
+      // the appended turn and put it on the wire alongside the hanging post.
+      await new Promise((resolve) => setTimeout(resolve, 750));
+
+      expect(maxConcurrent).toBe(1);
+
+      // Released only now, so the guarded sweep can finish and the run end.
+      (releaseSlowPost as unknown as () => void)?.();
+      await run;
+      // Waiting delayed the appended turn; it did not drop it.
+      expect(recordsSent()).toBe(2);
+    }, 20_000);
+
+    /**
+     * The final sweep gives up rather than holding the terminal.
+     *
+     * The wait added by the test above is unbounded on its own. pi has already
+     * exited by the time it runs, so the shell is sitting there waiting on
+     * this process for its prompt, and the sweep's `stat` and `read` have no
+     * timeout — against a stalled network home directory an `fs` promise never
+     * settles and cannot be cancelled once libuv has it. Unbounded, one wedged
+     * mount holds the user's terminal open forever over a capture the code
+     * says twice is allowed to fail.
+     *
+     * The hang is the defect, so the assertion is that the run ends at all;
+     * without the deadline this test fails by timing out, which is exactly the
+     * symptom being fixed. The loss report is asserted alongside it because
+     * giving up quietly would trade a visible hang for an invisible gap.
+     *
+     * Slow on purpose: it measures a ten second deadline, so it costs ten
+     * seconds. The neighbouring tests already pay real poll intervals.
+     *
+     * Unbound: no scenario describes a stalled session directory.
+     */
+    it("gives the shell its prompt back when the final sweep cannot finish", async () => {
+      child.state.holdOpen = true;
+
+      vi.mocked(globalThis.fetch).mockImplementation((async (
+        _url: unknown,
+        init?: { body?: string },
+      ) => {
+        if (init?.body) posted.push(init.body);
+        // Never settles, standing in for the unbounded half of the sweep. A
+        // real post could not do this - the transport caps it at five seconds
+        // - but a read against a stalled mount can, and it reaches the same
+        // await.
+        return await new Promise<Response>(() => {});
+      }) as unknown as typeof fetch);
+
+      const run = launchPi();
+      await waitUntil(() => child.state.close !== null, "the child to be spawned");
+
+      await writeFile(
+        join(dir, "own.jsonl"),
+        `${headerLine({ id: OWN_ID })}\n${assistantRow("55555555")}\n`,
+        "utf8",
+      );
+      await waitUntil(() => posted.length === 1, "the tick's pass to start");
+
+      // pi exits with the pass still wedged.
+      child.state.close?.();
+
+      const startedAt = Date.now();
+      await run;
+      const waited = Date.now() - startedAt;
+
+      // Generous, because the point is bounded-versus-forever, not the exact
+      // number. Unbounded, this line is never reached.
+      expect(waited).toBeLessThan(20_000);
+      // The turn the deadline interrupted is on the wire, so it is neither
+      // pending nor dropped and the count-based report says nothing about it.
+      // Exiting quietly here would trade a visible hang for an invisible gap,
+      // which is the trade this whole capture path refuses to make.
+      expect(stderrText()).toContain("did not finish in 10s");
+    }, 40_000);
   });
 
   describe("when no ingestion endpoint or key could be resolved", () => {

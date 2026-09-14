@@ -57,7 +57,10 @@ import {
   postOtlpBody,
 } from "./agent-rollout-transport";
 import { lwTag } from "./brand";
-import { createPiSessionStream } from "./pi-session-stream";
+import {
+  createPiSessionStream,
+  type PiSessionStream,
+} from "./pi-session-stream";
 import { resolvePiLineage } from "./pi-session-lineage";
 import {
   buildPiEventsPayload,
@@ -130,6 +133,69 @@ async function sessionFilesTouchedSince({
 }
 
 /**
+ * Every turn these files have gained that belongs to this run.
+ *
+ * Only turns this run produced. The reader's seen-set lives in memory and dies
+ * with the process, so a RESUMED session is offered from its first row again on
+ * the next run — the file's modification time moved, and the new process has no
+ * memory of what an earlier one already sent. Nothing downstream removes the
+ * repeat: the session fold sets `refoldOnOutOfOrder: false` because its
+ * accumulators commute, and sums commute without deduplicating, so a re-sent
+ * turn is ADDED to the cost and the call count rather than collapsing into the
+ * turn already there. Filtering on the entry clock is what makes the file-level
+ * "only what this run touched" rule true row by row, and it needs nothing kept
+ * on disk.
+ *
+ * The accepted cost: a turn written before this run started is never captured,
+ * so turns a crashed wrapped run never posted are not recovered by resuming it.
+ * That loss is this module's existing position on a crash, not a new one.
+ */
+async function readTurnsSince({
+  stream,
+  paths,
+  sinceMs,
+}: {
+  stream: PiSessionStream;
+  paths: string[];
+  sinceMs: number;
+}): Promise<PiTurnEvent[]> {
+  const turns: PiTurnEvent[] = [];
+  for (const path of paths) {
+    try {
+      for (const event of await stream.read(path)) {
+        if (event.timeUnixMs >= sinceMs) turns.push(event);
+      }
+    } catch {
+      // The reader is documented not to throw; if a future change makes it,
+      // one unreadable session must not cost the others their pass.
+    }
+  }
+  return turns;
+}
+
+export interface PiCaptureOptions {
+  /** The run's start. Sessions untouched since are left alone. */
+  sinceMs: number;
+  sessionsDir: string;
+  /** The OTLP logs endpoint, spelled out — pi emits events, never spans. */
+  logsEndpoint: string;
+  token: string;
+  scopeVersion?: string;
+  fetchImpl?: typeof fetch;
+  /** Overridable so a test can fill the buffer without 20,000 events. */
+  maxPending?: number;
+  /**
+   * Where the overflow notice goes. Defaults to stderr rather than to a no-op
+   * on purpose: a caller that forgets to pass one still gets a loud drop.
+   *
+   * Expected not to throw, and not trusted to keep that promise — see the call
+   * site. It is injected, so the never-throws contract cannot rest on the care
+   * taken inside any one implementation of it.
+   */
+  warn?: (message: string) => void;
+}
+
+/**
  * Start capture for one wrapped pi run.
  *
  * One stream for the whole run, not one per pass: the reader's cursors and its
@@ -146,23 +212,7 @@ export function createPiCapture({
   fetchImpl,
   maxPending = MAX_PENDING_EVENTS,
   warn = (message) => void process.stderr.write(message),
-}: {
-  /** The run's start. Sessions untouched since are left alone. */
-  sinceMs: number;
-  sessionsDir: string;
-  /** The OTLP logs endpoint, spelled out — pi emits events, never spans. */
-  logsEndpoint: string;
-  token: string;
-  scopeVersion?: string;
-  fetchImpl?: typeof fetch;
-  /** Overridable so a test can fill the buffer without 20,000 events. */
-  maxPending?: number;
-  /**
-   * Where the overflow notice goes. Defaults to stderr rather than to a no-op
-   * on purpose: a caller that forgets to pass one still gets a loud drop.
-   */
-  warn?: (message: string) => void;
-}): PiCapture {
+}: PiCaptureOptions): PiCapture {
   const stream = createPiSessionStream({ resolveLineage: resolvePiLineage });
   let pending: PiTurnEvent[] = [];
   let dropped = 0;
@@ -181,33 +231,7 @@ export function createPiCapture({
       // them in across a failed pass.
       const batch = pending;
       pending = [];
-      for (const path of paths) {
-        try {
-          // Only turns this run produced. The reader's seen-set lives in
-          // memory and dies with the process, so a RESUMED session is offered
-          // from its first row again on the next run — the file's modification
-          // time moved, and the new process has no memory of what an earlier
-          // one already sent. Nothing downstream removes the repeat: the
-          // session fold sets `refoldOnOutOfOrder: false` because its
-          // accumulators commute, and sums commute without deduplicating, so a
-          // re-sent turn is ADDED to the cost and the call count rather than
-          // collapsing into the turn already there. Filtering on the entry
-          // clock is what makes the file-level "only what this run touched"
-          // rule true row by row, and it needs nothing kept on disk.
-          //
-          // The accepted cost: a turn written before this run started is never
-          // captured, so turns a crashed wrapped run never posted are not
-          // recovered by resuming it. That loss is this module's existing
-          // position on a crash, not a new one.
-          const fresh = await stream.read(path);
-          for (const event of fresh) {
-            if (event.timeUnixMs >= sinceMs) batch.push(event);
-          }
-        } catch {
-          // The reader is documented not to throw; if a future change makes it,
-          // one unreadable session must not cost the others their pass.
-        }
-      }
+      batch.push(...(await readTurnsSince({ stream, paths, sinceMs })));
       if (batch.length === 0) return 0;
 
       try {
@@ -228,9 +252,19 @@ export function createPiCapture({
           // again, and a line every 2.5s for the length of an outage would bury
           // the terminal pi is running in. The exact total is reported at exit.
           if (dropped === 0) {
-            warn(
-              `${lwTag()} cannot reach LangWatch and the pi capture backlog is full; turns are now being discarded as they age out.\n`,
-            );
+            try {
+              warn(
+                `${lwTag()} cannot reach LangWatch and the pi capture backlog is full; turns are now being discarded as they age out.\n`,
+              );
+            } catch {
+              // The tally outranks the announcement, and both outrank the
+              // contract's convenience. `warn` is injected — the default
+              // writes to a stderr the wrapped session owns and may have
+              // closed — so a throw here would leave `harvest` rejecting on
+              // the one path where it is already failing, and the exit report
+              // undercounting by exactly the turns it just discarded. The
+              // caller loses the notice, never the number.
+            }
           }
           dropped += lost;
         }

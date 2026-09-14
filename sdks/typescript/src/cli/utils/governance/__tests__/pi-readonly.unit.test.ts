@@ -436,14 +436,21 @@ describe("given a user running pi through LangWatch for the first time", () => {
 			expect(spawnMock).toHaveBeenCalledTimes(1);
 		});
 
+		/**
+		 * The exact-list twin of the test above. That one filters ALLOWED_WRITE
+		 * out first, so it is equally happy with a run that wrote nothing at all
+		 * — and a harness watching the wrong tree writes nothing at all. This
+		 * one names the whole list, so it fails both ways: on a second path
+		 * appearing, and on LangWatch's own config NOT being written, which is
+		 * the shape a blind snapshot takes.
+		 */
 		it("writes nowhere but LangWatch's own config, and that list stays one entry long", async () => {
 			const sandbox = makeSandbox();
 			enterSandbox(sandbox);
 
 			const changed = await runLaunchPath({ sandbox, tool: "pi" });
 
-			expect(changed.every((p) => p === ALLOWED_WRITE)).toBe(true);
-			expect([ALLOWED_WRITE]).toHaveLength(1);
+			expect(changed).toEqual([ALLOWED_WRITE]);
 		});
 
 		/**

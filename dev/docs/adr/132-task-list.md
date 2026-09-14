@@ -522,10 +522,10 @@ everything proves only that the module runs.
 | key the header into the set on its session id (12.2) | 1: only the id-collision test | everything else |
 | consume the whole chunk, ignoring the newline (11.4) | 2: torn-line completion, and the real session at **125 of 127** events | the crash scenario |
 
-**The second break is the one worth keeping.** `if (parsed.tornTail) return []`
+**The second break is the one worth keeping.** `if (parsed.hasTornTail) return []`
 looks like it should destroy the crash scenario and does nothing at all: the
 chunk is trimmed to its last newline before the parser sees it, so
-`tornTail` is unreachable from this module. An inert break is not a passing
+`hasTornTail` is unreachable from this module. An inert break is not a passing
 test — it is a break aimed at code that cannot run. The rule the crash scenario
 actually rests on is the newline trim, and the third break is what proves it.
 
@@ -547,7 +547,7 @@ which is what caught the 2-event loss in the last break.
 
 **Re-run against the post-rung-15 file, and nothing was lost.** The table above
 was measured on the 239-line module, before rung 15's injected `resolveLineage`
-option and before the `lineageResolved` hardening. An added cursor field is
+option and before the `isLineageResolved` hardening. An added cursor field is
 exactly the kind of change that leaves every test green while quietly making a
 mutation inert, and this module has already produced one genuinely inert break,
 so the eight were re-run one line at a time against the 324-line file
@@ -590,13 +590,13 @@ Collapsing it into `lineage === undefined` retries the broken resolver on every
 poll tick for the life of the session; collapsing it into `NO_LINEAGE` is worse,
 because that value asserts `isFork: false` and a throw told us nothing about
 whether this session is a fork — and `parent_session_id` is once-set downstream
-and can never be corrected. Hence `lineageResolved: boolean` alongside
+and can never be corrected. Hence `isLineageResolved: boolean` alongside
 `lineage`.
 
 | Break | Red | Green |
 |---|---|---|
 | remove the `try`/`catch` entirely | both new tests | all 11 originals |
-| keep the catch, drop `lineageResolved` (retry on every pass) | 1: **only** the no-retry test — `expected 2 to be 1` | the contract test, all 11 originals |
+| keep the catch, drop `isLineageResolved` (retry on every pass) | 1: **only** the no-retry test — `expected 2 to be 1` | the contract test, all 11 originals |
 | catch the throw, then `return []` | 1: **only** the contract test — `expected [] to deeply equal [ 'pi.user_prompt', 'pi.api_request' ]` | the no-retry test, all 11 originals |
 
 The third break is the one the test was written for. A `read` that swallows the

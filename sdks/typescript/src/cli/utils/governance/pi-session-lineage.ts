@@ -89,14 +89,23 @@ async function readFirstLine(path: string): Promise<string | null> {
   let handle;
   try {
     // O_NONBLOCK, not just "r": the path comes out of a file we did not write,
-    // and `open(2)` on a FIFO with no writer — or on a stalled network mount —
-    // blocks forever rather than failing. Measured: a plain open of a FIFO here
-    // never returned and never threw, and because it blocks inside a libuv
-    // threadpool thread it also wedges one of the four, so a handful of them
-    // starve filesystem I/O process-wide. The reader awaits this inside a poll
-    // pass with no timeout of its own, so a hang is worse than an error: an
-    // error ends a tick, this ends capture. O_NONBLOCK is a no-op on regular
-    // files, which is every parent we actually expect.
+    // and `open(2)` on a FIFO with no writer blocks forever rather than
+    // failing. Measured, both spellings against one writerless FIFO: the plain
+    // open never returned and never threw, this one returned in 0ms. The
+    // blocking one waits inside a libuv threadpool thread, so it also wedges
+    // one of the four and a handful of them starve filesystem I/O
+    // process-wide. The reader awaits this inside a poll pass with no timeout
+    // of its own, so a hang is worse than an error: an error ends a tick, this
+    // ends capture.
+    //
+    // What the flag does NOT buy is a timeout. O_NONBLOCK is a no-op on
+    // regular files — which is every parent we actually expect — so an open or
+    // a read against a stalled network mount still hangs here, and no `fs`
+    // call can be cancelled once libuv has handed it to a thread. Bounding
+    // that belongs at the seam that awaits capture on the way out, not at this
+    // call: lineage resolves at most once per file, while the stream's own
+    // `stat` and `read` run every pass over every file, so a deadline on this
+    // one open would leave the hang it is named for entirely in place.
     handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
   } catch {
     return null;

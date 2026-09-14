@@ -169,6 +169,50 @@ describe("given an outage long enough to fill the backlog", () => {
       expect(capture.droppedCount()).toBeGreaterThan(droppedOnce);
       expect(said).toHaveLength(1);
     });
+
+    /**
+     * A `warn` that throws costs the notice and nothing else.
+     *
+     * The same shape as the injected lineage resolver the reader guards
+     * (ADR-132, "The never-throws contract, pinned at the seam"): `warn` is a
+     * parameter, so "harvest resolves, always" cannot rest on the care taken
+     * inside any one implementation of it. The default writes to a stderr the
+     * wrapped session owns and may have closed under us.
+     *
+     * Two assertions, because only catching the throw is not enough. A guard
+     * that swallowed the failure and skipped the tally would satisfy "does not
+     * reject" and leave the exit report short by exactly the turns just
+     * discarded — the undercount this module's overflow accounting exists to
+     * prevent. So the count is asserted alongside the resolution.
+     *
+     * Unbound: no scenario describes a warn callback that throws.
+     */
+    it("keeps counting what it discarded when the notice cannot be printed", async () => {
+      await writeFile(
+        join(dir, "s.jsonl"),
+        sessionLines("dddddddd", "eeeeeeee"),
+        "utf8",
+      );
+
+      const fetchImpl = vi.fn(async () => {
+        throw new Error("network is down");
+      }) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+        maxPending: 1,
+        warn: () => {
+          throw new Error("stderr is closed");
+        },
+      });
+
+      await expect(capture.harvest()).resolves.toBe(0);
+      expect(capture.droppedCount()).toBeGreaterThan(0);
+    });
   });
 });
 
