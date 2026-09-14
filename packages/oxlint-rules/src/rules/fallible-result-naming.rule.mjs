@@ -41,7 +41,7 @@ export const fallibleResultNamingRule = defineRule({
   messages: {
     tryPrefix: {
       what: "`{{name}}` hedges: a `try` method hands the caller a maybe instead of an answer.",
-      fix: "Name it `{{plain}}` and throw the domain error when it cannot answer; if absence is a normal outcome the caller branches on, name it `find*` and return undefined.",
+      fix: "Name it `{{plain}}` and throw the domain error when it cannot answer; if absence is a normal outcome the caller branches on, name it `find*` and return undefined — and rework the body to match: narrow any blanket try/catch to the one call whose failure means absence, so a real error propagates instead of reading as a miss.",
     },
     requirePrefix: {
       what: "Rename `{{name}}`: drop the `require` prefix; a method already returns or throws.",
