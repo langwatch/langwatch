@@ -1,15 +1,4 @@
-/**
- * The sidebar column: which pages the open product offers, and the utilities
- * pinned under them.
- *
- * Moved from `platform/app/src/features/navigation/shell/ProductSidebar.tsx`.
- * Everything it composed moved with it, so the column is the same column; the
- * two seams that changed are the host (the workspace, the grants, the address)
- * and the search palette, which the host answers with or without.
- *
- * Specs: specs/navigation/product-sidebars.feature,
- *        specs/navigation/settings-shell-v2.feature
- */
+/** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Search } from "lucide-react";
@@ -388,16 +377,7 @@ export function SidebarContent({
   );
 }
 
-/**
- * The navigation-v2 sidebar frame, shared by the product-switcher and
- * icon-rail shells: a wider column than the current chrome's, drawn one
- * step tighter so the longer page names hold one line. It never
- * auto-hides; only small screens keep the hover-expanded responsive
- * collapse the legacy chrome has.
- *
- * Specs: specs/navigation/product-sidebars.feature,
- *        specs/navigation/settings-shell-v2.feature
- */
+/** Sidebar frame for product-switcher and icon-rail. Wider; hover-collapse on small screens. */
 export function ProductSidebar({
   surface,
   isCompact,

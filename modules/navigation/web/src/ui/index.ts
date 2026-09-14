@@ -1,15 +1,4 @@
-/**
- * The navigation controls an application's chrome renders.
- *
- * The two switchers — one for the product, one for the project — plus the
- * vocabulary a chrome needs to place them: which product an address belongs to,
- * what the section rails offer, and where "Back to {product}" goes.
- *
- * Neither switcher reads for itself. The host hands the project switcher its
- * groups and answers both navigations, which is what lets a page that is not
- * the chrome render one too, and is why `projectSwitcher()` can be a real
- * answer rather than a null.
- */
+/** Navigation chrome: product and project switchers. Host provides data; not self-reading. */
 
 export { NavigationShell } from "./sections/navigation-shell.tsx";
 export { ShellPageBody, planManagementHref } from "./sections/shell-page-body.tsx";

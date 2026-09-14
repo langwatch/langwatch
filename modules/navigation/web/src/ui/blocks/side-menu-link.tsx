@@ -1,16 +1,4 @@
-/**
- * One entry in a navigation column, and the visual it is made of.
- *
- * Moved from `platform/app/src/components/sidebar/SideMenuLink.tsx`. Two
- * things did not travel and both are deliberate: the anchor is the package's
- * own {@link NavigationLink}, since the module it used
- * (`platform/app/src/components/ui/link`) no longer exists and a governed web
- * package may not import a router by name; and `trackEvent("side_menu_click")`
- * is gone with `platform/app/src/utils/tracking`, so the `project` prop that
- * existed ONLY to carry a project id into that call went with it. Product
- * analytics is the application's, and a prop nothing reads is worse than its
- * absence.
- */
+/** Navigation menu entry (moved from platform/app; uses this package's NavigationLink). */
 
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";

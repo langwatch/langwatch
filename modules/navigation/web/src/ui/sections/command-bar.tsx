@@ -5,15 +5,7 @@ import { useCommandBar } from "../../behavior/command-bar-context.ts";
 import { CommandPalette } from "./command-palette.tsx";
 import { COMMAND_BAR_MAX_WIDTH, COMMAND_BAR_TOP_MARGIN } from "../../model/command-bar-constants.ts";
 
-/**
- * The palette raised over the page by Cmd+K.
- *
- * This file is the SURFACE only: a dialog, its entrance, and the way it
- * dissolves when a question is handed to Langy. Everything the palette does —
- * search, navigation, recents, the Langy hand-off — lives in `CommandPalette`,
- * which the project home mounts inline as well. Two places to type, one set of
- * behaviours.
- */
+/** Cmd+K palette surface. Behaviors live in CommandPalette component. */
 export function CommandBar() {
   const { isOpen, close, query, setQuery } = useCommandBar();
   const reduceMotion = useReducedMotion();

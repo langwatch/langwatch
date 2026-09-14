@@ -1,15 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The number on the operations Dashboard entry.
- *
- * `ops.getBadgeCounts` was served and called by nobody once the legacy chrome's
- * `OpsSection` went: the procedure answered, and the menu drew nothing. This
- * suite mounts the settings sidebar the reader actually sees and asserts the
- * badge carries what the procedure answers, so the two halves cannot come apart
- * again without a red test.
- *
- * Spec: specs/navigation/ops-navigation-v2.feature
+ * Ops dashboard badge: verifies getBadgeCounts procedure answer reaches badge display.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

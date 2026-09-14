@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The presence toggle reaches the account dropdown as `accountMenu.presence`,
- * and the host offers it only on the surface that broadcasts presence. What is
- * asserted here is the menu's half of that: it draws the row the host offers,
- * and draws none when the host offers none.
- *
- * Spec: specs/traces-v2/presence-toggle-placement.feature
+ * Menu renders presence row when host offers it, none otherwise.
  */
 
 import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";

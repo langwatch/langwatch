@@ -41,21 +41,8 @@ const RESULTS_PANEL_VIEWPORT_MARGIN = 24;
 export type CommandPaletteSurface = "dialog" | "inline";
 
 /**
- * The palette: everything the command bar DOES, with nothing about where it
- * sits.
- *
- * Extracted from `CommandBar` so the home page can mount the same thing
- * without a dialog around it. A second field with its own search, its own
- * ranking and its own idea of what Enter means would be two products in one
- * app: the results would diverge the first time either side was touched, and
- * the reader would have to learn which box did what.
- *
- * The surface changes presentation only. The dialog flows its results inside
- * itself and can afford rotating tips; the inline one overlays its results on
- * the page, so opening them never pushes the rest of the home down.
- *
- * Spec: specs/langy/langy-command-bar-activation.feature,
- *       specs/home/langy-home.feature
+ * Palette: shared behaviors for command bar and home inline. Surface changes
+ * presentation only (dialog vs inline overlay behavior).
  */
 export function CommandPalette({
   surface,
@@ -330,15 +317,7 @@ export function CommandPalette({
     ],
   );
 
-  // Reset Langy mode whenever the palette stands down, so it never resumes
-  // mid-transition and the next visit lands on the normal command view. A
-  // pending handoff timer never outlives the stand-down either — a timer left
-  // running could close a later surface — but its close still RUNS, now: the
-  // panel's composer takes focus during the handoff overlap, which blurs an
-  // inline field and deactivates it before the timer fires, and skipping the
-  // close there would leave the field holding the question it already sent.
-  // `onDone` is idempotent on every surface, so the dialog path (already
-  // closed when this runs) is unaffected.
+  // Reset Langy mode and handoff timer on stand-down; onDone is idempotent across surfaces.
   useEffect(() => {
     if (!active) {
       if (handoffTimerRef.current !== null) {

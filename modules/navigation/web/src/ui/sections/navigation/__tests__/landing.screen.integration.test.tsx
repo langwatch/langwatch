@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The "/" landing seam: the per-org product memory decides ahead of the
- * server home resolver, and re-renders during the in-flight navigation
- * never restart the same replace.
- *
- * MOVED from `platform/app/src/pages/__tests__/index.landing.integration.test.tsx`.
- * The three mocks that named that application's modules — its router, its
- * workspace hook and its tRPC client — are one stub host and one stubbed
- * procedure map now; the scenarios and their expectations are unchanged.
- *
- * Spec: specs/navigation/navigation-v2-landing.feature
+ * Landing page (/): per-org product memory resolves before server. Moved from platform/app.
  */
 
 import { render, waitFor } from "@testing-library/react";

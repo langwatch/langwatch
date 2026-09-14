@@ -1,13 +1,4 @@
-/**
- * The shell's top bar: the organization and the product-native scope on the
- * left, the account controls on the right.
- *
- * Moved from `platform/app/src/features/navigation/shell/ShellTopBar.tsx`. The
- * impersonation banner came from `@langwatch/ops-web` — a feature-web package,
- * which a governed web package may not import — so the host hands it in with
- * the rest of the account chrome, and the tint behind it is driven by the
- * reader's own `impersonator` reading.
- */
+/** Top bar: org/product scope (left), account controls (right). Impersonation banner from host. */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Settings as SettingsIcon } from "lucide-react";

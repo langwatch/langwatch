@@ -1,17 +1,4 @@
-/**
- * The organization control in the shell's top bar.
- *
- * Moved from
- * `platform/app/src/features/navigation/shell/OrganizationSelect.tsx`. The
- * `FullyLoadedOrganization` it was typed against is a Prisma-derived shape
- * from `platform/app`'s server tree; the port's own `NavigationOrganization`
- * carries every field this control reads. And the two `localStorage` writes
- * go through the host: those keys are the application shell's scope memory,
- * and a second writer in a package is the split brain the landing move already
- * refused.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
- */
+/** Organization control (top bar). Uses NavigationOrganization; localStorage through host. */
 
 import { Button, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
@@ -30,16 +17,7 @@ function firstProjectSlug(organization: NavigationOrganization): string | null {
   return null;
 }
 
-/**
- * The organization in the product-switcher top bar: plain text for a
- * single-organization user, an in-place switch for a multi-organization
- * user. Switching stores the organization the resolver reads, clears the
- * stored project selection (it belongs to the old organization), and
- * lands on the same product's home in the new organization when it is
- * reachable there.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
- */
+/** Org selector: text (single org), switch (multi-org). Switching clears old project selection. */
 export function OrganizationSelect({ activeProductId }: { activeProductId: ProductId | null }) {
   const host = useNavigationHost();
   const organization = host.organization();

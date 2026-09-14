@@ -1,19 +1,6 @@
 /**
- * `/@project/<rest>`: the address that means "this page, in whichever project I
- * am in".
- *
- * Moved from `platform/app/src/pages/@project/[...path]/index.tsx`. It exists
- * so a link can be written without knowing the reader's project — the
- * onboarding mails and the docs use it — and its whole body is one redirect.
- *
- * THE FIVE-SECOND FALLBACK IS THE POINT. A reader whose workspace never
- * resolves has no project to substitute, and an address that spins forever
- * teaches nothing; sending them to `/` puts them where the landing redirect can
- * decide. The timer is cleared the moment the project does arrive.
- *
- * The remaining path comes off the host rather than a router: `catchAll` is the
- * segments after `@project`, already joined, which is the one thing the address
- * carries that the port does not otherwise answer.
+ * Redirect /@project/<rest> to current project. 5s fallback to /. Moved from platform/app.
+ * Allows links without project context (mails, docs). Path from host (no router access).
  */
 
 import { useEffect } from "react";

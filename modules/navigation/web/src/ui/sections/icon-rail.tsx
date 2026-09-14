@@ -1,20 +1,4 @@
-/**
- * The icon-rail mode's product column.
- *
- * Moved from `platform/app/src/features/navigation/shell/IconRail.tsx`. The
- * logo anchor survives the move as a real anchor: the chrome section of the
- * manifest recorded that a governed package could not keep it, because
- * `frontend-ui-boundaries` forbids `react-router` by name — the package's own
- * {@link NavigationLink} is the answer that was missing then, and a middle
- * click still opens a new tab.
- *
- * `trackEvent("navigation_product_switch")` did not travel, the same line
- * `@langwatch/workflow-web` drew for `trackEvent("workflow_create")`: product
- * analytics is the application's, and `platform/app/src/utils/tracking` no
- * longer exists to import in any case.
- *
- * Spec: specs/navigation/icon-rail-navigation.feature
- */
+/** Icon-rail product column (moved from platform/app; uses NavigationLink). */
 
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
@@ -83,15 +67,7 @@ function RailTile({
   );
 }
 
-/**
- * The icon-rail mode's product column: a darker full-height rail with
- * the logo, one tile per reachable product (tiny label under the icon,
- * white active tile with a side indicator), and Settings pinned to the
- * bottom. Picking a tile opens that product's home; the product
- * dropdown disappears from the top bar in this mode.
- *
- * Spec: specs/navigation/icon-rail-navigation.feature
- */
+/** Icon-rail: product tiles with Settings at bottom. Tile click opens product. */
 export function IconRail({
   activeProductId,
   isSettingsActive,

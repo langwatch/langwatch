@@ -31,22 +31,7 @@ const productPillStyle = {
   _hover: { backgroundColor: "bg.panel", borderColor: "border.emphasized" },
 } satisfies ButtonProps;
 
-/**
- * The product dropdown in the product-switcher top bar. Lists only the
- * products the user can reach, each with its pitch line so a first-time
- * visitor learns what it does, and marks the product the page belongs
- * to. Picking one opens that product's home.
- *
- * MOVED from `platform/app/src/features/navigation/shell/ProductSwitcherMenu.tsx`.
- * `trackEvent("navigation_product_switch", …)` did NOT travel, the line
- * `@langwatch/workflow-web` already drew for `trackEvent("workflow_create")`:
- * product analytics is the application's — which client, which consent, which
- * identity — and `platform/app`'s `utils/tracking` no longer exists to import
- * anyway. A port method the host could only answer with nothing would be worse
- * than its absence, so this records the loss instead of pretending to keep it.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
- */
+/** Product dropdown: reachable products with pitch. Marks current product. Tracking removed. */
 export function ProductSwitcherMenu({ activeProductId }: { activeProductId: ProductId }) {
   const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();

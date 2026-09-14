@@ -1,28 +1,6 @@
 /**
- * The interior of the shell's content card: the banners, the cross-scope
- * chrome, the team-membership guard and the page itself.
- *
- * Moved from `platform/app/src/components/DashboardPageBody.tsx`. Every shell
- * renders this same component inside its own frame, so the page-level behavior
- * cannot drift between them.
- *
- * WHAT DID NOT TRAVEL, and why each is a deletion rather than a gap:
- *
- * - `CurrentDrawer` and `GlobalTraceV2DrawerMount`. The drawer mount moved to
- *   `@langwatch/ui-drawer` and the application's chrome route mounts it ONCE,
- *   above the outlet — which is where a drawer opened from any page can
- *   render. A second mount inside the page body would open every drawer twice.
- * - `AnnouncementBanner` and `GlobalUpgradeModal`. Both are the application's
- *   own marketing chrome rather than navigation's, and neither has a reader on
- *   this side.
- * - `SavedViewsProvider` / `SavedViewsBar`. `platform/app`'s `useSavedViews`
- *   no longer exists; the bar was the last surface of the v1 view system, and
- *   the Trace Explorer carries its own.
- * - `usePostHogIdentify` and `trackEvent`. Product analytics is the
- *   application's, the line every family since the gateway has drawn.
- * - `usePlanManagementUrl`. Three lines of `isSaaS ? … : …`, which is
- *   `planManagementHref` below rather than a port method for a branch the
- *   deployment reading already decides.
+ * Shell page body: content card interior. Moved from platform/app.
+ * Drawer/announcements/analytics/SavedViews moved or removed.
  */
 
 import {
@@ -92,16 +70,7 @@ export const ShellPageBody = ({
 
   const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
 
-  // Admin viewing-as detection: an organization administrator is on a project
-  // that belongs to ANOTHER person's personal workspace. That is the only
-  // legitimate "using administrative reach to read somebody else's data" case:
-  // organization ADMIN cascades to every team as implicit membership, so a
-  // team-kind banner would shout at an administrator on their own dashboards.
-  //
-  // Gated to project-anchored addresses ONLY — the administrator's own
-  // surfaces (/governance, /settings/*, /me/*, /ops/*) must not fire the
-  // banner even when the team is still resolved from a project visited
-  // earlier.
+  // Admin viewing-as: org admin on personal workspace. Gated to project addresses.
   const isProjectAnchoredRoute = !!project && pathname.startsWith(`/${project.slug}`);
   const adminViewingAs: { label: string } | null =
     isProjectAnchoredRoute &&

@@ -1,32 +1,6 @@
 /**
- * THE APPLICATION CHROME. One component: the top bar, the product sidebar, the
- * content card and the page body inside it.
- *
- * Moved from
- * `platform/app/src/features/navigation/shell/NavigationV2Shell.tsx`, which is
- * the shape `DashboardLayout` resolved to for every device on a current
- * navigation mode. `DashboardLayout` itself is DELETED rather than moved: its
- * own body was the legacy chrome — breadcrumbs built from a route table that
- * no longer exists, a workspace switcher, a passkey nudge, an analytics
- * identify — and nothing on this side mounts it. What a host renders now is
- * this.
- *
- * The mode is still a parameter, because the icon rail and the product
- * switcher are two arrangements of the same chrome: in "product-switcher" the
- * product lives in a top-bar dropdown beside the mark; in "icon-rail" a
- * full-height rail on the left carries the mark and one tile per product, and
- * the dropdown disappears. The sidebar never auto-hides in either; only a
- * small viewport collapses it.
- *
- * THE DRAWER MOUNT IS NOT HERE, and that is deliberate. `CurrentDrawer` is
- * mounted once by the application's own chrome route, above the outlet and
- * outside this frame: a drawer is addressed by the query string and renders
- * through a portal, so it has to open over a page this shell does not draw as
- * well as over one it does.
- *
- * Specs: specs/navigation/product-switcher-navigation.feature,
- *        specs/navigation/icon-rail-navigation.feature,
- *        specs/navigation/product-sidebars.feature
+ * Application chrome: top bar, sidebar, content. Mode: product-switcher or icon-rail.
+ * Drawer mounted separately (portal-based). Moved from platform/app; DashboardLayout deleted.
  */
 
 import { Box, HStack } from "@chakra-ui/react";

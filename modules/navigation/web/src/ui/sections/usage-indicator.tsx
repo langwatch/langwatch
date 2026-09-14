@@ -1,16 +1,6 @@
 /**
- * The usage meter at the foot of a navigation column.
- *
- * Moved from `platform/app/src/components/sidebar/UsageIndicator.tsx`. Three
- * seams changed and none of the rules did:
- *
- * - `api.limits.getUsage` is now this package's own procedure map, asked with
- *   the SAME path and input the application shell asks with, which under
- *   tRPC's path-plus-input cache key is one entry rather than two requests.
- * - `PricingModel.SEAT_EVENT` was a Prisma enum import; a governed web package
- *   may not import Prisma at all, so the one member the rule compares against
- *   is stated here as the string the wire already carries.
- * - `isSaaS` comes off the host's deployment reading rather than `usePublicEnv`.
+ * Usage meter (footer). Moved from platform/app; three seams changed.
+ * API path same, PricingModel.SEAT_EVENT as string, isSaaS from host.
  */
 
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
@@ -42,15 +32,8 @@ const UNLIMITED_MESSAGES = 999_999_999;
 export type UsageDisplay = { visible: true; unitLabel: string } | { visible: false };
 
 /**
- * Whether the sidebar usage bar is visible and which unit label to display.
- *
- * The unit label is read from the answer via `usageUnit` rather than derived
- * from the pricing model in the browser.
- *
- * Visibility rules:
- * - Self-hosted: always visible
- * - SaaS + seat-and-event pricing + paid: not visible
- * - All other SaaS: visible
+ * getUsageDisplay: visibility and unit for sidebar bar. Unit from usageUnit.
+ * Self-hosted: visible. SaaS: hidden if seat-and-event + paid, visible otherwise.
  */
 export function getUsageDisplay({
   isSaaS,

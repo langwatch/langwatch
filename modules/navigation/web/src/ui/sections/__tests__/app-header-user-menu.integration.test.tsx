@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The avatar menu's navigation-mode picker.
- *
- * MOVED from `platform/app`. The seven mocks that named that application's
- * hooks are the stub host now; the picker itself no longer sits behind a flag,
- * so what this asserts is that it is there and offers exactly the two shells.
- *
- * Spec: specs/navigation/navigation-modes.feature
+ * Avatar menu navigation-mode picker (moved from platform/app; mocks replaced with stub host).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

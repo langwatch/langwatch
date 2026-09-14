@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The project bubble with an emoji-named project.
- *
- * The unit coverage of `firstGrapheme` proves the character is taken whole;
- * this proves the bubble actually shows that character. It has to, because
- * the avatar library re-derives initials with `charAt(0)` whenever it is
- * handed a `name` — so a component that passes the correct initial through
- * the wrong prop breaks in exactly the same way, with every unit test green.
+ * Avatar bubble with emoji project names: full grapheme, not char(0) only.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

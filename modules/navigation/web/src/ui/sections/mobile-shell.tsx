@@ -1,14 +1,4 @@
-/**
- * The shell on a phone-width viewport.
- *
- * Moved from `platform/app/src/features/navigation/shell/MobileShell.tsx` as
- * it stood: one compact bar with the logo, the product selector, the product's
- * own scope and a menu button; the page below takes the rest of the screen,
- * and the button opens a full-screen overlay carrying the selectors, the
- * product's pages and the account controls.
- *
- * Spec: specs/navigation/mobile-chrome.feature
- */
+/** Mobile shell: compact bar with logo, product selector, menu. Menu opens overlay. */
 
 import { Box, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
@@ -28,15 +18,7 @@ import { SidebarContent } from "./product-sidebar.tsx";
 
 const LOGO_HEIGHT = 24;
 
-/**
- * The navigation-v2 chrome on a phone-width viewport: one compact bar
- * with the logo, the product selector, the product's own scope control
- * and a menu button; the page below it takes the rest of the screen.
- * The menu button opens a full-screen overlay carrying the organization
- * and project selectors, the product's pages and the account controls.
- *
- * Spec: specs/navigation/mobile-chrome.feature
- */
+/** MobileShell component (see module doc above). */
 export function MobileShell({
   state,
   children,

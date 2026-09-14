@@ -1,29 +1,6 @@
 /**
- * The project column's entries: Home, Observe, Test and Build.
- *
- * Moved from `platform/app/src/components/MainMenu.tsx`. What travelled is the
- * SECTIONS — the list the product sidebar renders — and the two width
- * constants, which now live in `model/menu-widths` because the shell's own
- * layout math reads them.
- *
- * WHAT DID NOT TRAVEL, and why it is a deletion rather than a gap:
- *
- * - The `MainMenu` COLUMN itself, and the `OpsSection` inside it. Both belong
- *   to `DashboardLayout`, the legacy chrome this move deletes: the shell that
- *   renders these sections draws its own column, and offers every operations
- *   page from the settings menu instead (`opsGroup`). Moving a column nothing
- *   mounts would be the dead code this migration forbids.
- * - `projectRoutes`. `platform/app/src/utils/routes.ts` was deleted by commit
- *   `72ed591a13` while this move was in flight, which is what left this module
- *   importing something that no longer existed. The nineteen destinations the
- *   menu read off it are `model/project-nav-items`.
- * - `useRouter().pathname`. The host answers with the ADDRESS, and
- *   `toProjectRoutePattern` writes a project-anchored address back as the
- *   pattern, so every `isActive` test below keeps the exact comparison it was
- *   written with.
- *
- * Specs: specs/navigation/product-sidebars.feature,
- *        specs/navigation/ops-navigation-v2.feature
+ * Project menu sections (Home, Observe, Test, Build). Moved from platform/app;
+ * doesn't include MainMenu column (deleted with DashboardLayout).
  */
 
 import { GitPullRequest, SquareTerminal } from "lucide-react";

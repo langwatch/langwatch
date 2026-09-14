@@ -1,19 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The results panel's own top edge. The raised bar keeps the field and the
- * list in one card, where `showTopDivider` marks the boundary between them.
- * The home mounts the same results list as its own panel, and there the line
- * would draw a second edge a few pixels inside the panel's own — so the
- * inline surface passes `showTopDivider={false}` (see command-palette.tsx).
- *
- * Ported from platform/app/src/features/command-bar/__tests__/CommandPaletteInlinePanel.integration.test.tsx
- * (origin/main), narrowed from mounting the whole `CommandPalette` (which now
- * pulls in `useNavigationHost`, `useCommandBarItems`, `useRecentItems` and
- * several other tRPC-backed collaborators unrelated to this scenario) down to
- * the leaf presentational component that actually owns `showTopDivider` and
- * the border it draws.
- * See specs/home/langy-home.feature.
+ * Results panel's top edge with showTopDivider. Ported from platform/app;
+ * narrowed to this leaf presentational component.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

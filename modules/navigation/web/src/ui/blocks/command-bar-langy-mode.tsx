@@ -4,18 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 const LANGY_INPUT_RADIUS = "18px";
 
-/**
- * The focused "Ask Langy" state of the command bar.
- *
- * This deliberately borrows only Langy's quiet composer signals: its own mark,
- * the restrained hairline sheen, and the orange focus ring. It does not repaint
- * the global command palette with a generic sparkle/AI gradient treatment.
- *
- * THE MARK ARRIVES AS A NODE. It is the assistant's own drawing and belongs to
- * the assistant's package, which a shell package may not import; the host hands
- * it over with the rest of the Langy answer. A host that hands none draws the
- * composer without it rather than a placeholder in its place.
- */
+/** Langy mode: quiet composer signals, no generic AI gradient. Mark provided by host. */
 export function CommandBarLangyMode({
   query,
   onQueryChange,
