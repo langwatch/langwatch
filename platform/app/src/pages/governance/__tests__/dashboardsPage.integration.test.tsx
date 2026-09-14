@@ -344,6 +344,17 @@ describe("given the page is open with sample data off", () => {
       afterRerender.find((placement) => placement.graphId === moved.graphId)
         ?.gridRow,
     ).toBe(moved.gridRow + 4);
+
+    // …and no further than that. There is no row behind this page to save a
+    // layout to, so the next visit opens on the authored arrangement — which
+    // is the half of the promise the source scan cannot see.
+    cleanup();
+    renderPage();
+    expect(
+      (latestPlacements as ChartGridPlacement[]).find(
+        (placement) => placement.graphId === moved.graphId,
+      )?.gridRow,
+    ).toBe(moved.gridRow);
   });
 
   /** @scenario "Sample off shows an empty widget that says what would fill it" */
