@@ -263,6 +263,9 @@ describe("given the identifier-first auth screens", () => {
       await waitFor(() => {
         expect(signInMock).toHaveBeenCalledWith("auth0", {
           callbackUrl: undefined,
+          // The typed address rides along as the OIDC login hint, so the
+          // provider's own screen arrives prefilled.
+          loginHint: "sam@acme.com",
         });
       });
     });

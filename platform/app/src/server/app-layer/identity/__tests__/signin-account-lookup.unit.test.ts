@@ -110,12 +110,12 @@ function build({
   auth0Bridge?: boolean;
 } = {}) {
   const isLatched: IdentityUserGate = async () => latched;
-  return new ProjectionSignInAccountLookup(
-    new FakeHeads(projectedHolder, identifiers),
-    new FakeLegacyDirectory(account),
+  return new ProjectionSignInAccountLookup({
+    heads: new FakeHeads(projectedHolder, identifiers),
+    legacy: new FakeLegacyDirectory(account),
     isLatched,
-    auth0Bridge,
-  );
+    auth0BridgeIsActive: auth0Bridge,
+  });
 }
 
 async function routeLegacyAccount({

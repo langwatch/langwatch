@@ -34,16 +34,28 @@ export interface LegacySignInAccountDirectory {
  * Detached identifiers never count, and the repository exposes only method
  * presence, never credential material.
  */
+export interface ProjectionSignInAccountLookupDeps {
+  heads: IdentityHeadsRepository;
+  legacy: LegacySignInAccountDirectory;
+  isLatched: IdentityUserGate;
+  /** Whether the Auth0 connection bridge routes brokered subjects to their
+   *  own branded methods (`utils/auth0-bridge.ts`) — a composition decision,
+   *  handed in so this class never reads the environment. */
+  auth0BridgeIsActive?: boolean;
+}
+
 export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
-  constructor(
-    private readonly heads: IdentityHeadsRepository,
-    private readonly legacy: LegacySignInAccountDirectory,
-    private readonly isLatched: IdentityUserGate,
-    /** Whether the Auth0 connection bridge routes brokered subjects to
-     *  their own branded methods (`utils/auth0-bridge.ts`) — a composition
-     *  decision, handed in so this class never reads the environment. */
-    private readonly auth0BridgeIsActive: boolean = false,
-  ) {}
+  private readonly heads: IdentityHeadsRepository;
+  private readonly legacy: LegacySignInAccountDirectory;
+  private readonly isLatched: IdentityUserGate;
+  private readonly auth0BridgeIsActive: boolean;
+
+  constructor(deps: ProjectionSignInAccountLookupDeps) {
+    this.heads = deps.heads;
+    this.legacy = deps.legacy;
+    this.isLatched = deps.isLatched;
+    this.auth0BridgeIsActive = deps.auth0BridgeIsActive ?? false;
+  }
 
   async findAccountMethods({
     normalizedValue,

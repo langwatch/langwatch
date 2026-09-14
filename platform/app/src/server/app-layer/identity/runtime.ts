@@ -439,15 +439,15 @@ const signInRouterService = new SignInRouterService({
   domains: signInDomainRoutingPort(),
   policy: signInMethodPolicyPort,
   breakGlass: breakGlassLimiter,
-  accounts: new ProjectionSignInAccountLookup(
-    identityHeads,
-    identityUsers,
+  accounts: new ProjectionSignInAccountLookup({
+    heads: identityHeads,
+    legacy: identityUsers,
     isLatched,
-    auth0BridgeActive({
+    auth0BridgeIsActive: auth0BridgeActive({
       isSaas: env.IS_SAAS,
       authProvider: env.NEXTAUTH_PROVIDER,
     }),
-  ),
+  }),
 });
 
 export function signInRouter(): SignInRouterService {
