@@ -37,7 +37,7 @@ function harness() {
   const app = ScenarioApp.create({
     repositories: { scenarios: {} as ScenarioRepository },
     dependencies: { users: {} as UserApi },
-    config: undefined,
+    config: {},
     resources: {} as ResourceOwnership,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
@@ -324,7 +324,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
       const app = ScenarioApp.create({
         repositories: { scenarios: {} as ScenarioRepository },
         dependencies: { users: {} as UserApi },
-        config: undefined,
+        config: {},
         resources: {} as ResourceOwnership,
         members: {
           agentTesting: createApiFixture<AgentTestService>(),

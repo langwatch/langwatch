@@ -66,6 +66,7 @@ import {
   withResolvedModels,
 } from "@langwatch/scenario-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
+import { z } from "zod";
 import type { EventEmitter } from "node:events";
 import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput, TargetAdapterData, LiteLLMParams } from "@langwatch/scenario-contract";
 import type { AgentAdapter } from "@langwatch/scenario";
@@ -145,9 +146,16 @@ export interface ScenarioAppInfrastructure {
   scenarioHttp: ScenarioHttp;
   scenarioProcessorServiceMetrics: ScenarioProcessorServiceMetrics;
   scenarioTabStore: ScenarioTabStore;
-  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
-  publicBaseUrl?: string;
 }
+
+/**
+ * This App's own config: the deployment's public origin, for `platformUrl`.
+ * Optional — not every install serves REST — and defaulted to `{}` so a
+ * deployment that names no `scenario` slice in its process config still
+ * boots rather than failing to parse an absent object.
+ */
+const scenarioAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
+export type ScenarioAppConfig = z.infer<typeof scenarioAppConfigSchema>;
 
 /**
  * Error when ClickHouse-backed simulation reads are not composed yet,
@@ -182,12 +190,13 @@ export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
   static readonly reads = reads("encryption");
+  static readonly configSchema = scenarioAppConfigSchema;
 
   static create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
       ScenarioAppMembers,
-      undefined,
+      ScenarioAppConfig,
       ScenarioRepositories
     >,
   ): ScenarioApp {
@@ -214,7 +223,7 @@ export class ScenarioApp implements ScenarioApi {
       resultAtoms: setup.members.resultAtoms,
       runConfigurations: setup.members.runConfigurations,
       activity: setup.members.activity ?? new SilentScenarioActivity(),
-      publicBaseUrl: setup.members.publicBaseUrl,
+      publicBaseUrl: setup.config.publicBaseUrl,
     });
   }
 

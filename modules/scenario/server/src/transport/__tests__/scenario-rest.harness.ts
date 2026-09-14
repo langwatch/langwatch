@@ -91,10 +91,9 @@ export function createScenarioRestTestApp(
       testSuiteIds: new SequentialTestSuiteId(),
       clock: new FixedScenarioClock(),
       secretCipher: new PlainScenarioCipher(),
-      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: createApiFixture<ResourceOwnership>(),
-    config: void 0,
+    config: { publicBaseUrl: "https://app.langwatch.test" },
   });
 
   return { app, simulations, scenarioTabs };
