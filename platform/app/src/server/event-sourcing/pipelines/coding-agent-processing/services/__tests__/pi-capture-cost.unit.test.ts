@@ -192,7 +192,7 @@ describe("pi's captured cost reaching the session", () => {
   describe("given a session billing an assistant turn, a tool and a compaction", () => {
     /** @scenario "The session cost counts assistant turns, work inside tools, and summarised stretches" */
     it("adds all three to the session's cost", () => {
-      const events = buildPiTurnEvents(BILLED_SESSION);
+      const events = buildPiTurnEvents({ session: BILLED_SESSION });
 
       const session = foldAll(events);
 
@@ -202,7 +202,7 @@ describe("pi's captured cost reaching the session", () => {
 
     /** @scenario "The session cost counts assistant turns, work inside tools, and summarised stretches" */
     it("carries each cost on the one event the fold reads a cost from", () => {
-      const events = buildPiTurnEvents(BILLED_SESSION);
+      const events = buildPiTurnEvents({ session: BILLED_SESSION });
 
       const billed = events.filter(
         (event) => event.attributes.cost_usd !== undefined,
@@ -219,7 +219,7 @@ describe("pi's captured cost reaching the session", () => {
     });
 
     it("counts the nested and the summarising call as model calls, and every row's tokens", () => {
-      const session = foldAll(buildPiTurnEvents(BILLED_SESSION));
+      const session = foldAll(buildPiTurnEvents({ session: BILLED_SESSION }));
 
       expect(session.modelCalls).toBe(3);
       expect(session.inputTokens).toBe(170);
@@ -229,7 +229,7 @@ describe("pi's captured cost reaching the session", () => {
 
   describe("given every event a pi capture emits", () => {
     it("survives the attribute allowlist and the agent detector", () => {
-      const events = buildPiTurnEvents(BILLED_SESSION);
+      const events = buildPiTurnEvents({ session: BILLED_SESSION });
 
       expect(events.length).toBeGreaterThan(0);
       for (const event of events) {
@@ -261,7 +261,7 @@ describe("pi's captured cost reaching the session", () => {
      * reports none of them and the capture invents none.
      */
     it("moves no produced-work measurement, having moved the cost", () => {
-      const session = foldAll(buildPiTurnEvents(BILLED_SESSION));
+      const session = foldAll(buildPiTurnEvents({ session: BILLED_SESSION }));
       const initial = createInitCodingAgentSession();
 
       expect(session.costUsd).toBeGreaterThan(0);
