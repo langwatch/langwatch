@@ -1,18 +1,6 @@
 /**
- * Whether a member takes a full seat or a lite one.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/server/license-enforcement/member-classification.ts`,
- * which stays: six server modules import it — the enforcement service, the
- * limit guard, the repository, the organization service and the invite service —
- * and the deletes-only ruling forbids repointing any of them. The RBAC family's
- * rule for a copy applies and is met: this restatement can only ever be as
- * narrow as the original, because it reads the SAME two inputs and returns the
- * SAME two words, and the seat count a customer is billed for is decided by the
- * server copy and never by this one. What this copy decides is a LABEL next to
- * a name on the subscription page.
- *
- * It dies when the classification moves into `@langwatch/enterprise-licensing-contract`,
- * where both halves could name it.
+ * Whether member takes full or lite seat. Local copy for subscription page
+ * label; server copy decides billing.
  */
 
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";

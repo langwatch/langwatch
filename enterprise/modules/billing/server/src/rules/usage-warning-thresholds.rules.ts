@@ -16,13 +16,8 @@ import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 export type BillingUsageUnit = "traces" | "events";
 
 /**
- * Where this organization can go next, as `UsageLimitEmailData["nextStep"]` shapes it.
- *
- * A plain structural type rather than an import of `PlanNextStepService`: this package
- * does not depend on `@langwatch/entitlement-server`. Reading the organization's own
- * plan is this collaborator's job too — folding it in here, rather than taking a
- * separate `plans` port, keeps the FULL `Plan` shape `PlanNextStepService.resolve`
- * needs out of this package, which only ever sees the result.
+ * Where organization can go next; structural type avoids cross-package
+ * entitlement-server dependency.
  */
 export type BillingNextStepResolver = {
   find(input: {

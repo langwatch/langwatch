@@ -60,25 +60,14 @@ export const SubscriptionStatus = {
 export type SubscriptionStatus = (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
 
 /**
- * How plan resolution picks among an organization's active subscriptions:
- * newest contract wins, with the id as a total order so the same row answers
- * every time rather than whichever the database hands back first.
- *
- * Lives here, in a module with no imports of its own, so the query that
- * applies it and the report that explains it read the same rule instead of
- * restating it. `compareBySubscriptionOrder` is the in-memory reading of this
- * same list, for callers holding rows rather than issuing a query.
+ * Plan resolution picks newest contract; id breaks ties for stable results.
+ * `compareBySubscriptionOrder` mirrors this for in-memory row ordering.
  */
 export const ACTIVE_SUBSCRIPTION_ORDER_BY = [{ createdAt: "desc" }, { id: "desc" }] as const;
 
 /**
- * Orders already-fetched rows the way the database would.
- *
- * Relational comparison rather than `localeCompare`: Postgres orders text by
- * the column's collation, which for these ids is byte order, while ICU
- * collation can disagree on case and punctuation. The ids are lowercase
- * alphanumeric today, so the two agree, but that is a property of the current
- * id format rather than a guarantee.
+ * Orders fetched rows as the database would; relational comparison, not
+ * locale-aware, to match Postgres byte ordering of ids.
  */
 export function compareBySubscriptionOrder(
   a: { id: string; createdAt: Instant },

@@ -6,13 +6,8 @@ export interface BillingCheckpoint {
 }
 
 /**
- * The durable checkpoint the monthly roll-up reports against.
- *
- * Encapsulates the two-phase protocol the reportUsageForMonth command runs:
- * 1. writeIntent — sets pendingReportedTotal before calling Stripe
- * 2. confirm — promotes pending to lastReportedTotal, clears pending, resets failures
- *
- * Also carries failure tracking (consecutiveFailures) for the circuit breaker.
+ * Durable two-phase checkpoint: writeIntent before Stripe, confirm after.
+ * Also tracks consecutive failures for the circuit breaker.
  */
 export abstract class BillingCheckpointRepository {
   abstract findCheckpoint(params: {

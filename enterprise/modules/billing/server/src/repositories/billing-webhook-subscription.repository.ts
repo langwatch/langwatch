@@ -1,4 +1,4 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos intentionally empty.
 
 import type {
   BillingOrganizationRecord,
@@ -11,12 +11,7 @@ export type SubscriptionWithOrg = BillingSubscriptionRecord & {
 };
 export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
-/**
- * A write that targets a subscription row Stripe named. A nullable return
- * cannot say why nothing came back: Stripe redelivering for a row that was
- * since deleted, or racing another webhook's write, is the ordinary case, not
- * an anomaly — so the outcome names it instead of collapsing it into `null`.
- */
+/** Outcome names the why; never collapses to null. */
 export type SubscriptionMutationResult<T> =
   | { outcome: "updated"; subscription: T }
   | { outcome: "missing_subscription" };

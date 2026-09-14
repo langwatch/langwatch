@@ -41,13 +41,8 @@ const createMockDb = ({
 };
 
 /**
- * A `findFirst` that honors the `orderBy` it is handed, reading the clauses the
- * way Prisma does: the first decides, later ones break ties.
- *
- * A canned single row cannot tell whether the query orders anything, so the
- * only assertion left would be a copy of the query's own literal, which passes
- * even if the database ignores it. Sorting here lets the test say which row is
- * selected.
+ * OrderBy-aware findFirst; sorting here lets the test verify which row
+ * Prisma's ordering would select.
  */
 type OrderableRow = { id: string; createdAt: Date };
 type OrderByClause = Record<string, "asc" | "desc">;

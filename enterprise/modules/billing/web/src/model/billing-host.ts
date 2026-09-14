@@ -1,16 +1,6 @@
 /**
- * What the billing screens ask of the application they are mounted in.
- *
- * ONE PORT FOR THREE ADDRESSES — `/settings/plans`, `/settings/subscription`
- * and `/settings/usage` — declared here without importing anything of the
- * composing application's. Everything the platform pages read off
- * `useOrganizationTeamProject`, `usePublicEnv`, `useRequiredSession` and the
- * toaster arrives through these methods.
- *
- * THE DEPLOYMENT IS A SETTLED PAIR rather than a bare boolean, for the reason
- * the usage page makes visible: `isSaaS === false` selects the self-hosted
- * branch, which reads a LICENSE, and doing that while the answer is still
- * arriving fires a read that the hosted product has no answer for.
+ * Port for billing screens at three addresses. Deployment is a settled pair
+ * to handle self-hosted reads that hosted product doesn't answer.
  */
 
 import { createContext, useContext } from "react";

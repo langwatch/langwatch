@@ -1,17 +1,6 @@
 /**
- * The self-serve ladder `PlanNextStepService` ranks, read off `PLAN_LIMITS` — the same
- * static table every plan in this deployment is priced from. Annual variants are
- * collapsed onto their monthly rung here, since that grouping is this catalogue's own
- * fact and not a policy the next-step service should have to know.
- *
- * The seat-priced ladder (`SEAT_EVENT`) has one rung: an organization already on it has
- * nowhere self-serve to move to, so its next step correctly resolves to "none".
- *
- * It lives in billing rather than in entitlement because the ladder is billing's — the
- * prices, the tiers and the annual groupings are all `PLAN_LIMITS`, which this package
- * owns. Every process that offers an organization a next step composes this one adapter,
- * so an upgrade line in an automation-ceiling mail and one in a usage-limit mail cannot
- * disagree about what the next tier costs.
+ * Self-serve ladder from PLAN_LIMITS with annual collapsed to monthly. Lives in
+ * billing because prices and tiers are billing's fact.
  */
 import {
   GROWTH_SEAT_PLAN_TYPES,

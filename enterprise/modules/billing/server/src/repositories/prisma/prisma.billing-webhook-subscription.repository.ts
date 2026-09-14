@@ -1,17 +1,6 @@
 /**
- * The subscription writes a Stripe webhook makes, over the feature's own
- * Postgres repository.
- *
- * Every write here reports `{ outcome: "missing_subscription" }` for exactly
- * one thing: the row Stripe named is not there. Prisma reports that as
- * `P2025`, and the lifecycle services already read that outcome as "nothing
- * to change" — a redelivered or raced webhook, not an anomaly. `createPending`
- * is the one exception: it inserts a new row rather than targeting an
- * existing one, so it has no "missing" outcome to report and returns the
- * created record directly. Every other failure is rethrown, because the
- * webhook maps an unhandled error to a 500 and a 500 is what makes Stripe
- * redeliver — swallowing a connection failure here would acknowledge a
- * payment whose plan change never landed.
+ * Subscription writes from Stripe webhooks. P2025 (missing row) reports
+ * "missing_subscription"; other failures are rethrown so Stripe retries.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
@@ -166,7 +155,7 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
   }
 }
 
-/** Prisma's "an operation failed because it depends on one or more records that were required but not found". */
+/** Prisma P2025: a required record was not found. */
 function isRecordNotFound(error: unknown): boolean {
   return (
     typeof error === "object" &&

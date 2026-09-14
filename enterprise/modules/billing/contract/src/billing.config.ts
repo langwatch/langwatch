@@ -2,15 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * What a deployment needs to charge through Stripe and to trust what Stripe
- * calls back with.
- *
- * The two credentials are required together and are the whole gate: without
- * the secret key nothing can be charged, and without the signing secret a
- * delivery cannot be told apart from an attacker's POST. Half a configuration
- * is the shape that boots and then refuses every delivery, which reads as an
- * outage rather than as the configuration mistake it is. Every leaf is
- * optional because a self-hosted install bills through nobody.
+ * Both credentials required together; half a config looks like an outage.
+ * Optional because self-hosted installs don't bill.
  */
 export const billingServerConfigDefinition = RuntimeConfig.define({
   stripeSecretKey: Config.value(z.string().optional(), { env: "STRIPE_SECRET_KEY" }),

@@ -1,15 +1,6 @@
 /**
- * Shared setup for SubscriptionPage integration tests.
- *
- * Exports mock factories, mock function references, and a resetMocks()
- * helper that each test file calls in its own beforeEach.
- *
- * NOTE: vi.mock() calls are hoisted by vitest and must live at the
- * top level of each test file — they cannot be shared from here.
- * This module only exports data, factories, and imperative helpers.
- *
- * The render helper (renderSubscriptionPage) lives in each test file
- * because it requires JSX, which needs a .tsx extension.
+ * Mock setup for SubscriptionPage tests. vi.mock() calls must be in test
+ * files; renderSubscriptionPage helper lives in .tsx files.
  */
 import { vi } from "vitest";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";

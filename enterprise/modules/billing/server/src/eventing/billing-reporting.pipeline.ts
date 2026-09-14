@@ -15,19 +15,8 @@ import {
 } from "./report-usage-for-month.commands.ts";
 
 /**
- * Billing reporting's Eventing graph, and the worker-facing capability that
- * composes it.
- *
- * Command-only pipeline — no projections, no subscribers. The subscriber that
- * dispatches into it is the global billable-events meter, registered on the
- * EventSourcing runtime itself rather than on a pipeline.
- *
- * `selfDispatch` is the loop this feature cannot close alone: the command
- * re-dispatches itself to walk a month forward, so the sender it needs is
- * produced by the very registration that consumes it. The legacy registry
- * closed that loop by looking the pipeline up by name at dispatch time.
- * Binding it once, straight after registration, moves a mis-registered graph's
- * failure from the first monthly roll-up to boot.
+ * Command-only billing pipeline. selfDispatch loop closes at registration
+ * time, not at first dispatch, to catch misconfiguration at boot.
  */
 export class BillingReportingPipeline {
   static create(
@@ -71,7 +60,7 @@ export class BillingReportingPipeline {
           deduplication: {
             makeId: (p: { organizationId: string; billingMonth: string }) =>
               `${p.organizationId}:${p.billingMonth}`,
-            ttlMs: 310_000, // 310s > 300s delay — prevents thundering herd, self-dispatch still works via replace logic
+            ttlMs: 310_000, // 310s > 300s delay; replace preserves self-dispatch
           },
         },
       )

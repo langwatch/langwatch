@@ -49,7 +49,7 @@ export class NurturingPromptCreationService {
   /**
    * @param repository - The org-wide prompt count reads, over its own repository seam
    * @param projectId - The project where the prompt was created
-   * @param userId - The user who created the prompt (optional; resolved via resolveOrgAdmin if missing)
+   * @param userId - User who created the prompt; optional
    */
   static afterPromptCreated({
     repository,

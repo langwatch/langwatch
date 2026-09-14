@@ -1,42 +1,12 @@
 /**
- * Handled errors for the billing domain.
- *
- * Every class here is a `HandledError` with a stable `code`, so it travels the
- * handled channel untouched: the tRPC boundary maps `httpStatus` to a tRPC
- * code and puts the *code* on the wire, and the client renders copy from
- * `src/features/errors/logic/presentation.ts` keyed by that code. There is no
- * billing-specific middleware any more — the previous `BillingError` carried a
- * `trpcCode` string that `middleware.ts` re-threw as a bare `TRPCError` with no
- * `cause`, which collapsed all five `INTERNAL_SERVER_ERROR` variants into "An
- * unknown error occurred" for causes we can name.
- *
- * Two rules this file exists to hold:
- *
- * - **Every 5xx sets `fault` explicitly.** It defaults to `"customer"`, so an
- *   unannotated 5xx logs a real incident as routine noise.
- * - **`message` is customer-safe.** The REST boundary ships it in the response
- *   body, so it never names Stripe, a price catalog, an env var or a service.
- *   Internal detail belongs in `meta` (only where a client reads it) and in the
- *   log line at the throw site.
+ * Each class is a HandledError with stable code. Every 5xx sets fault
+ * explicitly; message is always customer-safe.
  */
 
 import { HandledError } from "@langwatch/handled-error";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
-/**
- * The organization behind a billing action does not exist (or is not visible).
- *
- * Known and actionable: reload and pick an organization that is still there.
- */
-/**
- * Billing needs an email address on the account and there isn't one.
- *
- * The old message named the billing provider and the record it was trying to
- * create ("...to create Stripe customer"), which told a customer about our
- * plumbing and nothing about what to do. It also answered 401, which reads as
- * "sign in again" — the wrong instruction for an account that is missing a
- * field. 422 keeps it on the validation path, where it belongs.
- */
+/** Billing requires an email; 422 validates the account field, not auth. */
 export class UserEmailRequiredError extends HandledError {
   declare readonly code: "billing_customer_email_required";
 
@@ -71,16 +41,7 @@ export class CustomerCreationRaceError extends HandledError {
   }
 }
 
-/**
- * The plan the customer picked has no price configured on our side.
- *
- * `fault: "platform"` and a 5xx, not the 400 this used to be: the customer's
- * request was fine, our catalog is incomplete. The old message
- * ("Plan X does not have an associated Stripe price") described our
- * misconfiguration to the person least able to fix it. The plan name is the
- * customer's own selection, so it stays in `meta`; the catalog detail belongs
- * in the log line at the throw site.
- */
+/** Plan has no configured price on our side; 5xx because our catalog is incomplete. */
 export class InvalidPlanError extends HandledError {
   declare readonly code: "billing_plan_price_missing";
 
@@ -94,15 +55,7 @@ export class InvalidPlanError extends HandledError {
   }
 }
 
-/**
- * Seat-based billing is not wired up in this deployment, so a seat action
- * cannot be completed.
- *
- * `fault: "platform"` rather than `"provider"`: nothing third-party was asked
- * anything — the seat-event collaborator simply isn't configured here, which is
- * ours. (The customer-facing copy is keyed off the `code`, not the fault, so
- * this only decides log level and alerting.)
- */
+/** Seat billing not configured; platform fault, not provider. */
 export class SeatBillingUnavailableError extends HandledError {
   declare readonly code: "seat_billing_unavailable";
 
@@ -115,13 +68,7 @@ export class SeatBillingUnavailableError extends HandledError {
   }
 }
 
-/**
- * We hold no active subscription for this organization where one was expected.
- *
- * Reached from proration preview and seat updates, both of which are only
- * offered when our records say a subscription exists — so arriving here means
- * our copy and the billing provider's have drifted apart.
- */
+/** No active subscription when one was expected; drift with the provider. */
 export class NoActiveSubscriptionError extends HandledError {
   declare readonly code: "subscription_sync_failed";
 
@@ -134,17 +81,7 @@ export class NoActiveSubscriptionError extends HandledError {
   }
 }
 
-/**
- * A live subscription exists in our records but was never linked to its
- * counterpart at the billing provider, so seat changes cannot be made from
- * the app at all.
- *
- * Deliberately NOT `subscription_sync_failed`: that code's copy promises the
- * state "usually catches up on its own", and this one never does — linking the
- * record is an operator action. A subscription lands here when it was set up
- * by hand at the provider rather than through our checkout, which is the only
- * flow that writes the link.
- */
+/** Subscription unlinked from provider; never catches up on its own. */
 export class SubscriptionNotLinkedError extends HandledError {
   declare readonly code: "subscription_not_linked";
 
@@ -158,20 +95,8 @@ export class SubscriptionNotLinkedError extends HandledError {
 }
 
 /**
- * The organization carries more than one live subscription, so there is no
- * single record a seat change can be charged against.
- *
- * Nothing in the checkout or webhook path produces this — both only ever turn
- * ACTIVE a row resolved by its provider id. It comes from the backoffice
- * subscription form, which writes any status against any organization with no
- * uniqueness check and no constraint behind it (there is no unique index on
- * `organizationId`).
- *
- * We refuse rather than pick. Preferring the linked row charges whichever
- * subscription happens to still carry a provider id, which on a money path is
- * a guess wearing a rule: the operator who added the second row may well have
- * meant it to supersede the first. Guessing here bills the wrong plan
- * silently; refusing costs a support message and nothing else.
+ * Multiple subscriptions exist; refusing to guess which to change avoids
+ * silently billing the wrong plan.
  */
 export class AmbiguousSubscriptionError extends HandledError {
   declare readonly code: "subscription_ambiguous";
@@ -187,18 +112,8 @@ export class AmbiguousSubscriptionError extends HandledError {
 }
 
 /**
- * The customer confirmed a seat change against a quote that is too old to
- * charge.
- *
- * The billing provider prices a mid-term change by the moment it is applied,
- * so a quote and a confirmation made at different times are different amounts.
- * We pin the confirmation to the instant the quote was issued; past a short
- * window that pin is refused rather than honoured, because the further it
- * drifts the more it charges for time the customer already paid for — and past
- * a period boundary it is a different bill entirely.
- *
- * `customer` fault: nothing failed, the dialog simply sat open. Reopening it
- * produces a fresh quote.
+ * Quote confirmation aged past the acceptable window; past a period boundary
+ * it becomes a different bill. Reopening produces a fresh quote.
  */
 export class QuoteExpiredError extends HandledError {
   declare readonly code: "billing_quote_expired";
@@ -213,12 +128,7 @@ export class QuoteExpiredError extends HandledError {
   }
 }
 
-/**
- * The subscription exists but is missing the line item we needed to change.
- *
- * Same drift as {@link NoActiveSubscriptionError}, one level further in. The
- * item name is ours, not the customer's, so it stays out of the message.
- */
+/** Missing subscription line item; drift with the provider one level in. */
 export class SubscriptionItemNotFoundError extends HandledError {
   declare readonly code: "subscription_sync_failed";
 
@@ -232,13 +142,7 @@ export class SubscriptionItemNotFoundError extends HandledError {
   }
 }
 
-/**
- * A seat count that cannot be billed reached the line-item builder.
- *
- * Stays a 422 `validation_error` because the number genuinely is invalid and
- * the shape the client reads for it (`meta.fieldErrors`) puts the complaint on
- * the seat input rather than in a toast.
- */
+/** Unbillable seat count; 422 puts validation on the seat input. */
 export class InvalidSeatCountError extends HandledError {
   declare readonly code: "validation_error";
 
@@ -255,10 +159,7 @@ export class InvalidSeatCountError extends HandledError {
   }
 }
 
-/**
- * We could not write the pending subscription record that the checkout hangs
- * off, so the checkout was never started.
- */
+/** Failed to create the pending subscription record; checkout never started. */
 export class SubscriptionCreationFailedError extends HandledError {
   declare readonly code: "subscription_sync_failed";
 
@@ -272,14 +173,7 @@ export class SubscriptionCreationFailedError extends HandledError {
   }
 }
 
-/**
- * A billing event arrived for a subscription we hold no record of.
- *
- * Webhook-side rather than customer-side, but still a named cause with a
- * trace id worth carrying, so it goes on the handled channel too. The
- * identifier is ours; it goes in `meta` for the log/agent readers, never in
- * the sentence.
- */
+/** Billing event for unknown subscription; webhook-side drift. */
 export class SubscriptionRecordNotFoundError extends HandledError {
   declare readonly code: "subscription_sync_failed";
 
@@ -294,12 +188,7 @@ export class SubscriptionRecordNotFoundError extends HandledError {
 }
 
 /**
- * The billing provider rejected our usage-summary request outright — an
- * invalid request or an authentication failure, both of which are our
- * configuration rather than a blip.
- *
- * A timeout or a provider 5xx is deliberately NOT this: those stay plain
- * `Error`s so they degrade to "unknown" with a trace id and stay retryable.
+ * Provider rejected the request; our config error, not a blip or timeout.
  */
 export class UsageReportFailedError extends HandledError {
   declare readonly code: "usage_report_failed";
@@ -315,17 +204,8 @@ export class UsageReportFailedError extends HandledError {
 }
 
 /**
- * The account is billed in a currency we sell no prices in.
- *
- * A billing account is locked to one currency once it has been invoiced, and
- * every later checkout has to match it. If that currency isn't one we price
- * plans in, no self-serve upgrade can succeed — so this stops before anything
- * is written rather than letting the payment provider reject the session and
- * leave a half-made subscription behind.
- *
- * `fault: "customer"` only in the sense that it is account state, not an
- * outage: it is not something the customer can correct from the UI, which is
- * why the copy sends them to support instead of telling them to retry.
+ * Account locked to a currency we don't price plans in; stop before writing
+ * half a subscription.
  */
 export class UnsupportedBillingCurrencyError extends HandledError {
   declare readonly code: "billing_currency_unsupported";
@@ -341,13 +221,8 @@ export class UnsupportedBillingCurrencyError extends HandledError {
 }
 
 /**
- * The billing profile this organization points at no longer exists.
- *
- * Deletion is terminal on the provider's side: the record still reads back,
- * but nothing can be attached to it, so no currency or plan makes the checkout
- * succeed. Retrying cannot help and neither can the customer — putting the
- * organization back on a usable billing profile is an explicit, audited
- * operation, not something to paper over by quietly making a new one here.
+ * Billing profile deleted on provider; terminal state requiring explicit
+ * operator action to restore.
  */
 export class BillingCustomerDeletedError extends HandledError {
   declare readonly code: "billing_customer_deleted";
@@ -362,13 +237,8 @@ export class BillingCustomerDeletedError extends HandledError {
 }
 
 /**
- * The payment provider told us to wait, or we could not reach it.
- *
- * Deliberately narrow: raised only for the two shapes that mean "nothing
- * happened, try again" — rate limiting and connection failure. Every other
- * provider failure stays unhandled and degrades to unknown at the boundary,
- * because naming a cause we do not understand would promise the caller an
- * action they do not have. The classification lives in `translateStripeError`.
+ * Provider rate-limited or unreachable; only for retryable shapes, not
+ * configuration errors.
  */
 export class BillingProviderUnavailableError extends HandledError {
   declare readonly code: "billing_provider_unavailable";

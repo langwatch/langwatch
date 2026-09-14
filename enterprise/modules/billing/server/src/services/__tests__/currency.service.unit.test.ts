@@ -1,16 +1,6 @@
 /**
- * Which currency a customer is quoted and billed in.
- *
- * The answer is a guess made from a request, and the cost of guessing wrong is
- * a price the customer did not expect, so the order it guesses in matters: a
- * country the CDN states outright beats one inferred from an IP address, and
- * anything unknown falls back to euros rather than picking a currency at
- * random.
- *
- * The local-address check is the part with no obvious caller and the worst
- * failure if it goes: on a self-hosted install every request arrives from
- * inside the network, and a geoip lookup of `10.0.0.4` answers with whatever
- * that block happens to map to.
+ * Customer currency guessed from request. Order matters: CDN country beats IP
+ * inference, unknown falls back to EUR. Local IPs need careful handling.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

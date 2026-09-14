@@ -15,15 +15,8 @@ import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.bi
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 
 /**
- * The event types the App's own twin subscribes to, restated rather than
- * imported.
- *
- * Three of them belong to `@langwatch/experiment-server`, and a feature
- * package may not import another feature's server — so the adapter states them
- * as literals and this list is what pins them. Importing the source of truth
- * here would assert the constants against themselves and pin nothing; these
- * are wire values on events already in the store, so neither side can move
- * without a migration.
+ * App metered event types restated not imported; pins wire values that
+ * require migration to change.
  */
 const APP_METERED_EVENT_TYPES = [
   "lw.obs.trace.span_received",

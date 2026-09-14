@@ -1,16 +1,6 @@
 /**
- * What this organization has used, at `/settings/usage`.
- *
- * ONE CARD PER DEPLOYMENT SHAPE, and there are three: the hosted product reads
- * an active plan, a licensed self-hosted deployment reads its license, and an
- * unlicensed one reads the open-source baseline, which is uncapped.
- *
- * WHETHER LIMITS ARE SHOWN AT ALL is a billing question and not a display one:
- * usage-based pricing has no ceiling to draw, so printing one would be a
- * fiction. `shouldShowPlanLimits` holds that rule.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address.
+ * Organization usage at /settings/usage. One card per deployment shape (hosted
+ * plan / self-hosted license / open-source). No chrome.
  */
 
 import {

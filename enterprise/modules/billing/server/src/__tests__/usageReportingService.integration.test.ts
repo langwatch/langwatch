@@ -307,18 +307,8 @@ describeIfStripeKey("Usage reporting integration", () => {
 
   describe("getUsageSummary()", () => {
     /**
-     * Prerequisite: This test uses a persistent Stripe test customer that
-     * accumulates meter events across runs. Stripe's Billing Meter Event
-     * Summaries API has aggregation lag — events reported in the current
-     * run may not appear in summaries until minutes later.
-     *
-     * On the FIRST run against a fresh Stripe test account, the
-     * "returns aggregated usage" test WILL FAIL because no previously
-     * aggregated data exists yet. Run the suite a second time and it
-     * will pass once Stripe has processed the events from the first run.
-     *
-     * The persistent customer is identified by email and is intentionally
-     * NOT cleaned up in afterAll so it retains history across runs.
+     * Uses persistent Stripe customer with aggregation lag; first run may fail
+     * until Stripe processes prior events. Retained across runs.
      */
     const findOrCreatePersistentCustomer = async () => {
       const email = "integration-test-usage-summary-persistent@langwatch.test";

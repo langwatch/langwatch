@@ -1,22 +1,6 @@
 /**
- * The billing family, as the browser application mounts it.
- *
- * THREE SCREENS, THREE ADDRESSES: `/settings/plans`, `/settings/subscription`
- * and `/settings/usage`.
- *
- * WHY ALL THREE ARE HERE. The credentials family's rule: a key belongs to the
- * family that owns its TRANSPORT. `plan.getActivePlan`, `limits.getUsage`,
- * `subscription.*` and `currency.detectCurrency` are billing's, and the pricing
- * catalogue every one of these pages renders was already in this package before
- * they arrived. Usage also reads `license.getStatus`, which is the licensing
- * family's — it is one boolean branch on a page whose other two branches are
- * entirely billing's, so the key follows the majority of its reads rather than
- * splitting a page in half.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is the tRPC Provider this
- * package's hooks run on and the host port that answers for the organization,
- * the active team, the deployment, the address, the departure to Stripe and the
- * two notices.
+ * Billing family mounted in browser app: plans, subscription, usage screens.
+ * Mounter provides tRPC Provider and host port for org/team/deployment.
  */
 
 import type { ComponentType } from "react";

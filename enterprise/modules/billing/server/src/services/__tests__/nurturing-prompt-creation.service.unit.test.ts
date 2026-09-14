@@ -16,7 +16,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-/** The two reads `NurturingPromptCreationService.afterPromptCreated` makes on its own, and nothing else. */
+/** Two reads afterPromptCreated makes; nothing else. */
 function repositoryCounting(orgPromptCount: number): NurturingPromptCountRepository {
   return {
     findOrganizationId: vi.fn(async () => "org-1"),

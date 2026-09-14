@@ -1,11 +1,6 @@
 /**
- * An in-application link, as the billing screens render one.
- *
- * `platform/app`'s `~/components/ui/link` wraps Chakra's anchor around the
- * router's own `Link`, which is a router import a feature-web package may not
- * make. A plain anchor navigates to the same address; what it gives up is the
- * client-side transition, and that is the same trade the gateway, automation,
- * coding-agent and annotation families made.
+ * In-app link for billing screens; plain anchor avoids router import that
+ * feature-web packages can't make.
  */
 
 import { Link as ChakraLink } from "@chakra-ui/react";

@@ -1,16 +1,6 @@
 /**
- * The generated Prisma enums these screens name, restated.
- *
- * `~/generated/prisma/client` is the application's generated client and a
- * browser package may not reach it. Each value below is an ENUM the product
- * compares a membership or a pricing shape against, restated here with the
- * alignment obligation `@langwatch/enterprise-billing-contract` already states
- * about its own Prisma enum copies: these must stay identical to
- * `packages/prisma-client/prisma/schema.prisma` or a role stops matching and a
- * plan stops resolving.
- *
- * `Currency` is NOT here: the billing contract already publishes it, so naming
- * it a second time would be a second opinion about the same enum.
+ * Prisma enums restated; must align with schema.prisma or matching fails.
+ * Currency omitted; billing contract publishes it.
  */
 
 export const PricingModel = {

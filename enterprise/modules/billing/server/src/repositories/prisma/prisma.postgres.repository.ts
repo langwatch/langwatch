@@ -27,15 +27,7 @@ export type PostgresBillingPersistence = {
   checkpoints: BillingCheckpointRepository;
 };
 
-/**
- * Constructs the feature's own Postgres repositories without exposing them.
- *
- * It used to build a `NotificationService` here too, by constructing
- * Notification's `PostgresNotificationAdapter` — one feature composing another
- * feature's persistence, which is what `cross-feature` reports. Exactly one
- * caller ever read that field; composing across features is the process's job,
- * so the process does it.
- */
+/** Constructs feature Postgres repositories. Composing across features is the process's job. */
 export class PrismaPostgresRepository {
   private constructor(
     private readonly database: BillingOrganizationPricingDatabase &

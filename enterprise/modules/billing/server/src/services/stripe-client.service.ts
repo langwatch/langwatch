@@ -1,11 +1,6 @@
 /**
- * The one Stripe client a process bills through.
- *
- * Here rather than at the composition root so the API version is pinned in the
- * package that knows what it means: a bump changes the shape of every object
- * the webhook and the subscription services read, which is a migration rather
- * than a default. It also keeps the provider SDK off the composition root's own
- * dependency list, where nothing else needs it.
+ * One Stripe client per process. Here, not at root, so API version pins where
+ * it matters to the services that read the shapes.
  */
 import Stripe from "stripe";
 

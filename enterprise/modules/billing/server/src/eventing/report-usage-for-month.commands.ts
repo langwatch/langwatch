@@ -70,18 +70,8 @@ function buildIdentifier({
 }
 
 /**
- * Command handler for reporting usage to Stripe.
- *
- * The handler:
- * 1. Checks skip conditions (org exists, has Stripe customer, active subscription, SEAT_EVENT pricing)
- * 2. Two-phase checkpoint protocol: write pending -> call Stripe -> confirm
- * 3. Self-dispatches when delta > 0 for convergence loop
- * 4. Circuit-breaker on consecutive failures (stops self-dispatch after MAX_CONSECUTIVE_FAILURES)
- *
- * Error handling: never propagates to framework. All errors caught internally.
- * The framework sees every job as "successful" — the handler owns all retry logic.
- *
- * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
+ * Reports usage to Stripe via two-phase checkpoints and self-dispatch convergence.
+ * Handles all errors internally; framework sees every job as successful.
  */
 export class ReportUsageForMonthCommandHandler implements CommandHandler<
   Command<ReportUsageForMonthCommandData>,

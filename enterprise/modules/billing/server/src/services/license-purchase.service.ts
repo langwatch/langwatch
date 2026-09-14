@@ -22,7 +22,7 @@ export abstract class LicenseGenerator {
   }): GeneratedLicense;
 }
 
-/** What a licence unlocks, as `@langwatch/mail`'s `licenseEmailProps.unlockedFeatures` shapes it. */
+/** What a licence unlocks; shaped for licenseEmailProps.unlockedFeatures. */
 export type LicenseUnlockedFeatures =
   | { kind: "self_serve"; url: string }
   | { kind: "account_team"; contactUrl: string };
