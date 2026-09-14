@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -93,6 +94,12 @@ type restartDoneMsg struct {
 	err     error
 }
 
+// snapshotMsg carries a completed live probe back to the UI thread. The probe
+// forks `ps` and dials a port per service and per shared server, so it runs as
+// a command like the bounce does - Update's goroutine is the one reading the
+// keyboard, and nothing that touches the machine may sit on it.
+type snapshotMsg struct{ report app.SessionReport }
+
 type viewerModel struct {
 	slug string
 
@@ -129,6 +136,10 @@ type viewerModel struct {
 	// key that stops the stack always takes two deliberate presses.
 	confirmStop bool
 	tickN       int // refresh counter, so the snapshot polls on a slow beat
+	// snapInFlight is whether a snapshot probe is already out. The probe runs
+	// off the event loop, so without this a probe slower than the beat that
+	// asked for it would have a second queued behind it, and a third.
+	snapInFlight bool
 	// expandedIDs are the lines a click has opened on the tab currently on
 	// screen, by the identity the tab gave them. Identity, not screen position:
 	// a row opened at the bottom of a following log tab is the same line three
@@ -212,7 +223,7 @@ func (m *viewerModel) sources(combined, capDir string) viewer.Sources {
 			PyroscopePort: obs.PyroscopePort, GrafanaPort: obs.GrafanaPort,
 			Worktree: m.slug, Services: profiledServices(),
 		}),
-		Stores: sessionStores{model: m},
+		Stores: &sessionStores{model: m},
 		Jobs:   sources.NewFileJobs(capDir, combined),
 		Render: renderCapturedLine,
 		Open:   openInBrowser,
@@ -248,10 +259,61 @@ func renderCapturedLine(line sources.LogLine) string {
 // session snapshot last saw. The ports are not known when the viewer is built  -
 // a stack still provisioning has none - so the source resolves them on every
 // poll rather than being handed a set that would be stale by the first frame.
-type sessionStores struct{ model *viewerModel }
+type sessionStores struct {
+	model *viewerModel
 
-// Stats probes each managed server the snapshot names.
-func (s sessionStores) Stats() ([]sources.StoreStat, error) {
+	mu      sync.Mutex
+	last    []sources.StoreStat
+	at      time.Time
+	probing bool
+}
+
+// storesTTL is how old a store reading may get before the next one is started.
+// A second is three of the viewer's beats and well under what the numbers it
+// shows - a connection count, a memory ceiling - actually move in.
+const storesTTL = time.Second
+
+// Stats reports the last probe of each managed server the snapshot names, and
+// starts the next one behind the reader's back.
+//
+// One probe forks psql, forks redis-cli and queries ClickHouse, bounded by
+// storeProbeTimeout each. The stores tab polls on every 300ms beat and Poll
+// runs inside Update, so probing inline put three process spawns between the
+// reader's keystroke and the frame that acknowledges it. Only the first probe
+// is paid for on the caller's goroutine, so the tab still opens on real rows.
+func (s *sessionStores) Stats() ([]sources.StoreStat, error) {
+	local := s.localStores() // reads the snapshot, so it must stay on this goroutine
+	s.mu.Lock()
+	if s.at.IsZero() && !s.probing {
+		s.mu.Unlock()
+		stats, _ := local.Stats()
+		s.keep(stats)
+		return stats, nil
+	}
+	last, refresh := s.last, time.Since(s.at) >= storesTTL && !s.probing
+	if refresh {
+		s.probing = true
+	}
+	s.mu.Unlock()
+	if refresh {
+		go func() {
+			stats, _ := local.Stats()
+			s.keep(stats)
+		}()
+	}
+	return last, nil
+}
+
+// keep files a completed probe as the answer every later ask reports.
+func (s *sessionStores) keep(stats []sources.StoreStat) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.last, s.at, s.probing = stats, time.Now(), false
+}
+
+// localStores is the probe this stack's snapshot describes: only the servers it
+// actually names, with the ceilings haven applied.
+func (s *sessionStores) localStores() sources.LocalStores {
 	ports := map[string]int{}
 	for _, server := range s.model.snap.Servers {
 		ports[server.Name] = server.Port
@@ -262,7 +324,7 @@ func (s sessionStores) Stats() ([]sources.StoreStat, error) {
 		RedisPort:            ports["redis"],
 		RedisCapBytes:        float64(envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB)) * (1 << 20),
 		ClickHouseLimitBytes: float64(clickHouseLimits().MaxServerMemory),
-	}.Stats()
+	}
 }
 
 // enableDashboard wires the action surface behind the session tab. It loads a
@@ -288,8 +350,9 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case viewerTickMsg:
 		m.ingest()
-		m.refreshDashboard()
-		return m, viewerTick()
+		return m, tea.Batch(viewerTick(), m.refreshDashboard())
+	case snapshotMsg:
+		return m.snapshotted(msg)
 	case stopDoneMsg:
 		return m.stopped(msg)
 	case restartDoneMsg:
@@ -316,10 +379,7 @@ func (m *viewerModel) restarted(msg restartDoneMsg) (tea.Model, tea.Cmd) {
 	} else if msg.summary != "" {
 		m.setToast(msg.summary)
 	}
-	if m.session != nil && m.session.Snapshot != nil {
-		m.snap = m.session.Snapshot()
-	}
-	return m, nil
+	return m, m.probeSnapshot()
 }
 
 // ingest tails the capture files and polls the tab on screen - and only that
@@ -624,12 +684,14 @@ func (m *viewerModel) onSessionTab() bool { return m.currentTab() == viewer.Sess
 // it says the stack is provisioning - but has no rows to move a cursor over.
 func (m *viewerModel) onDashboard() bool { return m.session != nil && m.onSessionTab() }
 
-// refreshDashboard re-probes the live snapshot on a slow beat (every ~1.2s, not
-// every 300ms tick) and expires the toast. Cheap as the probes are, there is no
-// reason to hammer them; the tabs update on the fast tick regardless.
-func (m *viewerModel) refreshDashboard() {
+// refreshDashboard expires the toast and asks for a new live snapshot on a slow
+// beat (every ~1.2s, not every 300ms tick). The ask is a command, not a call:
+// the probe reads the process table and dials a port per service, and every
+// millisecond of that spent inside Update is a millisecond the reader's next
+// keystroke waits. The answer lands as a snapshotMsg.
+func (m *viewerModel) refreshDashboard() tea.Cmd {
 	if m.session == nil {
-		return
+		return nil
 	}
 	m.tickN++
 	if m.toastTTL > 0 {
@@ -638,9 +700,35 @@ func (m *viewerModel) refreshDashboard() {
 			m.toast = ""
 		}
 	}
-	if m.session.Snapshot != nil && m.tickN%4 == 0 {
-		m.snap = m.session.Snapshot()
+	m.clampCursor()
+	if m.tickN%4 != 0 {
+		return nil
 	}
+	return m.probeSnapshot()
+}
+
+// probeSnapshot runs the live probe off the event loop, unless one is already
+// out there.
+func (m *viewerModel) probeSnapshot() tea.Cmd {
+	if m.session == nil || m.session.Snapshot == nil || m.snapInFlight {
+		return nil
+	}
+	m.snapInFlight = true
+	snapshot := m.session.Snapshot
+	return func() tea.Msg { return snapshotMsg{report: snapshot()} }
+}
+
+// snapshotted takes a completed probe.
+func (m *viewerModel) snapshotted(msg snapshotMsg) (tea.Model, tea.Cmd) {
+	m.snapInFlight = false
+	m.snap = msg.report
+	m.clampCursor()
+	return m, nil
+}
+
+// clampCursor keeps the dashboard's highlight on a row that exists, after a
+// snapshot in which a service came or went.
+func (m *viewerModel) clampCursor() {
 	m.cursor = minInt(m.cursor, maxInt(len(m.snap.Services)-1, 0))
 }
 

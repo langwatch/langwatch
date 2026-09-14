@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -31,6 +32,9 @@ type endpoint struct {
 	// port is what the liveness probe dials.
 	port   int
 	client *http.Client
+	// live is the shared liveness answer for that port, by pointer so every
+	// copy of this value type consults the same cache.
+	live *liveness
 }
 
 func newEndpoint(port int) endpoint {
@@ -38,17 +42,83 @@ func newEndpoint(port int) endpoint {
 		base:   fmt.Sprintf("http://127.0.0.1:%d", port),
 		port:   port,
 		client: &http.Client{Timeout: queryTimeout},
+		live:   &liveness{port: port},
 	}
 }
 
 // up reports whether anything is accepting connections on the port. A port
 // check, deliberately: a tab whose stack is down must issue no queries, so the
 // question of whether to query cannot itself be one.
-func (e endpoint) up() bool {
+//
+// The check is asked far more often than it changes - the log tab's footer asks
+// on every rendered frame, which is every keystroke - so only the first ask
+// dials on the caller's goroutine. See liveness.
+func (e endpoint) up() bool { return e.live.alive() }
+
+// livenessTTL is how stale a port answer may get before it is re-dialled. A
+// second is far longer than the viewer's 300ms beat, so a tab redrawn ten times
+// a second costs one connect a second rather than ten; and it is far shorter
+// than a person's patience for "the stack came up and the tab has not noticed".
+const livenessTTL = time.Second
+
+// liveness is one port's "is anything accepting" answer, cached.
+//
+// The dial itself is cheap only when the port answers or refuses at once. A
+// port that is bound but not accepting - a container forwarder mid-restart, a
+// dropped SYN - costs the full dialTimeout, and the viewer used to pay that on
+// the goroutine that also handles keystrokes, once per frame. Keys then queued
+// behind a connect they had nothing to do with, which is what "slow to register
+// input" was. Now the first ask dials (so the opening frame is as true as it
+// ever was) and every later ask reports the last answer, refreshing behind the
+// reader's back when it goes stale.
+type liveness struct {
+	port int
+
+	mu       sync.Mutex
+	answered bool
+	up       bool
+	at       time.Time
+	dialing  bool
+}
+
+// alive reports the last known answer, and never blocks on a dial except the
+// very first one.
+func (l *liveness) alive() bool {
+	l.mu.Lock()
+	if !l.answered {
+		l.mu.Unlock()
+		up := dialPort(l.port)
+		l.mu.Lock()
+		l.answered, l.up, l.at = true, up, time.Now()
+		l.mu.Unlock()
+		return up
+	}
+	up := l.up
+	refresh := time.Since(l.at) >= livenessTTL && !l.dialing
+	if refresh {
+		l.dialing = true
+	}
+	l.mu.Unlock()
+	if refresh {
+		go l.redial()
+	}
+	return up
+}
+
+// redial replaces the cached answer off the caller's goroutine.
+func (l *liveness) redial() {
+	up := dialPort(l.port)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.up, l.at, l.dialing = up, time.Now(), false
+}
+
+// dialPort is the connect itself, bounded by dialTimeout.
+func dialPort(port int) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 	dialer := net.Dialer{Timeout: dialTimeout}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(e.port)))
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		return false
 	}

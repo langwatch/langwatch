@@ -103,3 +103,9 @@ Feature: haven up terminal viewer — scroll and search
       Linux "xdg-open")
     And the footer key line names it
     And a row with no URL of its own (a loopback-only port) has nothing to open
+
+  @unit
+  Scenario: the viewer keeps its event loop free for the keyboard
+    Given a stack running under the attached viewer
+    When the viewer refreshes its live picture
+    Then the reader's keystrokes are handled without waiting for the refresh
