@@ -49,22 +49,27 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 
+import { appFromContext } from "~/app/api/middleware/app-context";
 import {
   DEFAULT_LWQL_RESULT_LIMITS,
   getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
 } from "~/server/analytics/lwql";
-import { apiKeyPermission, type createProjectApp } from "~/server/api/security";
-import { getProtectionsForProject } from "~/server/api/utils";
+import {
+  createUnifiedKeyAuthMiddleware,
+  type KeyAuthVariables,
+} from "~/server/api-key/auth-middleware";
+import { type createProjectApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import {
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
 } from "../../shared/base-responses";
+import { resolveLwqlQueryScope } from "./queryScope";
 import { lwqlQuerySchema, lwqlResultSchema, lwqlSchemaSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:query");
@@ -72,60 +77,61 @@ const logger = createLogger("langwatch:api:query");
 const QUERY_TAGS = ["Query"];
 
 /**
- * The permission this family enforces for itself.
+ * The permission this family enforces for itself, per project.
  *
- * Named once and shared by both routes so the policy and the audits cannot
- * drift apart, and so the fan-out variant has a single place to read it from.
+ * Named once so the handler-managed policy declaration and the fan-out that
+ * enforces it cannot drift. The door does not gate on it at the route level:
+ * it resolves the SET of projects the key holds it on and reads the union,
+ * so a key that holds it nowhere is a valid empty scope, not a refusal.
  */
 const QUERY_PERMISSION = "analytics:view" as const;
 
 /**
- * The gate: `analytics:view` through the API-key ceiling.
+ * The gate: authenticate any API key, then fan out to what it can read.
  *
- * `apiKeyPermission` rather than `requires`, because this is a public
- * API-key surface — the ceiling is what makes a scoped key answer
- * `effective = ApiKey ∩ user` instead of inheriting the whole of its owner's
- * access.
- *
- * This was briefly `handlerManagedAuth`, on the theory that the family would
- * grow a cross-project fan-out and that a route-level gate would resolve at
- * the wrong scope. That reasoning was wrong twice over. `handlerManagedAuth`
- * applies NO middleware — it is a declaration that the HANDLER authenticates,
- * a contract these handlers never honoured, so the door stood open and every
- * anonymous call died on `project.id` of `undefined` as a 500 rather than a
- * 401. And the scope worry does not apply here: these routes are mounted on a
- * project app, where the permission resolves against the project the
- * credential names. The fan-out, when it lands, is a different app on a
- * different mount, and it can choose its own gate then.
- *
- * The rule this leaves behind: reach for `handlerManagedAuth` only when the
- * credential genuinely cannot be expressed as a policy chain — the way the
- * dataset family's signed upload sessions cannot. A plain API key can.
+ * `handlerManagedAuth`, because the credential genuinely cannot be expressed
+ * as a policy chain (#8085). `apiKeyPermission` would demand a single project
+ * — an organization key with no `X-Project-Id` would fail to resolve one — and
+ * would 403 a key without the permission on THAT project, whereas this door
+ * fans the key out across every project it can read and reads zero rows for
+ * one it cannot. The auth middleware {@link registerQueryRoutes} prepends
+ * ({@link createUnifiedKeyAuthMiddleware}) authenticates any key without
+ * demanding a project; the tenant boundary is the row policy, not this gate.
  */
+const queryAuth: MiddlewareHandler = createUnifiedKeyAuthMiddleware({
+  prisma,
+  errorEnvelope: "canonical",
+});
+
+/** The declared policy: the handler authenticates, and enforces analytics:view per project. */
 function queryAccess() {
-  return apiKeyPermission(QUERY_PERMISSION);
+  return handlerManagedAuth({
+    reason:
+      "Any API key reaches the projects it holds analytics:view on; the fan-out and the row policy enforce the scope, not a single-project route gate (#8085).",
+    permissions: [QUERY_PERMISSION],
+    credential: "apiKey",
+  });
 }
 
-/** The project the credential resolved to, plus its redaction protections. */
+/** The projects the credential may read, plus the strictest redaction protections across them. */
 async function callerContext(c: Context) {
-  const project = c.get("project");
-  return {
-    project,
-    protections: await getProtectionsForProject(prisma, {
-      projectId: project.id,
-    }),
-  };
+  return resolveLwqlQueryScope({
+    principal: c.get("keyPrincipal"),
+    permissions: appFromContext(c).permissions,
+  });
 }
 
 /**
- * How a caller names the project it is querying.
+ * How a caller reaches the projects it queries.
  *
- * Shared by both doors so the two cannot describe the rule differently. An
- * organization key reaches many projects, so it has to say which one; a project
- * key already names its own, so it needs no header and any it sends is ignored.
+ * Shared by both doors so the two cannot describe the rule differently. Any
+ * LangWatch API key reaches every project it can read `analytics:view` on — an
+ * organization or personal key spans its projects, a project key its one. No
+ * project header is required; the `X-Project-Id` header is ignored. To read one
+ * project, filter inside the statement with `WHERE project_id = '<id>'`.
  */
 const HEADER_RULE =
-  "An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.";
+  "Any LangWatch API key reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. No project header is required, and `X-Project-Id` is ignored — to read a single project, filter inside the statement with `WHERE project_id = '<project id>'`.";
 
 /**
  * The response ceilings, read off the executor's own limits so this copy and
@@ -135,7 +141,7 @@ const HEADER_RULE =
 const RESULT_CEILINGS = `A response carries at most ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows and about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes. When a result reaches either ceiling it is cut off there, the top-level \`truncated\` field is \`true\`, and a \`RESULT_TRUNCATED\` diagnostic reports the applied row cap in its \`meta.maxRows\`.`;
 
 const RUN_DESCRIPTION =
-  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\n" +
+  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
   `${HEADER_RULE}\n\n` +
   `${RESULT_CEILINGS}\n\n` +
@@ -143,7 +149,7 @@ const RUN_DESCRIPTION =
 
 const SCHEMA_DESCRIPTION =
   "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\n" +
-  "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
+  "Scoped to the projects the credential can read and their permissions: a column this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
   `${HEADER_RULE}`;
 
 /**
@@ -154,9 +160,10 @@ const SCHEMA_DESCRIPTION =
  * its per-field `reasons` chain, exactly as on every other family — this
  * route neither builds nor classifies that failure itself.
  */
-function registerRun(secured: ReturnType<typeof createProjectApp>): void {
+function registerRun(secured: QuerySecuredApp): void {
   secured.access(queryAccess()).post(
     "/",
+    queryAuth,
     describeRoute({
       summary: "Run a LangWatchQL query",
       description: RUN_DESCRIPTION,
@@ -168,7 +175,7 @@ function registerRun(secured: ReturnType<typeof createProjectApp>): void {
         ...canonicalUnprocessableResponses,
         200: {
           description:
-            "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project.",
+            "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the projects the key can read.",
           content: {
             "application/json": { schema: resolver(lwqlResultSchema) },
           },
@@ -177,22 +184,25 @@ function registerRun(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", lwqlQuerySchema),
     async (c) => {
-      const { project, protections } = await callerContext(c);
+      const { projects, protections } = await callerContext(c);
       const { sql, parameters, timeWindow, granularitySeconds } =
         c.req.valid("json");
 
       logger.info(
-        { projectId: project.id, sqlLength: sql.length },
+        {
+          projectIds: projects.map((project) => project.id),
+          projectCount: projects.length,
+          sqlLength: sql.length,
+        },
         "Running LangWatchQL query",
       );
 
       const result = await getLangWatchQLService().execute({
-        // The tenant-capability SET the service resolves; a project-scoped
-        // credential is a set of one. The cross-project fan-out for an
-        // organization key — resolving every project the key holds
-        // `analytics:view` on via `resolveLwqlReadableProjects` — mounts on
-        // `createOrgApp` and lands with the route reroute (#8085 Step 5).
-        projects: [project],
+        // The tenant-capability SET the service resolves: a project key is a
+        // set of one, an API key the union of every project it holds
+        // `analytics:view` on. An empty set reads zero rows — the row policy,
+        // not this door, is the tenant boundary (#8085).
+        projects,
         protections,
         sql,
         ...(parameters ? { parameters } : {}),
@@ -210,9 +220,10 @@ function registerRun(secured: ReturnType<typeof createProjectApp>): void {
  * A GET, because it reads a catalog and takes no arguments: the credential is
  * the whole of its input.
  */
-function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
+function registerSchema(secured: QuerySecuredApp): void {
   secured.access(queryAccess()).get(
     "/schema",
+    queryAuth,
     describeRoute({
       summary: "Discover the queryable LangWatchQL schema",
       description: SCHEMA_DESCRIPTION,
@@ -237,10 +248,17 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
   );
 }
 
+/**
+ * The query app's context, widened with what the key-auth middleware sets.
+ *
+ * `createProjectApp` gives the project-auth variables; the query door layers
+ * its own {@link createUnifiedKeyAuthMiddleware}, which sets `keyPrincipal`, so
+ * the handlers can read it off context with full typing.
+ */
+type QuerySecuredApp = ReturnType<typeof createProjectApp<KeyAuthVariables>>;
+
 /** Registers the query-domain routes. */
-export function registerQueryRoutes(
-  secured: ReturnType<typeof createProjectApp>,
-): void {
+export function registerQueryRoutes(secured: QuerySecuredApp): void {
   registerRun(secured);
   registerSchema(secured);
 }

@@ -1120,6 +1120,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       And a project whose analytics:view permission is withheld is excluded
       And a project API key resolves to exactly its own project
 
+    @unit
+    Scenario: The query door resolves any key to its readable-project scope
+      Given the query door has authenticated a caller's API key
+      When it resolves the caller's query scope
+      Then a project key passes exactly its own project to the service
+      And an organization key passes the union of its analytics:view projects
+      And a key with the permission on no project passes an empty scope, which reads zero rows
+
   Rule: Narrow to one project inside the query
 
     @e2e @unimplemented
@@ -1157,6 +1165,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       When it selects from a LangWatchQL table
       Then no row of tenant-b is returned
       And an empty key-hash set returns zero rows
+
+    @unit
+    Scenario: The query door redacts content to the strictest protection across the readable set
+      Given a key that reads several projects with differing content protections
+      When the query door resolves the caller's content protections
+      Then a content category is offered only when every readable project grants it
+      And an empty readable set offers no content
 
     @unit
     Scenario: The tenant predicate and the rendered config predicate are the same text
