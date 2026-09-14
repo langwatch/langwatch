@@ -1,8 +1,5 @@
-/**
- * An attribute value offers the same compact format selector the rest of the drawer uses, and a value detected as
- * a JSON string reads as JSON in it rather than falling through to the first option.
- * @vitest-environment jsdom
- */
+// Attribute value format selector: JSON strings detected and preferred.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

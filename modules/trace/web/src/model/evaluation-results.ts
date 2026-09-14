@@ -112,9 +112,8 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
 };
 
 /**
- * Status indicator colors for evaluation results — single source of truth for dots, popover accents, score-bar
- * fills, and any other "one colour per status" rendering across the trace list, the v2 drawer header, the Evals
- * accordion cards, and the v3 evaluator chips.
+ * Status indicator colors: single source for dots, accents, fills across all
+ * trace views and evaluator renderings.
  */
 export const EVALUATION_STATUS_COLORS = {
   pending: "gray.400",
@@ -217,7 +216,8 @@ export interface EvalChipInput {
  *  the trace-list `EvalChip` and the v2 drawer header eval chips so
  *  visuals never drift between surfaces. */
 export interface EvalChipDisplay {
-  /** Mapped onto the v3 status enum so consumers can reuse `EVALUATION_STATUS_COLORS` / `getStatusLabel`. */
+  // Mapped onto v3 status enum; consumers can reuse `EVALUATION_STATUS_COLORS`
+  // / `getStatusLabel`.
   status: ParsedEvaluationResult["status"];
   /** Chakra color token for the status dot / accent. */
   color: string;

@@ -1,8 +1,6 @@
-/**
- * VisibleOrderStrip translates visible-subset indices (the row's position in the displayed list) into
- * `columnOrder` indices (the position in the full lens order, which may include hidden columns).
- * @vitest-environment jsdom
- */
+// VisibleOrderStrip maps visible indices to columnOrder indices,
+// accounting for hidden columns.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

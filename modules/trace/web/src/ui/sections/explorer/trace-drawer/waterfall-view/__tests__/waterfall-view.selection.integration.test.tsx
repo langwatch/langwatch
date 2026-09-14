@@ -1,8 +1,6 @@
-/**
- * Bringing the selected span's row into view, which is what makes naming a span from a comment worth anything,
- * and what the waterfall does with a comment whose span the trace no longer has.
- * @vitest-environment jsdom
- */
+// Scroll selected span into view (makes comment naming useful); handle
+// deleted spans.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

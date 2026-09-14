@@ -1,8 +1,6 @@
-/**
- * The per-turn separator ledger is decluttered: the cryptic model abbreviation and the raw input→output token
- * count are gone and the relative time carries an explicit "ago".
- * @vitest-environment jsdom
- */
+// Per-turn separator decluttered: no model abbreviation, no token counts,
+// explicit time-ago label.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

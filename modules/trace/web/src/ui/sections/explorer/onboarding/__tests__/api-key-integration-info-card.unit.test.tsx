@@ -1,8 +1,6 @@
-/**
- * Behaviour of the minted-token card once a token exists: the token is shown in full (not masked) by default, a
- * copy button sits next to the "shown once" warning, and the whole env block is highlighted.
- * @vitest-environment jsdom
- */
+// Minted-token card: full visibility (not masked), copy button, highlighted
+// env block.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

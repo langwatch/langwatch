@@ -91,10 +91,8 @@ const colorMap: Record<string, { background: string; color: string }> = {};
 
 export type RotatingColorSet = keyof typeof rotatingColors;
 
-/**
- * Bare Chakra `colorPalette` names derived from `rotatingColors.colors` (the leading segment of each `background`
- * token, e.g. `"orange.subtle"` → `"orange"`), so a given string hashes to the same hue whether you ask for the
- * token pair (`getColorForString`) or the bare palette name (`getColorPaletteForString`).
+// Bare Chakra palette names extracted from `rotatingColors.colors` so both
+// token pair and palette lookups hash to the same hue.
  */
 const ROTATING_PALETTES = rotatingColors.colors.map((c) => c.background.split(".")[0]!);
 

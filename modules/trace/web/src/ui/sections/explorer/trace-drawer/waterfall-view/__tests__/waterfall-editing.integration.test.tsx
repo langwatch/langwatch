@@ -1,8 +1,6 @@
-/**
- * What the waterfall reads while a correction is being written: the rows an earlier correction already changed
- * still say so, and removing a row takes its detail pane with it.
- * @vitest-environment jsdom
- */
+// Waterfall during edit: prior corrections remain marked, row removal closes
+// detail pane.
+// @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";

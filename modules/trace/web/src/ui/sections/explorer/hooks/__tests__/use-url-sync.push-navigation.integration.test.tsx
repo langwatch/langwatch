@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
-/**
- * A deep link such as Langy's "View in Trace Explorer" button navigates with `router.push(href)` to this page's
- * OWN route — same-route, fragment-only, mediated by React Router's `navigate()`, never by `popstate`.
- */
+// Deep links navigate via same-route fragments (React Router's `navigate()`,
+// never `popstate`).
 import { act, render } from "@testing-library/react";
 import { BrowserRouter, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";

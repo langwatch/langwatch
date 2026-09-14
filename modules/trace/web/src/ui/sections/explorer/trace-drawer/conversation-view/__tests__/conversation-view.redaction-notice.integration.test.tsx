@@ -1,8 +1,6 @@
-/**
- * One redaction notice for the whole conversation: the policy that scrubbed a turn is the project's, so the
- * conversation says so once, above the turns, with the link to the setting behind it.
- * @vitest-environment jsdom
- */
+// Single redaction notice for whole conversation (project policy); link to
+// setting included.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

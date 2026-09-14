@@ -1,6 +1,4 @@
-/**
- * The application and ports the shared transcript read is driven through. `TraceTranscriptReadService.readCodingAgentTranscript` takes the application it reads through and the ports this package does not own; both are assembled from the REAL implementations the API process wires (`readPorts()` in `apps/api/src/app/api-trace-read-stack.composition.ts`), so the log visibility gate, coding-agent join, and transcript derivation all run for real — the only doubles are the two stores the trace is read from.
- */
+// Real implementations everywhere; only the two stores are mocked.
 
 import { TraceReadRedactionService } from "../../../../services/read/trace-read-redaction.service.ts";
 import { vi } from "vitest";
@@ -23,9 +21,7 @@ export type TranscriptStoreMock = ReturnType<
   typeof vi.fn<(...args: unknown[]) => Promise<unknown[]>>
 >;
 
-/**
- * The two stores a transcript read stands on, as mocked boundaries. A real `TraceApp` stands over them rather than an object shaped like the reader's own calls: `readSpans` is where the tenant key and visibility cutoff are decided, so a double of it would assert nothing about the mapping the production read depends on.
- */
+// Real TraceApp required: readSpans decides tenant key and visibility cutoff.
 export function createTranscriptApp(codingAgents: CodingAgentApi): {
   app: TraceApp;
   getSpansByTraceId: TranscriptStoreMock;
@@ -45,7 +41,10 @@ export function createTranscriptApp(codingAgents: CodingAgentApi): {
 }
 
 /**
- * The read ports, real everywhere the package owns the implementation. `tryGetVisibilityCutoffMs` answers "no window": the plan's visibility cutoff is a SEPARATE gate resolved by the process, and leaving it on would mask the data-privacy decisions these suites measure.
+ * The read ports, real everywhere the package owns the implementation.
+ * `tryGetVisibilityCutoffMs` answers "no window": the plan's visibility cutoff
+ * is a SEPARATE gate resolved by the process, and leaving it on would mask the
+ * data-privacy decisions these suites measure.
  */
 export function createTranscriptReadPorts(): TracesV2ReadMembers {
   return {

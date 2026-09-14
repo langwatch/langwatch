@@ -1,8 +1,6 @@
-/**
- * The v2 trace drawer shell must mount on every non-traces page that can open a trace — including the
- * optimization studio, which does not use DashboardLayout and renders this mount itself.
- * @vitest-environment jsdom
- */
+// v2 drawer must mount on all trace-opening pages, including optimization
+// studio (non-DashboardLayout).
+// @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

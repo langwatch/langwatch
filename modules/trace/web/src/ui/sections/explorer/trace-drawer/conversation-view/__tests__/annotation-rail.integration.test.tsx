@@ -1,8 +1,6 @@
-/**
- * The rail beside a conversation turn: when it exists, where it sits, how it starts an annotation, and why what
- * is typed in it outlives the turn being unmounted by the virtualizer.
- * @vitest-environment jsdom
- */
+// Annotation rail: existence, placement, init, typed content survives
+// virtualizer unmount.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

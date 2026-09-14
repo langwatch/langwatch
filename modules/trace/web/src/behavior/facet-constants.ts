@@ -36,7 +36,8 @@ import { FIELD_VALUES } from "@langwatch/trace-contract";
 import { STATUS_COLORS } from "../model/display-formatters.ts";
 import { ORIGIN_DISPLAY } from "../model/origin-display.ts";
 
-/** Section key for the trace-level Attributes block (reads `Attributes` map on `trace_summaries`). */
+// Section key for the trace-level Attributes block (reads `Attributes`
+// map on `trace_summaries`).
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
 
 /**
@@ -54,7 +55,8 @@ export const METADATA_SECTION_KEY = "__metadata__";
 export const METADATA_DOCS_URL =
   "https://docs.langwatch.ai/integration/python/guide#adding-metadata";
 
-/** Section key for the span-level Attributes block (reads `SpanAttributes` map on `stored_spans`). */
+// Section key for the span-level Attributes block (reads `SpanAttributes`
+// map on `stored_spans`).
 export const SPAN_ATTRIBUTES_SECTION_KEY = "__span_attributes__";
 
 /** Section key for the per-event Attributes block (reads `Events.Attributes` on `stored_spans`). */
@@ -83,14 +85,8 @@ export const NORMAL_CASE_FIELDS = new Set([
 ]);
 
 /**
- * Evaluator Verdict is a traffic light like Status, and must read as the
- * SAME traffic light the evaluator drilldown already paints — green Passed,
- * red Failed, yellow Errored (see `buildVerdictSpecs` in EvaluatorDrilldown).
- * Without an entry here the field fell through to `hashColor`, which hashes
- * the literal strings "pass"/"fail" into arbitrary palette slots: the two
- * sections ended up showing the same words in opposite colours on the same
- * screen. `skipped` / `unknown` are non-verdicts and stay neutral grey so
- * they don't compete with the three that carry meaning.
+ * Evaluator verdict traffic light (green/red/yellow for pass/fail/error).
+ * Prevents sections from showing same verdicts in opposite colors.
  */
 const EVALUATOR_VERDICT_COLORS: Record<string, Tokens["colors"]> = {
   pass: "green.solid",
@@ -151,22 +147,8 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
   evaluator: [],
 };
 
-/**
- * Display order for facets whose values have an inherent sequence, applied
- * on top of the default count-sort. Deliberately NOT `FACET_DEFAULTS`: that
- * map SEEDS values (it feeds `synthesizeDefaultDescriptors`, and its entries
- * render as zero-count rows), so ordering a facet through it would also
- * conjure rows for verdicts the project has never emitted — extra furniture
- * in a section that is already dense. Ordering ranks what is present and
- * introduces nothing.
- *
- * Evaluator Verdict is the only member today: left to count-sorting, Fail
- * sat above Pass whenever failures outnumbered passes, so the same two rows
- * swapped places between projects for no reason a reader could see. The
- * order here is the drilldown's Passed / Failed / Errored, so the two
- * surfaces read the same way down as well as in colour. Values outside the
- * list (`skipped`, `unknown`) keep their count-sorted position behind these.
- */
+// Fixed order for facets with inherent sequence (unlike FACET_DEFAULTS,
+// which seeds zero-count rows); ensures consistent sorting across projects.
 export const FACET_VALUE_ORDER: Record<string, readonly string[]> = {
   evaluatorVerdict: ["pass", "fail", "error"],
 };

@@ -11,11 +11,10 @@ const FEATURE_LABEL: Record<PersonalFeatureKey, string> = {
   automations: "Automations",
 };
 
-/**
- * Click-to-enable dialog rendered when a user triggers an advanced action on their personal workspace while the bundle is off.
- * Spec: specs/ai-gateway/governance/personal-workspace-features.feature
- *       @modal scenarios
- */
+// Click-to-enable dialog for advanced actions on personal workspace
+// (bundle off).
+// Spec: specs/ai-gateway/governance/personal-workspace-features.feature
+// (@modal scenarios)
 export function PersonalFeatureGateDialog({
   state,
 }: {

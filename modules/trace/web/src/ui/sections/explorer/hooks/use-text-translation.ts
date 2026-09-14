@@ -26,9 +26,8 @@ export function useTextTranslation({
 }): UseTextTranslationResult {
   const { project } = useOrganizationTeamProject();
   const translateAPI = api.translate.translate.useMutation();
-  // Active state is keyed to the source signature rather than a boolean: when the content changes under the same mounted hook (e.g.
-  // stepping to the next trace re-renders the same memoized viewer), a stale boolean would keep the button on "Show original" while the
-  // screen already shows the new original — the key comparison resets it automatically.
+  // Active state keyed to source signature, not boolean; auto-resets on
+  // content change because key comparison beats stale boolean state.
   const [activeFor, setActiveFor] = useState<string | null>(null);
   // react-query v4's shared MutationObserver only tracks the LAST
   // `mutateAsync`, so `translateAPI.isPending` under-reports when several

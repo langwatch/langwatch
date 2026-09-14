@@ -1,8 +1,6 @@
-/**
- * Guards the horizontal-scroll fix: the IO preview content cell must NOT inherit the table shell's global
- * sticky-first-column rule (`tbody > tr > td:first-child { position: sticky }`).
- * @vitest-environment jsdom
- */
+// IO preview cell must NOT inherit sticky-first-column rule (horizontal
+// scroll fix).
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { Row } from "@tanstack/react-table";
 import { render } from "@testing-library/react";

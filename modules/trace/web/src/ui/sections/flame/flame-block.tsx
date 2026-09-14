@@ -60,9 +60,8 @@ export function FlameBlock({
   if (widthPct < 0.05 && totalSpanCount > 200) return null;
 
   const color = getSpanColor(span.type);
-  // `gray.solid` is too low-saturation for the white-on-fill recipe every other palette uses — at 85% alpha on a
-  // white canvas the result is a pale grey that white text dissolves into (operator report: "can't read the
-  // letters" on Scenario Turn / module / execute_event_loop_cycle bars).
+  // gray.solid lacks saturation; at 85% alpha, white text dissolves into
+  // pale grey (unreadable on small bars).
   const isLowContrastPalette = color === "gray.solid";
   // Sub-label-width blocks render calmer: softer fill, no border noise,
   // a 1px right gap and pill ends so a dense strip of adjacent tiny spans

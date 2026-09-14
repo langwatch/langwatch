@@ -1,8 +1,6 @@
-/**
- * A conversation-view turn whose content was hidden by a privacy rule renders the shared "Redacted" marker on the affected side instead of silently dropping the
- * bubble — so a hidden turn is never mistaken for a turn where the user said nothing / the assistant produced no response.
- * @vitest-environment jsdom
- */
+// Redacted turn: shows "Redacted" marker, not silent bubble drop (never
+// mistaken for empty turn).
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

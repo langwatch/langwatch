@@ -1,8 +1,7 @@
-/**
- * The no-traces pane: the token comes first, the ways forward sit under it, and the SDK instructions are an action rather than a tab.
- * @vitest-environment jsdom
- * Spec: specs/traces-v2/integrate-pane.feature
- */
+// No-traces pane: token first, forward paths below, SDK instructions as
+// action (not tab).
+// @vitest-environment jsdom
+// Spec: specs/traces-v2/integrate-pane.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

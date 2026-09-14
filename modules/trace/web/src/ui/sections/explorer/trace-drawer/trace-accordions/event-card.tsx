@@ -16,11 +16,8 @@ interface EventCardProps {
   spanId?: string | null;
   /** Selection callback for the "Open span" affordance. */
   onSelectSpan?: (spanId: string) => void;
-  /**
-   * Outcome colour for events whose structure we know (a denied tool call, a failed result) — the same tone
-   * vocabulary SessionView's Signals use, so a bad outcome reads at a glance instead of requiring a read through
-   * the attribute table underneath.
-   */
+  // Outcome colour for known structures (denied tool, failed result); same
+  // tone vocabulary as SessionView's Signals (readable at a glance).
   tone?: "danger" | "warning" | "neutral";
 }
 

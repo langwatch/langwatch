@@ -1,8 +1,6 @@
-/**
- * The per-evaluator eval column cell renders the chosen field (Score / Verdict / Label) of the evaluator's latest
- * run on the trace, or an em-dash when there is no run / no value.
- * @vitest-environment jsdom
- */
+// Evaluator column cell: renders chosen field (Score/Verdict/Label) of
+// latest run, or em-dash.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

@@ -70,9 +70,8 @@ export async function fetchSpanTreePages({
     const nodes = [...nodesById.values()];
     return needsSort ? nodes.sort(bySpanTreeOrder) : nodes;
   };
-  // Vanilla-client queries, not `utils.….fetch`: the abort signal reaches the in-flight HTTP request (closing
-  // the drawer cancels mid-page, not just between pages), and no throwaway per-page React Query cache entries
-  // are created — the assembled tree lives under the spanTree key.
+  // Vanilla queries for abort signal (drawer close cancels mid-page);
+  // tree cached under spanTree key, not per-page React Query entries.
   const client = getUntypedClient(
     utils.client as unknown as Parameters<typeof getUntypedClient>[0],
   );
@@ -153,11 +152,8 @@ function sameNode(a: SpanTreeNode, b: SpanTreeNode): boolean {
   return keysA.every((key) => a[key] === b[key]);
 }
 
-/**
- * Merges a `spanTreeDelta` result into the assembled tree: dedupes by spanId (a delta row is the span's latest version, so it wins), keeps
- * the tree in `(startTimeMs, spanId)` order, and returns the SAME array reference when nothing actually changed — the delta poll re-fetches
- * boundary rows every cycle, and an unchanged reference keeps React Query consumers from re-rendering on quiet polls.
- */
+// Merge spanTreeDelta: dedupe by spanId, maintain order, return same
+// reference when unchanged (avoid React Query re-renders on quiet polls).
 export function mergeSpanTreeDelta(
   existing: SpanTreeNode[],
   delta: SpanTreeNode[],

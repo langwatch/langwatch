@@ -1,8 +1,6 @@
-/**
- * The conversation-context strip distinguishes redacted turn content from a genuinely-absent one: a side whose content a privacy rule hid (the server nulled it but set `inputRedacted` /
- * `outputRedacted`) renders the shared "Redacted" marker, NOT the "(no user message)" / "(no assistant response)" placeholder used when a turn really has no content on that side.
- * @vitest-environment jsdom
- */
+// Conversation-context strip: redacted content shows "Redacted", not
+// "(no user message)" / "(no assistant response)" placeholders.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

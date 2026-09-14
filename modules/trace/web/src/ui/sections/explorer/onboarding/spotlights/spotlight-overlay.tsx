@@ -103,11 +103,9 @@ export function isAnchorParkedOffscreen(
   return rect.left - scrollX >= viewportWidth;
 }
 
-/**
- * The spotlight ring may only be PLACED once its anchor has settled: on screen (not parked off the right by an
- * entrance ride) and holding the same rect as the previous frame.
- * Spec: the drawer companion ride, specs/langy/langy-panel-layout.feature.
- */
+// Spotlight ring placement requires settled anchor: on-screen and rect
+// unchanged from previous frame.
+// Spec: specs/langy/langy-panel-layout.feature
 export function isAnchorSettled(
   next: AnchorRect | null,
   previous: AnchorRect | null,

@@ -1,8 +1,6 @@
-/**
- * Every way of leaving a trace mid-correction asks the same question, in the same dialog: closing the drawer,
- * opening another trace, walking back through the drawer's own history, and the browser's back button.
- * @vitest-environment jsdom
- */
+// All exit paths (drawer close, navigate, history back, browser back) use
+// the same unsaved-changes dialog.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

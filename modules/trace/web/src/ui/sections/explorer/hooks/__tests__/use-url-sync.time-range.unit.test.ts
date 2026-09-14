@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
-/**
- * The time range is the widest-reaching axis the fragment carries — every query on the page is scoped by it — and
- * it is the one axis where "the URL said nothing" and "the URL said use the default" are different statements.
- */
+// Time range scopes all queries; fragment absence differs from default (not
+// the same thing).
 import { act, renderHook } from "@testing-library/react";
 // `useURLSync` reads React Router's own `useLocation()` now (see the
 // push-driven-navigation effect), which throws outside a Router context.

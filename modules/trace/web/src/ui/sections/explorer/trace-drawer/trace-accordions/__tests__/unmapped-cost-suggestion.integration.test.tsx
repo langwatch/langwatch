@@ -1,8 +1,7 @@
-/**
- * Unmapped-cost suggestion in the span detail pane: shows when the span detail carries `costSuggestion`, opens the model costs page prefilled in a new window.
- * @vitest-environment jsdom
- * Spec: specs/traces-v2/span-unmapped-cost-suggestion.feature
- */
+// Unmapped-cost suggestion: shows when span carries `costSuggestion`,
+// opens model costs page in new window.
+// @vitest-environment jsdom
+// Spec: specs/traces-v2/span-unmapped-cost-suggestion.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";

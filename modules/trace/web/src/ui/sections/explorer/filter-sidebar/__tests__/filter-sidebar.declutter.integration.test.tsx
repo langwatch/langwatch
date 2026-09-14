@@ -1,8 +1,6 @@
-/**
- * The sidebar declutter pass: the "Find a facet" finder button is gone, and a "More…" button below the facet list
- * opens the same Configure popover the header trigger drives (via the shared facetManagerOpen state).
- * @vitest-environment jsdom
- */
+// Declutter: finder button removed, "More…" opens Configure popover via
+// shared facetManagerOpen state.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1,8 +1,6 @@
-/**
- * The comment action on a waterfall row: what it says when there is no room to write it down, what a commented
- * span shows at rest, and what a reader who may not write annotations is offered.
- * @vitest-environment jsdom
- */
+// Waterfall comment action: label when no room, commented span display,
+// read-only view.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

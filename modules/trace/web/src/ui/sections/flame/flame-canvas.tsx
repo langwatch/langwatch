@@ -136,7 +136,8 @@ export function FlameCanvas({
             );
           })}
 
-          {/* Parent time-range band: highlights the parent's slice of time when hovering a child */}
+          {/* Parent time-range band: highlights parent's time slice on child
+              hover */}
           {relatedSpanIds?.parent &&
             (() => {
               const p = relatedSpanIds.parent.span;

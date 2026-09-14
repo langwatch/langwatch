@@ -1,8 +1,7 @@
-/**
- * What a click does on a conversation row: the row opens the conversation's most recent trace in the drawer, and the chevron is the one affordance that expands its turns inline.
- * @vitest-environment jsdom
- * @see specs/traces-v2/sessions-lens.feature
- */
+// Click: row opens most recent trace in drawer; chevron expands turns
+// inline.
+// @vitest-environment jsdom
+// @see specs/traces-v2/sessions-lens.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

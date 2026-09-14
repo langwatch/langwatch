@@ -849,7 +849,8 @@ export const TracesMapping = ({
                             }}
                             value={subkey}
                           >
-                            {/* "* (full object)" option - returns complete object for the selected key */}
+                            {/* "* (full object)" option — returns complete
+                                object for selected key */}
                             <option value="">
                               {source === "spans" ? "* (full span object)" : "* (full object)"}
                             </option>

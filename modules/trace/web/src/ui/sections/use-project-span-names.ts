@@ -4,9 +4,9 @@ import { api } from "../../behavior/trace-api.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * @param projectId - The project ID to fetch field names from
- * @param enabled - Gate the query (default true); combined with projectId presence
- * @returns Object with spanNames, metadataKeys, evaluationNames arrays, isLoading state, and error if any
+ * @param projectId - project ID to fetch field names from
+ * @param enabled - gate query (default true)
+ * @returns spanNames, metadataKeys, evaluationNames, isLoading, error
  */
 export function useProjectSpanNames({
   projectId,

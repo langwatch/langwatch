@@ -1,8 +1,6 @@
-/**
- * Header drag-to-reorder vs sort interplay in TraceTableShell: the column LABEL is the drag zone (data-column-drag-handle), the sort chevron sits outside it, a plain
- * click on the label still toggles sorting, and the synthetic click fired right after a drag is swallowed so dropping a column doesn't also sort it.
- * @vitest-environment jsdom
- */
+// Header drag: label is drag zone, sort chevron outside, label-click sorts,
+// post-drag click swallowed.
+// @vitest-environment jsdom
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {

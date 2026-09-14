@@ -9,9 +9,8 @@ import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.
  */
 export function TraceMediaPart({ part }: { part: MediaPartData }) {
   const { project } = useOrganizationTeamProject();
-  // MediaPart needs a real projectId for its stored-object existence probe; its `enabled` gate requires
-  // `!!projectId`, so passing "" permanently disables the probe — a failed media URL would then sit as a broken
-  // element forever instead of resolving to the "missing" badge.
+  // MediaPart needs real projectId for stored-object probe (empty string
+  // disables it, breaking URL resolution).
   if (!project?.id) return null;
   return <MediaPart part={part} projectId={project.id} />;
 }

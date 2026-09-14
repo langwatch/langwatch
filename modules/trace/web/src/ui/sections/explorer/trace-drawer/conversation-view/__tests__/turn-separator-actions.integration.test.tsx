@@ -1,8 +1,6 @@
-/**
- * What the turn separator carries once everything said about a message is said on the message itself: one action, opening the turn's trace
- * to correct it, and — while a queue is being walked — the tick that counts the turn into the sitting.
- * @vitest-environment jsdom
- */
+// Turn separator actions: open trace to correct, and queue-walk tick
+// counter.
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

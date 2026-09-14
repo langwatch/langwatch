@@ -1,8 +1,6 @@
-/**
- * The drawer summary's media strip renders fold-derived refs from the summary's reserved attributes (specs/traces-v2/media-rendering.feature) — the trace-level
- * input/output are flattened text, so this strip is the only way the summary panel surfaces the winning span's recording / image / attachment.
- * @vitest-environment jsdom
- */
+// Summary media strip (only way to surface recording/image/attachment since
+// trace input/output are flattened).
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

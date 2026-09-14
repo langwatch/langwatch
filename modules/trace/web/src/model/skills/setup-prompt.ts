@@ -1,8 +1,5 @@
-/**
- * The text the "copy a prompt" menu hands to a coding agent: the skill's own instructions, with the project's
- * credentials in front of them when the reader already minted a token.
- * Spec: specs/skills/empty-state-skill-setup.feature
- */
+// Skill setup prompt with credentials injected when reader owns an API key.
+// Spec: specs/skills/empty-state-skill-setup.feature
 
 export type SetupCredentials = {
   apiKey: string;

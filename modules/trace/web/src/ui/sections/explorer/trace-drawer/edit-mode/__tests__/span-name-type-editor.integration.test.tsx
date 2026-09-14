@@ -1,8 +1,6 @@
-/**
- * The name and type editors seed from the correction the trace already carries, so a second reviewer reads what
- * the first one wrote instead of reverting it the moment they touch the field.
- * @vitest-environment jsdom
- */
+// Name/type editors seed from existing correction, preserving prior
+// reviewer's work (not reverted on touch).
+// @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

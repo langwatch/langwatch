@@ -4,11 +4,8 @@ import { AuroraSvg } from "../../../../elements/explorer/traces-page/aurora-svg.
 import { shouldShowAurora } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
-/**
- * Aurora ribbon that flares across the top of the trace table during the `auroraArrival` stage — the marquee
- * visual moment of the journey, mirroring `RefreshProgressBar`'s aurora pattern so the "new traces are arriving"
- * idea reads consistently across the platform.
- */
+// Aurora ribbon at trace table top (auroraArrival stage); mirrors
+// RefreshProgressBar's aurora pattern for consistent "arriving" visual.
 export const OnboardingAurora: React.FC = () => {
   const stage = useOnboardingStore((s) => s.stage);
   const showAurora = shouldShowAurora(stage);
