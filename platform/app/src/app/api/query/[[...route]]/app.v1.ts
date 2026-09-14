@@ -141,7 +141,7 @@ const HEADER_RULE =
  * the enforced caps cannot drift. Formatted with thousands separators for a
  * reader.
  */
-const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows: that \`LIMIT\` is appended before the query runs. A statement whose own \`LIMIT\` asks for more is refused with \`LIMIT_TOO_HIGH\` — lower it and page the rest with \`LIMIT\`/\`OFFSET\` and an \`ORDER BY\`. A result whose body exceeds about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes is refused outright with \`lwql_result_too_large\`, never cut — select fewer columns or a smaller \`LIMIT\`.`;
+const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows: that \`LIMIT\` is appended before the query runs. A statement whose own \`LIMIT\` asks for more is refused with \`LIMIT_TOO_HIGH\` — lower it and page the rest with \`LIMIT\`/\`OFFSET\` and an \`ORDER BY\`. When using \`UNION\`, every top-level branch must carry its own \`LIMIT\` clause of ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows or fewer, or the query is refused with \`LIMIT_REQUIRED_PER_BRANCH\`. A result whose body exceeds about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes is refused outright with \`lwql_result_too_large\`, never cut — select fewer columns or a smaller \`LIMIT\`.`;
 
 const RUN_DESCRIPTION =
   "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +

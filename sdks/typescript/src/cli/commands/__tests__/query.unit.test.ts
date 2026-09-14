@@ -92,7 +92,6 @@ describe("given a QueryApiService that returns rows", () => {
     columns: [{ name: "count", type: "number" }],
     rows: [{ count: 3 }],
     statistics: { elapsedMs: 12, rowsRead: 3, bytesRead: 128, rowsReturned: 1 },
-    truncated: false,
     followsTimeWindow: true,
     followsGranularity: false,
     diagnostics: [],

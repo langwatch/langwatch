@@ -136,5 +136,11 @@ describe("docs/api-reference/query/overview.mdx", () => {
       expect(content).toContain("LIMIT_TOO_HIGH");
       expect(content).toContain("lwql_result_too_large");
     });
+
+    /** @scenario "Each UNION branch must carry its own LIMIT ceiling" */
+    it("documents LIMIT_REQUIRED_PER_BRANCH for UNION queries", () => {
+      expect(content).toContain("LIMIT_REQUIRED_PER_BRANCH");
+      expect(content).toContain("UNION");
+    });
   });
 });

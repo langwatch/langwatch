@@ -201,6 +201,14 @@ describe("given the generated OpenAPI document", () => {
         expect(description).toContain("OFFSET");
       });
 
+      /** @scenario "Each UNION branch must carry its own LIMIT ceiling" */
+      it("documents LIMIT_REQUIRED_PER_BRANCH for UNION queries", () => {
+        const description: string = paths[RUN]?.post?.description ?? "";
+
+        expect(description).toContain("LIMIT_REQUIRED_PER_BRANCH");
+        expect(description).toContain("UNION");
+      });
+
       /** @scenario "Overflow throws and never silently truncates" */
       it("no longer advertises a truncated flag or a RESULT_TRUNCATED diagnostic", () => {
         const description: string = paths[RUN]?.post?.description ?? "";

@@ -66960,7 +66960,7 @@ Both endpoints answer with the standard LangWatch error envelope and a real HTTP
 |--------|--------|------|
 | `400` | `validation_error` | The request body failed validation. |
 | `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
-| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH`). |
+| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH` or `LIMIT_REQUIRED_PER_BRANCH`). |
 | `401` | `missing_credentials` | No supported authentication credential was sent. |
 | `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
 | `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
@@ -67010,7 +67010,7 @@ A query may call only the functions on the allowlist below. `GET /api/v1/query/s
 
 A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs, so a large answer comes back as one page rather than a stream. To read the rest, page with `LIMIT`/`OFFSET` and an `ORDER BY`.
 
-A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LIMIT_TOO_HIGH` before it runs. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`. Select fewer columns or a smaller `LIMIT` to bring it under the cap.
+A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LIMIT_TOO_HIGH` before it runs. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`. Select fewer columns or a smaller `LIMIT` to bring it under the cap.
 
 ---
 
