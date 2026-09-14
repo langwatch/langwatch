@@ -111,33 +111,147 @@ export function MemberAccessEditor({
   isCurrentUser: boolean;
   onSaved?: () => void;
 }) {
-  const queryClient = api.useUtils();
+  const {
+    pendingRole,
+    setPendingRole,
+    pendingBindingRemovals,
+    setPendingBindingRemovals,
+    pendingBindingAdditions,
+    setPendingBindingAdditions,
+    setHasDraftBinding,
+    isSaving,
+    bindingInputRef,
+    reset,
+    directBindings,
+    memberGroups,
+    hasChanges,
+    stageAddition,
+    handleSave,
+    userDirectBindings,
+    mirrorsTheSeat,
+  } = useMemberAccessEditor({
+    organizationId,
+    userId,
+    memberRole,
+    canManage,
+    onSaved,
+  });
 
-  const [pendingRole, setPendingRole] =
-    useState<OrganizationUserRole>(memberRole);
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<
-    Set<string>
-  >(new Set());
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
-    PendingBinding[]
-  >([]);
-  // The input row holds a complete draft the admin never pressed the assign
-  // button on. It counts as a change so Save is enabled, and the save flushes
-  // it.
-  const [hasDraftBinding, setHasDraftBinding] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  return (
+    <VStack gap={5} align="stretch" width="full">
+      {canManage && (
+        <Box>
+          <Text fontSize="sm" fontWeight="semibold" mb={3}>
+            Organization role
+          </Text>
+          {isCurrentUser ? (
+            <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+              You cannot change your own organization role.
+            </Text>
+          ) : (
+            <OrganizationUserRoleField
+              value={pendingRole}
+              onChange={setPendingRole}
+            />
+          )}
+        </Box>
+      )}
 
-  const bindingInputRef = useRef<BindingInputRowHandle>(null);
+      {canManage && (
+        <DirectAssignments
+          organizationId={organizationId}
+          userId={userId}
+          pendingRole={pendingRole}
+          directBindings={directBindings}
+          userDirectBindings={userDirectBindings}
+          mirrorsTheSeat={mirrorsTheSeat}
+          pendingBindingRemovals={pendingBindingRemovals}
+          setPendingBindingRemovals={setPendingBindingRemovals}
+          pendingBindingAdditions={pendingBindingAdditions}
+          setPendingBindingAdditions={setPendingBindingAdditions}
+          setHasDraftBinding={setHasDraftBinding}
+          stageAddition={stageAddition}
+          bindingInputRef={bindingInputRef}
+        />
+      )}
 
-  const reset = () => {
-    setPendingRole(memberRole);
-    setPendingBindingRemovals(new Set());
-    setPendingBindingAdditions([]);
-    setHasDraftBinding(false);
-  };
+      <MemberGroups memberGroups={memberGroups} />
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(reset, [userId, memberRole]);
+      {canManage && (
+        <HStack justifyContent="flex-end" gap={2}>
+          <Button variant="outline" disabled={!hasChanges} onClick={reset}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="blue"
+            disabled={!hasChanges}
+            loading={isSaving}
+            onClick={() => void handleSave()}
+          >
+            Save
+          </Button>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * Everything the member-access editor stages, constrains and saves.
+ *
+ * Separated from the markup because the two are read for different reasons:
+ * this is what a change to somebody's access DOES — the seat constraint, the
+ * order the two saves go in, and what is re-read afterwards — and the markup
+ * below is what it looks like.
+ */
+type SeatMirrorCandidate = {
+  role: string;
+  customRoleId?: string | null;
+  scopeType: RoleBindingScopeType;
+};
+
+/**
+ * Whether this row is the organization-scoped one that mirrors the seat.
+ *
+ * That row is managed by the seat selector, not by the assignments list:
+ * removing it would leave the seat without its assignment, and the next role
+ * change would put it straight back.
+ */
+function mirrorsSeat(
+  binding: SeatMirrorCandidate,
+  memberRole: OrganizationUserRole,
+): boolean {
+  return (
+    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+    !binding.customRoleId &&
+    binding.role === (memberRole as string)
+  );
+}
+
+type MemberAccessEditorInput = {
+  organizationId: string;
+  userId: string;
+  memberRole: OrganizationUserRole;
+  canManage: boolean;
+  onSaved?: () => void;
+};
+
+function useMemberAccessEditor({
+  organizationId,
+  userId,
+  memberRole,
+  canManage,
+  onSaved,
+}: MemberAccessEditorInput) {
+  const pending = usePendingAccessChanges({ userId, memberRole });
+  const {
+    pendingRole,
+    pendingBindingRemovals,
+    pendingBindingAdditions,
+    setPendingBindingAdditions,
+    hasDraftBinding,
+    bindingInputRef,
+  } = pending;
 
   const directBindings = api.roleBinding.listForUser.useQuery(
     { organizationId, userId },
@@ -148,80 +262,429 @@ export function MemberAccessEditor({
     userId,
   });
 
-  const updateOrgRole = api.organization.updateMemberRole.useMutation();
-  const applyMemberBindings = api.roleBinding.applyMemberBindings.useMutation();
-
   const hasBindingChanges =
     pendingBindingRemovals.size > 0 || pendingBindingAdditions.length > 0;
   const roleChanged = pendingRole !== memberRole;
   const hasChanges = hasBindingChanges || roleChanged || hasDraftBinding;
 
-  // A Lite Member seat allows Viewer only, so anything staged above it snaps
-  // down before it is listed or saved. The input row already restricts what
-  // can be picked; this holds the same line for rows staged before the seat
-  // was switched, and for whatever a stubbed row hands over in tests.
-  const constrainStagedRowToSeat = (binding: PendingBinding): PendingBinding =>
-    pendingRole === OrganizationUserRole.EXTERNAL &&
-    (binding.customRoleId || binding.role !== (TeamUserRole.VIEWER as string))
-      ? {
-          ...binding,
-          role: TeamUserRole.VIEWER,
-          roleValue: TeamUserRole.VIEWER,
-          customRoleId: undefined,
-          customRoleName: undefined,
-        }
-      : binding;
+  const { stageAddition } = useSeatConstrainedStaging({
+    pendingRole,
+    pendingBindingRemovals,
+    pendingBindingAdditions,
+    setPendingBindingAdditions,
+    directBindings,
+  });
 
-  const stageAddition = (incoming: PendingBinding) => {
-    const binding = constrainStagedRowToSeat(incoming);
-    const alreadyHeld = (directBindings.data ?? []).some(
-      (row) =>
-        !pendingBindingRemovals.has(row.id) &&
-        bindingKey(row) === bindingKey(binding),
-    );
-    if (alreadyHeld) return;
-    setPendingBindingAdditions((prev) =>
-      prev.some((staged) => bindingKey(staged) === bindingKey(binding))
-        ? prev
-        : [...prev, binding],
-    );
+  const { isSaving, handleSave } = useMemberAccessSave({
+    organizationId,
+    userId,
+    pendingRole,
+    roleChanged,
+    pendingBindingRemovals,
+    pendingBindingAdditions,
+    directBindings,
+    bindingInputRef,
+    onSaved,
+  });
+
+  return {
+    ...pending,
+    isSaving,
+    directBindings,
+    memberGroups,
+    hasChanges,
+    stageAddition,
+    handleSave,
+    userDirectBindings: directBindings.data ?? [],
+    mirrorsTheSeat: (binding: SeatMirrorCandidate) =>
+      mirrorsSeat(binding, memberRole),
   };
+}
 
-  // Picking a Lite Member seat rewrites the staged rows the way the save
-  // cascade rewrites the stored ones: above-Viewer rows snap down, an
-  // organization row has no lite equivalent and is dropped, and rows made
-  // identical by the correction collapse to one.
-  useEffect(() => {
-    if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
-    setPendingBindingAdditions((prev) => {
-      const seen = new Set<string>();
-      return prev
-        .filter(
-          (binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION,
-        )
-        .map(constrainStagedRowToSeat)
-        .filter((binding) => {
-          const key = bindingKey(binding);
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingRole]);
+/**
+ * The assignments held directly by this member, and the row that adds one.
+ *
+ * Staged, not applied: every removal and addition here is a pending change the
+ * Save button flushes as one batch, so an administrator can rearrange somebody
+ * completely and still back out with Cancel.
+ */
+function DirectAssignments({
+  organizationId,
+  userId,
+  pendingRole,
+  directBindings,
+  userDirectBindings,
+  mirrorsTheSeat,
+  pendingBindingRemovals,
+  setPendingBindingRemovals,
+  pendingBindingAdditions,
+  setPendingBindingAdditions,
+  setHasDraftBinding,
+  stageAddition,
+  bindingInputRef,
+}: {
+  organizationId: string;
+  userId: string;
+  pendingRole: OrganizationUserRole;
+  directBindings: ReturnType<typeof api.roleBinding.listForUser.useQuery>;
+  userDirectBindings: NonNullable<
+    ReturnType<typeof api.roleBinding.listForUser.useQuery>["data"]
+  >;
+  mirrorsTheSeat: (binding: {
+    role: string;
+    customRoleId?: string | null;
+    scopeType: RoleBindingScopeType;
+  }) => boolean;
+  pendingBindingRemovals: Set<string>;
+  setPendingBindingRemovals: React.Dispatch<React.SetStateAction<Set<string>>>;
+  pendingBindingAdditions: PendingBinding[];
+  setPendingBindingAdditions: React.Dispatch<
+    React.SetStateAction<PendingBinding[]>
+  >;
+  setHasDraftBinding: React.Dispatch<React.SetStateAction<boolean>>;
+  stageAddition: (incoming: PendingBinding) => void;
+  bindingInputRef: React.RefObject<BindingInputRowHandle | null>;
+}) {
+  return (
+    <Box>
+      <Text fontSize="sm" fontWeight="semibold" mb={3}>
+        {ROLE_ASSIGNMENT_WORDS.plural}
+      </Text>
 
-  const refreshAccessQueries = () =>
-    Promise.all([
-      queryClient.roleBinding.listForUser.invalidate(),
-      queryClient.roleBinding.listForOrg.invalidate(),
-      queryClient.organization.getMemberById.invalidate(),
-      queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
-      queryClient.organization.getAll.invalidate(),
-      // An org role change moves the member between full and Lite Member
-      // seats, so the seat counts an admin is reconciling against changed
-      // with this save.
-      queryClient.limits.getUsage.invalidate(),
-    ]);
+      {directBindings.isError ? (
+        <SectionErrorNotice
+          error={directBindings.error}
+          fallbackTitle="Couldn't read their role assignments"
+        />
+      ) : directBindings.isLoading ? (
+        <Spinner size="sm" />
+      ) : userDirectBindings.length === 0 &&
+        pendingBindingAdditions.length === 0 ? (
+        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+          No role assigned.
+        </Text>
+      ) : (
+        <VStack gap={2} align="stretch">
+          {userDirectBindings.map((b) => (
+            <HeldAssignmentRow
+              key={b.id}
+              binding={b}
+              markedForRemoval={pendingBindingRemovals.has(b.id)}
+              removable={
+                b.scopeType !== RoleBindingScopeType.PROJECT &&
+                !mirrorsTheSeat(b)
+              }
+              onToggleRemoval={() =>
+                setPendingBindingRemovals((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(b.id)) next.delete(b.id);
+                  else next.add(b.id);
+                  return next;
+                })
+              }
+            />
+          ))}
+          {pendingBindingAdditions.map((b, i) => (
+            <HStack
+              key={bindingKey(b)}
+              px={3}
+              py={2}
+              bg="bg.muted"
+              borderRadius="md"
+              fontSize="sm"
+              opacity={0.7}
+            >
+              <Badge colorPalette={roleTone(b.role)} size="sm">
+                {b.customRoleName ?? b.role}
+              </Badge>
+              <Text color="fg.muted">on</Text>
+              <Badge colorPalette="purple" size="sm" variant="surface">
+                {scopeLabel({
+                  scopeType: b.scopeType,
+                  scopeName: b.scopeName ?? null,
+                })}
+              </Badge>
+              <Spacer />
+              <Button
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                aria-label="Undo add"
+                onClick={() =>
+                  setPendingBindingAdditions((prev) =>
+                    prev.filter((_, j) => j !== i),
+                  )
+                }
+              >
+                <X size={14} />
+              </Button>
+            </HStack>
+          ))}
+        </VStack>
+      )}
+
+      <BindingInputRow
+        ref={bindingInputRef}
+        organizationId={organizationId}
+        onAdd={stageAddition}
+        onReadyChange={setHasDraftBinding}
+        organizationRole={pendingRole}
+        buttonLabel={ROLE_ASSIGNMENT_WORDS.create}
+      />
+    </Box>
+  );
+}
+
+/**
+ * The groups this member is in — read-only here.
+ *
+ * Group membership is decided by the group, so this says which ones and where
+ * to go; editing it from a person's drawer would be two places to change one
+ * fact.
+ */
+function MemberGroups({
+  memberGroups,
+}: {
+  memberGroups: ReturnType<typeof api.group.listForMember.useQuery>;
+}) {
+  return (
+    <Box>
+      <Text fontSize="sm" fontWeight="semibold" mb={3}>
+        Groups
+      </Text>
+      {memberGroups.isError ? (
+        <HandledErrorAlert
+          error={memberGroups.error}
+          fallbackTitle="Couldn't read their groups"
+        />
+      ) : memberGroups.isLoading ? (
+        <Spinner size="sm" />
+      ) : !memberGroups.data?.length ? (
+        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+          They are in no group.
+        </Text>
+      ) : (
+        <VStack gap={2} align="stretch">
+          {memberGroups.data.map((group) => (
+            <MemberGroupRow key={group.id} group={group} />
+          ))}
+        </VStack>
+      )}
+    </Box>
+  );
+}
+
+/**
+ * One assignment the member already holds, and the way to stage its removal.
+ *
+ * Struck through rather than removed from the list: a pending removal has to
+ * stay visible until Save, or Cancel would restore a row the administrator
+ * has already forgotten about.
+ *
+ * Not every row can go. A PROJECT-scoped binding is managed on the project,
+ * and the organization row that mirrors the member's seat belongs to the seat
+ * selector — removing it would leave the seat without its assignment and the
+ * next role change would put it straight back.
+ */
+function HeldAssignmentRow({
+  binding: b,
+  markedForRemoval,
+  removable,
+  onToggleRemoval,
+}: {
+  binding: NonNullable<
+    ReturnType<typeof api.roleBinding.listForUser.useQuery>["data"]
+  >[number];
+  markedForRemoval: boolean;
+  removable: boolean;
+  onToggleRemoval: () => void;
+}) {
+  return (
+    <HStack
+      px={3}
+      py={2}
+      bg="bg.muted"
+      borderRadius="md"
+      fontSize="sm"
+      opacity={markedForRemoval ? 0.4 : 1}
+      transition="opacity 0.15s"
+    >
+      <Badge
+        colorPalette={roleTone(b.role)}
+        size="sm"
+        textDecoration={markedForRemoval ? "line-through" : undefined}
+      >
+        {b.customRoleName ?? b.role}
+      </Badge>
+      <Text color="fg.muted">on</Text>
+      <Badge
+        colorPalette="purple"
+        size="sm"
+        variant="surface"
+        textDecoration={markedForRemoval ? "line-through" : undefined}
+      >
+        {scopeLabel(b)}
+      </Badge>
+      <Spacer />
+      {b.scopeType !== RoleBindingScopeType.PROJECT && !mirrorsTheSeat(b) && (
+        <Button
+          size="xs"
+          variant="ghost"
+          color={markedForRemoval ? "blue.500" : "fg.muted"}
+          aria-label={
+            markedForRemoval ? "Undo removal" : ROLE_ASSIGNMENT_WORDS.remove
+          }
+          onClick={onToggleRemoval}
+        >
+          <X size={14} />
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * One group this member is in, as a row (or as its bindings, where it has any).
+ *
+ * A group with no binding still shows: being in a group that grants nothing is
+ * exactly the case somebody opens this panel to find, and hiding it would read
+ * as "not in the group".
+ */
+function MemberGroupRow({
+  group,
+}: {
+  group: NonNullable<
+    ReturnType<typeof api.group.listForMember.useQuery>["data"]
+  >[number];
+}) {
+  return (
+    <>
+      {group.bindings.length === 0 ? (
+        <HStack
+          px={3}
+          py={2}
+          bg="bg.muted"
+          borderRadius="md"
+          fontSize="sm"
+          justifyContent="space-between"
+        >
+          <HStack gap={2}>
+            <Text fontSize="sm" color="fg.muted">
+              {group.name}
+            </Text>
+            {group.scimSource ? (
+              <IdentityChip
+                label="Directory"
+                title={`Membership of this group is managed by ${group.scimSource}.`}
+              />
+            ) : null}
+          </HStack>
+          <Link
+            href="/settings/directory?tab=groups"
+            fontSize="xs"
+            color="blue.400"
+          >
+            No role assigned
+          </Link>
+        </HStack>
+      ) : (
+        group.bindings.map((b) => (
+          <HStack
+            key={b.id}
+            px={3}
+            py={2}
+            bg="bg.muted"
+            borderRadius="md"
+            fontSize="sm"
+          >
+            <Badge colorPalette={roleTone(b.role)} size="sm">
+              {b.customRoleName ?? b.role}
+            </Badge>
+            <Text color="fg.muted">on</Text>
+            <Badge colorPalette="purple" size="sm" variant="surface">
+              {scopeLabel({
+                scopeType: b.scopeType,
+                scopeName: b.scopeName ?? null,
+              })}
+            </Badge>
+            {pendingRole === OrganizationUserRole.EXTERNAL &&
+              b.role !== (TeamUserRole.VIEWER as string) &&
+              b.role !== (TeamUserRole.CUSTOM as string) && (
+                <Text fontSize="xs" color="fg.muted">
+                  Applies as Viewer while on a Lite Member seat
+                </Text>
+              )}
+            <Spacer />
+            <Text fontSize="xs" color="fg.muted">
+              through {group.name}
+            </Text>
+          </HStack>
+        ))
+      )}
+    </>
+  );
+}
+
+/**
+ * Applying a staged set of access changes, in the one order that is safe.
+ *
+ * The ORG ROLE goes first: it carries the licence and plan checks, and a seat
+ * that cannot be granted must stop the whole save rather than land after a
+ * batch of assignments has already been written. The assignments then go as a
+ * single transactional batch, so a failure cannot leave half of them applied.
+ *
+ * A failure between the two can still sit on top of a role change that landed,
+ * which is why the catch re-reads rather than keeping rows the server has
+ * already rewritten.
+ */
+/**
+ * Everything that has to be re-read once a member's access changed.
+ *
+ * `limits.getUsage` is in the list because an organization role change moves
+ * the member between full and Lite Member seats, so the seat counts an
+ * administrator is reconciling against changed with this save.
+ */
+function refreshAccessQueries(queryClient: ReturnType<typeof api.useUtils>) {
+  return Promise.all([
+    queryClient.roleBinding.listForUser.invalidate(),
+    queryClient.roleBinding.listForOrg.invalidate(),
+    queryClient.organization.getMemberById.invalidate(),
+    queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
+    queryClient.organization.getAll.invalidate(),
+    // An org role change moves the member between full and Lite Member
+    // seats, so the seat counts an admin is reconciling against changed
+    // with this save.
+    queryClient.limits.getUsage.invalidate(),
+  ]);
+}
+
+type MemberAccessSaveInput = {
+  organizationId: string;
+  userId: string;
+  pendingRole: OrganizationUserRole;
+  roleChanged: boolean;
+  pendingBindingRemovals: Set<string>;
+  pendingBindingAdditions: PendingBinding[];
+  directBindings: ReturnType<typeof api.roleBinding.listForUser.useQuery>;
+  bindingInputRef: React.RefObject<BindingInputRowHandle | null>;
+  onSaved?: () => void;
+};
+
+function useMemberAccessSave({
+  organizationId,
+  userId,
+  pendingRole,
+  roleChanged,
+  pendingBindingRemovals,
+  pendingBindingAdditions,
+  directBindings,
+  bindingInputRef,
+  onSaved,
+}: MemberAccessSaveInput) {
+  const queryClient = api.useUtils();
+  const [isSaving, setIsSaving] = useState(false);
+  const updateOrgRole = api.organization.updateMemberRole.useMutation();
+  const applyMemberBindings = api.roleBinding.applyMemberBindings.useMutation();
 
   /**
    * The seat itself. Answers with the teams the change left without an admin,
@@ -284,7 +747,7 @@ export function MemberAccessEditor({
       const teamsLeftWithoutAdmin = await saveOrgRole();
       if (hasBindingChangesNow) await saveBindings(allBindingAdditions);
 
-      await refreshAccessQueries();
+      await refreshAccessQueries(queryClient);
       const withoutAdmin = teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
       toaster.create({
         title: "Member updated",
@@ -308,271 +771,141 @@ export function MemberAccessEditor({
     }
   };
 
-  const userDirectBindings = directBindings.data ?? [];
+  return { isSaving, handleSave };
+}
 
-  // The organization-scoped row that mirrors the member's seat is managed by
-  // the seat selector above, not by this list: removing it would leave the
-  // seat without its assignment and the next role change would recreate it.
-  const mirrorsTheSeat = (binding: {
-    role: string;
-    customRoleId?: string | null;
-    scopeType: RoleBindingScopeType;
-  }) =>
-    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-    !binding.customRoleId &&
-    binding.role === (memberRole as string);
+/**
+ * Staging an assignment, with the Lite Member seat enforced as it goes in.
+ *
+ * A Lite Member seat allows Viewer only, so anything staged above it snaps
+ * down before it is listed or saved — the input row already restricts what can
+ * be PICKED, and this holds the same line for rows staged before the seat was
+ * switched. Picking the seat rewrites what is already staged the same way the
+ * save cascade rewrites what is already stored: above-Viewer rows snap down,
+ * an organization row has no lite equivalent and is dropped, and rows made
+ * identical by the correction collapse to one.
+ */
+function useSeatConstrainedStaging({
+  pendingRole,
+  pendingBindingRemovals,
+  pendingBindingAdditions,
+  setPendingBindingAdditions,
+  directBindings,
+}: {
+  pendingRole: OrganizationUserRole;
+  pendingBindingRemovals: Set<string>;
+  pendingBindingAdditions: PendingBinding[];
+  setPendingBindingAdditions: React.Dispatch<
+    React.SetStateAction<PendingBinding[]>
+  >;
+  directBindings: ReturnType<typeof api.roleBinding.listForUser.useQuery>;
+}) {
+  // A Lite Member seat allows Viewer only, so anything staged above it snaps
+  // down before it is listed or saved. The input row already restricts what
+  // can be picked; this holds the same line for rows staged before the seat
+  // was switched, and for whatever a stubbed row hands over in tests.
+  const constrainStagedRowToSeat = (binding: PendingBinding): PendingBinding =>
+    pendingRole === OrganizationUserRole.EXTERNAL &&
+    (binding.customRoleId || binding.role !== (TeamUserRole.VIEWER as string))
+      ? {
+          ...binding,
+          role: TeamUserRole.VIEWER,
+          roleValue: TeamUserRole.VIEWER,
+          customRoleId: undefined,
+          customRoleName: undefined,
+        }
+      : binding;
 
-  return (
-    <VStack gap={5} align="stretch" width="full">
-      {canManage && (
-        <Box>
-          <Text fontSize="sm" fontWeight="semibold" mb={3}>
-            Organization role
-          </Text>
-          {isCurrentUser ? (
-            <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-              You cannot change your own organization role.
-            </Text>
-          ) : (
-            <OrganizationUserRoleField
-              value={pendingRole}
-              onChange={setPendingRole}
-            />
-          )}
-        </Box>
-      )}
+  const stageAddition = (incoming: PendingBinding) => {
+    const binding = constrainStagedRowToSeat(incoming);
+    const alreadyHeld = (directBindings.data ?? []).some(
+      (row) =>
+        !pendingBindingRemovals.has(row.id) &&
+        bindingKey(row) === bindingKey(binding),
+    );
+    if (alreadyHeld) return;
+    setPendingBindingAdditions((prev) =>
+      prev.some((staged) => bindingKey(staged) === bindingKey(binding))
+        ? prev
+        : [...prev, binding],
+    );
+  };
 
-      {canManage && (
-        <Box>
-          <Text fontSize="sm" fontWeight="semibold" mb={3}>
-            {ROLE_ASSIGNMENT_WORDS.plural}
-          </Text>
+  // Picking a Lite Member seat rewrites the staged rows the way the save
+  // cascade rewrites the stored ones: above-Viewer rows snap down, an
+  // organization row has no lite equivalent and is dropped, and rows made
+  // identical by the correction collapse to one.
+  useEffect(() => {
+    if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
+    setPendingBindingAdditions((prev) => {
+      const seen = new Set<string>();
+      return prev
+        .filter(
+          (binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION,
+        )
+        .map(constrainStagedRowToSeat)
+        .filter((binding) => {
+          const key = bindingKey(binding);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRole]);
 
-          {directBindings.isError ? (
-            <SectionErrorNotice
-              error={directBindings.error}
-              fallbackTitle="Couldn't read their role assignments"
-            />
-          ) : directBindings.isLoading ? (
-            <Spinner size="sm" />
-          ) : userDirectBindings.length === 0 &&
-            pendingBindingAdditions.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-              No role assigned.
-            </Text>
-          ) : (
-            <VStack gap={2} align="stretch">
-              {userDirectBindings.map((b) => {
-                const markedForRemoval = pendingBindingRemovals.has(b.id);
-                return (
-                  <HStack
-                    key={b.id}
-                    px={3}
-                    py={2}
-                    bg="bg.muted"
-                    borderRadius="md"
-                    fontSize="sm"
-                    opacity={markedForRemoval ? 0.4 : 1}
-                    transition="opacity 0.15s"
-                  >
-                    <Badge
-                      colorPalette={roleTone(b.role)}
-                      size="sm"
-                      textDecoration={
-                        markedForRemoval ? "line-through" : undefined
-                      }
-                    >
-                      {b.customRoleName ?? b.role}
-                    </Badge>
-                    <Text color="fg.muted">on</Text>
-                    <Badge
-                      colorPalette="purple"
-                      size="sm"
-                      variant="surface"
-                      textDecoration={
-                        markedForRemoval ? "line-through" : undefined
-                      }
-                    >
-                      {scopeLabel(b)}
-                    </Badge>
-                    <Spacer />
-                    {b.scopeType !== RoleBindingScopeType.PROJECT &&
-                      !mirrorsTheSeat(b) && (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color={markedForRemoval ? "blue.500" : "fg.muted"}
-                          aria-label={
-                            markedForRemoval
-                              ? "Undo removal"
-                              : ROLE_ASSIGNMENT_WORDS.remove
-                          }
-                          onClick={() =>
-                            setPendingBindingRemovals((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(b.id)) next.delete(b.id);
-                              else next.add(b.id);
-                              return next;
-                            })
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      )}
-                  </HStack>
-                );
-              })}
-              {pendingBindingAdditions.map((b, i) => (
-                <HStack
-                  key={bindingKey(b)}
-                  px={3}
-                  py={2}
-                  bg="bg.muted"
-                  borderRadius="md"
-                  fontSize="sm"
-                  opacity={0.7}
-                >
-                  <Badge colorPalette={roleTone(b.role)} size="sm">
-                    {b.customRoleName ?? b.role}
-                  </Badge>
-                  <Text color="fg.muted">on</Text>
-                  <Badge colorPalette="purple" size="sm" variant="surface">
-                    {scopeLabel({
-                      scopeType: b.scopeType,
-                      scopeName: b.scopeName ?? null,
-                    })}
-                  </Badge>
-                  <Spacer />
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    color="fg.muted"
-                    aria-label="Undo add"
-                    onClick={() =>
-                      setPendingBindingAdditions((prev) =>
-                        prev.filter((_, j) => j !== i),
-                      )
-                    }
-                  >
-                    <X size={14} />
-                  </Button>
-                </HStack>
-              ))}
-            </VStack>
-          )}
+  return { stageAddition };
+}
 
-          <BindingInputRow
-            ref={bindingInputRef}
-            organizationId={organizationId}
-            onAdd={stageAddition}
-            onReadyChange={setHasDraftBinding}
-            organizationRole={pendingRole}
-            buttonLabel={ROLE_ASSIGNMENT_WORDS.create}
-          />
-        </Box>
-      )}
+/**
+ * The unsaved half: what an administrator has staged but not yet applied.
+ *
+ * Reset whenever the panel points at a different person or their seat changed
+ * underneath it — staged rows belong to the member they were staged for, and
+ * carrying them across would apply one person's changes to another.
+ */
+function usePendingAccessChanges({
+  userId,
+  memberRole,
+}: {
+  userId: string;
+  memberRole: OrganizationUserRole;
+}) {
+  const [pendingRole, setPendingRole] =
+    useState<OrganizationUserRole>(memberRole);
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<
+    Set<string>
+  >(new Set());
+  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
+    PendingBinding[]
+  >([]);
+  // The input row holds a complete draft the admin never pressed the assign
+  // button on. It counts as a change so Save is enabled, and the save flushes
+  // it.
+  const [hasDraftBinding, setHasDraftBinding] = useState(false);
 
-      <Box>
-        <Text fontSize="sm" fontWeight="semibold" mb={3}>
-          Groups
-        </Text>
-        {memberGroups.isError ? (
-          <HandledErrorAlert
-            error={memberGroups.error}
-            fallbackTitle="Couldn't read their groups"
-          />
-        ) : memberGroups.isLoading ? (
-          <Spinner size="sm" />
-        ) : !memberGroups.data?.length ? (
-          <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-            They are in no group.
-          </Text>
-        ) : (
-          <VStack gap={2} align="stretch">
-            {memberGroups.data.map((group) =>
-              group.bindings.length === 0 ? (
-                <HStack
-                  key={group.id}
-                  px={3}
-                  py={2}
-                  bg="bg.muted"
-                  borderRadius="md"
-                  fontSize="sm"
-                  justifyContent="space-between"
-                >
-                  <HStack gap={2}>
-                    <Text fontSize="sm" color="fg.muted">
-                      {group.name}
-                    </Text>
-                    {group.scimSource ? (
-                      <IdentityChip
-                        label="Directory"
-                        title={`Membership of this group is managed by ${group.scimSource}.`}
-                      />
-                    ) : null}
-                  </HStack>
-                  <Link
-                    href="/settings/directory?tab=groups"
-                    fontSize="xs"
-                    color="blue.400"
-                  >
-                    No role assigned
-                  </Link>
-                </HStack>
-              ) : (
-                group.bindings.map((b) => (
-                  <HStack
-                    key={b.id}
-                    px={3}
-                    py={2}
-                    bg="bg.muted"
-                    borderRadius="md"
-                    fontSize="sm"
-                  >
-                    <Badge colorPalette={roleTone(b.role)} size="sm">
-                      {b.customRoleName ?? b.role}
-                    </Badge>
-                    <Text color="fg.muted">on</Text>
-                    <Badge colorPalette="purple" size="sm" variant="surface">
-                      {scopeLabel({
-                        scopeType: b.scopeType,
-                        scopeName: b.scopeName ?? null,
-                      })}
-                    </Badge>
-                    {pendingRole === OrganizationUserRole.EXTERNAL &&
-                      b.role !== (TeamUserRole.VIEWER as string) &&
-                      b.role !== (TeamUserRole.CUSTOM as string) && (
-                        <Text fontSize="xs" color="fg.muted">
-                          Applies as Viewer while on a Lite Member seat
-                        </Text>
-                      )}
-                    <Spacer />
-                    <Text fontSize="xs" color="fg.muted">
-                      through {group.name}
-                    </Text>
-                  </HStack>
-                ))
-              ),
-            )}
-          </VStack>
-        )}
-      </Box>
+  const bindingInputRef = useRef<BindingInputRowHandle>(null);
 
-      {canManage && (
-        <HStack justifyContent="flex-end" gap={2}>
-          <Button variant="outline" disabled={!hasChanges} onClick={reset}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="blue"
-            disabled={!hasChanges}
-            loading={isSaving}
-            onClick={() => void handleSave()}
-          >
-            Save
-          </Button>
-        </HStack>
-      )}
-    </VStack>
-  );
+  const reset = () => {
+    setPendingRole(memberRole);
+    setPendingBindingRemovals(new Set());
+    setPendingBindingAdditions([]);
+    setHasDraftBinding(false);
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(reset, [userId, memberRole]);
+
+  return {
+    pendingRole,
+    setPendingRole,
+    pendingBindingRemovals,
+    setPendingBindingRemovals,
+    pendingBindingAdditions,
+    setPendingBindingAdditions,
+    hasDraftBinding,
+    setHasDraftBinding,
+    bindingInputRef,
+    reset,
+  };
 }
