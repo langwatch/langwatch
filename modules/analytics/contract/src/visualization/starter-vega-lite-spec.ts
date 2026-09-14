@@ -1,14 +1,6 @@
 /**
- * The specification a member starts from when they first open Chart mode.
- *
- * Deliberately the smallest thing that draws the result they are already
- * looking at: one categorical or time column against one number. It is a
- * starting point to edit, not a guess at what they meant — so it never invents
- * a transform, never aggregates unless there is nothing to aggregate over, and
- * never picks a column that is not in the result.
- *
- * Whatever it returns is valid: `starterVegaLiteSpec.unit.test.ts` runs every
- * shape it can produce through the real validator.
+ * Starting specification when opening Chart mode: smallest thing that draws the
+ * current result without inventing transforms. Valid by construction.
  */
 
 import { VEGA_LITE_SCHEMA_URL } from "./vega-lite-schema.ts";
@@ -43,13 +35,8 @@ export interface StarterVegaLiteSpecInput {
 }
 
 /**
- * A column name, safe to use as a Vega-Lite `field` reference.
- *
- * Vega-Lite reads an unescaped `.`, `[` or `]` as nested-field or array-index
- * syntax rather than a literal character in the name (`fieldIsKnown` in
- * `vegaLiteFields.ts` reverses this same escaping when it checks a spec's
- * field against the columns a response actually carried). A result column
- * named e.g. `a.b` would otherwise resolve to the wrong path, or to nothing.
+ * Vega-Lite field names need escaping for '.', '[', ']' to avoid nested-field
+ * syntax interpretation.
  */
 function escapeVegaLiteField(name: string): string {
   return name.replace(/[\\.[\]]/g, "\\$&");

@@ -1,19 +1,7 @@
 /**
- * Schema-error selection must rank by JSON Pointer DEPTH, not by the character
- * length of the pointer string.
- *
- * `instancePath` is a string. Ranking it with `.length` scores a shallow error
- * on a long-named property above a genuinely nested one, and the filter that
- * follows then drops the nested error entirely — so the reader is told the
- * wrong thing is wrong.
- *
- * The fixture below is chosen so the two rankings disagree:
- *
- *   /description   → 12 characters, 1 pointer segment deep
- *   /encoding/x    → 11 characters, 2 pointer segments deep
- *
- * Ranking by characters keeps `/description` and discards `/encoding/x`.
- * Ranking by depth keeps `/encoding/x`, which is the specific failure.
+ * Rank schema errors by JSON Pointer depth, not character length, so shallow
+ * errors on long-named properties don't hide genuinely nested errors. Example:
+ * /description (12 chars, 1 segment) vs /encoding/x (11 chars, 2 segments) — depth wins.
  */
 
 import { describe, expect, it } from "vitest";

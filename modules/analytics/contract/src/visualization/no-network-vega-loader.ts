@@ -1,11 +1,6 @@
 /**
- * The repository-owned Vega loader: it refuses every load, so a spec that
- * slipped past static validation still cannot reach the network or the file
- * system.
- *
- * The loader shape is declared structurally rather than imported from `vega`.
- * Importing `vega` here would pull the browser runtime into every module that
- * touches the policy, which is the opposite of what this file is for.
+ * Repository-owned Vega loader that refuses all loads to block network/filesystem
+ * access. Declared structurally to avoid pulling the browser runtime into every module.
  */
 
 import type { Loader } from "vega";

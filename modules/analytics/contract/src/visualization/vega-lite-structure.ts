@@ -164,13 +164,8 @@ function pushDescendants({
 const PREDICATE_BRANCH_KEYS: readonly string[] = ["and", "or", "not"];
 
 /**
- * Walks a predicate and everything its `and`/`or`/`not` branches contain,
- * calling `visit` on each node with the pointer that reaches it — the node
- * itself first, then its branches in that order.
- *
- * Every predicate slot in Vega-Lite is either a value or one of those three
- * compositions, so this is the whole descent; sharing it keeps the expression
- * screen and the field check reading the same tree.
+ * Walks a predicate and its and/or/not branches. Shared descent for expression
+ * screen and field check.
  */
 export function visitPredicate({
   predicate,

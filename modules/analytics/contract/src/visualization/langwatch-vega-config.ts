@@ -1,18 +1,7 @@
 /**
- * The LangWatch Vega configuration: what a LangWatchQL chart looks like.
- *
- * A pure function over *resolved* values. It imports no Chakra and reads no
- * DOM, because everything under `visualization/` has to stay server-import-safe
- * — the component layer resolves the theme tokens and hands the answers in.
- *
- * Precedence is deliberate, and `buildLangWatchQLVegaSpec` is what enforces it:
- *
- *   this config  <  the member's own `config`  <  the pinned overrides
- *
- * So a member can restyle an axis or a mark, and cannot change the background
- * the chart is drawn on or the font it is drawn in — the two that decide
- * whether a chart reads as part of the application or as something pasted into
- * it, and the two a screenshot of a LangWatchQL result is judged on.
+ * The LangWatch Vega configuration for LangWatchQL charts. Pure function (no
+ * Chakra, no DOM) with enforced precedence: base config < member config < overrides.
+ * Members restyle axes/marks but not background/font.
  */
 
 /** Which of the application's two modes the chart is being drawn in. */

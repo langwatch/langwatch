@@ -1,30 +1,12 @@
 /**
- * The conservative screen over Vega expression strings.
- *
- * Vega's expression language is a real evaluator with access to scales, other
- * datasets, the browser environment, and the console. The screen is an
- * allowlist, not a denylist: anything not named here is refused until someone
- * reviews it and adds it. Extending `ALLOWED_VEGA_EXPRESSION_IDENTIFIERS` is the
- * intended way to widen it.
+ * Conservative allowlist screen over Vega expression strings. Refusing unknown
+ * identifiers until reviewed and added.
  */
 
 /**
- * Identifiers an expression may name. Everything else fails closed.
- *
- * Deliberately absent, and why:
- *   - `data`, `indata`, `scale`, `invert`, `copy`, `bandwidth`, `bandspace` —
- *     reach other datasets and scales, walking around the registered-dataset rule.
- *   - `event`, `item` — interaction objects that carry DOM nodes and the view.
- *   - `warn`, `error`, `info`, `debug` — console side effects.
- *   - `screen`, `windowSize`, `containerSize`, `pinchDistance`, `pinchAngle` —
- *     probe the browser environment.
- *   - `now`, `random` — nondeterministic, so the same result would chart differently.
- *   - `regexp`, `test` — caller-authored regular expressions.
- *   - `rgb`, `hsl`, `lab`, `hcl`, `gradient`, `scheme`, `luminance`, `contrast` —
- *     colour is the application's theme to decide, not the spec's.
- *   - `vlSelectionTest`, `vlSelectionResolve`, `treePath`, `treeAncestors`,
- *     `merge`, `pluck`, `sequence`, `inScope`, the `pan*`/`zoom*` family, and the
- *     `geo*` family — surfaces this workbench does not render.
+ * Allowed identifiers—everything else fails closed. Deliberately excludes access
+ * to other datasets, interaction, console, browser environment, nondeterministic
+ * functions, regex, unrendered surfaces.
  */
 export const ALLOWED_VEGA_EXPRESSION_IDENTIFIERS: readonly string[] = [
   // Literals the tokenizer sees as identifiers.
@@ -150,21 +132,8 @@ const MEMBER_ACCESS = /\.\s*[A-Za-z_$][A-Za-z0-9_$]*/g;
 const IDENTIFIER = /[A-Za-z_$][A-Za-z0-9_$]*/g;
 
 /**
- * Decimal and exponent numeric literals, which Vega supports.
- *
- * These are removed before the identifier scan because scientific notation
- * carries letters: left in place, `1e6` reads as the identifier `e6` and a
- * comparison Vega evaluates without complaint comes back refused.
- *
- * Hex is deliberately absent. Vega's expression language has no hex literal, so
- * `0x1f` is not a number the evaluator understands, and stripping it would turn
- * a form Vega rejects into one this screen waves through. Matching only the
- * leading `0` leaves `x1f` behind for the scan to report, which is the answer
- * that matches what Vega does.
- *
- * The leading boundary is what keeps `value1` whole — without it the trailing
- * digit is eaten and the identifier is reported under a name that never
- * appeared in the expression.
+ * Decimal and exponent numeric literals (removed first so 1e6 doesn't read as
+ * identifier e6). Hex deliberately absent—Vega doesn't support it.
  */
 const NUMERIC_LITERAL = /(?<![A-Za-z0-9_$])(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?/g;
 
@@ -215,18 +184,9 @@ export function screenVegaExpression(expression: string): VegaExpressionScreenin
 }
 
 /**
- * Every key whose value Vega-Lite hands to the expression evaluator.
- *
- * `expr`, `calculate`, and the string form of `filter` (including inside
- * `and`/`or`/`not` predicate composition) are the documented three. `signal` is
- * screened too — it is Vega's spelling, and a spec that smuggles one in should
- * not get a free pass. `labelExpr` is the fourth: axes, legends and headers each
- * carry one and it is evaluated exactly like the rest, so leaving it off this
- * list let a spec run an unscreened expression under a tick label, past both
- * expression byte ceilings as well.
- *
- * A key missing here is not a lesser refusal — it is no screening at all, which
- * is why this list is the one place the set is written.
+ * Every key where Vega-Lite hands expressions to the evaluator. signal is
+ * screened (Vega's spelling), labelExpr is screened (axes/legends/headers use
+ * it). Missing keys = no screening.
  */
 export const EXPRESSION_BEARING_KEYS: readonly string[] = [
   "expr",

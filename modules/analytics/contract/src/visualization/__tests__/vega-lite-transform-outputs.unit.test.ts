@@ -1,22 +1,8 @@
 /**
- * What `as` names, and what it does not.
- *
- * Vega-Lite's `bin` and `stack` take `as` as either one name or two. One name —
- * `as: "val"` — means the step writes `val` and `val_end`. Two names —
- * `as: ["lo", "hi"]` — means both outputs are already named, and nothing is
- * appended: there is no `lo_end`, and the transform never writes one.
- *
- * The distinction is load-bearing because `produces` is what the field
- * existence check reads. A name invented here is a name that check will accept
- * and the renderer will then look for in vain, so the error is fail-open — the
- * direction that lets a broken specification through rather than refusing a
- * working one.
- *
- * The `as`-less fallbacks are pinned in the same file on purpose. They encode
- * Vega's own defaults for a step that omits `as`, and nothing about fixing the
- * two-name case should move them.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Vega-Lite's `as` can be one name (writes val, val_end) or two names (both
+ * already named, nothing appended). The distinction matters because incorrect
+ * names in `produces` cause fail-open errors. Node environment — see
+ * `validateVegaLiteSpec.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 

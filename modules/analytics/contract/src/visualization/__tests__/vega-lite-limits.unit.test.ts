@@ -1,16 +1,7 @@
 /**
- * Every named ceiling, from both sides: a specification sitting exactly on the
- * ceiling renders, and one a single step past it is refused naming the ceiling
- * it crossed.
- *
- * Only the pair proves anything. A test that checked the refusal alone would
- * pass against a validator that refused everything.
- *
- * The specifications are generated from `LWQL_VEGA_LIMITS` so the pair
- * stays a pair when a ceiling moves; the absolute numbers are pinned separately
- * in the first test, so a ceiling cannot be moved without saying so.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Tests both sides of named ceilings: specs at the limit render, ones past it
+ * are refused. Pair tests are generated from LWQL_VEGA_LIMITS so they stay in
+ * sync when limits move. Node environment — see `validateVegaLiteSpec.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 

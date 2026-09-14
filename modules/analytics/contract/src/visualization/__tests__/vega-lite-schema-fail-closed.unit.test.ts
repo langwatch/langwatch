@@ -1,20 +1,7 @@
 /**
- * What a schema refusal reports when Ajv refuses without saying why.
- *
- * `validateAgainstVegaLiteSchema` returns a list of errors, and every caller
- * reads an empty list as "the schema accepted this". Ajv is allowed to return
- * `false` with `errors` left null or empty, and the reducer that picks the most
- * specific errors takes `Math.max` over that pool — `-Infinity`, which nothing
- * matches. So the refusal path can produce exactly the value the accept path
- * produces, and an invalid specification is admitted.
- *
- * The corpus suites cannot reach this: every fixture they refuse comes back
- * with errors attached, which is the branch that already worked. The validator
- * is stubbed here because the state under test is one the real generated
- * validator does not produce on demand.
- *
- * @see ../../src/visualization/vega-lite-schema.ts — the function under test
- * @see ./vega-liteSchemavalidator.unit.test.ts — the real validator's fidelity
+ * Ajv can refuse without errors, causing an empty error list to look like
+ * acceptance and invalid specs to slip through. This edge case is stubbed
+ * because the real validator doesn't produce it on demand.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

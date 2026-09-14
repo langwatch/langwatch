@@ -1,20 +1,7 @@
 /**
- * The single entry point for deciding whether a Vega-Lite specification may be
- * rendered over a LangWatchQL query result.
- *
- * The stages run in a deliberate order, each one bounding what the next has to
- * cope with:
- *
- *   1. dataset row ceilings  — about the data, and true whatever the spec says
- *   2. parsed-object check   — a URL or a scalar is never a specification
- *   3. `$schema` version     — an explicit non-v6 spec is refused, never converted
- *   4. size and depth        — so the schema validator is never handed something huge
- *   5. the bundled v6 schema — official, static, never fetched
- *   6. the LangWatchQL policy   — data sources, resource paths, transforms, ceilings
- *   7. field references      — resolved against the dataset feeding each branch
- *
- * The caller's specification is never mutated or rewritten: on success,
- * `normalized` is the object that was handed in.
+ * Single entry point for validating whether a Vega-Lite specification may
+ * render over a LangWatchQL result. Runs 7 validation stages in order. Never
+ * mutates the caller's spec.
  */
 
 import { type ColumnsByDataset, validateFieldReferences } from "./vega-lite-fields.ts";
@@ -41,14 +28,8 @@ export interface ValidateVegaLiteSpecStructureInput {
 }
 
 /**
- * Stages 2 to 6 — everything decidable from the specification alone.
- *
- * Split out because the two callers hold different amounts of the picture. The
- * renderer has rows and columns and asks {@link validateVegaLiteSpec} for all
- * seven stages. The save path holds a *query*, not its result, so the dataset
- * row ceilings and the field references are not yet facts about anything; it
- * asks for exactly this much on the way in, and the renderer asks for the rest
- * once rows exist. Neither re-implements a rule the other applies.
+ * Stages 2-6 of validation (spec-alone). Split out because renderer validates
+ * all seven stages, save path validates only these before rows exist.
  */
 export function validateVegaLiteSpecStructure({
   spec,

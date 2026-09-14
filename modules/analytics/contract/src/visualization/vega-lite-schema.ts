@@ -1,18 +1,6 @@
 /**
- * Schema validation against the official Vega-Lite v6 JSON Schema that ships
- * inside the `vega-lite` package.
- *
- * The validator is *generated* from that schema ahead of time and checked in
- * (`vegaLiteSchemaValidator.generated.js`, written by
- * `scripts/generate-vega-lite-validator.ts`). Ajv's runtime compiler builds its
- * validate function with `new Function`, which a Content-Security-Policy
- * without `unsafe-eval` refuses — the very policy the chart runtime is built to
- * survive. Generating ahead of time moves that one `new Function` call to a
- * developer's machine, so the browser loads code that already exists.
- *
- * It also means nothing is ever fetched, and the 1.9 MB schema document itself
- * never reaches the browser: a validator that reached the network to learn what
- * is valid would be a resource-loading path of its own.
+ * Schema validation against Vega-Lite v6. Validator is generated ahead of time
+ * (not runtime-compiled) for CSP compliance, so nothing is fetched.
  */
 
 import type { ErrorObject } from "ajv";
@@ -100,15 +88,8 @@ export function validateAgainstVegaLiteSchema(
 }
 
 /**
- * Keeps the errors at the deepest instance path — the ones that point at a
- * property rather than at the whole document — and drops the `anyOf`/`oneOf`
- * wrappers that only say a branch failed.
- *
- * Depth is counted in JSON Pointer segments, not characters. `instancePath` is
- * a string, so ranking it by `.length` would score `/encoding` (9 characters,
- * one segment deep) above `/x/y` (4 characters, two segments deep) and then
- * drop the genuinely nested error — a long property name at the top level would
- * outrank a real nested one.
+ * Keeps errors at the deepest instance path (JSON Pointer segments, not
+ * character length), drops anyOf/oneOf wrappers.
  */
 function pointerDepth(error: ErrorObject): number {
   return error.instancePath === "" ? 0 : error.instancePath.split("/").length - 1;

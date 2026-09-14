@@ -1,21 +1,7 @@
 /**
- * Field-reference validation, resolved against the dataset that actually feeds
- * each branch of the composition tree.
- *
- * Two deliberate choices, both to keep false refusals out of a member's way:
- *
- *   1. Transforms are treated as ADDITIVE. `aggregate` really does drop the
- *      columns it does not carry forward, but modelling that exactly would
- *      refuse working charts whenever this walk is a step behind Vega-Lite's
- *      own semantics. A reference to a dropped column renders empty; it is not
- *      a containment problem, and the row and view ceilings are what bound cost.
- *   2. `pivot` names its output columns after DATA VALUES, so nothing static can
- *      enumerate them. A branch downstream of a pivot reports unknown fields as
- *      warnings rather than refusals — see `transform-fields-unverifiable`.
- *
- * Expressions are not field-checked at all: `datum.foo` inside a `calculate` is
- * data, and the expression screen in `vegaLiteExpressions.ts` deliberately stops
- * at the dot.
+ * Field-reference validation against the dataset feeding each branch. Treats
+ * transforms as additive (not exact) and reports pivot output as warnings
+ * (unverifiable). Expressions not field-checked.
  */
 
 import { lwqlVegaError } from "./vega-lite-policy.ts";
@@ -56,15 +42,8 @@ interface FieldReference {
 }
 
 /**
- * Validates every field reference in the spec against the dataset feeding its
- * branch. Assumes the policy walk already established that each branch resolves
- * to a registered dataset.
- *
- * The composition tree comes from `collectViewNodes`, which already resolves
- * inherited data and `repeat` scope; what this adds on top is the one thing
- * that is field-specific — the columns each branch's own transforms leave
- * behind. Nodes arrive parent-first, so a branch's inherited scope is always
- * resolved before the branch itself is read.
+ * Validates every field reference in the spec. Adds transform-specific column
+ * tracking to collectViewNodes. Nodes arrive parent-first for scope resolution.
  */
 export function validateFieldReferences({
   spec,

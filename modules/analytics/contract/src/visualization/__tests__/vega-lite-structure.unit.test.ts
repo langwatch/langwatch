@@ -1,12 +1,6 @@
 /**
- * How far the document walk will follow a caller's nesting.
- *
- * `visitJsonObjects` is the descent every blanket refusal rule is built on, and
- * the document it walks is caller-authored: a saved specification arrives as
- * text and is parsed before any rule has run. So the walk has to reach an
- * object however deeply it is buried, and has to survive nesting authored to
- * break it — a walk that throws refuses nothing, and the screen shows a crash
- * where a refusal belonged.
+ * visitJsonObjects must reach deeply nested objects and survive malformed
+ * nesting, so walks don't crash. A failing walk refuses nothing.
  */
 
 import { describe, expect, it } from "vitest";
