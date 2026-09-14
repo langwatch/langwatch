@@ -21,11 +21,8 @@ function parseStatus(raw: string): TenantMigrationStatus {
   return status;
 }
 
-/**
- * The stored per-(migration, tenant) state - the runner's port plus the ops finders the
- * dashboard reads. `SystemMigrationTenantState` has no tenant FK on purpose (the runner is
- * generic over tenants), so every query here keys by migration name first.
- */
+/** Per-(migration, tenant) state: runner's port + ops finders. No tenant FK
+ * on purpose; every query keys by migration name first. */
 export class PrismaSystemMigrationStateRepository implements SystemMigrationStateRepository {
   static create({ prisma }: { prisma: PrismaClient }): PrismaSystemMigrationStateRepository {
     return new PrismaSystemMigrationStateRepository(prisma);
@@ -82,11 +79,8 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     });
   }
 
-  /**
-   * The runner's compare-and-set (see the port's own doc): the update is guarded on `status != rolled_back` in the same statement, so an operator's pin written between the pass's read and this write can never be
-   * overwritten - the guarded UPDATE simply matches nothing. A row that does not exist yet is created; a create that collides on the unique key means the row appeared since the guarded update ran, and the only
-   * writer that creates nothing-to-rolled_back transitions is nobody (the operator can only pin an EXISTING record), so the collision is read as the pin standing and answered `false`.
-   */
+  /** Runner's compare-and-set: update guarded on status != rolled_back so
+   * operator's pin is never overwritten. */
   async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
     const occurredAt = new Date();

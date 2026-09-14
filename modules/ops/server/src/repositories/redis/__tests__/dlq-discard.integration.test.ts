@@ -5,10 +5,8 @@ import { QueueRedisRepository } from "../queue.repository.ts";
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
 
-/**
- * Discard and explicit-id redrive against a real Redis (specs/ops/dead-letter-recovery.feature). Discard removes the group's DLQ entries — the durable mark is the
- * audit row the service writes, which the queue.service unit suite covers; here the substrate contract is that the jobs are gone and cannot come back.
- */
+/** Discard against real Redis: removes DLQ entries. Audit row is the durable
+ * mark; here the substrate contract is that jobs are gone. */
 // Module-level incrementing counter for unique queue names — no Date.now().
 let queueCounter = 0;
 

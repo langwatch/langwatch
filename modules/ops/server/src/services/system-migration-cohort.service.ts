@@ -16,19 +16,7 @@ export type OrganizationCohortAdmission = Readonly<{
   dataplane: OrganizationDataplane;
 }>;
 
-/**
- * Who is in an organization-rooted migration's cohort.
- *
- * Enrollment is read once, fresh, at the start of a pass rather than per
- * tenant — one query instead of one per tenant per migration — and the
- * dataplane is asked per organization from a table already in memory.
- *
- * A dedicated data plane is NOT a reason to leave an organization out: the
- * routing places an organization-rooted append on that organization's own
- * instance, so an automatic cohort admits a private-dataplane organization and
- * says which endpoint it landed on. Excluding them would strand exactly those
- * customers on their legacy path forever.
- */
+/** Cohort membership with enrollment read once; private-dataplane orgs are admitted. */
 export class SystemMigrationCohortService {
   static create(deps: {
     isSaaS: boolean;

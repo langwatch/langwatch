@@ -8,21 +8,7 @@ import { OpsHostProvider } from "../../../../model/ops-host.ts";
 import OpsProjectionsPage from "../ops-projections.screen.tsx";
 import OpsSchedulesPage from "../ops-schedules.screen.tsx";
 
-/**
- * Where each ops surface lives after the consolidation.
- *
- * Spec: specs/ops/ops-dashboard-density.feature ("One question, one place").
- *
- * These are placement guards, not rendering guards: each card has its own
- * tests for what it draws. What is worth pinning is that the card is mounted
- * on the page whose question it answers, because that is exactly what drifted
- * — upcoming work sat on the landing page previewing a calendar two clicks
- * away, and replay history sat a floor below the button that starts a replay.
- *
- * The retired /ops/queues address forwards from the packaged route table
- * rather than from a page, so its scenario is bound in
- * `src/__tests__/retiredPageRedirects.integration.test.tsx`.
- */
+/** Placement guards: cards on the page whose question they answer. */
 
 vi.mock("../../../../ui/sections/event-sourcing-layout.tsx", () => ({
   EventSourcingLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

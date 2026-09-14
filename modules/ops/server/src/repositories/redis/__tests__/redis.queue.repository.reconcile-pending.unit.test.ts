@@ -171,8 +171,8 @@ class FakeRedis {
   }
 
   /**
-   * Models the three cached scripts, told apart by their first key: the fenced counter write and the marker re-arm
-   * both act on the marker (and are then separated by arity), while the prune acts on the pending index.
+   * Models the three cached scripts: fenced counter write and marker re-arm both act on the
+   * marker (separated by arity), while prune acts on the pending index.
    */
   // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
   async evalsha(

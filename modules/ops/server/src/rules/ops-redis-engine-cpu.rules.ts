@@ -13,16 +13,7 @@ export type RedisCpuSample = {
   sampledAt: number;
 };
 
-/**
- * Returns the engine-CPU percent (0-100, rounded to one decimal) given a
- * previous sample and a fresh reading. Returns null when:
- *   - there is no previous sample yet (first collection cycle), OR
- *   - the cumulative counter went backwards (Redis restarted between samples), OR
- *   - the two samples were taken at the same instant (would divide by zero).
- *
- * The caller is responsible for storing the latest sample so the next call can
- * compare against it.
- */
+/** Engine-CPU percent (0-100); null on first sample, counter backslide, or same timestamp. */
 export function computeEngineCpuPercent(args: {
   prev: RedisCpuSample | null;
   nextUserSec: number;

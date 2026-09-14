@@ -32,14 +32,7 @@ const previewScript = new CachedLuaScript(BLOB_SWEEP_LUA);
 /** Lease-guarded hand delete. The guard is inside the script, not around it. */
 const deleteScript = new CachedLuaScript(BLOB_OPERATOR_DELETE_LUA);
 
-/**
- * Everything about a blob that comes from plain key reads.
- *
- * Separated from the sweep verdict because the verdict costs an eval per blob:
- * ranking and stats need these facts for thousands of blobs and the verdict for
- * none of them, so the two are gathered separately and only joined for the rows
- * actually returned.
- */
+/** Plain-key facts separated from sweep verdict to avoid evals for facts needed in rankings. */
 interface BlobFacts {
   queueName: string;
   projectId: string;
@@ -54,23 +47,10 @@ interface BlobFacts {
 /** Hard ceiling on a page regardless of what the caller asks for. */
 const MAX_PAGE = 200;
 
-/**
- * SCAN pages are approximate: Redis returns "up to COUNT" per call and the
- * cursor is the only way to resume. Walking until a page is exactly full could
- * mean many round trips on a sparse keyspace, so a page is bounded by BOTH the
- * requested limit and a fixed number of SCAN calls.
- */
+/** Bound SCAN calls per page to avoid excessive round trips on sparse keyspace. */
 const MAX_SCAN_CALLS_PER_PAGE = 20;
 
-/**
- * How many blobs a ranked listing may examine before it ranks what it has.
- *
- * There is no index over size / TTL / lease state, so ranking means describing
- * blobs one page at a time. This bounds that work at a few thousand pipelined
- * reads — enough that "largest" and "unreferenced" surface the real offenders
- * on a healthy instance, and bounded enough that it cannot become a scan of a
- * multi-million-key keyspace on a sick one.
- */
+/** Bounds sample examination for rankings; no index forces one-at-a-time reads. */
 const RANK_SAMPLE_CAP = 5_000;
 
 function isCluster(client: IORedis | Cluster): client is Cluster {
@@ -95,14 +75,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     return (await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).sort();
   }
 
-  /**
-   * Cursor pagination straight off SCAN.
-   *
-   * In cluster mode SCAN is per-node, so the cursor is a JSON map of node → its
-   * own cursor. That keeps the walk resumable without ever materialising the
-   * whole keyspace, which is the only way this is safe to expose to a browser
-   * against a production instance.
-   */
+  /** Cursor pagination with per-node SCAN cursors in cluster mode for safe browser exposure. */
   async findAll({
     queueName,
     cursor,
@@ -187,17 +160,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     };
   }
 
-  /**
-   * Ranked listing: read a bounded sample, order it, return the head.
-   *
-   * There is no index to sort by — size, TTL and lease state all live on
-   * separate keys — so a true global top-N would mean describing every blob in
-   * the keyspace on every request. The sample cap is the deliberate ceiling on
-   * that, and `rankedFromSample` tells the caller when the answer is
-   * "largest of what we looked at" rather than "largest that exists". Silently
-   * presenting the former as the latter is how an operator chases the wrong
-   * blob.
-   */
+  /** Ranked listing with bounded sample; signals when result is sampled, not global. */
   private async findRanked({
     queueName,
     limit,
@@ -355,16 +318,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     return summaries;
   }
 
-  /**
-   * Joins each row to the verdict a sweep would reach for it, in one round trip.
-   *
-   * The verdict is an eval per blob, so these are pipelined together rather than
-   * awaited one at a time — a 200-row page was 200 sequential round trips, which
-   * is what made a listing slow enough to feel broken. A node with no cached
-   * copy of the script answers NOSCRIPT for every row at once; those re-run
-   * through the script's own EVAL fallback, which warms the cache for later
-   * calls.
-   */
+  /** Joins rows to sweep verdicts via pipelined evals; avoids 200 sequential round trips. */
   private async withOutcomes(queueName: string, facts: BlobFacts[]): Promise<OpsBlobSummary[]> {
     if (facts.length === 0) return [];
 

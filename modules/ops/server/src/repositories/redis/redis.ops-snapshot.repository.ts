@@ -56,24 +56,7 @@ end
 return 0
 `;
 
-/**
- * Publish only if the lease still carries the token this scan started under
- * AND we are not moving `computedAt` backwards.
- *
- * A scan is not instantaneous, so a writer can lose the lease part-way through
- * one and finish holding a payload it is no longer entitled to publish. An
- * unconditional SET at that moment overwrites the new writer's fresher artifact
- * with a stale one, and every dashboard in the fleet reads the stale copy —
- * ADR-090's single-writer guarantee holds for scanning but not for the write
- * that follows it. The lease check closes that window.
- *
- * The `computedAt` check closes the smaller one behind it: a single writer runs
- * the live and detail cycles concurrently, so a slow scan can still land after
- * a faster later one. Both artifacts are snapshots of the same underlying
- * state, so the newest observation always wins.
- *
- * KEYS: artifact, lease. ARGV: payload, leaseToken, ttlSeconds, computedAt.
- */
+/** Guards lease and computedAt to prevent stale writes and backwards time movement. */
 const WRITE_FENCED_LUA = `
 if redis.call('GET', KEYS[2]) ~= ARGV[2] then
   return 0

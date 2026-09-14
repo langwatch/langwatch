@@ -1,17 +1,4 @@
-/**
- * A JSON body with a left-rail accent on the keys that matter.
- *
- * A family-local copy of
- * `platform/app/src/features/traces-v2/components/TraceDrawer/JsonHighlight.tsx`,
- * taken because the process-instance drawer and the outbox card render a stored
- * payload the same way the trace drawer renders a span body, and
- * `@langwatch/trace-web` publishes the explorer's stores and formatters rather
- * than this viewer. `platform/app` may only shrink, so the two consumers left
- * behind keep theirs and this one is the Ops family's.
- *
- * Byte-identical to the original except for the two import lines and this
- * docblock. If the two ever need to diverge, they already can.
- */
+/** JSON body with left-rail accent on keys; family-local copy from platform/app. */
 
 import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
 import { useMemo } from "react";
@@ -114,17 +101,7 @@ function computeHighlightLines(lines: string[], pinnedKeys: ReadonlySet<string>)
   return out;
 }
 
-/**
- * JSON viewer with a left-rail accent on lines whose key matches one of
- * `pinnedKeys`. We hand Shiki the highlight line numbers via Chakra's
- * `meta.highlightLines` and let the adapter mark them with `.highlighted`
- * / `data-highlight=""`. CSS below recolours the default highlight to our
- * blue tracing accent — same approach the empty-state card uses for its
- * orange highlight on env-block lines.
- *
- * Tokenisation goes through the ambient `<CodeBlock.AdapterProvider>` at
- * `TraceV2DrawerShell` (one shared Highlighter for the whole drawer).
- */
+/** JSON viewer with accent on pinned keys; highlights via Chakra's meta.highlightLines. */
 export function PinnedAwareJsonView({
   content,
   pinnedKeys,

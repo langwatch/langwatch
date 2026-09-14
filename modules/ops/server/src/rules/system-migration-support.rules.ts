@@ -1,8 +1,4 @@
-/**
- * What every part of the migrations surface shares: the stores it reads, the deployment facts and
- * per-migration hooks its composition supplies, and the two small decisions — which migration a name
- * refers to, and a uniform sample of a cohort — that would otherwise be copied into each part.
- */
+/** Shared stores, hooks, and decisions (migration resolution, cohort sampling) across surface. */
 
 import type { OpsMigrationEnrollmentRecord, OpsMigrationOverview } from "@langwatch/ops-contract";
 import type {
@@ -99,11 +95,7 @@ export type SystemMigrationsServiceDependencies = {
      * migration rather than writing rows nothing reads.
      */
     enrolledAutomatically: boolean;
-    /**
-     * Which axis the runner drives this migration over. Organization migrations form the ordered per-organization pipeline; a user enrollment but its
-     * tenants are the organization's MEMBERS, so it is neither a step in that pipeline nor readable back by organization id. Omitted means organization.
-     * migration (ADR-101 §6) is paced by the same organization
-     */
+    /** Organization or user axis; omitted means organization. See ADR-101 §6. */
     tenant?: "organization" | "user";
   }>;
   /** Read per call, so the answer is never a boot-time capture. */
@@ -115,11 +107,7 @@ export type SystemMigrationsServiceDependencies = {
    * the environment - not a list in code - is what names them.
    */
   privateDataplaneOrganizationIds: () => string[];
-  /**
-   * The ops audit trail. Enrollment decides which organizations the platform migrates, so both actions are recorded
-   * the way the backfill's own writes are - and the enrollment LISTING is recorded too, because it returns the
-   * enrollers' display names (personal data). A platform-scope entry carries no organizationId.
-   */
+  /** Ops audit trail; records enrollment, backfill, and listing actions. */
   audit: (entry: {
     userId: string;
     organizationId?: string;
@@ -127,20 +115,12 @@ export type SystemMigrationsServiceDependencies = {
     args?: Record<string, unknown>;
   }) => Promise<void>;
   runPass: () => Promise<MigrationPassSummary>;
-  /**
-   * One migration for one organization, now, under the same per-organization claim as a full pass (the
-   * summary's `claimed` says another pass is already working the organization). The composition supplies
-   * it because only the composition can build a runner scoped to a single (tenant, migration) pair.
-   */
+  /** One migration for one organization; composition scopes runner to (tenant, migration) pair. */
   runTargetedPass: (args: {
     organizationId: string;
     migrationName: string;
   }) => Promise<MigrationPassSummary>;
-  /**
-   * Whether a migration's stored report means it merely WAITED, per migration name. The state
-   * machine has no waiting status, so only the migration's own composition can tell a waiting
-   * tenant from a held one; a migration that never waits has no entry.
-   */
+  /** Checks if report means WAITED vs held; only migration composition can distinguish. */
   waitingReports?: Record<string, (report: unknown) => boolean>;
   /**
    * What else a rollback has to DO, per migration name. The generic rollback is a state write; a

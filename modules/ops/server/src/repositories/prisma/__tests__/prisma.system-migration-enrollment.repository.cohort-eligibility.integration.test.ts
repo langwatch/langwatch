@@ -1,5 +1,5 @@
-/**
- * The cohort's eligibility predicate against real rows: the unit suite pins the Prisma where-shape, but only a database proves the shape means what it says — that an enterprise subscription (active or pending) keeps its organization out of the pool, an enrollment row keeps its organization out, and a plain organization stays in.
+/** Cohort eligibility predicate against real rows: database proves the
+ * where-shape filters subscriptions and enrollments correctly.
  * @vitest-environment node
  * @see specs/migration/system-migrations-runner.feature
  */
@@ -143,7 +143,8 @@ describe.skipIf(!DB_URL)("given organizations of every eligibility kind", () => 
       expect(poolIds.has(excludedOrgId)).toBe(false);
     });
 
-    /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+    /** @scenario "A later step's cohort samples only organizations enrolled
+     * for the step before it" */
     it("narrows to the predecessor's enrollment when one is named", async () => {
       const laterStep = `${MIGRATION}-later`;
       // Only the organization already enrolled for MIGRATION (the

@@ -19,18 +19,7 @@ function describeSnapshotConnection({
   return isSuccess ? "connected" : "connecting";
 }
 
-/**
- * The Ops landing page.
- *
- * WHAT CHANGED IN THE MOVE, and it is the one live-data loss of this family:
- * the dashboard used to hold a tRPC SUBSCRIPTION (`ops.dashboardStream`) and
- * fall back to a five-second poll of `ops.getDashboardSnapshot` when the socket
- * was not up. `apps/ui`'s transport declares no subscriptions — the host routes
- * those over a WebSocket it configures from its own environment — so the page
- * now always takes the fallback. The numbers are the same numbers; they arrive
- * on a poll rather than a push, and the connection indicator says "polling"
- * rather than claiming a socket it does not have.
- */
+/** Ops landing page; always polls (subscriptions routed at host level). */
 export default function OpsDashboardScreen() {
   const payloadStore = useOpsOverlay("payloadStore");
   const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {

@@ -1,33 +1,5 @@
-/**
- * What the Ops screens ask of the application they are mounted in.
- *
- * A screen may not import the router, a toast singleton or the session client:
- * those are the imports ADR-004 seals off from a feature-web package, and
- * reaching for any of them is also what makes a screen untestable outside a
- * running application. They ask this port instead, and the frontend feature
- * that owns them — `apps/ui/src/features/ops` — answers it by adapting the
- * browser capabilities the application already resolves.
- *
- * It lives in `model` because it is a package-wide portable value: types plus
- * the React context they travel in, depending on nothing but React. Every layer
- * above may read it, which is the point — a confirm dialog four levels down a
- * queue table needs the same `failed` notice the screen does.
- *
- * THE FIFTH PORT OF THIS SHAPE (governance, gateway, personal-workspace,
- * automations, ops). The comment on `GatewayHostPort` said a third repeat was
- * the signal to promote them and it has now fired three times; promotion is a
- * change to five packages and is still not something a page move should smuggle
- * in.
- *
- * What Ops asks that no earlier family did: TWO access answers rather than one
- * permission. `platform/app` gated the workspace on a live `ops.getScope` probe
- * and the Backoffice on a separate `user.isAdmin` read, deliberately decoupled
- * so that widening ops access can never widen Backoffice. Both are modelled
- * here as questions, and `apps/ui` answers them from the session capability's
- * platform-tier grants — `ops:view` for the workspace, `ops:manage` for the
- * Backoffice — which is the same two-tier distinction the permission registry
- * already declares (`ops.actions = ["view", "manage"]`, scope `platform`).
- */
+/** Application port for Ops screens (can't import router/toast/session—ADR-004;
+ * testability). Package-wide portable value; two access answers (view+manage). */
 
 import { createContext, useContext } from "react";
 
@@ -107,16 +79,7 @@ export abstract class OpsHostApi {
 
   abstract route(): OpsRouteReading;
 
-  /**
-   * The whole address, path and query and fragment, as one string.
-   *
-   * Beyond what {@link route} answers because Deja View keeps its entire
-   * workspace — the searched query, the selected aggregate, the event cursor,
-   * the chosen projection — in the URL FRAGMENT, which no params-and-query
-   * reading carries. It is read once to seed that state and written back by the
-   * workspace itself through `history.replaceState`, which is the same thing it
-   * did in `platform/app`.
-   */
+  /** Whole address including fragment; Deja View state lives in URL fragment. */
   abstract asPath(): string;
 
   /** Replaces the whole query string; a key left out is a key removed. */

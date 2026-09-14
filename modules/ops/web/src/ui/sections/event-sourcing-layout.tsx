@@ -1,27 +1,4 @@
-/**
- * The frame every `/ops/event-sourcing/*` page renders inside.
- *
- * `platform/app`'s `EventSourcingLayout` wrapped `OpsPageShell` (an access gate
- * plus an error boundary) around `SectionNavigationLayout`, which wrapped
- * `DashboardLayout` — the whole application chrome. Two of those three layers
- * are not this family's: the access gate is the page guard's job now and the
- * chrome belongs to the route tree, and these pages are children of a layout
- * route the composing application still serves.
- *
- * So what moved is the middle layer only — the section rail and the content
- * column, harvested from `SectionNavigationFrame` — over the family's own copy
- * of the navigation rows. The gateway family took the same decision for the
- * same reason (`gateway-web`'s `ui/sections/gateway-layout.tsx`), and the rows
- * below are the ones `platform/app` listed, in the same order, including the
- * two tools that are sections of this workspace rather than Ops entries of
- * their own.
- *
- * KNOWN GAP, and the reason this file says so out loud: the outer
- * `DashboardLayout` does not come with it. An `/ops` page served from `apps/ui`
- * renders this frame and its content, and the application header, sidebar and
- * org-scope chip are not above it until a chrome layout route exists in the
- * route table. That route is the next structural slice, not this one.
- */
+/** Frame for /ops/event-sourcing/* pages; section rail and content column. */
 
 import { Badge, Box, Container, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import {

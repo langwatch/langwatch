@@ -176,7 +176,10 @@ describe("SystemMigrationsService.rollBack", () => {
     });
 
     describe("when the rolled-back migration carries an effect of its own", () => {
-      /** @scenario "Rolling back a cutover takes effect without a deploy, even with the queue stopped" */
+      /**
+       * @scenario "Rolling back a cutover takes effect without a deploy, even
+       * with the queue stopped"
+       */
       it("runs the effect after the pin is written, and only for that migration", async () => {
         let written: TenantMigrationRecord[] = [];
         const seen = { pinsAtEffect: -1 };
@@ -658,7 +661,10 @@ describe("SystemMigrationsService enrollment", () => {
   });
 
   describe("when the overview is read on a self-hosted installation", () => {
-    /** @scenario "Self-hosted installations run the preparation work but not the cutover yet" */
+    /**
+     * @scenario "Self-hosted installations run the preparation work but not
+     * the cutover yet"
+     */
     it("marks an unreleased migration unavailable so waiting reads as normal, not as attention", async () => {
       const { service } = serviceWith({
         record: null,
@@ -801,7 +807,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
   });
 
   describe("given a step that only waited on its prerequisites", () => {
-    /** @scenario "A targeted run that only waited says so, rather than reporting a held organization" */
+    /** @scenario "A targeted run that waited says so, not held organization" */
     it("answers that it is waiting, not that it is held for review", async () => {
       const { service } = serviceWith({
         // The state machine has no waiting status: a waiting step records

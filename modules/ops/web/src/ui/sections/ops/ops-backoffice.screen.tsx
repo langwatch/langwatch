@@ -1,26 +1,4 @@
-/**
- * The Backoffice, as one screen over six addresses.
- *
- * `platform/app` had six page files, each three lines: a resource view inside a
- * shared `BackofficeShell` that gated on `api.user.isAdmin` and rendered
- * `SettingsLayout`. Both halves of that shell belong somewhere else now — the
- * gate is the page guard's (`ops:manage`, the platform-tier grant the operator
- * allow-list already issues) and `SettingsLayout` is application chrome the
- * route tree serves — so what is left is the resource, and the resource is a
- * PROP.
- *
- * That is the automations family's shape, taken for the same reason: the route
- * table gives each address its own page key, so `apps/ui` maps a key to a
- * resource and this screen is told which one rather than reading the address to
- * learn what the router already knew. Six keys, one loader, no pathname on the
- * host port.
- *
- * ADMIN GATING STAYS DECOUPLED FROM `ops:view`, which is the property the
- * platform shell's docblock asked for out loud: if operator access ever widens
- * past the allow-list, the Backoffice must not widen with it. `ops:manage` is
- * the narrower of the two platform-tier grants and is what the guard in
- * `apps/ui` asks for on these six keys alone.
- */
+/** Backoffice over six addresses: one screen with resource as a prop. */
 
 import type { ComponentType } from "react";
 import BugReportsView from "../../../features/backoffice/ui/sections/bug-reports-view.tsx";

@@ -64,8 +64,10 @@ describe.skipIf(!hasRedis)("operator recovery clears every per-group counter", (
 
   describe("given a group blocked after a job used up its retry budget", () => {
     describe("when an operator unblocks it", () => {
-      /** @scenario A group unblocked after exhaustion retries instead of re-blocking on its first failure */
-      /** @scenario A group unblocked after exhaustion is not immediately re-quarantined by its old failure streak */
+      /** @scenario A group unblocked after exhaustion retries instead of
+       * re-blocking on its first failure */
+      /** @scenario A group unblocked after exhaustion is not immediately
+       * re-quarantined by its old failure streak */
       it("leaves no counter behind to spend the next job's budget", async () => {
         const { wasBlocked } = await repo.unblockGroup({ queueName, groupId });
 
@@ -75,7 +77,8 @@ describe.skipIf(!hasRedis)("operator recovery clears every per-group counter", (
         expect(await survivingCounters()).toEqual([]);
       });
 
-      /** @scenario An unblocked group's fresh ladder does not depend on how long the operator waited */
+      /** @scenario An unblocked group's fresh ladder does not depend on how
+       * long the operator waited */
       it("does not depend on how long the operator waited", async () => {
         // The retry chain expires on its own after ~30 minutes, so before the
         // fix a slow operator got a fresh ladder and a fast one got none. With
