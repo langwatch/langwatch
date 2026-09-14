@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/monitor-web": ["./src/online-evaluations.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,

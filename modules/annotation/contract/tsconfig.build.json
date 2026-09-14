@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/annotation-contract": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -37,9 +40,6 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"

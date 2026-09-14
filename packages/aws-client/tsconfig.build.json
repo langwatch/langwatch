@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/aws-client": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,

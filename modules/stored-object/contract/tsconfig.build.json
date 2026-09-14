@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/stored-object-contract": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,

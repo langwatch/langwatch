@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/monitor-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -27,6 +30,9 @@
   ],
   "references": [
     {
+      "path": "../../analytics/server/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -39,7 +45,13 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
+      "path": "../../evaluator/server/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/dashboard-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -37,6 +40,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"

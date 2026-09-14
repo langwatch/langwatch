@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/langy-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -63,6 +66,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -73,6 +79,9 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../presence/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"

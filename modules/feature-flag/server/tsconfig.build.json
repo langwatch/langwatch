@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/feature-flag-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -37,6 +40,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

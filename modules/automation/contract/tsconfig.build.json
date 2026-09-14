@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/automation-contract": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -32,9 +35,6 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"

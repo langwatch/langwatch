@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/trace-contract": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -37,9 +40,6 @@
     },
     {
       "path": "../../data-privacy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"

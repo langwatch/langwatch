@@ -26,9 +26,6 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../agent/web/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {

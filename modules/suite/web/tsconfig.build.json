@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/suite-web": ["./src/run-formatters.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,

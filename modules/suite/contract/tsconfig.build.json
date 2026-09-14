@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/suite-contract": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -28,6 +31,9 @@
   "references": [
     {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"

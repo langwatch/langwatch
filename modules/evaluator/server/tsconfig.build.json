@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/evaluator-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -40,6 +43,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"

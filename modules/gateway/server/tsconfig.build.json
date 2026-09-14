@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/gateway-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -54,6 +57,9 @@
   ],
   "references": [
     {
+      "path": "../../analytics/server/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -61,6 +67,9 @@
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
@@ -76,6 +85,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../langy/contract/tsconfig.build.json"
@@ -112,6 +124,12 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../webhook/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../webhook/server/tsconfig.build.json"
     }
   ]
 }

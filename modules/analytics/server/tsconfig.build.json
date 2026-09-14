@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/analytics-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -57,6 +60,9 @@
       "path": "../../data-privacy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -70,6 +76,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

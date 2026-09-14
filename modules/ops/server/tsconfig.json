@@ -49,6 +49,9 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -65,6 +68,9 @@
     },
     {
       "path": "../../../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"

@@ -28,6 +28,9 @@
     "resolveJsonModule": true
   },
   "include": [
+    "../modules/agent/web/src/**/*.ts",
+    "../modules/agent/web/src/**/*.tsx",
+    "../modules/agent/web/src/**/*.json",
     "../modules/scenario/web/src/**/*.ts",
     "../modules/scenario/web/src/**/*.tsx",
     "../modules/scenario/web/src/**/*.json",
@@ -72,6 +75,11 @@
     "../modules/analytics/web/src/**/*.json"
   ],
   "files": [
+    "../modules/agent/web/src/agent-management.ts",
+    "../modules/agent/web/src/connected-agents.ts",
+    "../modules/agent/web/src/agent-http-editor.ts",
+    "../modules/agent/web/src/agent-client.ts",
+    "../modules/agent/web/src/agent-editors.ts",
     "../modules/analytics/web/src/__tests__/lwql-fixtures.ts",
     "../modules/analytics/web/src/analytics.ts",
     "../modules/analytics/web/src/index.ts",
@@ -304,9 +312,6 @@
       "path": "../modules/agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../modules/agent/web/tsconfig.build.json"
-    },
-    {
       "path": "../modules/analytics/contract/tsconfig.build.json"
     },
     {
@@ -417,6 +422,11 @@
   ],
   "langwatchDeclarationGroup": {
     "members": [
+      {
+        "directory": "../modules/agent/web",
+        "source": "src",
+        "output": "dist"
+      },
       {
         "directory": "../modules/scenario/web",
         "source": "src",

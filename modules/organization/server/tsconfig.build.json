@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/organization-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -49,13 +52,25 @@
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/packages/plan-gate/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/server/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
@@ -86,18 +101,6 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../entitlement/server/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/infrastructure/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/packages/plan-gate/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     }
   ]
 }

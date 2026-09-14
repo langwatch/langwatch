@@ -23,6 +23,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -63,6 +66,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"

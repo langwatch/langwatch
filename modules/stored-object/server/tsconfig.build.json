@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/stored-object-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -39,6 +42,9 @@
       "path": "../../../packages/aws-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
@@ -46,6 +52,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"

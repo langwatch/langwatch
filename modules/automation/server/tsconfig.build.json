@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {
+      "@langwatch/automation-server": ["./src/index.ts"]
+    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -33,6 +36,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -57,6 +63,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -70,6 +79,9 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"
