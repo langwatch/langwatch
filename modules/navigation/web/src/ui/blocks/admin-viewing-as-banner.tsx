@@ -5,33 +5,7 @@ import { useEffect, useState } from "react";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { nowInstant } from "@langwatch/time";
 
-/**
- * Persistent "Viewing as admin" banner rendered in DashboardLayout when
- * the current admin is looking at another user's personal workspace.
- *
- * Personal workspaces are the only surface where the impersonation
- * framing is real: a different principal owns the data, the admin is
- * stepping into someone else's account. Team workspaces do NOT trigger
- * this banner — ORG:ADMIN cascades to every team in the org as
- * implicit membership, so flagging team drill-throughs as
- * "impersonation" is noise (rchaves bug 19: solo and small-org admins
- * who de-facto own every team kept seeing the banner on their own
- * dashboard).
- *
- * Layout-component-driven (NOT a client-side flag) for reload-safety:
- * direct-pasting /[someUserPersonalProjectSlug]/traces as admin still
- * renders the banner on first paint.
- *
- * Audit/OCSF emission lives at the tRPC layer
- * (`governance.recordWorkspaceView`), independent of this banner.
- *
- * Spec: specs/ai-gateway/governance/admin-trace-access.feature
- */
-/** Per-workspace dismissal flag — re-emerges when the admin switches
- *  workspaces or the dismissal expires (24h). The banner is a governance
- *  signal, not a soft notification: the audit trail still runs whether
- *  it's collapsed or expanded; we just give the admin a way to drop it
- *  out of the way during a long debugging session. */
+/** Admin viewing-as banner for personal workspaces (only where impersonation is real) */
 const DISMISS_TTL_MS = 24 * 60 * 60 * 1000;
 const STORAGE_KEY_PREFIX = "langwatch:admin-banner-dismissed:v1:";
 

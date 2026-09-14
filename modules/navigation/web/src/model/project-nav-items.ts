@@ -1,22 +1,4 @@
-/**
- * Where the project menu's entries point, and what they are called.
- *
- * NOT A COPY OF `platform/app/src/utils/routes.ts` — that table no longer
- * exists. Commit `72ed591a13` deleted it while this move was in flight, which
- * is what left `MainMenu` reading a module that was already gone. What is here
- * is the narrowing the MENU actually used: nineteen destinations out of a
- * seventy-entry table whose other fifty are breadcrumb parents, trace detail
- * pages and switch-href machinery, none of which a sidebar asks about.
- *
- * The `[project]` placeholder is kept exactly as the table spelled it, because
- * `projectScopedDestination` is what fills it in and it is what tells an entry
- * with no project yet to render inert instead of pointing somewhere wrong.
- *
- * The addresses are the product's, not this package's invention: every one of
- * them is served today, and `apps/ui`'s own route table names the same paths.
- * They are stated here rather than read from there because a governed web
- * package may not import the application that mounts it.
- */
+/** Project menu destinations; narrowing the actual menu used, not deleted platform/app table */
 
 /** One destination the project menu offers. */
 export type ProjectNavItem = {
@@ -54,31 +36,12 @@ export const projectNavItems = {
 
 export type ProjectNavKey = keyof typeof projectNavItems;
 
-/**
- * The name of the destination on screen, for the document title.
- *
- * An exact match on the address, the way `findCurrentRoute` matched a route
- * pattern: a page this menu does not offer contributes no title fragment
- * rather than the closest guess, which is the honest answer for the many pages
- * the sidebar never lists.
- */
+/** Destination name for document title; exact address match, not closest guess */
 export function projectNavItemAt(pathname: string): ProjectNavItem | undefined {
   return Object.values(projectNavItems).find((item) => item.path === pathname);
 }
 
-/**
- * A project-anchored address, written back as the route pattern.
- *
- * Every active-state test in the menu was written against `router.pathname` —
- * the PATTERN, `/[project]/sessions`, not the address `/acme/sessions`. The
- * host answers with the address, because that is the only thing a settings
- * entry can be matched against (every settings page but two resolves to one
- * registered pattern). Normalising here is what lets both kinds of test keep
- * the exact comparison they were written with.
- *
- * An address outside the project comes back unchanged: `/settings/usage` is
- * already the pattern it matches on.
- */
+/** Address to route pattern; normalize for pattern-based tests vs address-based host */
 export function toProjectRoutePattern({
   pathname,
   projectSlug,

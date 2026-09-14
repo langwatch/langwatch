@@ -19,19 +19,7 @@ export interface LandingDestinationInput {
   projectSlug: string | null;
 }
 
-/**
- * Where "/" goes in the new navigation modes, in strict order: the pin,
- * the remembered product (only when still reachable and resolvable), the
- * server resolver, then the safety nets. Null means nothing could be
- * decided and the caller keeps its existing bootstrap behavior
- * (onboarding for org-less users).
- *
- * Deliberate deviation from ADR-038 (recorded in the navigation ADR):
- * after the first product visit, product memory outranks the
- * organization intent. Legacy mode keeps ADR-038 unchanged.
- *
- * Spec: specs/navigation/navigation-v2-landing.feature
- */
+/** Landing destination ("/") in order: pin, remembered product, server resolver, safety nets */
 export function resolveLandingDestination({
   pinnedPath,
   rememberedProduct,

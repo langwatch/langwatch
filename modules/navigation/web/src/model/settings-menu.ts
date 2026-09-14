@@ -1,20 +1,4 @@
-/**
- * The settings navigation, as data.
- *
- * Moved from `platform/app/src/features/navigation/useSettingsMenu.ts`, entry
- * for entry and gate for gate. It arrives as a MODEL rather than a hook: the
- * six readings the hook made for itself all belong to the host, and a menu
- * that fetches its own gates cannot be asserted without a running application.
- * `behavior/use-settings-menu` is the hook that asks the host and calls this.
- *
- * TWO SETTINGS MENUS EXIST AND THAT IS NOT A COPY. `apps/ui`'s
- * `model/ui-settings-menu` is the harvest of `platform/app`'s
- * `SettingsLayout` — the ungrouped, icon-less list the settings PAGES render
- * their own chrome from. This is the shell's: grouped, iconed, carrying the
- * operations and backoffice groups, and read by the sidebar column. The two
- * were separate modules in `platform/app` for the same reason, and the layout
- * there stood its own menu down whenever this one was on screen.
- */
+/** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
 import {
   Activity,
@@ -71,16 +55,7 @@ export interface SettingsMenuItem {
   isEnterprise?: boolean;
 }
 
-/**
- * Whether a settings entry is the page on screen.
- *
- * `pathname` is the address in the address bar, never the route pattern the
- * compat router resolves: `/settings/*` is one registered pattern, so every
- * settings page but General and Audit Log reports the same
- * `/settings/[[...path]]` and no entry matched.
- *
- * Spec: specs/navigation/settings-shell-v2.feature
- */
+/** Settings entry active check; uses pathname, not router pattern */
 export function isSettingsMenuItemActive({
   item,
   pathname,
@@ -384,20 +359,7 @@ export function backofficeGroup(): SettingsMenuGroup {
   };
 }
 
-/**
- * The settings menu as data for the settings sidebar: grouped, iconed, and
- * filtered by the same gates the legacy settings navigation applied — plan
- * tier, lite membership, permissions, SaaS against self-hosted, operations
- * access. Every page keeps its address.
- *
- * A PURE FUNCTION of its gates rather than the hook it was moved from. The six
- * readings the hook made for itself (the workspace, the public environment,
- * the plan, the lite guard, operations access and the platform-admin check)
- * are all things the host already knows, and a menu that asks for them itself
- * cannot be asserted without a running application.
- *
- * Spec: specs/navigation/settings-shell-v2.feature
- */
+/** Settings menu data: grouped, iconed, filtered by gates; pure function of its gates */
 export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
   const groups: SettingsMenuGroup[] = [
     organizationGroup(gates),

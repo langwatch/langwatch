@@ -1,16 +1,4 @@
-/**
- * What a test mounts this package's screens and chrome inside.
- *
- * One stub host, built from a partial reading, so a suite states only the facts
- * its scenario turns on and gets fail-closed answers for the rest. The same
- * shape every other feature-web package's `testing` entry keeps.
- *
- * "Fail-closed" is what the defaults are for: no grants, no flags, no palette,
- * no chat bubble, a self-hosted deployment that is not a development build, a
- * free plan and no operator access. A shell rendered against this stub draws
- * the narrowest chrome the product has, which is the honest baseline for a
- * suite that names nothing.
- */
+/** Stub host for tests; built from partial reading with fail-closed defaults */
 
 import type { ReactNode } from "react";
 import {
