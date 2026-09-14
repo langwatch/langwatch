@@ -91,8 +91,16 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       virtualKeyPepper: config.virtualKeyPepper,
       spendSettlementGraceMs: config.spendSettlementGraceMs,
     },
-    /** Wholly defaulted; the entry exists because a schema refuses undefined. */
-    evaluator: {},
+    /** The address a dataset deep link is built under: this deployment's public one. */
+    ...(config.infrastructure.execution.publicBaseUrl
+      ? { dataset: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }
+      : {}),
+    /** Evaluator link addresses build under the same public origin. */
+    evaluator: {
+      ...(config.infrastructure.execution.publicBaseUrl
+        ? { publicBaseUrl: config.infrastructure.execution.publicBaseUrl }
+        : {}),
+    },
     github: stated(config.infrastructure.github),
     /** The origin a hosted MCP server advertises is the api's public one. */
     "hosted-mcp": { baseHost: config.infrastructure.execution.publicBaseUrl },
