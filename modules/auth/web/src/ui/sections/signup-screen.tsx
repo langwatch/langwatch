@@ -52,16 +52,7 @@ export default function SignUp() {
   if (!frontDoor.isResolved) return null;
   if (frontDoor.enabled) {
     return (
-      // The pitch is the hosted product's, and it lives OUTSIDE the card: the
-      // card itself is the same on every installation.
-      //
-      // Nothing sits under the tagline. `trustStrip` stayed empty because the
-      // one thing that belongs there is a customer - a quote or a logo row  - 
-      // and both are somebody else's decision to be named. A row of INTEGRATION
-      // marks was tried in that slot and is the wrong module for this page: it
-      // argues we are compatible, when the question a stranger is asking is
-      // whether anybody else trusts us. Leave it empty until there is a cleared
-      // name to put in it; an empty slot beats furniture.
+      // Hosted product pitch outside card; trustStrip empty until cleared for customer quote
       <FrontDoorShell
         headline={"See what your agents\nare actually doing."}
         headlineAccent="actually"

@@ -87,21 +87,7 @@ function readRefusal(error: { status: number } & object): Refusal {
 }
 
 /**
- * Creating the account WITH a passkey, on the step that would otherwise only
- * take a password (Passkey Central, "New account creation with a passkey").
- *
- * It is the same ceremony the settings screen runs, with the account created
- * at the end of it rather than found at the start: the address travels as the
- * registration `context`, the server refuses one that already has an account,
- * and the session is minted by the same hook that creates the account — so
- * this button ends with somebody signed in, not with a credential for an
- * account they still have to sign in to.
- *
- * Cancelling is not a failure and is not reported as one. The password fields
- * are still on the screen underneath, which is the whole reason this is a
- * button beside them rather than a step in front of them: declining a passkey
- * costs somebody nothing and leaves the other way of finishing exactly where
- * it was.
+ * Create account with passkey; ceremony creates account and session; cancel left unpunished
  */
 export function PasskeySignUpButton({
   email,

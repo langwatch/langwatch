@@ -57,24 +57,7 @@ const ACCOUNT_CREATED_FALLBACK =
   "Your account was created. Log in with your new details to carry on.";
 
 /**
- * Choosing how to sign in, which is the step that creates the account. It
- * takes a passkey or a password, and either one finishes the sign-up.
- *
- * The password half registers, signs in, and sends the address confirmation
- * after both — the
- * confirmation follows somebody in rather than standing in front of them
- * (ADR-117 §6, revised). The address is the one typed on the step before and
- * is not asked for again: it rides along in a hidden field so a password
- * manager saves the pair, and cannot be edited here, because the pair being
- * saved has to be the pair that was registered.
- *
- * The password is typed twice and held to a length. That is the ONLY place
- * either happens, on either door — the log-in form's single `current-password`
- * field never becomes an account's password.
- *
- * A rejection lands on the field that caused it, in words that say what to
- * change. Validation runs on blur in the same words, so most of the time the
- * server never has to answer at all.
+ * Sign-up step that creates account; passkey or password; address hidden for password manager
  */
 export function SignUpCredentialForm({
   email,

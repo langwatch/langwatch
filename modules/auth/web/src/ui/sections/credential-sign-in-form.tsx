@@ -37,26 +37,7 @@ const breakGlassSchema = credentialSchema.extend({
 type CredentialValues = z.infer<typeof credentialSchema>;
 
 /**
- * Signing in with the password held for an address the front door already
- * asked for.
- *
- * The address stays on screen and stays in the form: a password manager needs
- * the pair to save or fill it, and somebody who has got this far should never
- * be asked to type their address twice. The password field is spelled
- * `current-password` for the same reason.
- *
- * The failure wording is the anchor `sign-in-failure-messages.feature` holds:
- * a wrong password, a rate limit and an installation set up for another
- * address each say their own thing, through the same mapper the legacy screen
- * uses, and never put an internal code on screen.
- *
- * On whether the address has an account: the SCREEN says nothing, but the
- * unified funnel deliberately does not pretend — an address with no account
- * converts to sign-up ("check your email") where a held account answers
- * "invalid password". That asymmetry is ADR-117 §6 (Revision 2026-08-24),
- * which retired the no-oracle invariant at the screen level and scoped it to
- * the router and reset; the spec header in signin-signup-screens.feature
- * carries the argument.
+ * Sign in with password for already-asked address; stays on form for password manager
  */
 export function CredentialSignInForm({
   email,

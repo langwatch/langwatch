@@ -9,23 +9,7 @@ import { FrontDoorValuePanel } from "../elements/front-door-value-panel.tsx";
 import { LogoHandoff } from "./logo-handoff.tsx";
 
 /**
- * The ground the front door stands on.
- *
- * The card itself is the same on every installation, byte for byte: nothing
- * inside it asks which deployment it is running on. What differs is what
- * surrounds it, and that is composed here — a hosted signup has a case to
- * make, and a company's own installation does not.
- *
- * On a hosted deployment the whole viewport is ONE field — the site's light
- * mesh or its dark warp, depending on the colour mode — and everything sits
- * over it: the headline reads off the ground's protected side, and the card
- * is glass with the same ground moving through it. There is no border and no
- * change of surface between the two halves, because there are no two
- * surfaces; a seam down the middle of one field was the old layout's bug.
- *
- * Self-hosted is the plain centred card on plain paper, with nothing sold
- * beside it and nothing breathing behind it: an operator's door, not a
- * funnel.
+ * Front door layout ground; hosted vs self-hosted compose different surroundings around same card
  */
 export function FrontDoorShell({
   headline,

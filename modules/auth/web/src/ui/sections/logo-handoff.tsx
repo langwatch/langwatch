@@ -5,31 +5,7 @@ import "../elements/auth-front-door.css";
 import { beginEntrance, endEntrance } from "../../model/entrance.ts";
 
 /**
- * The entrance: the card settles into place once, on arrival.
- *
- * The loading screen and the card both show the same wordmark, nearly
- * centred, so a soft dissolve between the two screens already reads as one
- * thing coming to rest. What this component adds is only the settle — the
- * card rises a few pixels into place and its rows follow each other in by a
- * breath — all of it declared in the stylesheet against the
- * `lw-front-door-enter` class this component puts on the body.
- *
- * An earlier version flew the mark from the loading screen's centre into the
- * card's logo slot (FLIP, overlay, cross-fade). At real speed the flight read
- * as a flash — the mark vanished and reappeared rather than travelling — and
- * a motion that has to be explained is worse than none. The dissolve keeps
- * the continuity and drops the theatrics.
- *
- * Three rules, unchanged from the flight it replaces:
- *
- *   - once per page load. A route change, a step change and the sign-up
- *     morph are all the same page continuing; replaying an arrival on each
- *     one would be a tic.
- *   - nothing waits on it. The card is mounted and live from the first
- *     frame; the only thing the motion gates is when focus is taken
- *     (`useEntranceSettled`).
- *   - under `prefers-reduced-motion`, none of it runs and focus is taken
- *     immediately.
+ * Card settle on arrival; dissolve between screens, once per page load, respects reduced-motion
  */
 
 /** Survives remounts on purpose: the arrival belongs to the page load. */
