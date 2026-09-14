@@ -117,7 +117,6 @@ export {
 export {
   WebhookApp,
   type WebhookAppDependencies,
-  type WebhookInfrastructure,
   type WebhookTestDispatch,
 } from "./app/webhook.app.ts";
 export { webhookServer } from "./webhook.server.ts";

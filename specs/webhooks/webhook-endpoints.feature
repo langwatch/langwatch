@@ -259,6 +259,21 @@ Feature: Webhook endpoints, signed outbound event delivery
       # Messages already planned against the old transport are in flight in
       # the outbox.
 
+  Rule: A test fire refuses by name on a process that composes no dispatch
+
+    # The interactive process serves both doors over this application, but it
+    # never dispatches a real delivery itself - that is the worker's own
+    # delivery process manager, a separate composition this application does
+    # not share. A test fire asked of the interactive process must say so by
+    # name rather than crash on an unsupplied collaborator.
+
+    @unit
+    Scenario: A test fire from the interactive process refuses by name
+      Given the interactive process, which never dispatches deliveries itself
+      When an endpoint's test fire is requested
+      Then the request is refused as service unavailable
+      And the refusal names dispatch, not an unknown error
+
   Rule: Deliveries are signed and attributable
 
     @unit

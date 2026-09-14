@@ -6,7 +6,9 @@
 import { randomUUID } from "node:crypto";
 
 import { WebhookApi, type WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
-import { NO_TOKENS, type FeatureSetup } from "@langwatch/runtime-composition";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
@@ -14,8 +16,9 @@ import type { WebhookRepositories } from "../repositories/webhook.repositories.t
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
-import { WebhookHealthService, type WebhookHealthDeps } from "../services/webhook-health.service.ts";
+import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
+import { buildWebhookComposition } from "./webhook-composition.build.ts";
 
 /** The single-envelope batch a test fire sends. */
 function testFireBody(now: Instant): string {
@@ -94,35 +97,28 @@ export interface WebhookAppDependencies {
   endpointStream: WebhookEndpointStreamService;
 }
 
-/**
- * What a process supplies beside the repositories the registry resolves: the
- * collaborators no repository can derive on its own (the process store a
- * health read shares with the worker's process manager, the entitlement
- * gate, and the test-fire dispatch).
- */
-export interface WebhookInfrastructure {
-  /** The durable process store a health read shares with the worker's
-   *  delivery process manager. */
-  processStore: WebhookHealthDeps["processStore"];
-  assertEndpointsEntitled(organizationId: string): Promise<void>;
-  dispatch: WebhookTestDispatch;
-  webhookDestination: WebhookDestination;
-  webhookId: WebhookId;
-  webhookSecret: WebhookSecret;
-}
-
 type WebhookSetup = FeatureSetup<
   typeof WebhookApp.dependencies,
-  WebhookInfrastructure,
+  MembersRead<typeof WebhookApp.reads>,
   undefined,
   WebhookRepositories
 >;
 
 export class WebhookApp implements WebhookApiContract {
   static readonly contract = WebhookApi;
-  static readonly dependencies = NO_TOKENS;
+  /** The entitlement peer this app's own plan gate reads, composed in
+   *  {@link buildWebhookComposition} (`WebhookAccessService`). */
+  static readonly dependencies = { entitlement: EntitlementApi };
+  /** The one raw member this app derives collaborators from: the durable
+   *  store a health read shares with the worker's delivery process manager. */
+  static readonly reads = reads("prisma");
 
   static create(input: WebhookSetup): WebhookApp {
+    const built = buildWebhookComposition({
+      prisma: input.members.prisma,
+      entitlement: input.dependencies.entitlement,
+    });
+
     return new WebhookApp({
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
@@ -132,12 +128,12 @@ export class WebhookApp implements WebhookApiContract {
       }),
       health: WebhookHealthService.create({
         endpoints: input.repositories.endpoints,
-        processStore: input.members.processStore,
+        processStore: built.processStore,
       }),
-      assertEndpointsEntitled: input.members.assertEndpointsEntitled,
-      dispatch: input.members.dispatch,
+      assertEndpointsEntitled: built.assertEndpointsEntitled,
+      dispatch: built.dispatch,
       endpointStream: WebhookEndpointStreamService.create({
-        processStore: input.members.processStore,
+        processStore: built.processStore,
       }),
     });
   }

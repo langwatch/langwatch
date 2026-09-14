@@ -51,6 +51,6 @@ export const serverModuleMembers = {
   topic: ["prisma"],
   trace: ["clickhouse", "eventing", "logger"],
   user: ["prisma", "redis"],
-  webhook: [],
+  webhook: ["prisma"],
   workflow: ["encryption", "prisma"],
 } as const;
