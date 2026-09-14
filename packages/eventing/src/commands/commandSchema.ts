@@ -26,20 +26,10 @@ export interface CommandSchema<Payload, Type extends CommandType> {
 }
 
 /**
- * Creates a command schema with type safety and validation using a Zod schema.
- *
+ * Creates a command schema with Zod validation.
  * @param type - The command type identifier
  * @param schema - Zod schema for validating the payload
  * @param description - Optional description
- * @returns A command schema instance
- *
- * @example
- * ```typescript
- * const spanIngestionSchema = defineCommandSchema(
- *   "lw.obs.span_ingestion.record",
- *   storeSpanIngestionCommandDataSchema
- * );
- * ```
  */
 export function defineCommandSchema<
   Schema extends ZodSchema,

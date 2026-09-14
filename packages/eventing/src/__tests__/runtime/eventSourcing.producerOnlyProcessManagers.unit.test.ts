@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
  * Spec: packages/eventing/specs/producer-only-event-store.feature
- *
- * A pipeline that declares a process manager used to be unregisterable in a
- * process holding no `ProcessStore`, which made every command on it unsendable
- * from the tier that a customer's action actually arrives at. This pins the
- * mode that separates the two: the producer registers the pipeline whole and
- * declines the process manager BY NAME.
+ * Producer-only pipelines with process managers must register without the manager.
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";

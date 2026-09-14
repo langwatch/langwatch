@@ -3,19 +3,7 @@ import type { EventRecord } from "../eventRepository.types.ts";
 import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 
 /**
- * The re-fold reads (`getEventRecordsUpTo` and its paged twin) take an
- * `occurredAtFromMs` lower bound so ClickHouse can prune `event_log`'s weekly
- * partitions. The in-memory repository mirrors that filter ON PURPOSE: a window
- * too small to cover an aggregate's lifetime must drop events HERE, in tests,
- * rather than only in production against real data.
- *
- * That mirror is the whole safety argument, so it needs its own tests — without
- * them an inverted comparison or a dropped unknown-time check would pass every
- * suite and the mirror would quietly stop mirroring.
- *
- * Unknown occurred times are kept: the SQL says `EventOccurredAt = 0 OR ...`,
- * and the memory record type also allows null, so both spellings of "unknown"
- * survive the bound.
+ * Tests for occurredAtFromMs lower bound filtering; unknown times must survive the bound.
  */
 function record({
   eventId,

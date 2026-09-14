@@ -6,20 +6,7 @@ import type {
 } from "./projectionStore.types.ts";
 
 /**
- * Base class for in-memory projection stores.
- * Provides common key generation and storage patterns.
- *
- * @example
- * ```typescript
- * export class MyProjectionStoreMemory
- *   extends BaseMemoryProjectionStore<MyProjection>
- *   implements MyProjectionStore
- * {
- *   protected getKey(tenantId: string, aggregateId: string): string {
- *     return `${tenantId}:${aggregateId}`;
- *   }
- * }
- * ```
+ * Base class for in-memory projection stores with key generation pattern.
  */
 export abstract class BaseMemoryProjectionStore<
   T extends Projection = Projection,

@@ -44,52 +44,8 @@ export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
 }
 
 /**
- * Self-contained command handler class that bundles schema and handler.
- *
- * This design allows pipeline registration by simply passing the class, eliminating the need
- * to separately configure schema, handler, and routing logic. The framework extracts all
- * necessary information from static properties and methods.
- *
- * Configuration options (delay, concurrency, deduplication) should be provided via
- * registration options rather than static class properties.
- *
- * @example
- * ```typescript
- * import { z } from "zod";
- *
- * const myPayloadSchema = z.object({
- *   id: z.string(),
- *   data: z.string(),
- * });
- *
- * class MyCommandHandler implements CommandHandler<Command<z.infer<typeof myPayloadSchema>>, MyEvent> {
- *   static readonly schema = defineCommandSchema(
- *     "my.command.type",
- *     myPayloadSchema
- *   );
- *
- *   static getAggregateId(payload: MyPayload): string {
- *     return payload.id;
- *   }
- *
- *   static getSpanAttributes(payload: MyPayload) {
- *     return { "payload.id": payload.id };
- *   }
- *
- *   async handle(command: Command<MyPayload>): Promise<MyEvent[]> {
- *     // Handler implementation
- *   }
- * }
- *
- * // Register with options:
- * pipeline.withCommand("myCommand", MyCommandHandler, {
- *   delay: 1000,
- *   concurrency: 10,
- *   deduplication: {
- *     makeId: (payload) => `${payload.tenantId}:${payload.id}`,
- *   },
- * });
- * ```
+ * Self-contained command handler class that bundles schema and handler together.
+ * Register with pipeline.withCommand() passing the class and optional config.
  */
 export type CommandHandlerClass<
   Payload,
@@ -99,7 +55,7 @@ export type CommandHandlerClass<
   (new () => CommandHandler<Command<Payload>, EventType>);
 
 /**
- * Type helper to extract the payload type from a CommandHandlerClass or CommandHandlerClassStatic.
+ * Type helper to extract the payload type from a CommandHandlerClass.
  */
 export type ExtractCommandHandlerPayload<T> =
   T extends CommandHandlerClass<infer Payload, any, any>

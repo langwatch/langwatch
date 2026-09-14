@@ -109,9 +109,8 @@ export function parseEventPayload(rawPayload: unknown): unknown {
 }
 
 /**
- * Deduplicates events by Event ID and IdempotencyKey, keeping the first occurrence.
- * Events with the same idempotencyKey are treated as duplicates even if they have different EventIds.
- * Legacy events without an idempotencyKey are only deduped by EventId.
+ * Deduplicates events by Event ID and IdempotencyKey, keeping the first occurrence. Legacy
+ * events without idempotencyKey are only deduped by EventId.
  */
 export function deduplicateEvents<EventType extends Event>(events: EventType[]): EventType[] {
   const seenEventIds = new Set<string>();

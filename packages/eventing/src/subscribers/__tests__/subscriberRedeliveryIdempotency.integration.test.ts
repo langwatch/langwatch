@@ -8,14 +8,8 @@ import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 import type { Event } from "../../domain/types.ts";
 
 /**
- * Delivery is at-least-once, so a handler that completed and then lost its
- * acknowledgement is delivered again. What keeps the second delivery from
- * repeating the externally visible action is the action's IDENTITY: derived
- * from the subscriber and the source event, so the redelivery re-derives the
- * same key and the target collapses it onto the row already there.
- *
- * The action here is an append to the event log, which is the target every
- * subscriber's side effects ultimately reach.
+ * At-least-once delivery; idempotency derives from subscriber+event identity so
+ * redelivery collapses onto the existing row.
  */
 
 const aggregateType: AggregateType = "trace";

@@ -201,7 +201,7 @@ export class EventRepositoryMemory implements EventRepository {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
-    // Count records where: (timestamp < beforeTimestamp) OR (timestamp === beforeTimestamp AND id < beforeEventId)
+    // Filter: (timestamp < beforeTs) OR (timestamp === beforeTs AND id < beforeId)
     return records.filter((record) => {
       if (record.EventTimestamp < beforeTimestamp) {
         return true;

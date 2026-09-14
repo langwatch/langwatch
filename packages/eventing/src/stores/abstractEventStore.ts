@@ -18,17 +18,8 @@ import { rehydrationLowerBoundMs } from "./rehydrationWindow.ts";
 import type { EventRecord, EventRepository } from "./repositories/eventRepository.types.ts";
 
 /**
- * Abstract base class for EventStore implementations using the Template Method pattern.
- *
- * Provides the shared skeleton for reading and writing events:
- * - Read methods: validate tenant -> instrument -> fetch records -> map to events -> post-process -> deduplicate
- * - Write method: instrument -> validate tenant -> validate each event -> map to records -> insert -> on success
- *
- * Subclasses customize behavior through four hook methods:
- * - `postProcessEvents`: transform events after deduplication (e.g., sort, clone)
- * - `instrument`: wrap operations in tracing spans
- * - `logError`: structured error logging
- * - `onStoreSuccess`: log or notify after successful writes
+ * Abstract base with template-method skeleton; subclasses customize via hooks like
+ * postProcessEvents, instrument, logError, and onStoreSuccess.
  */
 export abstract class AbstractEventStore<
   EventType extends Event = Event,
@@ -95,13 +86,7 @@ export abstract class AbstractEventStore<
   }
 
   /**
-   * Per-batch enrichment hook applied to records after `eventToRecord` and
-   * before `repository.insertEventRecords`. Default: identity.
-   *
-   * ClickHouse override stamps `_retention_days` from the active tenant
-   * retention policy so `event_log` rows match the trace category retention
-   * (otherwise the source-of-truth event log outlives its derived projections,
-   * breaking re-projection — see `misc/langwatch-specs.md:107-113`).
+   * Enrichment hook; ClickHouse override stamps _retention_days from tenant policy.
    */
   protected async enrichRecordsForStorage(
     records: EventRecord[],
@@ -115,16 +100,8 @@ export abstract class AbstractEventStore<
   // ---------------------------------------------------------------------------
 
   /**
-   * An aggregate id is required to identify which stream to read. No aggregate
-   * type uses an empty string as its id, so an empty/whitespace id is always a
-   * caller bug (e.g. a re-fold enqueued with a missing aggregateId).
-   *
-   * Issuing the read anyway is actively harmful: `event_log` is
-   * `ORDER BY (TenantId, AggregateType, AggregateId, ...)`, so `AggregateId = ''`
-   * seeks to the empty-id key range — which collects every event ever written
-   * without an aggregate id — and materialises all their `EventPayload` blobs.
-   * In prod that read exceeds `max_memory_usage_per_query` and takes down the
-   * whole instance for every tenant. Short-circuit to an empty stream instead.
+   * Empty aggregate ID is a caller bug; reading it seeks the empty-id key range and crashes
+   * production. Short-circuit to an empty stream instead.
    */
   private hasMissingAggregateId(aggregateId: string): boolean {
     return String(aggregateId).trim().length === 0;
@@ -186,18 +163,8 @@ export abstract class AbstractEventStore<
   }
 
   /**
-   * Retrieves events with an EXPLICIT occurred-at lower bound, applied
-   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
-   * gated to time-local aggregate types because its callers supply a
-   * heuristic time.
-   *
-   * For reads that hold a provable bound of their own: a cursor tail
-   * catch-up wants only events ACCEPTED after its cursor, so occurred-at can
-   * be floored a safety window below that point and still prune every older
-   * weekly partition. The caller owns the margin — the bound MUST sit far
-   * enough below the wanted range that no delayed or replayed event's
-   * occurred-at can fall under it (rows with an unknown occurred time are
-   * always kept by the repositories, so the bound can never drop those).
+   * Retrieves events with an explicit occurred-at lower bound; caller must provide sufficient
+   * safety margin to avoid dropping delayed/replayed events.
    */
   async getEventsOccurredSince(
     aggregateId: string,

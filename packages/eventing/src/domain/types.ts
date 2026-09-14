@@ -1,14 +1,6 @@
 /**
- * Core types for the event sourcing library.
- *
- * Event and command types follow a taxonomy system:
- * `<provenance>.<domain>.<aggregate-type>.<specific-identifier>`
- *
- * Example: `lw.obs.span_ingestion.recorded`
- * - `lw`: Provenance (LangWatch)
- * - `obs`: Domain (Observability)
- * - `span_ingestion`: Aggregate type
- * - `recorded`: Specific identifier (event name)
+ * Core types for the event sourcing library using taxonomy-based identifiers.
+ * Format: `<provenance>.<domain>.<aggregate-type>.<specific-identifier>`
  */
 
 import { z } from "zod";
@@ -52,7 +44,7 @@ export const EventSchema = z.object({
   tenantId: TenantIdSchema,
   /** When this event was created/written (Unix timestamp in milliseconds, UTC). */
   createdAt: z.number().int().nonnegative(),
-  /** When the business action was initiated (Unix timestamp in milliseconds). Set by createEvent/recordToEvent. */
+  /** When the business action was initiated (Unix timestamp in milliseconds) */
   occurredAt: z.number().int().nonnegative(),
   /** Event type for routing and processing */
   type: EventTypeSchema,
@@ -73,12 +65,7 @@ type EventBase = z.infer<typeof EventSchema>;
 
 /**
  * Generic event type with type-safe payload and metadata.
- *
- * Events represent facts that have occurred in the system. They are immutable and
- * stored in the event store. Events are processed by handlers to build projections.
- *
- * Event types follow a taxonomy system.
- * For LangWatch Observability, event types are of the form: `lw.obs.<aggregate-type>.<event-name>`
+ * Immutable facts stored in the event store.
  */
 export type Event<Payload = unknown, Metadata = EventMetadataBase> = Omit<
   EventBase,
@@ -88,7 +75,7 @@ export type Event<Payload = unknown, Metadata = EventMetadataBase> = Omit<
   data: Payload;
   /** Metadata about the event, optional */
   metadata?: Metadata;
-  /** When the business action was initiated (Unix timestamp in milliseconds). Always present at runtime. */
+  /** When the business action was initiated (Unix timestamp in milliseconds) */
   occurredAt: number;
   /** Optional idempotency key for storage-level deduplication */
   idempotencyKey?: string;
@@ -146,9 +133,7 @@ export const ProjectionMetadataSchema = z.object({
 export type ProjectionMetadata = z.infer<typeof ProjectionMetadataSchema>;
 
 /**
- * Zod schema for projection envelope.
- * Wrapper returned by the projection pipeline to include metadata.
- * Uses the base ProjectionSchema. For custom projection schemas, use createProjectionEnvelopeSchema.
+ * Zod schema for projection envelope with base ProjectionSchema and metadata.
  */
 export const ProjectionEnvelopeSchema = z.object({
   projection: ProjectionSchema,
@@ -181,13 +166,7 @@ export type ProjectionEnvelope<TProjection extends Projection = Projection> = {
 };
 
 /**
- * Strategy for ordering events prior to processing.
- *
- * - "as-is": Preserves the order of events as provided (no sorting applied).
- *   Use when upstream (e.g., ClickHouse) has already provided correctly ordered events.
- * - "createdAt": Sorts events chronologically by their createdAt field (earliest first).
- *   Default strategy for most use cases.
- * - Custom function: Provide a comparator function for custom sorting logic.
+ * Strategy for ordering events prior to processing: "as-is", "createdAt", or a comparator.
  */
 export type EventOrderingStrategy<TEvent> =
   | "as-is"

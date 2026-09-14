@@ -372,15 +372,7 @@ export const incrementEsSubscriberEnqueueTotal = ({
 }) => subscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
 
 /**
- * `performed` — the aggregate's full history was re-read and replayed.
- * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
- * applied on top instead (the events are never lost; only the replay is skipped).
- * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
- * `incomplete` — the history read did not account for the state's applied
- * events even after retries (replica read lag), so the replay was abandoned
- * and the batch applied on top of the loaded state instead. Counted in
- * addition to `performed` (the attempt); a sustained rate means the event
- * log replica lags further than the re-fold retries wait.
+ * Fold refold outcomes: performed, declined, unavailable, or incomplete.
  */
 export const incrementEsFoldRefoldTotal = (
   projectionName: string,
@@ -499,16 +491,7 @@ export const incrementEsProcessIntentsSuppressed = ({
 }) => processIntentsSuppressed.labels(processName).inc(count);
 
 /**
- * The two store-side series, and the sink shape `EventSourcingServiceOptions.metrics`
- * accepts.
- *
- * They were declared in the platform application's own `server/metrics.ts`
- * while its composition root passed the sink in. That root is gone, so the
- * declarations live beside the `es_*` family they belong to and beside the
- * only code that can increment them. `NOOP_EVENT_SOURCING_METRICS` is the
- * default a process gets by leaving `metrics` out: the series is then not
- * published at all, which is the honest state — a panel that is flat because
- * nothing writes the metric reads exactly like a system that is idle.
+ * Store-side metrics series. Colocated with es_* family and the code that increments them.
  */
 const eventsStoredTotal = counter(
   "event_sourcing_events_stored_total",

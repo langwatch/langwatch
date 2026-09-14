@@ -61,20 +61,7 @@ export interface EventSourcingOptions {
    */
   processStore?: ProcessStore;
   /**
-   * Whether this process RUNS the process managers the pipelines it registers
-   * declare, or only PRODUCES commands onto them.
-   *
-   * `"run"` (the default) is the consumer's shape: a pipeline that declares a
-   * process manager needs a durable {@link ProcessStore}, and registering one
-   * without it fails at boot rather than half-running.
-   *
-   * `"producer-only"` is the shape a process that sends commands and claims no
-   * queue actually has. It is not a weaker `"run"`: the pipeline registers
-   * whole — every command dispatcher, every routing key the definition
-   * declares — and the runtime refuses BY NAME, once, to run the process
-   * managers rather than refusing the whole pipeline. The alternative was a
-   * process where one declaration in a definition made every command on it
-   * unsendable, which reads to a customer as a write that vanished.
+   * Process manager mode: "run" (default, requires ProcessStore) or "producer-only".
    */
   processManagerMode?: "run" | "producer-only";
 }
@@ -96,17 +83,8 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
 };
 
 /**
- * Central class for event sourcing infrastructure.
- *
- * Owns the event store, ONE global queue, a global job registry,
- * the projection registry, and all registered pipelines.
- *
- * Features:
- * - Lazy initialization: stores are created on first access
- * - Graceful degradation: if disabled, no errors are thrown
- * - Infrastructure is supplied through explicit store and queue ports
- * - Testable: supports dependency injection via createForTesting() / createWithStores()
- * - Closeable: close() shuts down all pipelines, the projection registry, and the global queue
+ * Central event sourcing infrastructure: event store, global queue, projection registry.
+ * Supports lazy initialization, graceful degradation, and dependency injection.
  */
 export class EventSourcing {
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.runtime");
@@ -310,15 +288,7 @@ export class EventSourcing {
         ? Record<string, EventSourcedQueueProcessor<any>>
         : CommandsToProcessors<Commands>
     >;
-    // One runtime, one registration per pipeline name, and a collision is
-    // fatal at boot rather than quiet.
-    //
-    // Handing the second registrant the first registration reads like
-    // idempotency and is not: the two definitions differ, so whichever ran
-    // first decides what the process can do. A producer-only definition that
-    // won a name this way kept the whole process's ingest draining into
-    // stand-ins that refuse every span, with one info line to say so. Compose
-    // exactly one registration per name and let the process state which.
+    // One runtime, one registration per pipeline name; collision is fatal at boot.
     if (this.pipelines.has(definition.metadata.name)) {
       throw new Error(this.describeDuplicateRegistration(definition));
     }
@@ -453,15 +423,7 @@ export class EventSourcing {
     if (this._globalQueue) {
       await this._globalQueue.close();
     }
-    // AFTER the queue, never before. Closing the registry only releases its
-    // router, and every dispatch that arrives afterwards drops its events with
-    // nothing above it to retry them — `eventSourcingService` catches the
-    // dispatch failure and carries on. While the queue is still draining it is
-    // very much still storing events, so a registry closed first is a registry
-    // discarding real work for the whole length of the drain: all 55 dropped
-    // batches in the 48h to 2026-08-17 landed after their pod's SIGTERM, the
-    // latest 26s into it. Ordering costs nothing here — `QueueManager.close()`
-    // is a no-op for the globally-owned queue.
+    // Close registry AFTER the queue, never before (see ADR-###).
     if (this.projectionRegistry.isInitialized) {
       await this.projectionRegistry.close();
     }
@@ -481,13 +443,7 @@ export class EventSourcing {
   }
 
   /**
-   * Says, once per process manager, that this process registered its pipeline
-   * and will not run it.
-   *
-   * Once rather than per command, because the fact is a property of the
-   * registration rather than of any dispatch, and a producer sends thousands.
-   * By name rather than by count, because "one process manager is not running
-   * here" is unactionable — which one it is, is the whole answer.
+   * Record that this process declines to run the given process managers.
    */
   private declineProcessManagers(definition: StaticPipelineDefinition<any, any, any>): void {
     const declined = [...definition.processManagers.keys()].filter(
@@ -564,19 +520,7 @@ export class EventSourcing {
   }
 
   /**
-   * Refuse a job this worker cannot route, instead of acknowledging it.
-   *
-   * Returning normally here would tell the queue the job SUCCEEDED: it is
-   * removed, its group advances, and the payload is gone. For a spend command
-   * that is money the ledger never records, and the gateway cannot notice
-   * because the ingest route already answered 200 and its spool segment is
-   * acked. The bug this replaces did exactly that, and a fleet running two
-   * builds at once lost whichever records happened to land on the older
-   * workers.
-   *
-   * Throwing puts the job back with the queue's normal bounded retry, so a
-   * worker that does have the pipeline picks it up. This generic path never
-   * decides on its own that a record is disposable.
+   * Refuse a job this worker cannot route: reject for retry, not acknowledge.
    */
   private rejectUnroutableJob(payload: Record<string, unknown>, queueName: string): never {
     const identity = EventSourcing.jobIdentity(payload);
@@ -692,18 +636,7 @@ export class EventSourcing {
     queueName: string,
   ): Promise<void> {
     if (payloads.length === 0) return;
-    // A coalesced batch is always one group → one registry entry. Resolve
-    // every payload and guard against a mixed/unknown batch (should never
-    // happen — the GroupQueue only coalesces same-group jobs — but a stray
-    // payload must never be misrouted to the wrong handler). On any mismatch
-    // fall back to per-item processing.
-    // Reject unroutable payloads UP FRONT so everything below works with a
-    // fully-resolved list. `rejectUnroutableJob` returns `never`, so this
-    // narrows `routed` to non-null for the compiler rather than for the
-    // reader only — which is what lets the rest of this function drop its
-    // non-null assertions (#6699). Behaviour is unchanged: a null entry
-    // could only ever reach the heterogeneous branch, which rejected it
-    // there anyway.
+    // Reject unroutable payloads upfront so lookupEntry returns only non-null.
     const routed = payloads.map((payload) => {
       const result = this.lookupEntry(payload);
       if (!result) this.rejectUnroutableJob(payload, queueName);

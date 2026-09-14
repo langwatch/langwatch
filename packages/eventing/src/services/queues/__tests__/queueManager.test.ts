@@ -16,7 +16,7 @@ import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
 
 /**
- * Creates a mock event handler definition in the shape expected by QueueManager.initializeHandlerQueues.
+ * Creates a mock event handler definition for QueueManager.initializeHandlerQueues.
  */
 function createMockEventHandlerDefinition(
   name: string,
@@ -42,7 +42,7 @@ function createMockEventHandlerDefinition(
 }
 
 /**
- * Creates a mock projection definition in the shape expected by QueueManager.initializeProjectionQueues.
+ * Creates a mock projection definition for QueueManager.initializeProjectionQueues.
  */
 function createMockProjectionDefinition(
   name: string,
@@ -57,7 +57,7 @@ function createMockProjectionDefinition(
 }
 
 /**
- * Creates a mock subscriber definition in the shape expected by QueueManager.initializeProjectionSubscriberQueues.
+ * Creates a mock subscriber definition for QueueManager.initializeProjectionSubscriberQueues.
  */
 function createMockSubscriberDispatchDefinition(
   name: string,

@@ -4,8 +4,7 @@ import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
 
 /**
- * Zod schema for Command objects.
- * Commands represent intent to change system state and are processed by command handlers to produce events.
+ * Zod schema for Command objects processed by command handlers.
  */
 export const CommandSchema = z.object({
   /**
@@ -41,7 +40,6 @@ type CommandBase = z.infer<typeof CommandSchema>;
 
 /**
  * Generic command type with type-safe payload and metadata.
- * Commands represent intent to change system state and are processed by command handlers to produce events.
  */
 export type Command<Payload = unknown, Metadata = Record<string, unknown>> = Omit<
   CommandBase,
@@ -71,28 +69,14 @@ export interface CommandHandler<
   EventType extends Event = Event,
 > {
   /**
-   * Processes a command, typically by validating state and emitting one or more events.
-   * This interface is intentionally generic and agnostic of storage or transport.
-   *
+   * Processes a command by validating state and emitting events.
    * @param command - The command to handle
-   * @returns Promise that resolves to an array of events to be stored
-   *
-   * **Note:** Handlers are typically async because they need to:
-   * - Fetch current state from stores
-   * - Validate business rules
-   * - Create and return events (framework will store them)
+   * @returns Array of events to be stored
    */
   handle(command: TCommand): CommandHandlerResult<EventType>;
 
   /**
-   * Optional post-store cleanup hook. When present, `processCommand` invokes this
-   * after `storeEventsFn` succeeds (event_log INSERT is durable). This is the
-   * correct place for best-effort side-effects that MUST NOT run before persistence
-   * (e.g., deleting a transient S3 spool). ADR-022.
-   *
-   * The original command is passed so that implementations can read command data
-   * directly rather than storing it as instance state (which would be a race bug
-   * when the handler instance is shared across parallel queue jobs).
+   * Optional post-store cleanup hook, invoked after events are persisted. See ADR-022.
    */
   cleanupAfterStore?(command: TCommand): Promise<void>;
 }
@@ -110,17 +94,7 @@ export function validateCommand(command: unknown): z.infer<typeof CommandSchema>
 }
 
 /**
- * Creates a command with type-safe payload and metadata.
- *
- * This function does not perform runtime validation because it receives already-validated types
- * (TenantId, CommandType) as parameters. For validating commands from external sources, use validateCommand().
- *
- * @param tenantId - Tenant identifier for multi-tenant isolation
- * @param aggregateId - The aggregate this command targets
- * @param type - Command type identifier
- * @param data - Command-specific payload
- * @param metadata - Optional metadata (e.g., correlation IDs, trace context)
- * @returns A new command object
+ * Creates a type-safe command. No runtime validation—pass pre-validated types only.
  */
 export function createCommand<Payload = unknown, Metadata = Record<string, unknown>>(
   tenantId: TenantId,

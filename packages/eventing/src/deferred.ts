@@ -8,20 +8,8 @@ import type { QueueSendOptions } from "./queues/queue.types.ts";
 export type CommandDispatcher<P> = (data: P, options?: QueueSendOptions<P>) => Promise<void>;
 
 /**
- * Typed container for a function that will be provided after construction.
- *
- * Replaces the ad-hoc `let x: T | null = null` + closure + null-check pattern
- * used in PipelineRegistry for self-referencing commands, post-registration
- * jobs, and cross-pipeline dispatchers.
- *
- * @example
- * ```ts
- * const dispatch = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
- * // Pass dispatch.fn to subscriber deps (before register)
- * const subscriber = createSubscriber({ resolveOrigin: dispatch.fn });
- * // Wire after register
- * dispatch.resolve(traceCommands.resolveOrigin);
- * ```
+ * Typed container for a function resolved after construction, for self-referencing
+ * commands and cross-pipeline dispatchers.
  */
 export class Deferred<Fn extends (...args: never[]) => unknown> {
   private _value: Fn | null = null;

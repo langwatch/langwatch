@@ -27,26 +27,8 @@ import { nowInstant } from "@langwatch/time";
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
 /**
- * Ready score for a payload whose own occurrence time orders its dispatch.
- *
- * A missing `occurredAt` means "we never recorded when this happened", not
- * "this happened in January 1970". The previous `?? 0` fallback meant the
- * latter: it staged the job with a ready score of epoch-plus-delay, which both
- * ranks it ahead of every real job and makes
- * `gq_oldest_pending_age_milliseconds` report about 56 years of backlog for the
- * whole queue (production, 2026-07-31 and 2026-08-03).
- *
- * Scoring an absent value at `Date.now()` matches every other producer in this
- * file - the `serializeByAggregate` branch scores `Date.now()` outright, and
- * `GroupQueue.send` does the same when no score function is registered.
- *
- * A value that IS present is handed over untouched, however odd it looks. It is
- * `GroupQueue`'s guard that judges it against the staging clock, and only there
- * is the queue name in scope to raise `gq_ready_score_implausible_total`.
- * Repairing it here would silently hide the producer that needs fixing - which
- * matters most for the highest-volume paths, where `occurredAt` is a
- * customer-supplied OTLP timestamp (`recordDataPoint`, `contributeMetricFacts`,
- * `contributeLogFacts`).
+ * Missing occurredAt defaults to Date.now() instead of epoch (which was causing false old-age
+ * metrics). Present values pass through untouched; GroupQueue validates them against the clock.
  */
 function occurredAtScore(payload: { occurredAt?: unknown }): number {
   const occurredAt = payload.occurredAt;
@@ -74,13 +56,7 @@ export interface JobRegistryEntry {
    */
   processBatch?: (payloads: any[], delivery?: JobDelivery) => Promise<void>;
   /**
-   * Max number of same-group jobs to coalesce into one `processBatch` call
-   * (including the dispatched job). Defaults to 1 (no coalescing).
-   *
-   * A resolver form is available for producers whose foldability depends on the
-   * individual job — a payload that will expand far beyond its queued size
-   * returns 1 and is processed on its own, because the drain's byte budget
-   * measures the QUEUED bytes and cannot see that expansion.
+   * Max same-group jobs in one `processBatch` call, or payload-based resolver.
    */
   coalesceMaxBatch?: number | ((payload: any) => number);
   /**
@@ -91,11 +67,7 @@ export interface JobRegistryEntry {
 }
 
 /**
- * How many same-group jobs this entry may fold in alongside the given one.
- *
- * A constant answers for every job; a resolver is asked about this one, which is
- * how a producer excludes the payloads it cannot safely fold. Absent means 1 —
- * no coalescing, the per-job path.
+ * How many same-group jobs fold here; resolver excludes unsafe payloads.
  */
 export function resolveCoalesceMaxBatch(
   entry: Pick<JobRegistryEntry, "coalesceMaxBatch">,
@@ -595,7 +567,7 @@ export class QueueManager<EventType extends Event = Event> {
     }
   }
 
-  /** Builds and registers one command's handler-registry entry (step 1 of `initializeCommandQueues`). */
+  /** Registers a command's handler-registry entry (step 1 of `initializeCommandQueues`). */
   private registerCommandHandlerEntry<Payload extends Record<string, unknown>>(
     registration: {
       name: string;

@@ -25,27 +25,8 @@ export type DefinedCommandClass<TCommandData, TCmdType extends CommandType> = Co
 };
 
 /**
- * Defines a pure command handler class from a Zod event data schema.
- *
- * The command data schema is auto-derived by merging envelope fields (tenantId,
- * occurredAt, idempotencyKey) into the event data schema. The handle() method
- * strips envelope fields and creates an event with EventUtils.createEvent().
- *
- * Returns a class with a zero-arg constructor, satisfying queueManager's
- * `new handlerClass()` constraint.
- *
- * @example
- * ```typescript
- * export const StartSuiteRunCommand = defineCommand({
- *   commandType: "lw.suite_run.start",
- *   eventType: "lw.suite_run.started",
- *   eventVersion: "2026-03-01",
- *   aggregateType: "suite_run",
- *   schema: suiteRunStartedEventDataSchema,
- *   aggregateId: (d) => d.batchRunId,
- *   idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}:${d.idempotencyKey}`,
- * });
- * ```
+ * Defines a command handler class from a Zod event data schema.
+ * Envelope fields (tenantId, occurredAt, idempotencyKey) are auto-merged.
  */
 export function defineCommand<
   TEventDataSchema extends z.ZodObject<z.ZodRawShape>,

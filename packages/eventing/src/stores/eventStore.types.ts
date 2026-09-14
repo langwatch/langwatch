@@ -4,14 +4,7 @@ import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
 
 /**
- * Zod schema for event store read context.
- * Context for reading events from the event store.
- *
- * **Security Note:** tenantId is REQUIRED for tenant isolation.
- * All queries MUST filter by tenant to prevent cross-tenant data access.
- *
- * **Concurrency Note:** Implementations should return a consistent snapshot of events
- * for a given aggregateId, even under concurrent writes.
+ * Event store read context; tenantId is REQUIRED for tenant isolation.
  */
 export const EventStoreReadContextSchema = z.object({
   /**
@@ -71,15 +64,7 @@ export interface EventStoreEventReadInput {
 }
 
 /**
- * Read-only event store for querying events.
- * Use this interface when you only need to read events without storing new ones.
- *
- * **Implementation Requirements:**
- * - MUST enforce tenant isolation when context.tenantId is provided
- * - MUST validate tenantId using validateTenantId() before queries
- * - SHOULD validate aggregateId format before querying
- * - SHOULD return events in a consistent order (typically by timestamp)
- * - MUST return readonly array to prevent caller mutations
+ * Read-only event store; enforces tenant isolation and returns readonly arrays.
  */
 export interface ReadOnlyEventStore<EventType extends Event = Event> {
   /**
@@ -93,21 +78,8 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   getEvent(input: EventStoreEventReadInput): Promise<EventType>;
 
   /**
-   * Retrieves all events for a given aggregate.
-   *
-   * @param aggregateId - The aggregate to fetch events for
-   * @param context - Security context with required tenantId
-   * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
-   * @param anchorOccurredAtMs - Optional reference time (ms) of the work that
-   *   triggered this read. For time-local aggregate types it lets the store
-   *   lower-bound the scan to a window around this time so ClickHouse can prune
-   *   old partitions; it never changes the result set for such aggregates. See
-   *   `rehydrationLowerBoundMs`.
-   * @returns Readonly array of events, typically ordered by timestamp
-   * @throws {Error} If tenantId is missing or invalid
-   *
-   * **Security:** Implementations MUST call validateTenantId(context, 'getEvents')
-   * before executing the query to ensure tenant isolation.
+   * Retrieves all events for an aggregate; optional anchorOccurredAtMs lets
+   * time-local stores prune old partitions. Validates tenant isolation before queries.
    */
   getEvents(
     aggregateId: string,
@@ -117,17 +89,8 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   ): Promise<readonly EventType[]>;
 
   /**
-   * Retrieves events with an EXPLICIT occurred-at lower bound (ms), applied
-   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
-   * gated to time-local aggregate types.
-   *
-   * For reads that hold a provable bound of their own, e.g. a cursor tail
-   * catch-up that only wants events accepted after its cursor. The caller
-   * owns the safety margin: the bound MUST sit far enough below the wanted
-   * range that no delayed or replayed event's occurred-at can fall under it.
-   *
-   * **Security:** Implementations MUST validate tenantId exactly as for
-   * `getEvents`.
+   * Retrieves events with explicit occurred-at lower bound; caller must provide sufficient
+   * safety margin. Validates tenantId like getEvents.
    */
   getEventsOccurredSince(
     aggregateId: string,
@@ -137,18 +100,7 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   ): Promise<readonly EventType[]>;
 
   /**
-   * Retrieves events for a given aggregate up to and including a specific event.
-   * Returns all events that come before or equal to the specified event in chronological order.
-   *
-   * @param aggregateId - The aggregate to fetch events for
-   * @param context - Security context with required tenantId
-   * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
-   * @param upToEvent - The event to fetch up to (inclusive)
-   * @returns Readonly array of events up to and including the specified event, typically ordered by timestamp
-   * @throws {Error} If tenantId is missing or invalid, or if the specified event is not found
-   *
-   * **Security:** Implementations MUST call validateTenantId(context, 'getEventsUpTo')
-   * before executing the query to ensure tenant isolation.
+   * Retrieves events up to and including a specific event; validates tenant isolation.
    */
   getEventsUpTo(
     aggregateId: string,
@@ -158,17 +110,8 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   ): Promise<readonly EventType[]>;
 
   /**
-   * Cursor-paginated variant of {@link getEventsUpTo}: returns at most `limit`
-   * events ordered by (timestamp ASC, eventId ASC), strictly after the `after`
-   * cursor (or from the start when `after` is undefined). Lets a re-fold stream
-   * a huge aggregate's history page-by-page instead of materialising every
-   * event and payload at once — the difference between a bounded working set
-   * and OOMing on a 100k-event trace. Optional: callers must check for this
-   * method's presence and fall back to {@link getEventsUpTo} themselves —
-   * `AbstractEventStore.getEventsUpToPaged` throws if the underlying
-   * repository lacks paging support rather than silently degrading.
-   *
-   * **Security:** Implementations MUST call validateTenantId(context, ...).
+   * Cursor-paginated variant of getEventsUpTo; enables paging large histories without
+   * materializing all events. Optional: callers must check presence and fall back to getEventsUpTo.
    */
   getEventsUpToPaged?(request: {
     aggregateId: string;
@@ -180,27 +123,8 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   }): Promise<readonly EventType[]>;
 
   /**
-   * Counts events that come before a given event in chronological order.
-   * Used to compute sequence numbers for event ordering.
-   *
-   * Counts events where:
-   * - `timestamp < beforeTimestamp`, OR
-   * - `timestamp === beforeTimestamp AND id < beforeEventId`
-   *
-   * **Performance:** Implementations SHOULD use efficient COUNT queries rather than
-   * fetching all events. For example, ClickHouse implementations should use COUNT(*)
-   * with WHERE clause filtering, leveraging indexes.
-   *
-   * @param aggregateId - The aggregate to count events for
-   * @param context - Security context with required tenantId
-   * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
-   * @param beforeTimestamp - The timestamp to compare against
-   * @param beforeEventId - The event ID to compare against (for tie-breaking when timestamps are equal)
-   * @returns The count of events that come before the specified event
-   * @throws {Error} If tenantId is missing or invalid
-   *
-   * **Security:** Implementations MUST call validateTenantId(context, 'countEventsBefore')
-   * before executing the query to ensure tenant isolation.
+   * Counts events before a given event; should use efficient COUNT with indexes for
+   * performance. Validates tenantId for security.
    */
   countEventsBefore(
     aggregateId: string,
@@ -212,45 +136,12 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
 }
 
 /**
- * Full event store with read and write capabilities.
- * Extends ReadOnlyEventStore with the ability to store events.
- *
- * **Implementation Requirements:**
- * - MUST validate events using isValidEvent before storage
- * - MUST enforce tenant isolation (events should only be queryable by same tenant)
- * - MUST validate tenantId using validateTenantId() before any operations
- * - SHOULD be idempotent (storing the same event twice should not fail)
- * - SHOULD support concurrent writes safely
+ * Full event store with read and write capabilities; validates events and enforces
+ * tenant isolation.
  */
 export interface EventStore<EventType extends Event = Event> extends ReadOnlyEventStore<EventType> {
   /**
-   * Stores one or more events atomically.
-   *
-   * @param events - Events to store. Implementations MUST validate these before storage.
-   * @param context - Security context with required tenantId
-   * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
-   * @throws {Error} If events are malformed, tenantId is missing, or validation fails
-   *
-   * **Security:** Implementations MUST:
-   * 1. Call validateTenantId(context, 'storeEvents') to ensure tenantId is present
-   * 2. Verify all events belong to the same tenant as context
-   * 3. Enforce that all events in the batch belong to the same tenant
-   * 4. Filter queries by tenantId to prevent cross-tenant access
-   *
-   * **Concurrency:** Should be safe for concurrent calls with different aggregateIds.
-   *
-   * @example
-   * ```typescript
-   * async storeEvents(
-   *   events: readonly Event[],
-   *   context: EventStoreReadContext,
-   *   aggregateType: AggregateType
-   * ): Promise<void> {
-   *   EventUtils.validateTenantId(context, 'EventStore.storeEvents');
-   *   // Verify all events belong to context.tenantId
-   *   // ... proceed with storage
-   * }
-   * ```
+   * Stores events atomically; validates and verifies tenant ownership before storage.
    */
   storeEvents(
     events: readonly EventType[],

@@ -18,13 +18,9 @@ export const TenantIdSchema = z
 export type TenantId = z.infer<typeof TenantIdSchema>;
 
 /**
- * Creates a TenantId from a string value.
- * This function validates that the value is a non-empty string using the schema.
- *
- * @param value - The string value to convert to a TenantId
- * @returns A TenantId branded type
- * @throws {SecurityError} If the value is empty, ir not a string
- * @throws {Error}
+ * Creates a TenantId from a string, validating it is non-empty.
+ * @param value - The string to convert to TenantId
+ * @throws {SecurityError} If the value is invalid
  */
 export function createTenantId(value: string): TenantId {
   try {

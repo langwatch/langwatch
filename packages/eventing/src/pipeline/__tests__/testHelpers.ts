@@ -259,7 +259,6 @@ export const BASE_COMMAND_HANDLER_SCHEMA = defineCommandSchema(
 
 /**
  * Creates a minimal pipeline definition setup for common test patterns.
- * Returns eventStore, globalQueue, globalJobRegistry, and a helper function to build a pipeline definition with a handler.
  */
 export function createMinimalPipelineDefinition() {
   const eventStore = createMockEventStore<TestEvent>();

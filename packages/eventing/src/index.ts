@@ -1,21 +1,5 @@
 /**
- * Event Sourcing Module
- *
- * This module provides event sourcing infrastructure for the LangWatch application.
- * Create an EventSourcing instance during application startup with explicit dependencies.
- *
- * @example
- * ```typescript
- * import { EventSourcing } from '~/server/event-sourcing';
- *
- * const es = new EventSourcing({
- *   clickhouse: clickhouseClient,
- *   redis: redisConnection,
- * });
- *
- * // In tests
- * const es = EventSourcing.createForTesting({ eventStore: memoryStore });
- * ```
+ * Event Sourcing Module: event sourcing infrastructure with explicit dependencies.
  */
 
 // Commands

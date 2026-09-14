@@ -7,21 +7,8 @@ import type { EventRepository } from "./repositories/eventRepository.types.ts";
 import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory.ts";
 
 /**
- * Simple in-memory EventStore used for tests and local development.
- *
- * **WARNING: NOT THREAD-SAFE**
- * This implementation is NOT safe for concurrent access.
- *
- * **Use Cases:**
- * - Unit tests
- * - Local development
- * - Single-threaded environments
- *
- * **DO NOT USE in production with multiple workers/processes.**
- * Use `EventingClickHouseEventStore` or another thread-safe implementation instead.
- *
- * Extends {@link AbstractEventStore} with:
- * - `postProcessEvents()`: sorts by timestamp then id, then deep clones to prevent mutation
+ * In-memory EventStore for tests and local development. NOT thread-safe; use
+ * EventingClickHouseEventStore in production.
  */
 export class EventStoreMemory<
   EventType extends Event = Event,

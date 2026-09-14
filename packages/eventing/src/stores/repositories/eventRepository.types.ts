@@ -41,15 +41,8 @@ export interface EventRepository {
   }): Promise<EventRecord>;
 
   /**
-   * Retrieves all event records for a given aggregate.
-   * Returns raw records without validation or transformation.
-   *
-   * `occurredAtFromMs`, when provided, lower-bounds the scan to events with
-   * `EventOccurredAt >= occurredAtFromMs` (events with an unknown occurred time
-   * of 0 are always kept). Callers must only pass it when every event of the
-   * aggregate is guaranteed to be at or after that bound — see
-   * `rehydrationLowerBoundMs`. It is purely a partition-pruning optimisation and
-   * must never change the result set for a correctly-classified aggregate.
+   * Retrieves event records; occurredAtFromMs is partition-pruning only, must not
+   * change result set for correctly-classified aggregates.
    */
   getEventRecords(
     tenantId: string,
@@ -59,17 +52,8 @@ export interface EventRepository {
   ): Promise<EventRecord[]>;
 
   /**
-   * Retrieves event records up to and including a specific event.
-   * Returns raw records without validation or transformation.
-   * Events are filtered where:
-   * - timestamp < upToTimestamp, OR
-   * - timestamp = upToTimestamp AND eventId <= upToEventId
-   *
-   * `occurredAtFromMs` carries the same meaning and the same caveats as on
-   * {@link EventRepository.getEventRecords}: a partition-pruning lower bound on
-   * `EventOccurredAt`, supplied by `rehydrationLowerBoundMs`. The upper bound
-   * above is on EventTimestamp, which is NOT the partition key, so without this
-   * the read walks every weekly partition ever written.
+   * Retrieves event records up to a specific event; occurredAtFromMs prunes
+   * partitions. Filters by timestamp and eventId.
    */
   getEventRecordsUpTo(request: {
     tenantId: string;
@@ -81,16 +65,8 @@ export interface EventRepository {
   }): Promise<EventRecord[]>;
 
   /**
-   * Cursor-paginated variant of `getEventRecordsUpTo`: returns at most `limit`
-   * records ordered by (EventTimestamp ASC, EventId ASC), starting strictly
-   * after the `after` cursor (or from the beginning when `after` is undefined).
-   * Bounds the working set so a re-fold of a huge aggregate (e.g. a 100k-span
-   * trace) streams the history page-by-page instead of materialising every
-   * EventPayload blob at once — which would blow `max_memory_usage_per_query`
-   * and OOM the ClickHouse instance. Optional: an implementation that doesn't
-   * support paging should leave this undefined so callers can detect its
-   * absence and use the unbounded `getEventRecordsUpTo` themselves — there is
-   * no automatic fallback once this method is called.
+   * Cursor-paginated variant; streams history page-by-page for large aggregates.
+   * Optional: callers detect absence and fall back to getEventRecordsUpTo.
    */
   getEventRecordsUpToPaged?(request: {
     tenantId: string;
