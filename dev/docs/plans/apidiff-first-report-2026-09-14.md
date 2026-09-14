@@ -137,3 +137,46 @@ organization ×4, model-defaults, model-providers ×2 all answer now).
 - `mutation-not-visible` (GET /api/model-providers): derivative of the
   intended 401→200 publication — main 401s the read, so the created entity
   can never appear on that side. Benign.
+
+## Run 6 (2026-09-14, all three new behaviors aboard)
+
+Worktree refreshed to fadcde0908 (webhook members 4f23924d2b, callerVoice
+74478fbbc6, entitled pass 5487ea8f9c, error-improved acceptance 73ebad8e43,
+license source aab9bce150). Exit 1: 21 known causes, 2 new; 192/336 probed
+(up from 171), 106 differing. Ledger/report: `.apidiff/*-20260914-r6.json`.
+
+**The Enterprise gate resolved itself the right way.** With aab9bce150 the
+branch reads the seeded license and resolves ENTERPRISE, so 5 of the 6
+gated management-API operations now agree outright (200/200, 201/201) in
+the BASE pass. The entitled pass found nothing gated and correctly stayed
+silent — dormant-but-verified, armed for the next gated surface. The r5
+"tier override product decision" is closed: self-hosted resolves the plan
+it licensed, no policy override needed.
+
+**Fixes confirmed:** webhooks endpoints/event-types no longer 500 (they
+moved to the known 401→200 publication bucket — main still refuses the
+probe credential); the callerVoice ZodError is gone from every log.
+
+**The 2 new causes are one unmasked defect:** organization/invites answers
+503 (`OrganizationCapabilityUnavailableError`, organization.app.ts:262 —
+the `#invitations` named-refusal fallback) now that requests get past the
+gate. Missing member wiring, b383462d96 family. Lane
+`organization-invitations-member` spawned.
+
+**One second-layer defect revealed:** POST /api/scenarios still 500s —
+callerVoice fixed, creation now dies in `platformUrl`
+(scenario.app.ts:721): `apiModuleConfig()` wires publicBaseUrl slices for
+suite/dataset/evaluator but scenario has no entry. Crashes scenario
+creation on any deployment without the slice. Lane `scenario-config-slice`
+spawned.
+
+**error-improved:** zero matches this run — nothing to accept, mechanism
+verified wired and exit-neutral.
+
+**Baseline candidates for the next accepted-ledger:** 401→200 (13 ops) and
+401→201 (2) publications, mutation-not-visible (2, derivative),
+body-value-diff on organization/members (seed email differs:
+admin@haven.localhost vs admin@mail.langwatch.localhost — fixture drift,
+not behavior). Still needs-product-decision: permission-leak ×3
+(model-defaults/providers entity visibility), permission-diff:200-404
+(governance ingestion-templates).
