@@ -280,7 +280,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           langwatchEndpoint,
           langwatchApiKey,
         }),
-        ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+        ...buildMaxTurnsRunConfig({
+          jobData,
+          scenarioMaxTurns: scenario.maxTurns,
+        }),
         ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
         metadata: {
           langwatch: {
@@ -326,6 +329,33 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
     process.exit(0);
   });
+}
+
+/**
+ * The `maxTurns` override to pass to `ScenarioRunner.run`, if any.
+ *
+ * An agent-first run (agent-first-script.ts) spends its first turn on the
+ * greeting and the caller's opening reply — a turn the judge is never asked
+ * about — so it needs one more turn than usual to keep the same judged-turn
+ * budget as every other run. Only the non-scripted (judge-driven) cast pays
+ * that cost: an agent test's script ends in `succeed()` and never consults
+ * `maxTurns` at all.
+ */
+function buildMaxTurnsRunConfig({
+  jobData,
+  scenarioMaxTurns,
+}: {
+  jobData: ChildProcessJobData;
+  scenarioMaxTurns: number | null | undefined;
+}): { maxTurns?: number } {
+  const bumpForGreeting =
+    !jobData.script && isAgentSpeaksFirst(jobData.adapterData);
+  if (scenarioMaxTurns == null && !bumpForGreeting) return {};
+  return {
+    maxTurns:
+      (scenarioMaxTurns ?? ScenarioRunner.DEFAULT_MAX_TURNS) +
+      (bumpForGreeting ? 1 : 0),
+  };
 }
 
 /**

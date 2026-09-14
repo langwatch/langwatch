@@ -78,21 +78,23 @@ function fakeExecutor() {
 describe("buildIsAgentSpeaksFirstScript", () => {
   describe('given a phone target whose agent greets on connect and "Agent speaks first" is on', () => {
     /** @scenario "A callee that greets on connect opens the call when Agent speaks first is on" */
-    it("opens the run with the agent's turn, then proceeds to the simulator/judge loop", async () => {
+    it("opens with the greeting, then the caller's reply and the agent's response, before proceeding", async () => {
       const script = buildIsAgentSpeaksFirstScript(phoneVoiceData(true));
 
-      // The run opens with the agent's greeting turn, then hands over.
+      // The run opens with the agent's greeting, the caller's reply and the
+      // agent's response — all scheduled explicitly — before handing over.
       expect(script).toBeDefined();
-      expect(script).toHaveLength(2);
+      expect(script).toHaveLength(4);
 
       const { calls, executor } = fakeExecutor();
       for (const step of script!) {
         await step({} as never, executor as never);
       }
 
-      // First the callee greets (agent turn), then the normal loop runs to a
-      // conclusion (proceed) — so the caller replies only after the greeting.
-      expect(calls).toEqual(["agent", "proceed"]);
+      // Greeting, caller reply, agent response, then the normal loop takes
+      // over (proceed) — the judge can only be reached after the caller has
+      // actually spoken, not on the greeting alone.
+      expect(calls).toEqual(["agent", "user", "agent", "proceed"]);
     });
   });
 
