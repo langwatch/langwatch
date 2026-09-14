@@ -380,7 +380,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
         if (typeof value === "object" && !Array.isArray(value) && value !== null) {
           setDefaultSettings(value, `${prefix}.${key}`);
         } else {
-          //@ts-expect-error: the path is built at runtime, so it is not one of the form's literal field paths
+          //@ts-expect-error: runtime-built path not a literal form field
           form.setValue(`${prefix}.${key}`, value);
         }
       });

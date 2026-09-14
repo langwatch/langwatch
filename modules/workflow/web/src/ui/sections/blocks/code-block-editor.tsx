@@ -47,14 +47,8 @@ export type CodeBlockEditorProps = {
 };
 
 /**
- * CodeBlockEditor - A reusable component for displaying and editing code.
- *
- * Displays a syntax-highlighted preview with an "Edit" overlay on hover.
- * Clicking opens a full-screen Monaco editor modal.
- *
- * Used in:
- * - BasePropertiesPanel for workflow code fields
- * - AgentCodeEditorDrawer for code-based agents
+ * Reusable code editor with syntax highlighting and full-screen modal.
+ * Used in BasePropertiesPanel and AgentCodeEditorDrawer.
  */
 export function CodeBlockEditor({
   code,

@@ -363,23 +363,8 @@ export function FieldsDefinition({
 }
 
 /**
- * FieldsForm - Form component for editing node parameters, inputs, or outputs
- *
- * Architecture:
- * - All UI updates flow through react-hook-form state first
- * - Form changes are watched and debounced before updating the node
- * - This prevents race conditions and ensures form state stays in sync
- *
- * Why form state instead of direct node updates?
- * - Prevents field resets when other fields change (e.g., LLM config resetting)
- * - Ensures all fields update atomically through form validation
- * - Debouncing reduces unnecessary node updates during rapid changes
- *
- * Data flow:
- * 1. User changes field → setValue() updates form state
- * 2. watch() detects form change → triggers debounced submit
- * 3. onSubmit() reads form state → updates node via setNode()
- *
+ * Form component for editing node parameters with debounced updates.
+ * React-hook-form state prevents race conditions and field resets.
  */
 export function FieldsForm({
   node,

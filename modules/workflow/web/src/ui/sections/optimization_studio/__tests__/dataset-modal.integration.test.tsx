@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The workflow dataset dialog (shared picker/editor on the entry-point node). Uses the real workflow store; only tRPC transport and drawer registry are mocked. See specs/datasets/studio-choose-dataset.feature.
+ * Workflow dataset dialog (picker/editor on entry-point node).
+ * Uses real store; mocks tRPC transport and drawer registry.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

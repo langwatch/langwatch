@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Evaluate-time autosave: with no Fast model resolved, the auto-committed version keeps the "autosaved" fallback and never fires commit-message generation, so no missing-model toast interrupts the run. See specs/model-providers/missing-model-popup.feature.
+ * Without Fast model: autosaved version persists and commit-message generation is skipped.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

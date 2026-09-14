@@ -1,5 +1,6 @@
 /**
- * Pushing a workflow's latest graph onto its replicas. Every replica starts selected, since the reader opened this to push. Reset is keyed on the replica IDs AS A VALUE, not the query result's identity, or a refetch resets choices mid-dialog. Load errors go through the host's failure notice, not a local alert.
+ * Push workflow graph to replicas (all pre-selected).
+ * Reset keyed on ID values to prevent mid-dialog changes from refetches.
  */
 
 import { Button, Text, VStack } from "@chakra-ui/react";

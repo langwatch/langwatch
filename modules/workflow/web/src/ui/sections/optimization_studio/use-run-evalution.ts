@@ -139,7 +139,7 @@ export const useRunEvalution = () => {
 
       let versionId =
         workflow_version_id ?? (latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id);
-      // Automatically generate a new version if there are changes and no version id was provided (e.g. when running from the wizard)
+      // Generate new version if changes but no version ID provided
       if (hasChanges && !workflow_version_id) {
         let commitMessage = previousVersion ? "autosaved" : "first version";
         if (previousVersionDsl && resolvedCommitMessageModel.data != null) {

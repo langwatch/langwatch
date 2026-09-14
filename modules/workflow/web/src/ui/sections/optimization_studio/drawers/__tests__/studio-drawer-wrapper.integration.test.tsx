@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The node drawer header's "..." menu (Duplicate/Delete) for regular component nodes; structural entry/end nodes cannot be duplicated or deleted, so it's hidden for them. See specs/optimization-studio/node-duplicate-delete-menu.feature.
+ * Node drawer header menu (Duplicate/Delete) for component nodes only.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

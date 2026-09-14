@@ -417,23 +417,9 @@ export default function OptimizationStudio() {
 
       <StudioWorkflowRunUntilHereDialog />
       {/*
-        THREE GLOBAL MOUNTS DID NOT TRAVEL, and each one is a real loss rather
-        than an omission.
-
-        `CurrentDrawer` is the application's drawer registry — it imports every
-        drawer in the product — and `GlobalTraceV2DrawerMount` and
-        `GlobalUpgradeModal` are the application's chrome for the same reason.
-        The studio mounted its own copies because its address has no dashboard
-        layout above it; a feature-web package can mount none of the three, and
-        the composing application has no overlay slot to fill them from yet.
-
-        What that costs, exactly: the node palette's pickers (`promptList`,
-        `evaluatorList`, `agentList`, `addOrEditDataset`) still write their
-        `?drawer.open=...` address, and nothing opens it; a trace opened from the
-        results panel writes its address and nothing opens it; and a save
-        refused by a plan limit reports as a failure notice rather than as the
-        upgrade dialog. The navigation is correct and waiting for a drawer host
-        in `apps/ui`. Recorded in this family's manifest row.
+        Global mounts (CurrentDrawer, GlobalTraceV2DrawerMount, GlobalUpgradeModal) not ported:
+        studio has no layout/overlay slot. Breaks drawers, traces, and upgrade dialog.
+        Pending app-level overlay slot in apps/ui.
       */}
     </div>
   );

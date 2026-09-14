@@ -11,16 +11,8 @@ import type {
 } from "./workflow-properties.ports.ts";
 
 /**
- * The full vocabulary an evaluator can return. When the workflow
- * behaves as an evaluator, the End node's results are exactly these
- * four - fixed identifiers and types, no add/remove/rename. Every
- * result is optional: connect any combination (a pass/fail, a score,
- * both, or neither) and unconnected results are simply omitted.
- *
- * `details` comes first: it carries the reasoning, and for an LLM judge
- * the reasoning should precede the verdict so the model reasons before
- * deciding. It also keeps the scaffold's reasoning -> details edge from
- * crossing the verdict edge.
+ * Evaluator return vocabulary: four fixed results (all optional).
+ * Details comes first so reasoning precedes verdict for LLM judges.
  */
 export const EVALUATOR_RESULT_FIELDS: Field[] = [
   { identifier: "details", type: "str", optional: true },

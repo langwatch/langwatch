@@ -1,18 +1,7 @@
 /**
- * A crash inside the create dialog's body, kept inside the dialog.
- *
- * `platform/app`'s `IsolatedErrorBoundary` is what the create dialog wrapped
- * its content in, and it is `react-error-boundary` plus a fallback panel plus
- * `explainAnyError`, which resolves copy from the application's code-keyed
- * presentation registry. None of that travels: the registry is the
- * application's, and adding a runtime dependency to render one panel is not
- * what the boundary is for.
- *
- * WHAT THE BOUNDARY IS FOR is that a render-time crash in a template card or
- * an emoji picker must not take the page down with it. That property is a
- * fourteen-line class component, and it is stated here rather than imported.
- * The words are the fallback's own, not a code's, because a render crash is by
- * definition something we could not name.
+ * Keeps render crashes in template cards and emoji pickers from taking the page down.
+ * Can't use IsolatedErrorBoundary (would pull in the app's registry).
+ * Hardcoded text because render crashes can't be named.
  */
 
 import { Alert } from "@chakra-ui/react";

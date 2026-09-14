@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The Evaluate dialog's version description is required, but the red ring must not appear until submit is attempted — a customer disliked an already-red field on open.
+ * Version field required; validation error shows on submit only.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

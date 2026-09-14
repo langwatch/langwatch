@@ -2,16 +2,8 @@ import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
 import { useState } from "react";
 
 /**
- * Canonical person avatar: renders the uploaded/SSO `image` when present and
- * falls back to the initials of `name`, then a silhouette when neither is set —
- * the single fallback chain every person-avatar surface shares.
- *
- * The `onError` guard tracks the *broken URL* (not a bare boolean) so that when
- * `image` changes to a new URL — the user uploads a new photo mid-session, or
- * the component is reused across people — a previously-broken image doesn't
- * stay latched to the fallback. Mirrors `PresenceAvatar`, which predates this
- * component and keeps its own copy for its presence-specific styling.
- *
+ * Person avatar with fallback chain: image → initials → silhouette.
+ * The onError guard tracks broken URLs so reused components don't stick to stale fallbacks.
  * Spec: specs/settings/user-avatar.feature
  */
 export function UserAvatar({

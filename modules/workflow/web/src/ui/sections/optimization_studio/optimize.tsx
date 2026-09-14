@@ -184,7 +184,7 @@ export function OptimizeModalContent({
       "params",
       Object.entries({ ...optimizer.params, ...params }).reduce(
         (acc, [key, value]) => {
-          // @ts-expect-error: the accumulator is keyed by the optimizer's dynamic param names, which OptimizeForm["params"] does not enumerate
+          // @ts-expect-error: accumulator keyed by optimizer's dynamic param names
           acc[key] = value ? value : optimizer.params[key];
           return acc;
         },
@@ -470,17 +470,7 @@ export function OptimizeModalContent({
               </GridItem>
             )}
           </Grid>
-          {/* {"max_rounds" in optimizer.params && (
-          <VStack align="start" width="full" gap={2}>
-            <SmallLabel>Max Rounds</SmallLabel>
-            <Input
-              {...form.register("params.max_rounds")}
-              type="number"
-              min={1}
-              max={100}
-            />
-          </VStack>
-        )} */}
+          {/* Max rounds field disabled */}
           {hasProvidersWithoutCustomKeys ? (
             <AddModelProviderKey
               runWhat="run optimizations"

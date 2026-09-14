@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The studio evaluations panel links to the full experiment results page through the run summary footer's actions slot.
+ * The run summary footer links to full experiment results.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
