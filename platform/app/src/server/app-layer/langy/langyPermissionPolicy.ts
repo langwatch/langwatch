@@ -191,7 +191,12 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
  * and delete all remain.
  */
 const AUTH_SCOPE_FAMILIES: Record<string, string> = {
-  sso: "SSO and directory-sync configuration controls authentication authority",
+  sso: "an SSO connection decides how everyone in the org signs in",
+  // Its own entry rather than a clause in `sso`'s: they are two families in
+  // `Resources`, and a family with no entry of its own is exactly what the
+  // classification tripwire exists to catch. Writing it provisions and
+  // deprovisions membership, which changes who can do what.
+  scim: "directory sync writes who exists in the organization",
   organization: "org membership and role administration IS the auth scope",
   team: "team membership administration decides who holds what",
   project:

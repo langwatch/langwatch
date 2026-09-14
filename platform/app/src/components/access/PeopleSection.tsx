@@ -118,14 +118,18 @@ export function PeopleSection({ organizationId }: { organizationId: string }) {
   );
 }
 
-function PeopleList({
+/**
+ * Everything the People tab reads, decides and can do.
+ *
+ * Separated from the markup because the two are read for different reasons: a
+ * reader here is asking what this page knows and who may change it, and a
+ * reader below is asking what it looks like. Keeping them in one body meant
+ * neither question had an answer shorter than the whole component.
+ */
+function usePeopleListState({
   organization,
-  teams,
-  activePlan,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
-  teams: TeamWithProjects[];
-  activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
   const { hasPermission } = useOrganizationTeamProject({
@@ -199,7 +203,7 @@ function PeopleList({
     activePlanSource: activePlan.planSource,
   });
 
-  const deleteMemberMutation = api.organization.deleteMember.useMutation();
+  const { deleteMember, deleting } = useDeleteMember(organization.id);
 
   // WHO IS ABOUT TO BE REMOVED, and null while nobody is. The row menu called
   // the mutation straight from its click handler, so a stray press on "Remove
@@ -210,39 +214,6 @@ function PeopleList({
     userId: string;
     label: string;
   } | null>(null);
-
-  const deleteMember = (userId: string) => {
-    deleteMemberMutation.mutate(
-      { organizationId: organization.id, userId },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Member removed successfully",
-            description: "The member has been removed from the organization.",
-            type: "success",
-            duration: 5000,
-          });
-          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
-            .invalidate()
-            .catch((error) => {
-              captureException(error, {
-                tags: { userId, organizationId: organization.id },
-              });
-            });
-          void queryClient.limits.getUsage.invalidate();
-          void queryClient.licenseEnforcement.checkLimit.invalidate();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: "Please try that again",
-            type: "error",
-            duration: 5000,
-          });
-        },
-      },
-    );
-  };
 
   const { setMemberDisabled } = useMemberDisableAction({
     organizationId: organization.id,
@@ -326,194 +297,90 @@ function PeopleList({
     canManage,
   });
 
-  const memberRows =
-    cut === "all" || cut === "members"
-      ? sortedMembers.map((member) => (
-          <IdentityRow
-            key={`member:${member.userId}`}
-            id={member.userId}
-            name={member.user.name}
-            address={member.user.email}
-            image={member.user.image}
-            muted={!!member.disabledAt}
-            data-testid="member-row"
-            onOpen={() => openDrawer("person", { userId: member.userId })}
-            badges={
-              <>
-                {member.role === "EXTERNAL" && (
-                  <Badge colorPalette="gray" size="sm">
-                    Lite Member
-                  </Badge>
-                )}
-                {member.user.deactivatedAt && (
-                  <Badge colorPalette="red" size="sm">
-                    Deactivated
-                  </Badge>
-                )}
-                {member.disabledAt && (
-                  <Badge colorPalette="orange" size="sm">
-                    Disabled
-                  </Badge>
-                )}
-              </>
-            }
-            chips={
-              <>
-                <ProvenanceChip provenance={provenance.data?.[member.userId]} />
-                {department.show && (
-                  <DepartmentChip
-                    name={departmentNameById.get(
-                      department.byUser.get(member.userId) ?? "",
-                    )}
-                  />
-                )}
-                {twoStep.show && (
-                  <SecondFactorCell
-                    member={twoStep.byUser.get(member.userId)}
-                    mfaRequired={twoStep.mfaRequired}
-                  />
-                )}
-              </>
-            }
-            trailing={
-              <HStack gap={3}>
-                {showDepartment && (
-                  <DepartmentPicker
-                    organizationId={organization.id}
-                    kind="user"
-                    entityId={member.userId}
-                    value={department.byUser.get(member.userId) ?? null}
-                    departments={department.departments}
-                    onAssigned={department.refetch}
-                  />
-                )}
-                <Text
-                  fontSize="sm"
-                  color="fg.muted"
-                  minWidth="90px"
-                  textAlign="right"
-                >
-                  {orgRoleLabel(member.role)}
-                </Text>
-                <MemberRowActions
-                  member={member}
-                  canDisable={canDisableMember(member.userId)}
-                  canDelete={canDeleteMember(member.userId)}
-                  onOpen={() => openDrawer("person", { userId: member.userId })}
-                  onSetDisabled={setMemberDisabled}
-                  onDelete={() =>
-                    setConfirmingRemoval({
-                      userId: member.userId,
-                      label:
-                        member.user.name ?? member.user.email ?? "this member",
-                    })
-                  }
-                />
-              </HStack>
-            }
-          />
-        ))
-      : [];
+  return {
+    canManage,
+    department,
+    showDepartment,
+    departmentNameById,
+    openDrawer,
+    cut,
+    selectCut,
+    isInviteLinkOpen,
+    selectedInvites,
+    pendingInvites,
+    resendInvite,
+    revokeInvite,
+    deleteMember,
+    deleting,
+    confirmingRemoval,
+    setConfirmingRemoval,
+    setMemberDisabled,
+    viewInviteLink,
+    onInviteModalClose,
+    provenance,
+    sortedMembers,
+    canDeleteMember,
+    canDisableMember,
+    invites,
+    openInvites,
+    joinRequests,
+    twoStep,
+  };
+}
 
-  const inviteRows =
-    cut === "all" || cut === "invited"
-      ? (cut === "invited" ? invites : openInvites).map((invite) => (
-          <InviteRow
-            key={`invite:${invite.id}`}
-            invite={invite}
-            isAdmin={canManage}
-            teams={teams}
-            onViewInviteLink={viewInviteLink}
-            onResendInvite={resendInvite}
-            onRevokeInvite={revokeInvite}
-          />
-        ))
-      : [];
-
-  const requestRows =
-    cut === "all" || cut === "waiting"
-      ? joinRequests.requests.map((request) => (
-          <JoinRequestRow
-            key={`request:${request.joinRequestId}`}
-            request={request}
-            isAdmin={canManage}
-            answering={joinRequests.answeringId === request.joinRequestId}
-            onApprove={joinRequests.approve}
-            onReject={joinRequests.reject}
-          />
-        ))
-      : [];
+function PeopleList({
+  organization,
+  teams,
+  activePlan,
+}: {
+  organization: OrganizationWithMembersAndTheirTeams;
+  teams: TeamWithProjects[];
+  activePlan: PlanInfo;
+}) {
+  const {
+    canManage,
+    department,
+    showDepartment,
+    departmentNameById,
+    openDrawer,
+    cut,
+    selectCut,
+    isInviteLinkOpen,
+    selectedInvites,
+    pendingInvites,
+    resendInvite,
+    revokeInvite,
+    deleteMember,
+    deleting,
+    confirmingRemoval,
+    setConfirmingRemoval,
+    setMemberDisabled,
+    viewInviteLink,
+    onInviteModalClose,
+    provenance,
+    sortedMembers,
+    canDeleteMember,
+    canDisableMember,
+    invites,
+    openInvites,
+    joinRequests,
+    twoStep,
+  } = usePeopleListState({ organization });
 
   return (
     <>
       <VStack align="stretch" gap={4} width="full">
-        {/* THE TAB'S OWN ACTION, WHERE EVERY TAB PUTS IT: at the end of the
-            first heading row. Four tabs that each placed their action
-            somewhere else read as four products. */}
-        <SectionTitle
-          title="People"
-          hint="Everybody in this organization, and everybody on their way in."
-          right={
-            canManage ? (
-              <HStack gap={2}>
-                <InlineInviteBox
-                  onStartTyping={(email) =>
-                    openDrawer(
-                      "inviteMember",
-                      email ? { initialEmail: email } : undefined,
-                    )
-                  }
-                />
-                <Button
-                  size="sm"
-                  colorPalette="orange"
-                  onClick={() => openDrawer("inviteMember")}
-                >
-                  <Plus size={14} />
-                  Invite people
-                </Button>
-              </HStack>
-            ) : null
-          }
-        />
-
-        {canManage && (
-          <MemberSeatUsage
-            organizationId={organization.id}
-            activePlan={activePlan}
-          />
-        )}
-
-        {/* A ZERO IS AN ANSWER. Every cut carries its number whether or not
-            there is anything behind it — somebody checking on a quiet week
-            came here to read exactly that. */}
-        <FilterChips
-          value={cut}
-          onChange={selectCut}
-          groupLabel="Filter people by how they got here"
-          countNoun={{ singular: "person", plural: "people" }}
-          testId="people-cuts"
-          items={[
-            {
-              value: "all",
-              label: "Everybody",
-              count:
-                sortedMembers.length +
-                openInvites.length +
-                joinRequests.requests.length,
-            },
-            { value: "members", label: "Members", count: sortedMembers.length },
-            {
-              value: "invited",
-              label: "Invited",
-              count: pendingInvites.data ? openInvites.length : 0,
-            },
-            {
-              value: "waiting",
-              label: "Waiting to join",
-              count: joinRequests.requests.length,
-            },
-          ]}
+        <PeopleHeader
+          organizationId={organization.id}
+          activePlan={activePlan}
+          canManage={canManage}
+          cut={cut}
+          onSelectCut={selectCut}
+          memberCount={sortedMembers.length}
+          openInviteCount={openInvites.length}
+          invitesLoaded={!!pendingInvites.data}
+          requestCount={joinRequests.requests.length}
+          onInvite={openDrawer}
         />
 
         {provenance.isError && (
@@ -536,50 +403,36 @@ function PeopleList({
           <AutomaticJoinsNotice joins={joinRequests.automaticJoins} />
         )}
 
-        <IdentityRowList data-testid="people-list" empty={emptyTextFor(cut)}>
-          {[...memberRows, ...inviteRows, ...requestRows]}
-        </IdentityRowList>
+        <PeopleRows
+          cut={cut}
+          organizationId={organization.id}
+          members={sortedMembers}
+          invites={invites}
+          openInvites={openInvites}
+          teams={teams}
+          canManage={canManage}
+          provenance={provenance.data}
+          department={department}
+          departmentNameById={departmentNameById}
+          showDepartment={showDepartment}
+          twoStep={twoStep}
+          joinRequests={joinRequests}
+          canDeleteMember={canDeleteMember}
+          canDisableMember={canDisableMember}
+          onOpenPerson={(userId) => openDrawer("person", { userId })}
+          onSetDisabled={setMemberDisabled}
+          onRequestRemoval={setConfirmingRemoval}
+          onViewInviteLink={viewInviteLink}
+          onResendInvite={resendInvite}
+          onRevokeInvite={revokeInvite}
+        />
       </VStack>
 
-      <Dialog.Root
+      <InviteLinkDialog
         open={isInviteLinkOpen}
-        onOpenChange={({ open }) => (open ? undefined : onInviteModalClose())}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>
-              <Heading>Invite Link</Heading>
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body paddingBottom={6}>
-            <VStack align="start" gap={4}>
-              <Text>
-                Send the link below to the users you want to invite to join the
-                organization.
-              </Text>
-
-              <VStack align="start" gap={4} width="full">
-                {selectedInvites.map((invite) => (
-                  <VStack
-                    key={invite.inviteCode}
-                    align="start"
-                    gap={6}
-                    width="full"
-                  >
-                    <Text fontWeight="600">{invite.email}</Text>
-                    <CopyInput
-                      value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
-                      label="Invite Link"
-                      marginTop={0}
-                    />
-                  </VStack>
-                ))}
-              </VStack>
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+        invites={selectedInvites}
+        onClose={onInviteModalClose}
+      />
 
       <ConfirmDialog
         open={confirmingRemoval !== null}
@@ -592,7 +445,7 @@ function PeopleList({
         } from this organization? They lose access to everything in it.`}
         confirmLabel="Remove"
         tone="danger"
-        loading={deleteMemberMutation.isPending}
+        loading={deleting}
         onConfirm={() => {
           if (!confirmingRemoval) return;
           deleteMember(confirmingRemoval.userId);
@@ -740,5 +593,432 @@ function InlineInviteBox({
         }
       }}
     />
+  );
+}
+
+/**
+ * One member, as the People list draws them.
+ *
+ * Lifted out of `PeopleList` whole: the row is where every per-person read on
+ * this page lands — provenance, department, second factor, role and the row
+ * menu — and keeping it beside the list's own state made the list unreadable
+ * as a list.
+ */
+function MemberListRow({
+  member,
+  organizationId,
+  provenance,
+  department,
+  departmentNameById,
+  showDepartment,
+  twoStep,
+  canDisable,
+  canDelete,
+  onOpen,
+  onSetDisabled,
+  onRequestRemoval,
+}: {
+  member: OrganizationWithMembersAndTheirTeams["members"][number];
+  organizationId: string;
+  provenance: React.ComponentProps<typeof ProvenanceChip>["provenance"];
+  department: ReturnType<typeof useDepartmentColumn>;
+  departmentNameById: Map<string, string>;
+  showDepartment: boolean;
+  twoStep: ReturnType<typeof useTwoStepRequirement>;
+  canDisable: boolean;
+  canDelete: boolean;
+  onOpen: () => void;
+  onSetDisabled: ReturnType<typeof useMemberDisableAction>["setMemberDisabled"];
+  onRequestRemoval: (target: { userId: string; label: string }) => void;
+}) {
+  return (
+    <IdentityRow
+      id={member.userId}
+      name={member.user.name}
+      address={member.user.email}
+      image={member.user.image}
+      muted={!!member.disabledAt}
+      data-testid="member-row"
+      onOpen={onOpen}
+      badges={
+        <>
+          {member.role === "EXTERNAL" && (
+            <Badge colorPalette="gray" size="sm">
+              Lite Member
+            </Badge>
+          )}
+          {member.user.deactivatedAt && (
+            <Badge colorPalette="red" size="sm">
+              Deactivated
+            </Badge>
+          )}
+          {member.disabledAt && (
+            <Badge colorPalette="orange" size="sm">
+              Disabled
+            </Badge>
+          )}
+        </>
+      }
+      chips={
+        <>
+          <ProvenanceChip provenance={provenance} />
+          {department.show && (
+            <DepartmentChip
+              name={departmentNameById.get(
+                department.byUser.get(member.userId) ?? "",
+              )}
+            />
+          )}
+          {twoStep.show && (
+            <SecondFactorCell
+              member={twoStep.byUser.get(member.userId)}
+              mfaRequired={twoStep.mfaRequired}
+            />
+          )}
+        </>
+      }
+      trailing={
+        <HStack gap={3}>
+          {showDepartment && (
+            <DepartmentPicker
+              organizationId={organizationId}
+              kind="user"
+              entityId={member.userId}
+              value={department.byUser.get(member.userId) ?? null}
+              departments={department.departments}
+              onAssigned={department.refetch}
+            />
+          )}
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            minWidth="90px"
+            textAlign="right"
+          >
+            {orgRoleLabel(member.role)}
+          </Text>
+          <MemberRowActions
+            member={member}
+            canDisable={canDisableMember(member.userId)}
+            canDelete={canDeleteMember(member.userId)}
+            onOpen={onOpen}
+            onSetDisabled={setMemberDisabled}
+            onDelete={() =>
+              setConfirmingRemoval({
+                userId: member.userId,
+                label: member.user.name ?? member.user.email ?? "this member",
+              })
+            }
+          />
+        </HStack>
+      }
+    />
+  );
+}
+
+/** The People tab's heading, seat meter and cut filter. */
+function PeopleHeader({
+  organizationId,
+  activePlan,
+  canManage,
+  cut,
+  onSelectCut,
+  memberCount,
+  openInviteCount,
+  invitesLoaded,
+  requestCount,
+  onInvite,
+}: {
+  organizationId: string;
+  activePlan: PlanInfo;
+  canManage: boolean;
+  cut: Cut;
+  onSelectCut: (next: string) => void;
+  memberCount: number;
+  openInviteCount: number;
+  invitesLoaded: boolean;
+  requestCount: number;
+  onInvite: ReturnType<typeof useDrawer>["openDrawer"];
+}) {
+  return (
+    <>
+      {/* THE TAB'S OWN ACTION, WHERE EVERY TAB PUTS IT: at the end of the
+          first heading row. Four tabs that each placed their action
+          somewhere else read as four products. */}
+      <SectionTitle
+        title="People"
+        hint="Everybody in this organization, and everybody on their way in."
+        right={
+          canManage ? (
+            <HStack gap={2}>
+              <InlineInviteBox
+                onStartTyping={(email) =>
+                  onInvite(
+                    "inviteMember",
+                    email ? { initialEmail: email } : undefined,
+                  )
+                }
+              />
+              <Button
+                size="sm"
+                colorPalette="orange"
+                onClick={() => onInvite("inviteMember")}
+              >
+                <Plus size={14} />
+                Invite people
+              </Button>
+            </HStack>
+          ) : null
+        }
+      />
+
+      {canManage && (
+        <MemberSeatUsage
+          organizationId={organizationId}
+          activePlan={activePlan}
+        />
+      )}
+
+      {/* A ZERO IS AN ANSWER. Every cut carries its number whether or not
+          there is anything behind it — somebody checking on a quiet week
+          came here to read exactly that. */}
+      <FilterChips
+        value={cut}
+        onChange={onSelectCut}
+        groupLabel="Filter people by how they got here"
+        countNoun={{ singular: "person", plural: "people" }}
+        testId="people-cuts"
+        items={[
+          {
+            value: "all",
+            label: "Everybody",
+            count:
+              sortedMembers.length +
+              openInvites.length +
+              joinRequests.requests.length,
+          },
+          { value: "members", label: "Members", count: memberCount },
+          {
+            value: "invited",
+            label: "Invited",
+            count: invitesLoaded ? openInviteCount : 0,
+          },
+          {
+            value: "waiting",
+            label: "Waiting to join",
+            count: requestCount,
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+/** The link for an invitation that has just been created. */
+function InviteLinkDialog({
+  open,
+  invites,
+  onClose,
+}: {
+  open: boolean;
+  invites: { inviteCode: string; email: string }[];
+  onClose: () => void;
+}) {
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open }) => (open ? undefined : onClose())}
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.Header>
+          <Dialog.Title>
+            <Heading>Invite Link</Heading>
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body paddingBottom={6}>
+          <VStack align="start" gap={4}>
+            <Text>
+              Send the link below to the users you want to invite to join the
+              organization.
+            </Text>
+
+            <VStack align="start" gap={4} width="full">
+              {invites.map((invite) => (
+                <VStack
+                  key={invite.inviteCode}
+                  align="start"
+                  gap={6}
+                  width="full"
+                >
+                  <Text fontWeight="600">{invite.email}</Text>
+                  <CopyInput
+                    value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
+                    label="Invite Link"
+                    marginTop={0}
+                  />
+                </VStack>
+              ))}
+            </VStack>
+          </VStack>
+        </Dialog.Body>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * Removing a member, with the invalidations the rest of the page depends on.
+ *
+ * Seat usage and the licence check are invalidated beside the membership list
+ * because all three read the same fact; leaving any of them stale shows an
+ * organization still paying for somebody it just removed.
+ */
+function useDeleteMember(organizationId: string) {
+  const queryClient = api.useUtils();
+  const deleteMemberMutation = api.organization.deleteMember.useMutation();
+  const deleteMember = (userId: string) => {
+    deleteMemberMutation.mutate(
+      { organizationId: organization.id, userId },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: "Member removed successfully",
+            description: "The member has been removed from the organization.",
+            type: "success",
+            duration: 5000,
+          });
+          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
+            .invalidate()
+            .catch((error) => {
+              captureException(error, {
+                tags: { userId, organizationId },
+              });
+            });
+          void queryClient.limits.getUsage.invalidate();
+          void queryClient.licenseEnforcement.checkLimit.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Sorry, something went wrong",
+            description: "Please try that again",
+            type: "error",
+            duration: 5000,
+          });
+        },
+      },
+    );
+  };
+  return { deleteMember, deleting: deleteMemberMutation.isPending };
+}
+
+/**
+ * The list itself: members, invitations and join requests, filtered by cut.
+ *
+ * One list rather than three stacked ones, because "everybody" is the default
+ * and a reader scanning it should not have to notice where one kind of row
+ * ends and the next begins.
+ */
+function PeopleRows({
+  cut,
+  organizationId,
+  members,
+  invites,
+  openInvites,
+  teams,
+  canManage,
+  provenance,
+  department,
+  departmentNameById,
+  showDepartment,
+  twoStep,
+  joinRequests,
+  canDeleteMember,
+  canDisableMember,
+  onOpenPerson,
+  onSetDisabled,
+  onRequestRemoval,
+  onViewInviteLink,
+  onResendInvite,
+  onRevokeInvite,
+}: {
+  cut: Cut;
+  organizationId: string;
+  members: OrganizationWithMembersAndTheirTeams["members"];
+  invites: React.ComponentProps<typeof InviteRow>["invite"][];
+  openInvites: React.ComponentProps<typeof InviteRow>["invite"][];
+  teams: TeamWithProjects[];
+  canManage: boolean;
+  provenance:
+    | Record<string, React.ComponentProps<typeof ProvenanceChip>["provenance"]>
+    | undefined;
+  department: ReturnType<typeof useDepartmentColumn>;
+  departmentNameById: Map<string, string>;
+  showDepartment: boolean;
+  twoStep: ReturnType<typeof useTwoStepRequirement>;
+  joinRequests: ReturnType<typeof useJoinRequests>;
+  canDeleteMember: (memberId: string) => boolean;
+  canDisableMember: (memberId: string) => boolean;
+  onOpenPerson: (userId: string) => void;
+  onSetDisabled: ReturnType<typeof useMemberDisableAction>["setMemberDisabled"];
+  onRequestRemoval: (target: { userId: string; label: string }) => void;
+  onViewInviteLink: (inviteCode: string, email: string) => void;
+  onResendInvite: ReturnType<typeof useInviteActions>["resendInvite"];
+  onRevokeInvite: ReturnType<typeof useInviteActions>["revokeInvite"];
+}) {
+  const memberRows =
+    cut === "all" || cut === "members"
+      ? members.map((member) => (
+          <MemberListRow
+            key={`member:${member.userId}`}
+            member={member}
+            organizationId={organizationId}
+            provenance={provenance?.[member.userId]}
+            department={department}
+            departmentNameById={departmentNameById}
+            showDepartment={showDepartment}
+            twoStep={twoStep}
+            canDisable={canDisableMember(member.userId)}
+            canDelete={canDeleteMember(member.userId)}
+            onOpen={() => onOpenPerson(member.userId)}
+            onSetDisabled={setMemberDisabled}
+            onRequestRemoval={setConfirmingRemoval}
+          />
+        ))
+      : [];
+
+  const inviteRows =
+    cut === "all" || cut === "invited"
+      ? (cut === "invited" ? invites : openInvites).map((invite) => (
+          <InviteRow
+            key={`invite:${invite.id}`}
+            invite={invite}
+            isAdmin={canManage}
+            teams={teams}
+            onViewInviteLink={viewInviteLink}
+            onResendInvite={resendInvite}
+            onRevokeInvite={revokeInvite}
+          />
+        ))
+      : [];
+
+  const requestRows =
+    cut === "all" || cut === "waiting"
+      ? joinRequests.requests.map((request) => (
+          <JoinRequestRow
+            key={`request:${request.joinRequestId}`}
+            request={request}
+            isAdmin={canManage}
+            answering={joinRequests.answeringId === request.joinRequestId}
+            onApprove={joinRequests.approve}
+            onReject={joinRequests.reject}
+          />
+        ))
+      : [];
+
+  return (
+    <IdentityRowList data-testid="people-list" empty={emptyTextFor(cut)}>
+      {[...memberRows, ...inviteRows, ...requestRows]}
+    </IdentityRowList>
   );
 }
