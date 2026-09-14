@@ -1,12 +1,4 @@
-/**
- * The invitation half of `organization.*`, as one ceremony rather than a
- * handler: create, revoke, resend, list and accept.
- *
- * Every path that touches a join request here is non-fatal on purpose. The
- * membership is the durable outcome, and a request left open is answered by
- * the next approval or by its own expiry - refusing the invitation because a
- * request could not be tidied would trade the outcome for the bookkeeping.
- */
+/** Invitation ceremony: non-fatal paths preserve membership as durable outcome. */
 
 import {
   InviteAlreadyAcceptedError,

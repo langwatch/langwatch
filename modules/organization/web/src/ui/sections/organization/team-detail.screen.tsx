@@ -276,7 +276,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
             // Same as the save path: a FORBIDDEN here is our own guard
             // refusing to archive a personal workspace, and its message is
             // the sentence explaining why.
-            title: trpcErrorMessage(error) ?? "That team could not be archived", // no-raw-error-toast-ok
+            title: trpcErrorMessage(error) ?? "Team could not be archived",
             type: "error",
             duration: 8000,
           });

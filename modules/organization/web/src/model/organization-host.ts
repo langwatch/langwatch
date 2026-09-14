@@ -1,25 +1,4 @@
-/**
- * What the organization settings screens ask of the application they are
- * mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package. It asks this port instead, and the frontend feature that owns it —
- * `apps/ui/src/features/organization` — answers it by adapting the browser
- * capabilities the application resolves.
- *
- * THE THIRTEENTH HOST PORT OF THE SAME SHAPE. Deferred again, for the same
- * reason every family before recorded: promoting the shape changes packages a
- * page move does not own, and doing it inside a page-family move would hide it.
- *
- * WHAT THIS ONE ASKS THAT NO OTHER DID is `download`. The audit trail's CSV
- * export is the one place in this family where the screen has to hand the
- * reader a FILE, and a screen may not synthesise an anchor, mint an object URL
- * or click either. So the split is the S6 one applied to a save rather than to
- * a wire: WHAT the file contains is decided in this package and pinned here
- * (`model/audit-log-export.ts`), and HOW it reaches the disk is the
- * application's, pinned in `apps/ui/tests/ui-file-download.unit.test.ts`.
- */
+/** Host port for organization screens: sealed imports (ui, router, session) routed here. */
 
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
@@ -111,15 +90,7 @@ export abstract class OrganizationHostApi {
   /** Whether the reader holds a grant, answered synchronously and fail-closed. */
   abstract hasPermission(permission: string): boolean;
 
-  /**
-   * The same question asked of the ORGANIZATION rather than of the page's scope.
-   *
-   * `hasPermission` answers for whatever scope the reader is in, which on a
-   * project-scoped address is the project. The team form offers an
-   * organization-wide control and has to know whether the reader holds the
-   * grant THERE, which is a different answer whenever a project binding
-   * narrowed them.
-   */
+  /** Permission check at organization scope, not page scope. */
   abstract hasOrganizationPermission(permission: string): boolean;
 
   /** Who is signed in, or undefined before the session resolves. */
@@ -175,15 +146,7 @@ export abstract class OrganizationHostApi {
     options?: { replace?: boolean },
   ): void;
 
-  /**
-   * Offers the reader a way to change which project they are looking at, or
-   * `null` when the application has no switcher to offer.
-   *
-   * The platform page put `DashboardLayout`'s `ProjectSelector` in its header.
-   * That component reaches the organization graph, the router and the shell's
-   * own scope memory, none of which a screen may name — so what travels is the
-   * ABILITY, and the application supplies the control.
-   */
+  /** Project switcher control, or null if unavailable. */
   abstract projectSwitcher(): ReactNode | null;
 
   /** Moves the address bar, for the back-link out of a gateway deep-link. */

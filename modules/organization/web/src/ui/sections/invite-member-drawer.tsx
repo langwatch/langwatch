@@ -1,4 +1,4 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+// biome-ignore lint/suspicious/noEmptyBlockStatements: empty blocks are deliberate.
 
 import { Heading } from "@chakra-ui/react";
 import type React from "react";
@@ -10,16 +10,7 @@ import { api } from "../../behavior/organization-api.ts";
 import { AddMembersForm } from "./add-members-form.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 
-/**
- * Invite teammates from a URL-routed drawer (see drawers.md) instead of a
- * page-local dialog — so the same flow opens from the members page, the command
- * bar, and the inline invite box, with a stable deep-link and back-button close.
- *
- * The invite mutation, seat/license enforcement and admin-vs-request branching
- * are reused wholesale from `useInviteActions` — the drawer only supplies the
- * organization + team scope and closes itself on success. `initialEmail` seeds
- * the form when the drawer is opened by someone typing into the inline box.
- */
+/** Invite drawer: stable deep-link from members page, command bar, or inline box. */
 export function InviteMemberDrawer({
   open = true,
   initialEmail = "",

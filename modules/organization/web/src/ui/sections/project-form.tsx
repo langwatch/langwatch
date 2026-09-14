@@ -1,21 +1,4 @@
-/**
- * The form behind `createProject`: a name, and a team to put it in.
- *
- * RECOVERED FROM `platform/app/src/components/projects/ProjectForm.tsx`,
- * deleted in `cc91631cd8`. It lands in this package rather than in
- * `@langwatch/project-web` because everything it asks for already lives here —
- * the organization in scope, the teams under it, the drawer navigator and the
- * feedback port — and because two of its three openers are this family's own
- * screens (the Teams page and the team form). The third is the CLI-auth screen,
- * which addresses the drawer by name and needs nothing of this module.
- *
- * FOUR NAMES CAME OUT OF `~/features/errors` AND ONE OF THEM DID NOT TRAVEL.
- * `applyHandledErrorToForm` and `HandledErrorAlert` are answered by
- * `behavior/handled-error-form`, which decides WHERE a refusal lands; the
- * code-keyed registry that decides what it SAYS stays the application's, and a
- * failure this package cannot name reads as the action that failed plus the
- * generic line. That is what the registry itself answers for an unlisted code.
- */
+/** Project form: name and team assignment; error display via handled-error-form. */
 
 import {
   Box,
@@ -72,7 +55,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   } = props;
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
-  // Use the explicitly passed organizationId if provided, otherwise fall back to the current organization
+  // Use passed organizationId or fall back to current organization
   const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
 
   const form = useForm<ProjectFormData>({
@@ -98,22 +81,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
 
   const teamId = watch("teamId");
 
-  /**
-   * The part of the submit failure the form itself could not put on a field.
-   *
-   * The mutation lives in the parent drawer, but the inputs live here, so the
-   * rejection has to come back down as a prop and be lifted onto the form on
-   * arrival. Without this the whole thing rendered as one alert reading
-   * "There's a problem with the name and the team" over an untouched form,
-   * leaving the user to work out which of the two the server meant.
-   *
-   * `hasFormErrorSlot` stays at its default `false` on purpose: the alert
-   * below IS this form's form-level slot, and it says more than
-   * `<FormServerError>` would — tips, docs link, error id. So the bridge
-   * claims only what it can mark on an input, and whatever it declines
-   * (a form-level complaint, a field with no input on screen, an error that
-   * isn't a validation failure at all) falls through to the alert intact.
-   */
+  /** Unclaimed errors not placed on fields; reserved for the alert. */
   const [unclaimedError, setUnclaimedError] = useState<unknown>(null);
   useEffect(() => {
     if (!error) {

@@ -160,7 +160,7 @@ function pickerSnapForSeat({
 // ── BindingInputRow ───────────────────────────────────────────────────────────
 
 export type BindingInputRowHandle = {
-  /** Return the uncommitted binding if all required fields are filled, otherwise null. Resets the row. */
+  /** Return uncommitted binding if valid, else null. Resets the row. */
   flush: () => PendingBinding | null;
 };
 

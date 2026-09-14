@@ -1,27 +1,4 @@
-/**
- * The organization settings family, as the browser application mounts it.
- *
- * FIVE SCREENS, FIVE ADDRESSES: `/settings/audit-log`, `/settings/members`,
- * `/settings/teams`, `/settings/teams/:team` and `/settings/groups`.
- *
- * The audit trail arrived first and the other four followed with the settings
- * family; they share a transport, a host port and a set of role vocabularies,
- * which is what makes them one package rather than four.
- *
- * WHY THIS IS ITS OWN PACKAGE. The credentials family's rule, read strictly: a
- * key belongs to the family that owns its TRANSPORT, and `organization.*` is
- * mounted from `@langwatch/organization-server`. The RBAC family's exception —
- * the roles pages went to `@langwatch/authz-web` though `role.*` is the role
- * feature's — turns on every TYPE on the page coming from the neighbour, and
- * fails here in both directions: `EnrichedAuditLog` is the organization
- * contract's, the member list the user search matches against is the
- * organization graph's, and the only thing on the page that is not this
- * feature's is the plan gate, which is one boolean off `limits.getUsage`.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is the tRPC Provider this
- * package's hooks run on and the host port that answers for the organization,
- * the address, the project switcher, the download and the one notice.
- */
+/** Five settings screens: audit-log, members, teams, team detail, groups. */
 
 import type { ComponentType } from "react";
 
@@ -63,14 +40,6 @@ export {
   type OrganizationTeamReading,
 } from "./model/organization-host.ts";
 
-/**
- * The department picker and its column, published for `@langwatch/project-web`.
- *
- * A web-to-web edge, and a deliberate one: the general settings page assigns a
- * project to a department with the SAME control the teams and members pages
- * assign a team or a person with, and a second copy of a picker over the same
- * `departments.*` transport would be a second opinion about what an assignment
- * is. The edge is the finding every family since governance carries one of.
- */
+/** Department picker: consistent assignment control across pages. */
 export { DepartmentPicker } from "./ui/sections/department-picker.tsx";
 export { useDepartmentColumn } from "./behavior/use-department-column.ts";

@@ -1,12 +1,4 @@
-/**
- * What the address says the audit table is showing.
- *
- * Every filter this page applies lives in the URL, which is deliberate: a
- * compliance reviewer's whole workflow is sending somebody else the view they
- * are looking at. So the reading is a pure function of the query, and the
- * writes answer with the NEXT WHOLE QUERY rather than performing navigation —
- * the host applies it, and both halves stay assertable without a router.
- */
+/** Audit-log filters: pure functions reading from and returning whole query. */
 
 const DEFAULT_PAGE_SIZE = 25;
 
@@ -117,15 +109,7 @@ export function auditBackLink({
   return { href: `/${projectSlug}/${entry.path}/${target.targetId}`, label: entry.label };
 }
 
-/**
- * The user id a typed name or address resolves to.
- *
- * The audit read filters by user id, so the box has to be matched in the
- * browser against the member list the reader is already allowed to see.
- * Undefined for an empty box means "no user filter"; undefined for a box that
- * matched nobody means the same thing, which is the one place this shape is
- * lossy and the reason the screen states the search term beside the table.
- */
+/** Resolve typed name/address to user id; undefined means no filter or no match. */
 export function matchMemberId(
   members: readonly { userId: string; user: { name: string | null; email: string | null } }[],
   search: string,
