@@ -883,71 +883,25 @@ function TeamCard({
                 </Text>
               ) : (
                 team.directMembers.map((m, i, arr) => (
-                  <HStack
+                  <TeamMemberRow
                     key={i}
-                    py={2}
-                    borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
-                    borderColor="border.muted"
-                    opacity={m.viaGroupId ? 0.7 : 1}
-                  >
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
-                    <Text fontSize="sm" flex={1}>
-                      {m.name}
-                    </Text>
-                    {m.viaGroupId ? (
-                      <>
-                        <Badge colorPalette={roleTone(m.role)} size="sm">
-                          {m.customRoleName ?? m.role}
-                        </Badge>
-                        <Link
-                          href="/settings/directory?tab=groups"
-                          fontSize="xs"
-                          colorPalette="purple"
-                          color="colorPalette.fg"
-                        >
-                          via {m.viaGroupName}
-                        </Link>
-                      </>
-                    ) : canManage && m.bindingId ? (
-                      <>
-                        <RoleSelect
-                          value={m.role}
-                          customRoleId={m.customRoleId}
-                          organizationId={organizationId}
-                          onChange={(role, customRoleId) =>
-                            updateBinding.mutate({
-                              organizationId,
-                              bindingId: m.bindingId!,
-                              role: role as any,
-                              customRoleId,
-                            })
-                          }
-                        />
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="fg.subtle"
-                          loading={deleteBinding.isPending}
-                          onClick={() =>
-                            deleteBinding.mutate({
-                              organizationId,
-                              bindingId: m.bindingId!,
-                            })
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      </>
-                    ) : (
-                      <Badge colorPalette={roleTone(m.role)} size="sm">
-                        {m.customRoleName ?? m.role}
-                      </Badge>
-                    )}
-                  </HStack>
+                    member={m}
+                    organizationId={organizationId}
+                    canManage={canManage}
+                    isLast={i === arr.length - 1}
+                    onChangeRole={(role, customRoleId, bindingId) =>
+                      updateBinding.mutate({
+                        organizationId,
+                        bindingId,
+                        role: role as any,
+                        customRoleId,
+                      })
+                    }
+                    onRemove={(bindingId) =>
+                      deleteBinding.mutate({ organizationId, bindingId })
+                    }
+                    removing={deleteBinding.isPending}
+                  />
                 ))
               )}
               <Text fontSize="xs" color="fg.subtle" mt={2}>
@@ -1145,5 +1099,88 @@ export function TeamsAndProjectsSection({
         ))}
       </VStack>
     </VStack>
+  );
+}
+
+/**
+ * One person on a team, and the three shapes that row takes.
+ *
+ * Inherited through a group: the role is shown and the GROUP is the link,
+ * because the place to change it is the group, not here. Held directly and
+ * editable: the role picker and a way off the team. Held directly but not
+ * editable by this reader: the role, stated and no more.
+ */
+function TeamMemberRow({
+  member: m,
+  organizationId,
+  canManage,
+  isLast,
+  onChangeRole,
+  onRemove,
+  removing,
+}: {
+  member: TeamData["directMembers"][number];
+  organizationId: string;
+  canManage: boolean;
+  isLast: boolean;
+  onChangeRole: (
+    role: string,
+    customRoleId: string | undefined,
+    bindingId: string,
+  ) => void;
+  onRemove: (bindingId: string) => void;
+  removing: boolean;
+}) {
+  return (
+    <HStack
+      py={2}
+      borderBottomWidth={isLast ? "0" : "1px"}
+      borderColor="border.muted"
+      opacity={m.viaGroupId ? 0.7 : 1}
+    >
+      <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+      <Text fontSize="sm" flex={1}>
+        {m.name}
+      </Text>
+      {m.viaGroupId ? (
+        <>
+          <Badge colorPalette={roleTone(m.role)} size="sm">
+            {m.customRoleName ?? m.role}
+          </Badge>
+          <Link
+            href="/settings/directory?tab=groups"
+            fontSize="xs"
+            colorPalette="purple"
+            color="colorPalette.fg"
+          >
+            via {m.viaGroupName}
+          </Link>
+        </>
+      ) : canManage && m.bindingId ? (
+        <>
+          <RoleSelect
+            value={m.role}
+            customRoleId={m.customRoleId}
+            organizationId={organizationId}
+            onChange={(role, customRoleId) =>
+              onChangeRole(role, customRoleId, m.bindingId!)
+            }
+          />
+          <Button
+            size="xs"
+            variant="ghost"
+            color="fg.subtle"
+            loading={removing}
+            onClick={() => onRemove(m.bindingId!)}
+          >
+            <X size={14} />
+          </Button>
+        </>
+      ) : (
+        <Badge colorPalette={roleTone(m.role)} size="sm">
+          {m.customRoleName ?? m.role}
+        </Badge>
+      )}
+    </HStack>
   );
 }
