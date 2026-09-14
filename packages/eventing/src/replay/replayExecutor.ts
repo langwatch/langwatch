@@ -158,22 +158,8 @@ interface BufferedMapRecord {
 }
 
 /**
- * Accumulates map projection records as events are fed in one at a time.
- *
- * Unlike FoldAccumulator (which merges state per aggregate), MapAccumulator
- * buffers one output record per event along with the originating event's
- * `ProjectionStoreContext`. Records are grouped by tenantId and flushed in
- * per-tenant chunks via `store.bulkAppend()` (tenant-scoped context, records
- * from many aggregates per call) or via sequential `store.append()` as a
- * fallback; the per-event context is preserved on the fallback path so stores
- * keying off `context.aggregateId` behave the same as the non-optimized
- * replay.
- *
- * Map records are append-only and need no cross-page state, so the buffer
- * drains incrementally: `apply` is synchronous (push only) and the streaming
- * driver awaits `drainIfNeeded()` once the buffer reaches `writeBatchSize`,
- * so the hot per-event loop carries no await. Memory is therefore bounded by
- * `writeBatchSize`, not by the number of events in an aggregate batch.
+ * Accumulates map projection records as events are fed in,
+ * buffering by tenant for efficient flushing.
  */
 export class MapAccumulator {
   private byTenant = new Map<string, BufferedMapRecord[]>();
@@ -295,26 +281,8 @@ interface StateEntry {
 }
 
 /**
- * Accumulates a Postgres operational state projection for a
- * canonical rebuild.
- *
- * Unlike {@link FoldAccumulator}, the write is ONE {@link StoredProjection} per
- * `(tenant, projection key)` — grouped by `projection.key?.(event) ??
- * aggregateId`, never per raw aggregate — and every fold starts from
- * `projection.init()`: `store.load` is never called, so the rebuild replaces
- * the selected operational row rather than merging with stale state.
- *
- * Each event is folded via {@link applyStateEvent}, the SAME per-event step the
- * live `StateProjectionExecutor` uses, so a rebuilt row is byte-identical to
- * the live-folded one — deterministic `occurredAt`/`createdAt`/`updatedAt`,
- * `version`, and a cursor of `(AcceptedAt=createdAt, EventId)`. Feed events in
- * canonical `(createdAt, EventId)` order (the event-log read order); the cursor
- * guard only drops duplicate / stale redeliveries.
- *
- * Memory is bounded by the number of distinct projection keys in the events
- * fed before `flush()` (one folded row per key, not the raw events) — the same
- * profile as FoldAccumulator, sized to the low-cardinality operational
- * projections this path targets (ADR-049).
+ * Accumulates a Postgres operational state projection for canonical rebuild,
+ * one per projection key.
  */
 export class StateAccumulator {
   private entries = new Map<string, StateEntry>();
@@ -400,14 +368,8 @@ export class StateAccumulator {
 }
 
 /**
- * Replays events through a fold projection using in-memory state tracking.
- *
- * Two-phase approach:
- * - Phase 1 (apply): Loop through events, accumulate state in memory per
- *   tenant-scoped key. Each event's tenantId is taken from the event itself,
- *   never assumed from a shared parameter.
- * - Phase 2 (store): storeBatch() in chunks of writeBatchSize, grouped by
- *   tenantId so each ClickHouse INSERT targets a single tenant.
+ * Replay events through fold projection in two phases: apply state in memory,
+ * then store in batches.
  */
 export async function replayEvents({
   projection,

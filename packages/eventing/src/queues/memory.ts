@@ -27,20 +27,7 @@ interface QueuedJob<Payload> {
   reject: (error: Error) => void;
 }
 
-/**
- * Minimal in-memory queue processor for dev/test environments.
- * Processes jobs asynchronously with simple concurrency control.
- *
- * **Use Cases:**
- * - Local development (when Redis is not available)
- * - Unit/integration tests
- * - Single-instance deployments
- *
- * **Limitations:**
- * - Not thread-safe (single process only)
- * - No persistence (jobs lost on restart)
- * - Simple concurrency (no advanced scheduling)
- */
+/** In-memory queue processor for dev/test environments with simple concurrency control. */
 export class EventSourcedQueueProcessorMemory<
   Payload extends Record<string, unknown>,
 > implements EventSourcedQueueProcessor<Payload> {

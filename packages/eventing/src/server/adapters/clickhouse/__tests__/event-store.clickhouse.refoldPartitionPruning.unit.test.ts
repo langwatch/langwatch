@@ -13,17 +13,8 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * `event_log` is `PARTITION BY toYearWeek(EventOccurredAt)`, but the re-fold
- * reads bound on `EventTimestamp` — acceptance order, NOT the partition key. So
- * without a predicate on `EventOccurredAt` the read cannot prune, and walks
- * every weekly partition ever written including the cold tier on S3.
- *
- * Measured in production before this bound existed: `event_log` was the ONLY
- * table cold-scanning (198 scans in 15 minutes across 3 pods), all of it from
- * these two loaders, against a table taking ~1M trace events/day with tenant
- * retentions up to 1827 days.
- *
- * `getEvents` already passed this bound; these two paths were the holdouts.
+ * Verify re-fold partition pruning: EventOccurredAt bound required for
+ * ClickHouse to prune partitions.
  */
 const tenantId = createTenantId("test-tenant");
 const OCCURRED_AT = 1_700_000_000_000;

@@ -12,21 +12,7 @@ import type { EventingRetentionConfiguration } from "../../retention.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
-/**
- * Normalizes payload values from ClickHouse.
- *
- * ClickHouse may serialize numeric values as strings (e.g., "123.45" instead of 123.45).
- * This function converts those numeric strings back to numbers.
- *
- * IMPORTANT: This function intentionally does NOT parse JSON strings into objects/arrays.
- * OTLP data contains stringValue fields that hold JSON-encoded content (e.g., message arrays).
- * These must remain as strings to preserve the OTLP schema semantics.
- */
-/**
- * Converts a numeric-looking string to a number, when it is short enough to
- * be worth the regex test and the parse round-trips finitely. Anything else
- * — including JSON-encoded content — passes through unchanged.
- */
+/** Converts numeric strings to numbers, leaving JSON-encoded content as strings. */
 function normalizeNumericString(value: string): unknown {
   if (value.length === 0 || value.length >= 32 || !NUMERIC_STRING_REGEX.test(value)) {
     return value;
@@ -60,18 +46,7 @@ function normalizePayloadValue(value: unknown): unknown {
   return value;
 }
 
-/**
- * Every `event_log` column the row mapper reads, and so the SELECT list all
- * three reads project.
- *
- * One constant rather than a list per query. The three reads answer the same
- * `EventRecord` through the same mapping, so a column present in one SELECT
- * and absent from another does not fail: it decodes as `undefined` and the
- * record is quietly short a field. `EventVersion` was missing from exactly one
- * of them, and every event rehydrated through that read carried no version —
- * which is the value a version-gated fold reads to decide how to decode a
- * payload, and which one projection writes back to the log.
- */
+/** All event_log columns the row mapper reads, shared across all three query paths. */
 const EVENT_LOG_COLUMNS = [
   "EventId",
   "EventTimestamp",

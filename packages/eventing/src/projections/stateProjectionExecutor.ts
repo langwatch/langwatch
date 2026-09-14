@@ -27,19 +27,7 @@ export function orderEvents<E extends Event>(events: readonly E[]): E[] {
   return [...events].sort((left, right) => compareCursors(cursorFor(left), cursorFor(right)));
 }
 
-/**
- * Fold ONE event onto the running projection, returning the advanced
- * `StoredProjection` — or `latest` unchanged when the event's type does not
- * match or its cursor does not advance past `latest` (duplicate / stale
- * redelivery). Pure and deterministic: the timestamps are derived from the
- * event, never from wall-clock, so the live executor and a canonical replay
- * produce byte-identical rows. `latest === null` starts the fold from
- * `projection.init()`.
- *
- * Callers that feed a batch must pass events in canonical `(createdAt, id)`
- * order (see {@link orderEvents}); the cursor guard only tolerates
- * duplicates/staleness, it does not re-order.
- */
+/** Fold one event onto the projection, returning the new StoredProjection or latest unchanged. */
 export function applyStateEvent<State, E extends Event>({
   projection,
   latest,

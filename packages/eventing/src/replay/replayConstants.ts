@@ -9,19 +9,8 @@ export const COMPLETED_KEY_PREFIX = "projection-replay:completed:";
 export const MARKER_TTL_SECONDS = 7 * 24 * 3600;
 
 /**
- * Redis key prefix for terminal "done" markers, one string key per aggregate:
- * `projection-replay:done:{projectionName}:{aggregateKey}` → `{timestamp}:{eventId}`.
- *
- * Written when replay finishes rebuilding an aggregate (see markCompletedBatch)
- * and read by the live checker alongside the active cutoff marker. Semantics:
- *   - active cutoff hash `"pending"`      → defer every event
- *   - active cutoff hash `"{ts}:{eventId}"` → replay in flight: skip ≤ cutoff, defer > cutoff
- *   - done key `"{ts}:{eventId}"`         → replay finished: skip ≤ cutoff, PROCESS > cutoff
- *   - neither                             → process
- *
- * Kept as a short-TTL key (not left in the cutoff hash) so a giant all-tenant
- * replay does not retain a marker per aggregate for its whole duration — the
- * cutoff hash stays bounded to in-flight aggregates and done markers self-expire.
+ * Redis key prefix for terminal "done" markers:
+ * `projection-replay:done:{projectionName}:{aggregateKey}`.
  */
 export const DONE_KEY_PREFIX = "projection-replay:done:";
 

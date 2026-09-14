@@ -25,36 +25,14 @@ export const BLOB_LEASE_TTL_SECONDS = 3 * 24 * 60 * 60;
 export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
 
 /**
- * How long a blob survives after its LAST lease is retired.
- *
- * The backstop above is sized for a blob someone is still expected to read — a
- * paused pipeline, a weekend-long retry chain. A blob whose last holder has
- * retired has no such reader, and leaving it on the 4-day backstop meant every
- * dead payload occupied Redis for four days. With no other Redis-tier reclaim
- * path that is not a practical bound: retention simply grows until the oldest
- * blobs age out, and that ceiling was never sized against the instance it has
- * to fit in (2026-07-21).
- *
- * Shortening the expiry is deliberately NOT the eager delete that leases
- * replaced. The bytes stay readable, and any subsequent take re-arms the full
- * backstop, so the release still cannot strip a blob from a producer that wrote
- * these bytes before the release and stages after it — a gap of one Redis round
- * trip, which this window over-covers by orders of magnitude.
+ * Grace period after lease retirement before blob expires (non-eager reclaim, so
+ * bytes stay readable if retaken).
  */
 export const BLOB_RELEASE_GRACE_TTL_SECONDS = 60 * 60;
 
 /**
- * How long a blob must already have been counting down on the release grace
- * window before the reclaim runner is allowed to DELETE its bytes.
- *
- * `TieredBlobStore.put` writes a blob BEFORE the value that references it is
- * staged, so between those two round trips the bytes carry no lease and no
- * holder. That is indistinguishable, by lease state alone, from a blob nothing
- * will ever reference again — which is exactly the read that made eager reclaim
- * unsafe. The margin is the proof: only the runner's own repair pass puts a blob
- * on the grace window, so a TTL that has fallen this far below it establishes
- * the blob has been unreferenced for at least this long. A just-written blob
- * still carries the full backstop and can never satisfy it.
+ * Safety margin proving unreferenced blobs are safe to reclaim (distinguishes
+ * just-written from abandoned).
  */
 export const BLOB_RECLAIM_SAFETY_MARGIN_SECONDS = 10 * 60;
 

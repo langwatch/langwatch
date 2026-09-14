@@ -3,21 +3,8 @@ import { createHash } from "node:crypto";
 import type { ChainableCommander, Cluster, Redis as IORedis } from "ioredis";
 
 /**
- * EVALSHA wrapper for a Lua script whose source is sent once, not per call.
- *
- * The queue's scripts are large — STAGE is ~11 KB and DISPATCH ~22 KB once the
- * shared helpers are prepended — and run at four-digit rates, so plain EVAL
- * re-transfers and re-hashes the full source on every call (measured at ~33%
- * of the prod Redis engine CPU, 2026-07-09). EVALSHA sends the 40-byte sha1
- * instead; on a NOSCRIPT miss (empty script cache after a restart or
- * SCRIPT FLUSH, or the first call against a cluster node) it falls back to
- * EVAL once, which loads the script into that node's cache for every later
- * call.
- *
- * The sha is derived from the source, so a deploy that changes a script can
- * never execute a stale cached body — a different source is a different sha.
- * Keys stay hash-tagged by the caller exactly as with EVAL, so cluster slot
- * routing is unchanged.
+ * EVALSHA wrapper: send sha once (NOSCRIPT miss falls back to EVAL to warm cache).
+ * Avoids re-transferring/re-hashing large scripts at high call rates.
  */
 export class CachedLuaScript {
   private readonly source: string;
@@ -37,19 +24,8 @@ export class CachedLuaScript {
   }
 
   /**
-   * {@link run}, but the caller can withdraw the command in the window the
-   * NOSCRIPT fallback opens.
-   *
-   * The fallback is issued AFTER an await, so unlike the initial EVALSHA it is
-   * not ordered ahead of whatever the caller sent next — on a cold script cache
-   * a command the caller has since superseded can land behind the write that
-   * superseded it. The queue's heartbeat is exactly that case: it must not
-   * extend a group's hold once the job's outcome is decided, and ordering alone
-   * only guarantees that for the EVALSHA (see `groupQueue.ts`'s
-   * `stopHeartbeat`). `isCancelled` closes the remaining window.
-   *
-   * Returns null when withdrawn, which every caller treats as "no refresh
-   * happened" — the same outcome as a heartbeat that never fired.
+   * Like {@link run} but cancellable: NOSCRIPT fallback is issued after await
+   * (ordering risk for stale commands; isCancelled closes the window).
    */
   async runCancellable(
     redis: IORedis | Cluster,
@@ -69,13 +45,8 @@ export class CachedLuaScript {
   }
 
   /**
-   * Queues one invocation onto a pipeline, so N runs cost one round trip
-   * instead of N.
-   *
-   * There is no NOSCRIPT fallback inside a pipeline — a queued command cannot
-   * retry itself — so the caller has to recognise that error on the result and
-   * re-run it through {@link run}, which loads the source and warms the cache
-   * for every later call. {@link isNoScriptResult} is that check.
+   * Queue into pipeline (no NOSCRIPT fallback; caller handles error via
+   * {@link isNoScriptResult} and re-runs with {@link run} to warm cache).
    */
   queue(
     pipeline: ChainableCommander,

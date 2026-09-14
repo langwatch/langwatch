@@ -49,15 +49,7 @@ describe("BlobSweeper", () => {
     }
   };
 
-  /**
-   * Pad the keyspace past several SCAN pages.
-   *
-   * SCAN pages by buckets and filters by MATCH afterwards, so a handful of keys
-   * come back in one call and a single tick would cover them however the cursor
-   * behaved. The padding is what makes a tick stop partway. It shares the suite
-   * prefix so teardown removes it, and carries no "<project>/<hash>" segment so
-   * the blob glob skips it.
-   */
+  /** Pad the keyspace to force SCAN pagination and test multi-tick sweeps. */
   const padKeyspace = async (count: number) => {
     const filler = redis.pipeline();
     for (let i = 0; i < count; i++) {

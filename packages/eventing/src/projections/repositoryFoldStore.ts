@@ -16,25 +16,7 @@ function sameRetention(
   );
 }
 
-/**
- * Generic adapter that wraps a ProjectionStore (repository) into a FoldProjectionStore.
- *
- * Replaces per-pipeline boilerplate store factories (e.g., createSuiteRunStateFoldStore,
- * createSimulationRunStateFoldStore) that all do the same thing: wrap data into a Projection
- * envelope on write, extract data on read.
- *
- * Accepts `ProjectionStore<Projection>` (untyped data) because existing repository
- * implementations default to `Projection` without a data type parameter.
- * The data is cast at the boundary — same as the factories this replaces.
- *
- * @example
- * ```typescript
- * const store = new RepositoryFoldStore<SuiteRunStateData>(
- *   suiteRunStateRepo,
- *   SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
- * );
- * ```
- */
+/** Generic adapter that wraps a ProjectionStore into a FoldProjectionStore. */
 export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
   constructor(
     private readonly repo: ProjectionStore<Projection>,

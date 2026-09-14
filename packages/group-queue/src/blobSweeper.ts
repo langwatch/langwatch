@@ -18,45 +18,17 @@ const sweepScript = new CachedLuaScript(BLOB_SWEEP_LUA);
 const SCAN_COUNT = 256;
 
 /**
- * Ceiling on blobs examined per queue per sweep, so one pass can never turn into
- * an unbounded walk of a multi-million-key keyspace. Work not reached this tick
- * is reached the next one; the sweep is periodic, not transactional.
- *
- * That promise only holds because the SCAN cursor is carried across ticks (see
- * {@link blobSweepCursorKey}). A ceiling on a walk that always restarts at the
- * beginning is not a rate limit, it is a blind spot: it would pin every sweep to
- * the same leading slice of the keyspace and leave everything past it to the
- * backstop TTL, however often the sweep ran.
+ * Ceiling on blobs per tick (persistent SCAN cursor defers work, not drops it).
  */
 const DEFAULT_MAX_KEYS_PER_QUEUE = 50_000;
 
 /**
- * Ceiling on SCAN calls per queue per sweep, bounding the walk by work done
- * rather than by matches found.
- *
- * The matched-key ceiling alone does not bound a tick: SCAN pages by buckets and
- * `MATCH` filters afterwards, so when few keys match, a tick walks the entire
- * keyspace to collect its quota however large that keyspace is — the cost is
- * paid whether or not anything comes back. `COUNT` is a work hint, not a
- * guarantee, so the number of calls to cross a keyspace is not fixed either.
- * Stopping on either ceiling makes one tick's cost bounded in both regimes, and
- * the parked cursor means the budget defers work rather than dropping it.
+ * Ceiling on SCAN calls per tick (bounds work when few keys match the filter).
  */
 const DEFAULT_MAX_SCAN_CALLS_PER_QUEUE = 2_000;
 
 /**
- * Where the last sweep of a queue stopped, so the next one resumes there instead
- * of re-walking the slice it already judged.
- *
- * A SCAN cursor stays valid indefinitely, so parking one between ticks is safe:
- * a full cycle still returns every key that exists for the whole of it. Keys
- * created mid-cycle may not be seen until the following one, which is the normal
- * SCAN guarantee and is what a periodic reclaim pass already assumes.
- *
- * It lives in Redis rather than in the process so progress survives a restart
- * and is shared by whichever pod runs the tick. One field per node, because in
- * cluster mode each master is iterated separately and a cursor only means
- * anything against the node that issued it.
+ * Parked SCAN cursor (persisted in Redis, per-node in cluster mode, survives restart).
  */
 function blobSweepCursorKey(queueName: string): string {
   return `${queueName}:gq:blob-sweep-cursor`;
@@ -134,19 +106,8 @@ async function scanNode(params: {
 }
 
 /**
- * Walks the GQ2 blob keyspace and bounds the retention of blobs nothing
- * references, independently of whether a release ever ran for them.
- *
- * The release grace window can only act at the moment a lease is retired. A
- * holder killed mid-flight never retires one, so its blob keeps the full
- * backstop and is re-armed on every redelivery; worse, the token it leaves in
- * the holder set makes the next clean release read the blob as still held and
- * withhold the window from every job sharing that content. This runner judges a
- * blob on its own lease state instead, which is the only view that survives a
- * holder dying without a release.
- *
- * See `blobSweepLua.ts` for why repair may shorten a deadline the release path
- * would not, and why reclaim is the only pass allowed to destroy bytes.
+ * Bound blob retention independently of release (grace window only acts at lease
+ * retirement, but killed holders never retire; judge by lease state instead).
  */
 export class BlobSweeper {
   private readonly redis: IORedis | Cluster;
@@ -195,13 +156,8 @@ export class BlobSweeper {
   }
 
   /**
-   * Read this queue's blob keys, resuming from the parked cursor.
-   *
-   * Returns where each node stopped rather than storing it: the cursor is only
-   * safe to advance once the blobs it covers have actually been judged, so the
-   * caller commits it after the sweep and never on a dry run. Advancing here
-   * would let a dry run — or a sweep that died before judging the batch — skip
-   * that slice until the cursor wrapped all the way around.
+   * Read blob keys resuming from parked cursor; return cursor state for caller to
+   * commit only after judging (advances only on real sweep, not dry run).
    */
   private async scanBlobKeys(queueName: string): Promise<{
     keys: string[];

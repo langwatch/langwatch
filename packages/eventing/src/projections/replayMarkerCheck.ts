@@ -29,28 +29,11 @@ export type ReplayMarkerDecision = "process" | "skip";
  * how markers are stored and looked up.
  */
 export interface ReplayMarkerChecker {
-  /**
-   * Check if projection-replay is active for the given event.
-   *
-   * Returns:
-   * - `"process"` → no replay active, continue normal fold processing.
-   * - `"skip"` → event is at or before the cutoff, replay handles it.
-   * - throws `ReplayDeferralError` → "pending" or event is after cutoff, defer.
-   *
-   * Cost when no replay is active: single HGET returning null (~0.1ms).
-   */
+  /** Check if replay is active for this event (returns decision or throws ReplayDeferralError). */
   check(projectionName: string, event: Event): Promise<ReplayMarkerDecision>;
 }
 
-/**
- * Redis-backed replay marker checker. Uses HGET on
- * `projection-replay:cutoff:{projectionName}` to coordinate with the replay CLI.
- *
- * Cutoff marker format: `{timestamp}:{eventId}` — comparison mirrors the
- * ClickHouse `ORDER BY EventTimestamp ASC, EventId ASC` ordering so that
- * the boundary is consistent between the replay tool's CH queries and the
- * live event handler's Redis check.
- */
+/** Redis-backed replay marker checker using projection-replay cutoff markers. */
 /** Minimal Redis surface: a pipeline that batches the two marker reads. */
 interface ReplayMarkerPipeline {
   hget(key: string, field: string): ReplayMarkerPipeline;

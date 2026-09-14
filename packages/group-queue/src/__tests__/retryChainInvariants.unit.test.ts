@@ -1,17 +1,6 @@
 /**
- * Retry-chain invariants.
- *
- * These do not test a behaviour so much as pin relationships BETWEEN constants
- * that are defined in different files and have no compiler-enforced link. Each
- * one here has already been violated in practice:
- *
- *   - the group attempt counter's TTL was derived from `activeTtlSec * 2`,
- *     which happens to equal `maxBackoffMs`, so from roughly attempt 12 the
- *     counter expired during the backoff, the retry read as a fresh delivery,
- *     and the fold re-applied the batch it had already folded.
- * A test that asserted the specific numbers would just restate them. These
- * assert the RELATIONSHIP, so raising one constant fails here rather than in
- * production.
+ * Pin relationships between retry-chain constants defined in separate files with no
+ * compiler-enforced link; past violations of these invariants led to delivery duplication.
  */
 import { describe, expect, it } from "vitest";
 import { GROUP_ATTEMPT_TTL_SECONDS } from "../groupQueue.ts";

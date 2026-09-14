@@ -1,12 +1,4 @@
-/**
- * The poison guard books a worker death when a claim marker's owner has no
- * liveness beacon (specs/poison-group-park-guard.feature). That
- * makes the ORDER of the two writes in `close()` load-bearing: the beacon
- * refresh runs on an interval, so retiring first and stopping the timer second
- * leaves a window where a refresh overwrites the `retired` tombstone with a
- * 90-second `alive` — which then expires into exactly the false death the
- * tombstone exists to prevent.
- */
+/** Retiring the liveness beacon before stopping its refresh timer prevents false deaths. */
 
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";

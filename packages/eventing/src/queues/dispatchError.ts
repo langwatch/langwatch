@@ -1,20 +1,5 @@
 import { nowInstant, toEpochMs } from "@langwatch/time";
-/**
- * Typed error thrown by outbox dispatch endpoints to signal whether the
- * failure is worth retrying.
- *
- * See dev/docs/adr/027-typed-dispatcherror-contract.md.
- *
- * Dispatch endpoints (alert dispatch, dataset append, etc.) should
- * catch provider/transport errors and re-throw as DispatchError with
- * an explicit `retryable` decision. The drainer interprets:
- *   - retryable: true  → schedule backoff retry (`failed_retryable`)
- *   - retryable: false → mark `dead`, surface to operator
- *
- * Any non-DispatchError thrown from a dispatch endpoint is treated as
- * retryable by default — better to retry an unexpected crash than to
- * silently dead-letter a row whose failure mode we did not classify.
- */
+/** Typed error to signal if a dispatch failure is retryable (see ADR-027). */
 export class DispatchError extends Error {
   readonly retryable: boolean;
   readonly cause?: unknown;
@@ -97,15 +82,7 @@ export function isRetryableHttpStatus(status: number): boolean {
   return status >= 500 && status < 600;
 }
 
-/**
- * Best-effort extraction of an HTTP status from the many error shapes the
- * dispatch providers raise (AWS SDK v3, axios/@slack/webhook, SendGrid, fetch).
- * Returns undefined for transport errors (ECONNREFUSED, ETIMEDOUT, …) that
- * carry no HTTP status — those are treated as retryable by the caller.
- *
- * Note `code` is only read when numeric: SendGrid uses a numeric `code` for the
- * status, whereas Node transport errors and @slack/webhook use a string `code`.
- */
+/** Best-effort extraction of HTTP status from dispatch provider errors. */
 export function extractHttpStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const e = error as Record<string, any>;
@@ -127,17 +104,7 @@ export function extractHttpStatus(error: unknown): number | undefined {
   return undefined;
 }
 
-/**
- * Converts a raw dispatch failure into a DispatchError with a retryable
- * decision derived from its HTTP status. An already-typed DispatchError is
- * returned unchanged. Failures with no recognizable status default to
- * retryable — see ADR-027 for why the unknown case is conservative.
- *
- * When the caller knows the failure cannot be retried (e.g. a template
- * render failure where the payload itself is malformed), it can pass
- * `retryable: false` to short-circuit the HTTP-status heuristic and
- * promote the row straight to `dead`.
- */
+/** Convert raw dispatch failure to DispatchError with retryable decision from HTTP status. */
 export function toDispatchError(
   error: unknown,
   { message, retryable: retryableOverride }: { message: string; retryable?: boolean },

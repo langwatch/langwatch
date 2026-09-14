@@ -168,16 +168,7 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
   return result.data as Metadata;
 }
 
-/**
- * Creates a projection representing the current state of an aggregate.
- *
- * @param id - Unique identifier for this projection
- * @param aggregateId - The aggregate this projection represents
- * @param tenantId - Tenant identifier for multi-tenant isolation
- * @param data - Projection-specific data
- * @param version - Version/timestamp (defaults to current time)
- * @returns A new projection object
- */
+/** Creates a projection representing the current state of an aggregate. */
 function createProjection<Data = unknown>(
   id: string,
   aggregateId: string,
@@ -224,28 +215,7 @@ function isValidProjection(projection: unknown): projection is Projection {
   return "data" in projection && (projection as any).data !== undefined;
 }
 
-/**
- * Validates that a context has a valid tenantId.
- * Throws an error if tenantId is missing or invalid.
- *
- * **Security:** This is a critical security check to prevent cross-tenant data leakage.
- * Store implementations MUST call this before any read or write operations.
- * Uses TenantIdSchema for consistent validation across the codebase.
- *
- * @param context - The context to validate
- * @param operation - Description of the operation (for error messages)
- * @throws {Error} If tenantId is missing, empty, or invalid
- *
- * @example
- * ```typescript
- * async storeEvents(events: Event[]): Promise<void> {
- *   // Extract tenantId from first event's root level
- *   const context = { tenantId: events[0].tenantId };
- *   EventUtils.validateTenantId(context, 'storeEvents');
- *   // ... proceed with storage
- * }
- * ```
- */
+/** Validates tenantId to prevent cross-tenant data leakage. */
 function validateTenantId(context: { tenantId?: string } | undefined, operation: string): void {
   if (!context) {
     throw new SecurityError(

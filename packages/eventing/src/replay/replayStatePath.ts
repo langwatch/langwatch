@@ -148,24 +148,7 @@ async function replayTenantForState({
   }
 }
 
-/**
- * Replays a single Postgres operational state projection into its
- * `StateProjectionStore`.
- *
- * A state rebuild differs from the fold/map paths in two deliberate ways:
- *
- * - **One projection-wide pause/drain.** State is rebuilt from `init()` while
- *   its live queue is paused, then queued events resume against the rebuilt
- *   cursor. Per-batch marker/swap machinery is unnecessary because Postgres
- *   rows are deterministic upserts rather than ClickHouse table replacements.
- * - **One accumulator per tenant, flushed once at the tenant's end.** A
- *   projection key may span aggregates (`projection.key`), so a key is only
- *   complete after every one of the tenant's aggregates has been folded. State
- *   memory is bounded by the tenant's projection-key cardinality, not events.
- *
- * Reads canonical events from ClickHouse only. It never touches subscribers,
- * process managers, or their delivery queues — there is no seam here that could.
- */
+/** Replay Postgres operational state projection from init() in a single pause/drain phase. */
 export async function replayStateProjection({
   ctx,
   projection,

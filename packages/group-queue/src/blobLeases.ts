@@ -115,14 +115,8 @@ export class BlobLeases {
   }
 
   /**
-   * Records this holder's lease on a blob, re-arming the full backstop on the
-   * blob itself. Acquiring and renewing are the same write — a deadline of
-   * `now + lease TTL` — so both names route through {@link writeLease}; they
-   * stay separate only to keep the intent legible at the call site.
-   *
-   * Re-arming matters beyond refreshing a long-lived blob: it is what lets the
-   * release path shorten an unleased blob's expiry safely. A take that landed
-   * after such a release restores the backstop under the new holder.
+   * Record holder's lease and re-arm backstop; acquire and renew are the same
+   * write to enable safe grace-window shortening.
    */
   async take(params: {
     projectId: TenantId;
@@ -162,15 +156,8 @@ export class BlobLeases {
   }
 
   /**
-   * Retires one holder's lease. When it was the last one, the blob's expiry
-   * drops to the release grace window instead of keeping the full backstop.
-   *
-   * `tier` decides whether there is a Redis key to expire at all — an s3-tier
-   * blob's bytes are the durable store's to reclaim, so only its bookkeeping
-   * keys are shortened.
-   *
-   * Resolves true when the grace window was applied, which is the signal that
-   * this release actually retired the blob rather than one of several holders.
+   * Retire holder's lease; apply grace window if it was the last holder (resolves
+   * true when applied). Tier determines whether Redis bytes expire.
    */
   async release({
     projectId,
@@ -214,13 +201,8 @@ export class BlobLeases {
   }
 
   /**
-   * Moves a lease from a retired value to its replacement in one eval. When the
-   * retired lease was the OLD blob's last, that blob goes onto the grace window
-   * — `oldTier` says whether there are bytes in Redis to shorten. A retry whose
-   * re-encode kept the content hash transfers within one lease set, so the
-   * replacement is already recorded and the window is withheld.
-   *
-   * Resolves true when the old blob went onto the grace window.
+   * Atomically move lease to replacement blob; apply old blob's grace window if it
+   * was the last holder (resolves true when applied).
    */
   async transfer({
     newProjectId,

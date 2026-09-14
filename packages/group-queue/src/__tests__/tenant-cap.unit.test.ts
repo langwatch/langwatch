@@ -3,19 +3,9 @@ import { DEFAULT_TENANT_CAP } from "../scripts.ts";
 import { resolveGroupQueuePolicyFromEnv } from "../policy-env.ts";
 
 /**
- * The tenant soft-cap is a defense added post-2026-05-11 incident.
- * As of the noisy-neighbour follow-up it ships ON by default
- * (DEFAULT_TENANT_CAP = 50) so every install gets baseline protection
- * without explicit configuration. Operators retune or kill via
- * LANGWATCH_DISPATCH_TENANT_CAP — these tests pin that contract so a
- * future refactor cannot silently change the default.
- *
- * `readTenantCap()` (a free function reading `process.env` directly) no
- * longer exists: parsing moved to `resolveGroupQueuePolicyFromEnv` (this
- * package owns only the parse, and returns `undefined` rather than a
- * default for an absent/invalid value), and the fallback to
- * `DEFAULT_TENANT_CAP` moved to `GroupStagingScripts`'s constructor. These
- * tests compose the two pieces the way the constructor does.
+ * Tenant soft-cap is a noisy-neighbour defense; defaults to 50 and configurable
+ * via LANGWATCH_DISPATCH_TENANT_CAP. Tests pin the contract between env parsing
+ * and constructor fallback.
  */
 function tenantCapFor(tenantConcurrencyCap: string | undefined): number {
   const policy = resolveGroupQueuePolicyFromEnv({ tenantConcurrencyCap });

@@ -13,16 +13,8 @@ import { TieredBlobStore } from "../tieredBlobStore.ts";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 /**
- * #5538. The drop path used to throw plain `Error`s, so every decode failure
- * looked identical: one catch-all "Failed to parse staged job data". These tests
- * pin the discriminator that separates a body that is GONE (irreducible loss)
- * from a body that is merely unreadable to THIS worker (recoverable — do not
- * retire it).
- *
- * The load-bearing rule under test: classification comes from the error TYPE.
- * Message text is NOT a classifier — zlib's wording is Node-version-dependent
- * and not ours to own, so an alert built on substrings breaks on a runtime
- * upgrade. No test in this file may assert on `err.message` to identify a class.
+ * Decode failures: classification comes from error TYPE, never message text,
+ * to distinguish irreversible loss (GONE) from recoverable (unreadable to this worker).
  */
 describe("jobEnvelope decode failures", () => {
   const projectId = createTenantId("project_5538");
@@ -187,19 +179,7 @@ describe("jobEnvelope decode failures", () => {
   });
 
   describe("given a body whose parse error would echo the payload back", () => {
-    // V8 quotes the offending input into the message:
-    //   JSON.parse("patient@…") -> Unexpected token 'p', "patient@ho"... is not valid JSON
-    // That message reaches the drop log, and redactStorageUrisInText only strips
-    // storage URIs — so without a guard, raw body lands in prod logs. AC1 says
-    // "never raw payload or tenant PII".
-    //
-    // The bare-JSON legacy decode path (an un-enveloped value) has since been
-    // retired — decodeJobEnvelope now rejects any non-`GQ2|` value with
-    // malformed_envelope before ever touching its bytes, so a raw payload can no
-    // longer reach JSON.parse via this function at all. The inline-bare-JSON
-    // leak cases from the original suite are gone with that path (see report:
-    // blocked). What remains, and still exercises the same redactor, is a
-    // properly-enveloped body whose DECOMPRESSED content fails to parse.
+    // Guard against raw payload/PII leaking into logs via JSON parse errors.
     describe("when an offloaded body fails to parse", () => {
       it("keeps the payload out of the thrown message", async () => {
         const { tieredBlobs, redisBlobs } = makeTiered();

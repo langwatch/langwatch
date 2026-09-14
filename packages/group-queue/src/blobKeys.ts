@@ -1,16 +1,8 @@
 import type { TenantId } from "./storage.ts";
 
 /**
- * The single source of truth for the redis key layout of offloaded blobs and
- * their lease sets. Centralizing the tenant-namespaced key layout keeps the
- * blob store, lease scripts, and rolling-deploy compatibility guard aligned.
- *
- * Keys carry the queue name (with its cluster hash tag) so a blob, its lease
- * set, and the queue's other keys all land in one cluster slot.
- *
- * `projectId` is the branded {@link TenantId} so the tenant boundary stays
- * intact at the exact API that mints tenant-scoped keys (ADR-029) — a
- * caller can't accidentally pass a raw user-controlled string.
+ * Centralized tenant-namespaced blob key layout; projectId is branded
+ * {@link TenantId} to enforce tenant boundaries at the minting API.
  */
 
 /** `<projectId>/<hash>` — the tenant-namespaced content id a blob is keyed by. */

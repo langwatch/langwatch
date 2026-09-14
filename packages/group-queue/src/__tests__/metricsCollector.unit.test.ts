@@ -108,15 +108,7 @@ function makeRedis(
       }),
     ),
     /**
-     * Paged SSCAN over the pending-groups index. Cursors are opaque in real
-     * Redis; an index models the one guarantee the sweep relies on, that a
-     * member present for a whole rotation is returned at least once, and lets
-     * a test choose where the page boundary falls.
-     *
-     * Defaults to the ready members when a case does not say otherwise, since
-     * most cases do not care which lifecycle state a group is in. The cases
-     * that do care pass `pendingGroups` with groups that are in no ready set
-     * at all, which is what a parked, blocked or claimed group looks like.
+     * Paged SSCAN over pending groups; tests can choose where pagination boundaries fall.
      */
     sscan: vi.fn(async (...args: unknown[]) => {
       const readyMembers = (opts.readyZset ?? []).map((e) => e.member);

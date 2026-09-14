@@ -34,18 +34,8 @@ function accumulate(totals: ReplayTotals, result: ReplayResult): void {
 }
 
 /**
- * Orchestrates projection replays. Every run flows through ONE engine:
- *
- * - Fold and map projections replay together via {@link runFoldMapReplay} —
- *   one discovery over the union of their event types, each batch's events
- *   loaded exactly once and streamed into every relevant accumulator.
- * - Postgres operational state projections rebuild afterwards in
- *   their own paused lane ({@link replayStateProjection}) — a from-init
- *   canonical rebuild keyed across aggregates, which the per-batch marker
- *   protocol does not fit.
- *
- * There is no per-projection serial path: selecting a state projection no
- * longer demotes the run's folds and maps to one-load-per-projection.
+ * Orchestrates projection replays: fold/map via runFoldMapReplay,
+ * state via replayStateProjection.
  */
 export class ReplayService {
   /** Shared dependencies handed to the path implementations. */

@@ -44,15 +44,7 @@ export function compressionMediaType(codec: CompressionCodec): string {
   return COMPRESSION_MEDIA_TYPES[codec];
 }
 
-/**
- * msgpack pays off only on large payloads. Below this, `JSON.stringify` beats
- * `msgpackr.pack` outright (measured ~1.7-1.9x on 1.5-6KB job bodies): our
- * payloads are dominated by long UTF-8 strings — LLM prompts, completions, RAG
- * contexts — which msgpack stores essentially the way JSON does, so there is no
- * structural redundancy for it to win back, while V8's JSON fast path is hard to
- * beat on exactly that shape. Above the threshold msgpack's faster *decode*
- * (2-3x) dominates and it wins.
- */
+/** msgpack break-even: JSON faster on small payloads, msgpack faster on large. */
 export const MSGPACK_MIN_BYTES = 100 * 1024;
 
 /**
@@ -134,14 +126,8 @@ export function decodePayload(buf: Buffer): Record<string, unknown> {
 }
 
 /**
- * The dedup key for a content-addressed blob.
- *
- * JSON and msgpack representations of the same payload are already different
- * byte sequences (UTF-8 JSON text vs. msgpackr's binary map encoding), so the
- * two codecs never land on the same key without an explicit prefix — hashing
- * the raw JSON string keeps this call byte-for-byte the same hash a pre-rollout
- * pod would have computed, so cross-version dedup during the msgpack rollout
- * isn't degraded by a hash that only this pod's code produces.
+ * Dedup key for content-addressed blob (hash raw JSON string for cross-version
+ * compatibility during msgpack rollout).
  */
 export function contentHashSource({
   codec,

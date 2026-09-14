@@ -108,22 +108,8 @@ export async function unmarkBatch({
 }
 
 /**
- * Terminal transition for replayed aggregates. For each aggregate: drop its
- * active cutoff marker from the cutoff hash, write a separate short-TTL "done"
- * marker preserving the cutoff boundary, and record it in the completed set.
- *
- * Unlike {@link unmarkBatch} (which HDELs the marker, returning the aggregate to
- * unconditional live processing), this PRESERVES the cutoff boundary. A job that
- * was staged — but never active — during the replay pause is not drained by
- * `waitForActiveJobs`; after unpause it runs, and without the boundary it would
- * re-process events at/before the cutoff and double-write records replay just
- * rebuilt (and re-fire map subscribers). The done-marker keeps the live checker
- * skipping those events while still letting genuinely newer events through.
- *
- * The boundary lives in its own short-TTL key rather than in the cutoff hash so
- * a giant (all-tenant, multi-month) replay does not retain a marker per
- * aggregate for its whole duration: the cutoff hash stays bounded to in-flight
- * aggregates and done markers self-expire after {@link DONE_MARKER_TTL_SECONDS}.
+ * Terminal transition for replayed aggregates: drop cutoff, write done marker,
+ * record completed.
  */
 export async function markCompletedBatch({
   redis,
@@ -152,16 +138,7 @@ export async function markCompletedBatch({
   checkPipelineErrors(results, "markCompletedBatch");
 }
 
-/**
- * Failure-path cleanup: HDEL a batch of aggregate keys from each projection's
- * cutoff hash WITHOUT adding them to the completed set (unlike
- * {@link unmarkBatch}) and WITHOUT touching done markers. Used when a batch
- * errors (or a cancellation abandons it) mid-flight: its aggregates were never
- * replayed, so their pending/cutoff markers must go — returning them to
- * unconditional live processing, matching their pre-replay state — while done
- * markers and completed-set entries from previously completed batches survive
- * so an operator re-run still skips those aggregates.
- */
+/** Failure-path cleanup: remove in-flight markers without completing aggregates. */
 export async function removeInFlightMarkers({
   redis,
   projectionNames,

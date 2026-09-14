@@ -15,15 +15,7 @@ type Payload = { id: string; value: string };
 
 const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * The throttle contract the subscribers rely on has to hold on the in-memory
- * queue too, not only on the Redis one — memory mode is a supported
- * single-process deployment, and a window that silently does nothing there
- * would let every event through while the code reads as if it were throttled.
- *
- * These drive the queue itself rather than asserting on option objects: what
- * matters is which payloads the processor is actually handed, and when.
- */
+/** Verify the throttle contract holds for the in-memory queue, not just Redis. */
 describe("EventSourcedQueueProcessorMemory throttle window", () => {
   function createQueue({
     windowMs,

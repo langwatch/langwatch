@@ -233,21 +233,7 @@ async function filterAlreadyCompleted({
   return { remaining, skippedCount };
 }
 
-/**
- * The fold/map replay engine: one discovery pass over the union of all
- * selected projections' event types, then per-batch
- * mark/pause/drain/cutoff/unpause/stream/write/complete, loading each batch's
- * events exactly once for every projection.
- *
- * The pause window covers only mark → drain → cutoff (ADR-015, amended): once
- * an aggregate's cutoff marker is recorded, the live checker skips its events
- * at/before the cutoff and defers anything newer, so the rebuild's load and
- * writes run with the queue flowing. Events stream straight from ClickHouse
- * into the accumulators — filtered to the union of selected event types, so
- * payload bytes no projection consumes are never read — and memory stays
- * bounded by fold states plus the map write buffer, never the batch's event
- * count.
- */
+/** Fold/map replay engine: discovery pass with mark/pause/drain/cutoff/write phases per batch. */
 export async function runFoldMapReplay({
   ctx,
   config,

@@ -1,16 +1,8 @@
 import { BLOB_RELEASE_GRACE_TTL_SECONDS } from "./blobConstants.ts";
 
 /**
- * Lua definition of `gqGraceExpireIfUnleased`, shared verbatim by every script
- * that retires a lease — the standalone release/transfer evals in
- * `blobLeases.ts` and the dedup-squash release inlined into `STAGE_LUA` in
- * `scripts.ts`. One definition, so a release path cannot drift into leaving the
- * full backstop on a blob the others would have put on the grace window.
- *
- * Callers must have already removed their own lease member and pruned expired
- * deadlines; the helper decides only whether anything is left.
- *
- * Returns 1 when the grace window was applied, 0 when it was withheld.
+ * Shared Lua: decide whether to apply grace window or full backstop after lease
+ * retirement (prevents drift between release paths). Returns 1 if applied, 0 if withheld.
  */
 export const GQ_BLOB_GRACE_LUA = `
 local function gqGraceExpireIfUnleased(leaseKey, legacyKey, blobKey)

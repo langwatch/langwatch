@@ -1,15 +1,6 @@
 /**
- * Regression test: GroupQueueProcessor.waitUntilReady() must survive a normal
- * ioredis reconnect cycle.
- *
- * Bug: rejecting readiness on the first `error` (or `close`) event turned an
- * ordinary transient ioredis reconnect into a startup failure. On an
- * unavailable endpoint with maxRetriesPerRequest: null, ioredis emits
- * `error` → `close` → `reconnecting` and can later emit `ready`; the old code
- * rejected at the first event instead of waiting for recovery.
- *
- * Fix: keep waiting across transient `error`/`close` events and resolve on
- * `ready`; reject only on the terminal `end` event.
+ * Regression: waitUntilReady() must survive ordinary ioredis reconnect cycles,
+ * not reject on transient `error`/`close` events.
  */
 
 import { EventEmitter } from "node:events";

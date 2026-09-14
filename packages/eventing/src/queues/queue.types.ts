@@ -37,62 +37,17 @@ export interface DeduplicationConfig<Payload> {
    * @default true
    */
   replace?: boolean;
-  /**
-   * Whether a dedup key whose job has already been DISPATCHED (removed from
-   * staging) but whose TTL is still alive should SQUASH a new job rather than be
-   * treated as stale and cleaned up.
-   *
-   * Default (`false`): the historical behavior — once the deduplicated job is
-   * dispatched, the dedup key is considered stale, deleted, and a new job stages
-   * (so a late re-trigger re-runs the command). When `true`, the still-alive TTL
-   * is HONORED: the new job is squashed for the remainder of the TTL window, so a
-   * late re-trigger arriving after dispatch cannot re-run the command. Use it
-   * when the dedup TTL is sized to span the whole window in which duplicate
-   * triggers may arrive (fixes per-trace evaluations running twice, #3912).
-   * @default false
-   */
+  /** If true, a dedup key survives dispatch and squashes new jobs within its TTL. */
   shouldSurviveDispatch?: boolean;
 }
 
-/**
- * Strategy for deduplicating queue jobs.
- *
- * - `undefined`: No deduplication (default) - every event processed individually
- * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}`
- * - `DeduplicationConfig`: Custom makeId function and TTL
- *
- * @example
- * ```typescript
- * const perAggregate: DeduplicationStrategy<Event> = "aggregate";
- * const custom: DeduplicationStrategy<Event> = {
- *   makeId: (event) => `${event.tenantId}:custom-key`,
- *   ttlMs: 2000,
- * };
- * ```
- */
+/** Strategy for deduplicating queue jobs: undefined (no dedup), "aggregate", or custom config. */
 export type DeduplicationStrategy<Payload> = "aggregate" | DeduplicationConfig<Payload>;
 
-/**
- * What the queue knows about THIS delivery of a job, as opposed to the job's
- * own payload.
- *
- * `attempt` is 1 on a fresh delivery and increments per retry. A fold uses it
- * to tell a first delivery from a redelivery: on a fresh delivery the previous
- * batch for that group must already have been acked (the queue holds one
- * active batch per group), so anything it recorded about applied events is
- * dead and can be discarded rather than accumulated forever.
- */
+/** Delivery-specific metadata about a queued job attempt. */
 export interface JobDelivery {
   attempt: number;
-  /**
-   * True when this handler call is a later sub-batch of the SAME locked
-   * dispatch, after an earlier sub-batch of this delivery already committed
-   * (set by the GroupQueue's batch bisection). Delivery-scoped state written by
-   * the handler — the fold store's applied-event-id set — must be EXTENDED on a
-   * continuation, never replaced: each commit in the chain only carries its own
-   * sub-batch's ids, and replacing would erase the ids the earlier commits
-   * recorded, letting a retry re-apply them (#6578).
-   */
+  /** True when this is a continuation of a batched dispatch. */
   isContinuation?: boolean;
 }
 
@@ -141,19 +96,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
    */
   coalesceMaxBatch?: (payload: Payload) => number | undefined;
 
-  /**
-   * Optional per-payload resolver for the maximum total byte size of a coalesced
-   * batch (ADR-066 pillar 2). The drain stops before taking a same-group job
-   * that would push the batch past this budget, so a coalesced append stays
-   * inside the downstream flush budget; a job too large to fit is left for its
-   * own later dispatch. Returns undefined to fall back to the GroupQueue default
-   * ({@link DEFAULT_COALESCE_MAX_BYTES}). Only consulted when `coalesceMaxBatch`
-   * enables coalescing.
-   *
-   * The budget is spent in payload bytes — the size a worker's batch actually
-   * holds — not in the bytes the job occupies in Redis, which for a compressed
-   * or blob-offloaded body is a small fraction of it.
-   */
+  /** Resolver for max byte size of a coalesced batch (see ADR-066). */
   coalesceMaxBytes?: (payload: Payload) => number | undefined;
 
   /**
@@ -178,17 +121,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
    */
   spanAttributes?: (payload: Payload) => SemConvAttributes;
 
-  /**
-   * Optional function to extract a group key from the payload.
-   * When provided, enables per-group sequential processing via the GroupQueue staging layer.
-   * Jobs with the same group key are processed sequentially (FIFO), while different groups
-   * are processed in parallel up to globalConcurrency.
-   *
-   * @example
-   * ```typescript
-   * groupKey: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`
-   * ```
-   */
+  /** Function to extract a group key for sequential FIFO processing of same-group jobs. */
   groupKey?: (payload: Payload) => string;
 
   /**
