@@ -455,12 +455,17 @@ export class BetterAuthDatabaseHooks {
   }): Promise<void> {
     try {
       const user = await this.deps.users.findById({ userId: account.userId });
-      if (!user?.email) return;
+      const email = user?.email;
+      if (!user || !email) return;
 
-      const domain = extractEmailDomain(user.email);
+      const domain = extractEmailDomain(email);
       if (!domain) return;
 
-      await this.admitAndReconcile({ user, account, domain });
+      await this.admitAndReconcile({
+        user: { ...user, email },
+        account,
+        domain,
+      });
     } catch (err) {
       logger.error(
         { err, userId: account.userId },
@@ -481,12 +486,7 @@ export class BetterAuthDatabaseHooks {
     account,
     domain,
   }: {
-    user: {
-      id: string;
-      email: string;
-      name?: string | null;
-      pendingSsoSetup?: boolean | null;
-    };
+    user: DatabaseHookUser & { email: string };
     account: { userId: string; providerId: string; accountId: string };
     domain: string;
   }): Promise<void> {
