@@ -5,21 +5,7 @@ import type { FieldError } from "react-hook-form";
 import "./auth-front-door.css";
 import { MONO_FONT } from "../../model/front-door-theme.ts";
 
-/**
- * One labelled row of the front door's forms: a small quiet label, the input,
- * and the words of a rejection under it.
- *
- * The board's field, not the app's settings form: no helper line repeating the
- * label in different words, no title casing, nothing between the label and the
- * field. The label's right-hand side is a slot, because "Forgot password?"
- * belongs on the label line and nowhere else.
- *
- * The label is a real `<label>` wired by id, so clicking it focuses the field
- * and a test (or a screen reader) finds the input by its name. The error is
- * plain text in the danger colour: a rejection on the field it belongs to is
- * already where the person is looking, and a red banner on top of a red line
- * would say it twice.
- */
+/** Form field row: label with optional end slot, input, and error below. */
 export function FrontDoorField({
   label,
   labelEnd,

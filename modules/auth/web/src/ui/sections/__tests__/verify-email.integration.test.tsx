@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The /auth/verify-email landing page renders under Chakra; only the URL
- * search-params hook is mocked. The page must never complete a verification
- * on its own - a scanner following the link sees exactly what a person does  - 
- * and it must never copy the link's proof into the DOM, where session-replay
- * and RUM collectors scrape attributes.
+ * Verify-email landing; never auto-completes, never exposes proof in DOM.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

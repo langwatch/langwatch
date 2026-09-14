@@ -1,18 +1,4 @@
-/**
- * A link out of a front-door screen.
- *
- * Harvested from `platform/app/src/utils/compat/next-link.tsx`, which wraps
- * react-router's `Link`. A feature-web package may not import the router
- * (ADR-004), so every destination is an anchor here — which on THIS family is
- * the right answer rather than a concession: the front door's own links move
- * between signed-out documents (`/auth/signin` ⇄ `/auth/signup`, forgot
- * password, an invitation), and every one of them wants the fresh document a
- * full navigation gives rather than a client transition carrying a cache
- * primed before there was a session.
- *
- * The prop shape is unchanged, including the object `href` and the
- * next/link-era props nothing reads, so no call site moved a character.
- */
+/** Front-door link as plain anchor; full navigation, not client transition. */
 
 import { type AnchorHTMLAttributes, forwardRef, type ReactNode } from "react";
 

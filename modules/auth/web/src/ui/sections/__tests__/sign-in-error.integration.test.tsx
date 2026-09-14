@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration coverage for the /auth/error referrer redirect on Auth0
- * deployments: an unrecoverable OAuth failure (no stable-error code) bounces
- * the user back to `document.referrer` after a 5s countdown, but only when
- * that referrer is same-origin — otherwise it falls back to "/". Exercises
- * the real `isSameOrigin` guard via `importOriginal`, not a reimplementation.
+ * Sign-in error: Auth0 bounces to referrer after 5s if same-origin, else "/".
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";

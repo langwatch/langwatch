@@ -3,16 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-/**
- * The responsive contract of the front door, pinned where it is written.
- *
- * A rendered assertion cannot see this: Chakra compiles responsive props to
- * class names, so a jsdom render shows `class="chakra-input css-ee9xfg"` for
- * both a field that is 16px on a phone and one that is not. What CAN be
- * checked is that the props are still there — which is the thing that gets
- * quietly dropped in a refactor, and the thing an iPhone notices immediately
- * by zooming the page in on focus and never zooming back out.
- */
+/** Pins responsive prop contract to source; jsdom cannot see compiled Chakra props. */
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Read relative to the package `src` root, so a file can move between layers. */

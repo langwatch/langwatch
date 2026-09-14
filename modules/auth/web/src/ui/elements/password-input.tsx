@@ -8,22 +8,7 @@ import "./auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme.ts";
 import { FIELD_FOCUS, FIELD_SURFACE } from "./front-door-field.tsx";
 
-/**
- * A password box with its own reveal toggle, sitting INSIDE the box.
- *
- * The toggle used to be a button beside the input, which cost the field the
- * width of a button and read as a separate control that happened to be next to
- * it. Inset, it belongs to the field it acts on — which matters most where
- * there are two of them, because "show" beside a pair of stacked boxes does
- * not say which one it means.
- *
- * Each box keeps its own state for the same reason: revealing what you typed
- * is a question about one field. A single toggle over a password and its
- * confirmation would answer it for both, which defeats confirming.
- *
- * The input reserves room for the button rather than overlapping it, so a long
- * password scrolls under the text and never under the icon.
- */
+/** Password input with inset reveal toggle; each field keeps its own visibility state. */
 export function PasswordInput({
   id,
   autoComplete,

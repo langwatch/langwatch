@@ -8,24 +8,7 @@ import {
 } from "../model/ground-palette.ts";
 
 /**
- * The ground, on its way to a new turn.
- *
- * Given where the field should BE, this returns where it is right now, a frame
- * at a time. The shader is handed the result every frame, so what a person
- * sees when a step changes is the field turning into position rather than
- * jumping there.
- *
- * It always tweens from wherever the field currently IS, never from the turn
- * it was last aiming at. Somebody who moves two steps quickly gets one
- * continuous motion that changes its mind, not a queue of animations.
- *
- * `instant` collapses the whole thing to an assignment: no frame loop, no
- * motion. That is the reduced-motion path, where the ground is not animating
- * at all and neither should this.
- *
- * `target` MUST be memoized by the caller. It is the effect's only trigger, so
- * a fresh object every render would restart the journey on the frame it
- * published — a loop, not an animation.
+ * Frame tween to new ground position; always from current; respects reduced-motion
  */
 export function useTweenedGround(
   target: GroundShift,

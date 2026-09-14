@@ -1,18 +1,5 @@
 /**
- * The castle Snake easter egg, as rules rather than pixels.
- *
- * Everything here is pure and deterministic: the caller injects the random
- * source, so a test can play a whole game by hand and the renderer can stay a
- * thin loop over `advance`. Nothing in this module touches the DOM, a canvas,
- * or the clock.
- *
- * The board is the ground's own signal grid (`lw-front-door-signal-grid`,
- * 72px), and the snake runs along the LINES of it rather than through the
- * cells — so a position is an intersection, and a move is one edge. That is
- * why the coordinates here are lattice nodes and carry no pixels: what a node
- * is worth in pixels belongs to the renderer.
- *
- * Spec: specs/identity/front-door-castle-snake.feature
+ * Pure snake game rules; injected random; positions are lattice intersections
  */
 
 export type Point = { readonly x: number; readonly y: number };
@@ -215,13 +202,7 @@ const pursue = ({ dx, dy }: { dx: number; dy: number }): Direction => {
 };
 
 /**
- * One tick of the molecule. It closes on the head along whichever axis it is
- * furthest away on, which is enough to be frightening and simple enough to be
- * escapable — it cannot cut a corner, so a turn always buys a node.
- *
- * The renderer ticks it slower than the snake. That is the whole difficulty
- * curve, and it is deliberately gentle: this is an easter egg, and the reward
- * for finding it should not be losing immediately.
+ * Molecule advances along wider axis; slower than snake for gentle difficulty curve
  */
 export const advanceChaser = (game: SnakeGame): SnakeGame => {
   if (game.ending) return game;

@@ -1,18 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Guards the public-route allowlist that keeps the unauthenticated auth pages
- * (forgot/reset password) reachable. Regression: those routes were missing
- * from `publicRoutes`, so the global session guard bounced visitors to
- * /auth/signin?callbackUrl=... before they could request a reset. The
- * page-render tests could not catch it because they mount the component
- * directly, bypassing the router-level guard.
- *
- * jsdom locks `window.location.href`, so rather than observe the online
- * redirect we drive the guard through its OFFLINE branch (it registers an
- * `online` listener instead of navigating). A public route returns before
- * either branch, so no `online` listener is registered; a protected route
- * reaches the redirect and registers one.
+ * Regression: publicRoutes guards unauthenticated pages; jsdom offline tests via online listener
  */
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

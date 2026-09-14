@@ -171,13 +171,7 @@ describe("applyHandledErrorToForm", () => {
 
   describe("given a key the form holds a value for but paints no input for", () => {
     /**
-     * The bug this replaced. `getValues()` answers "is there a value under
-     * this key", which is true for every hidden default a form carries —
-     * `projectId`, `organizationId`, an id threaded through for the mutation.
-     * The bridge would claim the error, set it on a key nothing renders, and
-     * return `true`, suppressing the caller's toast: the user pressed Save and
-     * absolutely nothing happened. One call site had already worked around it
-     * by hand.
+     * Regression: getValues() false-positives on hidden defaults, suppressing error toast
      */
     it("declines it, so the failure still reaches the user as a toast", () => {
       const form: FormStub = {

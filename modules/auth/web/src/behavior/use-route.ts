@@ -1,11 +1,5 @@
 /**
- * Where this document is, for a screen that may not import a router.
- *
- * `platform/app` answered both of these from `~/utils/compat/next-*`, which
- * wrap react-router; a feature-web package may import neither, so the address
- * arrives on the host port and these two shims put it back in the shapes the
- * screens were written against. Same names, same return types, so no call site
- * changed on the way over.
+ * Router compat shims for screens unable to import react-router; address from host port
  */
 
 import { useMemo } from "react";

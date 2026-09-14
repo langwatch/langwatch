@@ -5,37 +5,7 @@ import { MONO_FONT } from "../../model/front-door-theme.ts";
 import type { Direction, SnakeGame } from "../../model/castle-snake.ts";
 import { advance, advanceChaser, createGame, queueTurn } from "../../model/castle-snake.ts";
 
-/**
- * Double-tap the castle and a snake comes out of it.
- *
- * It runs along the lines of the ground's own signal grid — the 72px lattice
- * `lw-front-door-signal-grid` already draws — eating tokens, pursued by a
- * small and unwell molecule. Escape puts it away.
- *
- * ── The rules it plays by ───────────────────────────────────────────────────
- * It is an easter egg on a page where people are trying to log in, so it is
- * built to be impossible to trip over:
- *
- *   - **It cannot block the card.** The canvas is `position: fixed` with
- *     `pointer-events: none`, so it takes no clicks and, being out of flow,
- *     can never reflow anything. Every pixel the card owns stays the card's.
- *   - **It cannot start by accident.** A double-tap on the wordmark is the
- *     only way in. Nothing hints at it, and nothing else on the page listens.
- *   - **It rides the flag.** `FrontDoorShell` mounts it, so it exists exactly
- *     where the D13 screens exist and nowhere else.
- *   - **It takes only the keys it uses.** The arrows and Escape, while a game
- *     is actually running. Typing is untouched.
- *
- * ── Motion ──────────────────────────────────────────────────────────────────
- * This is the one thing on the front door that moves under
- * `prefers-reduced-motion: reduce`, and that is deliberate, not an oversight.
- * The setting asks not to be moved at by a page; it does not ask for a game
- * that somebody just deliberately started to sit still. Everything ambient —
- * the entrance, the warp, the rise — stays stood down exactly as before.
- * Please do not "fix" this by gating it.
- *
- * Spec: specs/identity/front-door-castle-snake.feature
- */
+/** Easter egg snake game: double-tap castle, fixed canvas, arrows/Escape only. */
 
 /** The pitch of the ground's signal grid. Change one, change the other. */
 const CELL = 72;

@@ -1,19 +1,4 @@
-/**
- * How far the ground has turned, and how it gets there.
- *
- * The two colour modes keep their own fields — the site's light mesh and its
- * dark warp are different objects, and each is the right answer for the ground
- * it sits on. What they share is a NUDGE: a small offset applied on top of
- * whichever field is up, so that moving through a door moves the thing behind
- * it.
- *
- * That is all this module holds. Not a palette and not a second look: five
- * numbers describing a turn, a slide and a breath of scale, small enough that
- * nobody watching could tell you what changed, large enough that the screen
- * does not feel frozen when the step underneath it changes. The shader's own
- * settings — its colours, its shape, its speed — stay where each field
- * declares them.
- */
+/** Ground shifts: nudges applied to colour field as user progresses through doors. */
 
 /** Which door somebody is standing at. */
 export type FrontDoorDoor = "signin" | "signup";

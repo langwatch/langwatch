@@ -8,15 +8,7 @@ export interface FormServerErrorProps<TFieldValues extends FieldValues> {
   form: { control: Control<TFieldValues> };
 }
 
-/**
- * Renders the form-level rejection that `applyHandledErrorToForm` set.
- *
- * Field-level errors show next to their fields; this is for the ones that
- * belong to the submission as a whole. Put it at the top of the form so a
- * rejected submit is visible without scrolling — the point of the form bridge
- * is that the user can see the server said no, not just that a field went red
- * somewhere below the fold.
- */
+/** Form-level server error; field-level errors show next to fields. */
 export function FormServerError<TFieldValues extends FieldValues>({
   form,
 }: FormServerErrorProps<TFieldValues>) {

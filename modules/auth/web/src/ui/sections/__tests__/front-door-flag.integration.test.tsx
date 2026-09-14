@@ -1,13 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * One flag covers the router and the screens (ADR-117 §7). These tests hold
- * both sides of it: enforced, the first-party screens answer and no journey
- * through them reaches an identity provider's hosted pages; not enforced, the
- * legacy screens answer exactly as they did before, which is what makes the
- * rollback a flag rather than a deploy.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * One flag covers router and screens (ADR-117 §7): enforced (first-party only),
+ * or legacy (pre-ADR behavior). Flag enables rollback without deploy.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { RoutingDecision } from "@langwatch/identity-contract";
@@ -290,7 +285,8 @@ describe("given the identifier-first front door is enforced", () => {
  * asset or attribute mentions a provider's hosted domain.
  */
 function expectNothingHosted(container: HTMLElement): void {
-  // biome-ignore-start lint/suspicious/noMisplacedAssertion: one shape of "nothing here is hosted elsewhere", asserted whole, for every journey that has to satisfy it
+  // biome-ignore-start lint/suspicious/noMisplacedAssertion: nothing hosted
+  // elsewhere, asserted whole, for every journey that has to satisfy it.
   expect(container.innerHTML).not.toMatch(/auth0\.com|\.auth0\.|okta\.com/i);
 
   for (const anchor of container.querySelectorAll("a[href]")) {

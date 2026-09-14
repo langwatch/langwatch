@@ -1,14 +1,6 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
 
-/**
- * What a sign-in method is called on screen.
- *
- * A federated method's id is what the deployment dials, which is an operator's
- * word rather than a customer's: `oidc`, `auth0` and `azure-ad` all mean "the
- * way my company signs me in". Known consumer identities keep their own name,
- * because that is the button a person is looking for; everything else reads as
- * single sign-on, which is the only thing about it the reader can act on.
- */
+/** Customer-facing labels for sign-in methods; unknown providers default to SSO. */
 const FEDERATED_METHOD_LABELS: Record<string, string> = {
   google: "Google",
   github: "GitHub",

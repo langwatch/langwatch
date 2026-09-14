@@ -6,23 +6,7 @@ import {
   resolveJoinBeforeCreate,
 } from "../../model/join-before-create.ts";
 
-/**
- * Join before create (ADR-117 §6): the step between confirming an address and
- * creating a workspace, where somebody whose colleagues are already here is
- * offered their team instead of a second organization nobody meant to make.
- *
- * The order of the two actions is the whole point, and it is not a styling
- * choice: joining LEADS and creating is the explicit secondary. Today every
- * sign-up mints an organization unconditionally, which is why production
- * carries thousands of single-person workspaces people abandoned the moment
- * they found their real team.
- *
- * Nothing is looked up before the address is verified. `lookup` is only ever
- * passed once the caller holds a verified address — the query behind it is
- * disabled until then — and the decision refuses to render an organization
- * without one anyway, so no organization name reaches the browser early even
- * if a caller got that wrong.
- */
+/** Offer to join existing organization before creating workspace; joining leads. */
 export function JoinBeforeCreateInterstitial({
   verifiedEmail,
   verified = true,

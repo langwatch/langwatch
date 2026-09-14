@@ -16,15 +16,7 @@ import { captureException, toError } from "./error-capture.ts";
 const submittedInviteCodes = new Set<string>();
 
 /**
- * Module-scoped outcome store, the counterpart of `submittedInviteCodes`.
- * Because the guard above survives remounts while `useMutation` state does
- * not, a page-subtree remount after `mutate` was dispatched would otherwise
- * leave the fresh mutation instance permanently idle → status stuck on
- * "loading" and the error only visible in the console (#5550). Outcomes are
- * recorded here by the mutation callbacks (which react-query keeps alive
- * even if the dispatching component unmounted) and read back via
- * `useSyncExternalStore`, so any remounted instance resolves to the real
- * terminal state.
+ * Module-scoped outcome store; survives remounts while useMutation state does not
  */
 interface InviteOutcome {
   status: Extract<AcceptInviteStatus, "success" | "already-accepted" | "error">;
@@ -74,30 +66,7 @@ export interface UseAcceptInviteOnceOptions {
 }
 
 /**
- * Fire `organization.acceptInvite` at most once per invite code and drive the
- * page through a small state machine.
- *
- * ## Why a module-scoped `Set` one-shot guard instead of `mutation.isIdle` or `useRef`?
- *
- * React StrictMode (dev) intentionally double-invokes effects **synchronously**
- * within the same render tick. During the second invocation the mutation's
- * `isIdle` flag is still `true` because react-query has not yet transitioned
- * state — a check against `isIdle` would still fire `mutate` twice. A guard
- * set immediately before `mutate()` is the only way to block the second call
- * without coupling to react-query's internal timing.
- *
- * The guard lives at **module scope** (not in a `useRef`) because a ref resets
- * whenever the component actually unmounts and remounts — HMR, parent re-keying,
- * or back-nav with `?inviteCode=` still in the URL would all resubmit. A
- * module-scoped `Set` survives those remounts; a successful `hardRedirect`
- * reloads the page and wipes the set, which is the correct semantics.
- *
- * ## Why navigate via `window.location.href` on success/already-accepted?
- *
- * A hard navigation busts the in-memory `useOrganizationTeamProject` cache,
- * which may have been primed with stale "no org" state before the invite was
- * accepted (either on this tab or in a prior tab). A soft `router.push` would
- * otherwise bounce the user to `/onboarding/welcome`.
+ * One-shot accept per invite code; hard navigation busts useOrganizationTeamProject cache
  */
 export function useAcceptInviteOnce({
   inviteCode,

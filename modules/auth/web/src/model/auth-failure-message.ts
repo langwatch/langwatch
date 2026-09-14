@@ -1,22 +1,5 @@
 /**
- * Customer-facing wording for a failed sign-in or sign-up.
- *
- * The auth layer answers with a code (`INVALID_EMAIL_OR_PASSWORD`,
- * `INVALID_ORIGIN`, ...) and a terse message written for whoever wired the
- * installation up, not for the person staring at the form. This maps the
- * failures worth naming onto wording that person can act on, and refuses to
- * put a raw code on screen.
- *
- * TWO sources of copy, because two different things answer this endpoint.
- * better-auth's own identifiers are its own vocabulary and have no
- * handled-error registry entry, so their wording lives here. Everything the
- * platform refuses with — the identity storage adapter translates a
- * `HandledError` into an `APIError` carrying its stable `code` (ADR-116 §6) —
- * reads from the client presentation registry, which is where every other
- * surface gets the words for a code. Writing a second set here would mean the
- * same failure reads differently depending on which screen a customer is on.
- *
- * Shared by the sign-in and sign-up screens so the two cannot drift.
+ * Customer wording for sign-in/sign-up failures; better-auth codes here, platform from registry
  */
 import { explainErrorCode } from "./error-presentation.ts";
 
@@ -47,14 +30,7 @@ const CREDENTIAL_REJECTION_KEYS = new Set([
 ]);
 
 /**
- * The auth layer's way of saying "those are not the credentials for this
- * account", as opposed to a rate limit, an address mismatch, or our side
- * falling over, each of which needs its own wording.
- *
- * The sign-up screen branches on this: it retries the sign-in with whatever the
- * customer typed, and a credential rejection is the one outcome that means the
- * address belongs to an account they cannot open. Reads the same set the
- * wording below does, so the two answers cannot drift.
+ * Credential rejection (not rate limit or address mismatch); sign-up uses to retry
  */
 export const isCredentialRejection = ({
   code,
@@ -76,18 +52,7 @@ const KEYED_MESSAGES: Record<string, string> = {
 };
 
 /**
- * The registry's copy for a platform error code, as one sentence.
- *
- * A code the composition lists copy for was written about for this failure;
- * anything else — better-auth's own identifiers, a code nobody has given copy
- * yet, or a composition that installed no registry at all — answers null and
- * falls through to the handling below, which is the ADR-045 degradation path.
- *
- * WHAT CHANGED IN THE MOVE: the platform screen asked the registry directly
- * (`explainHandledError`, and its `isRegistered` flag). A feature-web package
- * may not import it, so the registry is INSTALLED — see
- * `model/error-presentation.ts` — and an installed entry existing is what
- * `isRegistered` was.
+ * Registry copy for platform error code; installed registry via explainErrorCode
  */
 const registryMessage = (key: string): string | null => {
   // A probe, not a failure: the envelope fields carry the reader's own

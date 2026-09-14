@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Unit tests for the sign-in error UI shared by /auth/signin and /auth/error.
- * Renders the real component tree (Chakra + react-router), no shallow
- * rendering and no mocked navigation layer.
- *
- * Regression guard for the "stuck in the sign-in loop" report: when an account
- * collision (wrong sign-in method for an existing email) lands the user on the
- * "Account already exists" page, the recovery action must run a FEDERATED
- * logout (/api/auth/logout, which also clears the Auth0 session) instead of
- * bouncing straight back to /auth/signin. Otherwise the live IdP session
- * silently re-authenticates the same failing identity and the loop repeats.
+ * Sign-in error UI; regression: federated logout on account collision
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

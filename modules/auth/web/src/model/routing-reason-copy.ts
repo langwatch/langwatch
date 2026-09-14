@@ -1,28 +1,6 @@
 import type { SignInRoutingReasonCode } from "@langwatch/identity-contract";
 
-/**
- * The words a routing reason code is worth on screen (D13, ADR-117 §6).
- *
- * Reason codes are vocabulary, never copy: the router answers
- * `connection_suspended`, and this is the one place that decides what a
- * person reads when it does. A screen that needs a new state needs a new
- * reason code first, and a new reason code lands here in the same change —
- * the map is exhaustive over the router's vocabulary at the type level, so
- * one that arrives without copy fails the typecheck.
- *
- * Most codes are worth nothing on screen, and say so with `null`. Routing to
- * an identity provider, offering the ordinary method set and answering an
- * address nobody has an account for are all the flow working; narrating them
- * would only tell the reader things they did not ask about, and the last one
- * would answer a question the front door refuses to answer at all
- * (ADR-117 §2).
- *
- * Two entries have counterparts in the error registry
- * (`identity_jit_disabled`, `identity_link_proposed`) because the same two
- * refusals also arrive as thrown errors on the callback path. The words are
- * written to match: one situation reads one way, whichever door it comes
- * through.
- */
+/** Customer-facing copy for routing reason codes; map is exhaustive at type level. */
 export interface RoutingReasonCopy {
   title: string;
   /** What to do about it. Every guidance state has an action, or it is not

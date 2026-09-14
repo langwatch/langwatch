@@ -5,24 +5,7 @@ import { FullLogo } from "./full-logo.tsx";
 import "./auth-front-door.css";
 import { FRONT_DOOR_GRADIENT, HEADING_FONT } from "../../model/front-door-theme.ts";
 
-/**
- * The case the hosted product makes, next to the door rather than inside it.
- *
- * Everything here is a slot the shell fills, and none of it is in the auth
- * card: the card that authenticates a person is the same component on every
- * installation, and this panel is simply not rendered on one that has nothing
- * to sell.
- *
- * The panel owns no ground of its own — it reads directly off the shell's
- * field, standing on the side the ground keeps clean. What it owns is the
- * site's display voice: the serif headline with its single gradient word and
- * the mono tagline. The gradient is the mode's own cut — blue-into-orange on
- * paper, the lifted pair on ink — via the stylesheet token.
- *
- * On a narrow viewport the panel gives up everything but the headline. A
- * tagline and a trusted-by row above a log-in form on a phone are two screens
- * of scrolling in front of the thing the person came to do.
- */
+/** Value proposition panel; slots for headline, tagline, trust strip; hides on mobile. */
 export function FrontDoorValuePanel({
   headline,
   headlineAccent,
@@ -71,17 +54,7 @@ export function FrontDoorValuePanel({
           fontSize="clamp(30px, 3.1vw, 48px)"
           fontFamily={HEADING_FONT}
           fontWeight={400}
-          // Tight tracking and sub-1 leading are DISPLAY-size devices. The
-          // headline is the same sentence at every width, so a narrow viewport
-          // does not shrink it — it wraps it, and three tight lines become
-          // five, which is when 0.98 stops reading as confident and starts
-          // reading as squashed.
-          //
-          // So both open up as the type comes down, and they do it with the
-          // size rather than at a breakpoint: the line box has its own clamp,
-          // rising from ~1.27x the type at the small end to ~1.02x at full
-          // display size. Between them it is always the right leading for the
-          // size actually rendered, and there is no width at which it jumps.
+          // Tracking and leading respond to size, not breakpoints, via clamp().
           letterSpacing={{ base: "-0.018em", md: "-0.03em" }}
           lineHeight="clamp(38px, calc(18px + 2.1vw), 51px)"
           // The site's `.display` treatment, value for value: the subtle
@@ -130,19 +103,7 @@ export function FrontDoorValuePanel({
   );
 }
 
-/**
- * One word of the headline carries the gradient. Split rather than authored as
- * markup so the copy stays a single string a writer can change without
- * touching a component, and so a headline whose accent word is not in it still
- * renders the whole headline.
- *
- * A `\n` in the copy is a deliberate line break. `text-wrap: balance` breaks
- * where the maths says, and the maths does not know a phrase from a hole in
- * the ground — it gave the sign-in headline a stranded two-word middle line.
- * A display headline's breaks are part of the writing, so the writer sets
- * them, and balance stays only as the fallback for a width where the written
- * lines no longer fit.
- */
+/** Renders headline with one word in gradient; handles \n breaks as authored line breaks. */
 function AccentedHeadline({ text, accent }: { text: string; accent?: string }) {
   const withBreaks = (part: string, keyPrefix: string) => {
     const lines = part.split("\n");

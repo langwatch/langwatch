@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The entrance: the card settles into place when the front door first paints.
- * What is pinned here is not the motion — it is the three rules around it:
- * once per page load, nothing at all under reduced motion, and never in front
- * of a keystroke.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Entrance: once per page load, respects reduced motion, never before keystroke.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

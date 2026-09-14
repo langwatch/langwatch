@@ -1,40 +1,6 @@
 import { defineConfig } from "@chakra-ui/react";
 
-/**
- * The front door's palette, as a real Chakra config rather than a stylesheet
- * of custom properties.
- *
- * It used to be sixteen `--lw-front-door-*` properties declared twice in
- * `authFrontDoor.css` and read back through a `BRAND` object of `var()`
- * strings. That worked, and it cost the screens everything a token system is
- * for: the values were invisible to the theme, untyped at the call site,
- * undiscoverable from any other surface, and a component styling itself wrote
- * `backgroundColor={BRAND.action}` where the rest of the app writes
- * `bg="bg.surface"`. Two vocabularies for one job.
- *
- * Now they are semantic tokens under one namespace, so a component writes
- * `bg="frontDoor.action"` and light/dark resolves the way it does everywhere
- * else in the product.
- *
- * ── Why a namespace rather than overriding the app's own tokens ─────────────
- * The front door is the first LangWatch surface most people see, and it should
- * look like the SITE they arrived from rather than like an application they
- * have not signed in to yet. The app's `orange` ramp is a different orange.
- * Reconciling the two everywhere is a theme change this slice has no business
- * making, so the reconciliation stops at this namespace: nothing here changes
- * a single pixel anywhere else in the app.
- *
- * ── Wide gamut ──────────────────────────────────────────────────────────────
- * Every value here is sRGB, and that is deliberate: these are the FALLBACK.
- * `authFrontDoor.css` re-declares the emitted custom properties inside
- * `@media (color-gamut: p3)` with `color(display-p3 …)` equivalents, so a
- * display that can show the brand orange properly does, and one that cannot
- * never sees a colour it would have to clip. A media query is the only way to
- * express that, and a token cannot hold two values — so the token holds the
- * safe one and the upgrade lives in one clearly-labelled block.
- *
- * Spec: specs/identity/signin-signup-screens.feature
- */
+/** Chakra semantic tokens for the front door: site identity separate from app theme. */
 
 /** The brand ramp, as the marketing site cuts it. */
 const brand = {
@@ -93,17 +59,7 @@ export const frontDoorThemeConfig = defineConfig({
           detail: mode(brand[500], orange300(0.75)),
           focusRing: mode(orange(0.22), orange300(0.22)),
           glow: mode(orange(0.28), orange300(0.22)),
-          /**
-           * The card is glass on both grounds: a pane over the ground rather
-           * than a panel sitting on it.
-           *
-           * The dark floor sat at 0.42 for a while and the ground's blue
-           * bloom shone straight through it: the card's top half took the
-           * blue, its bottom half the dark, and the pane read as two
-           * surfaces. 0.54 keeps the ground legible through the glass while
-           * giving the whole card one continuous floor — see the matching
-           * recalibration on `.lw-front-door-card`'s backdrop-filter.
-           */
+          /** Glass card background: transparent pane showing ground beneath. */
           cardBg: mode(white(0.3), "rgba(10, 10, 12, 0.54)"),
           /**
            * On paper the border is a shadow's job done with a line: a soft

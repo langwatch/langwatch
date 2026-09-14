@@ -1,49 +1,10 @@
 import type { SignInMethod } from "@langwatch/identity-contract";
 
-/**
- * The method this browser last got in with, so somebody who signs in on the
- * same laptop every day is shown which button that was.
- *
- * Three deliberate limits:
- *
- *   - it is a BADGE, never an order. Moving the buttons around under somebody
- *     who has learned where they are is worse than not helping at all, and a
- *     picker whose order depended on device memory would no longer render
- *     identically for every visitor.
- *   - it lives in this browser and goes nowhere else. It is a convenience, not
- *     a record: a private window, a cleared site data, another device, and
- *     there is simply no badge.
- *   - it says nothing about accounts. The value is a METHOD ("password",
- *     "google"), which is instance-level vocabulary — it cannot tell the next
- *     person at this browser whether an address has an account.
- *
- * Every read and write is wrapped: storage throws outright in some contexts
- * (private modes, blocked site data, preview renderers), and a sign-in screen
- * that cannot render because a badge could not be looked up is a far worse
- * failure than a missing badge.
- */
-/**
- * Versioned, and the version is load-bearing.
- *
- * The first key was written the moment a federated button was CLICKED, so
- * every browser that ever tried a provider and backed out is still holding a
- * badge that was never true. Fixing the write does nothing for those: the
- * wrong value is already stored. A new key abandons them, and the old one is
- * cleared on the way past so it does not sit there forever.
- */
+/** Last-used sign-in method badge (device-local, never account-linked). */
 const STORAGE_KEY = "langwatch.auth.last-used-method.v2";
 const LEGACY_STORAGE_KEY = "langwatch.auth.last-used-method";
 
-/**
- * A federated method that has been dialled but has not got anybody in yet.
- *
- * The browser leaves for the provider and may never come back signed in — a
- * cancelled consent screen, a wrong directory, a closed tab. Writing the
- * badge at the moment of the hand-off made "last used" mean "last clicked",
- * so a provider somebody tried once and abandoned wore the badge forever.
- * The dial parks the method here instead, and it is promoted only when a
- * session actually exists.
- */
+/** Pending federated method; promoted only when session confirms sign-in. */
 const PENDING_KEY = "langwatch.auth.pending-method";
 
 export function readLastUsedMethodId(): string | null {

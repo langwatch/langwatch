@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The identifier-first sign-in screen (D13, ADR-117 §6): it renders routing
- * decisions and holds no routing logic, so every case here is "this decision
- * in, this screen out".
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Identifier-first sign-in renders routing decisions; holds no routing logic.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";

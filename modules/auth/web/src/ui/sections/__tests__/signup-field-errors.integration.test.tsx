@@ -1,19 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Sign-up says why it refused, on the field it refused.
- *
- * A live UX pass found this form drawing a red outline around Confirm Password
- * and no words anywhere on the page. The rejection was correct and the sentence
- * existed — the zod schema's refine produces "Passwords don't match" on
- * `confirmPassword` — but every control was wired with `invalid` only, so
- * `HorizontalFormControl` had a boolean and never the message. Four fields, and
- * the same for all of them: "Name is required" and "Password must be at least 8
- * characters" were computed and thrown away too.
- *
- * Rendered rather than asserted on the schema on purpose: the schema was never
- * the broken half, and a test that drives it directly would have passed
- * throughout.
+ * Sign-up shows rejection messages on the fields; rendered not schema-asserted.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

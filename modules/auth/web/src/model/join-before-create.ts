@@ -4,26 +4,7 @@ import {
   joinDomainOf,
 } from "@langwatch/identity-contract";
 
-/**
- * Join before create: the seam D13 left and D12 fills (ADR-117 §6).
- *
- * The contract in one line: a verified email address goes in, an interstitial
- * decision comes out. Sign-up asks this once, immediately after the address is
- * confirmed and before a workspace is created, and renders whatever it
- * answers.
- *
- * The invariant that gives this deliverable its second name lives here rather
- * than in the screen: NO organization is created for anybody who did not
- * choose to create one. Every outcome below either offers a choice or says
- * nothing at all; none of them creates anything.
- *
- *   verify address ──► what is open to it?
- *                        ├─ nothing ─────► create_workspace   (as today)
- *                        ├─ automatic ───► already_joined     (no step at all)
- *                        ├─ ask ─────────► offer_join         (join leads)
- *                        └─ already asked► awaiting_approval  (creating anyway
- *                                                              stays explicit)
- */
+/** Join-before-create interstitial: determines whether to offer workspace join. */
 
 export interface JoinBeforeCreateInput {
   /** The address the person just confirmed. Nothing else is known yet: no
@@ -70,16 +51,7 @@ export type JoinBeforeCreateDecision =
    *  creating an organization anyway stays a plain, explicit choice. */
   | { outcome: "awaiting_approval"; organization: JoinableOrganization };
 
-/**
- * The interstitial's decision.
- *
- * `verifiedEmail` is load-bearing rather than decorative: this re-checks the
- * address is email-shaped and NOT a consumer mail provider before it will
- * render any organization at all. The server enforces the same rule, so this
- * is a second, independent place the worst leak this deliverable can produce
- * has to get past — a bug on one side cannot offer strangers to each other on
- * its own.
- */
+/** Resolves join offer after address verification; re-checks domain independently. */
 export function resolveJoinBeforeCreate({
   verifiedEmail,
   verified,

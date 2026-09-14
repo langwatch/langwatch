@@ -8,13 +8,7 @@ type FormErrorTarget<TFieldValues extends FieldValues> = {
 import { readHandledError, safeProse } from "./read-handled-error.ts";
 
 /**
- * The key under `errors.root` this module writes form-level complaints to.
- *
- * Exported alongside the dotted path because `<FormServerError>` has to READ
- * it (`errors.root?.[key]`) where this module WRITES it (`setError("root.x")`)
- * — and rebuilding one from the other by splitting the string at render time
- * both re-derives what the constant already knows and asserts a tuple type the
- * compiler cannot check.
+ * Key under errors.root for form-level complaints; exported to keep read and write consistent
  */
 export const FORM_SERVER_ERROR_KEY = "serverError";
 
@@ -25,28 +19,7 @@ export const FORM_SERVER_ERROR_KEY = "serverError";
 export const FORM_SERVER_ERROR = `root.${FORM_SERVER_ERROR_KEY}`;
 
 /**
- * Puts a rejected submission back on the form that caused it.
- *
- * A validation failure is the one error class that already has a place to live
- * — next to the field that's wrong. Showing it in a toast makes the user hunt
- * for what to change, and the toast is gone by the time they find it.
- *
- * Maps `meta.fieldErrors` onto their fields and `meta.formErrors` onto the
- * form root, then focuses the first offending field so the rejection is
- * unmissable even on a long form.
- *
- * Returns `true` when it consumed the error, so callers can skip the toast:
- *
- * ```ts
- * onError: (error) => {
- *   if (applyHandledErrorToForm({ error, form })) return;
- *   showErrorToast({ error, fallbackTitle: "Couldn't save" });
- * },
- * ```
- *
- * Returns `false` for anything that isn't a field-level validation failure —
- * including a `validation_error` naming fields this form doesn't paint an
- * input for, which would otherwise be silently swallowed.
+ * Validation failures back on form next to wrong fields; returns true if consumed
  */
 export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   error,
@@ -56,14 +29,7 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   error: unknown;
   form: FormErrorTarget<TFieldValues>;
   /**
-   * Whether this form renders `<FormServerError form={form} />`.
-   *
-   * Form-level complaints (`meta.formErrors`) have nowhere to go on a form
-   * that doesn't render the root slot: `setError("root.serverError")` succeeds,
-   * nothing displays it, and claiming the error suppresses the caller's toast
-   * — so the user clicks Save and absolutely nothing happens. That is strictly
-   * worse than the raw-message toast this module set out to replace, so the
-   * default is the safe one: don't claim what you can't show.
+   * Whether form renders FormServerError slot; default false to avoid claiming unreported errors
    */
   hasFormErrorSlot?: boolean;
 }): boolean {
@@ -124,31 +90,7 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
 const MAX_FORM_ERRORS = 4;
 
 /**
- * Whether an input is actually on screen for this key.
- *
- * The question is "can this form SHOW the complaint", and only react-hook-form
- * knows: it records a `_f` descriptor with a live `ref` for each field an
- * input registered and mounted. Asking `getValues()` instead answered a
- * different question — it returns every key in the form's values, including
- * defaults for fields no input paints — so the bridge could claim an error,
- * set it on a key with nothing rendering it, and return `true`, suppressing
- * the caller's toast. The user pressed Save and nothing at all happened.
- * (One call site had already worked around this by hand.)
- *
- * This also settles two cases the value-shape check got wrong by construction:
- *
- *   - zod's flatten() collapses a nested path (["version","configData"]) to
- *     its head, and `_fields.version` is a plain branch with no `_f` — so a
- *     container is declined, without inspecting any value.
- *   - a multi-select registered as ONE input holds an array value and is
- *     perfectly renderable; ownership follows registration, not the shape of
- *     what happens to be in the field.
- *
- * Reading `control._fields` is reaching past the public API, deliberately:
- * `getFieldState` reports validation state, not whether anything is mounted,
- * and there is no public "is this registered" question. The failure mode if
- * the internal moves is the safe one — nothing looks painted, so every error
- * falls through to the toast.
+ * Whether input renders for key via _f descriptor; getValues() claimed non-rendering fields
  */
 function isPaintedField<TFieldValues extends FieldValues>({
   form,

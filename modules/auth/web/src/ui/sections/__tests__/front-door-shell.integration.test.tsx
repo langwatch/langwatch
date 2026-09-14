@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The shell around the card: what a hosted deployment says beside the door,
- * and what a company's own installation does not say at all. The card is the
- * same component either way — everything here is composed around it.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Front door shell: hosted shows value panel, self-hosted does not.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

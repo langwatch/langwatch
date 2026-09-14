@@ -3,24 +3,9 @@ import { signIn } from "./auth-client.tsx";
 import { credentialSignInFailure } from "../model/credential-sign-in.ts";
 
 /**
- * One attempt at a password, and the three things it can turn out to be.
- *
- * A refused credential is two situations wearing one answer, and only the
- * server can tell them apart: a wrong password for an account that exists, or
- * an address nobody has an account for at all. The second is somebody signing
- * up at the log-in form, so the attempt carries on as a sign-up rather than
- * becoming a refusal they have to act on.
- *
- * What it does NOT do is keep the password. It asks for the same confirmation
- * link the sign-up door asks for, and the password is chosen once, afterwards,
- * on the one screen built to ask for it — typed twice and held to a length.
- * Banking whatever was typed into a field labelled `current-password` meant an
- * account could be created two ways, and the log-in way took a single
- * character and never asked twice.
- *
- * Kept out of the component because it is the one piece of this screen that is
- * a decision rather than a rendering, and because it is the piece a test wants
- * to drive without a form around it.
+ * Password attempt with three outcomes (signed in, signing up, refused).
+ * Refused credential (wrong password vs no account) auto-converts to sign-up;
+ * asks for confirmation link, not password.
  */
 export type CredentialAttempt =
   | { outcome: "signed_in" }
@@ -42,13 +27,7 @@ export async function attemptCredentialSignIn({
   password: string;
   callbackUrl?: string;
   /**
-   * How an address with no account becomes a sign-up: it asks for the same
-   * confirmation link the sign-up door asks for, and takes no password. It
-   * REFUSES for an address that does have an account, which is what tells the
-   * two situations apart — so a wrong password stays a wrong password.
-   *
-   * Absent where an account is already known to exist, in which case a refusal
-   * is only ever a wrong password.
+   * Sign-up fallback for unknown address; refuses known accounts to distinguish from wrong password
    */
   convertToSignUp?: (input: { email: string }) => Promise<unknown>;
 }): Promise<CredentialAttempt> {

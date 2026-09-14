@@ -1,18 +1,4 @@
-/**
- * The handled-error payload, as much of it as the front door reads.
- *
- * `platform/app/src/features/errors/logic/readHandledError.ts` validates the
- * whole envelope from both boundaries and hands back nine fields. The front
- * door asks three questions of it — which code came back (`invite_expired`,
- * `invite_wrong_account`, `email_already_registered`), what the server said
- * was wrong with which field, and whether there is a trace id worth showing —
- * and those are what travel. The same narrowing `@langwatch/enterprise-governance-web`
- * took, for the same reason: the full reader belongs with the presentation
- * registry it feeds, and both move in a later slice.
- *
- * Trusts nothing: a misconfigured or older server must not be able to crash a
- * render by omitting a field.
- */
+/** Subset of handled-error payload relevant to auth; validates all fields. */
 
 /** The client-side view of a handled error, after validation. */
 export type AuthHandledError = {
@@ -94,26 +80,7 @@ export function readErrorTraceId(error: unknown): string | undefined {
   return typeof traceId === "string" ? traceId : undefined;
 }
 
-/**
- * Prose a procedure deliberately authored for the user, on an error that is
- * NOT a handled one.
- *
- * #5984 collapsed the wire message of a HANDLED error to its code, but
- * deliberately left a plain non-5xx `TRPCError`'s message alone, because that
- * is copy the procedure wrote to be read ("The invite was sent to …, but you
- * are signed in as …"). Dropping it in favour of "we've been notified" is
- * worse than the slug problem: it tells somebody to wait for something that
- * will never change.
- *
- * Harvested from `platform/app/src/features/errors/logic/readHandledError.ts`.
- * The server decides what counts as authored — it needs `cause`, which never
- * crosses the wire — and says so with `data.authored`. This trusts that flag
- * and then applies the same second, independent layer: a message that somehow
- * arrives marked authored but reads like a machine wrote it is still refused.
- * The one narrowing is the known-code set, which is this package's own
- * front-door table plus the slug shape rather than the whole `APP_ERROR_CODES`
- * list — a code outside it is still slug-shaped, which is what catches it.
- */
+/** Extracts authored error message; refuses machine-generated strings. */
 export function readAuthoredMessage(error: unknown): string | undefined {
   if (readHandledError(error)) return undefined;
 

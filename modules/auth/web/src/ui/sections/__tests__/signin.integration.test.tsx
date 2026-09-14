@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for /auth/signin: the Forgot-password entry point (the
- * credential form must offer a reset link in email mode, and SSO mode must
- * not render the credential form or the link at all) and the
- * already-authenticated bounce path (an authenticated user hitting this page
- * must be redirected only to a same-origin destination).
+ * Sign-in: forgot-password entry, SSO hide credential form, auth bounce same-origin.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

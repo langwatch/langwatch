@@ -1,11 +1,5 @@
 /**
- * The castle Snake's rules, played by hand.
- *
- * The whole game is pure and takes its randomness as an argument, so every
- * scenario here is a board set up exactly and stepped once. Nothing mounts,
- * nothing paints, and no scenario depends on a frame ever being drawn.
- *
- * Spec: specs/identity/front-door-castle-snake.feature
+ * Pure game rules tested by hand; each scenario sets board exactly and steps once, no rendering
  */
 import { describe, expect, it } from "vitest";
 

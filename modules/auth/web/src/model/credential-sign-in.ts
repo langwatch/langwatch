@@ -21,13 +21,7 @@ export interface CredentialSignInFailure {
 }
 
 /**
- * The wording for a credential sign-in that did not go through, or null when
- * it did.
- *
- * One reader for both screens, over the same mapper the legacy screens use:
- * the failure anchors (`sign-in-failure-messages.feature`) say a wrong
- * password, a rate limit and an installation set up for another address each
- * get their own sentence, and none of them ever puts an identifier on screen.
+ * Wording for credential sign-in failure; same reader, never puts identifier on screen
  */
 export function credentialSignInFailure({
   response,

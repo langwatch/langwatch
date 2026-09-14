@@ -1,22 +1,4 @@
-/**
- * A failure that is still true, said in place.
- *
- * The inline counterpart to a toast: a toast is for something that just
- * happened, an alert for a panel that is still broken.
- *
- * Harvested from `platform/app/src/features/errors/components/HandledErrorAlert.tsx`
- * with the same prop shape, the same restrained hairline and the same tip
- * list, minus the one thing that could not travel verbatim: the code-keyed
- * presentation registry, which supplies the specific title and description. It
- * is ~3,700 lines of the whole product's error copy and belongs in a package
- * of its own; until then the HOST answers for it through
- * `AuthHostApi.explainErrorCode`, and a composition that lists no copy for a
- * code degrades to the action name plus the generic line — which is exactly
- * what the registry itself answers for a code it does not list (ADR-045).
- *
- * `ErrorActions` did not travel either: it renders the copyable trace id and
- * lives in `platform/app`. The trace id is read here and printed plainly.
- */
+/** Inline error alert; says failure using host's explanation or generic fallback. */
 
 import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";

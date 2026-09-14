@@ -12,21 +12,7 @@ export const publicRoutes = [
 ];
 
 /**
- * Routes that REQUIRE authentication but should NOT be subject to the
- * `useOrganizationTeamProject` onboarding bouncer.
- *
- * These are routes where an authenticated user with zero organizations
- * is in a legitimate state — they're in the middle of accepting an
- * invitation that will create their first OrganizationUser row, or
- * they're in the onboarding flow itself. Without this exemption, the
- * `CommandBar` (mounted globally in `_app.tsx`) calls
- * `useOrganizationTeamProject({redirectToOnboarding: true})` and races
- * with the `acceptInviteMutation` in `/invite/accept`. For VALID
- * invites the mutation's `window.location.href = ...` hard-redirect
- * usually wins; for INVALID invites (expired, NOT_FOUND, FORBIDDEN)
- * the bouncer wins, silently masking the error UI and dumping the
- * user on `/onboarding/welcome` with no explanation. Caught by iter
- * 47 of the BetterAuth migration audit.
+ * Routes requiring auth but exempt from bouncer during invite accept or join-before-create
  */
 export const noOrgBouncerRoutes = [
   "/invite/accept",

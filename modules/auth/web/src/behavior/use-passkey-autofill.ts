@@ -32,41 +32,7 @@ async function offerPasskeyFromAutofill({
 }
 
 /**
- * Offering a passkey from the address field itself, the way the platform
- * offers a saved password (WebAuthn conditional mediation).
- *
- * This is the recommended way in, ahead of any button: the credential appears
- * in the browser's own autofill list under the field somebody is already
- * looking at, so it is found by people who do not remember having made a
- * passkey — which research says is most of them. A dedicated button is the
- * fallback for a crowded screen, not the primary route.
- *
- * The address field has carried `autocomplete="username webauthn"` all along.
- * That token on its own does NOTHING: it tells the browser a passkey MAY be
- * offered there, and the browser only offers one while a conditional request
- * is actually pending. This is that request.
- *
- * It is an offer, not an attempt, and behaves like one:
- *
- *   - it asks first. A browser without conditional mediation is left alone
- *     rather than shown a modal prompt it did not ask for, which is what a
- *     plain `get()` would do.
- *   - it never reports failure. Nobody started this, so nobody is owed an
- *     error about it — a person typing their address must not be interrupted
- *     by something they did not do.
- *   - it resolves only if somebody PICKS the passkey. Until then the promise
- *     simply waits, which is why there is no loading state anywhere near it.
- *   - it waits for a gesture. The request starts when the person actually
- *     reaches for the address field — a click or a keystroke — never on page
- *     load: a pending conditional request is supposed to be silent, but a
- *     third-party passkey provider (1Password, notably) answers it with its
- *     own unlock sheet the moment it starts, so starting it uninvited
- *     ambushes somebody who only came to read the page. Focus alone is NOT
- *     the gesture: the entrance focuses the address field programmatically
- *     (`useFocusWhenSettled`), and a focus the page gave itself is the page's
- *     intent, not the person's. The autofill list the credential rides in
- *     only shows under a focused field anyway, so arming this late costs
- *     nothing.
+ * WebAuthn conditional mediation for passkey autofill; starts on gesture, not load
  */
 export function usePasskeyAutofill({
   enabled,

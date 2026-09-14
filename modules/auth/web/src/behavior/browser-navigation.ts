@@ -1,30 +1,5 @@
 /**
- * Full-page navigation, behind a seam a test can substitute.
- *
- * These are the cases the SPA router deliberately cannot serve: leaving the
- * app for an auth handshake, or forcing a fresh document so every provider,
- * session and cache is rebuilt from scratch. They are real navigations, and
- * they belong in exactly one place.
- *
- * The reason it is a module and not a bare `window.location.href = ...` at the
- * call site is testability, and the constraint is harder than it looks.
- * `window.location` is a NON-CONFIGURABLE ACCESSOR, and its methods are
- * non-configurable and non-writable — measured directly in a jsdom VM realm:
- *
- *   Object.defineProperty(window, "location", ...)  -> Cannot redefine property
- *   vi.spyOn(window, "location", "get")             -> Cannot redefine property
- *   vi.spyOn(window.location, "reload")             -> Cannot redefine property
- *   vi.stubGlobal("location", ...)                  -> Cannot redefine property
- *
- * Every technique for observing a navigation by patching the global fails, and
- * assigning `href` for real just makes jsdom log "Not implemented: navigation"
- * without recording anything. So a test cannot see a navigation that a
- * component performs directly, and the tests that appeared to were relying on
- * a pool where jsdom happened to leave `location` replaceable.
- *
- * A module import is substitutable by `vi.mock` in any environment, which is
- * why this exists. Call these instead of touching `window.location`, and a
- * test asserts the navigation by asserting the call.
+ * Full-page navigation via module seam for testability; window.location non-configurable
  */
 
 /** True in the browser; false during SSR and in node-environment tests. */

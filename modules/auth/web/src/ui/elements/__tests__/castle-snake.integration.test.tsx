@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The castle Snake, checked for the only things that could hurt anybody: that
- * it cannot start by accident, cannot come between somebody and the form, and
- * gives everything back when it stops.
- *
- * The game's own rules are checked without a DOM in
- * `logic/__tests__/castleSnake.unit.test.ts`. jsdom has no 2D context, so no
- * frame is ever painted here — which is exactly the right level for these
- * scenarios, since none of them are about what the game looks like.
- *
- * Spec: specs/identity/front-door-castle-snake.feature
+ * Snake game: checks it cannot interfere with form, cannot start by accident.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

@@ -1,14 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The passkey autofill offer: a conditional-mediation request is supposed to
- * be invisible, but a third-party passkey provider (1Password) answers it
- * with its own unlock sheet the moment it starts. These tests pin the fix:
- * the request starts on the person's first real gesture toward the address
- * field — a click or a keystroke — never on page load, and never on the
- * programmatic focus the entrance gives the field itself.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Passkey autofill request starts on first gesture to address field, not page load
  */
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

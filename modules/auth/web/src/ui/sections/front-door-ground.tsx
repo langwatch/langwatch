@@ -8,32 +8,7 @@ import { useTweenedGround } from "../../behavior/use-tweened-ground.ts";
 import { resolveGroundShift } from "../../model/ground-palette.ts";
 import { useFrontDoorStage } from "../../model/ground-stage.ts";
 
-/**
- * The ground the whole front door stands on: one full-viewport field, in
- * whichever of the site's two grounds matches the colour mode.
- *
- * Light is the homepage hero, verbatim: the mesh cloud (white, warm, cloud
- * blue, white) drifting across the whole page, with a soft white radial
- * keeping the reading side clean. Dark is the site's enterprise band: the
- * ink-950 field with the blue-into-amber warp glowing up the card's side and
- * dissolving toward the reading side. They are different fields on purpose —
- * each is the right answer for the ground it sits on, and neither is the
- * other one tinted.
- *
- * What they share is a nudge. Moving a step deeper into a door — address to
- * password, password to "go and open your email" — turns whichever field is up
- * by a few degrees and slides it a little, over most of a second
- * (`useTweenedGround`). It is small enough that nobody could tell you what
- * moved, and it is the difference between a screen that changed and a screen
- * that is alive.
- *
- * The static gradient in the same palette is ALWAYS painted underneath, and
- * the live shader fades in over it once its first frame exists: a visitor
- * sees colour that sharpens, never a blank page that suddenly acquires a
- * background. Everything that cannot run a shader at all — reduced motion, a
- * machine with no WebGL, jsdom — simply keeps the static field, and the nudge
- * stands down with the rest of the motion.
- */
+/** Full-viewport ground field; animated nudges on step changes, falls back to static. */
 
 /** Light field, warm glow, cloud, light field: the site's mesh, verbatim. */
 const MESH_COLORS = ["#ffffff", "#ffaf6e", "#cddcf9", "#ffffff"];

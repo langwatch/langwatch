@@ -1,17 +1,5 @@
 /**
- * The front door's palette is a THEME, not a stylesheet.
- *
- * These pin the two properties that make that true and that a refactor could
- * quietly undo: the tokens actually reach the system (so `bg="frontDoor.action"`
- * resolves rather than silently rendering nothing), and adding them changed no
- * token any other surface reads.
- *
- * The emitted variable names are asserted rather than assumed, because the
- * wide-gamut block in `authFrontDoor.css` re-declares them by name — a rename
- * in the theme would leave that block overriding variables nobody reads, which
- * is a silent loss of the P3 upgrade rather than a build failure.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Front door palette is a theme not stylesheet; tokens reach system and don't change other surfaces
  */
 import { describe, expect, it } from "vitest";
 
@@ -20,14 +8,7 @@ import { createDesignSystem } from "@langwatch/design-system/system";
 import { frontDoorThemeConfig } from "../front-door-theme.ts";
 
 /**
- * The system the front door's config produces, built here rather than imported.
- *
- * `platform/app` read `@langwatch/ui`'s composed system, and this package may
- * not import the application it is installed into. What the assertions are
- * about is unchanged — that these tokens REACH a Chakra system, so
- * `bg="frontDoor.action"` resolves rather than silently rendering nothing, and
- * that adding them changes no token any other surface reads — because the
- * foundations under both are the same `@langwatch/design-system` config.
+ * System built here rather than imported; package can't import application it installs into
  */
 const system = createDesignSystem(frontDoorThemeConfig);
 

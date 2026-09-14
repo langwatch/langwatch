@@ -1,13 +1,4 @@
-/**
- * The harness a suite in this package mounts a screen inside.
- *
- * The same shape `@langwatch/gateway-web` introduced and every family since
- * has copied: one place that knows what a front-door screen needs above it, so
- * a test states what it is ABOUT rather than restating the composition.
- *
- * NOT PUBLISHED. There is no subpath export for it — `apps/ui` composes the
- * real host, and this exists for the suites next to the screens.
- */
+/** Test harness for auth screens; encapsulates host composition. Not published. */
 
 import type { ReactElement, ReactNode } from "react";
 

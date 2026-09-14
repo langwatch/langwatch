@@ -1,18 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Sign-up never dead-ends someone on their own account.
- *
- * Creating an account is two calls and only the first is durable: one writes
- * the User row and its password, the second exchanges them for a session. A
- * customer reported people hitting an unexplained error on sign-up and, on
- * every retry after it, "User already exists": an account they could not see,
- * sign into, or be found on the members list through, because the failed second
- * leg left them with no session and no organization.
- *
- * Rendered rather than unit-tested against the submit handler: the whole defect
- * was that the screen turned a recoverable state into a wall, so the assertions
- * are about what the screen does next.
+ * Sign-up recovers from partial creation; never dead-ends on own account.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

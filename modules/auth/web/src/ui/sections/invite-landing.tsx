@@ -10,20 +10,7 @@ import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
-/**
- * The invitation landing (D13, ADR-117 §6; the rules underneath are D11's).
- *
- * Three journeys, one screen. Signed out, it says who is asking and offers
- * every way in, carrying the invitation through whichever one is taken.
- * Signed in, it asks before it acts: an invitation is a membership, and one
- * should not appear because a link was opened. Expired, it points at the one
- * person who can fix it in a click.
- *
- * A revoked invitation and one that never existed end the same way, quietly.
- * That is D11's rule and it is deliberate: an invitation code is guessable
- * material, and a dead end that describes what it did not find is a way to
- * learn which organizations exist.
- */
+/** Invitation landing: handles signed-out, signed-in, and expired cases. */
 export function InviteLanding({ inviteCode }: { inviteCode: string }) {
   const { data: session } = useSession();
   const landing = api.frontDoor.inviteLanding.useQuery(

@@ -5,34 +5,7 @@ import type { ReactNode } from "react";
 import "./auth-front-door.css";
 import { FullLogo } from "./full-logo.tsx";
 
-/**
- * The card every unauthenticated screen is: the mark, one heading, one column
- * of content. The same component on every installation and at every step, so
- * a person moving between them sees one surface rather than a series of pages
- * that happen to look alike.
- *
- * The surface is glass: a translucent 14 pixel card whose border and fill
- * come from the stylesheet's per-mode tokens, with the shell's ground
- * blurring through it — the same panel treatment the site's dark sections
- * use, and its light-glass counterpart on paper. The serif display voice
- * belongs to the value panel beside the card, never to the card itself.
- *
- * Alignment is one rule, applied throughout: the identity block (mark,
- * heading and the intro line under it) is centred, and everything a person
- * reads or operates below it is a full-width left-aligned column. Footers
- * that are a single line of prose centre themselves; nothing else does. The
- * intro is a header slot rather than a row of the form, because it answers
- * the heading, not the field.
- *
- * Responsive shape:
- *
- *   - on a phone it goes full bleed. A bordered card inset in a viewport that
- *     is barely wider than the card wastes the only space there is, and the
- *     border reads as a frame around nothing.
- *   - on anything larger it is a single centered card in a narrow column,
- *     because a log-in form is a short list of short fields and stretching it
- *     across a desktop makes each row a journey.
- */
+/** Glass card container for all auth screens; centered on desktop, full-bleed on mobile. */
 export function AuthCard({
   title,
   intro,

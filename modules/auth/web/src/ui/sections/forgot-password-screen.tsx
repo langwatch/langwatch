@@ -33,21 +33,7 @@ export default function ForgotPassword() {
     return null;
   }
 
-  // Reset follows the identifier, not the deployment (ADR-117 §6, epic Q9).
-  // Whether a reset can happen is a fact about the account (does it hold a
-  // password?), and the name of the deployment's sign-in provider is not that
-  // fact. An installation that authenticates people itself keeps this door
-  // open however it federates, which is what makes self-recovery reachable
-  // for somebody whose identity provider is the thing that is broken.
-  //
-  // The one place the deployment still has the last word is where it holds no
-  // passwords to reset at all: the reset endpoints are not mounted there, so
-  // offering the form would promise an email nobody can send. That is the
-  // method-set policy governing, not the mode, and it stops governing when
-  // those installations hold password identifiers.
-  //
-  // Until the front door is enforced, the legacy rejection stands unchanged:
-  // in SSO and social deployments the identity provider owns the password.
+  // Reset follows account (has password?), not deployment provider.
   const deploymentHoldsNoPasswords = frontDoor.enabled
     ? Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email"
     : Boolean(isAuthProvider) && isAuthProvider !== "email";

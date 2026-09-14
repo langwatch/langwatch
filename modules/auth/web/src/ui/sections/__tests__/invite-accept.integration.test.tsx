@@ -1,15 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Regression coverage for langwatch/langwatch#5550:
- * when `acceptInvite` fails, the page must tell the user what happened and
- * offer a way out — a "Go to Dashboard" action next to "Log Out and Try
- * Again" — instead of dead-ending on the loading screen with the error only
- * in the console.
- *
- * The words come from `~/features/errors`, never from `error.message`: since
- * #5984 that is the code slug, and this page is the last thing a signed-out
- * visitor with a dead invite link sees.
+ * Invite-accept: shows error with action on failure, never dead-ends on loading.
  */
 import "@testing-library/jest-dom/vitest";
 

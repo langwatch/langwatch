@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The join-before-create seam (D13 ships the contract, D12 fills it):
- * a verified address goes in, an interstitial decision comes out.
- *
- * The invariant this file exists to hold is that NO organization is created
- * for anybody who did not choose to create one — so every assertion here is
- * really about which of the two actions leads, and whether anything happens
- * without a click.
- *
- * Spec: specs/identity/signin-signup-screens.feature,
- *       specs/identity/join-before-create.feature
+ * Join-before-create interstitial: no org created without user choice.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";

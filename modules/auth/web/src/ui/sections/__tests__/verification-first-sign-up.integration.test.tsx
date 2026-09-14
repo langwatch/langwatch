@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Sign-up (D13, ADR-117 §6, revised): the address is asked for, a password is
- * chosen, and the account exists. Confirming the address follows the person in
- * rather than gating them, and the address step itself sends nothing.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Sign-up: address, password, account; confirmation enters not gates.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { RoutingDecision } from "@langwatch/identity-contract";
@@ -139,15 +134,7 @@ const expiredLink = {
   },
 };
 
-/**
- * Types the same password into both boxes.
- *
- * Two steps, because the second box is not on the screen yet: the credential
- * step opens with one field, and the confirmation and the submit arrive once
- * somebody starts using it. Re-querying after the first is what proves that —
- * a single up-front `querySelectorAll` would have found one element and this
- * helper exists so every caller notices.
- */
+/** Types password into both fields; confirmation appears after first interaction. */
 const fillPasswordPair = async (container: HTMLElement, password: string) => {
   const first = container.querySelector('input[type="password"]');
   await userEvent.type(first as HTMLInputElement, password);

@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * @regression @integration
- *
- * Regression coverage for langwatch/langwatch#3324:
- *   - `useAcceptInviteOnce` must call `mutate` at most once per invite code,
- *     even under StrictMode double-invoke / remount.
- *   - An "Invite was already accepted" error must redirect home via a hard
- *     navigation (never during render) so the React "update during render"
- *     warning cannot fire from a downstream consumer.
- *   - A generic error must surface via `status: "error"` + the error itself
- *     (never a string lifted off it) and must NOT trigger any navigation.
+ * @regression @integration - issue #3324: single accept-invite call under StrictMode
  */
 import "@testing-library/jest-dom/vitest";
 

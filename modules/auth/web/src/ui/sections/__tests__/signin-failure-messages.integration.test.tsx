@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Covers specs/auth/sign-in-failure-messages.feature.
- *
- * The real sign-in screen, the real form, the real auth client and the real
- * wording rules all run here. Only the network is replaced: `fetch` answers the
- * way the server answers, so a failure travels the whole path it travels in a
- * browser, from the HTTP body to the sentence on screen.
+ * Sign-in failure messages travel full path; network mocked, everything else real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

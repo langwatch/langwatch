@@ -1,34 +1,11 @@
 /**
- * The address carried from one door to the other, in the URL FRAGMENT.
- *
- * A fragment is the one part of a URL the browser keeps to itself. It is not
- * on the request line, so it reaches no access log, no proxy, no CDN, no error
- * report, and no `Referer` header on the way anywhere else. A query string is
- * the opposite of all six: `?email=someone@example.com` is written down by
- * every hop it passes, and on these two screens the address is the single
- * piece of personal data there is to write down.
- *
- * Nothing about the carry is load-bearing — it exists so somebody who clicks
- * "Sign up" after typing their address does not type it twice — so making it
- * unreadable to the server costs nothing at all.
- *
- * It is read once and then wiped from the address bar, which keeps it out of
- * session history and out of anything that later reads `location.href`
- * (browser telemetry reads exactly that, ADR-058). The cost is that a manual
- * refresh forgets it. That is the right way round: the prefill is a
- * convenience and the address is a person's.
+ * Address in URL fragment (not query); keeps personal data out of logs
  */
 
 const KEY = "email";
 
 /**
- * `/auth/signup`, carrying the callback in the query and the address in the
- * fragment.
- *
- * `URLSearchParams` writes the fragment as well as the query so the two halves
- * escape identically, and so a `+` in an address survives the round trip:
- * written raw it would come back as a space, which is the plus-tag bug in a
- * second costume.
+ * /auth/signup with callback in query, address in fragment; URLSearchParams escapes both
  */
 export function signUpHref({
   callbackUrl,

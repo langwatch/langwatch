@@ -11,15 +11,7 @@ import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
 import { useAcceptInviteOnce } from "../../behavior/use-accept-invite-once.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
 
-/**
- * The invitation link's landing (ADR-117 §6, D13).
- *
- * Enforced, it is a screen: it says who is asking before anything happens,
- * takes a signed-out visitor through sign-in or sign-up with the invitation
- * still in hand, and asks a signed-in one to confirm. Until the flip it stays
- * what it was — a page that accepts on arrival and requires a session to
- * reach at all.
- */
+/** Invitation link landing; shows inviter, guides sign-in/up or confirms sign-in. */
 export default function Accept() {
   const router = useRouter();
   const frontDoor = useIdentityFrontDoor();

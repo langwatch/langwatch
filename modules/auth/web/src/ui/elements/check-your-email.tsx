@@ -1,20 +1,7 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { AuthCard } from "./auth-card.tsx";
 
-/**
- * The one state both doors end at when an address has to be confirmed: the
- * link is out, and there is nothing to do here until it comes back.
- *
- * Sign-up and a log-in that turned out to be a sign-up render the same card
- * with the same shape, because to the person waiting they are the same thing.
- *
- * It is not a dead end. The commonest reason to be looking at this card
- * puzzled is that the address on it is wrong — a typo, or the wrong one of two
- * — and the only way out used to be the browser's back button, which lands on
- * a step this screen keeps in memory rather than in the URL. So the way back
- * is on the card: it returns to the address step with nothing sent that
- * matters, because an unopened link simply expires.
- */
+/** Verification link confirmation screen; includes back option for wrong address. */
 export function CheckYourEmail({
   email,
   what,

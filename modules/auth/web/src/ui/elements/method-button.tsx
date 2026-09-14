@@ -4,21 +4,7 @@ import type { ReactNode } from "react";
 import "./auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme.ts";
 
-/**
- * One seat in the rail of ways in.
- *
- * Every method on the front door — a provider hand-off, a passkey ceremony —
- * is the same offer said with a different mark, so it is the same button.
- * Three fixed seats: the mark on the left rail, the words centred, the badge
- * (if any) floated on the right. A label centres on the same axis whatever
- * sits beside it, which is what lets the rail read as one column of choices
- * rather than a stack of separately-styled buttons.
- *
- * The shell is shared rather than copied because the rail is only legible
- * while the seats agree. A passkey button that centred its own icon-and-label
- * pair, at the field radius instead of the action one, was visibly a
- * different kind of thing sitting under three that matched.
- */
+/** Method button with icon, label, optional badge; shared shell for rail legibility. */
 export function MethodButton({
   icon,
   label,
