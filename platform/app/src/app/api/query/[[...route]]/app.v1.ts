@@ -44,7 +44,7 @@
  * for why the handler-managed form that stood here first was a mistake.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 

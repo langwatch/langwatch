@@ -9,7 +9,7 @@
  * column the validator then refused would send every caller down a dead end,
  * and that is the one inconsistency this endpoint must not have.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

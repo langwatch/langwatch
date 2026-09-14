@@ -9,7 +9,7 @@
  * brand-new door onto LangWatchQL (issue #7565), so its first regeneration is
  * exactly the moment this class of staleness could slip through.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 

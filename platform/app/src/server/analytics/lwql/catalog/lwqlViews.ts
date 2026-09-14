@@ -70,7 +70,7 @@
  * measurement behind the default.
  *
  * @see ./types.ts — the shapes, and the derivations the validator reads
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { contentFilteredMapSql } from "./contentGating";

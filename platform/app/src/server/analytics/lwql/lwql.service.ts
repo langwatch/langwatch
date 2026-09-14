@@ -43,7 +43,7 @@
  * caller: the first because `readonly = 1` refuses the setting change, the
  * second because it is not in the request shape.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ./provisioning/accessModel.ts — the isolation this composes over
  */
 

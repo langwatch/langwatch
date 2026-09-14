@@ -6,7 +6,7 @@
  * whether a REQUEST is issued — a reducer assertion could only ever prove that
  * some state did not change.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 
 import { describe, expect, it, vi } from "vitest";

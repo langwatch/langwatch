@@ -95,6 +95,12 @@ Feature: CLI cross-project access with the user-scoped login key
 
   Rule: whoami -o json prints a secret-free machine-readable snapshot
 
+    @e2e @unimplemented
+    Scenario: A headless coding agent asks the CLI who the key belongs to
+      Given a coding agent running headless with an API key
+      When it asks the CLI who the key belongs to
+      Then it gets the user and organization in a form it can parse
+
     @unit
     Scenario: whoami -o json prints one secret-free JSON object and exits 0
       Given the user is logged in
@@ -121,6 +127,14 @@ Feature: CLI cross-project access with the user-scoped login key
       When the user runs `langwatch whoami`
       Then the existing human-readable lines are printed unchanged
       And the command exits 0
+
+  Rule: A headless coding agent runs a query from the CLI
+
+    @e2e @unimplemented
+    Scenario: A headless coding agent runs a query from the CLI
+      Given a coding agent running headless with an API key
+      When it runs a query through the CLI
+      Then it gets the rows in a form it can parse
 
 # --- AC Coverage Map ---
 # AC12 "whoami -o json secret-free shape, exit 0" → Scenario: whoami -o json prints one secret-free JSON object and exits 0

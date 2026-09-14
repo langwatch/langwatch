@@ -34,7 +34,7 @@
  * gets ignored, and then it is not a warning at all.
  *
  * @see ./validation/validate.ts — the walk whose record the shape rules read
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {

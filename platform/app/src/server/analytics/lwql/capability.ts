@@ -42,7 +42,7 @@
  *
  * @see ./provisioning/accessModel.ts — the key map this value is looked up in
  * @see ./validation/validate.ts — the `SETTINGS` refusal that clause depends on
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { createHash } from "node:crypto";

@@ -11,7 +11,7 @@
  * force-enables the very flag under test — so consulting the real one would
  * make the switched-off case answer "on" and pass vacuously.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { nanoid } from "nanoid";

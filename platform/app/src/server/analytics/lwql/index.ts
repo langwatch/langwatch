@@ -5,7 +5,7 @@
  * the provisioning statements and the executor are the service's business, not
  * a route handler's.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 export { lwqlTenantCapability } from "./capability";

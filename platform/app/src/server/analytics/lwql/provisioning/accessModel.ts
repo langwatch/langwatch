@@ -41,7 +41,7 @@
  *
  * @see ./postgresMapping.ts — the PostgreSQL-resident datasets this model covers
  * @see ../sqlText.ts — the escaping and identifier rules these statements obey
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {

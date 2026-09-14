@@ -9,8 +9,8 @@
  * *organization*, and a second copy that forgot to would silently answer "off"
  * for every organization-scoped grant.
  *
- * @see specs/analytics/lwql-api.feature
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/api.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { NotFoundError } from "@langwatch/handled-error";

@@ -28,8 +28,8 @@
  * @see ~/app/api/shared/canonical-error — the mapping every refusal here goes
  *   through, including the 5xx redaction one case below turns on
  *
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-langy-authoring.feature — the placement routes
+ * @see specs/lwql/saved-charts.feature
+ * @see specs/lwql/langy-authoring.feature — the placement routes
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 

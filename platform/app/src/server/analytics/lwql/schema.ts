@@ -36,7 +36,7 @@
  * so referencing one is refused.
  *
  * @see ./catalog/types.ts — the derivations this projects
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { FieldProtection } from "../../traces/projection/catalog";

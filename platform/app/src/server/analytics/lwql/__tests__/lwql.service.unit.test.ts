@@ -11,7 +11,7 @@
  * {@link applyLangWatchQLResultLimits} directly, because a fake that implemented
  * its own truncation would prove only that the fake truncates.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -44,7 +44,7 @@
  *
  * @see ./types.ts — the shapes
  * @see ../provisioning/accessModel.ts — the approved views, the engine tables and the role
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { LangWatchQLViewDefinition } from "./types";

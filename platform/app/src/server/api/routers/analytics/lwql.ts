@@ -17,7 +17,7 @@
  * it would refuse and teaching a caller the wrong rule.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import { z } from "zod";

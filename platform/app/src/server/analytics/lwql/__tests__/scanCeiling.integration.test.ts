@@ -22,7 +22,7 @@
  *    proof that transcribes the thing it guards proves the transcription.
  *
  * @see ../provisioning/accessModel.ts — the profile that pins the ceilings
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

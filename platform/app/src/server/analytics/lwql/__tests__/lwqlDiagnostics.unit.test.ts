@@ -11,7 +11,7 @@
  * exactly the fact under test — a diagnostic that fired on everything would
  * pass every positive case here and be worthless in a response.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -9,7 +9,7 @@
  * resolved server-side from the authenticated context — never from the request
  * body, and never from the SQL text. This module only says what the shape is.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 /**

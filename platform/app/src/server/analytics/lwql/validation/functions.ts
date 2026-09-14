@@ -59,7 +59,7 @@
  * the schema endpoint's published example SQL uses it.
  *
  * @see ./validate.ts — the walk that applies this
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 /**

@@ -30,7 +30,7 @@
  * which rounding convention ClickHouse picked, and the case would be pinning
  * the implementation rather than the answer.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ~/server/analytics/lwql — the service under test
  * @see ./queryRestApi.integration.test.ts — the request/isolation proof for this door
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900

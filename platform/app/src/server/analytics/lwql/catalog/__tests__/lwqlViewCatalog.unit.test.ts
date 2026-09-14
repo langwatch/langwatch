@@ -10,7 +10,7 @@
  * data-privacy modules rather than from the catalog, so they can *disagree*
  * with it. A guard that reads the value it guards can only ever agree.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -41,7 +41,7 @@
  *  - Two tenants throughout, both seeded, so an isolation assertion has
  *    something to fail on.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ./queryRestApi.integration.test.ts — the request/error contract this suite relies on but does not re-prove
  * @see ~/server/analytics/lwql — the service under test
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900

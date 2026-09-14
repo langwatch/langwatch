@@ -64,7 +64,7 @@
  * the reachable surface uniform and small, so that "which table functions are
  * safe today" never becomes a question anyone has to re-answer.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ../provisioning/accessModel.ts — the database-layer isolation this backs up
  */
 

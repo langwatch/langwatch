@@ -1081,3 +1081,60 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a statement fails and the error echoes that DDL
     Then the password and the connection strings are redacted from the logged error
     And an empty or unset secret never matches
+
+  # ---------------------------------------------------------------------------
+  # Coding-agent gaps (#8085): scoping, discovery and identity from the caller's
+  # point of view, regrouped so every e2e user story leads its own Rule block.
+  # ---------------------------------------------------------------------------
+
+  Rule: Query across every project the key can read
+
+    @e2e @unimplemented
+    Scenario: Query across every project the key can read
+      Given a user with an API key with access to several projects
+      When they run a query without naming a project
+      Then they get rows from all of those projects
+
+  Rule: Narrow to one project inside the query
+
+    @e2e @unimplemented
+    Scenario: Narrow to one project inside the query
+      Given a user with an API key with access to several projects
+      When they run a query that filters to one project
+      Then they get rows from that project only
+
+  Rule: Never see a project the key cannot read
+
+    @e2e @unimplemented
+    Scenario: Never see a project the key cannot read
+      Given a user with an API key with no access to project X
+      When they run a query that names project X
+      Then they get no rows from project X
+
+  Rule: Discover what I can ask
+
+    @e2e @unimplemented
+    Scenario: Discover what I can ask
+      Given a user with an API key with access to at least one project
+      When they ask what datasets, columns and functions exist
+      Then they get an answer they can use without reading the docs
+
+    @integration
+    Scenario: The schema endpoint publishes the allowed function names
+      Given an authenticated API client
+      When it calls the schema discovery endpoint
+      Then the response includes functions as a sorted array
+      And that array equals the function allowlist the validator enforces
+
+    @unit
+    Scenario: The published OpenAPI schema for the schema endpoint declares the functions field
+      Given the OpenAPI schema for GET /api/v1/query/schema
+      Then it declares a functions field typed as an array of strings
+
+  Rule: Ask who the key is and what it can reach
+
+    @e2e @unimplemented
+    Scenario: Ask who the key is and what it can reach
+      Given a user with an API key
+      When they query for the key's owner and scope
+      Then they get the user, organization, projects and permissions the key carries

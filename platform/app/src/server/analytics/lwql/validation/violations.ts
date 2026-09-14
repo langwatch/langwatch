@@ -10,7 +10,7 @@
  * existence of another tenant; the only caller-supplied text any of them
  * carries is an identifier the caller wrote themselves, length-capped.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 import type { SqlSourcePosition } from "./parser";
 

@@ -8,7 +8,7 @@
  * is the real one, built with no executor: validation needs no database, and a
  * stubbed validator would prove only that the stub refuses.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";

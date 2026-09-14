@@ -12,7 +12,7 @@
  * quietly reinterpret stops being rejected before it reaches the server.
  *
  * @see ../postgresMapping.ts — the statements under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -7,7 +7,7 @@
  * named code, so a caller who skips the availability question gets the same
  * answer.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

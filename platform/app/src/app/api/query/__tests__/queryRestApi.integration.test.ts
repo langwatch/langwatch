@@ -37,7 +37,7 @@
  *  - Two tenants throughout, both seeded, so an isolation assertion has
  *    something to fail on.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ./queryRest.unit.test.ts — the surface proved without a database
  * @see ./queryRestServiceProofs.integration.test.ts — the service/isolation proof this suite does not repeat
  * @see ~/server/analytics/lwql — the service under test

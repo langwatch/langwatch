@@ -16,7 +16,7 @@
  *  - Every rejection is asserted by specific error code. "It threw" is not a
  *    proof of containment when a typo throws too.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

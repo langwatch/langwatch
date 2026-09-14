@@ -18,7 +18,7 @@
  * that would then be wrong everywhere else.
  *
  * @see ./lwqlViews.ts — the catalog itself
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { FieldProtection } from "../../../traces/projection/catalog";

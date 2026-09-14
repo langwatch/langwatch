@@ -26,7 +26,7 @@
  * the load property — the first holds on either object, the second only on the
  * view.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

@@ -18,7 +18,7 @@
  *    than trusted, so a migration that changes a column turns this red instead
  *    of turning the schema endpoint into a liar.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ../catalogStatements.ts — the statements under proof
  */
 

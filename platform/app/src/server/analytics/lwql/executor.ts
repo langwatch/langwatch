@@ -27,7 +27,7 @@
  *
  * @see ./provisioning/accessModel.ts — the identity, the profile, and the key map
  * @see ./capability.ts — the value sent as the tenant setting
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";

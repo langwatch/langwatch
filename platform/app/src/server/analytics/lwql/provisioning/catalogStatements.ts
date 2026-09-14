@@ -48,7 +48,7 @@
  *
  * @see ./catalog/lwqlViews.ts — the catalog these statements are built from
  * @see ./accessModel.ts — the access model applied over them
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
