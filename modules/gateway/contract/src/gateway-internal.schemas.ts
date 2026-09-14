@@ -1,14 +1,6 @@
 /**
- * The wire the Go data plane dials `/api/internal/gateway` with.
- *
- * These are request shapes, so they live in the contract rather than beside the
- * transport: the same bytes are written by the gateway's own Go client, and a
- * schema only the server could see would be a promise nothing else can read.
- *
- * Every field is spelled the way the data plane spells it — lower_snake_case,
- * `project_id` for the tenant — because these are the exact bodies a deployed
- * gateway sends. Nothing here may be renamed without changing the Go half in
- * the same release.
+ * Wire shapes the Go data plane sends to /api/internal/gateway; uses Go
+ * naming (lower_snake_case), matches deployed gateway exactly.
  */
 import { z } from "zod";
 

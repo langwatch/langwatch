@@ -3,14 +3,8 @@ import { toEpochMs } from "@langwatch/time";
 import { readableDate } from "./display-formatters.ts";
 
 /**
- * The editing model behind the targeting-rules dialog.
- *
- * Stored rules are a `match` object with optional keys; the dialog shows one
- * scope picker and one field. Translating between the two shapes is the only
- * thing in here, kept free of React so the ordering decisions — which are
- * where first-match-wins bites — can be read and tested on their own.
- *
- * @see specs/ops/internal-feature-flags.feature
+ * Translating between stored and UI rule shapes for the targeting-rules
+ * dialog; see specs/ops/internal-feature-flags.feature for ordering rules.
  */
 
 export type ScopeKind =

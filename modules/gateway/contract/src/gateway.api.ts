@@ -205,7 +205,7 @@ export interface GatewayApi {
     projectId: string;
     credential: GatewayRequestCredential;
   }): { actor: GatewayCaller; actorUserId: string };
-  /** A tenant-wide write a project credential names by id, checked at the organization it acts on. */
+  /** Tenant-wide write by project credential, checked at the organization. */
   authorizeOrganizationWideOperation(input: {
     actor: GatewayCaller;
     organizationId: string;
@@ -249,7 +249,7 @@ export interface GatewayApi {
     budgets: ReadonlyArray<{ providerKey: string | null }>,
   ): Promise<Map<string, string>>;
   listGroupTargets(organizationId: string): Promise<ReadonlyArray<GatewayGroupTarget>>;
-  /** How many members a per-member GROUP allowance currently covers, batched over a page of rows. */
+  /** Member count per-GROUP allowance covers, batched over a page. */
   groupMemberCounts(
     budgets: readonly { scopeType: string; scopeId: string }[],
   ): Promise<Map<string, number>>;
@@ -257,7 +257,7 @@ export interface GatewayApi {
   resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]>;
 
   listCacheRules(organizationId: string): Promise<GatewayCacheRuleResource[]>;
-  /** A cursor page of an organization's cache rules, priority-ordered, for the credentialed listing. */
+  /** Cursor page of org cache rules, priority-ordered. */
   listCacheRulePage(input: {
     organizationId: string;
     limit: number;

@@ -134,7 +134,10 @@ export type SpendEventRow = {
 };
 
 /**
- * Every quantity a provider bills by, one named integer field each — not a map, which would kill sumIf rollups, lose per-field defaults, and turn a typo into a silently unpriced quantity; every field defaults to zero. input/output_audio_tokens and input/output_image_tokens are DISJOINT from the text token counts (audio/image price several times higher; charging both would double that portion); image_count is display-only; reasoning_tokens stays a subset of output_tokens, also display-only. audio_ms is whole milliseconds; the one division by 1000 happens at the rating seam.
+ * Billing quantities: named fields (not a map, to preserve sumIf rollups and
+ * per-field defaults). audio/image_tokens are disjoint from text tokens.
+ * image_count and reasoning_tokens are display-only. audio_ms divides by 1000
+ * at the rating seam.
  */
 export const spendUsageSchema = z.object({
   input_tokens: z.number().int().min(0).default(0),

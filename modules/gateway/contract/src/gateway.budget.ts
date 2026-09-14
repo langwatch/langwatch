@@ -136,20 +136,8 @@ export type GatewayResolvedBudget = {
 };
 
 /**
- * One budget that already constrains a virtual key, as the drawers' "already
- * applies" list renders it.
- *
- * A WIRE shape, which is why it is in the contract rather than in the process
- * that resolves it: the `virtualKeys.applicableBudgets` tRPC procedure answers
- * an array of these and the browser types against every field below. It used
- * to be a type parameter on `GatewayApp` (`TApplicableBudgets`) on the theory
- * that only the process could name it — but a generic constraint does not
- * carry a shape out to a router's inferred output, so what actually reached
- * the browser was `unknown`.
- *
- * `scopeType`, `window` and `onBreach` are `string` rather than the enums
- * above because that is what the resolver already emits; tightening them is a
- * change to the resolver, not to this declaration.
+ * Wire shape for applicable budgets (virtualKeys resolve these);
+ * scopeType/window/onBreach are strings to match resolver output.
  */
 export type GatewayApplicableBudget = {
   id: string;
@@ -183,15 +171,8 @@ export type GatewayApplicableBudget = {
 };
 
 /**
- * The budget a key carries on itself, with what it has spent in that budget's
- * own current period — the period bar in the virtual-keys table.
- *
- * Distinct from the key's calendar-month spend: a daily cap is measured
- * against today, so a key that spent $2.50 this month can still be at $0.50 of
- * its $1.00 day. Both numbers travel in `virtualKeys.spendThisMonth`, so both
- * are wire shapes and both belong here. Same history as
- * {@link GatewayApplicableBudget}: this was `TDirectBudget`, and the browser
- * received `unknown`.
+ * Wire shape for the budget a key carries, with period spend; distinct from
+ * calendar-month spend (e.g., daily caps measure against today).
  */
 export type GatewayVirtualKeyDirectBudget = {
   budgetId: string;
@@ -419,14 +400,8 @@ export type GatewayBudgetHealth = {
 };
 
 /**
- * The inputs the `gatewayBudgets.*` tRPC surface publishes.
- *
- * Deliberately separate from the service schemas above, which they resemble
- * without matching: the wire surface takes no `actorUserId` (the process reads
- * the actor from its own session), publishes neither `externalId` nor
- * `metadata`, does not accept an ATTRIBUTED_USER scope, and demands a positive
- * `limitUsd` where the service accepts any finite amount. Collapsing the two
- * would change what a live endpoint accepts, so they stay apart and adjacent.
+ * Wire inputs for gatewayBudgets.* tRPC surface; separate from service schemas
+ * to preserve endpoint contract.
  */
 const gatewayBudgetApiScopeSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -466,15 +441,8 @@ export const gatewayBudgetApiCreateInputSchema = z.object({
   // ModelProvider row id. Null / absent = the budget counts every
   // provider; set = it counts and constrains only that provider.
   providerKey: z.string().nullable().optional(),
-  // Phases a cyclic window off this instant instead of the calendar.
-  // Absent keeps the calendar alignment. Rejected on TOTAL and
-  // MANUAL, which do not cycle.
-  //
-  // A Date, or an ISO string carrying its offset, and nothing looser:
-  // the same instant the REST surface demands. An offsetless string
-  // would be read in whichever zone the server process happens to run
-  // in, so the anchor a customer set would land on a different instant
-  // per deployment.
+  // Phases cyclic window off this instant (rejected on TOTAL/MANUAL).
+  // Must be Date or ISO string with offset, not offsetless.
   cycleAnchorAt: z
     .union([
       z.instanceof(Temporal.Instant),

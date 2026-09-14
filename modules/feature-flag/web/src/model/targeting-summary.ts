@@ -3,22 +3,8 @@ import { toEpochMs } from "@langwatch/time";
 import { readableDate } from "./display-formatters.ts";
 
 /**
- * One line under a flag's toggle saying who a rule has already switched the
- * flag on for, when the toggle itself reads off.
- *
- * The walk honors first-match-wins throughout, because every shortcut around
- * it makes the page contradict the resolver: a disabled rule shadows every
- * later rule for the same target, and a rule below a catch-all can never
- * fire.
- *
- * Age rules need more than a shadow check. Each is an inclusive lower bound,
- * so two of them carve the timeline into ranges rather than naming two
- * independent groups: a rule disabling "since June" placed above one enabling
- * "since January" leaves the flag on for January through May and off from
- * June, and a summary that reports the January rule's date on its own claims
- * a population the resolver switches off.
- *
- * @see specs/ops/internal-feature-flags.feature
+ * Summary of who a rule switched the flag on for, honoring first-match-wins
+ * and age-rule timeline ranges; see specs/ops/internal-feature-flags.feature.
  */
 
 /** Organizations created from `from` on, and — when set — before `until`. */
@@ -148,17 +134,8 @@ interface DecidedRange extends AgeRange {
 }
 
 /**
- * The creation dates the age rules decide, in order, as ranges.
- *
- * Every age condition is `created >= date`, so the verdict can only change at
- * a date some rule names: between two consecutive dates the same rule wins
- * for every organization. Resolving one organization per boundary therefore
- * describes the whole timeline exactly, and adjacent boundaries that agree
- * are merged so a run of rules reads as the one range it is.
- *
- * Only rules whose sole condition is the date take part. One that also names
- * an organization speaks for that organization alone, so it neither claims
- * the new-users population nor excludes any of it.
+ * Creation dates the age rules decide as ranges, one organization per
+ * boundary; only pure-date rules participate.
  */
 function ageRanges(rules: FeatureFlagRules): DecidedRange[] {
   const dated = rules.flatMap((rule) => {

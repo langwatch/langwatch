@@ -55,7 +55,10 @@ export abstract class LangyUiActionRestCatalog implements LangyUiActionCatalog {
   abstract tryFind(kind: string): LangyUiActionDefinition | null;
 }
 
-/** Everything the UI-action surface reaches that neither `LangyApi` nor the framework's own project door supplies. */
+/**
+ * Everything the UI-action surface reaches that neither `LangyApi` nor
+ * the framework's own project door supplies.
+ */
 export type LangyUiActionsRestMembers = Readonly<{
   /** This deployment's flag store, for the rollout gate and the identity bridge. */
   featureFlags: () => FeatureFlagApi;

@@ -1,14 +1,8 @@
 /**
  * @vitest-environment node
  *
- * VK tags stopped being inert storage the moment the gateway started stamping
- * them on every customer span as `langwatch.labels`: they now land in the
- * ClickHouse trace attribute map on each request and feed the Trace Explorer's
- * Label facet, which aggregates every distinct value. The normalisation below
- * is what keeps that a bounded surface, and it has to hold for tags written
- * through the REST API just as much as for tags typed into the drawer.
- *
- * Spec: specs/ai-gateway/span-shape.feature § VK tags land on customer spans as labels
+ * VK tag normalization keeps the Label facet bounded; must hold for REST API
+ * and drawer input. Spec: specs/ai-gateway/span-shape.feature
  */
 import { describe, expect, it } from "vitest";
 

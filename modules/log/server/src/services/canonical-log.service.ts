@@ -42,15 +42,8 @@ type StringRef = {
 };
 
 /**
- * Walk a decoded OTLP tree and collect every `stringValue` leaf.
- *
- * `path` addresses the leaf and must stay unique, which is why it is built from
- * array indices. That makes it useless to the sensitive-NAME rules: an
- * attribute list yields `log.0.value.stringValue`, and no deny-list entry can
- * ever match that. So the owning attribute's real name is carried down
- * alongside the path. Without it the name rules simply never fired on this
- * pipeline, and an `authorization` or `x-api-key` attribute was left to the
- * value-shape rules alone.
+ * Walk decoded OTLP tree, collect stringValue leaves with array-indexed paths (for
+ * uniqueness) and carry the owning attribute name so redaction NAME rules can fire.
  */
 export class CanonicalLogAdapter implements LogPreparer {
   private constructor(private readonly redaction: LogRedaction) {

@@ -31,16 +31,7 @@ export class GatewayAgentCacheEntryNotFoundError extends HandledError {
 }
 
 /**
- * The caller may see the virtual key but not attach guardrails to its project.
- *
- * A named denial rather than a string the client has to parse: the guardrails
- * surface used to branch on `err.message.includes("missing_perm")` to write its
- * own copy, which is exactly the message-prose coupling the handled-error
- * boundary exists to remove — and which would have broken silently the moment
- * this throw was tidied up.
- *
- * `customer` fault on purpose: a 403 here is a permission the caller can be
- * granted, not an incident.
+ * Caller lacks permission to attach guardrails to this virtual key's project.
  */
 export class GuardrailAttachForbiddenError extends HandledError {
   declare readonly code: "guardrail_attach_forbidden";
@@ -56,15 +47,8 @@ export class GuardrailAttachForbiddenError extends HandledError {
 }
 
 /**
- * A virtual key the caller asked for isn't there.
- *
- * Also raised when the key exists but this caller cannot see it
- * (`isVisibleToMembership`). That is deliberate and must stay
- * indistinguishable from a genuine miss: a separate "forbidden" would be an
- * existence oracle for keys in teams the caller has no part in. One code keeps
- * both answers identical while still giving the client something to render —
- * the bare `new TRPCError({ code: "NOT_FOUND" })` it replaces carried no
- * message at all, so the drawer had nothing to say but "unknown error".
+ * Virtual key not found (or invisible to caller), kept indistinguishable
+ * to prevent key-existence oracles.
  */
 export class VirtualKeyNotFoundError extends HandledError {
   declare readonly code: "virtual_key_not_found";
@@ -79,14 +63,8 @@ export class VirtualKeyNotFoundError extends HandledError {
 }
 
 /**
- * A key was written with an expiration date that had already passed.
- *
- * The key would be refused by the gateway on its first request, and nothing
- * about that refusal would point back at the date the caller typed. Refusing
- * at write time is the only moment the field is still on screen, so the
- * failure names it: `meta.fieldErrors` carries the field the drawers paint
- * the complaint under, both on the camel and the snake spelling, because the
- * tRPC form and the REST body call it different things.
+ * Expiration date already passed; rejected at write-time to point users at
+ * the field on screen.
  */
 export class VirtualKeyExpiryInPastError extends HandledError {
   declare readonly code: "virtual_key_expiry_in_past";
@@ -120,20 +98,8 @@ export class GatewayBudgetNotFoundError extends HandledError {
 }
 
 /**
- * A scope named in the request — a team, a project, a group, a user, or the
- * organization itself — does not belong to the organization the request is
- * scoped to.
- *
- * A cross-tenant guard, not a typo check: the scope id is request-supplied, so
- * without it a caller could put a budget or a key on another tenant's team.
- * That is why `meta` carries the TYPE of scope and never the id: the id names
- * another tenant's record, and the sentence it used to sit in
- * (`scope_org_mismatch: team tm_… is not in organization org_…`) shipped both
- * that id and ours to whoever asked.
- *
- * The key is `scope_type`, the same name the budget wire and the webhook
- * payloads already give this field, so a consumer reads one spelling
- * everywhere on the control plane.
+ * Scope does not belong to the request's organization; cross-tenant guard,
+ * never a typo.
  */
 export class GatewayScopeOrgMismatchError extends HandledError {
   declare readonly code: "gateway_scope_org_mismatch";
@@ -162,17 +128,8 @@ export class GatewayGuardrailProjectMismatchError extends HandledError {
 }
 
 /**
- * Per-key spend cannot be reported because this deployment has no per-key
- * spend ledger.
- *
- * `fault: platform` — a deployment shape, not anything the person reading the
- * column did, and nothing they can correct. Raised loudly rather than answered
- * with `$0.00`, which cannot be told apart from a key that genuinely spent
- * nothing.
- *
- * The copy says what is missing, never which engine is missing it: naming the
- * storage backend tells a customer nothing they can use
- * (`best_practices/copywriting.md`).
+ * Per-key spend ledger not available on this deployment; platform fault,
+ * not recoverable by the caller.
  */
 export class GatewaySpendUnavailableError extends HandledError {
   declare readonly code: "gateway_spend_unavailable";
@@ -187,16 +144,8 @@ export class GatewaySpendUnavailableError extends HandledError {
 }
 
 /**
- * Two rows in one organization cannot answer to the same `external_id`.
- *
- * A 409 rather than a 400: the request is well-formed and would have been
- * accepted a moment earlier, so the caller's fix is to pick another id or to
- * patch the row that already holds this one, not to correct a malformed field.
- *
- * `meta.external_id` echoes the id the caller sent, which is the caller's own
- * value and therefore safe to return: unlike the scope-mismatch guard above,
- * this leaks nothing about the colliding row beyond the fact that the caller
- * already used the id.
+ * Duplicate external_id in organization; 409 (not 400) since the request
+ * was well-formed a moment earlier.
  */
 export class GatewayExternalIdConflictError extends HandledError {
   declare readonly code: "external_id_conflict";
@@ -215,16 +164,7 @@ export class GatewayExternalIdConflictError extends HandledError {
 const EXTERNAL_ID_INDEX_FIELD = "externalId";
 
 /**
- * Does this P2002 name the external-id index?
- *
- * Prisma reports the offending constraint differently per connector and per
- * version: an array of field names on some, the index NAME on others. Both are
- * matched, and the match is on the field name specifically rather than on
- * "the write had an external id", because {@link VirtualKey} carries a SECOND
- * unique index, `hashedSecret`, whose collision means a minted secret
- * repeated and is emphatically not a customer-facing conflict. Translating
- * that one would report a platform failure as the caller's bad input and hide
- * a broken secret generator behind a 409.
+ * Does this P2002 name the external-id index (not hashedSecret collision)?
  */
 function namesExternalIdIndex(target: unknown): boolean {
   if (Array.isArray(target)) {
@@ -234,13 +174,8 @@ function namesExternalIdIndex(target: unknown): boolean {
 }
 
 /**
- * Re-throw `error` as {@link GatewayExternalIdConflictError} when it is the
- * external-id uniqueness violation, and untouched otherwise.
- *
- * Written as a translate-and-rethrow rather than a pre-flight SELECT because a
- * check-then-write races: two concurrent creates both find the id free and one
- * of them still hits the index. The index is the only thing that actually
- * decides, so it is what the error is read from.
+ * Translate P2002 to GatewayExternalIdConflictError when it names the
+ * external-id index; read from index not check-then-write.
  */
 export function translateExternalIdConflict(
   error: unknown,
@@ -262,14 +197,8 @@ const prismaUniqueConstraintErrorSchema = z
   .passthrough();
 
 /**
- * A per-member budget was asked for on a deployment that tracks spend in one
- * bucket per budget rather than one per member.
- *
- * Refused rather than created, because the cap would quietly mean something
- * other than what the admin asked for — every member enforced against the
- * group's combined spend. `fault: platform` for the same reason as
- * {@link GatewaySpendUnavailableError}: the request was reasonable and the
- * deployment cannot honour it.
+ * Per-member budgets not available on this deployment; platform shape, not
+ * recoverable.
  */
 export class GatewayGroupBudgetUnsupportedError extends HandledError {
   declare readonly code: "gateway_group_budget_unsupported";
@@ -306,21 +235,8 @@ export class GatewayTraceProjectRequiredError extends HandledError {
 }
 
 /**
- * A key names a trace destination this organization does not have.
- *
- * Resolution tries the explicit destination, then the key's single project
- * scope, then the governance project, and each stage only answers for the
- * keys the previous one left. That is right on the read path, where an
- * outlived destination should degrade rather than break dispatch, and wrong
- * on the write path: a key naming a deleted or foreign project would be
- * accepted with its traffic quietly attributed to whichever later stage
- * answered, while the saved `trace_project_id` went on claiming otherwise.
- * The two would then disagree forever, and nothing would say so.
- *
- * So a destination that is named has to be one that resolves. The id is
- * never echoed: it belongs to a record in another organization, if it names
- * a record at all, and confirming which of the two would be a small
- * disclosure of somebody else's data.
+ * Trace destination not in this organization; refused at write-time to
+ * prevent traffic mismapping.
  */
 export class GatewayTraceProjectUnknownError extends HandledError {
   declare readonly code: "gateway_trace_project_unknown";
@@ -336,20 +252,8 @@ export class GatewayTraceProjectUnknownError extends HandledError {
 }
 
 /**
- * A key was written whose traces would land somewhere it never named.
- *
- * A key resolves its trace destination from an explicit one it carries, or
- * from its single project scope. A key that has neither, an organization-
- * or team-owned key with no destination set, or one scoped to several
- * projects at once, falls back to the organization's governance project.
- * That is a fine read-path tolerance for keys that already exist, and a bad
- * shape to write: every project budget the creator had in mind matches
- * nothing, because the traffic is attributed to a project they never
- * mentioned.
- *
- * The app has always required the destination for these ownerships; this is
- * the API agreeing with it. An organization whose only project IS the
- * governance one is not refused, since there would be nothing else to pick.
+ * Key does not specify a trace destination; falls back to governance project
+ * on read, but rejected at write.
  */
 export class GatewayTraceProjectAmbiguousError extends HandledError {
   declare readonly code: "gateway_trace_project_ambiguous";
@@ -378,21 +282,8 @@ export class GatewayTraceProjectAmbiguousError extends HandledError {
 const REACHABLE_PROJECT_HINT_LIMIT = 10;
 
 /**
- * A budget was written on a scope none of the organization's active keys can
- * produce traffic for.
- *
- * Whether a completed request matches a TEAM, PROJECT or GROUP budget is
- * decided by the key that served it, not by anything chosen while writing the
- * budget. So the two sides can each look correct and never meet: a
- * team-scoped key whose traces land in the governance project matched no
- * budget on its own team, and a group budget matches nothing at all through a
- * shared key with no person behind it. The result is a spending control that
- * silently never fires, which is the worst way for one to fail.
- *
- * Refused at write time rather than reported later, with `allow_unreachable`
- * for the legitimate case of provisioning ahead of the keys that will use it.
- * An organization with no active keys is never refused: budget first, key
- * second is the natural setup order.
+ * Budget written on a scope no active keys reach; silently-failing spending
+ * control rejected at write-time.
  */
 export class GatewayBudgetScopeUnreachableError extends HandledError {
   declare readonly code: "gateway_budget_scope_unreachable";
@@ -428,17 +319,7 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
 }
 
 /**
- * A rollup was asked for on a dimension whose groups can still move.
- *
- * The walk pages by group key, which is exact only while a row cannot change
- * groups. Requested model and provider are replaced by the resolved ones when
- * the outcome lands, so over a window that has not settled a row can cross a
- * page boundary and be served twice or skipped. A checksum built on that
- * quietly disagrees with the books and gives no sign it did.
- *
- * `meta.group_by` names the dimensions that move, and `meta.settles_at` is
- * when the requested window will be safe to group this way, so a caller can
- * schedule the read rather than guess at it.
+ * Rollup on unstable groups; page walk not exact until window settles.
  */
 export class GatewaySpendGroupByUnstableError extends HandledError {
   declare readonly code: "gateway_spend_group_by_unstable";
@@ -463,14 +344,8 @@ export class GatewaySpendGroupByUnstableError extends HandledError {
 }
 
 /**
- * A cycle anchor was sent on a window that has no cycle to phase.
- *
- * TOTAL never rolls and MANUAL rolls only when someone asks it to, so an
- * anchor on either would be stored and then never read. Refused rather than
- * ignored: a caller who set one believes their budget rolls on the 17th, and
- * silently accepting it would let them find out otherwise from an invoice.
- *
- * `meta.window` echoes the window the caller sent, which is their own value.
+ * Cycle anchor sent on non-cycling window (TOTAL, MANUAL); silently-failing
+ * budget rejected.
  */
 export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
   declare readonly code: "gateway_budget_cycle_anchor_invalid";

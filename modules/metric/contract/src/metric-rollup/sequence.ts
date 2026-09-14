@@ -44,17 +44,9 @@ export interface MetricSequencePoint {
 }
 
 /**
- * The fields the rollup fold actually reads, on top of the ordering fields a
- * seek needs. Naming them is what lets the authoritative read stop asking for
- * the rest: attributes, schema urls, scope identity, flags, quantiles and the
- * accounting timestamps are stored on every point and read by none of the
- * builders below, yet `FINAL` materialised all of them for every row a seek
- * scanned — the megabytes-per-granule that pushed the reads over the server's
- * memory cap (`while reading column PointAttributesJson`).
- *
- * `MetricRollupSourcePoint` stays assignable to this, so a caller holding a
- * whole point still folds; the type only bounds what a caller *must* supply,
- * and so what a read has to fetch.
+ * Fields the rollup fold reads (excludes attributes, schema, scope, flags, quantiles,
+ * timestamps to avoid over-materializing). MetricRollupSourcePoint is assignable to
+ * full point; type bounds only what callers must supply to the read.
  */
 export type MetricRollupSourcePoint = MetricSequencePoint &
   Pick<

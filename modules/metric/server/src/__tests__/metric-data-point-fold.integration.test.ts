@@ -1,30 +1,8 @@
 /**
  * @vitest-environment node
  * @integration
- *
- * Runs the canonical metric repository's real INSERT/SELECT SQL against a
- * ClickHouse carrying the shipped migrations. The rollup unit tests exercise
- * the pure fold; the successor / affected-bucket seek queries and the rollup
- * INSERT they feed are only ever mocked. This file is what proves:
- * - ensureDataPoints lands raw points plus their usage-estimate ledger rows;
- * - recomputeAffectedRollupsMany converts a cumulative monotonic sum series
- *   spanning two 30s buckets into per-bucket deltas using rows it fetched back
- *   from ClickHouse, not the in-memory chunk;
- * - a late point ensured between existing samples converges the affected
- *   buckets on re-recompute (ReplacingMergeTree(UpdatedAt), read via FINAL —
- *   the dedup pattern metric_time_rollups mandates);
- * - folding a chunk in one pass lands on exactly the rollups the per-point
- *   path produces, using a number of reads set by the affected buckets rather
- *   than by how many points the chunk carries;
- * - a chunk carrying more than one series resolves each series' own successors,
- *   which is the shape `bulkAppend` actually hands this lane and the only shape
- *   in which the folded read's `arrayZip` pairing and its `LIMIT 1 BY SeriesId`
- *   can be wrong at all.
- *
- * Fixtures come from the shared metric-point builder the rollup unit tests
- * use, so expectations here mirror rollup-scalar.unit.test.ts semantics: the
- * first cumulative sample of a sequence contributes its full value
- * (reset-start), later samples contribute value deltas.
+ * Tests real ClickHouse INSERT/SELECT with rollup fold, dedup via FINAL, and
+ * multi-series handling; verifies data point landing and affected-bucket computation.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { randomUUID } from "node:crypto";
@@ -371,15 +349,8 @@ describe("given a cumulative series long enough to span several rollup buckets",
     }, 300_000);
 
     it("keeps its read count flat however many points the chunk holds", async () => {
-      // The seek budget folds all twelve successor seeks into one statement
-      // and every affected bucket into a second. Reading per point would make
-      // this grow with the chunk instead.
-      //
-      // The third is the wide predecessor pass. This series is new, so no
-      // bucket finds a predecessor in the near window and every one of them
-      // falls through to it — the common path under series churn, and one
-      // extra round trip whatever the chunk size. What matters here is that
-      // three does not become four when the chunk grows.
+      // Seek budget: one for successor seeks, one for affected buckets, one for
+      // predecessor pass. Read count stays at 3 regardless of chunk size.
       expect(reads).toBe(3);
     });
 
@@ -393,13 +364,9 @@ describe("given a cumulative series long enough to span several rollup buckets",
 });
 
 /**
- * The folded successor read does not seek once per point: within a series it
- * reads the chunk's own span in one branch and looks past the end of it in
- * another. Its results are only identical to a seek per point because every
- * chunk point is already stored, so no chunk point's successor can be further
- * away than the next chunk point. That argument is what this block exercises
- * against real ClickHouse - a series where the rows between the chunk's points
- * are rows the chunk itself does not carry.
+ * Tests folded successor read against real ClickHouse: reads within series span plus
+ * past-end in another branch. Verifies results match per-point seek when series has
+ * stored points between chunk points.
  */
 describe("given a series whose chunk points have stored points between them", () => {
   const foldedSeriesId = "0".repeat(64);
@@ -473,18 +440,9 @@ describe("given a series whose chunk points have stored points between them", ()
 });
 
 /**
- * The one shape the rest of this file never folds: a chunk carrying more than
- * one series. With a single series the folded read degenerates — one `arrayZip`
- * span row, so a mis-paired tuple index cannot show; one join candidate; and
- * `LIMIT 1 BY SeriesId` indistinguishable from `LIMIT 1`. `bulkAppend` hands
- * this lane coalesced multi-series batches, where a defect pairing one series'
- * id with another's bounds would drop successors for every series but one and
- * leave their rollups stale. The unit tier mocks the server, so only this tier
- * can see it.
- *
- * The two series are staggered in time so their spans do not coincide: that is
- * what makes the three chunk-global bounds three different values, and a bound
- * taken from the wrong series observable as a missing successor.
+ * Tests folding chunk with multiple staggered series (the shape {@link bulkAppend}
+ * sends). Catches defects in series-to-bounds pairing that would drop successors.
+ * Staggered timing ensures bounds differences are observable.
  */
 describe("given one chunk carrying two series staggered in time", () => {
   const earlySeriesId = "2".repeat(64);

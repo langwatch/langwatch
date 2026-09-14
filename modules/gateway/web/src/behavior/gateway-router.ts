@@ -1,13 +1,6 @@
 /**
- * The address, as the gateway screens read and write it.
- *
- * They arrived using `~/utils/compat/next-router`'s `useRouter` (path
- * parameters and the query string merged into one `query` bag), which is a
- * router import a feature-web package may not make, so it is re-bound to the
- * host's route capability with the shape the call sites already expect.
- *
- * `push` and `replace` take the same strings the pages pass today: an absolute
- * path navigates, and a bare `"?a=b"` rewrites the query of the current page.
+ * Gateway router address: re-bound to host's route capability with merged
+ * query parameters shape.
  */
 
 import { useMemo } from "react";

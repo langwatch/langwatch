@@ -1,12 +1,7 @@
 /**
- * `ModelProviderApp.create` builds its own collaborators from the members it
- * declares (`redis`, `secrets`) and its own config, rather than receiving a
- * hand-composed `ModelProviderInfrastructure` nothing supplies any more
- * (b383462d96 deleted the composition that used to build one). Before this
- * module regained that build step, every one of these calls crashed on
- * `Cannot read properties of undefined` — `defaultFeatures`, `systemProviders`
- * and `exists` — because the process handed `create` an empty members record
- * typed as if it were the whole bag.
+ * Tests that ModelProviderApp.create builds collaborators from declared members and config,
+ * not from hand-composed infrastructure. Regression: before regaining build step, calls
+ * crashed on undefined errors (defaultFeatures, systemProviders, exists).
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -66,7 +61,10 @@ function fakeRedis(): RedisConnection {
   } as unknown as RedisConnection;
 }
 
-/** Builds the app exactly the way boot does: through `create`, not the test-only `createForTesting`. */
+/**
+ * Builds the app exactly the way boot does: through `create`, not test-only
+ * `createForTesting`.
+ */
 function createRealModelProviderApp(): ModelProviderApp {
   return ModelProviderApp.create({
     repositories: MemoryModelProviderRepositories.create(),

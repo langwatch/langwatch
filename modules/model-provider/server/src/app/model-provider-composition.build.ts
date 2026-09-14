@@ -1,30 +1,8 @@
 /**
- * Builds the {@link ModelProviderInfrastructure} this module used to receive
- * hand-composed (`apps/api/src/app/api-model-provider.composition.ts` and
- * `apps/api/src/features/model-provider/model-provider.composition.ts`, both
- * deleted by b383462d96). `ModelProviderApp.create` now builds it itself from
- * the one member it reads — `redis` — its one contract peer, and its own
- * config. `isSaas`, the egress fence and the system-provider environment all
- * travel as CONFIG rather than a `secrets` member of this module's own,
- * because `apps/api`'s own `ApiModelProviderConfigResolution` already
- * resolves every one of them (the deleted composition's `options.environment`
- * was the same whole-environment map, passed the same way).
- *
- * Two branches differ from the deleted composition on purpose, both recorded
- * here rather than guessed at silently:
- *
- *  - `managed` is always {@link UnmanagedModelProviderGatewayAdapter}. The
- *    deleted composition adapted the Enterprise managed-provider service onto
- *    this port from `apps/api`'s OWN composition, which is allowed to import
- *    Enterprise code; this module is core and may not. A deployment that
- *    needs LangWatch-managed provider credentials needs that seam restored at
- *    the composition root, not invented here — see the handoff.
- *  - `spans` is always `undefined`. The deleted composition carried the trace
- *    read stack through as an untyped peer (`ModelProviderPeers`), outside the
- *    dependency-token system this module now installs through. The one
- *    caller that reads it, `previewCostRuleMatchingSpans`, already refuses by
- *    name (`ModelCostPreviewUnavailableError`) rather than crashing, which is
- *    what makes leaving it unset here a narrowing rather than a crash.
+ * Builds ModelProviderInfrastructure (previously hand-composed). ModelProviderApp.create
+ * builds from redis and config. Two intentional branches: managed is always
+ * UnmanagedModelProviderGatewayAdapter (core module may not import Enterprise); spans is
+ * always undefined (avoids untyped peer in dependency-token system).
  */
 import { nanoid } from "nanoid";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -44,13 +22,9 @@ import { ModelProviderRateLimit } from "./model-provider.members.ts";
 import type { ModelProviderAppConfig, ModelProviderInfrastructure } from "./model-provider.app.ts";
 
 /**
- * The connection-test limiter's counter, over the process's own Redis: a
- * fixed window per key, the same arithmetic `redisRateLimiter` in
- * `@langwatch/infrastructure` uses. Kept here rather than reused from there
- * because this module's window and max travel PER CALL — an organization's
- * window and the deployment's global one, both from
- * {@link WindowedModelProviderConnectionRateLimiterAdapter} — rather than
- * fixed once at construction the way the generic member is.
+ * Connection-test limiter counter over process Redis with per-call window/max (organization
+ * and global), not construction-time constants like {@link
+ * WindowedModelProviderConnectionRateLimiterAdapter}.
  */
 class RedisModelProviderRateLimit extends ModelProviderRateLimit {
   static create(input: { redis: RedisConnection }): RedisModelProviderRateLimit {

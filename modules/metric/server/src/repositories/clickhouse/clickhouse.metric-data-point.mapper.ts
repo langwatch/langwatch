@@ -17,13 +17,9 @@ export function clickHouseTimestamp(epochMs: number) {
 }
 
 /**
- * ReplacingMergeTree keeps the largest version, so inverting the acceptance
- * millisecond makes the first accepted retry win.
- *
- * On metric_usage_estimates this only holds within a month: that table
- * partitions by AcceptedAt, which is not part of a PointId's identity, and a
- * merge never crosses partitions. Cross-month dedup happens at query time
- * instead — see the KNOWN TENSION note in migration 00049.
+ * ReplacingMergeTree keeps largest version; inverting acceptance makes first retry win.
+ * On metric_usage_estimates this holds within a month (partitioned by AcceptedAt);
+ * cross-month dedup at query time (see KNOWN TENSION in migration 00049).
  */
 const MAX_UINT64 = 18_446_744_073_709_551_615n;
 
@@ -75,24 +71,9 @@ export interface RawMetricRow {
 }
 
 /**
- * The columns the rollup fold actually reads — {@link MetricRollupSourcePoint},
- * spelled as SQL.
- *
- * Dropping the payload column was not enough. `FINAL` materialises every
- * selected column for every row a seek's granules cover, not for the rows it
- * returns, and the authoritative bucket read returns on the order of a hundred
- * rows out of millions scanned. So each of the columns left out here — the two
- * attribute JSON blobs, the resource and scope identity, the description,
- * flags, the quantile JSON, the size and acceptance bookkeeping — was being
- * decompressed for every scanned row and thrown away. That is the allocation
- * the server ran out of memory inside: `Code: 241 ... (while reading column
- * PointAttributesJson)`.
- *
- * None of them is a rollup input: a rollup carries identity, kind, temporality
- * and aggregatable values, and quantiles are explicitly not aggregatable (see
- * `buildSummaryRow`). The type is what enforces that — adding a column here
- * without adding it to {@link MetricRollupSourcePoint} gains nothing, and
- * reading one in a builder without adding it here will not compile.
+ * Minimal columns for rollup reads (spelled as SQL). Dropping non-rollup columns
+ * (attributes, identity, flags, quantiles, etc.) solved memory exhaustion when FINAL
+ * materialized unused columns. Type constraint syncs with {@link MetricRollupSourcePoint}.
  */
 export const ROLLUP_SELECT = `
   TenantId, PointId, SeriesId,
@@ -168,18 +149,9 @@ export interface SeekMetricRow {
  */
 export class MetricDataPointMapper {
   /**
-   * One of the three `Array(UInt64)` count columns, refusing to decode a row that
-   * does not carry it.
-   *
-   * These are the only fields `fromRollupRow` dereferences without a null check,
-   * so a
-   * row arriving without them used to surface as a bare
-   * `Cannot read properties of undefined (reading 'map')` — no column, no series,
-   * no query, and a stack the queue drops in favour of the message alone. Naming
-   * the column and the row turns the next occurrence into evidence instead of a
-   * guess. It stays a plain `Error`: nothing here is customer-actionable, so it
-   * degrades to a generic failure with a trace id at the boundary and the queue
-   * retries it on the normal backoff (dev/docs/best_practices/error-handling.md).
+   * One of the three Array(UInt64) count columns, refusing rows without it. Validates
+   * before dereference (prevents "Cannot read properties of undefined"). Error names
+   * column and row for diagnostics; degrades to generic failure with trace id.
    */
   private static countsColumn({
     row,

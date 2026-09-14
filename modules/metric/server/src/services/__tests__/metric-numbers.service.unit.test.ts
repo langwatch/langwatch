@@ -1,19 +1,7 @@
 /**
- * The bounds an OTLP number is checked against before it is stored.
- *
- * A metric point carries integers declared as UInt64, Int64 or UInt32, and
- * doubles that may arrive as strings. Nothing downstream re-checks them: the
- * ClickHouse column takes whatever it is given, so a value past the declared
- * range is stored as a measurement nobody made, and a NaN becomes a hole in a
- * chart with no explanation.
- *
- * Two shapes of answer, deliberately different. A RANGE violation throws,
- * because the caller stated the range and a value outside it is a broken
- * point. An unreadable value answers null, because the caller's job is to drop
- * that point rather than lose the whole batch for it.
- *
- * The range check was unguarded until this test: replacing it with `if (false)`
- * left the metric suite entirely green.
+ * Tests bounds checking for OTLP numbers before storage. RANGE violations throw;
+ * unreadable values return null (caller drops point instead of losing batch). This
+ * logic was unguarded until this test.
  */
 
 import { describe, expect, it } from "vitest";

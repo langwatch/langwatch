@@ -5,17 +5,8 @@ import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
 import type { GatewayGuardrailBundleEntry } from "./gateway-guardrail.ts";
 
 /**
- * What a process needs to terminate virtual-key traffic and settle its spend.
- *
- * The three secrets are all-or-none, refused at boot by
- * {@link assertGatewaySecretsAllOrNone}: a deployment that set one of them
- * boots and then fails its first virtual-key request, which reads to a
- * customer as an outage rather than as the configuration mistake it is.
- *
- * `spendSettlementGraceMs` is carried as written. `@langwatch/gateway-server`
- * owns its bound and its warning, and the REST settlement policy and the
- * settlement sweeper call that one function on this one value, so a second
- * parse here would be a second answer.
+ * Secrets for virtual-key traffic and spend settlement, all-or-none at boot.
+ * spendSettlementGraceMs carried as-is.
  */
 export const gatewayServerConfigDefinition = RuntimeConfig.define({
   /** Verified before any handler runs; blank answers 500, never falls open. */
@@ -35,18 +26,8 @@ export type GatewayServerConfig = ConfigValue<typeof gatewayServerConfigDefiniti
 export const gatewayServerConfigSchema = compileRuntimeConfig(gatewayServerConfigDefinition);
 
 /**
- * The boot refusal that keeps a deployment out of a half-configured AI Gateway.
- *
- * The three secrets are individually optional on purpose: a deployment that
- * runs no gateway sets none of them and boots clean.
- *
- * What is never a deployment shape is SOME of them. The process starts, serves,
- * and then fails minutes later on the first virtual-key request with a 503 from
- * `/api/internal/gateway/*`, which reads as an outage rather than as the
- * configuration mistake it is. So the rule is all three or none, at boot.
- *
- * A value shorter than the floor is refused separately, because "set, but too
- * short" and "not set" need different words. Neither refusal prints a value.
+ * Boot refusal for incomplete gateway config (all three secrets or none);
+ * separate refusal for values too short.
  */
 
 /** The three variables that provision the AI Gateway, in the order to report. */

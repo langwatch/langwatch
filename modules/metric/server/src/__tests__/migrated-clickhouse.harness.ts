@@ -1,13 +1,7 @@
 /**
- * A ClickHouse endpoint carrying the *shipped* migrations, for metric suites
- * that must read the real `metric_data_points`, `metric_usage_estimates` and
- * `metric_time_rollups` schema rather than a transcription of it.
- *
- * The endpoint comes from `startTestClickHouseEndpoints`, so the suite runs
- * against the always-on native server when one is configured and a reusable
- * container otherwise, and the schema comes from `ClickHouseMigrateTask` —
- * the same goose run production performs. A suite that carried its own DDL
- * would prove the transcription, not the tables the product deploys.
+ * ClickHouse endpoint with shipped migrations for metric suites. Uses
+ * {@link startTestClickHouseEndpoints} (native or container) and {@link ClickHouseMigrateTask}
+ * (production goose run) to test real tables, not a transcription.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";

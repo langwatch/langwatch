@@ -16,13 +16,8 @@ export type GuardrailWireDirection = (typeof GUARDRAIL_WIRE_DIRECTIONS)[number];
 export const gatewayGuardrailFailureModeSchema = z.enum(["FAIL_OPEN", "FAIL_CLOSED"]);
 
 /**
- * When a guardrail runs, and what happens when it cannot answer.
- *
- * Named types over the two enums, because a browser rendering the guardrails
- * table needs a key type for its label maps and had been reaching into the
- * generated Prisma client for one. Prisma is a server implementation detail
- * that a browser package may not name; the contract is where the wire spelling
- * of an enum belongs.
+ * Guardrail direction and failure mode: named types for browser label maps,
+ * isolated from Prisma server implementation.
  */
 export type GatewayGuardrailDirection = z.infer<typeof gatewayGuardrailDirectionSchema>;
 export type GatewayGuardrailFailureMode = z.infer<typeof gatewayGuardrailFailureModeSchema>;

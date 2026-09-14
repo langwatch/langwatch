@@ -86,30 +86,9 @@ export function identifierProviderFor(providerId: string): IdentifierProvider {
 }
 
 /**
- * ATTACHED, VERIFIED or PRIMARY: a row that still holds its value for the
- * user. DEAD_END and DETACHED are tombstones.
- *
- * The list and the predicate live together on purpose — a repository needs
- * the list for a SQL `IN`, everything else needs the predicate, and two
- * hand-maintained copies would eventually disagree about whether a tombstone
- * can sign someone in.
- *
- * ADDING A STATE HERE IS NOT ENOUGH. Migration
- * `20260824120004_identifier_provider_subject_unique` puts a PARTIAL UNIQUE
- * INDEX on `Identifier(providerId, providerAccountId)` whose predicate
- * enumerates these three states as SQL literals. A migration is immutable
- * history and cannot import this constant, so it does not follow a change
- * made here — while `isLiveIdentifierState` and every repository `IN` clause
- * do, because they all read this array.
- *
- * A fourth live state added here therefore falls OUTSIDE the uniqueness
- * guarantee: a row in it could duplicate a provider subject another live row
- * already holds, with nothing to stop it, and the lookups would resolve one
- * enterprise IdP's subject to another IdP's user — the cross-tenant sign-in
- * that index exists to close. So adding a live state REQUIRES a new migration
- * that drops and recreates
- * `Identifier_providerId_providerAccountId_live_key` with the new state in
- * its predicate, in the same change.
+ * Live states (ATTACHED, VERIFIED, PRIMARY); DEAD_END and DETACHED are tombstones.
+ * Adding a state requires updating migration 20260824120004's PARTIAL UNIQUE INDEX predicate
+ * together—migrations can't import constants, so both must change in the same PR.
  */
 export const LIVE_IDENTIFIER_STATES = [
   "ATTACHED",

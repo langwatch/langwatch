@@ -1,13 +1,7 @@
 /**
- * The inputs and answers the `monitors.*` tRPC surface publishes.
- *
- * They live in the contract rather than beside the router so the wire shape a
- * client is typed against is stated once, in the package both sides may import.
- *
- * The precondition parser is the contract's own. It used to be injected by the
- * process so the trace-filter registry could narrow which rules a field
- * accepts; that registry now lives in a browser package no server module may
- * value-import, and every caller passed this schema instead.
+ * Input/answer schemas for monitors.* tRPC surface. Defined in contract so wire shape
+ * is consistent across client/server. Precondition parser moved here; formerly injected
+ * to tie with trace-filter registry (now in browser package server can't import).
  */
 import { z } from "zod";
 import {
@@ -67,8 +61,8 @@ export const monitorApiCreateInputSchema = z.object({
   sample: z.number().min(0).max(1),
   executionMode: monitorExecutionModeSchema,
   evaluatorId: z.string().min(1).optional(),
-  level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
-  threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
+  level: z.enum(["trace", "thread"]).optional(), // Trace or thread
+  threadIdleTimeout: z.number().int().positive().nullable().optional(), // Idle timeout (seconds)
 });
 
 /** Editing a monitor. */
@@ -84,8 +78,8 @@ export const monitorApiUpdateInputSchema = z.object({
   enabled: z.boolean().optional(),
   executionMode: monitorExecutionModeSchema,
   evaluatorId: z.string().min(1).nullable().optional(),
-  level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
-  threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
+  level: z.enum(["trace", "thread"]).optional(), // Trace or thread
+  threadIdleTimeout: z.number().int().positive().nullable().optional(), // Idle timeout (seconds)
 });
 
 export type MonitorApiProjectInput = z.infer<typeof monitorApiProjectInputSchema>;

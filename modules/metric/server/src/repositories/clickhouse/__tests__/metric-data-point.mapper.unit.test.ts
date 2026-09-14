@@ -1,14 +1,7 @@
 /**
- * The dedup version, which decides WHICH write survives a retry.
- *
- * `metric_data_points` is a ReplacingMergeTree, and a ReplacingMergeTree keeps
- * the row with the LARGEST version. The product rule is the opposite: when the
- * same PointId is accepted twice, the FIRST acceptance is the one that counts,
- * because a retry is the same measurement arriving again rather than a new one.
- *
- * Inverting the timestamp is what reconciles those two — an earlier acceptance
- * has to produce a bigger version. Drop the inversion and nothing fails
- * loudly: rows still write, still dedup, and quietly keep the wrong one.
+ * Tests dedup version logic: first acceptance wins (product rule), so timestamp is
+ * inverted—earlier acceptance produces larger version. ReplacingMergeTree keeps largest,
+ * so inversion ensures first write survives retry.
  */
 
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";

@@ -1,24 +1,6 @@
 /**
- * Money at the REST wire seam.
- *
- * This lives in the contract rather than in one feature's server because four
- * packages publish the same money fields — the gateway, governance, webhooks
- * and the enterprise API composition — and each had grown its own copy of
- * these conversions. Four copies of a rounding rule agree until one of them is
- * fixed, and then the same amount reads two ways depending on which surface a
- * customer asks.
- *
- * Every amount this surface publishes is published twice: the `_usd` decimal
- * STRING, which is the display value, and the `_nano_usd` integer, which is
- * the canonical figure to do arithmetic on. The spend surfaces already carry
- * nano-USD integers, so a caller reconciling a budget against spend events
- * compares like with like instead of parsing decimals.
- *
- * Both fields are derived from ONE exact integer here, so the pair always
- * reconciles. The float shortcuts they replace do not: `nano / 1e9` puts the
- * drift back that the integer exists to avoid, and a ClickHouse `Float64` sum
- * stringifies as `"0.000044999999999999996"` for 45 micro-USD, which is a
- * measurement artifact rather than a price anybody charged.
+ * Money at REST wire seam: centralized conversions for four packages; both
+ * decimal strings and nano-USD integers derived from one exact integer.
  */
 
 /**
@@ -47,20 +29,8 @@ const NANO_DIGITS = 9;
 const DECIMAL_PATTERN = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
 
 /**
- * A money amount as an exact nano-USD integer.
- *
- * Scales the DECIMAL STRING rather than the float: `toNumber() * 1e9` on a
- * six-decimal value lands a cent or two off for amounts a budget actually
- * holds, which is the whole reason the integer unit exists.
- *
- * Digits past the ninth round half away from zero, because the input is not
- * always exact to begin with. A `Float64` sum arrives carrying its own drift,
- * and truncating there would publish that drift as the amount: the 45
- * micro-USD that stringifies as `0.000044999999999999996` would become 44999
- * nano rather than 45000.
- *
- * Throws on anything that is not a decimal amount. A money field is not a
- * place to guess, and the alternative is publishing `NaN` as a price.
+ * Exact nano-USD integer from decimal string; rounds half-away from zero.
+ * Throws on non-decimal amounts.
  */
 export function usdToNanoUsd(value: { toString(): string }): bigint {
   const raw = value.toString().trim();
@@ -100,15 +70,8 @@ export function usdToNanoUsd(value: { toString(): string }): bigint {
 }
 
 /**
- * A nano-USD integer as the decimal string the wire publishes.
- *
- * Integer division and a padded remainder, so the digits are read out rather
- * than computed: `nano / 1e9` is float division and reintroduces the drift,
- * and the `.toFixed(6)` that used to hide it also dropped the three digits the
- * nano unit is named for, rendering a one-nano charge as `"0.000000"`.
- *
- * Up to nine fractional digits, trailing zeros trimmed, and never exponent
- * notation: one nano-USD reads `"0.000000001"`, not `"1e-9"`.
+ * Decimal string from nano-USD integer; up to 9 fractional digits,
+ * no exponent notation, trailing zeros trimmed.
  */
 export function nanoUsdToDecimalString(nano: bigint | number): string {
   const exact = typeof nano === "bigint" ? nano : BigInt(Math.round(nano));
@@ -123,44 +86,24 @@ export function nanoUsdToDecimalString(nano: bigint | number): string {
 }
 
 /**
- * A nano-MINOR integer as the same decimal string, for a currency that is not
- * US dollars.
- *
- * `AmountNanoMinor` is nano of the currency's MAJOR unit — nano-euros for a
- * subscription billed in euros — so the scale is identical to nano-USD and the
- * only thing that has to go is the name. Kept as a separate export rather than
- * renaming the USD one: every existing caller is publishing dollars and says
- * so at the call site, which is worth more than one fewer function.
- *
- * The currency code is deliberately NOT taken and NOT rendered. This returns
- * digits; which currency they are is the caller's to say, and a symbol chosen
- * here would be one this module has no way to be right about.
+ * Decimal string from nano-minor (like nano-USD but for non-USD currencies);
+ * currency code not taken or rendered.
  */
 export function nanoMinorToDecimalString(nano: bigint | number): string {
   return nanoUsdToDecimalString(nano);
 }
 
 /**
- * The display string for any amount this surface holds, whatever it holds it
- * as: a Prisma `Decimal`, a ClickHouse `Float64` already stringified, or a
- * decimal string that was passed through untouched.
- *
- * Routing every `_usd` field through here is what makes the promise on the
- * wire one promise. The value is normalised into nano first, so the string a
- * caller displays and the integer they reconcile against are the same number.
+ * Display string for any amount; routed through nano for single promise on
+ * the wire.
  */
 export function usdDisplayString(value: { toString(): string }): string {
   return nanoUsdToDecimalString(usdToNanoUsd(value));
 }
 
 /**
- * A money amount as a nano-USD JSON number, or null above
- * `Number.MAX_SAFE_INTEGER` (about 9.007e6 USD).
- *
- * Null rather than the number, because a JSON number past that has silently
- * lost its low digits and a wrong money figure is worse than an absent one.
- * The display string has no such ceiling: it is digits, so it stays exact and
- * keeps reading for amounts whose integer cannot be published.
+ * Nano-USD as JSON number or null above MAX_SAFE_INTEGER; display string has
+ * no ceiling.
  */
 export function decimalUsdToNanoUsd(value: { toString(): string }): number | null {
   const nano = usdToNanoUsd(value);
@@ -171,13 +114,8 @@ export function decimalUsdToNanoUsd(value: { toString(): string }): number | nul
 }
 
 /**
- * A ClickHouse `SUM` of nano-USD as a JSON number.
- *
- * ClickHouse serialises Int64 as a string, so the sum arrives as text and
- * stays exact until it is deliberately rendered. Past
- * `Number.MAX_SAFE_INTEGER` it refuses rather than returning a number that has
- * quietly lost its low digits, and it refuses a negative total: a summed spend
- * below zero is a query fault, not an amount to publish.
+ * Parse ClickHouse SUM of nano-USD as JSON number; refuses values past
+ * MAX_SAFE_INTEGER and negative totals.
  */
 export function parseSummedNanoUsd(value: unknown): number {
   const parsed = BigInt(String(value ?? 0));

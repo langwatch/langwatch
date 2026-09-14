@@ -32,13 +32,8 @@ const traceLogRowSchema = z.object({
 });
 
 /**
- * The whole canonical-log surface over ClickHouse: the append half, and the
- * trace-scoped read only a query graph makes.
- *
- * The appends are delegated rather than reimplemented. There is one insert
- * path in this package, and a graph that consumes `log_processing` composes
- * the same {@link ClickHouseCanonicalLogRecordAppendRepository} this class
- * holds — so the two graphs cannot come to disagree about what an append does.
+ * Canonical-log over ClickHouse: delegated append (shared with log_processing) and
+ * trace-scoped read to keep both graphs in sync on what an append does.
  */
 export class ClickHouseCanonicalLogRecordRepository extends CanonicalLogRecordRepository {
   private readonly append: ClickHouseCanonicalLogRecordAppendRepository;

@@ -1,18 +1,6 @@
 /**
- * The inputs the `virtualKeys.*` tRPC surface publishes.
- *
- * They live in the contract rather than beside the router so the wire shape a
- * client is typed against is stated once, in the package both sides may import.
- *
- * Nothing here describes a credential. The minted key is a response from
- * `create` and `rotate` and never an input, so no schema in this module carries
- * secret material and none of it reaches the audited argument record.
- *
- * `create` and `update` are factories rather than constants because the budget
- * they accept is parsed by a schema the process injects — the canonical budget
- * parser, whose decimal regex and positive-amount refinement are the write
- * path's contract. Taking it as a parameter keeps that single definition and
- * still lets the surrounding shape live here.
+ * VirtualKey tRPC input shapes; minted keys never inputs (responses only),
+ * budget parsing injected to share canonical parser.
  */
 import { z } from "zod";
 import { virtualKeyConfigSchema } from "./virtual-key-config.ts";

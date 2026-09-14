@@ -1,15 +1,6 @@
 /**
- * Money in and out of its exact integer form.
- *
- * Everything downstream of this is bigint nano-USD precisely so that a share
- * of an hourly bill — routinely a fraction of a cent — survives being added
- * up. That only holds if the two edges are exact, so what matters here is the
- * boundaries: the ninth decimal place, the rounding at it, the digits beyond
- * it, and the sign.
- *
- * The sign is the one with no obvious caller today and the worst failure if it
- * breaks. A credit on a vendor bill is negative, and dropping the minus turns
- * a refund into a charge of the same size.
+ * Money conversion precision: nano-USD preserves fractional cents as bigint.
+ * Tests rounding, sign handling, and decimal-place boundaries.
  */
 
 import { describe, expect, it } from "vitest";

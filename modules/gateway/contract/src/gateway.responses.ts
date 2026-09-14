@@ -1,11 +1,6 @@
 /**
- * What the gateway feature's tRPC transports answer, stated once.
- *
- * The chain declares each procedure's `withOutput` from here, so the shape a
- * client reads is written down in the contract rather than implied by
- * whatever a handler happened to return. The schemas are checked against
- * real answers in development and test; production returns the handler's
- * own value.
+ * Gateway tRPC response shapes, stated once in the contract for client
+ * reading and development/test validation.
  */
 import { z } from "zod";
 import { gatewayCacheRuleActionSchema, gatewayCacheRuleMatchersSchema } from "./gateway-cache-rule.ts";
