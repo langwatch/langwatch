@@ -4,6 +4,7 @@
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -24,24 +25,24 @@ function buildCaller(options: { manageable: readonly string[] }) {
     options.manageable.includes(check.projectId ?? ""),
   );
 
-  const prompts = PromptApp.create({
-    dependencies: {
-      projects: {
-        getOrganizationId: async () => "organization_1",
-        listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
-      } as unknown as ProjectApi,
-      permissions: {
-        hasPermission,
-        getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
-      } as unknown as AuthzApi,
+  const prompts = PromptApp.createWithPrompts(
+    {
+      dependencies: {
+        projects: {
+          getOrganizationId: async () => "organization_1",
+          listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
+        } as unknown as ProjectApi,
+        permissions: {
+          hasPermission,
+          getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
+        } as unknown as AuthzApi,
+      },
+      members: { prisma: {} as never, logger: { info: () => {} } as unknown as Logger },
+      config: { publicBaseUrl: "https://app.langwatch.test" },
+      resources: { own: () => {}, ownService: () => {} },
     },
-    members: {
-      prompts: {} as unknown as PromptService,
-      afterPromptCreated: () => undefined,
-    },
-    config: { publicBaseUrl: "https://app.langwatch.test" },
-    resources: { own: () => {}, ownService: () => {} },
-  });
+    {} as unknown as PromptService,
+  );
 
   const renameTagForProject = vi.spyOn(prompts, "renameTagForProject").mockResolvedValue({
     id: "tag_1",

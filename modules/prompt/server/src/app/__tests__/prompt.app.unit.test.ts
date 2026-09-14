@@ -3,6 +3,7 @@
  */
 import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -51,21 +52,21 @@ function harness() {
   // method throws on the missing property, which is the loud failure we want.
   const prompts: Partial<PromptService> = { updatePrompt };
 
-  const app = PromptApp.create({
-    dependencies: {
-      projects: {
-        getOrganizationId: async () => "org-1",
-        listIdsByOrganization: async () => ["project-copy"],
-      } as unknown as ProjectApi,
-      permissions: {} as unknown as AuthzApi,
+  const app = PromptApp.createWithPrompts(
+    {
+      dependencies: {
+        projects: {
+          getOrganizationId: async () => "org-1",
+          listIdsByOrganization: async () => ["project-copy"],
+        } as unknown as ProjectApi,
+        permissions: {} as unknown as AuthzApi,
+      },
+      members: { prisma: {} as never, logger: { info: () => {} } as unknown as Logger },
+      config: { publicBaseUrl: "https://app.langwatch.test" },
+      resources: { own: () => {}, ownService: () => {} },
     },
-    members: {
-      prompts: prompts as PromptService,
-      afterPromptCreated: () => {},
-    },
-    config: { publicBaseUrl: "https://app.langwatch.test" },
-    resources: { own: () => {}, ownService: () => {} },
-  });
+    prompts as PromptService,
+  );
 
   const apply = (source: VersionedPrompt) =>
     app.applySourceToCopy(
@@ -285,6 +286,45 @@ describe("PromptApp.commitMessageFor", () => {
     it("falls back to the source's id", () => {
       expect(PromptApp.commitMessageFor("synced", { id: "prompt-source", handle: null })).toBe(
         'Updated from source prompt "prompt-source"',
+      );
+    });
+  });
+});
+
+describe("PromptApp.create", () => {
+  describe("given only the process members it declares reading", () => {
+    it("builds a working engine over `prisma`, rather than crashing on an undefined member", async () => {
+      // Before this app declared `reads("prisma", "logger")`, nothing built
+      // `members.prompts` and this call crashed with "Cannot read properties
+      // of undefined (reading 'getAllPrompts')" - the exact defect apidiff
+      // measured on GET /api/prompts, GET /api/prompts/tags, POST
+      // /api/prompts and POST /api/prompts/tags.
+      const fakePrisma = {
+        llmPromptConfig: { findMany: vi.fn(async () => []) },
+      } as never;
+      const fakeLogger = { info: vi.fn() } as unknown as Logger;
+
+      const app = PromptApp.create({
+        dependencies: {
+          projects: {
+            getOrganizationId: async () => "org-1",
+            listIdsByOrganization: async () => [],
+          } as unknown as ProjectApi,
+          permissions: {} as unknown as AuthzApi,
+        },
+        members: { prisma: fakePrisma, logger: fakeLogger },
+        config: { publicBaseUrl: "https://app.langwatch.test" },
+        resources: { own: () => {}, ownService: () => {} },
+      });
+
+      await expect(
+        app.getAllPrompts({ projectId: "project-1", organizationId: "org-1" }),
+      ).resolves.toEqual([]);
+
+      app.announceCreated({ projectId: "project-1", userId: "user-1" });
+      expect(fakeLogger.info).toHaveBeenCalledWith(
+        { projectId: "project-1", userId: "user-1" },
+        "prompt created; no product-analytics sink is composed on this process",
       );
     });
   });

@@ -27,8 +27,10 @@ import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
 import type { PromptService } from "../services/prompt.service.ts";
+import { PostgresPromptAdapter } from "../services/prompt-postgres-composition.service.ts";
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 
 /**
@@ -54,21 +56,26 @@ export interface PromptCaller {
 }
 
 /**
- * What the PROCESS supplies that prompts do not own: where a project's new
- * prompt is announced, and the model a write that named none falls back to.
+ * What this application builds for itself, once created: where a project's
+ * new prompt is announced, and the read/write engine every method below
+ * forwards to.
  */
 export interface PromptInfrastructure {
   /**
    * The lifecycle nurturing that fires when a project gains a prompt, whether
    * written, copied or duplicated. Fire-and-forget: it may not fail a create.
+   * No deployment composes a product-analytics sink for this yet, so
+   * `create()` always builds the logged fallback over the `logger` member -
+   * the deleted composition's own absent branch (`prompt.composition.ts`,
+   * `LoggedApiPromptNurturing`, before b383462d96).
    */
   afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
   /**
    * The read/write engine this application forwards to. A bridge, not a
    * design choice: the four repositories behind it have not moved onto
-   * `defineRepositories` yet (ADR-133's persistence half), so the installer
-   * still builds this from `PostgresPromptAdapter` and hands it down here
-   * rather than the app building it from a framework-supplied repository
+   * `defineRepositories` yet (ADR-133's persistence half), so `create()`
+   * still builds this from `PostgresPromptAdapter` over the `prisma` member
+   * rather than the app taking it from a framework-supplied repository
    * bundle. Move it to a declared `repositories` bundle once the memory twins
    * exist.
    */
@@ -90,7 +97,7 @@ const promptAppConfigSchema = z.object({ publicBaseUrl: z.url() });
 
 type PromptSetup = FeatureSetup<
   PromptDependencies,
-  PromptInfrastructure,
+  MembersRead<typeof PromptApp.reads>,
   z.infer<typeof promptAppConfigSchema>
 >;
 
@@ -206,13 +213,42 @@ export class PromptApp implements PromptApi {
     permissions: AuthzApi,
   };
   static readonly configSchema = promptAppConfigSchema;
+  /**
+   * The one member the engine is built over. `PostgresPromptAdapter` is the
+   * bridge named on {@link PromptInfrastructure.prompts}; once the four
+   * repositories behind it move onto `defineRepositories`, this becomes a
+   * declared `repositories` bundle instead.
+   */
+  static readonly reads = reads("prisma", "logger");
 
-  static create({ config, dependencies, members }: PromptSetup): PromptApp {
+  static create(setup: PromptSetup): PromptApp {
+    const prompts: PromptService = PostgresPromptAdapter.create({
+      database: setup.members.prisma,
+    }).build();
+
+    return PromptApp.createWithPrompts(setup, prompts);
+  }
+
+  /**
+   * Split from {@link create} so a test can substitute a recording double
+   * for the engine without a real database - the engine is this module's own
+   * seam, not a process member (see {@link PromptInfrastructure.prompts}).
+   */
+  static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptApp {
+    const { config, dependencies, members } = setup;
     return new PromptApp({
-      prompts: members.prompts,
+      prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
-      members,
+      members: {
+        prompts,
+        afterPromptCreated: (input) => {
+          members.logger.info(
+            { projectId: input.projectId, userId: input.userId ?? null },
+            "prompt created; no product-analytics sink is composed on this process",
+          );
+        },
+      },
       publicBaseUrl: config.publicBaseUrl,
     });
   }
