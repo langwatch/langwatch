@@ -54,6 +54,7 @@ export interface SessionEventsCursor {
 export type CodingAgentSessionEventRow = CodingAgentSessionEvent;
 
 interface ClickHouseWriteRecord {
+  [key: string]: unknown;
   TenantId: string;
   SessionId: string;
   TimeUnixMs: ClickHouseMoment;

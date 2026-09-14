@@ -11,7 +11,7 @@ import type { NlpLambdaInvoke, NlpPayloadStaging } from "../../app/workflow.app.
 import {
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
-} from "../../adapters/workflow-nlp-lambda.adapter.ts";
+} from "../workflow-nlp-lambda.channel.ts";
 
 /**
  * Origin tag for the `X-LangWatch-Origin` header. Set at the request boundary

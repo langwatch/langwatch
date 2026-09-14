@@ -20,7 +20,7 @@ import type {
   CodingAgentCallerScopeDirectory,
   CodingAgentScopeCaller,
   CodingAgentScopePermissions,
-} from "#ports/coding-agent-caller-scope.port";
+} from "../app/coding-agent.members.ts";
 
 /** How one permitted project is named to a reader. */
 export interface CallerProjectDisplay {

@@ -30,6 +30,9 @@ import type { DatasetRepositories } from "../repositories/dataset.repositories.t
 import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
+import type { DatasetChunk, ChunkOffset } from "../rules/dataset-chunking.rules.ts";
+import type { S3Client } from "@aws-sdk/client-s3";
+import type { Readable } from "node:stream";
 
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";

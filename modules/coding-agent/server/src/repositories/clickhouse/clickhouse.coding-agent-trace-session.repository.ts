@@ -15,6 +15,7 @@ const TABLE_NAME = "coding_agent_trace_sessions" as const;
 const logger = createLogger("langwatch:app-layer:coding-agent:trace-session-repository");
 
 interface ClickHouseWriteRecord {
+  [key: string]: unknown;
   TenantId: string;
   TraceId: string;
   SessionId: string;

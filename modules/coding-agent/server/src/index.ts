@@ -29,7 +29,7 @@ export {
 export { OtelCodingAgentCostMetricsAdapter } from "./services/coding-agent-cost-metrics.service.ts";
 export type {
   CodingAgentCostMetrics,
-  CodingAgentTraceProcessing,
+  CodingAgentTraceProcessor,
 } from "./app/coding-agent.members.ts";
 export { createCodingAgentLogFactsDispatchSubscriber } from "./subscribers/coding-agent-log-facts-dispatch.subscriber.ts";
 export { createCodingAgentMetricFactsDispatchSubscriber } from "./subscribers/coding-agent-metric-facts-dispatch.subscriber.ts";

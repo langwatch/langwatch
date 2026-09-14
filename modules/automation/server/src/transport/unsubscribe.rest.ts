@@ -62,7 +62,6 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
     429: unsubscribeRestRefusalSchema,
   })
   .withDocs({
-    operationId: "confirmOneClickUnsubscribe",
     tags: ["Triggers"],
     summary: "RFC 8058 one-click unsubscribe",
     description:

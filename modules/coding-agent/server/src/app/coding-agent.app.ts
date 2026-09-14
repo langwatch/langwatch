@@ -38,9 +38,7 @@ import type {
   CodingAgentPullRequestUsageRead,
   CodingAgentViewer,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import type { CodingAgentSessionService } from "../services/coding-agent.service.ts";
-import type { CodingAgentBillingPolicy } from "#ports/coding-agent-billing.port";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
@@ -51,7 +49,9 @@ import { SystemCodingAgentClockAdapter } from "../services/coding-agent-clock.se
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
 import type {
+  CodingAgentBillingPolicy,
   CodingAgentCallerScopeDirectory,
+  CodingAgentScopeCaller,
   CodingAgentScopePermissions,
 } from "./coding-agent.members.ts";
 

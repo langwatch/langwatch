@@ -13,11 +13,11 @@ import {
   hasActionableTriggerFilters,
   ProjectNotFoundError,
   TriggerFiltersRequiredError,
-  type AutomationApi,
   type Trigger,
 } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { AutomationService } from "./automation.service.ts";
 
 /** The project an automation names, as a test fire renders it. */
 export interface AutomationProjectIdentity {
@@ -27,7 +27,7 @@ export interface AutomationProjectIdentity {
 
 /** What the shared rules read the world through. */
 export interface AutomationRulesCollaborators {
-  automation: AutomationApi;
+  automation: AutomationService;
   projects: ProjectApi;
   featureFlags: FeatureFlagApi;
 }

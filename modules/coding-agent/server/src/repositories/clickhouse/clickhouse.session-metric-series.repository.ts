@@ -23,6 +23,7 @@ export interface SessionMetricTotal {
 }
 
 interface ClickHouseWriteRecord {
+  [key: string]: unknown;
   TenantId: string;
   SessionId: string;
   SeriesId: string;

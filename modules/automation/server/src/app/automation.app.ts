@@ -27,6 +27,7 @@ import {
   type AutomationServerConfig,
   type CreateTriggerCommand,
   type CustomGraphNameRef,
+  type EmailSuppression,
   type EmailSuppressionRow,
   type ReportSchedule,
   type SlackChannelListing,
@@ -253,7 +254,7 @@ type AutomationSetup = FeatureSetup<
 
 /** What the application is composed from, once the process has supplied it. */
 interface AutomationAppCollaborators {
-  automation: AutomationApi;
+  automation: AutomationService;
   monitors: MonitorApiContract;
   rules: AutomationRulesService;
   authoring: AutomationAuthoringService;
@@ -382,7 +383,7 @@ export class AutomationApp implements AutomationApi {
     });
   }
 
-  #automation: AutomationApi;
+  #automation: AutomationService;
   #rules: AutomationRulesService;
   #authoring: AutomationAuthoringService;
   #monitors: MonitorApiContract;
@@ -450,6 +451,14 @@ export class AutomationApp implements AutomationApi {
     projectId: string;
   }): Promise<void> {
     return this.#rules.assertCustomGraphInProject(input);
+  }
+
+  /** Whether a graph alert's graph exists in this project. */
+  customGraphExistsInProject(input: {
+    customGraphId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    return this.#automation.customGraphExistsInProject(input);
   }
 
   /** The names of the custom graphs a list of automations points at. */
@@ -578,6 +587,10 @@ export class AutomationApp implements AutomationApi {
       projectId: input.projectId,
       triggerId: input.triggerId,
     });
+  }
+
+  softDeleteById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+    return this.#automation.softDeleteById(input);
   }
 
   /** Puts one report on the calendar scheduler (ADR-044). */
@@ -718,6 +731,13 @@ export class AutomationApp implements AutomationApi {
 
       throw err;
     }
+  }
+
+  /** Every suppression in the project, each row with its automation's name. */
+  getAllEnriched(input: {
+    projectId: string;
+  }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
+    return this.#automation.getAllEnriched(input);
   }
 
   /**

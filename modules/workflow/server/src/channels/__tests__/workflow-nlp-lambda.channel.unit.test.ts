@@ -8,10 +8,10 @@ import {
   InvokePayloadTooLargeError,
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
-} from "../../adapters/workflow-nlp-lambda.adapter.ts";
+} from "../workflow-nlp-lambda.channel.ts";
 import {
-  NlpLambdaInvoke,
-  NlpPayloadStaging,
+  type NlpLambdaInvoke,
+  type NlpPayloadStaging,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
 } from "../../app/workflow.app.ts";

@@ -7,7 +7,8 @@ import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi, type Evaluator } from "@langwatch/evaluator-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { AgentApi } from "@langwatch/agent-contract";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";
+import type { LanguageModel } from "ai";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
 import {

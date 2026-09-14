@@ -69,7 +69,7 @@ import {
 } from "@langwatch/automation-server";
 import {
   createCodingAgentSpanFactsDispatchSubscriber,
-  type CodingAgentTraceProcessing,
+  type CodingAgentTraceProcessor,
 } from "@langwatch/coding-agent-server";
 import type {
   ExecuteEvaluationCommandData,
@@ -167,7 +167,7 @@ export type WorkerTraceProcessingCompositionOptions = Readonly<{
   /** The ADR-022 claim check, for a span whose payload travelled out of band. */
   spool?: TraceSpanSpool;
   /** `subscriber:codingAgentSpanFactsDispatch`'s normalization and span read. */
-  codingAgentTraces: CodingAgentTraceProcessing;
+  codingAgentTraces: CodingAgentTraceProcessor;
   /** `reactor:trackedEventSync`'s builder, plus the late bind to `recordSpan`. */
   trackedEvents: WorkerTrackedEventComposition;
   /** EE governance rollups, composed as full subscriber specs by the caller so

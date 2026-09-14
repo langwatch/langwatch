@@ -599,7 +599,15 @@ export class AnnotationApp implements AnnotationApi {
     });
 
     const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
-    const annotationMap = Map.groupBy(annotationsWithUsers, (annotation) => annotation.traceId);
+    const annotationMap = new Map<string, typeof annotationsWithUsers>();
+    for (const annotation of annotationsWithUsers) {
+      const existing = annotationMap.get(annotation.traceId);
+      if (existing) {
+        existing.push(annotation);
+      } else {
+        annotationMap.set(annotation.traceId, [annotation]);
+      }
+    }
 
     return queueItems.map((item) => {
       const annotations = annotationMap.get(item.traceId) ?? [];

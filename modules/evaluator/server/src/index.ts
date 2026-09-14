@@ -7,11 +7,7 @@ export { evaluatorServer } from "./evaluator.server.ts";
  * process supplies it with. Both doors reach the same object, so a rule
  * written on it is the rule both doors get.
  */
-export {
-  EvaluatorApp,
-  type EvaluatorAppInfrastructure,
-  type EvaluatorGraph,
-} from "./app/evaluator.app.ts";
+export { EvaluatorApp, type EvaluatorGraph } from "./app/evaluator.app.ts";
 export type { EvaluatorNlpDispatcher } from "./services/evaluator-code-execution.service.ts";
 
 /** The replication both `evaluators.copy` and `monitors.copy` share. */

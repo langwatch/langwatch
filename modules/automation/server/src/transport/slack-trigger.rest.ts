@@ -37,7 +37,6 @@ export const slackAutomationRest = defineRestRouter(AutomationApi)
   .withPermission("triggers:manage")
   .withOutput(slackAutomationRestCreatedSchema)
   .withDocs({
-    operationId: "createSlackTrigger",
     summary: "Create a Slack alert trigger",
     description:
       "Create a trigger that posts to a Slack incoming webhook when traces match its filters. " +

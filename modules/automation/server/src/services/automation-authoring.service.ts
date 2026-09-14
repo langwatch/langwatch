@@ -28,7 +28,6 @@ import {
   TestFireUnavailableError,
   TriggerAction,
   TriggerFiltersRequiredError,
-  type AutomationApi,
   type AutomationApiCreateInput,
   type AutomationApiListSlackChannelsInput,
   type AutomationApiTestFireInput,
@@ -62,6 +61,7 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
+import type { AutomationService } from "./automation.service.ts";
 import {
   extractCheckKeys,
   notifyingActionOr,
@@ -87,7 +87,7 @@ const TEST_FIRE_MAX_PER_WINDOW = 10;
 
 /** What the authoring service reaches. */
 export interface AutomationAuthoringCollaborators {
-  automation: AutomationApi;
+  automation: AutomationService;
   rules: AutomationRulesService;
   monitors: MonitorApi;
   providers: AutomationProviderSecrets;

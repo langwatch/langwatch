@@ -13,10 +13,10 @@ import { CodingAgentApp } from "#app/coding-agent.app";
 import type { CodingAgentSessionService } from "#services/coding-agent.service";
 import type { CodingAgentAuditSink, CodingAgentViewerVisibilityReader } from "../../app/coding-agent.app.ts";
 import {
-  CodingAgentCallerScopeDirectory,
-  CodingAgentScopePermissions,
+  type CodingAgentCallerScopeDirectory,
+  type CodingAgentScopePermissions,
   type CodingAgentScopeCaller,
-} from "#ports/coding-agent-caller-scope.port";
+} from "../../app/coding-agent.members.ts";
 import {
   TestBillingPolicy,
   TestGithubService,

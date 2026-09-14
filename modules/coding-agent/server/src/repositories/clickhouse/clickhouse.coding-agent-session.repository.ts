@@ -67,6 +67,7 @@ const logger = createLogger("langwatch:coding-agent:session-repository");
  * migration 00051).
  */
 interface ClickHouseWriteRecord {
+  [key: string]: unknown;
   TenantId: string;
   SessionId: string;
   SessionKeySource: string;

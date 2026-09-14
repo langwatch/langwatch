@@ -3,7 +3,6 @@
  * Routes that address a single team (`:id`) check permissions at team scope;
  * collection routes stay at organization scope as they operate on that whole set.
  */
-import { toDate, type Instant } from "@langwatch/time";
 import {
   OrganizationApi,
   organizationTeamRestArchivedSchema,
@@ -13,12 +12,23 @@ import {
   organizationTeamRestSchema,
   organizationTeamRoleSchema,
   organizationTeamSchema,
+  type OrganizationCaller,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestTransportDeclaration } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { z } from "zod";
+
+/**
+ * Who a write is attributed to: the member the credential acts as, or the
+ * management API itself for a service key, which acts as nobody.
+ */
+const callerOf = (actor: { type: string; id?: string } | null): OrganizationCaller =>
+  actor && actor.type === "user" && actor.id
+    ? { id: actor.id }
+    : { id: SYSTEM_ACTORS.managementApi };
 
 /**
  * Wire schemas the REST family uses but which live in the contract, imported
@@ -50,7 +60,7 @@ const teamProjectListSchema = z.object({ data: z.array(z.unknown()) });
 
 /**
  * The team's response shape: the stored shape omits the personal flag and owner,
- * so the wire is narrower. Dates live as `Instant` in the app and convert here.
+ * so the wire is narrower.
  */
 function teamResponse(team: OrganizationTeam) {
   return {
@@ -58,8 +68,8 @@ function teamResponse(team: OrganizationTeam) {
     name: team.name,
     slug: team.slug,
     organizationId: team.organizationId,
-    createdAt: toDate(team.createdAt),
-    updatedAt: toDate(team.updatedAt),
+    createdAt: team.createdAt,
+    updatedAt: team.updatedAt,
   };
 }
 
@@ -99,7 +109,6 @@ export function createTeamRest(options: Readonly<{
     .withQuery(paginationQuerySchema)
     .withOutput(organizationTeamRestPageSchema)
     .withDocs({
-      operationId: "listTeams",
       tags: ["Teams"],
       description: "List all non-archived teams for the organization (paginated)",
     })
@@ -122,7 +131,6 @@ export function createTeamRest(options: Readonly<{
     .withOutput(organizationTeamRestSchema)
     .withStatus(201)
     .withDocs({
-      operationId: "createTeam",
       tags: ["Teams"],
       description: "Create a new team that can group projects and members",
     })
@@ -140,7 +148,6 @@ export function createTeamRest(options: Readonly<{
     .withParams(teamParamsSchema)
     .withOutput(organizationTeamRestSchema)
     .withDocs({
-      operationId: "getTeam",
       tags: ["Teams"],
       description: "Get a team by its id",
     })
@@ -159,7 +166,6 @@ export function createTeamRest(options: Readonly<{
     .withInput(updateTeamSchema)
     .withOutput(organizationTeamRestSchema)
     .withDocs({
-      operationId: "updateTeam",
       tags: ["Teams"],
       description: "Update a team by its id",
     })
@@ -178,7 +184,6 @@ export function createTeamRest(options: Readonly<{
     .withParams(teamParamsSchema)
     .withOutput(organizationTeamRestArchivedSchema)
     .withDocs({
-      operationId: "archiveTeam",
       tags: ["Teams"],
       description: "Archive a team (soft-delete)",
     })
@@ -191,7 +196,7 @@ export function createTeamRest(options: Readonly<{
       return {
         id: team.id,
         name: team.name,
-        archivedAt: team.archivedAt ? toDate(team.archivedAt) : null,
+        archivedAt: team.archivedAt ?? null,
       };
     })
 
@@ -200,7 +205,6 @@ export function createTeamRest(options: Readonly<{
     .withParams(teamParamsSchema)
     .withOutput(organizationTeamRestMemberListSchema)
     .withDocs({
-      operationId: "listTeamMembers",
       tags: ["Teams"],
       description: "List members of a team",
     })
@@ -212,14 +216,13 @@ export function createTeamRest(options: Readonly<{
         organizationId: scope.id,
       });
 
-      const bindings = await options.authz().listScopeBindings({
+      const bindings = await options.authz().listTeamMemberBindings({
         organizationId: scope.id,
-        scopeType: "TEAM",
-        scopeIds: [input.id],
+        teamIds: [input.id],
       });
 
       return {
-        data: bindings.map(memberResponse),
+        data: (bindings.get(input.id) ?? []).map(memberResponse),
       };
     })
 
@@ -230,7 +233,6 @@ export function createTeamRest(options: Readonly<{
     .withOutput(successSchema)
     .withStatus(201)
     .withDocs({
-      operationId: "addTeamMember",
       tags: ["Teams"],
       description: "Add a member to a team",
     })
@@ -253,19 +255,18 @@ export function createTeamRest(options: Readonly<{
     .withParams(teamMemberParamsSchema)
     .withOutput(successSchema)
     .withDocs({
-      operationId: "removeTeamMember",
       tags: ["Teams"],
       description: "Remove a member from a team",
     })
     .handle(async ({ app, input, scope, actor }) => {
-      const ledgerActor = actor && actor.type === "user" ? { type: "user" as const, id: actor.id ?? null } : { type: "system" as const, id: null };
-
-      await app.removeTeamMember({
-        teamId: input.id,
-        organizationId: scope.id,
-        userId: input.userId,
-        actor: ledgerActor,
-      });
+      await app.removeTeamMember(
+        {
+          teamId: input.id,
+          organizationId: scope.id,
+          userId: input.userId,
+        },
+        callerOf(actor),
+      );
 
       return { success: true };
     })
@@ -275,7 +276,6 @@ export function createTeamRest(options: Readonly<{
     .withParams(teamParamsSchema)
     .withOutput(teamProjectListSchema)
     .withDocs({
-      operationId: "listTeamProjects",
       tags: ["Teams"],
       description: "List projects in a team",
     })

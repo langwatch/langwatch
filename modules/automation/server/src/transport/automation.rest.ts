@@ -72,7 +72,6 @@ export function createAutomationRest(): Readonly<{
     .withPermission("triggers:view")
     .withOutput(z.array(automationRestResponseSchema))
     .withDocs({
-      operationId: "listTriggers",
       tags: ["Triggers"],
       description: "List all active triggers (automations) for the project",
     })
@@ -92,7 +91,6 @@ export function createAutomationRest(): Readonly<{
     .withPermission("triggers:view")
     .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
     .withDocs({
-      operationId: "getTrigger",
       tags: ["Triggers"],
       description: "Get a trigger by its ID",
     })
@@ -109,7 +107,6 @@ export function createAutomationRest(): Readonly<{
     .withOutput(automationRestResponseSchema)
     .withStatus(201)
     .withDocs({
-      operationId: "createTrigger",
       tags: ["Triggers"],
       description: "Create a new trigger (automation)",
     })
@@ -140,7 +137,6 @@ export function createAutomationRest(): Readonly<{
     .withPermission("triggers:update")
     .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
     .withDocs({
-      operationId: "updateTrigger",
       tags: ["Triggers"],
       description: "Update a trigger (name, active state, message, filters)",
     })
@@ -155,7 +151,6 @@ export function createAutomationRest(): Readonly<{
     .withPermission("triggers:manage")
     .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
     .withDocs({
-      operationId: "deleteTrigger",
       tags: ["Triggers"],
       description: "Delete (soft-delete) a trigger",
     })
