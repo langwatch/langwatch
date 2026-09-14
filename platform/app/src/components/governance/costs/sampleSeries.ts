@@ -35,6 +35,28 @@ export interface RankRow {
   unpriced?: boolean;
   /** How many cells behind the row hold no amount. Explains `unpriced`. */
   unpricedCells?: number;
+  /**
+   * The row's LEAD figure was never measured, so `value` is a stand-in the
+   * list must not print.
+   *
+   * Separate from `unpriced`, which says a US-dollar amount was withheld. A
+   * panel led by tokens has its own version of the same hole — a product that
+   * bills a seat can record no token count at all — and the two can be true
+   * of different rows on different panels, so one flag cannot carry both. The
+   * list still LISTS such a row: it spent money, and dropping it would report
+   * a smaller organization than the one that exists.
+   */
+  unmeasured?: boolean;
+  /**
+   * A second line beneath the lead figure — on the token panels, the dollars
+   * and what they cover.
+   *
+   * Formatted by the caller rather than derived here: the list knows how to
+   * rank and how to draw, and nothing about which unit a given screen leads
+   * with. A row without one draws the single-line shape the money panels have
+   * always drawn.
+   */
+  secondary?: string;
 }
 
 export interface DailyPoint {
@@ -298,8 +320,38 @@ export function sampleForecast({
   return { measured, projected, projectedFromDay: ahead[0] ?? null };
 }
 
+/** What a seat series counts: licences paid for, or licences sat in. */
+export type SeatSeriesMeasure = "bought" | "assigned";
+
+/** Separates the measure from the pool it was measured on. See `seatSeriesKey`. */
+const SEAT_SERIES_KEY_SEPARATOR = ":";
+
 /**
- * Seat counts over time — bought against assigned, per period.
+ * A seat series' key, which carries the pool it belongs to.
+ *
+ * The pool has to travel in the key rather than in a field beside it because
+ * the key is all the chart passes back — the colour callback and the click
+ * handler are both handed a series key and nothing else. Reading the measure
+ * off the key is what lets one colour rule paint every pool's pair alike.
+ */
+export function seatSeriesKey({
+  pool,
+  measure,
+}: {
+  pool: string;
+  measure: SeatSeriesMeasure;
+}): string {
+  return `${measure}${SEAT_SERIES_KEY_SEPARATOR}${pool}`;
+}
+
+/** What a seat series key counts, or null when it is not one of ours. */
+export function seatSeriesMeasureOf(key: string): SeatSeriesMeasure | null {
+  const measure = key.split(SEAT_SERIES_KEY_SEPARATOR)[0];
+  return measure === "bought" || measure === "assigned" ? measure : null;
+}
+
+/**
+ * Seat counts over time — bought against assigned, per pool, per period.
  *
  * COUNTS, never money. ADR-128 §6 stores what the roster reported as a plain
  * number and §6's own reversal note says seats ship as counts only, because
@@ -312,31 +364,33 @@ export function sampleForecast({
  * would draw a bar of bought-plus-assigned, a height nobody holds. The gap
  * between the two bars is the whole point of the panel — it is §16's wave-1
  * idle-seat aggregate, "you pay for N, M are assigned".
+ *
+ * A PAIR PER POOL, never one pair for the organization. Pools are separate
+ * purchases on separate contracts that renew on their own dates, so adding
+ * them drew a product nobody bought: a renewal working its backlog off in one
+ * pool was cancelled out by another sitting flat, and the gap the panel exists
+ * to show flattened into an average. The pools are never added, here or in the
+ * fold downstream.
  */
 export function sampleSeats(
   periods: string[],
   pools: readonly string[] = SAMPLE_SEAT_POOLS,
 ): DailyBucket[] {
-  return periods.map((day) => {
-    const counts = sampleSeatPools(day, pools);
-    const total = (pick: (pool: SampleSeatPool) => number) =>
-      counts.reduce((sum, pool) => sum + pick(pool), 0);
-    return {
-      day,
-      points: [
-        {
-          key: "bought",
-          label: "Seats bought",
-          value: total((pool) => pool.seatsBought),
-        },
-        {
-          key: "assigned",
-          label: "Seats assigned",
-          value: total((pool) => pool.seatsAssigned),
-        },
-      ],
-    };
-  });
+  return periods.map((day) => ({
+    day,
+    points: sampleSeatPools(day, pools).flatMap((pool) => [
+      {
+        key: seatSeriesKey({ pool: pool.skuPartNumber, measure: "bought" }),
+        label: `${pool.skuPartNumber} bought`,
+        value: pool.seatsBought,
+      },
+      {
+        key: seatSeriesKey({ pool: pool.skuPartNumber, measure: "assigned" }),
+        label: `${pool.skuPartNumber} assigned`,
+        value: pool.seatsAssigned,
+      },
+    ]),
+  }));
 }
 
 /** One licence pool's counts at a point in time. */

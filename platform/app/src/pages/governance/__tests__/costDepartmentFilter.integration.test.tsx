@@ -188,7 +188,7 @@ describe("the department filter", () => {
       renderScreen();
       const userPanel = () =>
         screen
-          .getByText("Metered spend by person")
+          .getByText("Tokens by person · trace store")
           .closest('[data-testid="cost-panel"]')?.textContent;
       const originalUserPanel = userPanel();
       expect(originalUserPanel).toContain("ada@acme.test");

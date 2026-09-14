@@ -17,6 +17,7 @@
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type {
+  ActiveUserCountChRow,
   PulledEventChRow,
   PushedEventChRow,
   SortDir,
@@ -24,9 +25,9 @@ import type {
   SpendByDepartmentChRow,
   SpendByTeamSourceChRow,
   SpendByUserChRow,
+  SpendByUserSortField,
   SpendOverTimeChRow,
   SpendOverTimeGroupBy,
-  SpendSortField,
   SummarySpendChRow,
   WindowCountChRow,
 } from "./activityMonitor.clickhouse.schemas";
@@ -54,11 +55,19 @@ export class ActivityMonitorClickHouseRepository {
     return this.spend.findSummarySpend(params);
   }
 
+  findActiveUserCount(params: {
+    tenantIds: string[];
+    windowStart: number;
+    windowEnd: number;
+  }): Promise<ActiveUserCountChRow> {
+    return this.spend.findActiveUserCount(params);
+  }
+
   findSpendByUser(params: {
     tenantId: string;
     windowStart: number;
     windowEnd: number;
-    sortBy: SpendSortField;
+    sortBy: SpendByUserSortField;
     sortDir: SortDir;
     limit: number;
     offset: number;

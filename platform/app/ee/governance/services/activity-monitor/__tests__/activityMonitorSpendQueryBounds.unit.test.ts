@@ -100,6 +100,15 @@ const READS: Array<{
       }),
   },
   {
+    name: "findActiveUserCount",
+    run: (repo) =>
+      repo.findActiveUserCount({
+        tenantIds: ["tenant-a", "tenant-b"],
+        windowStart: WINDOW_START,
+        windowEnd: WINDOW_END,
+      }),
+  },
+  {
     name: "findSpendByDepartment",
     run: (repo) =>
       repo.findSpendByDepartment({

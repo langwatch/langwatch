@@ -32,7 +32,7 @@ import {
   type TimeInterval,
 } from "~/components/governance/filters";
 
-import type { DailyBucket } from "./sampleSeries";
+import type { DailyBucket, DailyPoint } from "./sampleSeries";
 
 export const ALL_DEPARTMENTS = "__all__";
 
@@ -307,29 +307,40 @@ function laterOf(a: number | null, b: number | null): number | null {
 }
 
 /**
- * Seat counts folded to the interval by taking the LAST period in each bucket,
- * never by summing it.
+ * Seat counts folded to the interval by taking each SERIES' last period in the
+ * bucket, never by summing them.
  *
  * A seat count is a level, not a flow. A company holding 420 seats in each of
  * three months holds 420 at the end of the quarter, never 1,260. Every other
  * series on this page is money spent, which does add up, and reaching for the
  * money fold here is the mistake this function exists to make impossible.
+ *
+ * Per series rather than per period, because seat pools are separate purchases
+ * that renew on their own dates: keeping the latest DAY's whole set of points
+ * dropped every pool whose newest report fell earlier in the bucket, so an
+ * organization holding two products read as one that holds a single product.
+ * A pool reporting nothing since July is still held in September.
+ *
+ * Points travel through unchanged — this fold picks which one survives and
+ * never rewrites it.
  */
 export function aggregateSeatCounts(
   buckets: DailyBucket[],
   interval: TimeInterval,
 ): DailyBucket[] {
-  const byBucket = new Map<string, DailyBucket>();
-  // Ascending, so each write leaves the latest period of its bucket standing.
+  const byBucket = new Map<string, Map<string, DailyPoint>>();
+  // Ascending, so each write leaves that series' latest period standing.
   for (const bucket of [...buckets].sort((a, b) =>
     a.day.localeCompare(b.day),
   )) {
-    byBucket.set(bucketStartOf(bucket.day, interval), {
-      day: bucketStartOf(bucket.day, interval),
-      points: bucket.points,
-    });
+    const start = bucketStartOf(bucket.day, interval);
+    const points = byBucket.get(start) ?? new Map<string, DailyPoint>();
+    for (const point of bucket.points) points.set(point.key, point);
+    byBucket.set(start, points);
   }
-  return [...byBucket.values()].sort((a, b) => a.day.localeCompare(b.day));
+  return [...byBucket.entries()]
+    .map(([day, points]) => ({ day, points: [...points.values()] }))
+    .sort((a, b) => a.day.localeCompare(b.day));
 }
 
 /**

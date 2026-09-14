@@ -200,6 +200,15 @@ export interface GovernanceCostDayDto {
   billedCellsWithoutAmount: number;
   /** Gateway-lane cells that day holding no USD figure. */
   gatewayCellsWithoutAmount: number;
+  /**
+   * Tokens the day's gateway traffic processed, 0 on a day the lane is silent.
+   *
+   * Zero rather than null, unlike `gatewayUsd`: a day with no metered requests
+   * really did process no tokens, and a token count is never withheld the way
+   * a partial money figure is — the ledger meters every charged request
+   * itself, so there is no "some of the day is missing" state to signal.
+   */
+  gatewayTokens: number;
 
   /**
    * When the provider last restated this day, epoch ms, or null if never
@@ -1628,6 +1637,7 @@ function seriesFrom(
       gatewayUsd: null,
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
+      gatewayTokens: 0,
       billedRevisedAt: null,
       billedByCurrency: [],
       billedCurrenciesWithoutUsdAmount: [],
@@ -1669,7 +1679,12 @@ function seriesFrom(
   // be a warning about a thing that cannot happen. The lane never withholds a
   // day's figure, so `gatewayCellsWithoutAmount` stays zero.
   for (const day of gatewayDays) {
-    entryFor(day.day).gatewayUsd = gatewayDayUsd(day);
+    const entry = entryFor(day.day);
+    entry.gatewayUsd = gatewayDayUsd(day);
+    // The token count is reported even on a day whose dollar figure is
+    // withheld: what the models processed is known exactly whether or not
+    // every request of the day carries a price.
+    entry.gatewayTokens = day.tokensTotal;
   }
 
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));

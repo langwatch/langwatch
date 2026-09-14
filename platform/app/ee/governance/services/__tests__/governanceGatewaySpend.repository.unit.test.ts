@@ -46,6 +46,66 @@ function callOf(client: { query: ReturnType<typeof vi.fn> }) {
   };
 }
 
+/** The query with runs of whitespace collapsed, so an assertion reads the
+ *  expression rather than the indentation it happens to carry. */
+function flat(query: string): string {
+  return query.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The read's outer SELECT items: everything between the leading SELECT and the
+ * collapse it reads FROM, split on the commas that separate items rather than
+ * the ones inside a call's arguments.
+ *
+ * The subquery is skipped by construction — it sits inside the `FROM (...)`
+ * this stops at — which is what keeps its per-request `argMax(TokensInput, ...)`
+ * out of the rules below. Those are the collapse, never the total.
+ */
+function outerSelectItems(client: {
+  query: ReturnType<typeof vi.fn>;
+}): string[] {
+  const query = flat(queryOf(client));
+  const list = query.slice(
+    query.indexOf("SELECT") + "SELECT".length,
+    query.indexOf("FROM ("),
+  );
+  const items: string[] = [];
+  let depth = 0;
+  let item = "";
+  for (const character of list) {
+    if (character === "(") depth += 1;
+    if (character === ")") depth -= 1;
+    if (character === "," && depth === 0) {
+      items.push(item.trim());
+      item = "";
+      continue;
+    }
+    item += character;
+  }
+  if (item.trim() !== "") items.push(item.trim());
+  return items;
+}
+
+/**
+ * The expression behind the read's token figure: the outer SELECT item whose
+ * alias names a token total.
+ *
+ * The alias is matched loosely on purpose — what the rules below are about is
+ * which ledger columns the expression adds up, not the word chosen for the
+ * column. Returns "" when the read states no token figure at all, which every
+ * test below asserts against first: a rule about which columns an expression
+ * names proves nothing against an expression that does not exist.
+ */
+function meteredTokenExpression(client: {
+  query: ReturnType<typeof vi.fn>;
+}): string {
+  return (
+    outerSelectItems(client).find((item) =>
+      /\bAS\s+\w*Token\w*\b/.test(item),
+    ) ?? ""
+  );
+}
+
 const WINDOW = {
   tenantIds: ["proj_a", "proj_b"],
   fromDay: "2026-08-01",
@@ -214,6 +274,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           RequestCount: "3",
           PricedRequestCount: "1",
           RequestsWithoutAmount: "2",
+          TokensTotal: "1200",
         },
       ]);
 
@@ -226,6 +287,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
           requestCount: 3,
           pricedRequestCount: 1,
           requestsWithoutAmount: 2,
+          tokensTotal: 1200,
         },
       ]);
     });
@@ -305,6 +367,104 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
         expect(query).not.toMatch(/ORDER BY\s+AmountNanoUsd\b/);
         expect(query).toMatch(/ORDER BY\s+toInt64\(AmountNanoUsd\) DESC/);
       }
+    });
+  });
+  /**
+   * The metered token figure.
+   *
+   * The ledger stores a BILLABLE input count with cache already taken out of
+   * it (`BillableInputTokens()` returns prompt minus cache read minus cache
+   * creation), because the rating path prices each token once at its own rate.
+   * That is right for money and wrong for a count, so the panel's figure adds
+   * cache back and reports the work the model did. Two stored quantities are
+   * SUBSETS of quantities already in the sum and would double-count; three are
+   * not tokens at all.
+   *
+   * ADR-128 v3.18, "Supersedes Ruling 1".
+   */
+  describe("when reporting the metered token figure", () => {
+    /** @scenario "The metered token count counts what the model read, cache included" */
+    it("adds the cache the request read back to the billable remainder", async () => {
+      const { client, repo } = repositoryOver([]);
+      await repo.sumDaysForOrganizationProjects(WINDOW);
+
+      const expression = meteredTokenExpression(client);
+      // Without a stated figure the rule below asserts nothing.
+      expect(expression).not.toBe("");
+      // A prompt of 4,814 tokens with 4,736 served from cache is stored as 78.
+      // A figure reading the stored column alone reports 1.6% of the tokens
+      // the model processed, on the screen a customer opens to size usage.
+      expect(expression).toMatch(/\bRequestTokensCacheRead\b/);
+      expect(expression).toMatch(/\bRequestTokensCacheWrite\b/);
+      expect(expression).toMatch(/\bRequestTokensInput\b/);
+      expect(expression).toMatch(/\bRequestTokensOutput\b/);
+    });
+
+    /** @scenario "Reasoning tokens are not added on top of the output they are part of" */
+    it("leaves reasoning out, counted once inside the output it belongs to", async () => {
+      const { client, repo } = repositoryOver([]);
+      await repo.sumDaysForOrganizationProjects(WINDOW);
+
+      const expression = meteredTokenExpression(client);
+      expect(expression).not.toBe("");
+      // "it stays a subset of OutputTokens" — the emitter's own words.
+      expect(expression).toMatch(/\bRequestTokensOutput\b/);
+      expect(expression).not.toMatch(/Reasoning/);
+    });
+
+    /** @scenario "A longer-lived cache write is not added on top of the write it is part of" */
+    it("leaves the longer-lived write out, counted once inside the cache write", async () => {
+      const { client, repo } = repositoryOver([]);
+      await repo.sumDaysForOrganizationProjects(WINDOW);
+
+      const expression = meteredTokenExpression(client);
+      expect(expression).not.toBe("");
+      // The 1h column is the portion of the cache write that bought the longer
+      // retention, normalised upward into the write itself. The word boundary
+      // matters: `RequestTokensCacheWrite1h` starts with the name of the column
+      // that IS counted, so a plain substring check passes on the very query
+      // this rule forbids.
+      expect(expression).toMatch(/\bRequestTokensCacheWrite\b/);
+      expect(expression).not.toMatch(/CacheWrite1h/);
+    });
+
+    /** @scenario "The metered token count adds back the tokens that were priced separately" */
+    it("adds back the audio and image tokens the rating path subtracted", async () => {
+      const { client, repo } = repositoryOver([]);
+      await repo.sumDaysForOrganizationProjects(WINDOW);
+
+      const expression = meteredTokenExpression(client);
+      expect(expression).not.toBe("");
+      // These arrive already subtracted from the input and output counts so
+      // each token is priced exactly once; a figure that skips them reports a
+      // conversation as the handful of text tokens around it.
+      expect(expression).toMatch(/\bRequestTokensInputAudio\b/);
+      expect(expression).toMatch(/\bRequestTokensOutputAudio\b/);
+      expect(expression).toMatch(/\bRequestTokensInputImage\b/);
+      expect(expression).toMatch(/\bRequestTokensOutputImage\b/);
+
+      // And the collapse has to carry them, or the aliases above name nothing.
+      const query = queryOf(client);
+      expect(query).toContain("argMax(TokensInputAudio, EventTimestamp)");
+      expect(query).toContain("argMax(TokensOutputAudio, EventTimestamp)");
+      expect(query).toContain("argMax(TokensInputImage, EventTimestamp)");
+      expect(query).toContain("argMax(TokensOutputImage, EventTimestamp)");
+    });
+
+    /** @scenario "Characters, audio duration and a picture count are not tokens" */
+    it("counts no characters, no audio duration and no picture count", async () => {
+      const { client, repo } = repositoryOver([]);
+      await repo.sumDaysForOrganizationProjects(WINDOW);
+
+      const expression = meteredTokenExpression(client);
+      expect(expression).not.toBe("");
+      // Characters are what speech synthesis is priced by, milliseconds what
+      // transcription is priced by, and the image count is display only —
+      // nothing prices from it. None of the three is a token, and adding any
+      // to a token figure reports a number in no unit at all.
+      expect(expression).not.toMatch(/CharsInput/);
+      expect(expression).not.toMatch(/AudioMS/);
+      expect(expression).not.toMatch(/ImageCount/);
     });
   });
 });

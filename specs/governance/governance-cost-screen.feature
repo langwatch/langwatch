@@ -418,7 +418,7 @@ Feature: One cost screen, three honest lanes
     When the seat chart renders
     Then it plots seats bought against seats assigned
     And its figures are counts, with no currency anywhere on it
-    And the two series are drawn side by side rather than added together
+    And each pool draws its own bought-against-assigned pair, never added across products
 
   @integration
   Scenario: No panel is named after a single provider's product
@@ -453,7 +453,11 @@ Feature: One cost screen, three honest lanes
     # fully swapped implementation passes the cross-lane check. The test
     # must assert the two fixture values differ before asserting placement.
     # "Never summed into one figure" is a universal negative no test can
-    # prove; ADR-128 assigns it to the code-review gate in wave 1.
+    # prove; ADR-128 assigns it to the code-review gate in wave 1. That gate
+    # covers TOKENS as well as money from here on: the screen carries three
+    # token figures over traffic that overlaps, and adding any two of them is
+    # the same mistake in a different unit. What IS testable is the label —
+    # see "Every token figure names the store it was counted in" below.
     # "Matches its own source" end to end is a datastore-lane concern:
     # the billed lane's is covered by the rollup spec, the metered lane's
     # by the ledger scenarios in the section directly below.
@@ -1580,3 +1584,237 @@ Feature: One cost screen, three honest lanes
       And the control to turn them on is on the screen
       # A fault is not evidence the screen is empty, so the page offers the
       # samples and leaves the choice with the reader.
+
+  # =========================================================================
+  # TOKENS ON THE COST SCREEN. Money answers "what did this cost", which is
+  # the wrong question for an organization buying assistants on subscription:
+  # the per-request cost of a bundled seat is zero, so a department of heavy
+  # subscription users reads as nearly free. Tokens are true under both
+  # pricing models, and dollars are not.
+  #
+  # The trade taken here is deliberate. A token ranking is a worse cost
+  # ranking across a mixed model estate — ten million tokens through a cheap
+  # model can cost less than one million through an expensive one while
+  # ranking ten times larger — and these are ranked panels. The dollar figure
+  # is kept beside the tokens rather than dropped, so the reader has both.
+  #
+  # THE NUMBER IS THE WORK THE MODEL DID, NOT THE WORK THE CUSTOMER PAID FOR.
+  # The gateway ledger stores a BILLABLE input count with cache already taken
+  # out of it, because the rating path prices each token once at its own rate.
+  # That is right for money and wrong for a count: agent traffic is
+  # overwhelmingly cache reads, so a panel counting the stored column alone
+  # would report a small fraction of what the models actually processed, on
+  # the screen a customer opens to size their usage. Cache is added back.
+  # Audio and image tokens arrive subtracted out for the same rating reason
+  # and are added back too.
+  #
+  # Two of the ledger's quantities are SUBSETS of quantities already in the
+  # sum, and adding them would count the same tokens twice: reasoning is part
+  # of the output count, and the longer-lived portion of a cache write is
+  # part of that cache write. Three more are not tokens at all — characters,
+  # audio duration and a count of pictures.
+  #
+  # The two stores do NOT agree, and nothing here claims they do. The
+  # gateway's own customer trace publishes the cache-subtracted figure, and
+  # audio and image counts never reach the trace store. Same call, different
+  # numbers, on purpose — which is why every panel below has to name the
+  # store it counted in.
+  # =========================================================================
+
+  Rule: One word, one number — tokens mean the same thing in every panel
+
+    @unit
+    Scenario: The metered token count counts what the model read, cache included
+      Given a gateway request whose prompt was 4,814 tokens, 4,736 of them served from cache
+      When the metered token figure for that request is read
+      Then it reports 4,814 tokens
+      And it does not report the 78 tokens left once cache was taken out
+
+    @unit
+    Scenario: Reasoning tokens are not added on top of the output they are part of
+      Given a gateway request whose output includes reasoning tokens
+      When the metered token figure for that request is read
+      Then those reasoning tokens are counted once, inside the output count
+      And the figure is not the output count plus the reasoning count again
+
+    @unit
+    Scenario: A longer-lived cache write is not added on top of the write it is part of
+      Given a gateway request whose cache write bought the longer retention
+      When the metered token figure for that request is read
+      Then those tokens are counted once, inside the cache write count
+      And the figure is not the cache write plus the longer-lived portion again
+
+    @unit
+    Scenario: The metered token count adds back the tokens that were priced separately
+      Given a gateway request whose audio and image tokens were priced at their own rates
+      When the metered token figure for that request is read
+      Then the audio and image tokens are counted alongside its text tokens
+
+    @unit
+    Scenario: Characters, audio duration and a picture count are not tokens
+      Given a gateway request metered in characters, in audio milliseconds and in pictures
+      When the metered token figure is read
+      Then none of those three quantities is counted as a token
+
+    @integration
+    Scenario: A window of speech reports no tokens and still reports its cost
+      Given a window whose every request was metered in audio duration alone
+      When a permitted viewer opens the cost screen
+      Then the token figure for that window is zero
+      And the metered lane still shows what that traffic cost
+      # Tokens are blind to speech the way dollars are blind to subscriptions.
+      # Both lanes stay on the screen so neither blind spot is the only view.
+
+    @integration
+    Scenario: Tokens over time draws the metered lane instead of standing empty
+      Given gateway requests carrying tokens across the window
+      When a permitted viewer opens the cost screen
+      Then the tokens-over-time panel draws the tokens those requests used, period by period
+      And it does not say nothing has been recorded in this window
+
+    @integration
+    Scenario: Every token figure names the store it was counted in
+      Given tokens recorded in the gateway ledger and tokens recorded on traces
+      When a permitted viewer opens the cost screen
+      Then each panel showing tokens says on its own face which store counted them
+      And a panel reading the gateway says so in the panel, never only in a footnote
+      And no panel shows one token figure covering both stores
+      # The two stores measure different things for the same call, so they
+      # will disagree, and the label is what stops that reading as a defect
+      # in one of them. The universal negative — that nothing anywhere adds
+      # two token figures together — is the same code-review gate as "never
+      # summed into one figure" above, for the same reason.
+
+  # =========================================================================
+  # THE PANELS THAT COUNT PEOPLE. Two of them, and until now they disagreed
+  # about what they were measuring while sitting on the same screen. One was
+  # titled for a lane it does not read: "metered" names the gateway ledger
+  # everywhere else here, and the gateway lane is not allowed to be grouped
+  # by person at all — see "Metered spend is grouped by model and by virtual
+  # key, never by person" above. A panel cannot be fixed by filling it while
+  # its title still points at the wrong store.
+  #
+  # A department buying its assistants on subscription has no measured
+  # tokens either: those conversations are assembled deliberately cost-free
+  # and they arrive token-free too, so the panel either reads nothing or
+  # reads an estimate. Neither is a measurement, and the row says which it
+  # is rather than printing a zero — the rule that a panel never states a
+  # number it did not measure holds here too instead of being carved out.
+  # =========================================================================
+
+  Rule: A people panel measures tokens and says which store it read
+
+    @integration
+    Scenario: A department reports the tokens it ran, across every project of the organization
+      Given a department whose people ran traffic under two projects of the viewer's organization
+      And traffic under a project of another organization
+      When a permitted viewer opens the cost screen
+      Then the department leads with a token count covering both of the organization's projects
+      And the other organization's traffic contributes nothing
+      And the figure it leads with is not a dollar amount
+
+    @integration
+    Scenario: A department of subscription users shows the tokens it really used
+      Given a department whose assistants are bought on subscription
+      And every one of its requests carries no per-request cost
+      When a permitted viewer opens the cost screen
+      Then that department's token figure reflects the traffic it ran
+      And it is not reported as one of the cheapest departments on the strength of a zero
+
+    @integration
+    Scenario: A department with no token rows says it was not measured
+      Given a department whose traffic carries no token counts at all
+      When a permitted viewer opens the cost screen
+      Then that department's row says its tokens were not measured
+      And it does not show a token count of zero
+
+    @integration
+    Scenario: A department whose tokens were estimated says so on its row
+      Given a department whose tokens were counted by the estimator rather than reported by a provider
+      When a permitted viewer opens the cost screen
+      Then that department's row is labeled as estimated
+      And a department whose tokens a provider reported carries no such label
+
+    @integration
+    Scenario: The department panel keeps its dollar figure as a second line
+      Given departments with both token counts and per-request costs
+      When a permitted viewer opens the cost screen
+      Then each department leads with its token count
+      And its dollar figure is shown beneath, saying it covers per-request cost only
+
+    @integration
+    Scenario: The panel counting people is titled for the store it reads
+      Given the cost screen is drawn for a permitted viewer
+      When the panel ranking people by their tokens is read
+      Then its title names the store those tokens were counted in
+      And it does not describe itself as metered gateway spend
+
+    @integration
+    Scenario: The panel counting people reports tokens rather than dollars
+      Given people with both token counts and per-request costs recorded
+      When a permitted viewer opens the cost screen
+      Then each person leads with their token count
+      And the people shown first are those with the most tokens, not those with the largest dollar figures
+      # The panel is ranked and paginated on the server. Shipping the unit
+      # without the sort key leaves page one ordered by dollars while showing
+      # tokens, and a "top ten" that is not the top ten.
+
+  # =========================================================================
+  # SEATS ARE BOUGHT PER PRODUCT. An organization holds a pool per product,
+  # and the pools are separate purchases that renew on their own dates. Two
+  # things go wrong when they are folded onto a shared time bucket.
+  #
+  # The fold keeps the LATEST report in each bucket, which is right for a
+  # level and wrong for a set of pools: it replaces the bucket's whole set of
+  # figures with the latest day's, so a pool whose newest report fell earlier
+  # in the bucket is dropped entirely. Because pools renew on their own
+  # dates, different report days are the normal case, not the edge — and two
+  # pools reported on the SAME day travel together, so a case built on those
+  # would pass against the fold as it stands and prove nothing.
+  #
+  # And a layer earlier the pools are already gone: they are added into one
+  # bought figure and one assigned figure before the fold ever sees them,
+  # which reads on screen as an organization that bought a single product.
+  # =========================================================================
+
+  Rule: Every seat pool keeps its own row
+
+    @unit
+    Scenario: Two seat pools whose newest reports fall on different days both survive the fold
+      Given one pool whose newest counts were reported early in the bucket
+      And a second pool whose newest counts were reported later in the same bucket
+      When the counts are folded to the bucket in view
+      Then both pools are reported in that bucket
+      And each shows the counts of its own newest report
+
+    @unit
+    Scenario: Each seat pool draws its own bought-against-assigned pair
+      Given seat counts for two products
+      When the seat panel is read
+      Then each product draws its own pair of seats bought against seats assigned
+      And no figure on the panel adds the two products' counts together
+
+  # =========================================================================
+  # ADOPTION IS AN ORGANIZATION QUESTION. An admin asking how many of their
+  # people use assistants means everybody, not the people who happen to
+  # appear in one project. The count is read against the hidden governance
+  # project alone, while assistant traffic lands in the organization's
+  # application projects — so the read answers correctly for the one project
+  # it was given and understates the organization every time. The figure is
+  # presented as a measurement, so the reader has no way to tell.
+  #
+  # Only the HEADCOUNT widens. The money figures on the same card keep the
+  # scope they have, because a spend figure must not change as a side effect
+  # of a headcount fix, and the guard that reports "nothing connected" as
+  # unmeasured rather than as zero stays exactly as it is — see "An adoption
+  # count of zero with nothing connected is not reported as a measurement"
+  # above.
+  # =========================================================================
+
+  Rule: Adoption counts the people of the whole organization
+
+    @unit
+    Scenario: Somebody active in another project of the organization is counted
+      Given a person whose assistant traffic ran under a project of the organization other than the governance one
+      When a permitted viewer opens the cost screen
+      Then that person is counted among the people using AI tools

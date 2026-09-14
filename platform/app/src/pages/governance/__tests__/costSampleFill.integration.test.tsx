@@ -303,7 +303,7 @@ describe("the cost screen in sample mode", () => {
         "Cost over time",
         "Cost by department",
         "Cost by model",
-        "Metered spend by person",
+        "Tokens by person · trace store",
         "Conversations over time",
         "Tokens over time",
       ]) {

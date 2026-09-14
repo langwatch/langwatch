@@ -12,11 +12,15 @@
  * stored_spans into trace_summaries.Attributes so the rollup queries here
  * don't need to scan span-level data.
  *
- * Tenancy: every query filters by `TenantId = govProjectId` where
+ * Tenancy: the money reads filter by `TenantId = govProjectId` where
  * `govProjectId` is the org's hidden internal_governance Project (lazily
  * minted by `ensureHiddenGovernanceProject`). When the org has no Gov
  * Project yet (no IngestionSource has ever been minted), the queries
- * short-circuit to empty results.
+ * short-circuit to empty results. The reads that answer an organization
+ * question rather than a governance-project one - the department rollup and
+ * the adoption headcount - filter by `TenantId IN (...)` over every live
+ * project of the org, resolved from Prisma so they can only ever read this
+ * org's own projects.
  *
  * Anomaly counts (`openAnomalyCount` / `anomalyBreakdown`) read from
  * `prisma.anomalyAlert` - unaffected by the trace-store path.
@@ -55,6 +59,7 @@ import type {
   SortDir,
   SpendByDepartmentChRow,
   SpendByTeamSourceChRow,
+  SpendByUserSortField,
   SpendOverTimeChRow,
   SpendOverTimeGroupBy,
   SpendSortField,
@@ -96,6 +101,15 @@ export interface SpendByUserRow {
    */
   hasPriorBaseline: boolean;
   mostUsedTarget: string | null;
+  /**
+   * Prompt + completion tokens over the window, or null when not one of
+   * their traces carried a count — a person on a subscription product runs
+   * requests that bill per seat and report no token figure. Null is "we
+   * never counted", which a zero would misreport as "they ran nothing".
+   */
+  tokens: number | null;
+  /** Whether any counted trace of theirs was estimated rather than reported. */
+  tokensEstimated: boolean;
 }
 
 export interface SpendByTeamRow {
@@ -134,6 +148,23 @@ export interface SpendByDepartmentRow {
   spendUsd: string;
   requestCount: number;
   lastActivityIso: string | null;
+  /**
+   * Prompt + completion tokens the department ran, or NULL when not one of
+   * its traces carried a count.
+   *
+   * Null is not zero and must not be rendered as one: a product that bills a
+   * seat rather than a request can record no token count at all, and printing
+   * a zero there states a measurement nobody made. Beside `spendUsd` rather
+   * than replacing it — the bird's-eye dashboard still ranks this list by
+   * money, and the cost screen ranks its own copy by tokens.
+   */
+  tokens: number | null;
+  /**
+   * True when any counted trace of the department had its tokens ESTIMATED
+   * rather than reported by the provider. An estimate printed beside a
+   * reported count with nothing to tell them apart reads as one measurement.
+   */
+  tokensEstimated: boolean;
 }
 
 export interface IngestionSourceHealthRow {
@@ -450,6 +481,21 @@ export class ActivityMonitorService {
     return await resolveGovProjectId({ prisma: this.prisma, organizationId });
   }
 
+  /**
+   * Every live project of the org - the tenant scope for the reads that
+   * answer an organization question rather than a governance-project one
+   * (the department rollup, the adoption headcount). Archived projects are
+   * left out so a retired project stops counting.
+   */
+  private async organizationProjects(
+    organizationId: string,
+  ): Promise<Array<{ id: string; departmentId: string | null }>> {
+    return await this.prisma.project.findMany({
+      where: { team: { organizationId }, archivedAt: null },
+      select: { id: true, departmentId: true },
+    });
+  }
+
   // -----------------------------------------------------------------------
   // Summary
   // -----------------------------------------------------------------------
@@ -486,16 +532,36 @@ export class ActivityMonitorService {
       windowEnd: now,
     });
 
+    // Adoption is an organization question - a person who only ever worked in
+    // an application project is still one of the org's people - so the
+    // headcount reads every project while the money above keeps the
+    // governance project's scope. Splitting the read is what keeps a spend
+    // figure from moving as a side effect of this (ADR-128 ruling 6).
+    const projectIds = (
+      await this.organizationProjects(input.organizationId)
+    ).map((p) => p.id);
+    const activeUsers =
+      projectIds.length === 0
+        ? 0
+        : (
+            await this.repository.findActiveUserCount({
+              tenantIds: projectIds,
+              windowStart: thisWindowStart,
+              windowEnd: now,
+            })
+          ).thisUsers;
+
     return {
       spentThisWindowUsd: row.thisSpend,
       windowOverPreviousPct: pctChange(row.thisSpend, row.prevSpend),
       hasPriorBaseline: row.prevSpend > 0,
-      activeUsersThisWindow: row.thisUsers,
+      activeUsersThisWindow: activeUsers,
       // newUsers requires a baseline-window comparison query which is a
       // follow-up (3b: governance_kpis fold materialises the per-user
       // first-seen). For now the dashboard renders the field but the value
-      // is conservative - treat all active as new only when prev=0.
-      newUsersThisWindow: row.prevSpend === 0 ? row.thisUsers : 0,
+      // is conservative - treat all active as new only when prev=0. It is a
+      // headcount, so it follows the org-wide count.
+      newUsersThisWindow: row.prevSpend === 0 ? activeUsers : 0,
       openAnomalyCount,
       anomalyBreakdown,
     };
@@ -526,7 +592,7 @@ export class ActivityMonitorService {
     windowDays: number;
     limit?: number;
     offset?: number;
-    sortBy?: SpendSortField;
+    sortBy?: SpendByUserSortField;
     sortDir?: SortDir;
   }): Promise<SpendByUserRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
@@ -556,6 +622,8 @@ export class ActivityMonitorService {
       hasPriorBaseline: false,
       mostUsedTarget:
         r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
+      tokens: r.tokensStr === null ? null : Number(r.tokensStr),
+      tokensEstimated: r.tokensEstimatedStr === "1",
     }));
   }
 
@@ -565,10 +633,10 @@ export class ActivityMonitorService {
 
   /**
    * Spend rolled up by department across EVERY project in the org - the
-   * fix for the empty bird's-eye graphs. Unlike `summary`/`spendByUser`,
-   * which read only the hidden governance project and the governance
-   * ingestion origin, this aggregates the whole org's AI spend so an org
-   * with real traffic but no ingestion source still populates.
+   * fix for the empty bird's-eye graphs. Unlike the money reads in
+   * `summary`/`spendByUser`, which stay on the hidden governance project and
+   * the governance ingestion origin, this aggregates the whole org's AI spend
+   * so an org with real traffic but no ingestion source still populates.
    *
    * A trace's department is resolved by precedence (principal user → the
    * user's team → the project, else Unassigned), so a person's personal
@@ -587,13 +655,7 @@ export class ActivityMonitorService {
     organizationId: string;
     windowDays: number;
   }): Promise<SpendByDepartmentRow[]> {
-    const projects = await this.prisma.project.findMany({
-      where: {
-        team: { organizationId: input.organizationId },
-        archivedAt: null,
-      },
-      select: { id: true, departmentId: true },
-    });
+    const projects = await this.organizationProjects(input.organizationId);
     if (projects.length === 0) return [];
     if (!this.repository) return [];
 
@@ -1125,6 +1187,33 @@ interface SpendOverTimeRolled {
   rolledRows: RolledSpendRow[];
 }
 
+/**
+ * One CH row's tokens folded into what the department has accumulated so far.
+ *
+ * A department is UNMEASURED only when none of its rows carried a count: one
+ * measured project among several unmeasured ones is a partial figure, which
+ * is still a figure, and a null there would throw away a real measurement.
+ * The estimate flag only follows rows that contributed a count — a row with
+ * no tokens has no estimate to report.
+ */
+function addDepartmentTokens({
+  prior,
+  row,
+}: {
+  prior: { tokens: number | null; tokensEstimated: boolean };
+  row: SpendByDepartmentChRow;
+}): { tokens: number | null; tokensEstimated: boolean } {
+  // Rebuilt rather than returned as-is: the caller spreads this over the
+  // accumulator, and handing `prior` straight back would spread its spend and
+  // request counters over the ones the caller just advanced.
+  if (row.tokensStr === null)
+    return { tokens: prior.tokens, tokensEstimated: prior.tokensEstimated };
+  return {
+    tokens: (prior.tokens ?? 0) + Number(row.tokensStr),
+    tokensEstimated: prior.tokensEstimated || row.tokensEstimatedStr === "1",
+  };
+}
+
 function assembleDepartmentRows({
   rows,
   projectDepartmentById,
@@ -1140,7 +1229,14 @@ function assembleDepartmentRows({
 }): SpendByDepartmentRow[] {
   const acc = new Map<
     string,
-    { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
+    {
+      spendNanoUsd: bigint;
+      requestCount: number;
+      lastActivityMs: number;
+      /** Null until a contributing row carries a count. See the row type. */
+      tokens: number | null;
+      tokensEstimated: boolean;
+    }
   >();
   for (const r of rows) {
     const hasPrincipalUser = r.actor !== "";
@@ -1159,14 +1255,21 @@ function assembleDepartmentRows({
       spendNanoUsd: 0n,
       requestCount: 0,
       lastActivityMs: 0,
+      tokens: null,
+      tokensEstimated: false,
     };
     acc.set(key, {
       spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
       requestCount: prior.requestCount + Number(r.requests),
       lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+      ...addDepartmentTokens({ prior, row: r }),
     });
   }
 
+  // Ranked by money, deliberately: the bird's-eye dashboard reads this list in
+  // order and asks it a spend question. The cost screen leads its own copy
+  // with tokens and re-ranks at the render layer, which is where a per-screen
+  // unit belongs — one read cannot be sorted two ways at once.
   return [...acc.entries()]
     .map(([key, v]) => ({
       departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
@@ -1178,6 +1281,8 @@ function assembleDepartmentRows({
       requestCount: v.requestCount,
       lastActivityIso:
         v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
+      tokens: v.tokens,
+      tokensEstimated: v.tokensEstimated,
     }))
     .sort((a, b) => {
       const aNano = usdToNanoUsd(a.spendUsd);

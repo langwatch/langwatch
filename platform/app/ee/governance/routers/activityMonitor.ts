@@ -68,7 +68,13 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
         offset: z.number().int().min(0).default(0),
-        sortBy: z.enum(["spend", "requests", "lastActivity"]).default("spend"),
+        // "tokens" is the person read only: it orders by a sum the team
+        // rollup has no column for. Every value here is a key into
+        // SORT_FIELD_TO_AGG_EXPR, which is what keeps the ORDER BY a
+        // whitelisted literal rather than caller input.
+        sortBy: z
+          .enum(["spend", "requests", "lastActivity", "tokens"])
+          .default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )

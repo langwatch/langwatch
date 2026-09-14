@@ -312,6 +312,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
           requests: "100",
           lastActivityMs: "1700000000000",
           mostUsedTarget: "claude-haiku-4-5",
+          tokensStr: null,
+          tokensEstimatedStr: "0",
         },
       ]);
     });

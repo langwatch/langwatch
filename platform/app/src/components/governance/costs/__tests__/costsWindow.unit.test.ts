@@ -18,7 +18,13 @@ import {
   READ_WINDOW_DAY_CEILING,
   windowDaysForFrame,
 } from "../costsWindow";
-import { recentMonths, sampleForecast } from "../sampleSeries";
+import {
+  recentMonths,
+  SAMPLE_SEAT_POOLS,
+  sampleForecast,
+  sampleSeatPools,
+  sampleSeats,
+} from "../sampleSeries";
 
 /** A lane day with every honesty field at its quiet default. */
 const laneDay = (
@@ -142,6 +148,86 @@ describe("aggregateSeatCounts", () => {
         { key: "bought", label: "Seats bought", value: 420 },
         { key: "assigned", label: "Seats assigned", value: 302 },
       ]);
+    });
+  });
+
+  /**
+   * Pools are separate purchases that renew on their own dates, so their
+   * newest reports land on different days of the same bucket as a matter of
+   * course. Two pools reported on the SAME day travel together through the
+   * fold and would pass against it as it stands, which is why this case is
+   * built on days that differ.
+   */
+  describe("when two pools last reported on different days of one bucket", () => {
+    /** @scenario "Two seat pools whose newest reports fall on different days both survive the fold" */
+    it("keeps both pools, each at the counts of its own newest report", () => {
+      const poolPoints = (pool: string, bought: number, assigned: number) => [
+        { key: `bought:${pool}`, label: `${pool} bought`, value: bought },
+        { key: `assigned:${pool}`, label: `${pool} assigned`, value: assigned },
+      ];
+
+      const folded = aggregateSeatCounts(
+        [
+          // The first pool reports twice; the later report is the one it keeps.
+          { day: "2026-07-15", points: poolPoints("sku-a", 420, 300) },
+          { day: "2026-08-20", points: poolPoints("sku-b", 90, 61) },
+          { day: "2026-09-02", points: poolPoints("sku-a", 460, 388) },
+        ],
+        "quarter",
+      );
+
+      expect(folded).toHaveLength(1);
+      expect(folded[0]?.day).toBe("2026-07-01");
+      // Keeping the latest DAY's set of figures drops the pool whose newest
+      // report fell earlier in the bucket — an organization that bought two
+      // products reads as one.
+      expect(folded[0]?.points).toEqual(
+        expect.arrayContaining([
+          { key: "bought:sku-a", label: "sku-a bought", value: 460 },
+          { key: "assigned:sku-a", label: "sku-a assigned", value: 388 },
+          { key: "bought:sku-b", label: "sku-b bought", value: 90 },
+          { key: "assigned:sku-b", label: "sku-b assigned", value: 61 },
+        ]),
+      );
+      expect(folded[0]?.points).toHaveLength(4);
+    });
+  });
+});
+
+/**
+ * The panel's own series, a layer before the fold ever sees them.
+ *
+ * The pools are added into one bought figure and one assigned figure here,
+ * which reads on screen as an organization that bought a single product — and
+ * leaves the fold above nothing to keep apart even once it can.
+ */
+describe("sampleSeats", () => {
+  describe("when an organization holds two seat pools", () => {
+    const POOLS = SAMPLE_SEAT_POOLS.slice(0, 2);
+    const PERIOD = "2026-07-01";
+
+    /** @scenario "Each seat pool draws its own bought-against-assigned pair" */
+    it("draws a bought-against-assigned pair per pool and adds neither across them", () => {
+      const pools = sampleSeatPools(PERIOD, POOLS);
+      const [period] = sampleSeats([PERIOD], POOLS);
+      const points = period?.points ?? [];
+
+      // Two pairs, not one: a pair per pool is what makes the gap between
+      // bought and assigned readable per product.
+      expect(points).toHaveLength(2 * pools.length);
+      expect(new Set(points.map((point) => point.key)).size).toBe(
+        2 * pools.length,
+      );
+
+      // Every figure drawn is one pool's own count. A total of the two would
+      // be a height no pool holds, and the panel would name a product nobody
+      // bought.
+      const ascending = (a: number, b: number) => a - b;
+      expect(points.map((point) => point.value).sort(ascending)).toEqual(
+        pools
+          .flatMap((pool) => [pool.seatsBought, pool.seatsAssigned])
+          .sort(ascending),
+      );
     });
   });
 });

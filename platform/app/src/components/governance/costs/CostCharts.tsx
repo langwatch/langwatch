@@ -60,6 +60,18 @@ export function fmtCount(value: number): string {
 }
 
 /**
+ * A token count with its unit attached, for the panels that LEAD with tokens.
+ *
+ * The word is part of the figure rather than a column heading: these rows
+ * carry a dollar amount on the line beneath, and two bare numbers stacked is
+ * exactly the shape that gets one read as the other. `fmtCount` for the
+ * number itself, for the reason `fmtWhole` explains.
+ */
+export function fmtTokens(value: number): string {
+  return `${fmtCount(value)} tokens`;
+}
+
+/**
  * A count spelled out in full, thousands separated.
  *
  * For the things a reader could in principle count: conversations, seats,
@@ -160,15 +172,21 @@ export interface RankBar extends RankRow {
  * the rendered output.
  */
 export function rankBarGeometry(rows: RankRow[]): RankBar[] {
+  // A row whose figure was never measured is out of the scale for the same
+  // reason a withheld one is: its `value` is a stand-in, and sizing the real
+  // bars against it would draw every one of them against a number nobody
+  // measured.
+  const blank = (row: RankRow) =>
+    row.unpriced === true || row.unmeasured === true;
   const scale = rows.reduce(
-    (max, row) => (row.unpriced ? max : Math.max(max, Math.abs(row.value))),
+    (max, row) => (blank(row) ? max : Math.max(max, Math.abs(row.value))),
     0,
   );
   return rows.map((row) => ({
     ...row,
     widthPct:
-      row.unpriced || scale <= 0 ? 0 : (Math.abs(row.value) / scale) * 100,
-    isCredit: !row.unpriced && row.value < 0,
+      blank(row) || scale <= 0 ? 0 : (Math.abs(row.value) / scale) * 100,
+    isCredit: !blank(row) && row.value < 0,
   }));
 }
 
@@ -219,20 +237,35 @@ function RankBarCell({ row }: { row: RankBar }) {
 function RankFigure({
   row,
   format,
+  wide = false,
 }: {
   row: RankBar;
   format: (value: number) => string;
+  /**
+   * True on the two-line rows, whose figure is a token count and a word
+   * rather than a short money amount. `18%` of a third-width panel does not
+   * hold "4.1m tokens", and a figure that wraps mid-word is worse than a
+   * label that truncates.
+   */
+  wide?: boolean;
 }) {
   return (
     <Text
-      flex="0 0 18%"
+      flex={wide ? "0 0 auto" : "0 0 18%"}
+      whiteSpace={wide ? "nowrap" : undefined}
       textAlign="right"
       fontVariantNumeric="tabular-nums"
+      // The figure a reader compares rows by, named so a test can assert on
+      // WHICH figure leads rather than only on the words being present
+      // somewhere in the panel. Order is the whole claim on a ranked list and
+      // text alone cannot state it.
+      data-rank-lead=""
       // Readable without resolving styling, as `data-width-pct` is: an em dash
       // alone cannot tell a test which of the two things it means, and the
       // reason is what a reader is owed here.
       data-unpriced={row.unpriced ? "true" : undefined}
-      color={row.unpriced ? "fg.muted" : undefined}
+      data-unmeasured={row.unmeasured ? "true" : undefined}
+      color={row.unpriced || row.unmeasured ? "fg.muted" : undefined}
       // The word the dash stands for, since the column is too narrow to print
       // it. Same sentence the spender panel uses for the same withholding, so
       // the two panels do not explain it differently.
@@ -242,16 +275,51 @@ function RankFigure({
           : undefined
       }
     >
-      {row.unpriced ? "—" : format(row.value)}
+      {rankLeadText({ row, format })}
     </Text>
   );
 }
 
 /**
- * Ranked horizontal bars — label, bar, figure. Rows are ordered by what was
- * spent, and each bar is scaled against the largest figure rather than the
- * total, so a long tail stays legible instead of collapsing into slivers.
- * `rankBarGeometry` explains why "largest" means largest magnitude.
+ * The words a ranked row leads with.
+ *
+ * An UNMEASURED row prints them rather than a dash: unlike a withheld amount
+ * there is no figure elsewhere on the row to carry the meaning, and a zero
+ * here would be a count the screen never took. A WITHHELD one keeps the dash
+ * it has always had, explained by the hover beside it.
+ */
+function rankLeadText({
+  row,
+  format,
+}: {
+  row: RankBar;
+  format: (value: number) => string;
+}): string {
+  if (row.unmeasured) return RANK_UNMEASURED_LABEL;
+  if (row.unpriced) return "—";
+  return format(row.value);
+}
+
+/**
+ * What a row leads with when its figure was never measured.
+ *
+ * Unit-free on purpose — the list does not know what its panel counts, and
+ * the second line beneath says what the row does hold.
+ */
+const RANK_UNMEASURED_LABEL = "Not measured";
+
+/**
+ * Ranked horizontal bars — label, bar, figure. Rows are ordered by the figure
+ * they lead with, and each bar is scaled against the largest of them rather
+ * than the total, so a long tail stays legible instead of collapsing into
+ * slivers. `rankBarGeometry` explains why "largest" means largest magnitude.
+ *
+ * A row may carry a SECOND line (`secondary`), which the token panels use for
+ * the dollars beneath the count. Rows that carry one are drawn two lines
+ * high, with the bar moved down beside the second line; a list where no row
+ * carries one draws the single line the money panels have always drawn. The
+ * unit itself is the caller's: this list ranks and draws, and `format` is the
+ * only thing that knows whether a value is money or tokens.
  */
 export function CostRankList({
   rows,
@@ -269,20 +337,27 @@ export function CostRankList({
     // Copied before sorting: these rows can be a query cache, and sorting in
     // place would reorder what every other reader of that cache sees.
     //
-    // WITHHELD rows sort last whatever their placeholder value says. Ranking
-    // them by it would file a row nobody could price among the figures, and
-    // its stand-in zero would land it above every credit on the panel.
+    // WITHHELD and UNMEASURED rows sort last whatever their placeholder value
+    // says. Ranking them by it would file a row nobody could price — or
+    // nobody counted — among the figures, and its stand-in zero would land it
+    // above every credit on the panel.
     () =>
       rankBarGeometry(
         [...(rows ?? [])]
           .sort(
             (a, b) =>
-              Number(a.unpriced ?? false) - Number(b.unpriced ?? false) ||
+              Number(a.unpriced === true || a.unmeasured === true) -
+                Number(b.unpriced === true || b.unmeasured === true) ||
               b.value - a.value,
           )
           .slice(0, maxRows),
       ),
     [rows, maxRows],
+  );
+  // One shape for the whole list, not per row: a panel whose rows disagreed
+  // on their height would rank figures a reader has to re-find on every line.
+  const twoLine = shown.some(
+    (row) => row.secondary !== undefined || row.unmeasured === true,
   );
 
   if (rows === null)
@@ -290,10 +365,44 @@ export function CostRankList({
   if (shown.length === 0)
     return <EmptyPanel height="220px" unanswered={false} empty={empty} />;
 
+  if (twoLine)
+    return (
+      <VStack align="stretch" gap={3}>
+        {shown.map((row) => (
+          // The row itself is named, and the DOM order of these is the rank.
+          // "Leads with" is a claim about order, which no amount of asserting
+          // on text can check.
+          <VStack key={row.key} align="stretch" gap={1} data-rank-row={row.key}>
+            <HStack gap={3} fontSize="sm">
+              <Text flex="1" minWidth={0} truncate title={row.label}>
+                {row.label}
+              </Text>
+              <RankFigure row={row} format={format} wide />
+            </HStack>
+            <HStack gap={3}>
+              <RankBarCell row={row} />
+              {/* Smaller and muted: it is the figure the panel does NOT rank
+                  by, and one that reads as loud as the lead invites a reader
+                  to compare rows by it. */}
+              <Text
+                data-rank-secondary=""
+                flex="0 0 auto"
+                whiteSpace="nowrap"
+                fontSize="xs"
+                color="fg.muted"
+              >
+                {row.secondary}
+              </Text>
+            </HStack>
+          </VStack>
+        ))}
+      </VStack>
+    );
+
   return (
     <VStack align="stretch" gap={2}>
       {shown.map((row) => (
-        <HStack key={row.key} gap={3} fontSize="sm">
+        <HStack key={row.key} gap={3} fontSize="sm" data-rank-row={row.key}>
           {/* Half the row, because these labels are agent slugs and email
               addresses — `genie-revenue-analyst` and `genie-supply-planner`
               share a prefix long enough that a third of the row truncated

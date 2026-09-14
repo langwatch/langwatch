@@ -80,6 +80,14 @@ const harness = vi.hoisted(() => ({
   dailyByProvider: undefined as unknown,
   /** Not yet implemented: the records behind one day at one provider. */
   periodRecords: undefined as unknown,
+  /**
+   * The cost summary's per-day series, when a test needs one of its own.
+   *
+   * `undefined` leaves the dollars-only default below in place. Set it when a
+   * test needs days that carry a token figure as well as a dollar one: the
+   * token panels have no read of their own and fold this same series.
+   */
+  series: undefined as unknown,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -187,9 +195,11 @@ vi.mock("~/utils/api", () => ({
                   currencyTotals: [],
                 },
             seats: { status: "awaiting_data" },
-            series: harness.lanesReport
-              ? [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }]
-              : [],
+            series:
+              harness.series ??
+              (harness.lanesReport
+                ? [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }]
+                : []),
             windowDays: 30,
           },
           isLoading: false,
@@ -235,6 +245,7 @@ beforeEach(() => {
   harness.periodRecords = undefined;
   harness.modelSpend = undefined;
   harness.modelSpendFails = false;
+  harness.series = undefined;
 });
 
 afterEach(() => cleanup());
@@ -395,7 +406,7 @@ describe("the cost breakdown panels", () => {
         "Cost over time",
         "Cost by department",
         "Cost by model",
-        "Metered spend by person",
+        "Tokens by person · trace store",
       ]) {
         const panel = screen
           .getByText(title)
@@ -569,7 +580,9 @@ describe("the cost breakdown panels", () => {
         screen.queryByText("Billed spend by API key"),
       ).not.toBeInTheDocument();
       expect(screen.getByText("Unattributed spend")).toBeInTheDocument();
-      expect(screen.getByText("Metered spend by person")).toBeInTheDocument();
+      expect(
+        screen.getByText("Tokens by person · trace store"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -845,6 +858,493 @@ describe("the cost breakdown panels", () => {
       const note = region.getByLabelText(/cover only part of what was spent/i);
       expect(note).toHaveTextContent(/Anthropic/);
       expect(note).toHaveTextContent(/EUR/);
+    });
+  });
+
+  /**
+   * TOKENS ON THE PANELS THAT COUNT PEOPLE, AND ON THE LANE THAT METERS THEM.
+   *
+   * Money answers "what did this cost", which is the wrong question for an
+   * organization buying assistants on subscription: the per-request cost of a
+   * bundled seat is zero, so a department of heavy subscription users reads as
+   * nearly free. ADR-128 v3.17 ruling 7, narrowed by v3.18, moves these panels
+   * onto tokens and keeps the dollar figure beside them rather than dropping
+   * it.
+   *
+   * THE DOM CONTRACT THESE TESTS ASSERT ON. "Leads with" and "shown beneath"
+   * are claims about order, and order is not observable through text alone —
+   * a panel that printed tokens somewhere and dollars somewhere else would
+   * satisfy any text-only assertion while failing the requirement. So each
+   * ranked row exposes `data-rank-row="<key>"` with `[data-rank-lead]` and
+   * `[data-rank-secondary]` inside it. That is a contract the implementation
+   * has to honour, and it is the same shape as the `data-unpriced="true"`
+   * hook the withheld-model case above already relies on.
+   *
+   * Spec: specs/governance/governance-cost-screen.feature, the rules
+   * "One word, one number", "A people panel measures tokens and says which
+   * store it read", and "Adoption counts the people of the whole
+   * organization".
+   */
+  describe("the token figures", () => {
+    /** Every panel card currently on the screen. */
+    const allPanels = () =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid="cost-panel"]'),
+      );
+
+    /** The panel card a piece of visible text sits inside. */
+    const panelHolding = (text: string | RegExp): HTMLElement => {
+      const panel = screen
+        .getByText(text)
+        .closest('[data-testid="cost-panel"]');
+      // biome-ignore lint/suspicious/noMisplacedAssertion: this helper narrows the lookup to a panel for every caller, so the check belongs with the narrowing
+      expect(panel, `no panel holds ${String(text)}`).not.toBeNull();
+      return panel as HTMLElement;
+    };
+
+    /** A panel's ranked rows, in the order the panel draws them. */
+    const rankRows = (panel: HTMLElement) =>
+      Array.from(panel.querySelectorAll<HTMLElement>("[data-rank-row]"));
+
+    const rowFor = (panel: HTMLElement, key: string): HTMLElement => {
+      const row = panel.querySelector<HTMLElement>(`[data-rank-row="${key}"]`);
+      // biome-ignore lint/suspicious/noMisplacedAssertion: this helper narrows the lookup to a row for every caller, so the check belongs with the narrowing
+      expect(row, `the panel draws no ranked row for ${key}`).not.toBeNull();
+      return row as HTMLElement;
+    };
+
+    /** The figure a row leads with — the one a reader compares rows by. */
+    const lead = (row: HTMLElement): string => {
+      const el = row.querySelector<HTMLElement>("[data-rank-lead]");
+      // biome-ignore lint/suspicious/noMisplacedAssertion: this helper narrows the lookup to a lead figure for every caller, so the check belongs with the narrowing
+      expect(el, `${row.dataset.rankRow} states no lead figure`).not.toBeNull();
+      return (el as HTMLElement).textContent ?? "";
+    };
+
+    /** The second line beneath the lead figure, if the row draws one. */
+    const secondary = (row: HTMLElement): string =>
+      row.querySelector<HTMLElement>("[data-rank-secondary]")?.textContent ??
+      "";
+
+    /** A window of days that each carry a token count as well as dollars. */
+    const TOKEN_SERIES = [
+      {
+        day: "2026-08-01",
+        billedUsd: 12.5,
+        gatewayUsd: 4.5,
+        gatewayTokens: 900_000,
+      },
+      {
+        day: "2026-08-02",
+        billedUsd: 31.0,
+        gatewayUsd: 9.25,
+        gatewayTokens: 2_400_000,
+      },
+      {
+        day: "2026-08-03",
+        billedUsd: 8.75,
+        gatewayUsd: 1.75,
+        gatewayTokens: 310_000,
+      },
+    ];
+
+    describe("given the gateway metered tokens across the window", () => {
+      beforeEach(() => {
+        harness.series = TOKEN_SERIES;
+      });
+
+      /** @scenario "Tokens over time draws the metered lane instead of standing empty" */
+      it("draws the tokens those requests used rather than reporting an empty window", () => {
+        // The panel folds the same summary series the dollar lanes fold, so a
+        // window with token-bearing days has nothing left to wait for. Today
+        // it is handed `AWAITING_A_READ` — the empty array declared at
+        // costs.tsx:1123 and passed at :1627 — whatever the read answered, so
+        // it prints a measurement of an empty window it never made.
+        renderScreen();
+
+        const tokens = panelHolding("Tokens over time");
+        expect(
+          within(tokens).queryByText("Nothing in this window yet."),
+        ).not.toBeInTheDocument();
+        expect(
+          within(tokens).queryByText("Not available."),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("given a window whose every request was metered in audio duration alone", () => {
+      beforeEach(() => {
+        // Speech is billed by duration, not by tokens. `AudioMS` is one of the
+        // three metering columns that are not tokens at all (ADR-128 v3.18),
+        // so these days carry real dollars and a true token count of zero.
+        harness.series = [
+          {
+            day: "2026-08-01",
+            billedUsd: 0,
+            gatewayUsd: 21.5,
+            gatewayTokens: 0,
+          },
+          {
+            day: "2026-08-02",
+            billedUsd: 0,
+            gatewayUsd: 46.39,
+            gatewayTokens: 0,
+          },
+        ];
+      });
+
+      /** @scenario "A window of speech reports no tokens and still reports its cost" */
+      it("reports the zero it measured and keeps the metered lane's dollar figure", () => {
+        // Tokens are blind to speech the way dollars are blind to
+        // subscriptions. Both lanes stay on the screen so neither blind spot
+        // is the only view — and the token panel reports the zero rather than
+        // the empty-window sentence, because a window of speech was measured
+        // and came to zero. That is a different state from the department row
+        // with no token rows at all, which says it was not measured.
+        renderScreen();
+
+        const tokens = panelHolding("Tokens over time");
+
+        // THE ZERO IS ASSERTED AS THE PANEL'S STATE, NOT AS A RENDERED "0".
+        // The panel is a chart, and a chart draws nothing under a renderer
+        // with no layout — recharts declines to plot into a container that
+        // measures zero, the same reason the provider-split case above checks
+        // its heading rather than its bars. What IS observable is which of the
+        // two states the panel is in: today it is in the empty state and can
+        // never be in the other one, because it is handed `AWAITING_A_READ`
+        // (costs.tsx:1123, passed at :1627) whatever the read answered.
+        expect(
+          within(tokens).queryByTestId("cost-panel-empty"),
+        ).not.toBeInTheDocument();
+        expect(
+          within(tokens).queryByText("Nothing in this window yet."),
+        ).not.toBeInTheDocument();
+        expect(
+          within(tokens).queryByText("Not available."),
+        ).not.toBeInTheDocument();
+        // Zero is a count the screen made. "Not measured" is the wording
+        // reserved for the rows it could not count at all.
+        expect(tokens.textContent ?? "").not.toMatch(/not measured/i);
+
+        // And the money the speech cost is still on the screen beside it.
+        const gateway = within(screen.getByTestId("cost-lane-gateway"));
+        expect(gateway.getByText("$67.89")).toBeInTheDocument();
+      });
+    });
+
+    describe("given tokens recorded in the gateway ledger and on traces", () => {
+      beforeEach(() => {
+        harness.series = TOKEN_SERIES;
+        harness.activity.summary = {
+          activeUsersThisWindow: 7,
+          newUsersThisWindow: 1,
+          spentThisWindowUsd: "430.75",
+        };
+        harness.activity.spendByDepartment = [
+          {
+            departmentId: "dep-1",
+            departmentName: "Engineering",
+            spendUsd: "310.50",
+            tokens: 4_100_000,
+            tokensEstimated: false,
+          },
+        ];
+        harness.activity.spendByUser = [
+          {
+            actor: "ada@acme.test",
+            spendUsd: "200.00",
+            requests: 90,
+            tokens: 2_600_000,
+            tokensEstimated: false,
+          },
+        ];
+      });
+
+      /** @scenario "Every token figure names the store it was counted in" */
+      it("names a store on the face of every token panel, and never one figure for both", () => {
+        // The two stores measure different things for the same call — the
+        // gateway's own customer span publishes the cache-subtracted figure
+        // and never carries audio or image counts at all (ADR-128 v3.18,
+        // striking "the two stores then agree by construction"). They will
+        // disagree, and the label is what stops that reading as a defect.
+        renderScreen();
+
+        const tokenPanels = allPanels().filter((panel) =>
+          /token/i.test(panel.textContent ?? ""),
+        );
+        // SELF-CHECK BEFORE THE RULE. Every assertion below is universally
+        // quantified over this list, so an empty list would pass all of them
+        // while the screen showed no tokens anywhere. Three panels carry
+        // tokens once this ships: the metered lane over time, the department
+        // panel and the people panel.
+        expect(tokenPanels.length).toBeGreaterThanOrEqual(3);
+
+        // The gateway lane says so in the panel itself, not in a footnote
+        // somewhere else on the page.
+        expect(panelHolding("Tokens over time").textContent ?? "").toMatch(
+          /gateway/i,
+        );
+
+        for (const panel of tokenPanels) {
+          const text = panel.textContent ?? "";
+          const namesGateway = /gateway/i.test(text);
+          const namesTraces = /trace/i.test(text);
+          // Exactly one store per panel. Naming both is how one figure
+          // covering both stores would reach the screen.
+          expect(
+            namesGateway !== namesTraces,
+            `panel names ${namesGateway && namesTraces ? "both stores" : "no store"}: ${text.slice(0, 120)}`,
+          ).toBe(true);
+        }
+      });
+    });
+
+    describe("given departments whose people ran traffic under the organization's projects", () => {
+      beforeEach(() => {
+        harness.activity.summary = {
+          activeUsersThisWindow: 12,
+          newUsersThisWindow: 2,
+          spentThisWindowUsd: "430.75",
+        };
+      });
+
+      /** @scenario "A department reports the tokens it ran, across every project of the organization" */
+      it("leads the department with a token count rather than a dollar amount", () => {
+        // The read is already org-wide — `spendByDepartment` resolves every
+        // project of the organization and passes `tenantIds`
+        // (activityMonitor.service.ts:586-620), so cross-org traffic cannot
+        // reach this list by construction. What is wrong is the UNIT: the
+        // panel renders `Number(row.spendUsd)` through `fmtMoney`
+        // (costs.tsx:1748-1760), so a department is ranked and read in money.
+        harness.activity.spendByDepartment = [
+          {
+            departmentId: "dep-1",
+            departmentName: "Engineering",
+            spendUsd: "310.50",
+            // Both of the organization's projects, added up by the read.
+            tokens: 4_100_000,
+            tokensEstimated: false,
+          },
+        ];
+
+        renderScreen();
+
+        const panel = panelHolding("Engineering");
+        const row = rowFor(panel, "dep-1");
+        expect(lead(row)).toMatch(/token/i);
+        expect(lead(row)).not.toMatch(/\$/);
+      });
+
+      /** @scenario "A department of subscription users shows the tokens it really used" */
+      it("shows a subscription department the traffic it ran instead of filing it as cheapest", () => {
+        // Routed subscription conversations are assembled deliberately
+        // cost-free (conversationTraceAssembly.ts:42-52), so this department's
+        // every request carries no per-request cost. On dollars it sinks to
+        // the bottom of the panel on the strength of a zero it never earned.
+        harness.activity.spendByDepartment = [
+          {
+            departmentId: "dep-subscription",
+            departmentName: "Legal",
+            spendUsd: "0",
+            tokens: 5_000_000,
+            tokensEstimated: false,
+          },
+          {
+            departmentId: "dep-metered",
+            departmentName: "Engineering",
+            spendUsd: "400.00",
+            tokens: 100_000,
+            tokensEstimated: false,
+          },
+        ];
+
+        renderScreen();
+
+        const panel = panelHolding("Legal");
+        const subscription = rowFor(panel, "dep-subscription");
+        expect(lead(subscription)).toMatch(/token/i);
+        expect(lead(subscription)).not.toMatch(/\$/);
+        // Fifty times the traffic of the department beside it, so it is not
+        // the smallest row on a panel that ranks by what was run.
+        expect(rankRows(panel)[0]?.dataset.rankRow).toBe("dep-subscription");
+      });
+
+      /** @scenario "A department with no token rows says it was not measured" */
+      it("says a department with no token rows was not measured rather than printing a zero", () => {
+        // The Copilot Studio mapper carries no token field at all, and
+        // `TotalPromptTokenCount` is `Nullable(UInt32)` that stays null for
+        // these rows (ADR-128 v3.18, narrowing ruling 7). A zero here would
+        // be a number the screen never measured — the same rule the adoption
+        // headcount above is held to.
+        harness.activity.spendByDepartment = [
+          {
+            departmentId: "dep-1",
+            departmentName: "Engineering",
+            spendUsd: "310.50",
+            tokens: 1_000_000,
+            tokensEstimated: false,
+          },
+          {
+            departmentId: "dep-unmeasured",
+            departmentName: "Support",
+            spendUsd: "120.25",
+            tokens: null,
+            tokensEstimated: false,
+          },
+        ];
+
+        renderScreen();
+
+        const panel = panelHolding("Support");
+        const row = rowFor(panel, "dep-unmeasured");
+        expect(row.textContent ?? "").toMatch(/not measured/i);
+        expect(lead(row)).not.toMatch(/\b0\b/);
+      });
+
+      /** @scenario "A department whose tokens were estimated says so on its row" */
+      it("labels the estimated department and leaves the reported one unlabelled", () => {
+        // The Genie mapper declines to copy the puller's literal zeros and
+        // leaves the estimator to count text, stamping
+        // `langwatch.tokens.estimated = true` (genieTraceMapper.ts:475-477).
+        // An estimate beside a provider-reported count, both unlabelled,
+        // reads as one measurement.
+        harness.activity.spendByDepartment = [
+          {
+            departmentId: "dep-estimated",
+            departmentName: "Legal",
+            spendUsd: "0",
+            tokens: 5_000_000,
+            tokensEstimated: true,
+          },
+          {
+            departmentId: "dep-reported",
+            departmentName: "Engineering",
+            spendUsd: "400.00",
+            tokens: 1_000_000,
+            tokensEstimated: false,
+          },
+        ];
+
+        renderScreen();
+
+        const panel = panelHolding("Legal");
+        expect(rowFor(panel, "dep-estimated").textContent ?? "").toMatch(
+          /estimated/i,
+        );
+        expect(rowFor(panel, "dep-reported").textContent ?? "").not.toMatch(
+          /estimated/i,
+        );
+      });
+
+      /** @scenario "The department panel keeps its dollar figure as a second line" */
+      it("keeps the dollar figure beneath the tokens, saying what it covers", () => {
+        // Tokens are a worse COST ranking across a mixed model estate — ten
+        // million tokens through a cheap model can cost less than one million
+        // through an expensive one — so the dollars stay on the panel rather
+        // than being dropped. Beneath, and saying what they cover, because a
+        // subscription department's zero is not a cheap department.
+        harness.activity.spendByDepartment = [
+          {
+            departmentId: "dep-1",
+            departmentName: "Engineering",
+            spendUsd: "310.50",
+            tokens: 4_100_000,
+            tokensEstimated: false,
+          },
+          {
+            departmentId: "dep-2",
+            departmentName: "Support",
+            spendUsd: "120.25",
+            tokens: 900_000,
+            tokensEstimated: false,
+          },
+        ];
+
+        renderScreen();
+
+        const panel = panelHolding("Engineering");
+        for (const key of ["dep-1", "dep-2"]) {
+          expect(lead(rowFor(panel, key))).toMatch(/token/i);
+        }
+        expect(secondary(rowFor(panel, "dep-1"))).toContain("$310.50");
+        expect(secondary(rowFor(panel, "dep-2"))).toContain("$120.25");
+        expect(panel.textContent ?? "").toMatch(/per-request/i);
+      });
+    });
+
+    describe("given people with both token counts and per-request costs recorded", () => {
+      beforeEach(() => {
+        harness.activity.summary = {
+          activeUsersThisWindow: 2,
+          newUsersThisWindow: 0,
+          spentThisWindowUsd: "510.00",
+        };
+        // Ada costs more; Bob ran ninety times the tokens. The two orderings
+        // disagree on purpose, so a panel that shipped the unit without the
+        // sort key is caught rather than accidentally satisfied.
+        harness.activity.spendByUser = [
+          {
+            actor: "ada@acme.test",
+            spendUsd: "500.00",
+            requests: 120,
+            tokens: 100_000,
+            tokensEstimated: false,
+          },
+          {
+            actor: "bob@acme.test",
+            spendUsd: "10.00",
+            requests: 40,
+            tokens: 9_000_000,
+            tokensEstimated: false,
+          },
+        ];
+      });
+
+      /** @scenario "The panel counting people is titled for the store it reads" */
+      it("titles the people panel for the trace store instead of metered gateway spend", () => {
+        // "Metered" names the gateway ledger everywhere else on this screen,
+        // and the gateway lane is not allowed to be grouped by person at all.
+        // A panel cannot be fixed by filling it while its title still points
+        // at the wrong store. Today: costs.tsx:1272.
+        renderScreen();
+
+        const panel = panelHolding("ada@acme.test");
+        const heading = panel.querySelector("h1, h2, h3, h4, h5, h6");
+        expect(heading).not.toBeNull();
+        const title = heading?.textContent ?? "";
+
+        expect(title).not.toBe("Metered spend by person");
+        expect(title).toMatch(/trace/i);
+        expect(
+          screen.queryByText("Metered spend by person"),
+        ).not.toBeInTheDocument();
+      });
+
+      /** @scenario "The panel counting people reports tokens rather than dollars" */
+      it("leads each person with their tokens and ranks the panel by them", () => {
+        // The panel is ranked and paginated on the server — the sort
+        // whitelist the spend read splices into its ORDER BY,
+        // `SORT_FIELD_TO_AGG_EXPR`, offers spend, requests and lastActivity
+        // and holds no token key. Shipping the unit without the sort key
+        // leaves page one ordered by dollars while showing tokens, and a "top
+        // ten" that is not the top ten.
+        //
+        // (The file that whitelist lives in is deliberately not named here:
+        // this test is jsdom-only, and naming a datastore module in its source
+        // moves the whole file into the datastore lane — see
+        // src/test-utils/integrationLanes.ts.)
+        renderScreen();
+
+        const panel = panelHolding("ada@acme.test");
+        const order = rankRows(panel).map((row) => row.dataset.rankRow);
+        expect(order[0]).toBe("bob@acme.test");
+
+        for (const actor of ["bob@acme.test", "ada@acme.test"]) {
+          const figure = lead(rowFor(panel, actor));
+          expect(figure).toMatch(/token/i);
+          expect(figure).not.toMatch(/\$/);
+        }
+      });
     });
   });
 });

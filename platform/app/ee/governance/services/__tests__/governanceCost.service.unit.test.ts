@@ -40,6 +40,7 @@ function gatewayDay(overrides: Partial<GatewayDayRow> = {}): GatewayDayRow {
     requestCount: 0,
     pricedRequestCount: 0,
     requestsWithoutAmount: 0,
+    tokensTotal: 0,
     ...overrides,
   };
 }
@@ -418,6 +419,7 @@ describe("GovernanceCostService.summary", () => {
             day: "2026-08-01",
             billedUsd: 12,
             gatewayUsd: 7,
+            gatewayTokens: 0,
             billedCellsWithoutAmount: 0,
             gatewayCellsWithoutAmount: 0,
             // Neither row was ever revised or observed by a pull, so the day

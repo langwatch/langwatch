@@ -95,22 +95,23 @@ describe("the invented seat counts", () => {
     const chart = sampleSeats(MONTHS);
     const lastBar = chart[chart.length - 1];
     const valueOf = (key: string) =>
-      lastBar?.points.find((point) => point.key === key)?.value ?? 0;
+      lastBar?.points.find((point) => point.key === key)?.value;
 
-    // The lane lists pools and the chart sums them, so the comparison is the
-    // sum — but both must be answering about the same month, which is what
-    // this catches if either side ever picks a different one.
+    // The lane lists pools and the chart draws a pair per pool, so the
+    // comparison is pool by pool — both must be answering about the same
+    // month, which is what this catches if either side ever picks a different
+    // one. Per pool rather than against a total: a total agrees even when the
+    // two sides disagree about which product holds which seats.
     if (lane.status !== "reported") throw new Error("the sample lane reports");
-    const laneBought = lane.pools.reduce(
-      (sum, pool) => sum + pool.seatsBought,
-      0,
-    );
-    const laneAssigned = lane.pools.reduce(
-      (sum, pool) => sum + pool.seatsAssigned,
-      0,
-    );
 
-    expect(laneBought).toBe(valueOf("bought"));
-    expect(laneAssigned).toBe(valueOf("assigned"));
+    // A pair per listed pool and nothing besides, so a pool one side dropped
+    // cannot hide behind the pairs that still match.
+    expect(lastBar?.points).toHaveLength(2 * lane.pools.length);
+    for (const pool of lane.pools) {
+      expect(valueOf(`bought:${pool.skuPartNumber}`)).toBe(pool.seatsBought);
+      expect(valueOf(`assigned:${pool.skuPartNumber}`)).toBe(
+        pool.seatsAssigned,
+      );
+    }
   });
 });

@@ -14,9 +14,12 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 import {
+  type ActiveUserCountChRow,
   ATTR_INGESTION_SOURCE_ID,
   ATTR_ORIGIN_KIND,
   ATTR_USER_ID,
+  activeUserCountRowSchema,
+  EMPTY_ACTIVE_USER_COUNT,
   EMPTY_SUMMARY_SPEND,
   ORIGIN_KIND_VALUE,
   SORT_FIELD_TO_AGG_EXPR,
@@ -24,9 +27,9 @@ import {
   type SpendByDepartmentChRow,
   type SpendByTeamSourceChRow,
   type SpendByUserChRow,
+  type SpendByUserSortField,
   type SpendOverTimeChRow,
   type SpendOverTimeGroupBy,
-  type SpendSortField,
   type SummarySpendChRow,
   spendByDepartmentRowSchema,
   spendByTeamSourceRowSchema,
@@ -108,6 +111,63 @@ export class ActivityMonitorSpendClickHouseRepository {
   }
 
   /**
+   * Distinct people active in one window, across every project handed in.
+   *
+   * Adoption is an organization question, so this takes a tenant list where
+   * `findSummarySpend` takes one tenant - assistant traffic lands in the
+   * org's application projects, not the hidden governance one. The
+   * `langwatch.origin.kind` filter is the same, because it is what marks the
+   * assistant traffic this headcount is meant to count. Kept separate from
+   * the summary read so that widening the headcount cannot move a money
+   * figure with it (ADR-128 ruling 6).
+   */
+  async findActiveUserCount({
+    tenantIds,
+    windowStart,
+    windowEnd,
+  }: {
+    tenantIds: string[];
+    windowStart: number;
+    windowEnd: number;
+  }): Promise<ActiveUserCountChRow> {
+    // Multi-tenant read across the org's projects; the shared client serves
+    // every project, so resolving by any one of them routes identically.
+    const ch = await this.resolveClient(tenantIds[0] ?? "");
+    const result = await ch.query({
+      query: `
+        SELECT
+          uniqExact(ts.Attributes[{userKey:String}]) AS thisUsers
+        FROM trace_summaries ts
+        WHERE ts.TenantId IN ({tenantIds:Array(String)})
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
+          AND ts.Attributes[{originKey:String}] = {originValue:String}
+          AND ts.Attributes[{userKey:String}] != ''
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId IN ({tenantIds:Array(String)})
+              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params: {
+        tenantIds,
+        windowStart,
+        windowEnd,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        userKey: ATTR_USER_ID,
+      },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
+      format: "JSONEachRow",
+    });
+    const rows = activeUserCountRowSchema.array().parse(await result.json());
+    return rows[0] ?? EMPTY_ACTIVE_USER_COUNT;
+  }
+
+  /**
    * Per-user spend rollup with pagination + sort.
    *
    * ClickHouse 25.x resolves bare column names in ORDER BY to outer
@@ -130,13 +190,14 @@ export class ActivityMonitorSpendClickHouseRepository {
     tenantId: string;
     windowStart: number;
     windowEnd: number;
-    sortBy: SpendSortField;
+    sortBy: SpendByUserSortField;
     sortDir: SortDir;
     limit: number;
     offset: number;
   }): Promise<SpendByUserChRow[]> {
     const ch = await this.resolveClient(tenantId);
-    // Fails closed: SORT_FIELD_TO_AGG_EXPR is Record<SpendSortField, string>
+    // Fails closed: SORT_FIELD_TO_AGG_EXPR is
+    // Record<SpendByUserSortField, string>
     // so this is exhaustive at compile time, but sortBy crosses a tRPC
     // boundary — an erased/loosened type upstream must never turn into an
     // interpolated `undefined` in the ORDER BY clause.
@@ -151,13 +212,29 @@ export class ActivityMonitorSpendClickHouseRepository {
           toString(sum(spendUsd)) AS spendUsdStr,
           toString(count()) AS requests,
           toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs,
-          any(model) AS mostUsedTarget
+          any(model) AS mostUsedTarget,
+          -- NULL, not 0, when no trace of theirs carried a count: both token
+          -- columns are Nullable(UInt32) and a subscription product can leave
+          -- them unset. Same expressions as the department read, on the same
+          -- table, so the two panels cannot drift on what a token is.
+          if(
+            countIf(promptTokens IS NOT NULL OR completionTokens IS NOT NULL) = 0,
+            NULL,
+            toString(sum(coalesce(promptTokens, 0) + coalesce(completionTokens, 0)))
+          ) AS tokensStr,
+          toString(toUInt8(maxIf(
+            tokensEstimated,
+            promptTokens IS NOT NULL OR completionTokens IS NOT NULL
+          ))) AS tokensEstimatedStr
         FROM (
           SELECT
             ts.Attributes[{userKey:String}] AS actor,
             coalesce(ts.TotalCost, 0) AS spendUsd,
             ts.OccurredAt AS occurredAt,
-            arrayElement(ts.Models, 1) AS model
+            arrayElement(ts.Models, 1) AS model,
+            ts.TotalPromptTokenCount AS promptTokens,
+            ts.TotalCompletionTokenCount AS completionTokens,
+            ts.TokensEstimated AS tokensEstimated
           FROM trace_summaries ts
           WHERE ts.TenantId = {tenantId:String}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
@@ -194,9 +271,17 @@ export class ActivityMonitorSpendClickHouseRepository {
   }
 
   /**
-   * Per-(projectId, actor) spend for the department rollup. Multi-tenant:
-   * queries across all org projects so the department bird's-eye view
-   * aggregates the whole org's AI spend.
+   * Per-(projectId, actor) spend AND tokens for the department rollup.
+   * Multi-tenant: queries across all org projects so the department bird's-eye
+   * view aggregates the whole org's AI spend.
+   *
+   * Tokens come back beside the dollars rather than instead of them. A
+   * subscription product bills a seat, not a request, so its traces carry no
+   * per-request cost at all — ranked on dollars a department of heavy
+   * subscription users reads as nearly free. Ranked on tokens it reads as what
+   * it ran. The two are not interchangeable (a million tokens through an
+   * expensive model costs more than ten million through a cheap one), so the
+   * read carries both and the screen decides which one it leads with.
    */
   async findSpendByDepartment({
     tenantIds,
@@ -217,7 +302,34 @@ export class ActivityMonitorSpendClickHouseRepository {
           ts.Attributes[{userKey:String}] AS actor,
           toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr,
           toString(count()) AS requests,
-          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs
+          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs,
+          -- NULL, not 0, when no row of the group carried a count. Both token
+          -- columns are Nullable(UInt32) and a subscription trace can leave
+          -- them unset, so the count of rows that DID carry one is what tells
+          -- "nothing measured" apart from "measured, and it was nothing". The
+          -- coalesce inside the sum keeps a row that carried only one of the
+          -- two halves from dropping its measured half.
+          if(
+            countIf(
+              ts.TotalPromptTokenCount IS NOT NULL
+              OR ts.TotalCompletionTokenCount IS NOT NULL
+            ) = 0,
+            NULL,
+            toString(
+              sum(
+                coalesce(ts.TotalPromptTokenCount, 0)
+                + coalesce(ts.TotalCompletionTokenCount, 0)
+              )
+            )
+          ) AS tokensStr,
+          -- Only over the rows that carried a count: a row with no tokens has
+          -- no estimate to report, and letting it set the flag would label a
+          -- department's real figure as an estimate.
+          toString(toUInt8(maxIf(
+            ts.TokensEstimated,
+            ts.TotalPromptTokenCount IS NOT NULL
+            OR ts.TotalCompletionTokenCount IS NOT NULL
+          ))) AS tokensEstimatedStr
         FROM trace_summaries ts
         WHERE ts.TenantId IN ({tenantIds:Array(String)})
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
