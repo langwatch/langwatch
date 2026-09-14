@@ -34,13 +34,8 @@ export const suiteFormSchema = z.object({
 export type SuiteFormData = z.infer<typeof suiteFormSchema>;
 
 /**
- * The form `useSuiteForm` actually returns.
- *
- * Three type arguments, not one: the schema's INPUT is what the fields hold
- * while a person is typing, and `SuiteFormData` is what the resolver hands a
- * submit. A consumer that writes `UseFormReturn<SuiteFormData>` is naming a
- * different type — the two disagree on every field zod narrows, which is how
- * the run plan editor came to be passing a form nothing would accept.
+ * The form `useSuiteForm` returns: input type (fields during editing) + resolved
+ * output type (what submit receives), distinct when zod narrows the schema.
  */
 export type SuiteFormReturn = UseFormReturn<
   z.input<typeof suiteFormSchema>,

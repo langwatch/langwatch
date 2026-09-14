@@ -1,35 +1,6 @@
 /**
- * What the personal-workspace screens ask of the application they are mounted
- * in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make these screens
- * untestable outside a running application. They ask this port instead, and the
- * frontend feature that owns them — `apps/ui/src/features/personal-workspace` —
- * answers it by adapting the browser capabilities the application already
- * resolves.
- *
- * It lives in `model` because it is a package-wide portable value: types plus
- * the React context they travel in, depending on nothing but React.
- *
- * THE THIRD FAMILY TO DECLARE THIS SHAPE, after `GovernanceHostPort` and
- * `GatewayHostPort`. The three are close enough that promoting them is now the
- * obvious next move — the comment on `GatewayHostPort` says a third repeat is
- * the signal — and deliberately not done here: promotion is a change to two
- * packages this move does not own, and doing it inside a page-family move would
- * hide it. Recorded in `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * What this family asks that the other two did not: the reader's organization
- * ROLE (a view-only member is told why their own workspace refuses writes), and
- * whether the scope has resolved yet (the two project-scoped screens say
- * nothing about a project until they have one, rather than "no sessions").
- *
- * What the SIGN-IN METHODS screen added to it is a transport rather than a
- * reading: five better-auth ceremonies, because a passkey is registered in the
- * browser and never over tRPC, and `better-auth` is one of the imports ADR-004
- * seals off. Declared on this port rather than on a second one — a package has
- * ONE host port — and answered from `apps/ui/src/behavior/ui-passkeys.ts`.
+ * Host port for personal-workspace screens: org/project scope, actor, feedback
+ * and auth ceremonies. Third family to use this pattern; see ui-family-move-manifests.md.
  */
 
 import { createContext, useContext } from "react";
@@ -113,15 +84,7 @@ export type PersonalSuccessNotice = {
 export type PersonalFailureNotice = {
   error: unknown;
   fallbackTitle: string;
-  /**
-   * A sentence for a refusal that has no code to look up.
-   *
-   * The credentials family added this to `UiFailureNotice` and it is the same
-   * field: the registry still WINS over it, so it can never talk over
-   * registered copy, and it only fills the gap where there is no code at all. A
-   * passkey ceremony that did not finish is exactly that — there is no server
-   * error, only a device that could not complete the attempt.
-   */
+  /** Description for errors with no registered code. */
   description?: string;
   id?: string;
 };
@@ -167,15 +130,7 @@ export type HeldPasskey = {
   transports?: string | null;
 };
 
-/**
- * How a passkey ceremony ended.
- *
- * THE THREE-WAY ANSWER IS THE WHOLE VALUE OF THIS TYPE. A cancelled prompt is
- * not a failure: somebody opened the operating system's dialog, looked at it
- * and closed it, and saying "something went wrong" about a decision is telling
- * them off for deciding. better-auth reports that as a zero status, which the
- * application reads and this flag carries.
- */
+/** Passkey ceremony outcome: ok, cancelled, or failed. */
 export type PasskeyOutcome =
   | { ok: true }
   | { ok: false; cancelled: true }
@@ -235,31 +190,11 @@ export abstract class PersonalWorkspaceHostPort {
 
   abstract navigate(to: string): void;
 
-  /**
-   * Re-reads who is signed in.
-   *
-   * The one action on this port that is not navigation or a notice, and it
-   * exists for one surface: the avatar control writes a new photo and the
-   * header has to stop showing the old one. `platform/app` did it by calling
-   * `session.update()` on the better-auth client, which is precisely the
-   * import ADR-004 seals off — so the screen asks for the effect and the
-   * application decides how its own session is refreshed.
-   */
+  /** Re-reads who is signed in after credential changes. */
   abstract refreshSession(): Promise<void>;
 
-  // -- the reader's own sign-in methods ---------------------------------------
-  //
-  // FIVE CEREMONIES AND A REDIRECT, none of them tRPC. Passkeys are registered,
-  // renamed and removed through better-auth's browser client, and linking an
-  // additional method leaves the page for the provider — so `better-auth` is
-  // the import ADR-004 seals off and the wire lives in
-  // `apps/ui/src/behavior/ui-passkeys.ts`, the browser-transport home the
-  // credentials family carved out for the CLI device flow.
-  //
-  // THE SPLIT IS THE POINT, and it is the same one: what the screen SAYS about
-  // an outcome is decided here and pinned in this package; what the outcome IS
-  // — in particular that a cancelled device prompt arrives as a zero status and
-  // is not a failure — is decided in `apps/ui` and pinned there.
+  // -- the reader's own sign-in methods
+  // Passkey ceremonies through better-auth client, linking through provider.
 
   /** Every passkey this account holds, newest reading each time it is asked. */
   abstract listPasskeys(): Promise<readonly HeldPasskey[]>;

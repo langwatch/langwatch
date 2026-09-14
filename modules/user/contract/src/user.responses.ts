@@ -1,13 +1,4 @@
-/**
- * What the `user.*` tRPC surface ANSWERS.
- *
- * The inputs already lived in `user.schemas.ts`; these are the other half, so
- * every procedure can state its response shape the way it states its request
- * one. They are the transport's shapes rather than the service's: several
- * procedures answer an acknowledgement the service itself never mentions
- * (`{ success: true }`), and the ones that forward a service value reuse that
- * value's own schema instead of restating it.
- */
+/** Response schemas for the `user.*` tRPC surface. */
 import { ensuredPersonalWorkspaceSchema } from "@langwatch/organization-contract";
 import { z } from "zod";
 

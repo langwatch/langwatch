@@ -1,12 +1,6 @@
 /**
  * @vitest-environment node
- * The account contract, stated once and run against every backend the package
- * can reach. The memory twin runs always; a Postgres backend joins the table
- * when this package declares a datastore in its vitest config.
- *
- * The two repositories are exercised over ONE bundle on purpose: they share the
- * `Account` rows, so a credential minted by the user repository has to be the
- * row the credential repository reads back.
+ * Account contract tested across all backends (memory + Postgres).
  * @see modules/user/specs/user.feature
  */
 import { describe, expect, it } from "vitest";

@@ -1,12 +1,4 @@
-/**
- * Renders scenario runs as either a grid of cards or a list of rows.
- *
- * Shared between RunRow (ungrouped view) and BatchSection (grouped view)
- * to avoid duplicating the grid/list rendering logic.
- *
- * When item count exceeds VIRTUALIZE_THRESHOLD, uses @tanstack/react-virtual
- * to only render visible items, avoiding expensive ScenarioGridCard mounts.
- */
+/** Renders scenario runs as grid or list with virtualization above a threshold. */
 
 import { Grid, VStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";

@@ -119,7 +119,7 @@ export type RunGroup = {
   scenarioRuns: ScenarioRunData[];
 };
 
-/** A batch run groups all scenario runs that share the same batchRunId. Extends RunGroup for backward compatibility. */
+/** A batch run groups scenario runs by batchRunId. */
 export type BatchRun = RunGroup & {
   batchRunId: string;
   scenarioSetId?: string; // present in All Runs view
@@ -127,7 +127,7 @@ export type BatchRun = RunGroup & {
 
 /** Summary statistics for a run group (batch, scenario, or target). */
 export type RunGroupSummary = {
-  /** Pass rate as percentage (0-100), or null when no runs have a verdict (all stalled/cancelled/in-progress). */
+  /** Pass rate as percentage, or null when no runs have settled. */
   passRate: number | null;
   passedCount: number;
   failedCount: number;
@@ -278,26 +278,12 @@ function getTargetReferenceId(run: ScenarioRunData): string | undefined {
   return run.metadata?.langwatch?.targetReferenceId;
 }
 
-/**
- * The key the run's target folds under: the stamped target key, which tells
- * an agent on one set of parameters from the same agent on another, or the
- * bare reference id of a run recorded before targets carried a key.
- *
- * @see specs/features/agent-testing/comparison-mode.feature
- */
+/** Returns the target key for a run, distinguishing agents with different parameters. */
 export function targetKeyOfRun(run: ScenarioRunData): string | undefined {
   return run.metadata?.langwatch?.targetKey ?? getTargetReferenceId(run);
 }
 
-/**
- * Groups a flat list of scenario runs by their target key.
- *
- * One group per key, in the order the keys first appear. The label is the key
- * itself: naming a target belongs to the client, which holds the names of the
- * agents and the prompts. Runs without a target fold under "Unknown".
- *
- * @see specs/features/agent-testing/comparison-mode.feature
- */
+/** Groups scenario runs by their target key, with unknown runs under "Unknown". */
 export function groupRunsByTargetKey({ runs }: { runs: ScenarioRunData[] }): RunGroup[] {
   const targetMap = new Map<string, ScenarioRunData[]>();
 
@@ -371,17 +357,8 @@ export function computeBatchRunSummary({ batchRun }: { batchRun: BatchRun }): Ru
 }
 
 /**
- * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
- *
- * Pass rate = passed / settled. "Settled" = passed + failed + stalled + cancelled
- * (all terminal states). Only in-progress and queued runs are excluded from the
- * denominator since we don't know their outcome yet.
- * When no runs have settled yet (settledCount == 0), passRate is null.
- *
- * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
- * with its own pass rate formula. If you change the formula here, also update:
- *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar query)
- *   - SuiteSidebar.tsx → RunSummaryLine() (sidebar display)
+ * Computes pass/fail summary for any RunGroup. Keep in sync with the sidebar's
+ * ClickHouse query in simulation.clickhouse.repository.ts → getSetSummaries().
  */
 export function computeGroupSummary({ group }: { group: RunGroup }): RunGroupSummary {
   let passedCount = 0;
@@ -487,17 +464,7 @@ export function getScenarioDisplayNames({
   return displayed.join(", ");
 }
 
-/**
- * Computes iteration numbers for scenario runs that share the same
- * scenario + target combination within a batch.
- *
- * Returns a Map from scenarioRunId to iteration number (1-based).
- * Only includes entries for runs where there are multiple iterations
- * (i.e., the same scenario+target pair appears more than once).
- *
- * The target is its key, so the same agent on two sets of parameters counts
- * as two targets and neither borrows the other's iterations.
- */
+/** Maps scenario runs to iteration numbers by scenario+target combination. */
 export function computeIterationMap({
   scenarioRuns,
 }: {
@@ -549,17 +516,7 @@ export function buildDisplayTitle({
   return title;
 }
 
-/**
- * Resolves the origin label for a batch run in the All Runs panel.
- *
- * - On-platform runs (matching __internal__<projectId>__on-platform-scenarios): returns friendly display name
- * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
- * - External runs: returns the raw scenario set ID as the label
- * - No set ID: returns null
- *
- * onPlatformLabel renames only the on-platform set, for a surface that calls
- * it something else. Omitted, the label is the one v1 has always shown.
- */
+/** Resolves a batch run's origin label: on-platform, suite, external, or null. */
 export function resolveOriginLabel({
   scenarioSetId,
   suiteNameMap,

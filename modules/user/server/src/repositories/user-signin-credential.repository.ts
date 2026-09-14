@@ -12,16 +12,8 @@ export type UserCredentialAccount = {
 };
 
 /**
- * The `Account` rows a person's sign-in methods live on, as the user feature
- * reads and writes them.
- *
- * A second repository beside `UserRepository` rather than more methods on it,
- * and the reason is one column. `Account.password` is the bcrypt hash a
- * credential sign-in is checked against, and the only two operations that may
- * touch it are the comparison and the rotation — both of which live in
- * `UserCredentialService`. Splitting these reads out here is what lets that
- * service be the whole surface: nothing else in the package, and nothing
- * outside it, is handed a reader that returns the hash.
+ * Account rows for sign-in methods. Separate to restrict hash access to
+ * UserCredentialService alone.
  */
 export interface UserCredentialRepository {
   /**

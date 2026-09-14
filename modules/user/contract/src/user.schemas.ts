@@ -1,14 +1,4 @@
-/**
- * The inputs the `user.*` tRPC surface publishes.
- *
- * They live in the contract rather than beside the router so the wire shape a
- * client is typed against is stated once, in the package both sides may import.
- *
- * Passwords appear here only as length bounds. The policy itself is checked in
- * the handler, where a refusal can carry `meta.fieldErrors` and land on the
- * field the person is looking at; a schema rejection arrives as a tRPC parse
- * error with no field to hang on. No schema here stores or echoes a secret.
- */
+/** Input schemas for the `user.*` tRPC surface. Secrets never stored here. */
 import { z } from "zod";
 
 /**

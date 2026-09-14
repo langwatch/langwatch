@@ -1,15 +1,4 @@
-/**
- * The address, as the personal-workspace screens read and write it.
- *
- * They arrived using `platform/app`'s `~/utils/compat/next-router` (path
- * parameters and the query string merged into one `query` bag) and, on the
- * settings screen, `react-router`'s `useSearchParams`. Both are router imports
- * a feature-web package may not make, so they are re-bound to the host's route
- * capability with the shape the call sites already expect.
- *
- * `push` and `replace` take the same strings the pages passed: an absolute path
- * navigates, and a bare `"?a=b"` rewrites the query of the current page.
- */
+/** Router for personal-workspace screens, bound through host's route capability. */
 
 import { useMemo } from "react";
 import { usePersonalWorkspaceHost } from "../model/personal-workspace-host.ts";

@@ -1,12 +1,4 @@
-/**
- * Compact metrics pill for run/group row headers.
- *
- * Shows pass rate, total duration, and total cost inline.
- * Hover tooltip shows detailed breakdown with expandable
- * percentile distributions for agent latency and cost.
- *
- * Design follows TargetSummary.tsx from the evaluations page.
- */
+/** Compact metrics pill for run/group row headers with pass rate, duration, and cost. */
 
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ChevronRight, Clock, Zap } from "lucide-react";
@@ -264,7 +256,7 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
           </HStack>
         )}
 
-        {/* Pass rate — shown when there are completed runs (even while running for partial results) */}
+        {/* Pass rate when there are completed runs */}
         {!isRunning && summary.totalCount > 0 && (
           <>
             <Text fontWeight="600">Pass</Text>

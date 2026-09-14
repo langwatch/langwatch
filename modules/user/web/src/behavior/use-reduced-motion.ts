@@ -1,13 +1,4 @@
-/**
- * Whether the reader asked their system to keep motion still.
- *
- * The package's own copy of `platform/app`'s `useReducedMotion`, taken rather
- * than imported because a feature-web package may not reach into the
- * application. One live `MediaQueryList` for the whole page: `getSnapshot` runs
- * on every render of every subscriber, and `window.matchMedia` is a measurable
- * per-call cost at that frequency. The cache keys on the `matchMedia` function
- * identity, so a test that stubs it gets a fresh list.
- */
+/** Reads whether the system prefers reduced motion. Cached MediaQueryList. */
 
 import { useSyncExternalStore } from "react";
 

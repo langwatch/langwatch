@@ -1,14 +1,4 @@
-/**
- * Collapsible row for a grouped set of scenario runs.
- *
- * Used when group-by is set to "scenario" or "target".
- * Header: [chevron] [group_name (bold)] [counts (word labels)] ... [N runs]
- * Expanded: sub-grouped by batch, each with a lightweight header showing
- * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
- *
- * The header is rendered as a direct child of the scroll container (no wrapper Box)
- * so that `position: sticky` works correctly within the scrollport.
- */
+/** Collapsible row for grouped scenario runs, with header sticky positioning. */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";

@@ -1,20 +1,6 @@
 /**
- * The handled-error payload, as much of it as this family reads.
- *
- * `platform/app/src/features/errors/logic/readHandledError.ts` validates the
- * whole envelope from both boundaries and hands back nine fields. This family
- * asks it two questions — which code came back, and whether the server named a
- * field that was rejected — so that is what travels here.
- *
- * A COPY of the same nine lines `@langwatch/gateway-web`,
- * `@langwatch/automation-web`, `@langwatch/annotation-web` and
- * `@langwatch/enterprise-governance-web` carry, for the same reason and with
- * the same gap: the reader belongs with the presentation registry it feeds, and
- * five families will converge on one when that registry moves out of
- * `platform/app`.
- *
- * Trusts nothing: a misconfigured or older server must not be able to crash a
- * render by omitting a field.
+ * Handled-error payload: code and field rejections. Read from server via
+ * platform/app's logic, duplicated in feature-web packages.
  */
 
 export type UserHandledError = {
@@ -44,16 +30,7 @@ export function readHandledError(error: unknown): UserHandledError | null {
   };
 }
 
-/**
- * What the server said about individual fields, if it named any.
- *
- * A NARROWED `applyHandledErrorToForm`. The platform helper is 130 lines
- * because it also decides whether the caller may suppress its toast, which
- * turns on whether the form paints a root-error slot; this dialog always paints
- * one, so the decision is not this function's to make. What survives is the
- * reading — only a `validation_error` names fields, and only the FIRST message
- * per field fits beside an input.
- */
+/** Server field rejections for validation errors, keyed by field name. */
 export function fieldProblems(error: unknown): Record<string, string> {
   const handled = readHandledError(error);
   if (handled?.code !== "validation_error") return {};
@@ -101,16 +78,7 @@ const SCREAMING_CASE = /^[A-Z][A-Z0-9_]*$/;
 /** `validation_error` — a code slug, not a sentence. */
 const SLUG_SHAPED = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 
-/**
- * Shapes that mean a machine wrote this string, not a person.
- *
- * Deliberately conservative in ONE direction: every pattern here has to be
- * something no product person would ever type, because a false positive
- * silently replaces good copy with "something went wrong on our side". That is
- * why the SQL pattern is case-SENSITIVE — an earlier version of the platform
- * guard matched case-insensitively and would have eaten "Select a template from
- * the list before running this."
- */
+/** Patterns that signal machine-generated text, not authored copy. */
 const MACHINE_PROSE = new RegExp(
   [
     "\\bprisma\\.",
@@ -125,27 +93,8 @@ const MACHINE_PROSE = new RegExp(
 );
 
 /**
- * Prose a procedure deliberately authored for the reader, on an error that is
- * not a `HandledError`.
- *
- * WHY THIS TRAVELS WITH THE FAMILY. #5984 collapsed the wire message to the
- * code for handled errors and to a generic string for unhandled 5xx, but it
- * deliberately left a plain non-5xx `TRPCError`'s message alone, because that
- * is copy the procedure wrote to be read. `user.changePassword` throws exactly
- * one: a 401 saying WHICH password was wrong, which is the only thing that
- * tells a reader to retype the first field rather than the second.
- *
- * The application's feedback capability resolves copy from a code, and an
- * authored error carries none — so it would degrade this to the generic line.
- * The screen therefore reads it and passes it as the notice's `description`,
- * which the capability uses only where there is no code, so it can never talk
- * over registered copy.
- *
- * A NARROWED COPY of `platform/app/src/features/errors/logic/readHandledError.ts`'s
- * `readAuthoredMessage`, keeping both of its layers: the server's own
- * `data.authored` flag (it needs `cause`, which never crosses the wire) and the
- * independent machine-prose refusal, because the cost of being wrong here is a
- * Prisma string in front of a customer.
+ * Authored error message for non-5xx errors. Must be verified to exclude
+ * machine-generated prose (Prisma, SQL, stack traces).
  */
 export function authoredMessage(error: unknown): string | undefined {
   if (readHandledError(error)) return void 0;

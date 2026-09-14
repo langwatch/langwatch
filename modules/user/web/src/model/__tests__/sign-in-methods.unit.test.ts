@@ -1,14 +1,6 @@
 /**
- * How a linked sign-in method is named and classified.
- *
- * The Auth0 strategy encoding is a convention nothing enforces, and reading it
- * wrong is how a Google account starts calling itself "Email/Password" — which
- * is the one label that decides whether a Change Password control is offered.
- * Offering it on a social account sends the reader to a dialog whose submit can
- * only fail; withholding it from a credential account leaves them no way to
- * change their password at all.
- *
- * Spec: specs/settings/change-password-auth0.feature
+ * Tests naming and classification of Auth0 sign-in methods. The strategy
+ * encoding decides whether Change Password is offered. Ref: change-password-auth0.feature
  */
 
 import { describe, expect, it } from "vitest";

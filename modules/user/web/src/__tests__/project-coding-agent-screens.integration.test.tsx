@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The two project-scope coding-agent screens hand the table the address's project, saying nothing about one not yet resolved. The release flag moved out to the route map, so this doesn't guard it too. @see specs/coding-agent/project-menu-links.feature
+ * Tests coding-agent project screens. Ref: specs/coding-agent/project-menu-links.feature
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

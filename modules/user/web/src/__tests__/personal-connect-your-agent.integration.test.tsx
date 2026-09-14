@@ -1,25 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Covers specs/ai-governance/personal-portal/connect-your-agent-button.feature.
- *
- * Full-tree: the real overview screen renders with every section live. The
- * tRPC surface is a proxy that answers every query empty unless a test pins
- * it. The two pinned reads are the personal context (which project the /me
- * home watches) and project.getHasFirstMessage, the same Project.firstMessage
- * signal the authorize page's first-trace watch polls, reused here as the
- * button's appearance gate.
- *
- * THE FLAG GUARD IS NOT HERE ANY MORE, and neither is the chrome. Both moved to
- * the frontend feature that mounts this screen: the guard is stated in
- * `apps/ui`'s route map and covered by its own suite, and the layout is a
- * container. What is left in this file is the page content, which is what it
- * was always about.
- *
- * THE LANGY ROUTE IS GONE from the menu, so its three scenarios no longer bind
- * here. `askLangy` and `useCanAskLangy` are application state a feature-web
- * package may not reach and `apps/ui` has no assistant capability to answer
- * with; recorded in dev/docs/plans/ui-family-move-manifests.md.
+ * Tests connect-your-agent-button.feature. Full-tree integration with tRPC
+ * surface pinning personal context and project.getHasFirstMessage for gate.
  */
 
 import { readFileSync } from "node:fs";

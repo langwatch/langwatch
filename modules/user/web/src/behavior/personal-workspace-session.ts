@@ -1,17 +1,4 @@
-/**
- * The reads the personal-workspace screens used to get from
- * `useOrganizationTeamProject`, `useRequiredSession`, `useLiteMemberGuard` and
- * `usePublicEnv`.
- *
- * The platform hook resolved the active scope AND redirected on it: a reader
- * without a project was bounced to onboarding unless the caller opted out.
- * Landing policy is not a screen's business and does not travel with it — the
- * gateway family made the same cut — so what is left here is the reading half,
- * served by the host.
- *
- * The options object is gone with the redirects it configured. That is the one
- * shape change every call site of these hooks carries.
- */
+/** Reads for personal-workspace screens: org, project, actor, bound via host. */
 
 import { useMemo } from "react";
 import {

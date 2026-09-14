@@ -1,27 +1,6 @@
 /**
- * Builds the {@link UserInfrastructure} this module used to receive
- * hand-composed (`apps/api/src/features/user/user.composition.ts`, deleted by
- * b383462d96). `UserApp.create` now builds it itself from the two members it
- * reads — `prisma` and `redis` — its own config, and its contract peers.
- *
- * Every branch here is the deleted composition's own, kept verbatim where a
- * member or a peer can stand in for what it read: `deployment.authProvider`
- * is `dependencies.auth.resolveAuthProvider()` (the SAME auth application the
- * deleted composition read through a peer function of the identical name);
- * the organization directory's Prisma reads are the deleted composition's
- * own queries, over the `prisma` member instead of an externally-supplied
- * client; the per-budget rate limiter is the fixed-window counter
- * `automation-composition.build.ts` already built for the same reason (each
- * caller names its own window and ceiling, which the process's shared
- * `rateLimiter` member cannot, since that one is built with ONE fixed policy
- * at boot).
- *
- * What the deleted composition refused by name — the Auth0 tenant, CLI
- * credential revocation, gateway governance, the Enterprise spend ledger —
- * still refuses by name here. What it wired to the stored-object family (the
- * avatar bytes) and to the identity ceremony (email verification) refuses by
- * name too: neither crossing is a member or a declared dependency of this
- * module yet, and no package owns the adapter that would make it one.
+ * Builds UserInfrastructure from members and dependencies. Composition moved
+ * here from hand-composition in deleted apps/api/features/user/user.composition.ts.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";

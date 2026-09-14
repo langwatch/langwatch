@@ -43,18 +43,7 @@ export type PersonalApiKeyRow = {
   createdAt: string;
 };
 
-/**
- * Wire shape mirrors `api.user.personalBudget` (Sergey's dc07c772e) and
- * the gateway 402 body. status=ok → no banner; warning → yellow 80%
- * banner; exceeded → BudgetExceededBanner with the structured fields.
- *
- * The OK status carries the same snapshot fields as warning / exceeded
- * when the user has a real applicable budget — the /me chip needs
- * always-on data ("rogerio-claude-budget · 13% spent" at 13% used)
- * even though no banner fires. Banners still gate on `status`. When
- * the user has no applicable budget at all, the wire collapses to
- * just `{ status: "ok" }` (no extra fields).
- */
+/** Wire shape for budget state: ok/warning/exceeded with optional details. */
 export type PersonalBudgetState =
   | { status: "ok" }
   | {
@@ -83,30 +72,12 @@ export type PersonalContext = {
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
-  /**
-   * Whether the read behind `personalProjectId` has answered.
-   *
-   * `ready` is about the session and the organization, and the personal
-   * context is only asked for once those land, so there is a window where
-   * `ready` is true and the project is still unknown. A surface that says
-   * something about the workspace when there is no project has to tell that
-   * window apart from a genuine absence, or it states a fact it does not have.
-   */
+  /** Whether the personal project read has answered. */
   isPersonalProjectResolved: boolean;
   apiKeys: PersonalApiKeyRow[];
 };
 
-/**
- * Personal-context data source. Pulls workspace identity + routing policy
- * + API-key list from real tRPC. Cost / spend-over-time / by-tool /
- * recent-activity are still mocked because the per-user ClickHouse
- * aggregations aren't shipped yet — they will plug in here once the
- * trace-fold subscriber learns to project per-user totals.
- *
- * Spec: specs/ai-gateway/governance/personal-keys.feature
- *       specs/ai-gateway/governance/my-usage-dashboard.feature
- *       specs/ai-gateway/governance/my-settings.feature
- */
+/** Personal-context data source: workspace identity + routing policy + API keys. */
 export function usePersonalContext(): PersonalContext {
   const currentUser = useCurrentUser();
   const { organization } = useOrganizationTeamProject();
@@ -122,26 +93,7 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
-  // `targetUserId` is NOT optional here even though the procedure allows it.
-  // Omitting it means "sweep the whole org" for any caller holding
-  // `virtualKeys:viewOtherPersonal` at the organization tier — the org ADMIN
-  // template grants it, and team ADMIN reaches the same tier through the
-  // legacy team-membership union. Such a caller's own /me page listed every
-  // member's personal keys as if they were their own, and revoking one then
-  // failed, because `revokePersonal` is correctly scoped to the caller.
-  // /me is a first-person surface: always pin the principal to the session
-  // user. The org-wide sweep belongs to the admin audit surface, not here.
-  //
-  // `enabled` therefore gates on `userId` too: an enabled query with an
-  // undefined target is precisely the sweep, so the request has to wait
-  // until the session says who is asking.
-  //
-  // The `?? ""` is not cosmetic. `undefined` is the exact value that MEANS
-  // sweep, so passing it through while the session resolves would leave the
-  // whole guarantee resting on `enabled` alone — one refactor that flips a
-  // gate reopens the hole. `""` fails closed instead: it takes the
-  // `targetUserId !== undefined` branch, which is FORBIDDEN for a member and
-  // zero rows for a holder. Never the sweep.
+  // Always pin userId to prevent org-wide key sweep.
   const personalKeysQuery = api.personalVirtualKeys.list.useQuery(
     { organizationId: orgId, targetUserId: userId ?? "" },
     {
