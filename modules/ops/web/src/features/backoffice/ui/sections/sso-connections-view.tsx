@@ -25,19 +25,8 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 const PAGE_SIZE = 25;
 const COLUMN_COUNT = 6;
 
-/**
- * The back office's single sign-on connections (D05 tier 1).
- *
- * It extends the back office rather than sitting beside it: the same
- * `BackofficeTable` shell, the same debounced search and paging, the same
- * per-row overflow menu, and a detail drawer that opens beside the list. What
- * is different is underneath — every action here is a guarded command with
- * the operator recorded on it, so this view holds no form that writes a
- * field. It offers verbs.
- *
- * This is what replaces the two free-text single sign-on inputs that used to
- * sit on the organization record.
- */
+/** SSO connections management (D05 tier 1). Uses BackofficeTable shell; every action
+ * is guarded command (offers verbs, not forms). Replaces org-record text inputs. */
 export default function SsoConnectionsView() {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -245,12 +234,8 @@ interface RowAction {
   run: () => void;
 }
 
-/**
- * Which verbs the lifecycle admits from this row, as data. Derived rather
- * than rendered inline so that "what may be done from this state" is one
- * readable list beside the state machine it mirrors, and an entry that is not
- * in the list is not merely hidden — it was never offered.
- */
+/** Verbs as data (derived, not rendered) so list mirrors state machine; unfamiliar
+ * entries are rejected, not just hidden. */
 function rowActionsFor({
   connection,
   commands,
@@ -378,15 +363,8 @@ function RowActions({
   );
 }
 
-/**
- * Removing a live connection states its own risk before it happens.
- *
- * The confirmation names the organization the way an operator can check it —
- * by name — and says who would lose their way in. When the name cannot be
- * resolved the control is withheld entirely rather than confirmed against an
- * identifier nobody can verify at a glance: on a cross-tenant surface the
- * risk is not the wrong action, it is the right action on the wrong tenant.
- */
+/** Names org by resolvable name to verify before removing; withheld if unresolvable
+ * (on cross-tenant surface, risk is right action on wrong tenant). */
 function RemoveConnectionDialog({
   connection,
   open,

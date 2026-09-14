@@ -3,15 +3,8 @@ import { Badge, Button, Card, HStack, Spacer, Spinner, Table, Text } from "@chak
 import { useMemo } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 
-/**
- * Anomalous-tenants panel. Lists tenants whose enqueue rate has spiked
- * far above their normal baseline (rate breaker) or whose traces are
- * being dominated by a single structural fingerprint (fingerprint loop).
- *
- * Post-2026-05-11 incident follow-up. On the day of the outage we had no
- * way to see "tenant X is 96% of cluster volume" until customers were
- * already paging us. This panel surfaces it within minutes.
- */
+/** Anomalous tenants: spiked enqueue rate or trace dominance (rate breaker, fingerprint
+ * loop). Post-incident: surface tenant volume anomalies early. */
 export function AnomaliesCard() {
   const query = api.ops.listAnomalies.useQuery(undefined, {
     refetchInterval: 30_000,

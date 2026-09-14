@@ -7,17 +7,8 @@ import { ProcessInstanceDrawer } from "./process-instance-drawer.tsx";
 import { ProcessInstancesDrawer } from "./process-instances-drawer.tsx";
 import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 
-/**
- * strip → structure → detail, per best_practices/ops-dashboard.md.
- *
- * BOTH DRAWERS ARE ADDRESSED HERE. `platform/app` registered them by name and
- * mounted them from the application shell; a feature-web package may not carry
- * that registry, so each keeps its own query key on this page — `?processes=`
- * for the instance list (the literal `all` for the every-process view) and
- * `?processInstance=<process>|<tenant>|<key>` for one instance's detail. Both
- * addresses are still shareable, which is the only property the registry ever
- * gave them.
- */
+/** Strip→structure→detail. Both drawers addressed here (each own query key; still
+ * shareable). */
 export function ProcessesContent() {
   const instances = useOpsOverlay("processes");
   const instance = useOpsOverlay("processInstance");

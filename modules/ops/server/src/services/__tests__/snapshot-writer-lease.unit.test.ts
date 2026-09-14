@@ -5,9 +5,10 @@ import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
 
 /**
- * the lease must return BEFORE scanning, not merely skip the write. A version that scanned and then discarded would still run
- * ~14 scans a cycle across the fleet and look identical from the outside, so this is worth pinning.
- * The lease gate is the whole cost saving in ADR-090: a pod that does not hold
+ * The lease must return BEFORE scanning, not skip the write. A version
+ * that scanned and discarded would run ~14 scans per cycle across the fleet
+ * and look identical, so this is important. The lease gate is ADR-090's
+ * cost saving.
  */
 
 const redisStub = {

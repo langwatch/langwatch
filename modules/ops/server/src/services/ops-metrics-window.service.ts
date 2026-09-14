@@ -76,9 +76,9 @@ const EMPTY_PHASE = {
 } as const;
 
 /**
- * Raw `__jobType` values become the projection-kind node names the health join looks up: folds enqueue as `projection`, maps
- * as `handler`, state projections as `stateProjection`. Filing `handler` under `fold` (as this did until #7322) left every map
- * row permanently dark — the join looked under `map`, which the tree never produced.
+ * `__jobType` becomes projection-kind node names: folds enqueue as
+ * `projection`, maps as `handler`, state projections as `stateProjection`.
+ * Filing `handler` under `fold` (#7322) left every map row dark.
  */
 export interface PeakBucket {
   completedPerSec: number;

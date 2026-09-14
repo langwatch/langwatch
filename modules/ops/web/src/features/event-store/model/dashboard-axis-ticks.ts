@@ -1,12 +1,5 @@
-/**
- * Tick maths for the throughput chart's two y-axes.
- *
- * The chart plots rates on the left and counts on the right. Deriving each
- * maximum independently and letting the chart library choose ticks per axis
- * puts two sets of gridlines at unrelated heights, so a reader cannot tell
- * which line belongs to which scale — the axes visually contradict each other
- * even when both are correct.
- */
+/** Two y-axes (rates, counts) with shared gridline count so scales align; deriving
+ * maxima independently misaligns gridlines. */
 
 /** Gridline count is shared by both axes; 4 intervals reads well at chart height. */
 export const AXIS_INTERVALS = 4;

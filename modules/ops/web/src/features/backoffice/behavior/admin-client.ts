@@ -1,12 +1,5 @@
-/**
- * Thin typed wrapper around the Hono `/api/admin/:resource` endpoints.
- *
- * The backend (see the app-owned Ops Hono route) is a `ra-data-simple-prisma`
- * handler: every call is a POST with `{ resource, method, params }`. The
- * Chakra backoffice UI talks to it through this wrapper, keeping all business
- * logic (user deactivate/reactivate side effects, org ssoDomain normalization,
- * subscription list join, search logic, audit logs) in one place on the server.
- */
+/** Typed wrapper around Hono /api/admin/:resource endpoints; backend keeps
+ * business logic (user/org effects, dedup, search) server-side. */
 
 import type { AdminResourceName } from "@langwatch/ops-contract";
 
@@ -29,20 +22,8 @@ export interface DataResult<T> {
   data: T;
 }
 
-/**
- * A failed `/api/admin/*` call, carrying whatever the server said.
- *
- * The admin endpoints are Hono routes, so a handled failure comes back in the
- * flat REST shape — `{ error: "<code>", message, ...meta, tips, docsUrl,
- * fault, trace }` (see `src/app/api/middleware/error-handler.ts`). Copying
- * those fields onto the thrown error is what lets `readHandledError` lift
- * them: it reads that shape off the error object itself.
- *
- * Before this, the backoffice threw `new Error("Admin user/update failed
- * (403): {...}")`. Nothing could read a code off that, so every one of these
- * failures rendered as "Something went wrong — we've been notified", with the
- * actual reason sitting unread inside the message and no error id to quote.
- */
+/** Carries Hono error shape; readHandledError reads code/meta from error object.
+ * Lets backoffice surface actual failure reasons (was generic before). */
 class AdminRequestError extends Error {
   constructor(message: string, body: object, status: number) {
     super(message);
@@ -54,13 +35,7 @@ class AdminRequestError extends Error {
   }
 }
 
-/**
- * Reads the failure body and throws it in a shape the error UI understands.
- *
- * `context` is the fallback sentence for a response with nothing to say — an
- * HTML error page from a proxy, an empty 502. It never overrides the server's
- * own message, because that one is about the actual failure.
- */
+/** Throws failure in error-UI shape; context is fallback for proxy errors. */
 async function throwAdminError(res: Response, context: string): Promise<never> {
   const raw = await res.text().catch(() => "");
   let body: object = {};

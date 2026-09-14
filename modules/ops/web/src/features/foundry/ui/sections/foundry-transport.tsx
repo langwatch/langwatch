@@ -8,7 +8,8 @@ import { useOpsHost } from "../../../../model/ops-host.ts";
 import { api } from "../../../../behavior/ops-api.ts";
 import type { OpsOrganizationGraph } from "../../../../behavior/ops-api.ts";
 
-/** Flattens every project across every team of every organization into a flat FoundryProject list. */
+/** Flattens every project across every team of every organization into flat
+ * FoundryProject list. */
 function flattenFoundryProjects(organizations: OpsOrganizationGraph[]): FoundryProject[] {
   return organizations.flatMap((organization) =>
     organization.teams.flatMap((team) => mapTeamProjects(organization.name, team)),

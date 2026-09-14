@@ -1,19 +1,5 @@
-/**
- * Grafana Explore deep links, as the queue and process surfaces build them.
- *
- * A family-local copy of the browser-side half of
- * `platform/app/src/utils/grafanaLinks.ts`, which stays where it is because the
- * error handler, the tRPC root and the PostHog capture all still call it — and
- * `platform/app` may only shrink, so repointing them is not on the table.
- *
- * WHAT DELIBERATELY DID NOT COME: `grafanaConfigFromEnv` and
- * `grafanaTraceUrlFromEnv`. They read `process.env`, which is a server fact and
- * one of the browser capabilities a screen closure may not name. The config
- * still arrives the way it always did — the server answers
- * `ops.getGrafanaLinkConfig` and the browser turns an id into an href.
- *
- * Pure and isomorphic: no env reads, no side effects, just id + config → URL.
- */
+/** Grafana Explore deep links. Family-local copy (env-reading functions stayed on
+ * platform). Pure: id+config→URL (no env reads). */
 
 export const DEFAULT_TEMPO_DATASOURCE_UID = "tempo";
 export const DEFAULT_LOKI_DATASOURCE_UID = "loki";

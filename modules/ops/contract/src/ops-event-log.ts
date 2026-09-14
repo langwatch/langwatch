@@ -51,15 +51,8 @@ export const opsStartReplayInputSchema = z.object({
   description: z.string(),
 });
 
-// ---------------------------------------------------------------------------
-// The event explorer's answers.
-//
-// `OpsEventExplorer` said `Promise<unknown>` for all four of its operations,
-// so the replay wizard, the aggregate search and the projection-state viewer
-// read their fields off `{}`. Every shape below is the one
-// `EventExplorerService` already declares inline; naming them is what lets the
-// port publish them.
-// ---------------------------------------------------------------------------
+// Named schemas for types EventExplorerService declares inline; naming them
+// lets the port publish them.
 
 /** How many aggregates one projection would replay, and for whom. */
 export const aggregateDiscoverySchema = z.object({

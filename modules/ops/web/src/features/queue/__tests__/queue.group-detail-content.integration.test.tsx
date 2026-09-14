@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Renders the real GroupDetailContent via React Testing Library against an
- * actual ChakraProvider — the drawer body, minus the tRPC queries that feed
- * it. The vanished-group case is the one that mattered in practice: a group
- * finishes between the table refresh and the click, and the drawer used to
- * render a title and nothing else.
+ * Real GroupDetailContent rendering; vanished-group case (group finishes between
+ * table refresh and click).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { GroupInfo } from "@langwatch/ops-contract";

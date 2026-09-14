@@ -20,15 +20,8 @@ const PAGE_SIZE = 25;
  */
 const FLEET_DISCARD_PHRASE = "DISCARD ALL";
 
-/**
- * Every message the substrate has permanently given up on.
- *
- * A dead message is work that will never happen again without an operator, so
- * it is the most urgent thing these pages report — and until this view it was
- * only ever a number. `getProcessOutbox` needs a full process ref, so reaching
- * a dead message meant already knowing which instance held it, and the fleet
- * table showed a count with no way in.
- */
+/** Messages substrate gave up on (work needs operator). Most urgent; was just counts
+ * before (needed process ref to reach). */
 export function DeadLettersContent() {
   const { hasAccess } = useOpsPermission();
   const [processName, setProcessName] = useState<string | undefined>(undefined);

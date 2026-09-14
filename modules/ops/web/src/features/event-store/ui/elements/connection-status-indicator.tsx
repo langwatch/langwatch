@@ -16,16 +16,8 @@ const labelMap: Record<OpsConnectionStatus, string> = {
   disconnected: "Disconnected",
 };
 
-/**
- * Connection state AND snapshot age, because either alone can lie (ADR-090).
- *
- * The connection is between this browser and its own pod, and it stays happily
- * "Live" while the numbers behind it rot: the fleet's writer can die and leave
- * the lease unclaimed for a window, or a detail cycle can stall, and every pod
- * — including this one — keeps serving the last snapshot it read. A viewer
- * would see a green light over stale data with nothing to distinguish it from
- * a healthy page. Age is the only signal that separates the two.
- */
+/** Needs both connection state AND snapshot age (either alone can lie, ADR-090);
+ * connection green but data stale looks healthy. */
 export function ConnectionStatusIndicator({
   status,
   computedAtMs,

@@ -1,16 +1,5 @@
-/**
- * The two-step confirm every destructive Ops action goes through.
- *
- * Moved from `platform/app/src/components/ops/shared/ConfirmDialog.tsx` with one
- * line changed: the dialog primitive is the Design System's rather than the
- * application's. Nine call sites across the queue, payload-store and scheduler
- * surfaces render it, and none of them changed.
- *
- * NOT the same component as `@langwatch/design-system/confirm-dialog`, which the
- * gateway and governance families adopted: this one takes an arbitrary child
- * under the description, which is what the typed-confirmation inputs on the
- * destructive queue actions render into.
- */
+/** Two-step confirm for destructive actions (moved from platform/app, design-system
+ * dialog only). Takes arbitrary child (typed-confirmation inputs). */
 
 import { Button, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";

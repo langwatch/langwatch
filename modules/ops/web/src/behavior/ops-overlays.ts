@@ -1,24 +1,5 @@
-/**
- * An overlay that lives in the address, and nothing that registers one.
- *
- * `platform/app` mounted every Ops drawer through `components/drawerRegistry.ts`
- * and opened it by name — `openDrawer("opsGroupDetail", { queueName, groupId })`
- * — which is a composition the application owns and a feature-web package may
- * not carry a copy of. What the surfaces ever needed from it was the ADDRESS:
- * an operator who has a queue group open must be able to send that URL to
- * whoever is on call with them.
- *
- * So each overlay keeps its own query key, the surface that opens it also
- * renders it, and the registry entry is deleted. The gateway and automations
- * families reached the same answer for a while and then went back: the registry
- * is composition, but its ADDRESS is a query string a host can write, so a
- * screen can name a registered drawer without reaching the registry. These stay
- * local because nothing outside Ops links to them — no email, no REST field, no
- * other screen — so there is no second caller for one address to serve.
- *
- * `setQuery` REPLACES the whole query string, so `open` spreads what is already
- * there: an overlay opened over a filtered table must not clear the filter.
- */
+/** Query-keyed overlays (not registry); setQuery replaces whole string to preserve
+ * filters when opening over a filtered view. */
 
 import { useCallback, useMemo } from "react";
 import { useOpsHost } from "../model/ops-host.ts";

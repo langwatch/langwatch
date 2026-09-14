@@ -159,9 +159,9 @@ export class OpsMetricsCollectorService {
   }
 
   /**
-   * Awaits the lease release. The caller is a shutdown hook racing a process exit and a Redis
-   * disconnect, so a fire-and-forget release here is the same as no release at all: the connection
-   * closes first and the fleet waits out the full lease TTL for a writer it could have had immediately.
+   * Awaits the lease release. Caller is a shutdown hook racing exit and
+   * disconnect, so fire-and-forget release is same as no release: connection
+   * closes first and fleet waits the full lease TTL.
    */
   async stop(): Promise<void> {
     if (this.collectInterval) {
@@ -358,8 +358,8 @@ export class OpsMetricsCollectorService {
   }
 
   /**
-   * The rates this cycle measured, and the history point they produce. Parked groups count toward
-   * in-flight (see ../rules/ops-in-flight.rules), without which the derived ingestion rate is wrong.
+   * Rates measured this cycle and history point. Parked groups count toward
+   * in-flight (see ../rules/ops-in-flight.rules); without it derived rate is wrong.
    */
   private async recordCycleRates(queues: QueueInfo[]): Promise<void> {
     let totalPending = 0;

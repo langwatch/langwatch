@@ -1,4 +1,5 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: empty blocks in
+// this file are deliberate no-ops.
 
 import type { ReplayProgress } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";

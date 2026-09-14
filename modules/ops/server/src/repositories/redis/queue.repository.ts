@@ -304,11 +304,8 @@ redis.call("SREM", dlqIndexKey, groupId)
 return {count, lastError or ""}
 `;
 
-// Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile single-flight marker,
-// but only while the caller still holds it. A marker that lapsed mid-pass may already have been
-// re-acquired by another instance, and extending or dropping that one would put two reconcile passes
-// on the same counter at once — exactly what the marker exists to prevent. GET-then-act is safe only
-// inside a script, where nothing else can run in between.
+// Re-arm or drop the pending-reconcile single-flight marker while the caller holds it.
+// GET-then-act is safe only inside a script.
 const RECONCILE_MARKER_TTL_LUA = `
 local markerKey  = KEYS[1]
 local holderToken = ARGV[1]
@@ -319,11 +316,9 @@ if ttlMs <= 0 then return redis.call("DEL", markerKey) end
 return redis.call("PEXPIRE", markerKey, ttlMs)
 `;
 
-// Write the reconciled counter only while this pass still holds the marker. Losing the marker means another pass has started and may already have written a fresher value; a late write
-// from the old pass would put a stale count back. The check and the write have to be one step, so a marker lost between them cannot leave the stale write to land anyway.
-/**
- * Exported so the fence can be tested against the real script and a real Redis. The reconcile unit suite runs against a fake that models these semantics, and a model cannot fail when the thing it models changes.
- */
+// Write reconciled counter only while this pass holds the marker. Check and
+// write must be one step to prevent stale writes.
+/** Exported for testing against real script and Redis. */
 export const RECONCILE_WRITE_LUA = `
 local markerKey  = KEYS[1]
 local counterKey = KEYS[2]
@@ -357,11 +352,8 @@ end
 return pruned
 `;
 
-// ── Cached scripts ─────────────────────────────────────────────────── EVALSHA, not EVAL: plain EVAL re-transfers
-// and re-hashes the full source on every call, which was measured at ~33% of the prod Redis engine CPU for the
-// queue's own scripts (see `cachedLuaScript.ts`). These ops scripts are larger than they look — each one carries
-// the shared TTL/park helpers — and the bulk paths below run one per group across a whole page, so the same
-// argument applies. A NOSCRIPT miss falls back to EVAL once and warms the node's cache.
+// Cached scripts: EVALSHA not EVAL to avoid re-hashing the full source on every call.
+// A NOSCRIPT miss falls back to EVAL once and warms the cache.
 
 const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
@@ -542,11 +534,7 @@ export class QueueRedisRepository extends QueueRepository {
     const totalPendingKey = `${prefix}stats:total-pending`;
     const parkedTenantsKey = `${prefix}parked-tenants`;
 
-    // Sample BOTH ends of the ready zset. The zset is scored by dispatch eligibility, so its ends hold the two distinct
-    // stuck-group classes: the high end is the most-deferred groups (in-flight, retry backoff — where a failing group hides
-    // between attempts), the low end is the most-eligible ones (an old due head the dispatcher is starving). A single-ended
-    // ZREVRANGE sampled only the deferred end, so an aged eligible backlog past `limit` never appeared in the dashboard at all.
-    // When the zset fits in `limit` the two ranges coincide and dedup makes this identical to before.
+    // Sample both ends of the zset to capture both deferred and eligible groups.
     const [
       readyCount,
       blockedCount,
@@ -565,10 +553,7 @@ export class QueueRedisRepository extends QueueRepository {
       this.redis.smembers(parkedTenantsKey),
     ]);
 
-    // Sum parked depth across the tenants currently over cap. The registry set
-    // is tiny (one entry per over-cap tenant), so this is a single SMEMBERS plus
-    // one ZCARD per parked tenant — effectively free in the cap=0 steady state
-    // where the registry is empty.
+    // Sum parked depth across tenants over cap.
     let parkedGroupCount = 0;
     if (parkedTenants.length > 0) {
       const parkedPipeline = this.redis.pipeline();
@@ -744,11 +729,7 @@ export class QueueRedisRepository extends QueueRepository {
 
   // ── Job Browsing ────────────────────────────────────────────────
 
-  /**
-   * The payload size to DISPLAY for a staged value: the encoder-recorded `header.s` when present, and null when the
-   * value cannot say. Deliberately not `readJobPayloadBytes`, whose "unknown is worth the cap" sentinel is a
-   * batch-budget rule — rendered on a job card it would read as a 50 MB payload that isn't one.
-   */
+  /** Payload size to display for a staged value. Null when value cannot say. */
   private readDisplayPayloadBytes(raw: string): number | null {
     try {
       if (!isEnvelope(raw)) return null;
@@ -981,11 +962,8 @@ export class QueueRedisRepository extends QueueRepository {
     }));
   }
 
-  /**
-   * Age comes from each tenant's head parked group's oldest job. The head is the tenant's most dispatch-eligible
-   * parked group, and parking preserves the score it held in ready, so this is the closest available answer to "how
-   * long has this tenant been waiting" without walking every parked group.
-   */
+  /** Age from each tenant's head parked group's oldest job. Closest answer to
+   * "how long has this tenant been waiting" without walking every parked group. */
   private async oldestJobPerTenant({
     prefix,
     headGroups,
@@ -1240,11 +1218,11 @@ export class QueueRedisRepository extends QueueRepository {
     return all.filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
   }
 
-  // Bulk-drain every group whose ID starts with "<tenantId>/" for the given queue, optionally narrowed
-  // by a substring filter on the groupId. Returns the total group count and total job count drained.
+  // Bulk-drain every group for the tenant, optionally narrowed by substring filter.
+  // Returns total group count and total job count drained.
   // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand wasn't feasible.
-  // `groupIdContains`: optional plain-text fragment that the groupId must contain in addition to
-  // starting with `<tenantId>/`. Use this to scope a drain to part of a tenant's groups — for example:
+  // groupIdContains: optional plain-text fragment to scope a drain to part of
+  // a tenant's groups.
   async drainTenant(params: {
     queueName: string;
     tenantId: string;
@@ -1540,8 +1518,8 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /**
-   * Run one Lua script over an explicit group-id list, batched into pipelines. Shared by the two
-   * explicit-id recovery paths, which differ only in their script, their key arity and what they count.
+   * Run one Lua script over an explicit group-id list, batched into pipelines.
+   * Shared by the two explicit-id recovery paths.
    * Errored replies are skipped — a group that failed its script simply does not count as acted on.
    */
   private async runOverDlqGroups(params: {

@@ -7,16 +7,8 @@ import {
 } from "@langwatch/config";
 import { z } from "zod";
 
-/**
- * The operator surfaces: the two bearers that gate them, the second
- * ClickHouse identity a cross-tenant EXPLAIN runs as, and what this install
- * reports about itself.
- *
- * Every bearer is optional and blank means the door is not registered at all,
- * so no caller can reach an operator surface by presenting nothing.
- * `collectClickHouseBackupMetrics` is on unless deliberately turned off,
- * which is why it is a switch with a `true` default rather than an opt-in.
- */
+/** Operator surfaces and config; bearers are optional and blank means the
+ * door is not registered. Backup metrics on by default. */
 /** Values of `CLICKHOUSE_BACKUP_METRICS_ENABLED` that turn backup collection off. */
 const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
 

@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Renders the real StatStrip against an actual ChakraProvider. The latency
- * tiles' basis matters because P50/P99 here are computed over a rolling
- * completed-jobs sample, not a time window — an operator reading them as
- * "the last five minutes" during an incident would be misled in either
- * direction depending on throughput.
+ * Real StatStrip; latency tiles computed over jobs, not time window.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DashboardData, PhaseMetrics } from "@langwatch/ops-contract";

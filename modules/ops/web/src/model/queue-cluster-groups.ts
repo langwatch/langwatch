@@ -1,15 +1,5 @@
-/**
- * Collapse a fan-out into one row per cluster.
- *
- * A single trace fans out into hundreds of groups whose identifiers differ only
- * by a trailing index — `…/trace:023eaa…:41`, `…:52`, `…:15` — and whose every
- * other column reads the same. Rendered flat that is two hundred rows saying
- * one thing, with the identifier eating the width that state should have.
- *
- * Clustering is on the identifier's stem: everything up to the final `:`
- * segment when that segment is a bare index. Groups that do not share a stem
- * are never merged, so unrelated pipelines keep their own rows.
- */
+/** Cluster groups by identifier stem (before trailing :index) into one row per trace
+ * cluster; reduces fan-out width. */
 
 export interface ClusterableGroup {
   queueName: string;

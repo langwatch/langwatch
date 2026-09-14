@@ -20,9 +20,9 @@ import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * One global knob each, per the visibility plan: a wake this far past due means the wake worker is starved or
- * dead, and a pending message this far past its next attempt with no live lease means delivery is not happening.
- * The table shows raw ages either way, so the thresholds only decide what counts as trouble in the summary.
+ * One global knob each: wake past due means the worker is starved/dead,
+ * pending message past due with no lease means delivery is not happening.
+ * Thresholds only decide what counts as trouble.
  */
 export const OVERDUE_WAKE_MS = 60 * 1000;
 export const OVERDUE_PENDING_MS = 5 * 60 * 1000;
@@ -268,9 +268,9 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Dead letters back to pending — one process name, or every process when omitted. Bounded per call by
-   * the repository, so the returned count is what moved rather than what existed; pressing again takes
-   * the next batch. The count is the blast radius the audit row records.
+   * Dead letters back to pending — one process name or all. Bounded per call
+   * by the repository: returned count is what moved, not what existed. Press
+   * again for the next batch. Count is the blast radius the audit records.
    */
   async redriveDeadLetters(params: {
     processName?: string;
@@ -328,9 +328,9 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Clear a LAPSED lease so the message is due now instead of waiting out the lease window. The repository's write guards on the
-   * lapse, so a live delivery keeps its lease; the residual risk — the holder is alive and slow, and completion after this
-   * release re-delivers — is absorbed by the message-key idempotency and stated in the confirm copy.
+   * Clear a LAPSED lease to make the message due now. Repository guards the
+   * lapse, so live delivery keeps it. Residual risk (slow holder re-delivers)
+   * is absorbed by message-key idempotency.
    */
   async releaseLapsedLease(params: {
     ref: ProcessRef;
@@ -416,9 +416,9 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Dead-letter recovery for one process instance's outbox: dead rows go back to pending with a fresh
-   * attempt budget, due immediately. Narrow with `messageKeyPrefix` to requeue one target's messages
-   * (e.g. a single webhook endpoint's batches) without resurrecting unrelated failures.
+   * Dead-letter recovery: dead rows go back to pending with fresh attempt
+   * budget, due immediately. Narrow with `messageKeyPrefix` to requeue one
+   * target's messages without resurrecting unrelated failures.
    */
   async requeueDeadMessages(params: {
     processName: string;

@@ -11,17 +11,8 @@ export interface PausedSchedulesResult {
   total: number;
 }
 
-/**
- * The switched-off schedules, asked for directly.
- *
- * The obvious implementation — read a page of `listScheduledJobs` and filter
- * it on `active` — is wrong in a way that hides itself: that read orders
- * `active DESC`, and Postgres sorts `true` above `false`, so the inactive
- * rows are precisely the ones its `LIMIT` drops. On any fleet with more
- * schedules than the page holds, the panel would report zero paused schedules
- * and look like it had checked. `listPausedSchedules` filters in SQL and
- * returns the fleet total alongside the page.
- */
+/** Needs dedicated endpoint; filtering listScheduledJobs drops inactive rows (ordered
+ * active DESC, so LIMIT hides them). listPausedSchedules filters in SQL. */
 export function usePausedSchedules(): PausedSchedulesResult {
   const query = api.ops.listPausedSchedules.useQuery(
     { limit: PAGE_SIZE },

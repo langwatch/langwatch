@@ -99,20 +99,8 @@ export abstract class ProcessOpsRepository {
     now: number;
   }): Promise<{ messageKey: string } | null>;
 
-  /**
-   * Dead messages back to pending with a fresh budget — narrowed to one
-   * process name, or every process when omitted.
-   *
-   * BOUNDED, not exhaustive: an implementation moves at most one batch per
-   * call, because an unbounded UPDATE holds row locks on the highest-volume
-   * table in the system for as long as it runs. The returned count is what
-   * actually moved, so a caller wanting the rest calls again — and an
-   * operator pressing the button again is exactly that.
-   *
-   * Due times are spread rather than set to a single instant: releasing
-   * thousands of intents all due now hands the dispatcher one batch the size
-   * of the backlog.
-   */
+  /** Redrive dead messages with fresh budget, BOUNDED per batch to avoid
+   * row-lock contention on the highest-volume table. */
   abstract redriveAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
 
   /**

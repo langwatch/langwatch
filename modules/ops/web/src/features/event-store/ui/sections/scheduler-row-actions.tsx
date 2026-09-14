@@ -9,13 +9,8 @@ import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presen
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 
-/**
- * Per-row controls (ADR-091), following row-actions-overflow-menu.
- *
- * Every confirmation names the PROJECT, not its identifier: these controls are
- * cross-tenant, and the realistic failure is not the wrong action but the right
- * action on the row above the one you meant.
- */
+/** Per-row controls (ADR-091). Confirmations name PROJECT (cross-tenant; risk is
+ * right action on wrong row). */
 export function SchedulerRowActions({
   scheduleId,
   targetType,
@@ -112,15 +107,8 @@ export function SchedulerRowActions({
   );
 }
 
-/**
- * The four confirmations, split out so the menu component stays readable.
- *
- * The copy's noun is the target TYPE, never its ksuid. An identifier an
- * operator cannot read is not something they can check the sentence against, so
- * putting one mid-sentence buys the appearance of specificity and none of the
- * protection. The full identifier is still shown, on its own line, where it can
- * be compared against the row that was clicked.
- */
+/** Confirmations use target TYPE not ksuid (unreadable ID isn't checkable in
+ * sentence); full ID shown separately for verification. */
 function SchedulerConfirmations({
   pending,
   onClose,
@@ -205,15 +193,8 @@ function TargetIdentity({ targetId }: { targetId: string }) {
   );
 }
 
-/**
- * Run-now confirms by typed project name, not by one click.
- *
- * It is the only control here that is not reversible and the only one that can
- * put something in front of a customer, so it is the one where the guard has to
- * cost more than the muscle memory of pressing Confirm. Typing the project is
- * also the check that matters: the realistic failure is the right action on the
- * wrong tenant.
- */
+/** Confirms by typed project name (irreversible, affects customers). Typing is the
+ * real check—prevents right action on wrong tenant. */
 function RunNowConfirmation({
   open,
   onClose,

@@ -141,9 +141,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Whether acting on this migration takes the typed destructive confirmation. Read from the migration's
-   * own declaration so the gate and the page that renders it can never disagree about which migration is
-   * dangerous; an unknown name is refused before any confirmation question arises.
+   * Whether this migration requires typed destructive confirmation. Read
+   * from the migration's declaration so gate and page never disagree about
+   * which migration is dangerous.
    */
   requiresOperatorConfirmation({ migrationName }: { migrationName: string }): boolean {
     return systemMigrationLookup.registeredMigration(this.deps, migrationName)
@@ -151,9 +151,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Kick a pass now instead of waiting for the next worker boot - the lever for processing a fresh enrollment right away or
-   * re-verifying held tenants after remediation. Fire-and-forget: per-organization claims keep two passes off the same
-   * organization, so the worst case for a double click is a pass that finds everything claimed and does nothing.
+   * Kick a pass now instead of waiting for the next worker boot. Lever for
+   * processing fresh enrollment or re-verifying held tenants. Fire-and-forget:
+   * worst case for double click is a pass that finds everything claimed.
    */
   startPass(): void {
     void this.deps.runPass().catch((error) => {

@@ -1,31 +1,5 @@
-/**
- * The operator back office's application: what its door calls.
- *
- * It holds every capability the feature's api file reaches - the operations
- * service and the three explorers the process composes alongside it, the
- * feature-flag registry and the project search - and it is the one typed thing
- * a transport is given. Before it, the api file declared that composition
- * inline as a private `OpsApplication` bag, so nothing outside that one file
- * could reach it and a second door would have had to describe it again.
- *
- * Most operations are the composed capabilities' own, reached through
- * {@link operations}, {@link events}, {@link processes} and {@link replay}.
- * What lives here as a rule of its own is what the transport was deciding for
- * itself:
- *
- *   - the extra gate on a destructive operator write, which eight procedures
- *     called and any new one could forget;
- *   - what a deployment with no snapshot collector answers, which three read
- *     procedures each decided separately;
- *   - that only a registered flag key may be written, which the two
- *     feature-flag writes checked with two copies of the same line;
- *   - that a missing queue group or projection is a not-found rather than a
- *     null the caller has to interpret.
- *
- * The operator arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve the back office, a script and a future
- * REST door without knowing which it is serving.
- */
+/** Operator back office application: holds every capability the feature api
+ * reaches, and centralizes rules the transport was deciding separately. */
 import {
   AuditLogApi,
   type AuditLogApi as AuditLogApiContract,
@@ -122,18 +96,8 @@ export type OpsProcessRef = {
   processKey: string;
 };
 
-/**
- * The event-sourcing explorers and the replay runner, each narrowed to what
- * this feature calls.
- *
- * Structural rather than imported, because they are the process's own
- * composition over its event store - but typed with the contract's
- * vocabulary, not `unknown`. They were `Promise<unknown>` under a comment
- * claiming the concrete types reached the client "through the context type
- * rather than through these shapes", and nothing did: a tRPC procedure
- * publishes what its handler returns, so `unknown` here is `{}` in the
- * browser, and every field the operator pages read was unchecked.
- */
+/** Event-sourcing explorers typed with contract vocabulary, not Promise<unknown>;
+ * the concrete types reach the client through the return type. */
 export type OpsEventExplorer = {
   discoverAggregates(input: {
     projectionNames: string[];
@@ -410,15 +374,8 @@ type OpsRuntimeDependencies = Readonly<{
   isProduction: boolean;
 }>;
 
-/**
- * Config schema: the deployment's operator allow-list (the same
- * `ADMIN_EMAILS` shape identity reads), the dedicated EXPLAIN account's
- * connection and secret, whether this deployment is production (the EXPLAIN
- * service's fail-closed rule), and the SSO connection-projection cutover
- * flag. Every field defaults to the deleted composition's own absent-config
- * answer: no operators, EXPLAIN refuses, not production, legacy strings still
- * writable.
- */
+/** Config schema: operator allow-list, EXPLAIN account, production flag.
+ * Fields default to absent-config: no operators, EXPLAIN refuses. */
 const opsAppConfigSchema = z.object({
   adminEmails: z.array(z.string()).default([]),
   /** `LANGWATCH_OPS_API_KEY`. Absent refuses every EXPLAIN call. */
@@ -641,36 +598,16 @@ export class OpsApp implements OpsApi {
     this.#dependencies = dependencies;
   }
 
-  /**
-   * Whether this identity is on the deployment's operator allow-list.
-   *
-   * Synchronous, and keyed on the identity's email rather than a user id —
-   * `OpsApi.isAdmin(identity: AdminIdentity)` is the contract, and the
-   * allow-list is a list of addresses. Lifted onto the application because a
-   * door outside this feature asks it: the SSO connection surface gates on the
-   * staff list rather than on `ops:*`, and it reaches this answer through the
-   * same slice.
-   */
+  /** Whether this identity is on the deployment's operator allow-list,
+   * keyed on email address. */
   isAdmin(identity: AdminIdentity): boolean {
     return this.#dependencies.ops.isAdmin(identity);
   }
 
   // -- the rules the transport used to hold ----------------------------------
 
-  /**
-   * The extra gate on an operator write whose damage nobody would notice in
-   * time: a real signed-in operator, not an impersonation, and a typed
-   * confirmation.
-   *
-   * `ops:manage` already resolves through the admin allow-list, but it is not
-   * enough on its own: it is inherited by an impersonation session, and the
-   * damage is silent - pinning an organization back onto the legacy
-   * authorization path changes which tables answer every permission check for
-   * that tenant without failing anything.
-   *
-   * Eight procedures called this, and it lives here rather than in the
-   * transport so a ninth cannot quietly answer a different question.
-   */
+  /** Extra gate on destructive operator writes: signed-in (not impersonated),
+   * typed confirmation, because damage is silent. */
   requireDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void {
     if (!operator) throw new OpsOperatorSessionRequiredError();
     if (operator.impersonator) throw new OpsImpersonatedOperatorRefusedError();
@@ -682,15 +619,8 @@ export class OpsApp implements OpsApi {
     return this.#dependencies.ops.snapshots?.findDashboardData() ?? null;
   }
 
-  /**
-   * The two integers the global ops badge renders.
-   *
-   * Without a snapshot collector the counts are zero and `computedAt` is null,
-   * because these zeroes are "we cannot say" rather than "nothing is wrong" —
-   * stamping the current time would present unavailable data as a fresh
-   * all-clear. Same shape either way, so no caller branches on whether the
-   * field exists.
-   */
+  /** The two integers the global ops badge renders. Without a snapshot
+   * collector, null means "we cannot say", not "all clear". */
   badgeCounts(): OpsBadgeReading {
     const snapshots = this.#dependencies.ops.snapshots;
     if (!snapshots) return { blockedCount: 0, dlqCount: 0, computedAt: null };
@@ -1503,17 +1433,8 @@ export interface OpsWorker {
   tryStartQueueMetricsWriter(): OpsWorkerHandle | undefined;
 }
 
-/**
- * Where one organization's data lives.
- *
- * The answer used to decide whether an organization ran at all, which on the
- * automatic axis would have stranded exactly the private-dataplane customers
- * on the legacy path forever.
- *
- * It decides nothing now. These migrations are rooted in the organization and
- * the routing places an organization-rooted append on that organization's own
- * instance, so the dataplane is what a pass REPORTS, not what it filters by.
- */
+/** Where one organization's data lives. The routing places an
+ * organization-rooted append on its own instance. */
 export type OrganizationDataplane =
   | Readonly<{ kind: "shared" }>
   | Readonly<{ kind: "private"; endpoint: string }>;
@@ -1551,16 +1472,8 @@ export interface OpsReplayRuntime {
   close: () => Promise<void>;
 }
 
-/**
- * Builds the runtime a replay run drives. The engine reaches the deployment's
- * ClickHouse resolver, its Redis and every feature's projection stores, so the
- * composition owns it; ops owns when a replay starts, what it covers and how it
- * is reported.
- *
- * `create` THROWS when the deployment cannot serve a replay (no Redis, no
- * ClickHouse route). `ReplayService` finalises the run with that message rather
- * than leaving a lock held on a run that never began.
- */
+/** Builds the runtime a replay run drives. `create` throws when the
+ * deployment cannot serve a replay (no Redis, no ClickHouse route). */
 export interface OpsReplayRuntimeFactory {
   create(): OpsReplayRuntime;
 }

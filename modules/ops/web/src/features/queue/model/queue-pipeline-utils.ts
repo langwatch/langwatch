@@ -58,24 +58,12 @@ export interface GroupClassification {
   attempt: number;
 }
 
-/**
- * The error hash persists until a SUCCESS clears it, so an old message can
- * outlive the failure it recorded. An error only reads as "failing right now"
- * while the group is mid-retry, or while the message is recent enough that the
- * next attempt has plausibly not resolved it yet.
- */
+/** Error hash persists until SUCCESS; reads as "failing now" only mid-retry or
+ * recent enough. */
 const FAILING_ERROR_MAX_AGE_MS = 15 * 60 * 1000;
 
-/**
- * What a group is doing right now, from fields the scan already returns.
- *
- * The ready score is the instant the dispatcher may next pick the group up —
- * GroupQueue re-stages a failed group at `now + backoff` — so a future score
- * on a retried group IS the retry countdown, and on a fresh group it is
- * deliberate deferral. The active key alone cannot distinguish "running" from
- * "waiting out backoff" (the re-stage keeps it alive for the backoff window),
- * which is why the retry check outranks it.
- */
+/** Group status from scan fields. Ready score is re-stage time (now+backoff); future
+ * score on retry IS countdown. Retry check outranks active key. */
 function hasUnclearedError(g: OpsQueueGroup, attempt: number, now: number): boolean {
   if (g.errorMessage === null) return false;
   if (attempt > 0) return true;

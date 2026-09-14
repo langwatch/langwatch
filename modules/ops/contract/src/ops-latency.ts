@@ -1,28 +1,11 @@
 import { z } from "zod";
 
-/**
- * How many completed jobs each queue keeps in its rolling latency sample
- * (`<queue>:gq:stats:latencies-ms`, written by GroupQueue on every completion
- * and trimmed to this length).
- *
- * The dashboard's P50/P99 tiles are computed over this sample, so their basis
- * is a sample SIZE, not a time window: at hundreds of jobs a second the sample
- * spans under a second of wall clock, at one job a minute it spans hours.
- * Shared between the queue (which trims to it) and the tiles (which say so),
- * so the copy can never drift from what the queue actually keeps.
- */
+/** How many completed jobs the queue keeps in its rolling latency sample;
+ * shared between queue and tiles so the value can't drift. */
 export const LATENCY_SAMPLE_SIZE = 200;
 
-// ── Windowed percentiles ─────────────────────────────────────────────────
-//
-// The rolling sample above cannot answer "P99 over the last day" at any
-// throughput, so completions ALSO increment time-bucketed histograms:
-// per-minute hashes (kept two hours, feeding the hour window), per-hour
-// hashes (kept eight days, feeding the day and week windows), and one
-// cumulative hash for all time. The single elected snapshot writer merges
-// them on its detail cycle. Everything here is shared between the writer
-// (GroupQueue), the reader (the collector), and the tests, so the key and
-// bucket grammar cannot drift between the two ends.
+// Windowed percentiles: rolling sample can't answer P99 over the last day, so
+// completions increment time-bucketed histograms shared between writer, reader, and tests.
 
 /** Log-spaced upper bounds in ms: 1,1.5,2,3,4,6,… up to ~8.7 minutes. */
 export const LATENCY_HISTOGRAM_BOUNDS_MS: readonly number[] = (() => {

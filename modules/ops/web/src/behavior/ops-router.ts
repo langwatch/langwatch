@@ -1,35 +1,12 @@
-/**
- * The address, as the Ops surfaces read and write it.
- *
- * They arrived using `~/utils/compat/next-router`'s `useRouter` (path
- * parameters and the query string merged into one `query` bag), which is a
- * router import a feature-web package may not make, so it is re-bound to the
- * host's route capability with the shape the call sites already expect.
- *
- * Both call shapes the Ops surfaces actually use are carried: a plain path
- * string (`router.push("/ops/projections/run_1")`) navigates, and the compat
- * router's OBJECT form (`router.replace({ query }, undefined, { shallow })`)
- * rewrites the query of the current page. The two backoffice tables use the
- * object form to keep an opened row in the address, so dropping it would have
- * silently stopped their deep links working.
- *
- * `asPath` is the whole address INCLUDING the fragment, because Deja View keeps
- * its entire workspace state there. It is the one reading the host has to
- * supply beyond params and query, and it is why `OpsHostApi.asPath` exists.
- */
+/** Re-bind next-router through host port; both call shapes (string path, object
+ * query) preserved. asPath includes fragment for Deja View workspace state. */
 
 import { useMemo } from "react";
 import { useOpsHost } from "../model/ops-host.ts";
 
 export type OpsRouterTarget =
   | string
-  /**
-   * `Record<string, unknown>` rather than a string-ish union, because the two
-   * backoffice tables build their next query by spreading `router.query` — which
-   * the compat router typed as `string | string[] | undefined` — and then
-   * deleting a key off it. Anything that is not a string is stringified below,
-   * which is what `buildUrl` did.
-   */
+  /** Record<string, unknown> allows spreading then deleting keys; stringified below. */
   | { pathname?: string; query?: Record<string, unknown> };
 
 export type OpsRouter = {

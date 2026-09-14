@@ -1,21 +1,5 @@
-/**
- * A failure that is still true, said in place.
- *
- * The inline counterpart to the host's `failed` notice: a toast is for
- * something that just happened, an alert for a panel that is still broken.
- *
- * Harvested from `platform/app/src/features/errors/components/HandledErrorAlert.tsx`
- * with the same prop shape and the same restrained hairline, minus the two
- * things that could not travel: the code-keyed presentation registry, which
- * supplies the specific title, the remediation tips and the docs link, and
- * `ErrorActions`, which renders the copyable trace id. Both are `platform/app`
- * modules and both are a later slice. Until then a named failure reads as the
- * action that failed plus the generic line — which is exactly what the registry
- * itself answers for a code it does not list.
- *
- * The gateway and governance families carry the same element, for the same
- * reason and with the same gap. They converge when the registry moves.
- */
+/** Inline failure display (harvested from platform/app). Registry and ErrorActions
+ * are later slice; uses generic line for unknown codes. */
 
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";

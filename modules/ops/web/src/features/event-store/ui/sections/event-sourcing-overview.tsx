@@ -8,15 +8,8 @@ import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { api } from "../../../../behavior/ops-api.ts";
 
-/**
- * Where an operator lands, built to answer one question: is anything wrong,
- * and where.
- *
- * Everything here is a headline or a pointer. The subsystem tables live on
- * their own routes, because ops-dashboard.md's rule is that space is
- * proportional to trouble and four dense tables stacked on one page give the
- * healthy three exactly as much room as the broken one.
- */
+/** Landing page: "is anything wrong, and where?" Headlines/pointers only. Subsystem
+ * tables separate (space proportional to trouble, per ops-dashboard.md). */
 export function EventSourcingOverview() {
   const fleet = api.ops.listProcessFleet.useQuery(undefined, {
     refetchInterval: 15_000,
@@ -56,14 +49,8 @@ export function EventSourcingOverview() {
   );
 }
 
-/**
- * Dead work, first thing, in red, with a way in.
- *
- * A dead message is the only state this substrate reports that will never
- * resolve on its own. It was previously a number in a table cell with nothing
- * behind it — an alarm with the label torn off, in the words of the ops
- * guidance. It now leads the page and links to the rows themselves.
- */
+/** Dead work first, red, with way in (was just alarm-number in cell). Never
+ * resolves on its own. */
 function DeadLetterBanner({
   total,
   byProcess,

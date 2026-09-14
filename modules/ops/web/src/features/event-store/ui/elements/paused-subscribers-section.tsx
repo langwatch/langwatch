@@ -3,19 +3,8 @@ import type { ReactNode } from "react";
 
 export const PAUSED_SUBSCRIBERS_HREF = "/ops/event-sourcing/subscribers";
 
-/**
- * Subscribers and pipelines an operator paused.
- *
- * Pausing is how an operator stops a bad subscriber from burning through
- * events during an incident, which makes it the single easiest thing to leave
- * switched on afterwards. Events still arrive and simply queue behind the
- * pause, so the symptom of forgetting is a backlog with no error attached to
- * it — reported here rather than only on the subscribers page.
- *
- * A key is either a pipeline name or `<pipeline>/subscriber`; both are the
- * operator's own vocabulary from the pause control, so they are shown as
- * written rather than resolved against the registry.
- */
+/** Paused subscribers/pipelines (easy to forget after incidents). Events queue behind
+ * pause; backlog without error is forgetting symptom. Keys shown as written. */
 export function PausedSubscribersSection({
   pausedKeys,
   renderSubscribersLink,

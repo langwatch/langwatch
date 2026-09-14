@@ -15,9 +15,9 @@ export type OpsExplainOutcome =
   | { status: "error"; message: string };
 
 /**
- * The decision-making behind the operator-only EXPLAIN endpoint: which client to run against, whether the fallback
- * is acceptable given the environment, and the audit trail of what ran. The route keeps the HTTP shape (status
- * codes, JSON envelopes); this is everything about whether and how the query reaches ClickHouse.
+ * Decision-making for the operator-only EXPLAIN endpoint: which client, whether
+ * the fallback is acceptable, and the audit trail. The route keeps the HTTP shape
+ * (status, JSON); this is everything about reaching ClickHouse.
  */
 export class OpsExplainService {
   private warnedAboutMissingOpsUrl = false;

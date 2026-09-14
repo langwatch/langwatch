@@ -32,15 +32,8 @@ interface FoundryExecutor {
 
 const otelDeps = { context, trace, SpanStatusCode } as const;
 
-/**
- * Cache of long-lived executors keyed on the credential / endpoint /
- * service.name tuple. Foundry's interactive workflow fires N
- * independent send actions per session; building a fresh provider +
- * BatchSpanProcessor + exporter for every click (and tearing them down
- * with two 250ms settles inside `close()`) was pure overhead. With
- * this cache, the first send warms the pipeline and every subsequent
- * send reuses it. Teardown happens once at page-hide.
- */
+/** Cache long-lived executors (credential/endpoint/service.name); avoids rebuild per
+ * click. Teardown at page-hide. */
 const executorCache = new Map<string, FoundryExecutor>();
 let pageHideHookInstalled = false;
 
@@ -68,12 +61,8 @@ function ensurePageHideHook(): void {
   });
 }
 
-/**
- * Returns a cached executor for the given credential + endpoint, or
- * creates one on first call. Subsequent calls with the same options
- * reuse the same provider — no per-call setup/teardown cost. The
- * caller never closes the executor; the page-hide handler does it.
- */
+/** Cached executor (reuses same provider for same options); caller doesn't close
+ * (page-hide handler does). */
 export function getFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
   ensurePageHideHook();
   const key = executorCacheKey(opts);
@@ -201,12 +190,8 @@ function buildSpan(
     }
   }
 
-  // LLM spans emit the OTel gen-AI semantic conventions in full —
-  // attributes for the request/response shape and events for each chat
-  // turn — alongside the legacy `langwatch.*` keys our projection still
-  // reads. The dual emission means an external OTel collector pointed at
-  // these traces sees a spec-compliant LLM span without us losing the
-  // trace-summary rollup.
+  // LLM spans emit OTel gen-AI semantic conventions alongside legacy langwatch keys;
+  // dual emission for spec-compliance and trace-summary rollup.
   if (config.llm) {
     span.setAttribute("gen_ai.operation.name", "chat");
     const system = inferGenAiSystem(config.llm.requestModel ?? config.llm.responseModel);
@@ -370,12 +355,8 @@ const GEN_AI_SYSTEMS: { system: string; prefixes?: string[]; fragments?: string[
   { system: "cohere", prefixes: ["command"], fragments: ["cohere"] },
 ];
 
-/**
- * Map a model string to the OTel `gen_ai.system` enum value. Heuristic:
- * we only have the model name on hand, so we infer the vendor from
- * common prefixes/families. Returns undefined for unknown models so we
- * don't emit a misleading vendor.
- */
+/** Map model string to OTel gen_ai.system; heuristic infers vendor from
+ * prefixes/families. Undefined for unknown (avoids misleading vendor). */
 function inferGenAiSystem(model: string | undefined): string | undefined {
   if (!model) return undefined;
   const id = model.toLowerCase();

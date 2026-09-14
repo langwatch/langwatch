@@ -55,16 +55,8 @@ export const opsRollBackSystemMigrationTenantInputSchema = z.object({
   confirm: z.literal("ROLL BACK").optional(),
 });
 
-/**
- * What the operator surface READS back.
- *
- * These sat only on the process's `SystemMigrationsService`, so the transport
- * port could name none of them and declared `Promise<unknown>` for all three.
- * A tRPC procedure publishes what its handler returns, so `unknown` is what
- * reached the browser — the migrations page read `data?.isSaaS` off `{}` and
- * every row field off `unknown`. Declared here so the port can say what it
- * answers and the page gets its types back.
- */
+/** What the operator surface reads back; declared here so the port can
+ * publish the correct types instead of Promise<unknown>. */
 
 /**
  * The migration status vocabulary, as a schema.

@@ -5,22 +5,12 @@ import { formatCount, formatMs, formatRate } from "../../../../model/ops-formatt
 import { api } from "../../../../behavior/ops-api.ts";
 import { LinkedStat } from "../elements/linked-stat.tsx";
 
-/**
- * What the percentile tiles are measured over. A sample count, deliberately
- * not a time window: at high throughput the sample spans under a second, on a
- * quiet queue it can span hours, and pretending either is "the last 5 minutes"
- * would be wrong in both directions.
- */
+/** Percentiles measured over sample count (rolling, not time window); width varies
+ * with throughput. */
 const LATENCY_BASIS = `Processing time across each queue's last ${LATENCY_SAMPLE_SIZE} completed jobs — a rolling sample, not a time window.`;
 
-/**
- * The headline figures, on ONE row.
- *
- * This was a ten-column grid holding eleven tiles, so the eleventh orphaned
- * onto a second row and cost a full row of whitespace. Redis is one tile
- * carrying three figures, because an operator reads memory, processor and
- * connections together or not at all.
- */
+/** Headline figures on ONE row. Redis as one tile (three figures read together);
+ * avoids orphaning eleventh tile. */
 export function StatStrip({ data }: { data: DashboardData }) {
   const totalBlocked = data.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0);
   const totalParked = data.queues.reduce((sum, q) => sum + q.parkedGroupCount, 0);
@@ -110,16 +100,8 @@ function LatencyStats({ data }: { data: DashboardData }) {
   );
 }
 
-/**
- * Dead work across BOTH substrates, as one figure.
- *
- * The GroupQueue DLQ and the process-manager outbox retire work through
- * different machinery, and this tile used to count only the first — so it read
- * "0" on a page that had 94 dead outbox messages on it. An operator asking
- * "has anything stopped?" is not asking about a mechanism, so the headline is
- * the union and the sublabel says where it lives
- * (specs/ops/dead-letter-recovery.feature).
- */
+/** Dead work from BOTH substrates (queue DLQ + outbox); headline is union, sublabel
+ * names source. */
 function DeadLetterStat({
   queueDead,
   outboxDead,

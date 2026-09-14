@@ -5,11 +5,8 @@ import {
 } from "@langwatch/ops-contract";
 import type { MigrationEnrollmentRecord } from "../../services/system-migrations.service.ts";
 
-/**
- * The cloud rollout's enrollment rows (`SystemMigrationEnrollment`): which organizations each registered migration processes,
- * one row per (organization, migration); withdrawal deletes the row. The uniqueness refusals live here because the unique key
- * is the only race-free duplicate check - the service adds the guards that are business rules rather than storage facts.
- */
+/** Cloud rollout enrollment rows: which organizations each migration processes.
+ * Uniqueness checks live here as the only race-free duplicate check. */
 export class PrismaSystemMigrationEnrollmentRepository {
   static create({ prisma }: { prisma: PrismaClient }): PrismaSystemMigrationEnrollmentRepository {
     return new PrismaSystemMigrationEnrollmentRepository(prisma);
@@ -17,11 +14,8 @@ export class PrismaSystemMigrationEnrollmentRepository {
 
   private constructor(private readonly prisma: PrismaClient) {}
 
-  /**
-   * Every enrollment with the names the ops page shows - the organization's, and something
-   * readable for who enrolled it. Both are best-effort lookups: an enrollment must still
-   * list (and be withdrawable) when its organization or enroller has since been deleted.
-   */
+  /** Every enrollment with organization and enroller names. Both are best-effort
+   * lookups so enrollment must list even when organization/enroller is deleted. */
   async findAll(): Promise<MigrationEnrollmentRecord[]> {
     const rows = await this.prisma.systemMigrationEnrollment.findMany({
       orderBy: { createdAt: "desc" },
@@ -135,11 +129,8 @@ export class PrismaSystemMigrationEnrollmentRepository {
     });
   }
 
-  /**
-   * The cohort's eligible pool for one migration: organizations with no enrollment row for it, no active enterprise subscription, and not on the caller's exclusion list (the
-   * private-dataplane organizations, whose ids the composition reads from the environment). A later pipeline step passes `enrolledForMigrationName` and the pool narrows to
-   * organizations already enrolled for that predecessor. Ids and names only - the service samples from this in memory, so the pool never needs an order.
-   */
+  /** Cohort eligible pool: organizations not enrolled, not on exclusion list,
+   * optionally filtered by predecessor enrollment. Ids and names only. */
   async findCohortEligibleOrganizations({
     migrationName,
     enrolledForMigrationName,
@@ -151,9 +142,8 @@ export class PrismaSystemMigrationEnrollmentRepository {
     excludeOrganizationIds: string[];
     includeEnterprise?: boolean;
   }): Promise<Array<{ id: string; name: string }>> {
-    // The enrollment table has no relation to Organization (a plain string
-    // column pair), so the enrolled ids are read first and excluded by id -
-    // the enrolled set is the small side of this join by construction.
+    // Enrollment table has no Organization relation; enrolled ids read first.
+    // Enrolled set is the small side of this join.
     const enrolled = await this.prisma.systemMigrationEnrollment.findMany({
       where: { migrationName },
       select: { organizationId: true },
@@ -173,11 +163,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
           ...(pool === undefined ? {} : { in: pool }),
           notIn: [...excludeOrganizationIds, ...enrolled.map((row) => row.organizationId)],
         },
-        // PENDING rides along with ACTIVE: a just-signed enterprise whose subscription has not settled is
-        // exactly the organization the exclusion exists to keep out of an experimental cohort. Spread rather
-        // than a ternary INSIDE `subscriptions`, because `subscriptions: undefined` and no `subscriptions` key
-        // are the same query to Prisma but not the same thing to a reader: omitting the key says "this filter
-        // does not apply", which is what lifting the exclusion means.
+        // PENDING rides with ACTIVE; exclude unsettled enterprise subscriptions.
         ...(includeEnterprise
           ? {}
           : {
@@ -193,11 +179,8 @@ export class PrismaSystemMigrationEnrollmentRepository {
     });
   }
 
-  /**
-   * The cohort's write: every picked organization in one statement. `skipDuplicates` covers the race with a
-   * concurrent single enrollment - a row that appeared since the pool was read is simply not re-created, and the
-   * returned count is what actually landed, so the caller reports what happened rather than what it attempted.
-   */
+  /** Cohort write: every picked organization in one statement. skipDuplicates
+   * covers race with concurrent enrollment. */
   async createMany({
     organizationIds,
     migrationName,

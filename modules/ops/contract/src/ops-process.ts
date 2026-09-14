@@ -92,17 +92,8 @@ export const opsListOutboxAttemptsInputSchema = z.object({
   projectId: z.string().min(1).max(200),
 });
 
-// ---------------------------------------------------------------------------
-// The process-manager explorer's vocabulary.
-//
-// It lived in `platform/app`, so `OpsProcessExplorer` — the port the operator
-// transport calls — could only say `Promise<unknown>` for all twenty of its
-// operations. Its own comment claimed "the concrete return types reach the
-// client through the context type rather than through these shapes", and
-// nothing did: `unknown` is what a tRPC procedure publishes, and `{}` is what
-// the browser reads it back as. The dead-letter table, the fleet card, the
-// wake list and the outbox panel were all reading fields off nothing.
-// ---------------------------------------------------------------------------
+// Process-manager explorer vocabulary: OpsProcessExplorer returns unknown because
+// it lived in platform/app; these shapes let the client publish the concrete types.
 
 /** One instance of a process manager, as the fleet table lists it. */
 export const processInstanceRowSchema = z.object({

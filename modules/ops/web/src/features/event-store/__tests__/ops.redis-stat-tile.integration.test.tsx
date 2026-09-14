@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Renders the real RedisStatTile via React Testing Library against an actual
- * ChakraProvider — no shallow rendering, no module mocks.
- *
- * Memory, processor and connections are ONE tile (specs/ops/ops-dashboard-density.feature,
- * "Redis statistics read as one subject"): three separate tiles are what pushed
- * the strip to eleven entries in a ten-column grid and orphaned the last onto a
- * row of its own.
+ * Real RedisStatTile rendering (Memory, Processor, Connections as one tile).
  */
 import { ChakraProvider, defaultSystem, HStack } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

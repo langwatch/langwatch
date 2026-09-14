@@ -6,15 +6,8 @@ export const PAUSED_SCHEDULES_HREF = "/ops/event-sourcing/schedules";
 
 export type { PausedSchedule } from "../../model/paused-schedule.ts";
 
-/**
- * Schedules that are switched off.
- *
- * A paused schedule is silent by design, which is exactly why it needs
- * reporting: nothing fires, nothing errors, and the only evidence is work that
- * never happened. `deriveStatus` already treats `active: false` as its own
- * state rather than as overdue — this section carries that state to the
- * dashboard so it is not something an operator has to go and look for.
- */
+/** Paused schedules (silent by design, need reporting—work never happened without
+ * errors). Dashboard so operators don't hunt for them. */
 export function PausedSchedulesSection({
   schedules,
   total,

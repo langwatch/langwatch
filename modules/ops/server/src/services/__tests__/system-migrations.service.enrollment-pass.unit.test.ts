@@ -179,7 +179,10 @@ describe("the migration pass under its cohort rules", () => {
   });
 
   describe("given a release that declares the migration ready for self-hosting", () => {
-    /** @scenario "A release that turns a migration on for self-hosting makes it run on the next pass" */
+    /**
+     * @scenario "A release that turns a migration on for self-hosting makes
+     * it run on the next pass"
+     */
     it("drives it for every organization on the next pass", async () => {
       const nowReleased = migrationOf({
         name: "cutover-like",
@@ -274,7 +277,10 @@ describe("the migration pass under its cohort rules", () => {
   });
 
   describe("given a cloud installation and a migration enrolled automatically", () => {
-    /** @scenario "An organization nobody enrolled migrates for an automatically enrolled migration" */
+    /**
+     * @scenario "An organization nobody enrolled migrates for an automatically
+     * enrolled migration"
+     */
     it("drives it for every organization, including one created after the rollout finished", async () => {
       const automatic = migrationOf({
         name: "authz-engine-like",

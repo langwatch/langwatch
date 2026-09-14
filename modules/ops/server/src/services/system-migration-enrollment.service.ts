@@ -27,9 +27,9 @@ export class SystemMigrationEnrollmentService {
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
   /**
-   * The enrollment listing for the ops page: every migration's, newest first, with whatever names still resolve. `isSaaS` rides
-   * along so the page can say honestly that a self-hosted installation has nothing to enroll. The read is audited because the
-   * records carry the enrollers' display names - personal data leaves through here, so the trail says who read it.
+   * Enrollment listing for the ops page: every migration, newest first, with
+   * names still resolving. `isSaaS` rides along so page says self-hosted has
+   * nothing to enroll. Read is audited because enrollers' names are personal data.
    */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
     isSaaS: boolean;
@@ -205,9 +205,9 @@ export class SystemMigrationEnrollmentService {
   }
 
   /**
-   * Withdraw an enrollment: the row is deleted, and the next pass simply no longer processes the organization for that migration. State
-   * already recorded stays exactly as it is - withdrawal pauses the rollout, it does not roll anything back (that is the operator rollback's
-   * job). Refused for a migration that admits every organization anyway, where deleting a row would pause nothing.
+   * Withdraw an enrollment: row is deleted, pass stops processing the org.
+   * Already recorded state stays as-is; withdrawal pauses, not rollback. Refused
+   * for migrations that admit everyone anyway.
    */
   async withdraw({
     organizationId,
@@ -237,9 +237,9 @@ export class SystemMigrationEnrollmentService {
   }
 
   /**
-   * Refuses an enrollment action on a migration that admits every organization anyway. Withdrawal asks
-   * this too: pausing a rollout is what an operator withdraws FOR, and a migration outside enrollment's
-   * reach cannot be paused that way - the per-organization rollback is the lever that still works on it.
+   * Refuses enrollment action on migrations that admit everyone anyway.
+   * Withdrawal also checks: pausing is what an operator withdraws FOR, and
+   * migrations outside enrollment can only be paused per-organization.
    */
   private requireEnrollmentDecidesSomething(migrationName: string): void {
     const migration = this.deps.migrations().find((candidate) => candidate.name === migrationName);

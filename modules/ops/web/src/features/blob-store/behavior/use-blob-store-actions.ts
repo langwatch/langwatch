@@ -14,17 +14,8 @@ interface DeleteVariables {
   hash: string;
 }
 
-/**
- * The two destructive calls the payload store offers, with their operator
- * feedback and cache invalidation attached.
- *
- * Success callbacks receive the variables the completed call ran with. That is
- * what lets the caller close only the dialog that owns the resolved request:
- * both the delete target and the reclaim prompt are single pieces of shared
- * state, so a stale completion (a delete the operator cancelled, a preview that
- * resolves after the Run dialog opened) must not be allowed to close whatever
- * dialog is open now.
- */
+/** Two destructive payload-store calls with operator feedback and cache
+ * invalidation. Callbacks receive variables to close only their own dialog. */
 export function useBlobStoreActions({
   onCleanupSuccess,
   onDeleteSuccess,

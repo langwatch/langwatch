@@ -12,11 +12,8 @@ const auditMetadataSchema = z.record(z.string(), z.json());
 /** Target of an act that names no single instance; the scope is in metadata. */
 const FLEET_TARGET_ID = "fleet";
 
-/**
- * Writes process-manager operator actions to the shared audit log, the same customer-visible effect re-emitted out
- * of band, so "why did this deliver at 03:14" must be answerable without anyone's memory.
- * contract the scheduler controls follow (ADR-091): a redriven intent is a
- */
+/** Process-manager operator actions written to audit log so delivery timing
+ * is answerable without anyone's memory. */
 export class PrismaProcessAuditRepository extends ProcessAuditRepository {
   static create({
     prisma,

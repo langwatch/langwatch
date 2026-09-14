@@ -6,20 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagsContent } from "../ui/sections/feature-flags-content.tsx";
 import { renderWithOpsHost, fakeOpsHost } from "../../../testing.tsx";
 
-/**
- * This page's copy is the only thing that tells an operator where a flag's
- * value comes from, and it drifted once already: PostHog left the resolver
- * without anyone editing the strings, so /ops/feature-flags spent months
- * telling SaaS operators their postgres edit was "an emergency override
- * only" when it was in fact the source of truth. An operator who believes
- * that does not write the row, and the rollout does not happen.
- *
- * These assertions are deliberately about meaning rather than wording: they
- * pin what the copy must still tell an operator — what a value set here
- * reaches, what outranks it, and in what order — and that it names no
- * external service. A future rewrite is free to say it better, but not free
- * to say the old thing again, and not free to drop a link in the chain.
- */
+/** Copy is the only source of truth on where values come from (drifted when PostHog
+ * left). Assertions pin meaning not wording; no external service names. */
 
 const FLAGS = [
   {
@@ -69,12 +57,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
     ops: {
       listFeatureFlags: {
         useQuery: () => ({
-          // `families` is not optional on the catalogue the view renders, and
-          // the fixture omitted it: the row that lists dynamically named flags
-          // reads `catalogue.families.length` unguarded, so every render in
-          // this file threw before the page it is about was on screen. Repaired
-          // rather than moved verbatim; the file asserts nothing about
-          // families, so an empty list is the faithful reading.
+          // families required (code reads unguarded); omitted in fixture so add empty list.
           data: { flags: FLAGS, families: [] },
           isLoading: false,
           error: null,
@@ -108,13 +91,8 @@ function renderPage() {
  *  Kept as a list so adding a future vendor to the copy trips this too. */
 const EXTERNAL_FLAG_SERVICES = [/posthog/i, /launchdarkly/i, /split\.io/i];
 
-/**
- * The section's own description, not the whole section: several registry
- * entries still name the removed service in their historical descriptions,
- * and those render inside this same box. Reading the sibling of the heading
- * keeps the assertion on the copy this test is about, so a fixture that
- * quotes a real description cannot fail it for the wrong reason.
- */
+/** Section's own description (not whole section); isolates test from historical
+ * fixture data. */
 function sectionDescription(heading: string): string {
   return screen.getByText(heading).nextElementSibling?.textContent ?? "";
 }
@@ -151,13 +129,8 @@ describe("the Ops feature flags page", () => {
 
       const copy = sectionDescription("System");
 
-      // Order is the assertion, not mere presence: the chain is env override,
-      // then this store, then the registry default, and copy that lists them
-      // in any other order teaches an operator the wrong precedence.
-      //
-      // Each link is matched loosely so that rewording the copy — "env" to
-      // "environment variable", say — does not fail a test about ordering.
-      // Only a reordered or missing link should turn this red.
+      // Order is the assertion (not presence); chain: env→store→registry default.
+      // Links matched loosely so rewording doesn't fail; only reordering/missing matter.
       const positionOf = (link: string, pattern: RegExp) => {
         const at = copy.search(pattern);
         expect(at, `System copy never mentions ${link}: "${copy}"`).toBeGreaterThanOrEqual(0);
@@ -190,16 +163,9 @@ describe("the Ops feature flags page", () => {
 
       expect(screen.getByText("All customers")).toBeDefined();
 
-      // The explanation used to live only in tooltip content, which Chakra
-      // does not render until hover — so the whole note could be replaced
-      // with "x" and this file stayed green. It is now screen-reader-only
-      // text inside the badge, which puts it in the DOM for a screen reader
-      // and for this assertion at the same time.
-      //
-      // Queried by text rather than by label on purpose: an aria-label on
-      // Chakra's role-less <span> badge would satisfy getByLabelText while
-      // being ignored by an actual screen reader, so a passing label query
-      // would prove nothing about the claim this test exists to pin.
+      // Explanation now in badge (screen-reader-only, not just hover tooltip).
+      // Query by text not label (aria-label on role-less span would pass but screen
+      // readers ignore).
       const note = screen.getByText(/whole fleet/i).textContent ?? "";
 
       expect(note).toMatch(/no targeting rule matches/i);

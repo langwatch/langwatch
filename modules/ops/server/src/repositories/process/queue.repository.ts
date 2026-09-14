@@ -1,4 +1,5 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null*
+// repositories implement the interface as intentional no-ops.
 
 import type {
   OpsBlockedSummary,

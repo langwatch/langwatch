@@ -4,15 +4,8 @@ import { PrismaAdminUserMapper } from "../prisma.admin-user.mapper.ts";
 
 const mapUserToBackofficeRow = PrismaAdminUserMapper.map;
 
-/**
- * Pins the Backoffice Users list's project-visibility rule: a user who has
- * an OrganizationUser but NO TeamUser must still see every non-archived
- * project in every team of those orgs — same rule the main app applies in
- * `organization.prisma.repository.ts#getAllForUser`. Regression coverage
- * for commit 605ab6ccb, where the Backoffice previously walked
- * teamMemberships and rendered an empty Projects column for exactly that
- * cohort.
- */
+/** Regression test for project-visibility rule: OrganizationUser without
+ * TeamUser sees all non-archived projects. */
 
 function buildUser(
   overrides: Partial<UserWithBackofficeIncludes> = {},

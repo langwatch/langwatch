@@ -1,18 +1,5 @@
-/**
- * How an Ops surface tells the operator how an action turned out.
- *
- * `~/components/ui/toaster` and `~/features/errors`'s `showErrorToast` are both
- * application singletons a feature-web package may not reach, so the two names
- * the surfaces already call are re-bound to the host port. The call SHAPES are
- * carried over unchanged on purpose — `toaster.create({ title, type })` and
- * `showErrorToast({ error, fallbackTitle })` — so the move touches the two lines
- * that acquire them and none of the call sites that use them.
- *
- * WHAT DOES NOT COME WITH THEM, and is a later slice: the code-keyed
- * presentation registry. `apps/ui` resolves a handful of codes and falls back to
- * the action name plus the generic line; the full registry, its tips, its docs
- * links and its global-handler dedup still live in `platform/app`.
- */
+/** Re-bind app singletons through host port; call shapes preserved, presentation
+ * registry deferred. */
 
 import { useCallback, useMemo } from "react";
 import { useOpsHost } from "../model/ops-host.ts";

@@ -1,24 +1,5 @@
-/**
- * The application an Ops screen is mounted in, faked.
- *
- * Every surface in this package reads the world through `OpsHostApi`: whether
- * the reader is an operator, whether they are an admin, what the address says,
- * and where a success or a failure is announced. A test that mounts one
- * therefore has to answer that port, and answering it ad hoc per file is how a
- * dozen suites come to disagree about what an operator is.
- *
- * Two things live here. `fakeOpsHost` builds the port from a small configuration
- * and records everything written through it, so an assertion about a navigation
- * or a notice reads off `host.recording` rather than off a spy on a module.
- * `renderWithOpsHost` mounts a tree underneath it and owns the one piece of
- * state a static double cannot have: the query string. Every Ops overlay opens
- * from a query key now — the queue group from `?group=`, the payload store from
- * `?payloadStore=` — so a click that writes the address has to come back as a
- * re-render, or the drawer never opens and the test proves nothing.
- *
- * The same shape as `@langwatch/gateway-web`'s harness, because the two host
- * ports are the same shape. They converge if the ports are ever promoted.
- */
+/** OpsHostApi test harness. fakeOpsHost records port writes; renderWithOpsHost owns
+ * query state (overlays open from ?key=). Same shape as gateway-web. */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, type RenderResult } from "@testing-library/react";

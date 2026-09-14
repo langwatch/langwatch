@@ -184,7 +184,8 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
       });
     });
 
-    /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+    /** @scenario "A later step's cohort samples only organizations enrolled for the
+     * step before it" */
     it("pools from the predecessor's enrollment when one is named", async () => {
       const findMany = vi
         .fn()

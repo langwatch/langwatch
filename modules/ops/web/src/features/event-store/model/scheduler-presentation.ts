@@ -1,12 +1,5 @@
-/**
- * Derives what the scheduler page could not say (ADR-091).
- *
- * The page rendered `nextRunAt` as ordinary text, so an overdue schedule and a
- * healthy one differed by the words "ago" and "in" buried mid-timestamp, in no
- * particular order. Overdue is the single most important fact this page can
- * carry — it means the calendar loop is behind or has stopped — so it becomes a
- * state of its own, sorts to the top, and is counted in the header.
- */
+/** Derives overdue status (ADR-091); most important fact—calendar loop behind/stopped.
+ * Page previously just rendered nextRunAt text. */
 
 import { toEpochMs } from "@langwatch/time";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
@@ -21,13 +14,7 @@ export interface SchedulerJobLike {
 
 export type SchedulerJobStatus = "paused" | "retrying" | "running" | "overdue" | "scheduled";
 
-/**
- * How late a schedule may be before it counts as overdue.
- *
- * The loop leases a slot by pushing `nextRunAt` forward, so a row can sit a
- * beat in the past during normal claiming. A small grace keeps that from
- * reading as an incident every tick.
- */
+/** Grace period (slot leases may sit past during normal claiming). */
 export const OVERDUE_GRACE_MS = 30_000;
 
 /** No tick within this window means the calendar loop itself is the problem. */
@@ -69,22 +56,8 @@ export function needsAttention(status: SchedulerJobStatus): boolean {
   return status === "overdue" || status === "retrying";
 }
 
-/**
- * Whether run-now should be offered at all (ADR-091).
- *
- * Three refusals, each of which the server also enforces — this decides only
- * whether the operator is shown a control they could use.
- *
- * - No resolved project name: run-now is the one control that can deliver
- *   something to a customer, and a ksuid is not a target an operator can check
- *   a confirmation against.
- * - Paused: the point of pausing is that nothing runs.
- * - Running or retrying: a slot is claimed and a worker is executing it. Making
- *   the schedule due again hands the SAME slot to a second worker, because
- *   `claim()` preserves an existing `currentSlot` rather than refusing — so the
- *   target is delivered twice. This is the outcome ADR-091 declines to offer
- *   even behind a confirmation.
- */
+/** Three refusals (ADR-091): no project name, paused, or running/retrying (risk
+ * delivering same slot to two workers). Enforced server-side too. */
 export function canRunNow({
   projectName,
   status,
@@ -109,12 +82,7 @@ export function isSlotStale({
   return now - toEpochMs(heldSince) >= SLOT_STALE_AFTER_MS;
 }
 
-/**
- * Sort so the rows that need action are first, then by how soon each fires.
- *
- * Within a status, sooner-first matches how an operator reads the page: the
- * next thing to happen is the next thing to care about.
- */
+/** Action-needed rows first, then by firing time (sooner-first matches operator reading). */
 export function compareForAttention({
   a,
   b,
@@ -187,14 +155,8 @@ function tally({
   if (until > 0 && until <= 3_600_000) counts.dueWithinHour++;
 }
 
-/**
- * Whether the calendar loop looks alive, inferred from the schedules themselves.
- *
- * There is no heartbeat to read, so the most recent `lastSlot` across active
- * schedules stands in for one: if nothing has fired recently AND something was
- * due, the loop is the suspect rather than any individual row. With nothing
- * due, silence is expected and says nothing either way.
- */
+/** Loop health from schedule fire times (no heartbeat); most recent lastSlot stands
+ * in for heartbeat. */
 export function deriveLoopHealth({ jobs, now }: { jobs: SchedulerJobLike[]; now: number }): {
   healthy: boolean;
   lastFiredAt: number | null;

@@ -1,27 +1,10 @@
 import { HandledError } from "@langwatch/handled-error";
 
-/**
- * Rolling an organization back to its legacy path is an operator action with
- * NO status precondition: the stored `rolled_back` pin is the only runtime
- * lever that keeps a pass off an organization, and a migration that enrols
- * automatically has no enrollment to withdraw instead. So every status is
- * pinnable, and so is a tenant with no record at all - see
- * `SystemMigrationsService.rollBack`. What varies is whether the migration's
- * rollback EFFECT runs, which is that method's business, not an error's.
- * The refusals that remain here are per-migration preconditions, not
- * eligibility.
- */
+/** Rollback has no status precondition; stored rolled_back pin is the only
+ * runtime lever. These refusals are per-migration preconditions, not eligibility. */
 
-/**
- * A rollback refused because ANOTHER migration's state still stands on this
- * one. The canonical case (and today the only one): the authz cutover has
- * put — or is putting — the organization's grant history in charge, and the
- * genesis import / team-user backfill are the floor it stands on. Rolling
- * the floor back flips WRITES to the legacy path while reads stay wherever
- * the cutover left them, so a later revocation deletes the legacy row and
- * never the engine's — the revoked member keeps access. The operator's
- * action is in the message: roll the dependent migration back first.
- */
+/** Rollback refused when another migration's state depends on this one;
+ * rolling the floor back flips writes to the legacy path while reads stay elsewhere. */
 export class MigrationRollbackBlockedByDependentError extends HandledError {
   declare readonly code: "migration_rollback_blocked_by_dependent";
 

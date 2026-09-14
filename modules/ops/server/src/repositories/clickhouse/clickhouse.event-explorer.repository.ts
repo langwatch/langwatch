@@ -45,11 +45,9 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       queryParams.tenantIds = params.tenantIds;
     }
 
-    // event_log partitions on `toYearWeek(toDateTime64(EventOccurredAt / 1000, 3))`, NOT on EventTimestamp. The previous version filtered on EventTimestamp, which is the ReplacingMergeTree version
-    // column (ingest-time) — that predicate does not prune partitions, so every weekly partition was scanned including cold S3 ones. EventOccurredAt is what the partition key is derived from and is also
-    // closer to the caller's intent ("aggregates active since this real-world time"). `EventOccurredAt = 0` is the historical sentinel for events that pre-date the column (added after the table was
-    // already in production). Those rows still live in the epoch-week partition and are real aggregates the bulk replay wizard must be able to surface; a naïve `>= sinceMs` filter would silently drop
-    // them. Including `OR EventOccurredAt = 0` keeps partition pruning (epoch-week + last-N-weeks instead of every partition) while preserving the legacy rows.
+    // event_log partitions on EventOccurredAt, not EventTimestamp, enabling
+    // partition pruning. EventOccurredAt = 0 preserves legacy rows while still
+    // pruning.
     const result = await this.client.query({
       query: `
         SELECT
@@ -104,11 +102,9 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       throw new Error("Enter a search query or pick at least one tenant before searching.");
     }
 
-    // No silent time clamp in the repo. The caller (the ops router for the DejaView UI) supplies sinceMs
-    // explicitly - currently a 1-year bound surfaced under the search box as a banner so the operator sees
-    // the window up front. Other callers (e.g. integration tests, ad-hoc scripts) can pass `undefined` to
-    // scan the full event_log, paying the partition-fan-out cost knowingly. EventOccurredAt = 0 is the
-    // legacy sentinel; preserved alongside the bound so historical test data doesn't silently disappear.
+    // No silent time clamp in repo; caller supplies sinceMs explicitly.
+    // EventOccurredAt = 0 is the legacy sentinel, preserved so historical
+    // test data doesn't silently disappear.
     const queryParams: Record<string, unknown> = {};
     let timeBoundFilter = "";
     if (typeof params.sinceMs === "number" && params.sinceMs > 0) {

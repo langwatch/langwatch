@@ -49,11 +49,10 @@ export class SystemMigrationRunService {
       organizationId,
       migrationName,
     });
-    // Every tenant the run covered was claimed elsewhere, so this run did nothing and the operator should
-    // retry. For an organization-rooted run that is one tenant, so `claimed > 0` and this condition are
-    // the same thing. For a USER-rooted run the tenants are the organization's members, and one contended
-    // member is partial progress: aborting on it would discard the outcomes of every member that
-    // finalized, and the operator would be told to retry a run that mostly succeeded.
+    // Every tenant was claimed elsewhere, so this run did nothing. For
+    // organization-rooted: one tenant, `claimed > 0` same as this condition.
+    // For user-rooted: one contended member is partial progress; aborting
+    // would discard outcomes of members that finalized.
     if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
       throw new MigrationPassAlreadyRunningError();
     }

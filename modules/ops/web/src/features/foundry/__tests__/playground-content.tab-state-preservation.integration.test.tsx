@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * #5588 gave PlaygroundContent `lazyMount` without `unmountOnExit`, on the
- * grounds that the Editor tab holds in-progress edits a remount would discard.
- * Nothing enforced that: adding `unmountOnExit` in a later performance pass
- * would silently throw the edit away.
- *
- * What is actually at risk is narrower than "the Input and Textarea fields".
- * Every field in SpanEditorPanel and the LLM/RAG/Prompt editors is controlled
- * straight through to the `traceStore` on each keystroke, so those survive a
- * remount either way. The one piece of state that lives only in React is
- * AttributeEditor's `newKey`, the name of an attribute typed but not yet
- * committed with the Add button. That is the draft this test protects.
+ * Risk of remount: only AttributeEditor's newKey draft lives in React; other
+ * fields controlled through traceStore. Test protects the draft.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

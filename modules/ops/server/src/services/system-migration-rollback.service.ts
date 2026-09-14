@@ -23,9 +23,9 @@ export class SystemMigrationRollbackService {
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
   /**
-   * The operator's rollback: pin a migrated or finalized organization back onto its legacy path
-   * (specs/migration/system-migrations-runner.feature, "An operator rolls a finalized organization back to its legacy path", "An
-   * operator rolls a migrated organization back to its legacy path"), then apply whatever that migration's rollback has to DO.
+   * Operator's rollback: pin organization back to legacy path and apply the
+   * migration's rollback effect.
+   * (See specs/migration/system-migrations-runner.feature)
    */
   async rollBack({
     migrationName,
@@ -139,9 +139,9 @@ export class SystemMigrationRollbackService {
 }
 
 /**
- * When this rollback was decided, read back off the pin a previous call wrote. Null when the report carries no
- * usable stamp — a record pinned by something other than this method, or by a version of it that predates the
- * stamp — in which case the caller falls back to now and the retry simply does not dedupe.
+ * Read back the pin a previous call wrote. Null when the report carries no
+ * usable stamp (pinned by other method or older version), in which case
+ * caller falls back to now and retry does not dedupe.
  */
 function rollbackDecidedAt(report: Record<string, unknown>): string | null {
   const rolledBack = report.rolledBack;

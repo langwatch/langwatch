@@ -10,18 +10,8 @@ export type ParkedGroupsRender = (
   tenant: Pick<ParkedTenant, "tenantId" | "queueName">,
 ) => ReactNode;
 
-/**
- * Which tenants are parked, and how badly.
- *
- * The Parked tile could read 129,091 with nothing anywhere on the page naming a
- * tenant — an alarm with the label torn off. This section is the label. It also
- * says what parked MEANS, because an orange six-figure number that describes
- * flow control working correctly otherwise reads as an outage.
- *
- * One of three sections under the paused panel. It owns no card of its own:
- * "what is switched off" is one question, and PausedCard is where it is
- * answered — including the decision to render nothing when nothing is.
- */
+/** Labels which tenants are parked (the alarming number needs context—flow control
+ * working correctly). One of three sections under paused panel; no own card. */
 export function ParkedTenantsSection({
   parkedTenants,
   parkedTenantsBound,

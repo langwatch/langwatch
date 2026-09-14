@@ -1,14 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * One vocabulary across both dead-letter substrates
- * (specs/ops/dead-letter-recovery.feature).
- *
- * The two surfaces retire work through different machinery and were built at
- * different times, which is exactly how they drifted: the queue card said
- * "Replay" while the outbox said "Redrive" for the same act. This renders the
- * row from each and holds them to the same words — including that "Replay" is
- * gone from here, because it means projection rebuilds elsewhere in ops.
+ * Same recovery vocabulary across queue and outbox substrates (drifted: "Replay"
+ * vs "Redrive" for same act).
  */
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

@@ -5,20 +5,8 @@ import { z } from "zod";
 
 const usageStatsCountRowsSchema = z.array(z.object({ Total: z.string() }));
 
-/**
- * An organization's usage, counted over the process's one ClickHouse client.
- *
- * Each project is counted by name rather than the whole organization in one
- * `TenantId IN (...)` sweep: the client routes a statement by the tenant it
- * names, so a per-project statement reaches the server that project's rows are
- * actually on, and an organization split across a private route and the shared
- * one is counted correctly rather than reported as whatever one endpoint held.
- *
- * There is no branch here for "no client". A deployment that named no
- * ClickHouse refuses at boot naming this module and the member; a read that
- * cannot reach the store raises, because a usage report that answers zero
- * traces for a busy organization is indistinguishable from a quiet one.
- */
+/** Organization usage counted per project so per-project statements reach
+ * the correct server. No fallback: deployment without ClickHouse refuses at boot. */
 export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseRepository {
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();

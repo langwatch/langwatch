@@ -166,7 +166,10 @@ describe("SystemMigrationsService.enrollCohort", () => {
         );
       });
 
-      /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
+      /**
+       * @scenario "A later step's cohort samples only organizations enrolled
+       * for the step before it"
+       */
       it("pools a later step from the step before it, and the first step from everyone", async () => {
         const { service, findCohortEligibleOrganizations } = serviceWith({
           migrationNames: ["authz-team-user-backfill", MIGRATION],

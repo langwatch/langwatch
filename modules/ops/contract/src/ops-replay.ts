@@ -1,12 +1,5 @@
-/**
- * What a projection replay is, as every door reads it.
- *
- * The vocabulary was in `platform/app`, so the port the operator transport
- * calls could only say `Promise<unknown>` — and `unknown` reaches the browser
- * as `{}`. Every field the replay drawer, the history table and the status
- * banner read was therefore unchecked: forty-one reads in the drawer alone
- * were type errors that a running page happened to satisfy.
- */
+/** Projection replay vocabulary: port could only return Promise<unknown>,
+ * leaving all field reads type-unchecked on the client. */
 
 import { z } from "zod";
 
