@@ -275,17 +275,17 @@ describe("the instance sign-in method policy", () => {
     });
   });
 
-  describe("when credentials are present for a provider the deployment does not mount", () => {
+  describe("when credentials are present for several social providers", () => {
     beforeEach(() => {
       licensedStore(true);
     });
 
-    /** @scenario "A social provider this deployment never mounted is never offered" */
-    it("never offers a provider better-auth was not handed", async () => {
-      // Both sets of credentials are present; only one provider is mounted,
-      // because `buildSocialProviders` builds the one `NEXTAUTH_PROVIDER`
-      // names. Offering the other would draw a button whose sign-in call
-      // reaches a provider better-auth has never heard of.
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("offers every social provider whose credentials are present", async () => {
+      // Credentials ARE the mounting decision now (D09): the Auth0-broker
+      // migration needs the native providers mounted beside the one
+      // `NEXTAUTH_PROVIDER` names, and an operator sets a client id and
+      // secret for no reason other than to offer that provider.
       envMock.NEXTAUTH_PROVIDER = "google";
       socialCredentials("google");
       socialCredentials("github");
@@ -293,7 +293,34 @@ describe("the instance sign-in method policy", () => {
       const policy = await resolveSignInMethodPolicy();
 
       expect(methodIds(policy.defaultMethods)).toContain("google");
+      expect(methodIds(policy.defaultMethods)).toContain("github");
+    });
+
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("still never offers a provider whose credentials are absent", async () => {
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toContain("google");
       expect(methodIds(policy.defaultMethods)).not.toContain("github");
+      expect(methodIds(policy.defaultMethods)).not.toContain("gitlab");
+    });
+
+    /** @scenario "A social provider this deployment never mounted is never offered" */
+    it("never offers a provider whose credentials are incomplete", async () => {
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+      // Two of azure-ad's three values: better-auth is never handed the
+      // provider, so no button may dial it.
+      envMock.AZURE_AD_CLIENT_ID = "azure-client";
+      envMock.AZURE_AD_CLIENT_SECRET = "azure-secret";
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toContain("google");
+      expect(methodIds(policy.defaultMethods)).not.toContain("azure-ad");
     });
   });
 

@@ -238,9 +238,23 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
 
   @unit
   Scenario: A social provider this deployment never mounted is never offered
-    Given credentials are present for a social provider this deployment does not mount
+    Given a social provider's credentials are incomplete, so better-auth never mounted it
     When the sign-in page is requested
     Then that provider is not one of the offered methods
+
+  # Retiring the NextAuth-era "exactly one provider" rule is what lets the
+  # native providers mount beside the Auth0 broker during its migration
+  # (D09). Setting a client id and secret is the mounting decision; the
+  # provider env keeps selecting the generic-OAuth branch and leading the
+  # rail, and a provider env naming something unmountable still lands in
+  # email mode even while another provider's credentials are present.
+  @unit
+  Scenario: Social providers mount on their credentials, not on the provider env
+    Given credentials are present for two social identity providers
+    And the provider env names only one of them
+    When the sign-in page is requested
+    Then both providers are among the offered methods
+    And a provider whose credentials are absent is still never offered
 
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 

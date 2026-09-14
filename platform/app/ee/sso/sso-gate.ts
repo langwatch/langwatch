@@ -7,7 +7,11 @@ import {
   parseLicenseKey,
   verifySignature,
 } from "../licensing/validation";
-import { buildGenericOAuthConfigs, buildSocialProviders } from "./providers";
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+  socialProviderKeyFor,
+} from "./providers";
 import {
   type ISsoLicenseRepository,
   SsoLicenseRepository,
@@ -248,11 +252,14 @@ export async function platformSSOAllowed(): Promise<boolean> {
 /**
  * Did the configured provider actually get wired into BetterAuth?
  *
- * Both builders only ever produce an entry for `NEXTAUTH_PROVIDER`, so
- * "produced nothing" means the deployment named a provider that this build
- * cannot mount: an id it does not know (`azureAd` for `azure-ad`, or one
- * that was never implemented), or a known id whose client credentials are
- * missing.
+ * The NAMED provider, specifically. The social map mounts on credentials now
+ * rather than on `NEXTAUTH_PROVIDER`, so "anything mounted" stopped meaning
+ * "the named provider mounted": a deployment that names a provider this
+ * build cannot mount — an id it does not know (`azureAd` for `azure-ad`), or
+ * a known id whose client credentials are missing — must land in email mode
+ * even while some other social provider's credentials are present. The
+ * generic-OAuth builder still produces only the named provider, so its
+ * length still answers for auth0, okta and the OIDC table.
  *
  * Exported because the authentication settings page reports this state. Email
  * mode is the safe landing for it (see `resolveAuthProvider`), but it is
@@ -261,10 +268,11 @@ export async function platformSSOAllowed(): Promise<boolean> {
  * federation is being enforced when it is not.
  */
 export function authProviderIsMounted(): boolean {
-  return (
-    Object.keys(buildSocialProviders(env)).length > 0 ||
-    buildGenericOAuthConfigs(env).length > 0
-  );
+  const namedSocialKey = socialProviderKeyFor(env.NEXTAUTH_PROVIDER);
+  if (namedSocialKey !== null) {
+    return namedSocialKey in buildSocialProviders(env);
+  }
+  return buildGenericOAuthConfigs(env).length > 0;
 }
 
 /**
