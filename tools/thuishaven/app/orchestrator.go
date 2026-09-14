@@ -163,7 +163,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 3)
+	ports, err := o.sys.FreePorts(nSvc + 4)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -173,9 +173,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
-	// ports[nSvc+1] the worker metrics endpoint, and ports[nSvc+2] the IdP
-	// simulator's verification nameserver — the one listener that is reached by
-	// address rather than by hostname, so it cannot go through the proxy.
+	// ports[nSvc+1] the worker metrics endpoint, ports[nSvc+2] the IdP
+	// simulator's verification nameserver, and ports[nSvc+3] the mail sink's SMTP
+	// listener — both reached by address rather than by hostname, so neither can
+	// go through the proxy.
 	redisDB, exclusive := o.allocateRedisDB(slug)
 	if !exclusive {
 		fmt.Printf(
@@ -213,14 +214,17 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		if r.Name == domain.IdPService {
 			svc.DNSPort = ports[nSvc+2]
 		}
+		if r.Name == domain.MailService {
+			svc.SMTPPort = ports[nSvc+3]
+		}
 		if !runsLocally(r.Name, opts) {
 			if base, ok := o.baselineService(r.Name); ok {
-				// The nameserver comes with it: a fallback idp answers domain
-				// proofs on the baseline's listener, not on the port this
-				// stack allocated for a simulator it is not running.
-				svc.Port, svc.DNSPort, svc.IsFallback = base.Port, base.DNSPort, true
+				// The nameserver/SMTP listener comes with it: a fallback idp or
+				// mail sink answers on the baseline's own listener, not on the
+				// port this stack allocated for a service it is not running.
+				svc.Port, svc.DNSPort, svc.SMTPPort, svc.IsFallback = base.Port, base.DNSPort, base.SMTPPort, true
 			} else {
-				svc.Port, svc.DNSPort = 0, 0
+				svc.Port, svc.DNSPort, svc.SMTPPort = 0, 0, 0
 			}
 		}
 		// Portless enabled: the proxy routes every service through one shared
@@ -1072,6 +1076,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Langy
 	case "idp":
 		return opts.Selection.IDP
+	case domain.MailService:
+		return opts.Selection.Mail
 	case domain.DesignSystemService:
 		return opts.Selection.DesignSystem
 	case domain.MailRoomService:

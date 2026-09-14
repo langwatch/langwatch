@@ -106,11 +106,12 @@ func TestReadSelectionKeepsDefaultsForServicesTheFileNeverNames(t *testing.T) {
 	})
 }
 
-// A worktree's .haven.json may still carry the two developer-tool lanes'
-// pre-rename spellings ("storybook", "mail") from before they became
-// "design-system" and "mail-room". Losing that on the rename would silently
-// turn a lane back off for every worktree that had turned it on — so the old
-// keys still decode, and the new key wins when a file somehow states both.
+// A worktree's .haven.json may still carry the developer-tool lanes'
+// pre-rename spellings. "storybook" still decodes onto design-system, and the
+// new key wins when a file somehow states both. Mail-room's old "mail" shim
+// is retired: that key now states the mail sink lane, so a pre-rename file's
+// "mail": true reads as the sink (its default anyway) and the mail room is
+// turned on again by hand.
 //
 // @scenario "A stored old-name developer-tool selection migrates on load"
 func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
@@ -125,8 +126,14 @@ func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
 			if !ok {
 				t.Fatal("a file stating the old names was treated as never written")
 			}
-			if !sel.DesignSystem || !sel.MailRoom {
-				t.Errorf("got %+v, want both developer tools read back on from their old keys", sel)
+			if !sel.DesignSystem {
+				t.Errorf("got %+v, want the design system read back on from its old key", sel)
+			}
+			if sel.MailRoom {
+				t.Errorf("got %+v, want the mail room left off: the old \"mail\" spelling now states the sink", sel)
+			}
+			if !sel.Mail {
+				t.Errorf("got %+v, want \"mail\": true read as the mail sink lane", sel)
 			}
 		})
 
@@ -151,14 +158,14 @@ func TestReadSelectionMigratesTheOldDeveloperToolNames(t *testing.T) {
 			if _, stated := raw.Services["storybook"]; stated {
 				t.Error("the re-saved file still carries the old \"storybook\" key")
 			}
-			if _, stated := raw.Services["mail"]; stated {
-				t.Error("the re-saved file still carries the old \"mail\" key")
+			if v, _ := raw.Services["mail"].(bool); !v {
+				t.Error("the re-saved file does not state \"mail\": true for the sink lane")
 			}
 			if v, _ := raw.Services["design-system"].(bool); !v {
 				t.Error("the re-saved file does not state \"design-system\": true")
 			}
-			if v, _ := raw.Services["mail-room"].(bool); !v {
-				t.Error("the re-saved file does not state \"mail-room\": true")
+			if v, stated := raw.Services["mail-room"].(bool); !stated || v {
+				t.Error("the re-saved file should state \"mail-room\": false under its own key")
 			}
 		})
 	})

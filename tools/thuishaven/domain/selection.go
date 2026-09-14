@@ -24,6 +24,12 @@ type Selection struct {
 	// setup step. Worktrees that don't want it say `haven up -idp` once.
 	// `haven idp` runs the simulator alone, with no stack at all.
 	IDP bool `json:"idp"`
+	// Mail is the local mail sink (mailsim), on by default for the same reason
+	// as IDP: it is one small Go process, and having it always routed means an
+	// email the app sends — a signup verification, an invite — can always be
+	// caught and read without a setup step. Worktrees that don't want it say
+	// `haven up -mail` once.
+	Mail bool `json:"mail"`
 	// DesignSystem is the design system's component workshop, off by default:
 	// it is a developer's tool rather than a part of the product, and the
 	// worktrees that never open it should not pay for the build. A worktree
@@ -39,28 +45,31 @@ type Selection struct {
 }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
-// gateway, nlp and the idp simulator — no langy, and neither of the two
-// developer tools (design-system, mail-room).
-func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true, IDP: true} }
+// gateway, nlp, the idp simulator and the mail sink — no langy, and neither of
+// the two developer tools (design-system, mail-room).
+func DefaultSelection() Selection {
+	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true}
+}
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "design-system", "mail-room"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "design-system", "mail-room"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
 // standalone worker lane and hosting the queue stack inside the app process;
 // the worker is its own application now, so the lane always runs and there is
-// nothing left to select. `storybook` and `mail` are the pre-rename spellings
-// of the two developer-tool lanes — refused the same way, naming the flag that
-// replaced each one rather than pretending it still works. Refused by name
-// rather than falling into the generic "unknown service" error, which would
-// read as a typo.
+// nothing left to select. `storybook` is the pre-rename spelling of the
+// design-system lane — refused the same way, naming the flag that replaced it
+// rather than pretending it still works. `mail` used to be the pre-rename
+// spelling of the mail-room studio too, but that rename freed the name for the
+// actual mail lane (the sink) — `±mail` is a real selector now, not a retired
+// one; see MailService. Refused by name rather than falling into the generic
+// "unknown service" error, which would read as a typo.
 var RetiredSelectionServices = map[string]string{
 	"workers":   "no longer selects anything — the worker runs in the backend lane locally and as its own deployment in production — every stack runs the ui and backend lanes, so there is nothing to select",
 	"api":       "no longer selects anything — the api runs in the backend lane, which every stack runs",
 	"backend":   "is not selectable — every stack runs the backend lane, or it would serve pages and process no jobs",
 	"storybook": "was renamed — use +design-system / -design-system",
-	"mail":      "was renamed — use +mail-room / -mail-room",
 }
 
 // MonolithRetiredSelectionServices are the ±names refused on a monolith
@@ -121,6 +130,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Langy = on
 	case "idp":
 		sel.IDP = on
+	case "mail":
+		sel.Mail = on
 	case "design-system":
 		sel.DesignSystem = on
 	case "mail-room":
@@ -146,6 +157,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Langy = local
 		case "idp":
 			sel.IDP = local
+		case MailService:
+			sel.Mail = local
 		case DesignSystemService:
 			sel.DesignSystem = local
 		case MailRoomService:
@@ -208,6 +221,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.NLP, "nlp")
 	add(s.Langy, "langy")
 	add(s.IDP, "idp")
+	add(s.Mail, "mail")
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	out := "services: " + strings.Join(on, " · ")

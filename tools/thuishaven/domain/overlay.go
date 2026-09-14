@@ -161,7 +161,7 @@ func (s Stack) OverlayEnv() []string {
 		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
 		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
 		// comma-separated list. The seeded admin needs to be in it, or logging in
-		// as admin@haven.localhost gets a normal user, not a platform admin.
+		// as DefaultAdminEmail gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the worker manager): the control plane dials it at its loopback
@@ -296,6 +296,45 @@ func (s Stack) observabilityEnv() []string {
 // invariant holds for whatever a future recipe checks.
 func LaneEnv(lane string) string {
 	return "LANGWATCH_LANE=" + lane
+}
+
+// MailProviderEnvVars are the env keys that mean a developer configured an
+// outgoing-mail provider explicitly. Any one of them present in the resolved
+// environment means haven must inject nothing: silently rewiring mail a
+// developer deliberately routed to SendGrid, Resend, SES or a hand-rolled SMTP
+// endpoint would send their test traffic somewhere they did not choose.
+var MailProviderEnvVars = []string{
+	"EMAIL_PROVIDER", "SMTP_URL", "SMTP_HOST", "SENDGRID_API_KEY", "RESEND_API_KEY", "USE_AWS_SES",
+}
+
+// HasEmailProviderConfigured reports whether resolved — the environment the
+// app process will actually see, already merged with its own precedence —
+// names an email provider. resolved is a plain map so callers build it once
+// (process env layered over the worktree's .env) and this stays pure and
+// trivially testable with a literal fixture.
+func HasEmailProviderConfigured(resolved map[string]string) bool {
+	for _, key := range MailProviderEnvVars {
+		if resolved[key] != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// MailSMTPEnv is the SMTP override that routes the app's outgoing mail at the
+// local sink, or nil when the developer already configured a provider (see
+// HasEmailProviderConfigured) — the sink still catches whatever is addressed
+// to it directly, but haven injects nothing over a deliberate choice.
+func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
+	if HasEmailProviderConfigured(resolved) {
+		return nil
+	}
+	return []string{
+		"EMAIL_PROVIDER=smtp",
+		"SMTP_HOST=127.0.0.1",
+		fmt.Sprintf("SMTP_PORT=%d", smtpPort),
+		"SMTP_SECURE=false",
+	}
 }
 
 // EnvMap turns KEY=VALUE lines into a map, for callers that need to look a

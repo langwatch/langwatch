@@ -300,6 +300,20 @@ var baseTable = []commandSpec{
 		},
 	},
 	{
+		name:    "mail",
+		summary: "read this worktree's caught email: address | list | get <id> | wait | clear",
+		args:    "<address|list|get|wait|clear> [id]",
+		maxArgs: 2,
+		flags: []flagSpec{
+			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
+			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
+			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			{long: "--html", summary: "get: the message's raw HTML body instead of its text"},
+			{long: "--json", summary: "machine-readable"},
+		},
+		run: runMail,
+	},
+	{
 		name:    "logs",
 		summary: "captured service logs from any terminal: all interleaved, or the named ones",
 		args:    "[service…]",

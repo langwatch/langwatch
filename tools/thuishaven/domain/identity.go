@@ -11,7 +11,7 @@ package domain
 const (
 	// DefaultAdminEmail/DefaultAdminPassword are the seeded BetterAuth
 	// credential login every worktree and every agent can sign in with.
-	DefaultAdminEmail    = "admin@haven.localhost"
+	DefaultAdminEmail    = "admin@mail.langwatch.localhost"
 	DefaultAdminPassword = "LocalHavenAdmin!2026"
 
 	// DefaultPrivateAccessToken is a full-access personal access token

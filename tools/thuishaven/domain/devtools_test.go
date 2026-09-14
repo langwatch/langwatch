@@ -47,21 +47,22 @@ func TestDeveloperToolDeltas(t *testing.T) {
 	}
 }
 
-// The old spellings ("storybook", "mail") must be refused by name, the same
-// way `haven up ±workers` is refused — naming the flag that replaced each one,
-// rather than falling through to "unknown service" (a typo) or silently doing
-// nothing.
+// The old "storybook" spelling must be refused by name, the same way `haven
+// up ±workers` is refused — naming the flag that replaced it, rather than
+// falling through to "unknown service" (a typo) or silently doing nothing.
+// "mail" was the design system's studio's old spelling too, but that rename
+// freed the name for the actual mail lane (the sink) — see
+// TestMailIsNoLongerRefusedAsTheStudiosOldName in selection_mail_test.go —
+// so it is a real selector now, not a retired one.
 //
 // @scenario "A renamed developer-tool lane is refused by its old name"
-func TestStorybookAndMailAreRefusedByTheirOldNames(t *testing.T) {
+func TestStorybookIsRefusedByItsOldName(t *testing.T) {
 	cases := []struct {
 		delta string
 		want  string
 	}{
 		{"+storybook", "+design-system"},
 		{"-storybook", "-design-system"},
-		{"+mail", "+mail-room"},
-		{"-mail", "-mail-room"},
 	}
 	for _, c := range cases {
 		_, err := ApplySelectionDeltas(DefaultSelection(), []string{c.delta})

@@ -22,6 +22,11 @@ type Service struct {
 	// answers confidently for somebody else's domains. Allocated here, the
 	// two sides are told the same number and there is nothing to collide.
 	DNSPort int `json:"dnsPort,omitempty"`
+	// SMTPPort is the mail sink's SMTP listener, and is zero for every other
+	// service. Same reasoning as DNSPort: it is a second listener the one
+	// PerWorktreeServices port cannot name, allocated by haven rather than left
+	// to the sink's own fixed default, so two stacks' sinks can never collide.
+	SMTPPort int `json:"smtpPort,omitempty"`
 	// Aliases are the extra hostnames routed to this same listener (see
 	// ServiceHostAliases). Hostname stays the one canonical address; these are
 	// recorded so a report can show every way in and teardown can remove every
@@ -143,15 +148,18 @@ type Stack struct {
 // its own domain.APIService entry right after this loop rather than
 // complicating this one's allocation and fallback logic. `app` is the browser
 // application's port - the `ui` lane (apps/ui, Vite) is what listens on it.
-// The last two are developer tools rather than parts of the product: off
-// unless the worktree selects them, and never counted among the three Node
-// lanes (see Lanes). Order is the launch + print order.
+// `mail` is the local mail sink (mailsim): on by default, like idp, because
+// nothing about it is a developer tool — the product's own outgoing email
+// lands there. The last two ARE developer tools rather than parts of the
+// product: off unless the worktree selects them, and never counted among the
+// three Node lanes (see Lanes). Order is the launch + print order.
 var PerWorktreeServices = []struct{ Name, Role string }{
 	{"app", "App — UI + API at /api"},
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
 	{"idp", "IdP simulator (Go)"},
+	{MailService, "Mail sink (mailsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
 }

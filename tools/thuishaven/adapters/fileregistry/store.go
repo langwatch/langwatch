@@ -116,19 +116,18 @@ type selectionFields struct {
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
 	IDP     *bool `json:"idp"`
+	Mail    *bool `json:"mail"`
 	// The two developer tools, both off by default and both stated here the
 	// same way as the rest, so a file written before they existed keeps
 	// leaving them off rather than reading as a deliberate choice.
 	DesignSystem *bool `json:"design-system"`
 	MailRoom     *bool `json:"mail-room"`
-	// LegacyDesignSystem / LegacyMailRoom decode the pre-rename keys
-	// (`"storybook"` / `"mail"`) a worktree's .haven.json may still carry.
-	// applyTo prefers the new key when both are present; WriteSelection never
-	// writes these, so the next `haven up` in that worktree migrates the file
-	// to the new spelling instead of silently dropping the lane it had turned
-	// on.
+	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
+	// worktree's .haven.json may still carry. applyTo prefers the new key
+	// when both are present; WriteSelection never writes it, so the next
+	// `haven up` migrates the file to the new spelling. Mail-room's own
+	// legacy `"mail"` shim is gone: that key now states the mail sink lane.
 	LegacyDesignSystem *bool `json:"storybook,omitempty"`
-	LegacyMailRoom     *bool `json:"mail,omitempty"`
 }
 
 // applyTo overlays the services this file actually states onto sel.
@@ -138,8 +137,9 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.NLP, nil, &sel.NLP},
 		{f.Langy, nil, &sel.Langy},
 		{f.IDP, nil, &sel.IDP},
+		{f.Mail, nil, &sel.Mail},
 		{f.DesignSystem, f.LegacyDesignSystem, &sel.DesignSystem},
-		{f.MailRoom, f.LegacyMailRoom, &sel.MailRoom},
+		{f.MailRoom, nil, &sel.MailRoom},
 	} {
 		switch {
 		case field.stated != nil:
@@ -186,6 +186,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		NLP:          &sel.NLP,
 		Langy:        &sel.Langy,
 		IDP:          &sel.IDP,
+		Mail:         &sel.Mail,
 		DesignSystem: &sel.DesignSystem,
 		MailRoom:     &sel.MailRoom,
 	}}, "", "  ")

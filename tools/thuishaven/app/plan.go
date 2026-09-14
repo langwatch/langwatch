@@ -2,11 +2,28 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
+
+// resolvedDevEnv is the environment the app process will actually see in this
+// worktree: the operator's .env, overridden by whatever the shell that ran
+// `haven up` already exports — the same precedence a dotenv loader gives a
+// real env var. It exists to answer one question honestly (did the developer
+// already configure an email provider?) without haven reading or writing
+// anything to disk itself.
+func resolvedDevEnv(repoDir string) map[string]string {
+	resolved := domain.LoadDotenv(repoDir)
+	for _, kv := range os.Environ() {
+		if key, val, ok := strings.Cut(kv, "="); ok && val != "" {
+			resolved[key] = val
+		}
+	}
+	return resolved
+}
 
 // palette gives each supervised child a distinct prefix color.
 var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94", "96", "95"}
@@ -54,6 +71,18 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// the CA is absent, so this appends nothing outside a portless stack.
 	if ca := o.proxy.CACertPath(); ca != "" {
 		base = append(base, "NODE_EXTRA_CA_CERTS="+ca)
+	}
+	// The app's own outgoing mail, routed at the sink for both Node lanes — but
+	// never over a provider the developer configured explicitly (see
+	// domain.MailSMTPEnv): haven must not silently rewire mail they deliberately
+	// routed elsewhere. Computed before `base` feeds the ui/backend lanes (and
+	// mono's own copy) below, so a monolith checkout's one lane gets it too.
+	if opts.Selection.Mail {
+		for _, svc := range st.Services {
+			if svc.Name == domain.MailService && svc.SMTPPort != 0 {
+				base = append(base, domain.MailSMTPEnv(resolvedDevEnv(repoDir), svc.SMTPPort)...)
+			}
+		}
 	}
 	port := func(name string) int {
 		for _, s := range st.Services {
@@ -141,6 +170,34 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
 			Shell: goServiceShell(opts.RepoRoot, "idpsim", opts.ShouldGoWatch),
 			Env:   idpEnv,
+		})
+	}
+	if opts.Selection.Mail {
+		var httpPort, smtpPort int
+		var mailURL string
+		for _, svc := range st.Services {
+			if svc.Name == domain.MailService {
+				httpPort, smtpPort, mailURL = svc.Port, svc.SMTPPort, svc.URL
+			}
+		}
+		// Messages survive a restart (MAILSIM_DATA_DIR persists them as files) and
+		// are pruned only when the worktree's own state is — never shared across
+		// worktrees, mirroring langyagent's per-slug state dir below.
+		mailDataDir := filepath.Join(o.cfg.Home, "mail", st.Slug)
+		_ = os.MkdirAll(mailDataDir, 0o755)
+		mailEnv := append(append([]string{}, base...),
+			domain.LaneEnv("mail"),
+			fmt.Sprintf("MAILSIM_HTTP_ADDR=:%d", httpPort),
+			fmt.Sprintf("MAILSIM_SMTP_ADDR=:%d", smtpPort),
+			"MAILSIM_DATA_DIR="+mailDataDir,
+		)
+		if mailURL != "" {
+			mailEnv = append(mailEnv, "MAILSIM_BASE_URL="+mailURL)
+		}
+		out = append(out, Child{
+			Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
+			Shell: goServiceShell(opts.RepoRoot, "mailsim", opts.ShouldGoWatch),
+			Env:   mailEnv,
 		})
 	}
 	// The two developer tools. Neither is a Node LANE — nothing in the product
