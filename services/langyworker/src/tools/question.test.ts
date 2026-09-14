@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   ANSWERED_CONTINUE_LINE,
   askQuestions,
+  dropRepeatedOptions,
   NO_ANSWER_PUSHBACK,
   QUESTION_TOOL_NAME,
   WAIT_MAX_MS,
@@ -207,6 +208,64 @@ describe("the question tool", () => {
       );
       expect(renderAnswers([])).toBe(NO_ANSWER_PUSHBACK);
       expect(NO_ANSWER_PUSHBACK).not.toContain(ANSWERED_CONTINUE_LINE);
+    });
+  });
+
+  describe("when the question text repeats the options at its end", () => {
+    const LABELS = ['Create "Guest completes checkout" as your first scenario test', "Chat about this"];
+    const PROPOSAL =
+      "Now that your agent is integrated, I think we should write some tests for it. The first one I'd write is Guest completes checkout, because it covers the full happy path.";
+
+    /** @scenario "The question text does not repeat the options the card draws" */
+    it("drops a numbered, bulleted or bare list of the labels, and the line that introduced it", () => {
+      const numbered = `${PROPOSAL}\n\nOptions, in this order:\n\n1. Create "Guest completes checkout" as your first scenario test\n2. "Chat about this"`;
+      expect(dropRepeatedOptions(numbered, LABELS)).toBe(PROPOSAL);
+      const bulleted = `${PROPOSAL}\n- Create "Guest completes checkout" as your first scenario test.\n* Chat about this\n`;
+      expect(dropRepeatedOptions(bulleted, LABELS)).toBe(PROPOSAL);
+      const bare = `${PROPOSAL}\n\nCreate "Guest completes checkout" as your first scenario test\nchat about this`;
+      expect(dropRepeatedOptions(bare, LABELS)).toBe(PROPOSAL);
+      // One label at the end is a repeat too; a line that is no label ends the list.
+      expect(dropRepeatedOptions(`${PROPOSAL}\nChat about this`, LABELS)).toBe(PROPOSAL);
+      expect(dropRepeatedOptions(`${PROPOSAL}\nOptions:\nChat about this\nOr tell me more.`, LABELS)).toBe(
+        `${PROPOSAL}\nOptions:\nChat about this\nOr tell me more.`,
+      );
+    });
+
+    /** @scenario "The question text does not repeat the options the card draws" */
+    it("leaves a text with no repeat, one with the labels mid-text, and one that is only the labels alone", () => {
+      expect(dropRepeatedOptions(PROPOSAL, LABELS)).toBe(PROPOSAL);
+      const midText = `1. Create "Guest completes checkout" as your first scenario test\n2. Chat about this\n\n${PROPOSAL}`;
+      expect(dropRepeatedOptions(midText, LABELS)).toBe(midText);
+      expect(dropRepeatedOptions("1. Chat about this", LABELS)).toBe("1. Chat about this");
+      expect(dropRepeatedOptions(`${PROPOSAL}\nChat about this`, [])).toBe(`${PROPOSAL}\nChat about this`);
+    });
+
+    /** @scenario "The question text does not repeat the options the card draws" */
+    it("raises the card with the trimmed text and the options as they were", async () => {
+      const { calls } = fakeApp({
+        "/api/langy/waits": [{ waitId: "wait_1" }],
+        "/api/langy/waits/wait_1": [
+          { waitId: "wait_1", state: "answered", answers: [{ question: PROPOSAL, selected: [LABELS[0]!] }] },
+        ],
+      });
+      const options = [
+        { label: LABELS[0]!, description: "Make the first end-to-end scenario now." },
+        { label: LABELS[1]!, quiet: true, description: "Describe the scenario instead." },
+      ];
+      await questionTool().execute("t1", {
+        questions: [
+          {
+            bare: true,
+            header: "Propose the first scenario",
+            question: `${PROPOSAL}\n\nOptions, in this order:\n\n1. ${LABELS[0]}\n2. "${LABELS[1]}"`,
+            options,
+          },
+        ],
+      });
+      expect(calls[0]?.body).toMatchObject({
+        kind: "question",
+        questions: [{ bare: true, header: "Propose the first scenario", question: PROPOSAL, options }],
+      });
     });
   });
 

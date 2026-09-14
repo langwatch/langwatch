@@ -1037,6 +1037,17 @@ Feature: Langy guides the first setup after sign-up
       And the framework line, the pull request line and the branch line are said with the say tool right before the card, in that order, with no reply text before it
       And no scenario exists yet
 
+    # On film the proposal's text ended with the two options written out as a
+    # numbered list, and the card drew the same two as buttons under it, so
+    # the person read them twice.
+    @unit
+    Scenario: The question text does not repeat the options the card draws
+      Given a question whose text ends with its option labels, as a numbered, bulleted or bare list, quotes and punctuation aside
+      When the worker's question tool raises the card
+      Then those lines, and the line that introduced them, are dropped from the text
+      And the options stay as they are
+      And a text with no such lines, one with the labels mid-text, and one that is only the labels are left alone
+
     @e2e
     Scenario: Chat about this hands the scenario back to the conversation
       Given Langy proposed the first scenario
