@@ -1,17 +1,6 @@
 /**
- * What a re-keyed cause actually looks like once pino has written it.
- *
- * The other request-logging tests assert on the object handed to the logger,
- * which is one level above the bug this file exists for. pino applies
- * serializers by exact property name and warns about nothing when a key has
- * none: the value goes to `JSON.stringify`, and an `Error` has no enumerable
- * own properties, so it lands as `{}`. Moving a cause from `error` to
- * `requestError` without registering the second key therefore drops the
- * message and the stack - the only reasons the cause is logged at all - while
- * every assertion on the handed-over object still passes.
- *
- * So these tests read the emitted line, through the same serializer map
- * `createLogger` installs.
+ * Test emitted line through serializer map (catches errors pino silently drops).
+ * Catches missing serializers that JSON.stringify converts to {}.
  */
 
 import { Writable } from "node:stream";

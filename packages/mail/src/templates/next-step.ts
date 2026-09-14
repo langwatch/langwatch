@@ -1,31 +1,13 @@
 import { z } from "zod";
 
 /**
- * Where an organization can go next, as a message is allowed to say it.
- *
- * Three shapes, and the reason there are three is that a price is only ever
- * true of an organization buying from the public ladder. An organization on
- * legacy enterprise terms, on the newer enterprise pricing, or on anything
- * negotiated has limits and a price that are its own, so quoting the list
- * price at it is wrong in a way the reader can see. Those organizations get
- * the people who hold their contract instead.
- *
- * The absent case is deliberate and is not a fallback: a sender that cannot
- * say what comes next for THIS organization says nothing, because the guess
- * is what turns a service message into a mis-sell.
+ * Where organization can go next: price for public ladder, people for negotiated
+ * terms. Absent (not a fallback) if neither applies.
  */
 
 /**
- * The organization buys from the public ladder, so a plan and a price are true
- * of it.
- *
- * `url` is the page that sells THIS plan — the checkout or the plan's own page,
- * built by the sender from what billing produced for it. A generic pricing page
- * would make the reader choose again a question they have already answered.
- *
- * Every field here is composed into copy and none of it is written in a
- * template: a plan whose price is a literal in a message is a price that is
- * wrong the day it changes and right nowhere but in a screenshot.
+ * Organization buys from public ladder: plan and price (URL built specifically,
+ * not generic pricing page).
  */
 export const selfServeStepFields = {
   kind: z.literal("self_serve"),

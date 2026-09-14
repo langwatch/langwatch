@@ -2,18 +2,7 @@ import { z } from "zod";
 import { HighlightedCode, InlineLink, Muted, Paragraph } from "../email-layout.tsx";
 
 /**
- * The first thing to do, in the language of why they came.
- *
- * Two readers arrive through the same door and want opposite things from it.
- * Somebody who came to watch what their coding agents do wants the command line
- * and their agent running, not an SDK; somebody who came to trace an
- * application wants three lines in that application. Showing both is showing
- * neither, so the block asks what the organization said it came for.
- *
- * When nobody has said — and at sign-up nobody has, because the organization
- * does not exist until the address is confirmed — the block is the SDK one.
- * That is the safe default rather than the popular one: it is the step every
- * reader can take, and it is what the message said before the intent existed.
+ * First steps in the language of their intent (SDK default for unknown).
  */
 export const onboardingIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
 

@@ -3,15 +3,8 @@ import type { ReactElement } from "react";
 import { z } from "zod";
 
 /**
- * One transactional message, described well enough that a tool can render it
- * without knowing which message it is.
- *
- * The props are a zod schema rather than a TypeScript type because a type is
- * gone by the time anything could use it. The schema is what lets the preview
- * studio build a form for a message it has never heard of, and what makes a
- * fixture wrong at the moment it is written instead of at the moment it is
- * sent. Types come from the schema with `infer`; nothing here is declared
- * twice.
+ * One transactional message: props as zod schema (preview studio uses it, fixtures
+ * validated early).
  */
 export interface MailTemplate {
   /** Stable, url-safe, and the key the studio keeps in its address bar. */
@@ -69,13 +62,8 @@ export const renderMailTemplate = async (
 };
 
 /**
- * The props form the studio draws, as JSON Schema.
- *
- * Reading zod's own internals would tie the studio to a zod minor; JSON Schema
- * is the shape zod already agrees to export, and the one a form can walk
- * without a special case per version. A schema with no JSON Schema form is not
- * an error — the studio falls back to editing the props as JSON, which is
- * always available.
+ * Props form as JSON Schema (decouples from zod versions). Falls back to JSON
+ * editing if unavailable.
  */
 export const propsFormSchema = (template: MailTemplate): unknown => {
   try {

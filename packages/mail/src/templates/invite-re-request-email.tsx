@@ -5,14 +5,8 @@ import { DataTable, EmailLayout, Paragraph, PrimaryButton } from "./email-layout
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
- * "The person you invited says their link expired" (D11).
- *
- * Sent to the admins who can act on it, never to the invitee — the invitee's
- * side of this is a screen that says the request went out. The mail carries
- * no link of its own: a fresh invitation is minted by an admin resending
- * from the members table, which is the one path that rotates the code and
- * revokes the stale one. A "resend it for them" link in mail would be a
- * second, unauthenticated way to mint a bearer token.
+ * Sent to admins when invitee's link expires (not to the invitee). Admins resend
+ * from members table to safely rotate the code.
  */
 export const inviteReRequestEmailProps = z.object({
   adminEmail: z.email(),
@@ -20,14 +14,8 @@ export const inviteReRequestEmailProps = z.object({
   invitedEmail: z.email(),
   membersSettingsUrl: z.url(),
   /**
-   * Seats held and seats the plan covers, when the sender knows both.
-   *
-   * Shown only while there is a seat free. An admin about to re-send an
-   * invitation is the last reader who should meet a wall, so a plan with no
-   * room left says nothing here and the seat conversation happens where seats
-   * are bought. A ceiling that is negotiated rather than sold is not passed at
-   * all: the sender resolves both numbers for THIS organization, and answers
-   * nothing where a public number would be a fiction.
+   * Seats held and ceiling, shown only when seats available (don't wall admins).
+   * Negotiated ceilings not passed.
    */
   seats: z
     .object({ used: z.number().int().nonnegative(), ceiling: z.number().int().positive() })

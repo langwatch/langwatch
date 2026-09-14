@@ -1,19 +1,6 @@
 /**
- * `createLogger` hands out one memoised logger per name, and the thing that
- * makes that safe is where the request fields come from.
- *
- * Constructing a pino logger is expensive — a stack capture per call to work
- * out the caller, plus a level cache and bindings rebuilt each time — and the
- * app calls `createLogger` from 400+ sites, some of them per-instance class
- * fields. Memoising removes all of it.
- *
- * The risk memoising introduces is that a shared instance carries one
- * request's organizationId / projectId / userId onto another request's lines.
- * It does not, because those fields are not bound at construction: they come
- * from pino's `mixin`, which is invoked per log call and reads the async-local
- * context at that moment. That property is the reason this file exists, so it
- * is asserted against records the logger actually wrote rather than against
- * the implementation.
+ * Memoized logger is safe: request fields from mixin at log-call time (async-local),
+ * not at construction. Tests verify this by asserting written records.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

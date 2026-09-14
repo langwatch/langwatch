@@ -1,12 +1,6 @@
 /**
- * Token colouring for the code in an email, without a runtime.
- *
- * A mail client runs no JavaScript, so highlighting has to be in the markup
- * that arrives: every token is a `<span>` with a class the layout's stylesheet
- * promotes for dark. A real parser is not what this needs — the code in these
- * messages is three lines of setup we wrote ourselves, so a handful of rules
- * per language colours it correctly and a rule that misses colours a token as
- * plain text, which is the same thing the reader saw before.
+ * Token coloring for email code (markup, no runtime). Simple rules per language
+ * (code is just setup).
  */
 
 export const highlightLanguages = ["bash", "typescript", "python", "go"] as const;

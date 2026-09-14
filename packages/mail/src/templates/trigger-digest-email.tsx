@@ -21,13 +21,8 @@ import { defineTemplate, renderMailTemplate } from "./registry.ts";
 const DIGEST_ROW_LIMIT = 10;
 
 /**
- * One settled match, as a row in the digest.
- *
- * Everything past the two identifiers is optional and everything optional is
- * something the sender already had: the moment it happened, a short preview of
- * what matched, and the number that tripped the automation. A row carrying
- * only an identifier still renders, in the same table, exactly as informative
- * as the whole digest used to be.
+ * One match as a digest row: identifiers required, rest optional (empty rows
+ * still render).
  */
 export const triggerDigestEntry = z.object({
   traceId: z.string().optional(),
@@ -45,17 +40,8 @@ export const triggerDigestEntry = z.object({
 export type TriggerDigestEntry = z.infer<typeof triggerDigestEntry>;
 
 /**
- * What the digest is rendered from.
- *
- * `triggerType` is a plain string rather than the automation feature's
- * `AlertType`: the only thing the template does with it is put it in
- * parentheses ahead of the heading, so naming the union here would buy the
- * mail gateway a dependency on a feature contract for a value it never
- * branches on.
- *
- * Nothing here reads configuration. `baseHost` arrives from the composition
- * root, and every link in the mail is built from it, so a deployment behind a
- * different origin sends links that resolve.
+ * Digest rendered from: triggerType is plain string (avoids feature dependency),
+ * links built from baseHost.
  */
 export const triggerDigestMail = z.object({
   triggerName: z.string().min(1),

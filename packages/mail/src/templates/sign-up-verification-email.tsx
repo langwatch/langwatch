@@ -15,15 +15,8 @@ export const signUpVerificationEmailProps = z.object({
   email: z.email(),
   verificationUrl: z.url(),
   /**
-   * The first steps to show, when the sender wants them shown.
-   *
-   * Present, the mail carries what to do once they are in, so the empty
-   * project on the other side of the link is not the first thing the reader
-   * meets. Absent, the message is only the confirmation it always was: this
-   * arrives before an account exists, so it is onboarding and never an offer.
-   *
-   * The organization does not exist yet at this point in sign-up, so nothing
-   * here knows why they came and the block falls back to its default steps.
+   * First steps shown after confirmation (if present). Defaults used (organization
+   * not yet created).
    */
   firstSteps: firstStepsSchema.optional(),
 });

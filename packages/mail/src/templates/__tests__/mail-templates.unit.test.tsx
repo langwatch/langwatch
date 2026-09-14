@@ -7,13 +7,8 @@ import { mailTemplates } from "../index.ts";
 import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 
 /**
- * The output IS the product here, so these are snapshot tests on purpose.
- *
- * A rendered email is the artefact a person receives; there is no lower level
- * at which "the mail is right" can be checked. The assertions around the
- * snapshot are the ones a snapshot cannot make — that a link survived, that a
- * subject exists, that the dark cut is present — so a snapshot accepted without
- * reading still cannot hide a broken message.
+ * Snapshot tests on purpose: the rendered email is the product. Assertions check what
+ * snapshots cannot (links survived, subjects exist, dark mode present).
  */
 
 const templatesDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");

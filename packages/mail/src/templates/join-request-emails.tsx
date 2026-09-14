@@ -13,20 +13,8 @@ import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
- * The six join-request emails (D12).
- *
- * Two rules run through all of them.
- *
- * No mail carries an action link that decides anything. An admin approves in
- * the members area, behind their session; a link in mail that approved a
- * request would be a second, unauthenticated way to add somebody to an
- * organization — the same reason D11's re-request mail carries no "resend it
- * for them" link.
- *
- * And a rejection says nothing about why, and does not name who said no. The
- * ending is deliberately quiet: an admin who has to justify a refusal is an
- * admin who hesitates to make one, and a requester who learns which colleague
- * turned them down has learned something that is not theirs.
+ * No action links for approval/rejection (decisions stay behind user session).
+ * Rejections silent about reasons and who decided.
  */
 
 const adminNotice = "You are receiving this because you administer this organization.";
@@ -430,13 +418,8 @@ export const domainAutoJoinedProps = z.object({
   domain: z.string().min(1),
   membersSettingsUrl: z.url(),
   /**
-   * Seats held after this join, against what the plan covers.
-   *
-   * This message exists so an admin can catch a mistake, so the count goes
-   * under the action rather than in front of it. It is a fact, not an offer:
-   * somebody they did not approve now holds one of these seats. An
-   * organization whose seat ceiling is negotiated rather than sold is passed
-   * nothing, because a public number would not be its number.
+   * Seat count after join shown under action (fact, not offer).
+   * Negotiated ceilings not passed.
    */
   seats: z
     .object({ used: z.number().int().nonnegative(), ceiling: z.number().int().positive() })

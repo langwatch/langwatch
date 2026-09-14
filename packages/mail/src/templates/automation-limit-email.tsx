@@ -29,15 +29,7 @@ export const automationLimitEmailProps = z.object({
   kind: z.enum(automationLimitKinds),
   automationName: z.string().min(1),
   projectName: z.string().min(1),
-  /**
-   * Confirmed matches this automation is allowed to act on per day.
-   *
-   * Zero is a real ceiling — a deployment may allow a plan no automation
-   * dispatches at all — and it is exactly the case this mail has to be able to
-   * state. Requiring a positive number here made the render throw on that
-   * ceiling, and the caller swallows a render failure, so the automation was
-   * skipped and nobody was told.
-   */
+  /** Confirmed matches allowed per day; zero is valid (some plans allow no dispatches). */
   dailyCeiling: z.number().int().nonnegative(),
   /** Confirmed matches it dropped today, at the moment the mail was queued. */
   skippedToday: z.number().int().nonnegative(),
@@ -45,15 +37,8 @@ export const automationLimitEmailProps = z.object({
   /** What the project's organization is metered in, as its own meter reports it. */
   usageUnit: usageUnitSchema.optional(),
   /**
-   * Where this organization can go for a higher ceiling, resolved for it.
-   *
-   * Rendered only for a ceiling that was reached. A paused automation is a
-   * mistake in the customer's own condition, and selling more ceiling there
-   * sells them more of the mistake, so the gate is the kind and not the data.
-   *
-   * An organization on enterprise or negotiated terms has a ceiling that is
-   * its own, so it is never shown a tier's number. It is shown the people who
-   * can change the one it has.
+   * Where the organization can get a higher ceiling (resolved for them). Shown only when
+   * reached. Enterprise orgs see people who change their own ceiling, not tier numbers.
    */
   nextStep: z
     .discriminatedUnion("kind", [
@@ -237,13 +222,8 @@ export const sendAutomationLimitEmail = async ({
 };
 
 /**
- * A provider failure reduced to something safe to write down.
- *
- * A rejection message from a mail provider routinely quotes the envelope back,
- * as in `550 5.1.1 <someone@example.com>: recipient rejected`, so the message
- * carries the recipient's address into any log or exception that repeats it.
- * The code or SMTP status is the part that tells an operator what went wrong,
- * and it names no one.
+ * Extract the error code or SMTP status from provider rejections to avoid logging
+ * recipient addresses.
  */
 function failureKind(reason: unknown): string {
   if (typeof reason === "object" && reason !== null) {

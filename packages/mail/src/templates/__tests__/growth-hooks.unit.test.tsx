@@ -19,14 +19,8 @@ import { triggerDigestEmailTemplate } from "../trigger-digest-email.tsx";
 import { usageLimitEmailTemplate } from "../usage-limit-email.tsx";
 
 /**
- * Every hook is optional data behind a gate, so every hook is two assertions:
- * what the reader sees when the sender could answer, and what they see when it
- * could not. The pricing hooks are five, because a price that is true of an
- * organization on the public ladder is false of one on its own terms.
- *
- * Assertions are on rendered content — a number, a name, an address — rather
- * than on prose, so a copy edit does not fail a test that is about whether the
- * hook fired.
+ * Every hook is optional data behind a gate, so test both when the sender can and cannot
+ * answer. Assertions are on rendered content (not prose), so copy edits don't break tests.
  */
 
 const html = async (template: MailTemplate, props: unknown): Promise<string> =>

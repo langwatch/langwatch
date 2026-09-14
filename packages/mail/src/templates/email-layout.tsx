@@ -16,40 +16,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { tokenize, type HighlightLanguage } from "./onboarding/highlight.ts";
 
 /**
- * The one shell every LangWatch message is built in.
- *
- * ── Expressive, not productive ─────────────────────────────────────────────
- * The pair of names is IBM Carbon's, which splits its own system the same way
- * and for the same reason: productive styles serve someone getting work done,
- * expressive styles serve a moment that has to carry the brand. We use them for
- * two whole systems rather than two type ramps inside one, which is the only
- * place we depart from Carbon's usage.
- *
- * EXPRESSIVE is the marketing site's: the cream page, the serif
- * display line, the ink pill, the brand orange kept for details — the language
- * of the website and of the front door somebody arrives through. PRODUCTIVE is
- * the application's own: the working surface a person spends the day inside,
- * with its own denser scale and its own orange ramp.
- *
- * Mail is expressive. Every message here is read outside the product, mostly
- * by somebody who is not signed in, and the link in it lands on the front door.
- * A message dressed in the productive system would look like a screenshot of an
- * application the reader has not opened yet.
- *
- * The palette below is therefore the MARKETING site's. The light cut is
- * `emailTheme.ts` from the front-door work, verbatim — the site's cream page,
- * a paper card on it, and an ink pill for the primary action. The brand orange
- * is spent on details and never on the button: an orange slab makes the most
- * important control on the screen the loudest thing the brand owns, and white
- * on that orange never cleared the contrast it pretended to.
- *
- * The application's own `#ED8926` is a DIFFERENT orange, and it is deliberately
- * not here. Somebody who clicks a link in one of these mails lands on the sign-
- * in screen; the two have to look like one company.
- *
- * The dark cut is the front door's dark tokens with the alpha layers composited
- * once — an email has no backdrop to show through, and half the clients that
- * compose a dark ground render no `rgba()` at all.
+ * The shell for every LangWatch message: expressive design from the marketing site
+ * with composited alpha layers for dark mode (email has no backdrop for rgba).
  */
 
 const light = {
@@ -67,13 +35,8 @@ const light = {
   tint: "#fdece0",
   field: "#f6f5f4",
   /**
-   * Syntax colours, anchored on the expressive palette where it has an answer.
-   *
-   * The brand orange carries keywords, because a keyword is exactly the kind of
-   * detail the orange is kept for; a comment is the palette's quietest text.
-   * The green and the blue are the two the palette does not hold and a reader
-   * of code expects, chosen to sit at the same weight as the orange rather than
-   * to shout past it.
+   * Syntax colors: orange for keywords, green and blue at the same weight as orange
+   * (colors the expressive palette doesn't define but readers expect).
    */
   syntax: {
     keyword: "#a83e05",
@@ -108,28 +71,11 @@ const dark = {
 } as const;
 
 /**
- * Headings are set in the site's display serif, and in Georgia where they
- * cannot be.
- *
- * Sentient is fetched from Fontshare, who serve it, rather than from an asset
- * of ours: mail has no origin of its own to serve a font from, and Fontshare's
- * own delivery is the path the face is published through. The clients that
- * honour a remote stylesheet — Apple Mail, iOS Mail, Outlook for Mac,
- * Thunderbird — draw the face the front door draws. Gmail on the web and
- * Outlook on Windows strip it and land on the serif stack, which is why the
- * fallback is a serif at the same size and tracking rather than the body sans:
- * both cuts have to read as the same decision.
- *
- * Weight stays 400 and tracking -0.03em in both, because that pair is the
- * front door's display line and a heavier cut of Sentient is a different
- * voice.
+ * Headings use Sentient from Fontshare (fallback to serif stack where remote fonts
+ * unavailable). Weight and tracking stay the same in both.
  */
 /**
- * Where the fine print sends a reader who wants to know more.
- *
- * One constant, used once, in the shell every message is built in: the link
- * belongs to every message equally, so a template that wanted its own copy of
- * it would be the first step toward fifteen slightly different addresses.
+ * Where fine print sends readers who want to know more.
  */
 export const DOCUMENTATION_URL = "https://docs.langwatch.ai";
 
@@ -169,13 +115,8 @@ const MESH = {
 } as const;
 
 /**
- * The wordmark, per ground.
- *
- * Light is the raster, because it is the one wordmark that draws in every
- * client including the ones that drop SVG outright. Dark is the SVG cut, which
- * only reaches clients that honour a `prefers-color-scheme` block — the same
- * clients that render SVG. A dark raster is the one asset this would still
- * benefit from.
+ * Light wordmark (raster) for all clients; dark wordmark (SVG) for clients supporting
+ * prefers-color-scheme.
  */
 const WORDMARK_LIGHT = "https://app.langwatch.ai/images/logo.png";
 const WORDMARK_DARK = "https://app.langwatch.ai/images/logo-full-darktheme.svg";
@@ -516,14 +457,8 @@ export const PrimaryButton = ({ href, children }: { href: string; children: Reac
 );
 
 /**
- * The actions of a message, on one line, with the supporting note under them.
- *
- * Two buttons stacked as separate blocks read as two unrelated things that
- * happen to follow one another, and the line explaining the second ends up
- * further from it than the first button is. Side by side in one row they read
- * as what they are: the thing to do, and the other thing available. Outlook
- * draws no flexbox, so the row is two cells and the second is only drawn when
- * there is a second action.
+ * Actions on one line as alternatives (Outlook-compatible: two cells, second drawn
+ * only when present).
  */
 export const ActionRow = ({
   primary,
@@ -661,17 +596,8 @@ export interface DataRow {
 }
 
 /**
- * The one table every message shows data in.
- *
- * Written once because the alternative already happened: a usage breakdown
- * with its own header styles, a seat position written as prose, a digest of
- * bare links. Each read as a different product. It is a real `<table>` with
- * inline styles rather than anything flexible, because Outlook draws no
- * percentage-width `div` and a data view that collapses is worse than none.
- *
- * A column every shown row leaves empty is dropped rather than drawn as a
- * stripe of nothing: a digest whose rows carry only an identifier is exactly
- * as informative as it was before the other columns existed.
+ * The one table for data: real `<table>` with inline styles (Outlook-compatible),
+ * empty columns dropped.
  */
 export const DataTable = ({
   columns,
@@ -839,13 +765,8 @@ export const CountTiles = ({ tiles }: { tiles: readonly { label: string; value: 
 );
 
 /**
- * A key, a licence, a token, a line of code: something to be copied exactly.
- *
- * `breakAnywhere` is for the one case that has no spaces to break on — a
- * licence key is a single 200-character word and has to wrap mid-token or run
- * off the card. Everything else breaks on spaces, because a shell command
- * split down the middle of `langwatch/skills` is a command the reader has to
- * repair before they can use it.
+ * Code to be copied exactly. Break on spaces unless a single long word (like a
+ * license key) needs mid-token wrapping.
  */
 export const CodeBlock = ({
   children,

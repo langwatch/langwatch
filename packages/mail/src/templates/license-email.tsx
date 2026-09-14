@@ -20,14 +20,8 @@ export const licenseEmailProps = z.object({
   expiresAt: z.string().min(1).describe("ISO date the license runs out"),
   organizationName: z.string().min(1),
   /**
-   * What this licence unlocks, resolved for the licence that was issued.
-   *
-   * Never a map from plan name to page kept here. A licence is exactly the
-   * thing that can carry limits nobody else has, so the page a buyer should
-   * read is decided where the licence's own terms are known, and a licence
-   * whose terms are negotiated is pointed at the people who negotiated them.
-   * Absent, the message says nothing, which is what a guess would be worse
-   * than.
+   * License's unlocked features: URL/contact for its terms (resolved at issuance,
+   * negotiated licenses point to their people).
    */
   unlockedFeatures: z
     .discriminatedUnion("kind", [

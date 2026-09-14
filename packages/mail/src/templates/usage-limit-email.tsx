@@ -46,13 +46,8 @@ export const usageLimitEmailProps = z.object({
    */
   usageUnit: usageUnitSchema.optional(),
   /**
-   * Where this organization can go next, resolved for THIS organization.
-   *
-   * This is the one message where the reader has already asked the question a
-   * larger plan answers. At a full crossing it is still a service message
-   * about an interruption, so the line goes UNDER the fix and never in place
-   * of it. An organization on enterprise or negotiated terms is never quoted a
-   * list price; it is pointed at the people who hold its contract.
+   * Where organization can go next (reader already asked the question).
+   * Enterprise not quoted list price.
    */
   nextStep: z
     .discriminatedUnion("kind", [
@@ -164,17 +159,8 @@ const tryHeaviestProject = (
 const FULL_CROSSING = 100;
 
 /**
- * The two actions, in the order the crossing decides.
- *
- * Below a full crossing nothing is interrupted yet, so the plan that removes
- * the limit leads and the usage page is the other thing available. At a full
- * crossing the message is about an interruption, so the page where it is dealt
- * with leads and the plan follows it — an offer standing in front of a service
- * message is the one thing this hook must never become.
- *
- * The label names the plan, so the reader knows what pressing it buys before
- * they press it, and the note carries the two facts that decide it: the
- * allowance it gives them and what it costs. Both come from the sender.
+ * Two actions ordered by crossing level: at full crossing, interruption (page)
+ * leads, plan follows. Label and cost from sender.
  */
 const UsageActions = ({
   actionUrl,

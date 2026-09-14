@@ -1,11 +1,6 @@
 /**
- * The exact shape of one console line.
- *
- * Driven through the real pino-pretty stream rather than asserted against the
- * options object, because what a developer reads is the string and the options
- * are only how it is asked for.
- *
- * Corresponds to specs/setup/dev-stack-log-format.feature.
+ * Test console line output (what developers read) via real pino-pretty stream
+ * (see dev-stack-log-format.feature).
  */
 
 import pino from "pino";
