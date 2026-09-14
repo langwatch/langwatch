@@ -709,15 +709,19 @@ const VALUE_RULES: ValueRule[] = [
       // media reference into a 404 (#8077). A span whose LAST path segment
       // names itself a record id is a reference to that record, not a
       // credential, whatever the earlier segments look like. The guard stays
-      // narrow on purpose: a real key containing `/` keeps its protection
-      // unless its terminal segment carries an allowlisted record prefix,
-      // which key material has no reason to do.
+      // narrow on purpose — RECORD ids only, not the wider non-credential
+      // family: a digest or uuid prefix on the terminal segment says nothing
+      // about the rest of the span, and a slash-containing credential that
+      // happens to end in `sha_…` must keep its protection. A real key has
+      // no reason to end in an allowlisted record prefix.
       const lastSlash = body.lastIndexOf("/");
       if (lastSlash !== -1) {
         const tailPrefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(
           body.slice(lastSlash + 1),
         )?.[1];
-        if (tailPrefix && isNonCredentialPrefix(tailPrefix)) return false;
+        if (tailPrefix && RECORD_ID_PREFIXES.has(tailPrefix.toLowerCase())) {
+          return false;
+        }
       }
       return isKeyShapedBody(body);
     },

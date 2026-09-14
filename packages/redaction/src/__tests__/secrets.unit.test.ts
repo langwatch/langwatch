@@ -1251,4 +1251,28 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
       expect(redactedCount).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe("given a slash-carrying key whose tail apes a digest or uuid prefix", () => {
+    // The tail bypass is RECORD ids only, not the wider non-credential
+    // family: `sha`/`uuid`/`phc` on the terminal segment say nothing about
+    // the rest of the span, and treating them as a pass would hand any
+    // credential a costume — end it in `sha_…` and walk past the filter.
+    it("still redacts a key whose last segment starts with sha_", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/sha_Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts a key whose last segment starts with uuid-", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/uuid-Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
