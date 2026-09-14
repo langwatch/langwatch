@@ -1,19 +1,7 @@
 /**
- * The voice worker's public media listener.
- *
- * Twilio dials back `wss://<host>/twilio/<nonce>` for every call. This listener
- * owns that public port in the parent worker process: it accepts the upgrade,
- * authenticates the nonce against {@link ../scenarios/voice/voice-nonce-registry},
- * and hands the raw socket to the scenario child that owns the call. It does
- * NOT complete the WebSocket handshake - a live `ws.WebSocket` cannot cross an
- * IPC boundary, so the child completes the handshake against its own `ws` server
- * (slice 2, {@link ../scenarios/voice/voice-socket-handoff}).
- *
- * Everything that is not a `/twilio/<nonce>` upgrade is refused before any audio
- * flows: `/healthz` answers 200, every other request answers 404, an upgrade on
- * a wrong path is closed 404, and an unknown or expired nonce is closed 403 with
- * a warn. The listener boots on every worker process (see
- * `workers/worker-boot-plan.ts`).
+ * Voice worker's public media listener: accepts Twilio upgrade to /twilio/<nonce>, authenticates
+ * nonce, hands raw socket to scenario child (which completes WebSocket handshake since
+ * ws.WebSocket cannot cross IPC).
  */
 
 import type { ChildProcess } from "node:child_process";

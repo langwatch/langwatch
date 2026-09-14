@@ -5,13 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkerTiktokenCounterAdapter } from "../worker-token-counter.adapter.ts";
 
 /**
- * Spec: modules/trace/specs/span-token-estimation.feature
- *
- * The vendor transport on its own. `node-fetch-cache` is mocked for the whole
- * file so the remote path is deterministic: the real client keeps a one-year
- * disk cache under `node_modules/.cache/tiktoken`, so a test that let it run
- * would pass or fail depending on whether some earlier run had already
- * downloaded the table.
+ * Tests vendor transport with mocked `node-fetch-cache` for deterministic paths. See
+ * modules/trace/specs/span-token-estimation.feature.
  */
 vi.mock("node-fetch-cache", () => ({
   default: {

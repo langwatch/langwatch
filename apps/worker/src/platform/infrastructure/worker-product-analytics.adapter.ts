@@ -4,38 +4,8 @@ import { PostHog } from "posthog-node";
 import type { WorkerProductAnalyticsConfig } from "../config/worker.config.ts";
 
 /**
- * The product-analytics sink for this process, as a vendor transport.
- *
- * This is the application's `platform/app/src/server/posthog.ts` verbatim in
- * everything that reaches the wire: the same lazy singleton keyed on
- * `POSTHOG_KEY`, the same host passed straight through, the same
- * fire-and-forget `capture` with the org admin's user id as `distinctId`, the
- * same conditional `projectId` spread, and the same shutdown that flushes what
- * is queued. Only the seams changed — it extends the port Trace declares
- * rather than exporting two module functions, and it takes the process's own
- * resolved configuration rather than reading `env.mjs`.
- *
- * ## Why a key-absent no-op is parity and not a gap
- *
- * The predecessor here logged the event and said in its own name that it was
- * not delivery, on the reasoning that a silent no-op in a background process
- * would undercount the funnel on the deployment that actually ran analytics.
- * That reasoning held only while the process could not read the key at all.
- * It now reads the same two variables the application reads, so the two halves
- * make the same decision from the same input: a deployment that named no
- * `POSTHOG_KEY` chose not to run product analytics and neither half records
- * anything, and a deployment that named one gets a real capture from whichever
- * graph owns the ingest path. Logging a "delivery" on the second deployment is
- * the undercount, which is why the logged adapter is deleted rather than kept
- * as a fallback.
- *
- * ## Why the import is top-level
- *
- * `posthog-node` is a hard dependency of this process, not an optional one, and
- * the application imports it top-level in the module this twins. The lazy
- * `import()` calls in `WorkerTiktokenCounterAdapter` are load-bearing for the
- * opposite reason — `tiktoken` is optional at runtime and stays external to the
- * production bundle — and that precedent does not reach here.
+ * Product-analytics sink: worker twin of platform/app/src/server/posthog.ts, verbatim on the
+ * wire. Key-absent is a no-op (same decision from same input as the app).
  */
 export class WorkerPostHogProductAnalyticsAdapter implements TraceProductAnalytics {
   static create(options: {
@@ -112,16 +82,7 @@ export class WorkerPostHogProductAnalyticsAdapter implements TraceProductAnalyti
     }
   }
 
-  /**
-   * Flushes what is queued.
-   *
-   * The client batches, so a process that exited without this would drop
-   * whatever had not left yet — and the one event this path emits is emitted
-   * at most once in a project's lifetime, so a dropped one is not re-sent by
-   * anything. The application calls the same shutdown from its own graceful
-   * sequence rather than from a signal handler of its own, and this is owned by
-   * the composition's resource scope for the same reason.
-   */
+  /** Flushes what is queued; the client batches, so exit without this drops pending events. */
   async close(): Promise<void> {
     const client = this.client;
     if (!client) return;

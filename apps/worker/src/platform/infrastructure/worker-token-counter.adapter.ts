@@ -9,20 +9,8 @@ const logger = createLogger("langwatch:tiktoken");
 type Tiktoken = { encode: (text: string) => Uint32Array; free: () => void };
 
 /**
- * The encoding tables the application counts tokens with, in this process.
- *
- * This is the application's `TiktokenClient` verbatim: the same per-model
- * encoding resolution, the same default when a model is unknown, the same
- * local-BPE-then-remote fetch order, the same one-year disk cache, the same
- * single timer guarding both fetch paths and the same traversal refusal. Only
- * the seams changed — it extends the port Trace declares rather than
- * implementing an application interface, and it takes the process's own
- * resolved tokenizer configuration.
- *
- * The lazy `import()` calls are load-bearing and deliberately kept: `tiktoken`
- * and `node-fetch-cache` are optional at runtime, and the two JSON imports need
- * the `with` attribute because production runs an esbuild bundle where tiktoken
- * stays external and Node resolves them through the ESM loader.
+ * Encoding tables for token counting: worker twin of TiktokenClient, verbatim on the wire. Lazy
+ * imports are load-bearing for optional runtime deps.
  */
 export class WorkerTiktokenCounterAdapter implements TraceTokenCounter {
   static create(config: WorkerTraceTokenizerConfig): WorkerTiktokenCounterAdapter {

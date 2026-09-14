@@ -5,15 +5,8 @@ import { WORKER_HEARTBEAT_STALL_BUDGET_MS, WORKER_LIVENESS_PATH } from "./worker
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The worker process's single HTTP listener: the Prometheus metrics port, which
- * also answers the kubelet's unauthenticated liveness path.
- *
- * Everything the endpoint needs from the process that hosts it arrives as a
- * port. In particular the prom-client registry is NOT imported here: `register`
- * is a process-global singleton, and two packages resolving two copies of
- * prom-client would serve an empty registry rather than fail — a silent,
- * total loss of worker metrics. The host reads its own registry and hands the
- * rendered text over through `readMetrics`.
+ * Worker's single HTTP listener: Prometheus metrics port + kubelet liveness path. Registry comes
+ * through `readMetrics` port (not imported here) to avoid duplicate prom-client singletons.
  */
 
 /** The auth input, shaped like the only part of a request the gate reads. */
@@ -113,36 +106,15 @@ export function createWorkerMetricsHandler(ports: WorkerMetricsMembers): Request
 }
 
 /**
- * How often the main event loop stamps its heartbeat. The staleness budget it
- * is judged against lives with the rest of the liveness policy, in
- * `worker.liveness.ts`.
- *
- * A worker saturated with queue catch-up can pin the event loop for over a
- * minute of legitimate work; `/healthz` served on that same loop then misses
- * any realistic kubelet probe budget, and Kubernetes kills exactly the
- * busiest pods — requeueing their in-flight jobs and deepening the backlog
- * that caused the saturation. Serving liveness from a worker thread with a
- * loop heartbeat separates the two questions: "is the process alive" (thread
- * answers instantly, always) and "is the main loop moving" (heartbeat age,
- * judged against a budget far beyond any legitimate saturation but well
- * short of "restart never comes").
+ * Heartbeat interval: liveness served from worker thread separates "is process alive" (always
+ * yes) from "is main loop moving" (judged by heartbeat age).
  */
 export const WORKER_HEARTBEAT_INTERVAL_MS = 1_000;
 const METRICS_PROXY_TIMEOUT_MS = 10_000;
 
 /**
- * Source for the liveness thread, evaluated via `new Worker(src, {eval:true})`
- * so it survives every bundler/runtime (no file to resolve). Plain CommonJS,
- * Node built-ins only. It owns the metrics port: `/healthz` is answered
- * in-thread from the shared heartbeat; anything else is proxied to the main
- * thread over `parentPort` (metrics bodies come from the prom-client registry,
- * which lives there) with a timeout so a stalled loop fails the scrape, never
- * the probe.
- *
- * The heartbeat comparison below is the worker's ONE liveness predicate. It
- * cannot import one, because this module is a string evaluated in a thread
- * with no module graph — which is why there is no second copy in TypeScript
- * for it to drift from.
+ * Liveness thread source (string-eval'd): serves /healthz from heartbeat, proxies other
+ * requests. Cannot import liveness predicate (no module graph in eval'd thread).
  */
 export const LIVENESS_THREAD_SOURCE = `
 const http = require("node:http");
@@ -187,21 +159,8 @@ server.listen(workerData.port, () => parentPort.postMessage({ isListening: true 
 `;
 
 /**
- * Exposes the host process's metrics registry over HTTP on the worker metrics
- * port, behind the host's bearer gate, and answers the kubelet's liveness
- * probe on the same port.
- *
- * In a split deployment this port is what a scraper talks to: the chart's
- * Prometheus scrape config targets the worker pod directly on it, NOT the web
- * process's `/workers/metrics` proxy — that proxy dials its own loopback, so it
- * only resolves when the workers share the web process (in-process dev mode).
- * In that in-process mode this server is not started at all; the web server
- * serves the same shared registry at `/metrics`.
- *
- * The port is bound by the liveness thread (LIVENESS_THREAD_SOURCE) so
- * `/healthz` keeps answering while the main loop is saturated. If the thread
- * cannot start, fall back to the old in-loop server rather than boot with no
- * probe target at all.
+ * Exposes host metrics registry over HTTP + kubelet liveness probe. Port bound by liveness
+ * thread (not in-loop) for resilience; falls back to in-loop if thread fails.
  */
 export async function startWorkerMetricsServer(
   options: StartWorkerMetricsServerOptions,

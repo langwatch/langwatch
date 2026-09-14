@@ -2,11 +2,7 @@
  * @vitest-environment node
  * @see specs/features/agents/voice-phone.feature
  *
- * Every worker now boots voice (worker-boot-plan.ts always includes
- * "voice-ws-listener"), so a failure opening this process's own tunnel or
- * binding its own media listener must not crash the worker — one Cloudflare
- * hiccup or port conflict must not take down the whole fleet's job
- * processing. Pins the non-fatal guard directly at the two boot steps.
+ * Tests that voice boot failures (tunnel, listener) are non-fatal.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

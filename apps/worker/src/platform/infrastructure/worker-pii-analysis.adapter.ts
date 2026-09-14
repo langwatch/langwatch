@@ -1,34 +1,6 @@
 /**
- * The Google DLP and Presidio clients this process talks to, answering
- * `PiiAnalysis`.
- *
- * Harvested from the application's `AppPiiRedactionTransport` and its module
- * functions in `platform/app/src/server/tracer/collector/piiCheck.ts`, which
- * stay as they are while both graphs ingest. It lives here rather than in
- * `@langwatch/data-privacy-server` because it is not the feature's asset: it
- * is two vendor clients, one of which opens a gRPC channel over a generated
- * proto tree, and a feature package that carried them would push that weight
- * into every process that reads a privacy policy.
- *
- * FOUR MECHANICAL DIFFERENCES from the twin, and no others:
- *
- *  - the class extends `PiiAnalysis` instead of implementing the
- *    application's `PiiRedactionTransport` interface, and takes its metrics
- *    port alongside its config;
- *  - the three `prom-client` instruments become calls on
- *    `PiiAnalysisMetrics`, whose OTel adapter writes the same three series
- *    under the same names with the same labels;
- *  - `PRESIDIO_STRICT_ENTITIES` is imported from `@langwatch/redaction` rather
- *    than declared here, because the custom picker has to read it too;
- *  - the config type is this process's own projection of the same four
- *    environment variables.
- *
- * The two info-type tables, the 250,000-character truncation, the `✳` masking
- * width, the `[REDACTED]` replacement, the `min_threshold` and the request
- * path are pinned by literal in this adapter's test. They are a wire format
- * with a service that answers with anonymized text and no positions: a value
- * this process sends differently is redacted differently, and the response
- * gives no way to notice.
+ * Google DLP and Presidio clients for PiiAnalysis, harvested from the application. Lives here
+ * rather than in the feature package to keep gRPC proto weight out of every process.
  */
 
 import type { DlpServiceClient } from "@google-cloud/dlp";
@@ -66,17 +38,8 @@ export class WorkerPiiAnalysisAdapter implements PiiAnalysis {
     readonly metrics: PiiAnalysisMetrics,
   ) {}
 
-  // Lazy DLP client - created only when getDlpClient() is called. The
-  // @google-cloud/dlp SDK (generated protos via google-gax/grpc) is one of the
-  // largest single deps in the server graph, so its module is imported here on
-  // first use rather than at boot — and only ever when a google_dlp check
-  // actually runs with credentials configured (see dlpCheck's guards).
-  //
-  // The *promise* is what is cached, not the resolved client: the module import
-  // is asynchronous, so caching only the settled value would let every check that
-  // arrives while the first import is still in flight construct its own client.
-  // Each of those holds a gRPC channel, and all but the last would be dropped
-  // without ever being closed.
+  // Lazy DLP client: imports large @google-cloud/dlp only on first use, and caches the promise
+  // (not the client) to prevent concurrent imports from each spawning a gRPC channel.
   getDlpClient(): Promise<DlpClient> {
     // Assigned before the first await so concurrent callers observe the in-flight
     // promise rather than an unset client.

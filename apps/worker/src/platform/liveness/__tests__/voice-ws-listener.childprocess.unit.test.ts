@@ -1,11 +1,6 @@
 /**
- * The parent -> child socket handoff, end to end through a real OS child
- * process with an inter-process channel. This is the one test that exercises
- * `ChildProcess.send(message, socket)` for real: the listener accepts a raw
- * upgrade and the socket, with the bytes read during the upgrade, arrives in a
- * separate process.
- *
- * @see specs/features/agents/voice-phone.feature
+ * Tests parent-to-child socket handoff through inter-process channel: ChildProcess.send(socket)
+ * end-to-end. See specs/features/agents/voice-phone.feature.
  */
 
 import { type ChildProcess, spawn } from "node:child_process";

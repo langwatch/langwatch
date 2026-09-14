@@ -174,10 +174,8 @@ export class WorkerClickHouseInfrastructure {
   }
 
   /**
-   * The process's one routed query client, over the SAME connection every fold and every append
-   * resolves its own vendor client through. No `RetryPolicy` and no `ConcurrencyLimiter` here: this
-   * connection's vendor clients are already wrapped by `ClickHouseManagedClientService` (retries and
-   * a statement limiter at the vendor layer), so a second layer of either here would retry retries.
+   * The process's one routed query client; retries and concurrency limiting are already applied
+   * at the vendor layer.
    */
   readonly queryClient: ClickHouseQueryClient;
 

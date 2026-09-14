@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Boots the real liveness thread (LIVENESS_THREAD_SOURCE, eval'd exactly as
- * production does) against a shared heartbeat: `/healthz` answers from the
- * thread using the heartbeat's age — a saturated-but-alive main loop stays
- * 200, a loop stalled past the budget goes 503 — and non-liveness paths
- * proxy to the parent.
+ * Boots real liveness thread against shared heartbeat: /healthz responds with thread status
+ * (200 if alive, 503 if stalled).
  */
 import http from "node:http";
 import { Worker } from "node:worker_threads";

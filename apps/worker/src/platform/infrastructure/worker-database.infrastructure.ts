@@ -19,21 +19,8 @@ export type WorkerDatabaseInfrastructureOptions = {
 };
 
 /**
- * Worker-owned Postgres construction: one guarded Prisma client per process,
- * and its disconnection.
- *
- * There is no unguarded path through this class, and that is its point. The
- * options carry a connection string and a NODE_ENV and nothing else — no
- * guard, no client, no factory — so the only client it can build is the one
- * {@link PrismaConnectionService} builds with {@link PrismaTenancyGuardService}
- * wrapped around every operation. A background process runs unattended across
- * every tenant, which is exactly where an unguarded query does the most damage.
- *
- * UNLIKE THE API, THERE IS NO ABSENCE ARM. An API process without a database
- * still serves its lifecycle surface; a worker without one has no process
- * store, so it can neither lease a job nor advance a process manager. It
- * refuses at boot instead of coming up green with every job failing
- * individually.
+ * Worker-owned Postgres: one guarded Prisma client per process. Unlike the API, there is no
+ * absence arm — boot fails if the database is missing.
  */
 export class WorkerDatabaseInfrastructure {
   static create(options: WorkerDatabaseInfrastructureOptions): WorkerDatabaseInfrastructure {

@@ -54,19 +54,8 @@ export class WorkerTraceSpoolStorageAdapter implements TraceSpoolStorage {
 }
 
 /**
- * The v1 spool read, expressed through the same stored-objects runtime.
- *
- * The application reaches a v1 key with a second, S3-only client factory
- * (`createS3Client`). This process has one storage path, so the key is turned
- * back into a URI against the project's own destination and read through the
- * registry — the same bucket, the same credentials, one resolution rule instead
- * of two.
- *
- * NON-S3 DESTINATIONS REFUSE BY NAME, and the refusal is not a limitation. The
- * v1 format predates the move onto the shared stored-objects layer, and that
- * move is what gave the spool Azure and filesystem destinations at all — so a
- * v1 key can only ever name an S3 object. Minting one against an Azure or file
- * destination would fabricate a location nothing ever wrote to.
+ * v1 spool read through stored-objects runtime: key is resolved to URI against the project's
+ * destination. Non-S3 destinations refuse by name (v1 format predates multi-destination support).
  */
 export class WorkerTraceSpoolLegacyObjectAdapter implements TraceSpoolLegacyObject {
   static create(options: {

@@ -5,14 +5,8 @@ import {
 } from "../worker-product-analytics.adapter.ts";
 
 /**
- * Spec: modules/trace/specs/trace-product-analytics-worker-composition.feature
- *
- * A FROZEN-TWIN test against `platform/app/src/server/posthog.ts`. Every
- * assertion below is a literal read of what that module puts on the wire —
- * `distinctId` is the user id, the properties are the event's own with
- * `projectId` spread in after them, the key decides whether a client exists at
- * all, and shutdown flushes. None of it is derived from the application's
- * source, which would die the moment either file moves.
+ * Frozen-twin test against platform/app/src/server/posthog.ts — every assertion is a literal
+ * read of the wire contract.
  */
 
 type Capture = {

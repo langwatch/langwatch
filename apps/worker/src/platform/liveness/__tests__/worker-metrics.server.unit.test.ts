@@ -1,20 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Covers the worker metrics server's routing + auth branches — the handler the
- * kubelet's liveness/startup probes call.
- *
- * The regression that motivates the liveness path: the Helm chart probed
- * `GET /metrics`, but that endpoint is fail-closed in production (no metrics
- * API key ⇒ 500) and an httpGet probe cannot read a Secret, so both a default
- * install and a secretKeyRef install crash-looped. `/healthz` answers
- * unauthenticated in every configuration; `/metrics` keeps its bearer gate.
- *
- * The registry arrives through the `readMetrics` port rather than from
- * prom-client: `register` is a process-global singleton owned by the host
- * process, and importing it here would be a second copy that renders nothing.
- *
- * See specs/server/worker-liveness-probe.feature.
+ * Tests worker metrics server routing and auth for kubelet probes. /healthz is unauthenticated
+ * (fixes crash-loop from fail-closed /metrics); /metrics keeps bearer auth.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -37,15 +25,7 @@ const servesSamples = vi.fn<WorkerMetricsMembers["readMetrics"]>(async () => ({
   contentType: PROMETHEUS_CONTENT_TYPE,
 }));
 
-/**
- * Captures what the handler wrote, without binding a port.
- *
- * Headers are captured from BOTH paths a response can set them — `writeHead(
- * status, headers)` and `setHeader(name, value)`. A fake that drops them (a
- * no-op `setHeader`, a `writeHead` that reads only its first argument) lets the
- * Content-Type line be deleted from the handler with every test still green,
- * while Prometheus silently stops parsing the worker registry.
- */
+/** Fake that captures handler output without binding a port, verifying headers are properly set. */
 function fakeExchange(url: string) {
   const req = { url, headers: {} } as unknown as HandlerRequest;
   const captured: {

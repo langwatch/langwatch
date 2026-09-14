@@ -16,13 +16,8 @@ import {
 } from "@langwatch/eventing/server";
 
 /**
- * Whether this runtime claims `event-sourcing/jobs`, and what claiming it needs
- * beyond the producer surface.
- *
- * Absent means disabled. Exactly one process may consume the shared queue, so
- * the composition that owns the consumer has to say so; every other
- * construction stays a producer by omission rather than by remembering to opt
- * out.
+ * Whether this runtime claims `event-sourcing/jobs` — only one process consumes the shared
+ * queue.
  */
 export type WorkerEventingConsumerOptions =
   | {
@@ -52,16 +47,8 @@ export interface WorkerEventingDependencies {
   /** Per-tenant operator stop for every component the pipelines mount. */
   killSwitch?: KillSwitch;
   /**
-   * Projections that span pipelines, configured before any of them exist.
-   *
-   * The Eventing runtime takes these at construction because a global
-   * projection's queues are registered against the shared job registry the
-   * moment the first pipeline is registered, not by an installer afterwards.
-   * The live registry configures the SaaS billable-events meter and its
-   * dispatch subscriber exactly here, and their routing keys (`global:*`) sit
-   * in the same registry as every pipeline's. A consumer that claimed
-   * `event-sourcing/jobs` without them would reject and redeliver every
-   * billable span, evaluation, experiment and simulation event forever.
+   * Global projections must be configured at construction time, before the first pipeline is
+   * registered, so their queues land in the shared job registry.
    */
   configureGlobalProjections?: EventSourcingOptions["configureGlobalProjections"];
 }
@@ -90,16 +77,8 @@ export class WorkerEventingRuntime {
   }
 
   /**
-   * Builds the Worker’s one durable Eventing graph from the sealed server
-   * adapters. The process root supplies Prisma, ClickHouse, retention, and
-   * Group Queue ports, and says whether this process is the one that consumes
-   * the shared queue — a runtime built without that option produces only.
-   *
-   * The decision reaches two places from here. The Group Queue factory decides
-   * whether a queue definition also starts a consumer loop, and the Eventing
-   * runtime decides whether the process-manager outbox, wake and schedule
-   * workers run. Half of that is a graph that claims jobs and never drains its
-   * own process managers.
+   * Builds the Eventing graph; consumer ownership determines whether queue definitions start
+   * loops and whether process-manager workers run.
    */
   static createProduction(options: WorkerEventingProductionOptions): WorkerEventingRuntime {
     const consumers = options.consumers ?? { enabled: false };
