@@ -214,10 +214,23 @@ def is_claude_model(model: Optional[str]) -> bool:
     Matched anywhere in the string rather than after the provider prefix,
     because the routes disagree about where the name sits:
     `anthropic/claude-sonnet-4-5`, `bedrock/anthropic.claude-sonnet-4-5-v1:0`,
-    `vertex_ai/claude-sonnet-4-5` and a Bedrock inference-profile ARN all
-    carry it differently. No other vendor names a model "claude".
+    `vertex_ai/claude-sonnet-4-5` and a Bedrock system inference-profile ARN
+    all carry it differently. No other vendor names a model "claude".
     """
     return "claude" in model.lower() if model else False
+
+
+def is_opaque_bedrock_inference_profile(model: Optional[str]) -> bool:
+    """
+    Whether this model is a Bedrock application inference profile, whose ARN
+    carries a generated id and not the underlying model's name
+    (`arn:aws:bedrock:<region>:<account>:application-inference-profile/<id>`).
+
+    Nothing in such a request says which family the profile serves, so the
+    name test above cannot claim or clear it — the caller decides what an
+    unknowable family means for its own treatment.
+    """
+    return "application-inference-profile/" in model if model else False
 
 
 def apply_anthropic_sampling_compatibility(kwargs: dict) -> dict:
@@ -237,8 +250,17 @@ def apply_anthropic_sampling_compatibility(kwargs: dict) -> dict:
     from a call that also names a temperature costs almost nothing on a
     model that would have accepted both, while keeping it fails the call
     outright and the evaluation reaches no verdict at all.
+
+    A Bedrock application inference profile is treated as possibly Claude by
+    the same asymmetry, since its ARN hides which family it serves: on
+    whatever model such a profile actually fronts, a top_p riding alongside
+    a temperature is redundant, and on a Claude it is fatal. Resolving the
+    profile through the AWS API instead would put a network call and a
+    credential requirement on every judge call, to avoid a drop that is
+    nearly free.
     """
-    if not is_claude_model(kwargs.get("model")):
+    model = kwargs.get("model")
+    if not (is_claude_model(model) or is_opaque_bedrock_inference_profile(model)):
         return kwargs
     if kwargs.get("temperature") is None or kwargs.get("top_p") is None:
         return kwargs

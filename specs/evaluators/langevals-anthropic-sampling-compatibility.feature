@@ -58,6 +58,19 @@ Feature: Evaluator judge sampling on models that accept only one sampling knob
     When the evaluator asks that model to judge
     Then the request leaves with no top_p at all
 
+  # A Bedrock application inference profile hides the model behind a
+  # generated id — nothing in the request names the family at all. It is
+  # treated as possibly Claude, on the same asymmetry that shapes the whole
+  # feature: dropping a top_p that rides alongside a temperature costs
+  # almost nothing on whatever model the profile actually serves, while
+  # keeping both is fatal if it serves a Claude.
+  @unit
+  Scenario: An opaque inference profile is treated as possibly Claude
+    Given an evaluator whose judge asks for a temperature and a top_p
+    And its model is a Bedrock application inference profile that names no model
+    When the evaluator asks that model to judge
+    Then the request leaves with no top_p at all
+
   @unit
   Scenario: Either knob alone is delivered as given
     Given an evaluator whose judge asks for only one sampling knob

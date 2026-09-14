@@ -69,6 +69,19 @@ def test_recognises_a_claude_model_behind_a_cloud_provider_route(model):
     assert "top_p" not in kwargs
 
 
+# @scenario "An opaque inference profile is treated as possibly Claude"
+def test_treats_an_opaque_bedrock_inference_profile_as_possibly_claude():
+    kwargs = patch_litellm_params(
+        {
+            "model": "bedrock/arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/abc123xyz",
+            "temperature": 0.0,
+            "top_p": 0.9,
+        }
+    )
+
+    assert "top_p" not in kwargs
+
+
 # @scenario "Either knob alone is delivered as given"
 def test_leaves_a_lone_top_p_alone():
     kwargs = patch_litellm_params({"model": "anthropic/claude-sonnet-4-5", "top_p": 0.9})
