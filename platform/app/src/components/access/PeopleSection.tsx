@@ -128,8 +128,10 @@ export function PeopleSection({ organizationId }: { organizationId: string }) {
  */
 function usePeopleListState({
   organization,
+  activePlan,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
+  activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
   const { hasPermission } = useOrganizationTeamProject({
@@ -365,7 +367,7 @@ function PeopleList({
     openInvites,
     joinRequests,
     twoStep,
-  } = usePeopleListState({ organization });
+  } = usePeopleListState({ organization, activePlan });
 
   return (
     <>
@@ -699,12 +701,12 @@ function MemberListRow({
           </Text>
           <MemberRowActions
             member={member}
-            canDisable={canDisableMember(member.userId)}
-            canDelete={canDeleteMember(member.userId)}
+            canDisable={canDisable}
+            canDelete={canDelete}
             onOpen={onOpen}
-            onSetDisabled={setMemberDisabled}
+            onSetDisabled={onSetDisabled}
             onDelete={() =>
-              setConfirmingRemoval({
+              onRequestRemoval({
                 userId: member.userId,
                 label: member.user.name ?? member.user.email ?? "this member",
               })
@@ -792,10 +794,7 @@ function PeopleHeader({
           {
             value: "all",
             label: "Everybody",
-            count:
-              sortedMembers.length +
-              openInvites.length +
-              joinRequests.requests.length,
+            count: memberCount + openInviteCount + requestCount,
           },
           { value: "members", label: "Members", count: memberCount },
           {
@@ -879,7 +878,7 @@ function useDeleteMember(organizationId: string) {
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteMember = (userId: string) => {
     deleteMemberMutation.mutate(
-      { organizationId: organization.id, userId },
+      { organizationId, userId },
       {
         onSuccess: () => {
           toaster.create({
@@ -981,8 +980,8 @@ function PeopleRows({
             canDisable={canDisableMember(member.userId)}
             canDelete={canDeleteMember(member.userId)}
             onOpen={() => onOpenPerson(member.userId)}
-            onSetDisabled={setMemberDisabled}
-            onRequestRemoval={setConfirmingRemoval}
+            onSetDisabled={onSetDisabled}
+            onRequestRemoval={onRequestRemoval}
           />
         ))
       : [];
@@ -995,9 +994,9 @@ function PeopleRows({
             invite={invite}
             isAdmin={canManage}
             teams={teams}
-            onViewInviteLink={viewInviteLink}
-            onResendInvite={resendInvite}
-            onRevokeInvite={revokeInvite}
+            onViewInviteLink={onViewInviteLink}
+            onResendInvite={onResendInvite}
+            onRevokeInvite={onRevokeInvite}
           />
         ))
       : [];
