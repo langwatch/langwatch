@@ -127,15 +127,8 @@ const SSE_ACCESS = handlerManagedAuth({
   credential: "session",
 });
 
-/**
- * The subscription lane as one app, for the process to mount at its own root.
- *
- * It is deliberately NOT a declared REST family: `defineRestRouter` names the
- * one module whose App answers a family, and this lane answers for every module
- * at once, out of the composed tRPC router rather than out of any single App.
- * The address is written here in full for the same reason - there is no family
- * namespace to derive it from.
- */
+// Subscription lane as one app. Answers for every module at once, not a
+// declared REST family.
 export function createSseSubscriptionApp(options: {
   members: SseSubscriptionMembers;
   logger?: Logged;

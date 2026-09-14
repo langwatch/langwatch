@@ -31,7 +31,7 @@ export type SupervisedHandle = {
 export type RestartPolicy = {
   /** Restarts granted to a service that crashes after having been healthy. */
   maxRestarts: number;
-  /** Delay before each restart attempt; the last entry repeats if the list is shorter than maxRestarts. */
+  /** Delay before each restart attempt. Last entry repeats if list is short. */
   backoffMs: readonly number[];
   /** Uptime after which the restart counter resets to zero. */
   steadyUptimeMs: number;
@@ -65,24 +65,8 @@ type SupervisionState = {
   untap: () => void;
 };
 
-/**
- * Spawn a child process under supervision: tee stdout/stderr to its log file
- * AND emit "log" events on the bus so the CLI can render to TTY. Writes a
- * pidfile so a stale process can be detected on the next CLI run.
- *
- * Crash policy: a crash before the service's first "healthy" event is a boot
- * failure and fails fast with a "crashed" event, exactly once. A crash after
- * the service has been healthy is retried in place with bounded backoff
- * (announced via "restarting" events); staying up for `steadyUptimeMs`
- * refills the budget. When the budget is exhausted the crash falls through
- * to the "crashed" event. Supervision learns about "healthy" by observing
- * the bus; the health probes live in each service's start helper.
- *
- * The returned handle's `stop()` sends SIGTERM, waits up to 10s for clean
- * exit, then SIGKILLs. It also cancels any pending restart. Idempotent.
- * `pid` and `child` always reflect the current (most recently spawned)
- * process.
- */
+// Supervise a child process. Tee stdout/stderr to log file, emit log events
+// on bus. Crash policy: boot failure before healthy, retried with backoff after.
 export function supervise({
   spec,
   paths,
@@ -186,15 +170,7 @@ function spawnAttempt(state: SupervisionState): void {
   wireChildTermination(state, child, logStream, pipesDrained);
 }
 
-/**
- * A child ends its life one of two ways: it exits (cleanly or a crash), or
- * it never really started at all ("error": ENOENT/EACCES/EPERM spawning the
- * command). Both funnel into the same handleExit dispatch, gated by a
- * settle-once guard so only whichever fires first is processed. Node does
- * not reliably follow a failed spawn with "exit", so relying on "exit"
- * alone leaves that failure completely unhandled, and an unhandled "error"
- * event throws and takes down the whole CLI process, restart logic or not.
- */
+// Wire child termination. Both exit and spawn error funnel to handleExit.
 function wireChildTermination(
   state: SupervisionState,
   child: ChildProcess,

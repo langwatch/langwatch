@@ -9,16 +9,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import { AiCallFailedError } from "@langwatch/model-provider-server";
 
-/**
- * The `data.cause` payloads this app's frontend interceptors read. They stay
- * app-owned deliberately: the model-provider compatibility shapes are browser
- * contracts, not API framework policy, so they reach the framework formatter
- * as a port rather than being moved into it.
- *
- * Order matters only in that a cause is one of these or none of them; the
- * plan-limit shape is last because it is the shapeless one, recognised by a
- * field rather than by a class.
- */
+// Error cause payloads for frontend interceptors. Model-provider shapes are
+// browser contracts, not API framework policy; they reach as a port.
 const causePayload: TrpcErrorCausePayload = {
   payloadFor(cause) {
     if (cause instanceof ModelNotConfiguredError) {

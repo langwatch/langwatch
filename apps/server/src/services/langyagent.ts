@@ -8,19 +8,7 @@ import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 import { nowInstant } from "@langwatch/time";
 
-/**
- * Whether the downloaded mono-binary knows the `langyagent` subcommand.
- * Binaries released before the assistant existed answer any unknown command
- * with a usage line listing the services they do have, so the presence of
- * the name in that output is the honest capability check. Without this
- * probe, an older binary dies at boot with "unknown service" and takes the
- * whole install down with it; with it, the install comes up assistant-less
- * and says why.
- *
- * Never throws and never hangs: the assistant is optional, so a probe that
- * cannot answer (broken binary, hung exec) reads as "not supported" and the
- * install proceeds without the assistant rather than dying over it.
- */
+// Check if mono-binary supports langyagent subcommand.
 export async function monobinarySupportsLangyagent(binary: string): Promise<boolean> {
   try {
     const { stdout, stderr } = await execa(binary, [], {
@@ -39,25 +27,7 @@ export async function monobinarySupportsLangyagent(binary: string): Promise<bool
 // ENVIRONMENT never even asks for the unsafe mode.
 const UNSAFE_ISOLATION_ENVIRONMENTS = new Set(["local", "development", "dev", "test"]);
 
-/**
- * The Langy assistant's manager, the process that owns one opencode worker
- * per conversation. Same `cmd/service` mono-binary as the gateway and the NLP
- * engine, dispatched as `langyagent`, so the assistant adds no download of its
- * own beyond the opencode runtime predep.
- *
- * Health: /health.
- *
- * WHAT IS DIFFERENT ABOUT A LAPTOP. In a cluster this pod runs under a
- * sandboxed container runtime, as root, handing every conversation's worker
- * its own UID, because there the workers belong to different people and a
- * prompt-injected one must not be able to read a colleague's credentials off
- * disk. Here there is one person, on their own machine, and each worker
- * already runs as them with their own credentials. The UID handoff would need
- * root to perform, so demanding it would mean asking someone to run their
- * laptop install as root in order to isolate them from themselves. We run
- * unsandboxed instead, and say so rather than implying a boundary that is not
- * there.
- */
+// Langy assistant manager. Runs unsandboxed on laptop (one person, one UID).
 export async function startLangyagent(
   ctx: RuntimeContext,
   bus: EventBus,

@@ -12,15 +12,8 @@ import {
 } from "./api.main.ts";
 import { bootApiProcess } from "./app/api-production.composition.ts";
 
-/**
- * The api process, stated once.
- *
- * The boot seam resolves the secrets and parses the config; this composition
- * says what the process IS - the api role, every installed module, and the
- * listener the role's own lifecycle routes are served on. Each module's
- * declared transports are mounted by boot on the doors this process opens, so
- * there is no family named here and nothing to keep in step when one is added.
- */
+// Boot seam resolves secrets and config; this composition says what the
+// process IS - the api role, every installed module, and listener.
 class ApiProductionComposition extends ApiRuntimeComposition {
   async compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcess> {
     const { runtime, trpc, staticSurface } = await bootApiProcess({
@@ -65,20 +58,7 @@ class ApiProductionComposition extends ApiRuntimeComposition {
   }
 }
 
-/**
- * Everything the API process does lives behind one composition, which is the
- * table of what the process is made of.
- *
- * This catch reports what it caught. It used to assume the failure had already
- * reached the error stream and stay silent, which holds only once the process
- * has a logger — and the boot seam resolves secrets and parses config BEFORE
- * that, so the failures most worth seeing are exactly the ones nothing had
- * reported yet. An `InvalidRuntimeConfigError` naming the variables it rejected
- * was being swallowed whole, leaving a process that exits 1 having printed
- * nothing at all, under a supervisor that can only report "exit status 1".
- * `apps/tasks` has always logged here (tasks.entrypoint.main.ts:106); this is
- * the same line.
- */
+// Report all boot errors: logger may not exist yet when config/secrets fail.
 export async function bootApi(): Promise<void> {
   try {
     const main = await ApiRuntimeBootstrap.create({
@@ -94,15 +74,7 @@ export async function bootApi(): Promise<void> {
   }
 }
 
-/**
- * The process surface an EMBEDDED api needs: its environment, and nothing else.
- *
- * The standalone process reads `process.env` and owns its own signals. A
- * launcher hosting this application beside another (`tools/dev-runtime`) owns
- * both — the first of two applications to hear a SIGTERM would otherwise end
- * the process while the other was still draining — so the embedded seam is
- * narrower than the executable's used to be: environment in, runtime out.
- */
+// Embedded API receives environment only; standalone owns signals.
 export type ApiExecutableHost = Readonly<{
   env: Readonly<Record<string, unknown>>;
 }>;
@@ -117,17 +89,7 @@ export type StartStandaloneApiOptions = Readonly<{
   observability?: ApiRuntimeBootstrapOptions["observability"];
 }>;
 
-/**
- * Starts this application inside a process it does not own, and hands back the
- * runtime so the owner can close it.
- *
- * The SAME composition the standalone entry point uses. b383462d96 replaced the
- * hand-written per-process composition with `bootApiProcess` over the generated
- * module list, so there is no second graph to keep in step: one composition,
- * two entry points, and the only difference between them is who owns the
- * process — signals and the exit status stay with the launcher, which is why
- * this asks for none of them.
- */
+// Embedded start: same composition, no signals or exit status.
 export async function startStandaloneApi(
   options: StartStandaloneApiOptions = {},
 ): Promise<ApiRuntimeBootstrap> {

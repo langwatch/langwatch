@@ -1,15 +1,5 @@
-/**
- * The chart operations, in the document an integrator actually reads.
- *
- * `check:openapi-route-coverage` asks whether a registered route reached the
- * document; this asks whether the *checked-in* document still describes it. The
- * two fail for different reasons: the gate goes red when a `describeRoute` is
- * dropped, this goes red when the document is stale — a route annotated,
- * shipped, and never regenerated is published to nobody.
- *
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-langy-authoring.feature — the placement operations
- */
+// Chart operations in the checked-in OpenAPI document. Detects staleness.
+// @see specs/analytics/lwql-saved-charts.feature
 
 import { describe, expect, it } from "vitest";
 

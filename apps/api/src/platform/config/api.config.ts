@@ -917,16 +917,7 @@ function resolveModelProviderConfig(
   };
 }
 
-/**
- * The restricted identity, or nothing — never half of one. A partial set
- * means the workbench was meant to run; the omission is named (var names
- * only, one of these is a password).
- */
-/**
- * The database an unqualified table name resolves to on this process's own ClickHouse:
- * the connection URL's path. A malformed or absent URL answers nothing rather than a
- * guess — the surfaces that need it already refuse without a ClickHouse at all.
- */
+// Resolve unqualified table names to ClickHouse database from URL path.
 function clickHouseDatabaseOf(url: string | undefined): string | undefined {
   const trimmed = url?.trim();
   if (!trimmed) return undefined;

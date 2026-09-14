@@ -147,15 +147,7 @@ program
       );
     }
 
-    // Drain runtime events from the start. The same async stream feeds two
-    // renderers:
-    //   - install-phase events → docker-buildx-style bounded panels
-    //     (one per service, last 5 lines visible) via the router below.
-    //   - everything else → `concurrently`-style prefixed scroll lines
-    //     in animation/log-tee.ts.
-    // The router buffers events that arrive before listr2's task subscribes
-    // (typical race: prepare:app emits 'starting' before the panels render
-    // resolves the task callbacks).
+    // Drain runtime events to two renderers: panels and prefixed scroll lines.
     const installRouter = makeInstallPanelRouter();
     const panelsPromise = renderInstallPanels(installRouter);
     const eventsStream = streamEventsToTTY(runtime.events(ctx), {

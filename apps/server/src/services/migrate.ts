@@ -4,20 +4,7 @@ import { locateTasksDir, resolvePnpm } from "./node-deps.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 import { nowInstant } from "@langwatch/time";
 
-/**
- * Run Prisma migrations against the embedded postgres + ClickHouse goose
- * migrations against the embedded clickhouse. Both run through apps/tasks'
- * `@langwatch/task` launcher, which declares the prisma CLI as a runtime
- * dependency, so this is a thin shell-out.
- *
- * Idempotent — Prisma reports "Already in sync" and goose reports "no
- * migrations to run" when the schema is current.
- *
- * envFromFile is the `.env` we scaffold into LANGWATCH_HOME — each task
- * parses the process configuration it needs at boot and refuses by name on a
- * missing leaf, even for a migrate-only invocation. Without this overlay the
- * task exits 1 before goose ever runs.
- */
+// Run Prisma and ClickHouse goose migrations through apps/tasks launcher.
 export async function runMigrations(
   ctx: RuntimeContext,
   bus: EventBus,

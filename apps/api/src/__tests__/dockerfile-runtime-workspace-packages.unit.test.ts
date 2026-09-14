@@ -1,19 +1,5 @@
-/**
- * Regression guard: the runtime image must ship every workspace package the
- * three deployables depend on at runtime.
- *
- * The builder stage does `COPY packages ./packages`; the runtime stage is
- * assembled by hand. pnpm links a dependency as
- * `apps/<app>/node_modules/@langwatch/<name> -> ../../../packages/<path>`, and
- * that symlink is copied along with `apps/<app>/`. If the package it points at
- * is not also copied the link dangles and the process dies at boot with
- * `Cannot find module '@langwatch/<name>'` — which is exactly how
- * `@langwatch/handled-error` broke the workers entry point once already.
- *
- * Ported from `platform/app/src/__tests__/` at the deployment cutover, when
- * `platform/app` stopped being in the image at all. The shape of the check is
- * unchanged; what it names is the three applications instead of the monolith.
- */
+// Runtime image must ship every workspace package the three apps depend on.
+// Symlinks dangle if packages are not copied; prevents module-not-found at boot.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

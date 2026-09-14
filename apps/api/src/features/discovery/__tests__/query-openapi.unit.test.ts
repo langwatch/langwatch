@@ -1,17 +1,5 @@
-/**
- * The query-domain doors, in the document an integrator actually reads.
- *
- * `check:openapi-route-coverage` asks whether a registered route reached the
- * document; this asks whether the *checked-in* document still describes it. The
- * two fail for different reasons: the gate goes red when a `describeRoute` is
- * dropped, this goes red when the document is stale — a route annotated,
- * shipped, and never regenerated is published to nobody. The query domain is a
- * brand-new door onto LangWatchQL (issue #7565), so its first regeneration is
- * exactly the moment this class of staleness could slip through.
- *
- * @see specs/analytics/lwql-api.feature
- * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
- */
+// Query-domain doors in the checked-in OpenAPI document. Detects staleness.
+// @see specs/analytics/lwql-api.feature
 
 import { describe, expect, it } from "vitest";
 
@@ -72,15 +60,7 @@ describe("given the generated OpenAPI document", () => {
       ).toBeDefined();
     });
 
-    /**
-     * The payload, at the top level — not nested under an envelope member.
-     *
-     * This family briefly answered JSON-RPC, where the result sat under
-     * `result` and an error under `error.code` as a number. Publishing either
-     * of those now would generate a client that reads `columns` off the wrong
-     * level and finds nothing — a mistake that typechecks, passes review, and
-     * only fails against a live server.
-     */
+    // Payload at top level, not nested under envelope.
     it("publishes the run result itself as the 200 body", () => {
       const properties =
         responseSchema({ path: RUN, method: "post", status: "200" })?.properties ?? {};
@@ -92,7 +72,7 @@ describe("given the generated OpenAPI document", () => {
       expect(properties).not.toHaveProperty("result");
     });
 
-    /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
+    /** @scenario "client discovers LangWatchQL schema scoped to own permissions" */
     it("publishes the queryable schema itself as the 200 body", () => {
       const properties =
         responseSchema({ path: SCHEMA, method: "get", status: "200" })?.properties ?? {};

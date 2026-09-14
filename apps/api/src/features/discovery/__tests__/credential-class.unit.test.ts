@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Which credential class each route publishes, and where it comes from.
- *
- * The class is derived from the app a route is mounted on rather than
- * declared per route, so these assert the derivation rather than a list: a
- * list would agree with itself forever while the apps moved underneath it.
- *
+ * Assert that credential class derivation matches route mounting.
  * Spec: specs/security/api-endpoint-authorization.feature
  */
 import { readFileSync } from "node:fs";
@@ -32,17 +27,8 @@ import {
 
 const SPEC_PATH = join(dirname(fileURLToPath(import.meta.url)), "../openapi-document.json");
 
-/**
- * The surfaces published to external integrators, and the credential family
- * each one belongs to.
- *
- * Written out rather than derived from the route registry, which would need
- * every Hono app imported and would then agree with the generator by
- * construction. The point of asserting against the committed document is to
- * catch it drifting from the code that produced it, so the expectation has to
- * come from somewhere else: the mount. Spend and webhooks are organization
- * apps, the rest of the gateway surface is a project app.
- */
+// Published surfaces and their credential families. Written out to assert
+// against the committed document, not derived from route registry.
 const PUBLIC_SURFACES = [
   { prefix: "/api/webhooks/v1", scheme: "admin_api_key" },
   { prefix: "/api/gateway/v1/spend-summaries", scheme: "admin_api_key" },

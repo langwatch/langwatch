@@ -1,12 +1,5 @@
-/**
- * The two credentials this process resolves for itself: the project door every
- * SDK key arrives at, and the organization door the management surfaces answer
- * behind.
- *
- * It reads three peer Apps and nothing else. Every one of them is another
- * module resolved by the same boot that mounts the routes, which is why the
- * process states its doors as a factory rather than building them beforehand.
- */
+// Resolves project and organization credentials. Reads peer Apps resolved
+// by the same boot that mounts the routes.
 import {
   type ApiKeyApi,
   type ResolvedApiKeyCredential,

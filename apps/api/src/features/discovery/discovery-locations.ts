@@ -41,15 +41,7 @@ export function isRootDiscoveryPath(pathname: string): boolean {
 /** Escapes a literal path for embedding in a regular expression. */
 const escapeForRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/**
- * The dev proxy rule matching exactly these paths, built here so a dev server
- * config cannot fall behind the list. A path added above but missed there would
- * reach Hono in production and the SPA in development — the worst shape of bug,
- * because it only appears where nobody is testing.
- *
- * Vite matches `server.proxy` regex keys against the full request URL, path and
- * query, so the optional trailing slash and query string are both part of it.
- */
+// Dev proxy rule built here to stay in sync with ROOT_DISCOVERY_PATHS.
 export const ROOT_DISCOVERY_PROXY_PATTERN = `^(?:${ROOT_DISCOVERY_PATHS.map(escapeForRegExp).join(
   "|",
 )})/?(?:\\?.*)?$`;

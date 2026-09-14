@@ -1,17 +1,5 @@
-/**
- * The api process's tRPC door.
- *
- * One root, one policy chain, one declared runtime — built once, at boot, from
- * the pieces that survived the old assembly: the browser-session context, the
- * error formatter, and the subscription lane. Every installed module's declared
- * namespace is mounted on THIS runtime, which is what makes a procedure
- * reachable over the request lane and over the stream lane at the same time.
- *
- * What the process owns here is the same list REST's door table owns: who the
- * caller is, what may be asked of them, where a mutation is recorded, and the
- * envelope a refusal is written in. A module declares its namespace and knows
- * none of it.
- */
+// The API tRPC door: one runtime for request and stream lanes. Every module
+// namespace is mounted here. Process owns caller identity and policy.
 import { AuditLogApi, recordAuditLogCommandSchema } from "@langwatch/audit-log-contract";
 import {
   auditScopeIds,
@@ -163,15 +151,7 @@ export class ApiTrpcHost implements FeatureTrpcHost<ApiTrpcNamespace> {
     }).declaredRuntime;
   }
 
-  /**
-   * One declared namespace on this process's root.
-   *
-   * The declaration arrives type-erased — `mountDeclaredTransports` knows
-   * nothing of tRPC on purpose — so the cast IS the seam rather than a shortcut
-   * around one. What the module bound for its own facts travels beside the
-   * process's own bindings, and the process's go first so a module cannot
-   * shadow the caller's address with one of its own.
-   */
+  // Mount one declared namespace on this root. Process facts come first.
   mount(
     declaration: MountableTransport,
     app: () => unknown,

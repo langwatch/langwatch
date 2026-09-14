@@ -1,22 +1,5 @@
-/**
- * The API process's own tRPC policy chain, built on its own root.
- *
- * A declared namespace states its access as an `AuthzDeclaration` and the
- * runtime installs the check for it, so what the PROCESS supplies is the ports
- * behind that check rather than a chain of its own middlewares. The hand-mount
- * kit this file used to hand back went with the assembly that consumed it
- * (b383462d96); `declaredRuntime` is the whole of what a door needs now.
- *
- * Everything the chain is made of is already packaged in `@langwatch/api/trpc`.
- * What was missing was a process that filled the ports: an identity port over
- * this process's request context, an authorization port over the AuthZ service
- * it already composes, an audit port over the sink it already holds, and the
- * error-reporting and cause-translation ports. That is all this module is.
- *
- * ORDER IS BEHAVIOUR — see `declaredPolicy` in `@langwatch/api/trpc`. Nothing
- * here re-states the order; it hands the pieces over and the packaged
- * composition puts them in it.
- */
+// API tRPC policy chain. Supplies ports (identity, authz, audit, error
+// reporting) for the packaged chain in @langwatch/api/trpc.
 import type { Actor } from "@langwatch/actor";
 import {
   createTrpcRuntime,
@@ -52,18 +35,7 @@ export type ApiTrpcPolicyMembers<TContext, TAuthenticatedContext extends object>
   denials: TrpcAuthorizationDenial;
 }>;
 
-/**
- * Builds this process's policy chain and its authenticated procedure.
- *
- * Called ONCE per root: every middleware belongs to the root that produced it,
- * so a second call would hand out middlewares from a root nothing is mounted
- * on.
- *
- * The authorization port answers the SAME decisions object for every request.
- * The packaged port is a resolver because a process may compose its decisions
- * per request; this one does not — the AuthZ service is process-wide and reads
- * the caller from the arguments it is given, never from ambient state.
- */
+// Called ONCE per root. AuthZ service is process-wide, not per-request.
 export function createApiTrpcPolicy<
   TContext extends TrpcPolicyContext & TrpcDeclaredAuthzContext & TrpcRuntimeContext & object,
   TAuthenticatedContext extends object,

@@ -1,14 +1,7 @@
 import type { RuntimeEvent } from "../shared/runtime-contract.ts";
 
-/**
- * Single-consumer event bus. The CLI calls `runtime.events(ctx)` exactly
- * once and gets back this AsyncIterable. Producers call `bus.emit(event)`
- * which buffers if no consumer is currently awaiting `next()`. Once `bus.end()`
- * is called every pending consumer wakes up with `{ done: true }`.
- *
- * Multi-consumer is intentionally not supported: the CLI animates and tees
- * logs from a single iterator. If we ever need fan-out we tee at the consumer.
- */
+// Single-consumer event bus. Producers call bus.emit(), consumer calls
+// runtime.events() once.
 export class EventBus implements AsyncIterable<RuntimeEvent> {
   private readonly buffer: RuntimeEvent[] = [];
   private readonly waiters: Array<(result: IteratorResult<RuntimeEvent>) => void> = [];

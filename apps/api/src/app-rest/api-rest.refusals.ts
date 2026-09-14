@@ -130,15 +130,7 @@ export class ApiRestDoorUnverifiedError extends HandledError {
 }
 
 
-/**
- * A route this process mounted whose deployment named none of what it dials.
- *
- * The hand-composed process left such a family UNMOUNTED, so the same request
- * used to 404. A module declares its own transports now and the process cannot
- * withhold one route of a family, so the honest answer moved from "no such
- * endpoint" to "this deployment composed no such capability" - a refusal that
- * names the gap, rather than a proxy attempt at an address that is not there.
- */
+// Route is mounted but deployment has no such capability.
 export class ApiRestCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 

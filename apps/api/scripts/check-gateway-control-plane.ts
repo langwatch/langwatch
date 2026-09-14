@@ -1,22 +1,8 @@
-/**
- * Verifies that an already-running AI Gateway process, the one `pnpm dev`
- * (scripts/start.sh) is about to reuse because its derived gateway port is
- * already listening, is actually pointed at THIS worktree's control plane
- * rather than another worktree's or a stale process left over from an
- * earlier run.
- *
- * A gateway proxies LLM traffic and answers every request 200 regardless of
- * which control plane it ships spend, budget and auth traffic to, so a
- * wrong target produces no error anywhere. This script asks the gateway
- * directly, via its GET /debug/control-plane endpoint
- * (services/aigateway/adapters/httpapi/debug_control_plane.go), and prints
- * a loud warning when the answer does not match what this worktree expects,
- * or when the gateway cannot be asked at all (an older build that predates
- * the endpoint is the common case for a mismatch this check cannot name
- * precisely).
- *
- * Usage: tsx check-gateway-control-plane.ts <gatewayPort> <expectedControlPlaneUrl>
- */
+// Verifies the already-running AI Gateway is pointed at this worktree's
+// control plane, not another's. Gateway proxies LLM traffic so wrong targets
+// produce no error; this script checks via GET /debug/control-plane and warns
+// on mismatch or if the gateway cannot be asked.
+// Usage: tsx check-gateway-control-plane.ts <gatewayPort> <expectedControlPlaneUrl>
 
 export type GatewayReuseVerdict = "ok" | "mismatch" | "unverifiable";
 

@@ -1,14 +1,5 @@
-/**
- * What the interactive process IS: the api role, the config it parsed, and the
- * modules this build installs.
- *
- * There is no wiring left here. Every family the api serves is an installed
- * module that declares its own repositories, its own transports and the
- * members it reads; boot builds exactly that union, in order, and refuses by
- * module and member when this deployment configured none. What used to be
- * 4,989 lines of hand-composition is the module list and the mapping from the
- * api's own parsed config onto the members every process states the same way.
- */
+// What the interactive process IS: config, role, and installed modules.
+// Boot unions every module's repositories and transports.
 import {
   createProcessMembers,
   type MailConfig,
@@ -53,61 +44,13 @@ import type { ApiConfig } from "../platform/config/api.config.ts";
 import { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.members.ts";
 import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.members.ts";
 
-/**
- * The null audit log, installed where no tier provides a real one.
- *
- * `modules/audit-log` publishes a contract and no core server half — the
- * implementation is `enterprise/modules/audit-log/server` — so a core build
- * installs nothing for the `audit-log` token. Meanwhile `agent`, `evaluator`
- * and `ops` each declare a REQUIRED dependency on it, and boot refuses with
- * `MissingProviderError` before the listener opens: the api process cannot
- * start at all in the tier it ships by default.
- *
- * `@langwatch/audit-log-null` is what an installation without the Enterprise
- * feature answers with, and apps/api has always declared the dependency on it
- * in its package.json — only the line that installs it was missing. Appended
- * conditionally so an enterprise build, where the real module IS in the list,
- * does not end up with two providers for one token.
- */
+// Core build needs null audit log where enterprise module not available.
 const coreAuditLog = serverModules.some((module) => (module.name as string) === "audit-log")
   ? []
   : [auditLogNullServer];
 
-/**
- * What each installed module parses as its own configuration.
- *
- * `createProcess` takes this as `moduleConfig` and boot hands each module
- * `config[<module name>]`, which its `configSchema` then parses. **No process
- * was passing it.** The option existed, nothing supplied it, so every module
- * declaring a schema received `undefined` and refused at boot with
- * `FeatureConfigError` — the api could not start for the same reason it could
- * not start on the three unsatisfiable member claims: a seam that was built
- * and never connected.
- *
- * Every installed module that declares a schema needs an entry, because a
- * schema parses `{}` into its defaults but refuses `undefined`. The values are
- * the ones the api already parses for itself — this maps them onto the names
- * the modules declare, it does not re-read the environment. `automation` and
- * `log` get an empty object on purpose: their schemas are wholly defaulted and
- * the api parses nothing for them, so anything else would be inventing
- * configuration rather than passing it on.
- */
-/**
- * One config slice with its empty strings dropped.
- *
- * A resolution that writes `""` for "the operator set nothing" is saying
- * absent in a value that is present, and a module declaring
- * `Config.optionalSecret` — `z.string().min(1).optional()` — refuses it,
- * because the `optional()` branch is unreachable for an empty string. The api
- * resolves github's four credentials that way (`appId?.trim() ?? ""`) while
- * resolving `host` beside them as `|| undefined`, so the inconsistency is
- * inside one object literal.
- *
- * Filtered here rather than at the resolution, because
- * `ApiGithubConfigResolution` types those four as `string` and other readers
- * are entitled to that. What crosses into a module is the module's own
- * statement of absence.
- */
+// Each module gets its config slice from the API's parsed values.
+// Drop empty strings from config slices; modules expect absence, not "".
 function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Slice> {
   return Object.fromEntries(
     Object.entries(slice).filter(([, value]) => value !== ""),
@@ -139,7 +82,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     "data-retention": {
       platformDefaultRetentionDays: config.platformDefaultRetentionDays,
     },
-    /** Already resolved by the api's own parse — the module takes the RESOLVED record (re-parsing emptied the force-enable list, a defect the worker's tests caught). */
+    // Already resolved by API; module receives RESOLVED record.
     "feature-flag": config.featureFlags,
     /** Carried raw: `settlementGraceMs` in the gateway package owns the parse and the bound. */
     gateway: {
@@ -160,7 +103,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
         .map((email) => email.trim())
         .filter((email) => email.length > 0),
     },
-    /** This process's own name in every refusal, and the demo organization every caller may read. */
+    // Process name in refusals and demo organization.
     organization: {
       processName: config.serviceName,
       demoProject: {
@@ -189,7 +132,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     prompt: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl },
     /** Where a Studio graph runs; absent, workflow's runs refuse by name. */
     workflow: { nlpServiceUrl: config.infrastructure.modelProvider.nlpServiceUrl },
-    /** The blob backends, as the api already parses them; a Map becomes the JSON shape the schema reads. */
+    // Blob backends as parsed by API; Map becomes JSON schema shape.
     "stored-object": {
       backend: config.infrastructure.storedObjects.backend,
       localFilesystemRoot: config.infrastructure.storedObjects.localFilesystemRoot,
@@ -215,7 +158,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       processName: config.serviceName,
       publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
     },
-    /** Verbatim from the deleted composition: the public host and the unsubscribe signing secret. */
+    // Public host and unsubscribe signing secret.
     automation: {
       baseHost: config.infrastructure.execution.publicBaseUrl ?? "",
       unsubscribeSecret: config.storedSecretEncryptionKey,
@@ -246,15 +189,7 @@ function apiIdempotencyLedger(options: {
   }).run;
 }
 
-/**
- * The api's parsed config, as every process states itself.
- *
- * A datastore this deployment did not name is left out rather than defaulted:
- * an absent address is never a decision to run without the store, so the
- * member refuses by name at boot and the module that reads it is named with
- * it. The only way to run a module without its stores is to install it on its
- * memory repositories, in code.
- */
+// API's parsed config. Absent datastores refuse at boot.
 export function apiProcessConfig(options: {
   readonly config: ApiConfig;
   /** Every secret this process resolved at boot (ADR-132). */
@@ -392,16 +327,7 @@ export async function bootApiProcess(options: {
 }): Promise<ApiBootedProcess> {
   const config = options.config;
 
-  // The api's `eventing` member: a producer, and only ever a producer (the
-  // three structural decisions are api-eventing.members.ts's docblock). Built
-  // here rather than from the config slice because which log a role appends
-  // to and whether it claims the queue are role decisions, and this role's
-  // answer is objects, not addresses: a producer-only store and a factory
-  // over the process's one Group Queue. No Redis means no queue and no
-  // eventing member, and a module reading it then refuses by name at boot —
-  // the honest answer for a process that cannot enqueue. The member source
-  // never closes a member the caller built, so the runtime service below
-  // drains the producer and its connection after the feature graph stops.
+  // Eventing producer member. No Redis means no queue, module refuses at boot.
   const producerResources = new ResourceScope();
   const queue = ApiQueueInfrastructure.tryCreate({
     resources: producerResources,

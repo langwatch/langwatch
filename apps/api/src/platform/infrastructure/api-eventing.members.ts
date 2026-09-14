@@ -38,41 +38,8 @@ export type ApiEventingInfrastructureOptions = {
   killSwitch?: KillSwitch;
 };
 
-/**
- * API-owned Eventing construction: a PRODUCER, and only ever a producer.
- *
- * The API process sends commands; the worker process claims
- * `event-sourcing/jobs` and runs the handlers, appends their events and folds
- * their projections. That split is location-independent by construction —
- * routing metadata is stamped from the pipeline and command NAMES at send
- * time, so a command this process enqueues is routed by the consumer's own
- * registry rather than by which process produced it.
- *
- * Three decisions make the producer-only property structural rather than
- * something a composition root has to keep true:
- *
- *  - `consumersEnabled: false`, so the Group Queue factory builds a producer
- *    and starts no consumer loop. Two processes claiming one shared queue is
- *    the failure the worker cutover exists to prevent: a claimant that has not
- *    registered every pipeline rejects and redelivers the rest forever.
- *  - {@link EventStoreProducerOnly}, so there is no event log in this process
- *    to read or append. A memory store in that seat would accept an append and
- *    lose it; omitting the store entirely is worse still, because the runtime
- *    answers a store-less registration with a pipeline that drops commands
- *    silently.
- *  - `processManagerMode: "producer-only"` and no `ProcessStore`. A process
- *    manager's inbox, outbox and wakes are the consumer's work. Declaring the
- *    mode is what lets a pipeline that MOUNTS one still register here for its
- *    commands: the runtime declines the manager by name, once at boot, instead
- *    of refusing the whole pipeline. Without it, one process-manager
- *    declaration inside a definition made every command on it unsendable from
- *    the tier a customer's action arrives at — which is how the API came to
- *    answer `service_unavailable` for every scenario run and Langy turn.
- *
- * It exists only where the queue does. Redis is what a command is enqueued
- * into, so a process without one cannot produce, and pretending otherwise
- * would move the failure from boot to the first grant a customer changes.
- */
+// API eventing producer only. Configured with consumersEnabled: false,
+// EventStoreProducerOnly, and processManagerMode: producer-only.
 export class ApiEventingInfrastructure {
   /**
    * Composes the producer only when this process has a Group Queue.

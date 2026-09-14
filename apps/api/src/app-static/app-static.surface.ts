@@ -98,18 +98,8 @@ export function pathIsClaimedByTheApi(pathname: string): boolean {
   return isRootDiscoveryPath(pathname);
 }
 
-/**
- * Every route pattern the mounted REST families declare, read off the families themselves.
- *
- * The SPA fallback is asked before the Hono application (the listener's one raw hook), so a
- * root-level family address the fallback does not decline is an address the fallback SHADOWS.
- * Deriving the set from `Hono.routes` rather than restating it keeps that impossible: a family
- * that gains an address gains the reservation with it.
- *
- * A bare `*` or `/*` is dropped. Hono records per-family middleware as a route, and a pattern
- * that matches every path can only be middleware — no family serves the whole origin, and
- * honouring one would hand the entire browser application to the API.
- */
+// Mounted route patterns from families. Drops `*` or `/*` (middleware only).
+// Fallback shadows any family address it doesn't decline.
 export function mountedPathsOfRestFamilies(
   families: readonly { readonly routes: readonly { readonly path: string }[] }[],
 ): readonly string[] {

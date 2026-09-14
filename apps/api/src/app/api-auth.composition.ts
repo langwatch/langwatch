@@ -1,22 +1,4 @@
-/**
- * How this process turns a request's session cookie into a VERIFIED browser
- * session, and how that verification is joined to the auth module's own live
- * session lookup.
- *
- * Two questions, kept apart, because they fail differently and the difference
- * is load-bearing:
- *
- *   1. Did Better Auth accept the cookie this request presented? That is the
- *      deployment's own request boundary — {@link ApiBrowserSessionTransport} —
- *      and its answer carries the RAW auth-session id an impersonation is
- *      started and stopped against.
- *   2. Is there still a live session behind it? That is `AuthApi`'s, a module
- *      peer, and it can answer no for a cookie Better Auth just accepted: the
- *      row is gone, revoked, or was never this process's to see.
- *
- * A process that conflated the two would start an impersonation against a
- * session that had expired, so the resolved caller reports both.
- */
+// Verify session cookies through Better Auth and AuthApi module.
 import type { BrowserSessionApi, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
@@ -92,16 +74,7 @@ export type ApiBrowserSessionResolver = (
   request: Request,
 ) => Promise<ApiRestBrowserCaller | null>;
 
-/**
- * Joins the two halves into the ONE resolver every session-reading door and
- * fact on this process reads. Composed once, so two doors can never decide
- * differently about who somebody is.
- *
- * A cookie Better Auth accepted whose session the auth module cannot resolve
- * still answers a caller — carrying the verified auth-session id and NO user.
- * The back office's `adminAuthSession` fact asks exactly that question, and
- * every other reader gates on `userId`, so such a caller reaches no handler.
- */
+// Joins two halves into one resolver. Composed once so doors agree on identity.
 export function composeApiBrowserSession(options: {
   sessions: ApiBrowserSessionTransport;
   auth: BrowserSessionApi;
@@ -135,16 +108,7 @@ export function composeApiBrowserSession(options: {
   };
 }
 
-/**
- * The same two halves, joined for the tRPC door — which renders the person, so
- * it carries the whole resolved user rather than REST's id-and-email caller.
- *
- * An unresolvable session answers null here where REST answers a userless
- * caller: the one REST reader of that distinction is the back office's
- * `adminAuthSession` fact, and no tRPC procedure asks it. Left unwired, the
- * door stays mounted and refuses every signed-in caller as anonymous —
- * spec: specs/auth/verified-session-on-request-context.feature.
- */
+// tRPC door resolver. Returns full user, not just id-email caller.
 export function composeApiTrpcSession(options: {
   auth: BrowserSessionApi;
 }): ApiTrpcSessionResolver {

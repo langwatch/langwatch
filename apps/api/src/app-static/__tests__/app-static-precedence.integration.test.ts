@@ -7,16 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApiHttpListener } from "../../api-http.listener.ts";
 import { mountedPathsOfRestFamilies, tryCreateApiStaticSurface } from "../app-static.surface.ts";
 
-/**
- * The production listener's route precedence, end to end: the API families answer every
- * address they declare, and the browser bundle answers what is left.
- *
- * The order is the whole point. The SPA fallback is served from the listener's raw hook,
- * ahead of the Hono application, so it has to decline a claimed path rather than reach it —
- * a fallback that answered `/api/prompts` would turn a 401 into an HTML shell with a 200,
- * and a fallback that answered `/mcp` would take the hosted Model Context Protocol endpoint
- * off the air.
- */
+// Route precedence: API families first, then browser bundle. SPA fallback
+// serves from listener hook, ahead of Hono app.
 describe("given the api process serves both the REST families and the browser bundle", () => {
   let clientDistDir: string;
   let listener: ApiHttpListener | undefined;

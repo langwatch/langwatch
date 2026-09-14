@@ -97,16 +97,7 @@ const runtimeImpl: RuntimeApi = {
     // resolved feature toggles ride along explicitly (see featureEnv) so the
     // app describes exactly the install this process just built.
     const features = resolveEffectiveFeatures(ctx.envFile);
-    // The assistant is OPTIONAL: nothing else depends on it, so no failure of
-    // its own may take the install down. It boots (or declines to) BEFORE the
-    // app tier, because the app must be told the truth about it: an agent URL
-    // with no agent behind it turns every send into a hang. Two ways it
-    // declines, each with its own notice:
-    //   - the mono-binary predates the langyagent service (the npm package
-    //     and the release binary move in lockstep, but a smoke run of an
-    //     unreleased CLI, or an install mid release-window, gets the previous
-    //     release's binary, which answers "unknown service");
-    //   - it started but never reached healthy.
+    // Assistant is optional; boots before app tier so app knows the truth.
     let isLangyRunnable = features.isLangyEnabled;
     let langyHandle: SupervisedHandle | null = null;
     if (isLangyRunnable) {
@@ -158,15 +149,7 @@ const runtimeImpl: RuntimeApi = {
       else delete childEnv.FEATURE_FLAG_FORCE_ENABLE;
     }
 
-    // nlpgo is the only NLP runtime — the Go service from the aigateway
-    // monobinary, dispatched as `nlpgo`. It binds to ctx.ports.nlp; the
-    // langwatch app's /studio/* routing always targets /go/*.
-    //
-    // allSettled, not all: with all(), one service failing its health probe
-    // rejects the combinator and DISCARDS the handles of the services that
-    // had already started — stopHandles never sees them, and every partial
-    // boot leaks live nlpgo/gateway processes that then squat the port slot
-    // and force the next run to auto-shift.
+    // Use allSettled not all: partial boot must not leak handles.
     const results = await Promise.allSettled([
       startNlpgo(ctx, bus, childEnv),
       startLangevals(ctx, bus, childEnv),

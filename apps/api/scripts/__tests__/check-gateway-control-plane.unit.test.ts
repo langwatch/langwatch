@@ -1,12 +1,9 @@
 /**
  * @vitest-environment node
  *
- * Tests for the pure decision logic behind
- * scripts/check-gateway-control-plane.ts: given what this worktree expects
- * and what a reused AI Gateway process actually reports on its
- * GET /debug/control-plane endpoint, decide whether to warn and what to
- * say. The probe (fetch, timeout, JSON parsing) is deliberately not under
- * test here, only the comparison and the resulting message.
+ * Tests for the decision logic: given worktree expectations vs what the
+ * gateway reports on GET /debug/control-plane, decide to warn and what to
+ * say. Probe logic (fetch, timeout, JSON parsing) is tested elsewhere.
  */
 
 import { describe, expect, it } from "vitest";
@@ -39,7 +36,7 @@ describe("evaluateGatewayReuse", () => {
   });
 
   describe("when the reused gateway reports a different control plane", () => {
-    /** @scenario "a reused gateway pointed at a different control plane raises a loud, actionable warning" */
+    /** @scenario "gateway with mismatched control plane raises actionable warning" */
     it("raises a multi-line warning naming both the expected and the actual URL", () => {
       const result = evaluateGatewayReuse({
         expectedControlPlaneUrl: "http://localhost:7580",
@@ -66,7 +63,7 @@ describe("evaluateGatewayReuse", () => {
   });
 
   describe("when the reused gateway's control-plane target cannot be verified", () => {
-    /** @scenario "a reused gateway whose control-plane target cannot be verified is treated as suspect, not silently trusted" */
+    /** @scenario "unverifiable gateway target is not silently trusted" */
     it("raises a warning saying the target could not be verified", () => {
       const result = evaluateGatewayReuse({
         expectedControlPlaneUrl: "http://localhost:7580",

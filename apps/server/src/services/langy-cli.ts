@@ -14,16 +14,7 @@ import { nowInstant } from "@langwatch/time";
 // same rule Dockerfile.langyagent follows for the container image.
 export const LANGY_CLI_VERSION = "1.0.0";
 
-/**
- * Puts a `langwatch` executable on the PATH the assistant's workers inherit.
- *
- * Installed from npm rather than shipped in the server tarball: it is 4MB that
- * only an install running the assistant needs, and fetching it here keeps it
- * out of every install that does not.
- *
- * Idempotent, a marker file records the version installed, so re-running the
- * server is a no-op until the pin moves.
- */
+// Install langwatch CLI from npm. Idempotent via version marker.
 export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promise<void> {
   const cliRoot = join(ctx.paths.root, "cli");
   const marker = join(cliRoot, ".installed-version");
