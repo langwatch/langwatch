@@ -134,6 +134,15 @@ const LATEST_REQUEST_SUBQUERY = `
  * request whose confirmation never arrived so its cost is unknown. Settled
  * rows add nothing to the money sum.
  *
+ * "Consumed tokens" there is the SAME token surface `TokensTotal` sums, which
+ * is why both read `METERED_TOKEN_SUM` rather than each listing its own
+ * columns. A predicate naming only the text columns would miss a charged
+ * request priced at zero that carried audio or image tokens alone — the day
+ * would then report a measured zero where its cost is in fact unknown, the
+ * one mistake this count exists to prevent. `TokensReasoning` is added on top
+ * for presence only: it is a subset of the output and so cannot be
+ * double-counted by a `> 0` test, while the total must leave it out.
+ *
  * `TokensTotal` is the work the models did, over the same charged requests.
  * The ledger stores a BILLABLE input count with cache and the separately
  * rated modalities already taken OUT of it — the rating path prices each
@@ -147,6 +156,12 @@ const LATEST_REQUEST_SUBQUERY = `
  *
  * ADR-128 v3.18, "Supersedes Ruling 1".
  */
+const METERED_TOKEN_SUM = `
+            RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
+            + RequestTokensCacheWrite + RequestTokensInputAudio
+            + RequestTokensOutputAudio + RequestTokensInputImage
+            + RequestTokensOutputImage`;
+
 const METERED_FIGURE_COLUMNS = `
           toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
           countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
@@ -154,16 +169,9 @@ const METERED_FIGURE_COLUMNS = `
           countIf(
             RequestStatus IN ${CHARGED_STATUSES}
             AND RequestCostNanoUSD = 0
-            AND (
-              RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
-              + RequestTokensCacheWrite + RequestTokensReasoning
-            ) > 0
+            AND (${METERED_TOKEN_SUM} + RequestTokensReasoning) > 0
           ) + countIf(RequestStatus = 'settled') AS RequestsWithoutAmount,
-          sumIf(
-            RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
-            + RequestTokensCacheWrite + RequestTokensInputAudio
-            + RequestTokensOutputAudio + RequestTokensInputImage
-            + RequestTokensOutputImage,
+          sumIf(${METERED_TOKEN_SUM},
             RequestStatus IN ${CHARGED_STATUSES}
           ) AS TokensTotal`;
 

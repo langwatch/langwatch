@@ -33,6 +33,7 @@ import type {
 
 import type { SpenderRow } from "./CostSpenderPanel";
 import { type RankRow, sampleSeatPools } from "./sampleSeries";
+import { tokenRowSecondaryLine } from "./tokenRowSecondary";
 
 /**
  * A billed lane that runs a little above the gateway's meter, which is the
@@ -59,11 +60,26 @@ const GATEWAY_USD_PER_MILLION_TOKENS = 3;
  * beside it implies another teaches a reader that the screen does not add up.
  * Ranking is unaffected — every row is scaled by the same factor — so the
  * panels keep the steep falloff real spend has.
+ *
+ * THE DOLLARS STAY, on the second line, in the real panels' own sentence. A
+ * measured token row carries one (`tokenRowSecondaryLine`) and is therefore
+ * drawn two lines high; a sample row without one drew `CostRankList`'s
+ * one-line shape, so sample mode taught a layout the real screen never shows.
+ * The money it names is the money this row was scaled FROM, which is what
+ * keeps the two lines telling one story rather than two.
+ *
+ * Never marked estimated: these tokens were not counted by the estimator, or
+ * by anything else. The marker states how a real count was arrived at, and a
+ * sample that wore it would be making a claim about a measurement nobody took.
  */
 export function sampleTokenRows(rows: readonly RankRow[]): RankRow[] {
   return rows.map((row) => ({
     ...row,
     value: Math.round((row.value / GATEWAY_USD_PER_MILLION_TOKENS) * 1_000_000),
+    secondary: tokenRowSecondaryLine({
+      spendUsd: String(row.value),
+      hasEstimatedTokens: false,
+    }),
   }));
 }
 

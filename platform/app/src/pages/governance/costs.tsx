@@ -32,7 +32,6 @@ import {
 } from "~/components/governance/chartTheme";
 import {
   azureBillingNoteSentence,
-  formatLaneUsd,
   laneTrendPct,
   meteredRequestsWithoutAmountNote,
 } from "~/components/governance/costLaneFormat";
@@ -97,6 +96,7 @@ import {
   sampleSeats,
   seatSeriesMeasureOf,
 } from "~/components/governance/costs/sampleSeries";
+import { tokenRowSecondaryLine } from "~/components/governance/costs/tokenRowSecondary";
 import {
   coerceInterval,
   DEFAULT_TIME_FRAME,
@@ -873,7 +873,7 @@ interface Breakdowns {
      */
     tokens: number | null;
     /** Any counted trace of the department was estimated, not reported. */
-    tokensEstimated: boolean;
+    hasEstimatedTokens: boolean;
   }> | null;
   userRows: Array<{
     actor: string;
@@ -881,7 +881,7 @@ interface Breakdowns {
     requests: number;
     /** Null when no trace of theirs carried a count — see `SpendByUserRow`. */
     tokens: number | null;
-    tokensEstimated: boolean;
+    hasEstimatedTokens: boolean;
   }> | null;
   activeUsers: number | null;
   /**
@@ -1717,7 +1717,7 @@ function CountPanels({
             Counted by the gateway as it served the traffic.
           </Text>
           <CostLine
-            points={showSample ? sample.tokens : (tokenPoints ?? [])}
+            points={showSample ? sample.tokens : tokenPoints}
             interval={interval}
             empty={costPanelEmpty({
               what: "How many tokens were spent, period by period.",
@@ -1833,31 +1833,6 @@ interface MeasuredRows {
 }
 
 /**
- * The line beneath a ranked token count — a department's or a person's:
- * what they spent, and what that figure covers.
- *
- * "Per-request cost" rather than "spend", because a subscription department's
- * zero is not a cheap department — it is a department whose bill arrives
- * somewhere this panel does not read. The estimate marker sits here rather
- * than beside the count so the lead figure stays one thing a reader compares
- * rows by.
- *
- * Shared by both token panels deliberately: they rank different things off
- * the same traces, and a reader comparing the two should not have to work out
- * whether two differently-worded second lines mean the same money.
- */
-function tokenRowSecondaryLine(row: {
-  spendUsd: string;
-  tokensEstimated: boolean;
-}): string {
-  // The screen's own lane formatter, not the compact one the ranked figures
-  // use: this line is an exact amount read beside a count, and `$310.5` next
-  // to `4.1m tokens` reads as a truncated number rather than a price.
-  const money = `${formatLaneUsd(Number(row.spendUsd))} per-request cost`;
-  return row.tokensEstimated ? `${money} · tokens estimated` : money;
-}
-
-/**
  * The wire rows, folded to the interval and narrowed by the department chip.
  *
  * Null carries all the way through: an unanswered read stays unanswered rather
@@ -1892,7 +1867,7 @@ function measuredRows({
               // down, because tokens are a worse COST ranking across a mixed
               // model estate.
               value: row.tokens ?? 0,
-              unmeasured: row.tokens === null,
+              isUnmeasured: row.tokens === null,
               secondary: tokenRowSecondaryLine(row),
             })),
     // Already totalled by the service. A model the provider named nothing
@@ -1923,7 +1898,7 @@ function measuredRows({
             key: row.actor,
             label: row.actor,
             value: row.tokens ?? 0,
-            unmeasured: row.tokens === null,
+            isUnmeasured: row.tokens === null,
             secondary: tokenRowSecondaryLine(row),
           })),
   };

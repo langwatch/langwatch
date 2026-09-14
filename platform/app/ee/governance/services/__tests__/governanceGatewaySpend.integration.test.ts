@@ -51,6 +51,10 @@ function spendRow({
   costNanoUsd,
   tokensInput = 100,
   tokensOutput = 50,
+  tokensInputAudio = 0,
+  tokensOutputAudio = 0,
+  tokensInputImage = 0,
+  tokensOutputImage = 0,
   occurredAtMs = AUG_1,
   eventTimestampOverride,
 }: {
@@ -62,6 +66,13 @@ function spendRow({
   costNanoUsd: number;
   tokensInput?: number;
   tokensOutput?: number;
+  /** The separately rated modalities. The rating path takes these OUT of the
+   *  text counts, so a speech or vision request can carry tokens here and
+   *  nothing at all in `tokensInput` / `tokensOutput`. */
+  tokensInputAudio?: number;
+  tokensOutputAudio?: number;
+  tokensInputImage?: number;
+  tokensOutputImage?: number;
   occurredAtMs?: number;
   eventTimestampOverride?: number;
 }): Record<string, unknown> {
@@ -86,6 +97,10 @@ function spendRow({
     TokensCacheRead: 0,
     TokensCacheWrite: 0,
     TokensReasoning: 0,
+    TokensInputAudio: tokensInputAudio,
+    TokensOutputAudio: tokensOutputAudio,
+    TokensInputImage: tokensInputImage,
+    TokensOutputImage: tokensOutputImage,
     CostNanoUSD: costNanoUsd,
     RateVersion: "v1",
     Labels: [],
@@ -447,6 +462,40 @@ describe("the governance gateway spend read", () => {
       expect(day?.requestCount).toBe(2);
       expect(day?.pricedRequestCount).toBe(0);
       expect(day?.requestsWithoutAmount).toBe(2);
+    });
+  });
+
+  describe("given a zero-cost request whose only tokens were audio", () => {
+    /** @scenario "A request priced at zero whose only tokens were audio carries no amount" */
+    it("counts it among the requests carrying no dollar amount", async () => {
+      await insert([
+        // Speech in, speech out, priced at nothing. The rating path prices
+        // each modality at its own rate and takes it OUT of the text counts,
+        // so both text columns are zero on a request that plainly consumed
+        // work. A presence test reading the text columns alone calls this a
+        // request that consumed nothing, and the day then reports a measured
+        // zero for a cost nobody knows.
+        spendRow({
+          tenantId: projectA,
+          status: "confirmed",
+          costNanoUsd: 0,
+          tokensInput: 0,
+          tokensOutput: 0,
+          tokensInputAudio: 900,
+          tokensOutputAudio: 300,
+        }),
+      ]);
+
+      const [day] = await repo.sumDaysForOrganizationProjects({
+        tenantIds: [projectA],
+        ...WINDOW,
+      });
+
+      expect(day?.requestCount).toBe(1);
+      expect(day?.pricedRequestCount).toBe(0);
+      expect(day?.requestsWithoutAmount).toBe(1);
+      // And the tokens it did consume are still the day's token figure.
+      expect(day?.tokensTotal).toBe(1200);
     });
   });
 

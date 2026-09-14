@@ -88,6 +88,15 @@ const harness = vi.hoisted(() => ({
    * token panels have no read of their own and fold this same series.
    */
   series: undefined as unknown,
+  /**
+   * Whether the cost summary read has answered at all.
+   *
+   * `false` is the in-flight / never-permitted state, which the summary query
+   * reports as `data: undefined`. Every other knob here describes what an
+   * ANSWER said, and none of them can express this one: a window with no days
+   * is a measurement, and the token panel is required to tell the two apart.
+   */
+  summaryAnswered: true,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -151,57 +160,68 @@ vi.mock("~/utils/api", () => ({
       },
       summary: {
         useQuery: () => ({
-          data: {
-            unavailableReason: null,
-            providers: harness.providers,
-            // In the DTO's own shape: the US dollar line IS the lane's dollar
-            // figure, and a lane that reported nothing has no line at all.
-            billed: harness.lanesReport
-              ? {
-                  amountUsd: 123.45,
-                  cellsWithoutAmount: 0,
-                  currenciesWithoutUsdAmount: [],
-                  currencyTotals: [
-                    {
-                      currencyCode: "USD",
-                      amount: 123.45,
+          // `undefined` is a read that has NOT answered, which is a different
+          // thing from one that answered with nothing — see `summaryAnswered`.
+          data: harness.summaryAnswered
+            ? {
+                unavailableReason: null,
+                providers: harness.providers,
+                // In the DTO's own shape: the US dollar line IS the lane's
+                // dollar figure, and a lane that reported nothing has no line
+                // at all.
+                billed: harness.lanesReport
+                  ? {
+                      amountUsd: 123.45,
                       cellsWithoutAmount: 0,
-                    },
-                  ],
-                }
-              : {
-                  amountUsd: null,
-                  cellsWithoutAmount: 0,
-                  currenciesWithoutUsdAmount: [],
-                  currencyTotals: [],
-                },
-            gateway: harness.lanesReport
-              ? {
-                  amountUsd: 67.89,
-                  cellsWithoutAmount: 0,
-                  currenciesWithoutUsdAmount: [],
-                  currencyTotals: [
-                    {
-                      currencyCode: "USD",
-                      amount: 67.89,
+                      currenciesWithoutUsdAmount: [],
+                      currencyTotals: [
+                        {
+                          currencyCode: "USD",
+                          amount: 123.45,
+                          cellsWithoutAmount: 0,
+                        },
+                      ],
+                    }
+                  : {
+                      amountUsd: null,
                       cellsWithoutAmount: 0,
+                      currenciesWithoutUsdAmount: [],
+                      currencyTotals: [],
                     },
-                  ],
-                }
-              : {
-                  amountUsd: null,
-                  cellsWithoutAmount: 0,
-                  currenciesWithoutUsdAmount: [],
-                  currencyTotals: [],
-                },
-            seats: { status: "awaiting_data" },
-            series:
-              harness.series ??
-              (harness.lanesReport
-                ? [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }]
-                : []),
-            windowDays: 30,
-          },
+                gateway: harness.lanesReport
+                  ? {
+                      amountUsd: 67.89,
+                      cellsWithoutAmount: 0,
+                      currenciesWithoutUsdAmount: [],
+                      currencyTotals: [
+                        {
+                          currencyCode: "USD",
+                          amount: 67.89,
+                          cellsWithoutAmount: 0,
+                        },
+                      ],
+                    }
+                  : {
+                      amountUsd: null,
+                      cellsWithoutAmount: 0,
+                      currenciesWithoutUsdAmount: [],
+                      currencyTotals: [],
+                    },
+                seats: { status: "awaiting_data" },
+                series:
+                  harness.series ??
+                  (harness.lanesReport
+                    ? [
+                        {
+                          day: "2026-08-01",
+                          billedUsd: 123.45,
+                          gatewayUsd: 67.89,
+                        },
+                      ]
+                    : []),
+                windowDays: 30,
+              }
+            : undefined,
           isLoading: false,
           isError: false,
         }),
@@ -246,6 +266,7 @@ beforeEach(() => {
   harness.modelSpend = undefined;
   harness.modelSpendFails = false;
   harness.series = undefined;
+  harness.summaryAnswered = true;
 });
 
 afterEach(() => cleanup());
@@ -885,7 +906,7 @@ describe("the cost breakdown panels", () => {
    * store it read", and "Adoption counts the people of the whole
    * organization".
    */
-  describe("the token figures", () => {
+  describe("given the panels that lead with a token count", () => {
     /** Every panel card currently on the screen. */
     const allPanels = () =>
       Array.from(
@@ -972,6 +993,34 @@ describe("the cost breakdown panels", () => {
       });
     });
 
+    describe("given the summary read has not answered", () => {
+      beforeEach(() => {
+        harness.summaryAnswered = false;
+      });
+
+      /** @scenario "Tokens over time says nothing about a window nobody read" */
+      it("states what would fill the panel rather than reporting an empty window", () => {
+        // The panel folds the summary's series, and an unanswered read hands
+        // it null. Collapsing that null into an empty array — `tokenPoints ??
+        // []` — makes the panel print "Nothing in this window yet.", which is
+        // a finding about a window nothing measured.
+        renderScreen();
+
+        const tokens = panelHolding("Tokens over time");
+        expect(
+          within(tokens).queryByText("Nothing in this window yet."),
+        ).not.toBeInTheDocument();
+        expect(
+          within(tokens).getByText(
+            "How many tokens were spent, period by period.",
+          ),
+        ).toBeInTheDocument();
+        expect(
+          within(tokens).getByText("Fills from traffic the gateway serves."),
+        ).toBeInTheDocument();
+      });
+    });
+
     describe("given a window whose every request was metered in audio duration alone", () => {
       beforeEach(() => {
         // Speech is billed by duration, not by tokens. `AudioMS` is one of the
@@ -1046,7 +1095,7 @@ describe("the cost breakdown panels", () => {
             departmentName: "Engineering",
             spendUsd: "310.50",
             tokens: 4_100_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
         harness.activity.spendByUser = [
@@ -1055,7 +1104,7 @@ describe("the cost breakdown panels", () => {
             spendUsd: "200.00",
             requests: 90,
             tokens: 2_600_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
       });
@@ -1123,7 +1172,7 @@ describe("the cost breakdown panels", () => {
             spendUsd: "310.50",
             // Both of the organization's projects, added up by the read.
             tokens: 4_100_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
 
@@ -1147,14 +1196,14 @@ describe("the cost breakdown panels", () => {
             departmentName: "Legal",
             spendUsd: "0",
             tokens: 5_000_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
           {
             departmentId: "dep-metered",
             departmentName: "Engineering",
             spendUsd: "400.00",
             tokens: 100_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
 
@@ -1182,14 +1231,14 @@ describe("the cost breakdown panels", () => {
             departmentName: "Engineering",
             spendUsd: "310.50",
             tokens: 1_000_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
           {
             departmentId: "dep-unmeasured",
             departmentName: "Support",
             spendUsd: "120.25",
             tokens: null,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
 
@@ -1214,14 +1263,14 @@ describe("the cost breakdown panels", () => {
             departmentName: "Legal",
             spendUsd: "0",
             tokens: 5_000_000,
-            tokensEstimated: true,
+            hasEstimatedTokens: true,
           },
           {
             departmentId: "dep-reported",
             departmentName: "Engineering",
             spendUsd: "400.00",
             tokens: 1_000_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
 
@@ -1249,14 +1298,14 @@ describe("the cost breakdown panels", () => {
             departmentName: "Engineering",
             spendUsd: "310.50",
             tokens: 4_100_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
           {
             departmentId: "dep-2",
             departmentName: "Support",
             spendUsd: "120.25",
             tokens: 900_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
 
@@ -1288,14 +1337,14 @@ describe("the cost breakdown panels", () => {
             spendUsd: "500.00",
             requests: 120,
             tokens: 100_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
           {
             actor: "bob@acme.test",
             spendUsd: "10.00",
             requests: 40,
             tokens: 9_000_000,
-            tokensEstimated: false,
+            hasEstimatedTokens: false,
           },
         ];
       });

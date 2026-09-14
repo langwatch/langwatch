@@ -177,7 +177,7 @@ export function rankBarGeometry(rows: RankRow[]): RankBar[] {
   // bars against it would draw every one of them against a number nobody
   // measured.
   const blank = (row: RankRow) =>
-    row.unpriced === true || row.unmeasured === true;
+    row.unpriced === true || row.isUnmeasured === true;
   const scale = rows.reduce(
     (max, row) => (blank(row) ? max : Math.max(max, Math.abs(row.value))),
     0,
@@ -237,7 +237,7 @@ function RankBarCell({ row }: { row: RankBar }) {
 function RankFigure({
   row,
   format,
-  wide = false,
+  isWide = false,
 }: {
   row: RankBar;
   format: (value: number) => string;
@@ -247,12 +247,12 @@ function RankFigure({
    * hold "4.1m tokens", and a figure that wraps mid-word is worse than a
    * label that truncates.
    */
-  wide?: boolean;
+  isWide?: boolean;
 }) {
   return (
     <Text
-      flex={wide ? "0 0 auto" : "0 0 18%"}
-      whiteSpace={wide ? "nowrap" : undefined}
+      flex={isWide ? "0 0 auto" : "0 0 18%"}
+      whiteSpace={isWide ? "nowrap" : undefined}
       textAlign="right"
       fontVariantNumeric="tabular-nums"
       // The figure a reader compares rows by, named so a test can assert on
@@ -264,8 +264,8 @@ function RankFigure({
       // alone cannot tell a test which of the two things it means, and the
       // reason is what a reader is owed here.
       data-unpriced={row.unpriced ? "true" : undefined}
-      data-unmeasured={row.unmeasured ? "true" : undefined}
-      color={row.unpriced || row.unmeasured ? "fg.muted" : undefined}
+      data-unmeasured={row.isUnmeasured ? "true" : undefined}
+      color={row.unpriced || row.isUnmeasured ? "fg.muted" : undefined}
       // The word the dash stands for, since the column is too narrow to print
       // it. Same sentence the spender panel uses for the same withholding, so
       // the two panels do not explain it differently.
@@ -295,7 +295,7 @@ function rankLeadText({
   row: RankBar;
   format: (value: number) => string;
 }): string {
-  if (row.unmeasured) return RANK_UNMEASURED_LABEL;
+  if (row.isUnmeasured) return RANK_UNMEASURED_LABEL;
   if (row.unpriced) return "—";
   return format(row.value);
 }
@@ -346,8 +346,8 @@ export function CostRankList({
         [...(rows ?? [])]
           .sort(
             (a, b) =>
-              Number(a.unpriced === true || a.unmeasured === true) -
-                Number(b.unpriced === true || b.unmeasured === true) ||
+              Number(a.unpriced === true || a.isUnmeasured === true) -
+                Number(b.unpriced === true || b.isUnmeasured === true) ||
               b.value - a.value,
           )
           .slice(0, maxRows),
@@ -357,7 +357,7 @@ export function CostRankList({
   // One shape for the whole list, not per row: a panel whose rows disagreed
   // on their height would rank figures a reader has to re-find on every line.
   const twoLine = shown.some(
-    (row) => row.secondary !== undefined || row.unmeasured === true,
+    (row) => row.secondary !== undefined || row.isUnmeasured === true,
   );
 
   if (rows === null)
@@ -377,7 +377,7 @@ export function CostRankList({
               <Text flex="1" minWidth={0} truncate title={row.label}>
                 {row.label}
               </Text>
-              <RankFigure row={row} format={format} wide />
+              <RankFigure row={row} format={format} isWide />
             </HStack>
             <HStack gap={3}>
               <RankBarCell row={row} />
@@ -1164,7 +1164,13 @@ export function CostLine({
   interval,
   empty,
 }: {
-  points: Array<{ day: string; value: number }>;
+  /**
+   * Null is a read that never answered; empty is one that found nothing. The
+   * two are kept apart here for the reason `EmptyPanel` gives: collapsing an
+   * unanswered read into an empty array makes the panel report "nothing in
+   * this window yet" about a window nobody measured.
+   */
+  points: Array<{ day: string; value: number }> | null;
   height?: string;
   format?: (value: number) => string;
   /** The bucket width in view, which the time axis is ticked by. */
@@ -1172,6 +1178,8 @@ export function CostLine({
   /** This panel's own empty state. See `costPanelEmpty`. */
   empty?: (unanswered: boolean) => ReactNode;
 }) {
+  if (points === null)
+    return <EmptyPanel height={height} unanswered empty={empty} />;
   if (points.length === 0)
     return <EmptyPanel height={height} unanswered={false} empty={empty} />;
 

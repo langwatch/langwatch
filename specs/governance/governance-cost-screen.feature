@@ -554,6 +554,24 @@ Feature: One cost screen, three honest lanes
     And the screen does not say nothing was recorded
 
   @integration
+  Scenario: A request priced at zero whose only tokens were audio carries no amount
+    # The separately rated modalities are stored in their own columns, taken
+    # out of the text counts. A speech or vision request priced at zero holds
+    # nothing in the text columns, so a count that only reads those calls it a
+    # request that consumed nothing and the day reports a measured zero where
+    # the cost is in fact unknown.
+    Given a charged gateway request priced at zero whose only tokens were audio
+    When the metered lane is read
+    Then that request is counted among the requests carrying no dollar amount
+    And the day reports no priced request
+
+  @unit
+  Scenario: The unpriced count reads the same tokens the metered token figure counts
+    Given the metered read's counts of requests carrying no dollar amount
+    When the tokens each of them looks at are compared
+    Then every token the metered figure counts is one the unpriced count looks for
+
+  @integration
   Scenario: A failed gateway ledger read never renders the metered lane as zero
     # The ledger read failing while the rollup read succeeds still rejects
     # the whole summary, per the rule at the top of the service.
@@ -1671,6 +1689,17 @@ Feature: One cost screen, three honest lanes
       When a permitted viewer opens the cost screen
       Then the tokens-over-time panel draws the tokens those requests used, period by period
       And it does not say nothing has been recorded in this window
+
+    @integration
+    Scenario: Tokens over time says nothing about a window nobody read
+      Given the cost summary read has not answered
+      When a permitted viewer opens the cost screen
+      Then the tokens-over-time panel names what it shows and what would fill it
+      And it does not say nothing has been recorded in this window
+      # The two blank states are not the same claim. A read that answered with
+      # no days measured the window; a read still in flight measured nothing,
+      # and a panel that reports "nothing in this window yet" from that state
+      # states a finding the screen does not have.
 
     @integration
     Scenario: Every token figure names the store it was counted in

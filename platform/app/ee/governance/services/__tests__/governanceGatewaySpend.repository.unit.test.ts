@@ -106,6 +106,31 @@ function meteredTokenExpression(client: {
   );
 }
 
+/**
+ * The expression behind the count of requests carrying no dollar amount: the
+ * outer SELECT item whose alias names it.
+ *
+ * Returns "" when the read states no such count, which the rule below asserts
+ * against first — a rule about which columns an expression names proves
+ * nothing against an expression that does not exist.
+ */
+function unpricedRequestExpression(client: {
+  query: ReturnType<typeof vi.fn>;
+}): string {
+  return (
+    outerSelectItems(client).find((item) =>
+      /\bAS\s+RequestsWithoutAmount\b/.test(item),
+    ) ?? ""
+  );
+}
+
+/** The `RequestTokens*` columns an expression names, deduplicated. */
+function tokenColumnsNamed(expression: string): string[] {
+  return [
+    ...new Set(expression.match(/\bRequestTokens[A-Za-z0-9]*\b/g) ?? []),
+  ].sort();
+}
+
 const WINDOW = {
   tenantIds: ["proj_a", "proj_b"],
   fromDay: "2026-08-01",
@@ -465,6 +490,25 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
       expect(expression).not.toMatch(/CharsInput/);
       expect(expression).not.toMatch(/AudioMS/);
       expect(expression).not.toMatch(/ImageCount/);
+    });
+
+    /** @scenario "The unpriced count reads the same tokens the metered token figure counts" */
+    it("looks for every one of those tokens when deciding a request is unpriced", async () => {
+      const { client, repo } = repositoryOver([]);
+      await repo.sumDaysForOrganizationProjects(WINDOW);
+
+      const total = tokenColumnsNamed(meteredTokenExpression(client));
+      const unpriced = tokenColumnsNamed(unpricedRequestExpression(client));
+      // Neither rule means anything against an expression that does not exist.
+      expect(total.length).toBeGreaterThan(0);
+      expect(unpriced.length).toBeGreaterThan(0);
+
+      // A charged request priced at zero is "no dollar amount" only if it
+      // consumed tokens, and the tokens it consumed are the ones the figure
+      // beside it counts. Text-only columns in the presence test would have
+      // called an audio-only or image-only request one that consumed nothing,
+      // and the day would report a measured zero for a cost nobody knows.
+      expect(total.filter((column) => !unpriced.includes(column))).toEqual([]);
     });
   });
 });

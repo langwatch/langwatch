@@ -46,7 +46,7 @@ export interface RankRow {
    * list still LISTS such a row: it spent money, and dropping it would report
    * a smaller organization than the one that exists.
    */
-  unmeasured?: boolean;
+  isUnmeasured?: boolean;
   /**
    * A second line beneath the lead figure — on the token panels, the dollars
    * and what they cover.

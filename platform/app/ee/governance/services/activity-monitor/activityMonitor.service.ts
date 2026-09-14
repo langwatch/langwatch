@@ -109,7 +109,7 @@ export interface SpendByUserRow {
    */
   tokens: number | null;
   /** Whether any counted trace of theirs was estimated rather than reported. */
-  tokensEstimated: boolean;
+  hasEstimatedTokens: boolean;
 }
 
 export interface SpendByTeamRow {
@@ -164,7 +164,7 @@ export interface SpendByDepartmentRow {
    * rather than reported by the provider. An estimate printed beside a
    * reported count with nothing to tell them apart reads as one measurement.
    */
-  tokensEstimated: boolean;
+  hasEstimatedTokens: boolean;
 }
 
 export interface IngestionSourceHealthRow {
@@ -623,7 +623,7 @@ export class ActivityMonitorService {
       mostUsedTarget:
         r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
       tokens: r.tokensStr === null ? null : Number(r.tokensStr),
-      tokensEstimated: r.tokensEstimatedStr === "1",
+      hasEstimatedTokens: r.tokensEstimatedStr === "1",
     }));
   }
 
@@ -1200,17 +1200,21 @@ function addDepartmentTokens({
   prior,
   row,
 }: {
-  prior: { tokens: number | null; tokensEstimated: boolean };
+  prior: { tokens: number | null; hasEstimatedTokens: boolean };
   row: SpendByDepartmentChRow;
-}): { tokens: number | null; tokensEstimated: boolean } {
+}): { tokens: number | null; hasEstimatedTokens: boolean } {
   // Rebuilt rather than returned as-is: the caller spreads this over the
   // accumulator, and handing `prior` straight back would spread its spend and
   // request counters over the ones the caller just advanced.
   if (row.tokensStr === null)
-    return { tokens: prior.tokens, tokensEstimated: prior.tokensEstimated };
+    return {
+      tokens: prior.tokens,
+      hasEstimatedTokens: prior.hasEstimatedTokens,
+    };
   return {
     tokens: (prior.tokens ?? 0) + Number(row.tokensStr),
-    tokensEstimated: prior.tokensEstimated || row.tokensEstimatedStr === "1",
+    hasEstimatedTokens:
+      prior.hasEstimatedTokens || row.tokensEstimatedStr === "1",
   };
 }
 
@@ -1235,7 +1239,7 @@ function assembleDepartmentRows({
       lastActivityMs: number;
       /** Null until a contributing row carries a count. See the row type. */
       tokens: number | null;
-      tokensEstimated: boolean;
+      hasEstimatedTokens: boolean;
     }
   >();
   for (const r of rows) {
@@ -1256,7 +1260,7 @@ function assembleDepartmentRows({
       requestCount: 0,
       lastActivityMs: 0,
       tokens: null,
-      tokensEstimated: false,
+      hasEstimatedTokens: false,
     };
     acc.set(key, {
       spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
@@ -1282,7 +1286,7 @@ function assembleDepartmentRows({
       lastActivityIso:
         v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
       tokens: v.tokens,
-      tokensEstimated: v.tokensEstimated,
+      hasEstimatedTokens: v.hasEstimatedTokens,
     }))
     .sort((a, b) => {
       const aNano = usdToNanoUsd(a.spendUsd);
