@@ -20,23 +20,7 @@ import {
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection.ts";
 
-/**
- * Contributes one log record's facts to its session, stamping row-bearing
- * records with the session's declared working context on the way through.
- *
- * The stamp happens HERE and nowhere later, because this is the one lane with
- * both per-session ordering and the ability to hold state: contributions are
- * keyed per session and drain in order (see the processing adapter), while the
- * map projection that writes the fact table runs per-event on an unordered
- * queue and must stay pure. Stamping the event data before it is appended also
- * makes replays deterministic — a projection rebuild re-reads the same stamped
- * events.
- *
- * A `session_context` declaration updates the memo; every record that becomes
- * a fact-table row reads it. A record processed before its session ever
- * declared goes through unstamped, which the usage read prices under the
- * legacy whole-session rule.
- */
+/** Log facts contribution with stamped context; stamping exclusive to this lane. */
 export class EventingContributeLogFactsAdapter implements CommandHandler<
   Command<ContributeLogFactsCommandData>,
   LogFactsContributedEvent
@@ -79,16 +63,7 @@ export class EventingContributeLogFactsAdapter implements CommandHandler<
     ];
   }
 
-  /**
-   * The contribution with the working context applied: a declaration writes
-   * the memo, a row-bearing record reads it onto the event, and everything
-   * else (hooks, plugin loads, body events) passes through untouched.
-   *
-   * A memo write is idempotent, so a retried command re-writes the same value.
-   * Neither a failed read nor a failed write fails the contribution: both
-   * degrade to an unstamped row, because attribution is a refinement of the
-   * record, not part of it.
-   */
+  /** Apply working context; memo write idempotent, failures degrade to unstamped row. */
   private async stamped(
     data: ContributeLogFactsCommandData,
   ): Promise<ContributeLogFactsCommandData> {

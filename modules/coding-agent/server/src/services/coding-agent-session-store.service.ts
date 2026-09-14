@@ -25,22 +25,7 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
   );
 }
 
-/**
- * FoldProjectionStore adapter for the coding-agent session fold (ADR-056).
- *
- * Unlike PR #5708's trace-keyed store there is no "is this a coding agent"
- * gate here: the dispatchers on the source pipelines are the gate, so every
- * event this fold sees is a coding-agent contribution and every folded state
- * is a session worth a row — including a metric-only session, which has zero
- * model calls and zero tool runs and must still appear
- * (specs/coding-agent/session-aggregate.feature).
- *
- * Read-back (ADR-066): `get`/`getWithApplied` decode the last committed row
- * (typed read-back columns, migrations 00053/00054) so the delivery path does
- * not refold from `event_log`; the applied-event-id watermark rides next to the
- * row so a cold-cache retry still dedups a redelivered batch. Decoding is gated
- * on whether the row actually carries those columns — see `getWithApplied`.
- */
+/** Store adapter; no agent gate (dispatchers gate upstream), read-back decoding per ADR-066. */
 export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionStore<CodingAgentSessionState> {
   private constructor(
     private readonly persistence: CodingAgentProjectionPersistence,
@@ -169,17 +154,7 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   }
 }
 
-/**
- * A session state is worth a row once the session has said something: a
- * prompt, a model or tool call, tokens, cost, a name, or the repository it
- * works in. An agent that starts and dies before its first prompt still
- * emits lifecycle and error telemetry, and folding that minted untitled
- * rows with a dash in every column — twelve of them in one boot when a
- * fleet's agents all resumed against an expired credential. The canonical
- * records stay stored either way; the contributions before the first real
- * signal are the price of not storing the noise, and they amount to
- * lifecycle timing nothing reads.
- */
+/** Session worth a row once it signals: prompt, call, tokens, cost, name, or repo. */
 function hasPersistableSignal(state: CodingAgentSessionState): boolean {
   return (
     state.prompts > 0 ||

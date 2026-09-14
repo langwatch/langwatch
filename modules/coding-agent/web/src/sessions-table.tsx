@@ -22,28 +22,7 @@ import { SessionRow } from "./session-row.tsx";
 import { SessionsToolbar } from "./sessions-toolbar.tsx";
 import { useTerminalReplay } from "./use-terminal-replay.ts";
 
-/**
- * Every coding-agent session of the last quarter, and what it cost in context
- * rather than only in tokens.
- *
- * The personal usage card answers "what did I spend this month" in four
- * numbers; this table answers "on what". One row per session, named by the
- * title its agent generated, carrying the economics that decide whether a
- * session was cheap or ruinous (the peak context it carried, how often it
- * compacted, how often it rebuilt its cache, how long it worked against how
- * long it waited on its human) and the pull requests it drove.
- *
- * The list opens on the session that moved most recently and on all time,
- * because a window would hide the long-lived ones. The search box and the
- * period narrow it from there, every column sorts, and a third click on a
- * column hands the order back.
- *
- * Choosing a row replays the session in the terminal view, in place: the
- * drawer opens over the table, so leaving it puts the reader back exactly
- * where they were rather than on a page they have to narrow again.
- *
- * Spec: specs/coding-agent/sessions-screen.feature.
- */
+/** Sessions table (last quarter); answers "on what" for spend. Replays in terminal. */
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 25;

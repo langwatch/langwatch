@@ -43,17 +43,7 @@ function ariaSortFor(direction: "asc" | "desc" | null) {
   return direction === "asc" ? ("ascending" as const) : ("descending" as const);
 }
 
-/**
- * A heading that sorts, drawn the way the trace table draws one: the column in
- * force reads as the one in charge, with a tinted band, a darker label and a
- * chevron pointing the way it is ordered. Every other sortable column keeps a
- * faint chevron so a reader can tell at a glance which headings do something,
- * without hovering each one to find out.
- *
- * `aria-sort` on the header says the same thing to a reader who cannot see the
- * chevron: without it someone could sort the table by keyboard and have no way
- * to learn that they had.
- */
+/** Sortable heading; chevrons show active/inactive, aria-sort adds a11y. */
 export function SortableColumnHeader<Column extends string>({
   label,
   column,
