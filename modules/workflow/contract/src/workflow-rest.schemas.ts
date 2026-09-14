@@ -1,11 +1,5 @@
 /**
- * Every shape the workflow module's four REST families put on the wire: the
- * `/api/workflows` collection, the three synchronous run addresses, the
- * Studio editor's two literal doors and the deployment's own cron sweep.
- *
- * They live in the contract rather than beside a transport because a wire
- * shape is a published promise: a schema only the server can see is one no
- * other reader of this feature can hold it to.
+ * Wire schemas for workflow module REST families — published promises enforced in contract.
  */
 import { z } from "zod";
 

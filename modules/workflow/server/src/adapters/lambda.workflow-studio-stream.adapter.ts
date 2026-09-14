@@ -1,14 +1,5 @@
 /**
- * The engine's streaming studio route, reached on the project's OWN Lambda.
- *
- * This is the half the platform app wrapped its HTTP call in and that the
- * hostname-only adapter deliberately left behind: a per-project function
- * resolved by ARN, an oversized body parked in object storage rather than
- * posted over Lambda's 6 MiB invoke cap, and the Lambda Web Adapter's
- * RESPONSE_STREAM prelude stripped before the first SSE frame reaches Studio.
- *
- * Cancelling the reader aborts the invocation: a viewer who walks away must
- * stop the run, not leave it billing until the graph ends on its own.
+ * Engine's streaming studio route on project's own Lambda; uses object storage for large payloads.
  */
 import { createLogger } from "@langwatch/observability";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";

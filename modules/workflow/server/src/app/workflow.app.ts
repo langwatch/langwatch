@@ -293,32 +293,8 @@ export interface WorkflowInfrastructure {
 }
 
 /**
- * What the process still hands this module directly, now that `evaluators`
- * (an `EvaluatorApi` dependency), `studioDsl` (built over the model-provider
- * dependency), `agentMappings` (built over the agent dependency),
- * `workflowRows` (built over this module's own `workflowRepositories`
- * registry), `workflows` (the `WorkflowService`, built over this module's own
- * repositories, the `datasets` dependency, an nlp runtime resolved from
- * config, and a nanoid id generator - the same shape `apps/worker`'s
- * `createWorkerEvaluationWorkflows` composed by hand) and `datasets` (a
- * `DatasetApi` dependency, no longer read off the host bag) are no longer
+ * What the process hands the module; some dependencies now module-supplied instead of
  * host-supplied.
- *
- * This is still a bespoke bag rather than `MembersRead<typeof
- * WorkflowApp.reads>` - `lineage`, `publications`, `permissions`,
- * `evaluations`, `nlpLambda*` and the rest were added to
- * {@link WorkflowInfrastructure} after `apps/api/src/features/workflow/
- * workflow.composition.ts` (the deleted authority for this conversion) was
- * written, so there is no precedented "how" to build them from a `reads()`
- * member or a peer dependency yet. Boot's automatic `membersFor(members,
- * app.reads)` only ever produces `{prisma, encryption}` for this app and casts
- * the rest away (`application.ts`'s `membersFor(...) as Members`), so a
- * process that wants the fields below MUST still construct `WorkflowApp`
- * directly - exactly what `apps/worker` does today - handing this bag in by
- * hand rather than through `createApp().withModules([workflowServer]).boot()`.
- * Folding them into `reads()`/`dependencies` too is real, separate work:
- * several (`permissions`, `lineage`, `evaluations`) read or write project data
- * with no existing adapter in this package to convert from.
  */
 export type WorkflowHostMembers = Omit<
   WorkflowInfrastructure,
@@ -1144,18 +1120,7 @@ export type WorkflowStudioStreamInput = {
 };
 
 /**
- * The engine's streaming studio route, as bytes.
- *
- * Separate from {@link WorkflowNlpRuntime} because it is a different
- * conversation rather than a different address: `execute_sync` answers once
- * with a result, and `execute` answers continuously until it says `done`. A
- * process that can do the first cannot necessarily do the second — the
- * platform app reached the streaming route through per-project Lambda
- * routing — so a deployment declares them apart.
- *
- * The port hands back the raw reader rather than decoded events: the SSE
- * framing and the abort protocol are the same on any address, and stating them
- * once in a service is what keeps a second adapter from re-deriving them.
+ * Engine's streaming studio route; separate from synchronous route because it streams continuously.
  */
 export interface WorkflowStudioStream {
   open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>>;
@@ -1192,13 +1157,8 @@ export interface WorkflowLlmParameters {
 }
 
 /**
- * Application-owned preparation of a Studio graph before it is persisted.
- *
- * Two steps the host owns rather than the feature: editor-only local node
- * configuration is folded into the execution DSL, and every LLM node without a
- * model is filled in from the project's providers. The second reaches the
- * host's model cascade and its registry flagship, so the whole preparation is
- * one port rather than a rule split across the boundary.
+ * Application-owned preparation of Studio graph before persistence; folds editor config and
+ * fills LLM nodes.
  */
 export interface WorkflowStudioDsl {
   prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;

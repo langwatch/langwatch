@@ -1,15 +1,5 @@
 /**
- * The engine's STREAMING studio route, reached over HTTP.
- *
- * This is the wire half of the platform app's `studioBackendPostEvent`: one
- * POST to `/go/studio/execute` tagged `X-LangWatch-Origin`, whose response body
- * is a server-sent event stream the caller reads until the engine says `done`.
- *
- * What did NOT come with it is the per-project Lambda routing and the S3
- * payload staging the platform app wrapped it in. That machinery is the
- * deployment's rather than the feature's, and a process that has only a service
- * URL is a supported shape rather than a degraded one — it is what every
- * self-hosted install and every local stack already runs.
+ * Engine's streaming studio route; HTTP POST with SSE stream, no per-project Lambda routing.
  */
 import { type WorkflowStudioStream, type WorkflowStudioStreamInput } from "../app/workflow.app.ts";
 

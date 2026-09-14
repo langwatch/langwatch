@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- *
  * @see specs/workflows/workflow-node-owned-llm.feature
- *
- * spec_version 1.4 → 1.5: the workflow-level default_llm is removed —
- * every LLM node owns its config. The migration folds the old default
- * into any llm parameter that has no model of its own and drops the
- * field, so legacy persisted versions keep running identically.
+ * Spec 1.4 → 1.5: workflow default_llm moves to per-node ownership.
  */
 import { describe, expect, it } from "vitest";
 

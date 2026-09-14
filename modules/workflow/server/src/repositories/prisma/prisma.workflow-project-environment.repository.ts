@@ -1,11 +1,5 @@
 /**
- * The project rows a Studio run's environment is built from.
- *
- * Moved from the platform app's
- * `runtime/app/features/workflow-studio-enrichment.adapter.ts`: the two reads
- * and their selections are unchanged, because what a running graph sees in its
- * environment is customer-visible behaviour. The decryption pass moved above
- * this seam - a repository reads rows and never holds a cipher.
+ * Project rows for Studio run environment; moved from platform app with unchanged selections.
  */
 import {
   WorkflowProjectEnvironmentRepository,

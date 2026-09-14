@@ -1,16 +1,5 @@
 /**
- * Preparing a Studio graph before any version of it is written.
- *
- * Two steps, moved together from the platform app because they were always one
- * decision: editor-only local node configuration is folded into the execution
- * DSL (`runtime/app/features/workflow.ts`), and every LLM node arriving
- * without a model is filled in from the project's own cascade
- * (`server/workflows/materializeNodeLlmConfigs.ts`).
- *
- * The second is a PERSISTENCE chokepoint rather than a convenience: there is
- * no workflow-level default at execution time, so a graph written with a
- * modelless LLM node is a graph that fails at run time with nothing to point
- * at. Filling it in here is what guarantees no persisted DSL can do that.
+ * Prepares a Studio graph: folds editor-only config into DSL and fills modelless LLM nodes.
  */
 import {
   ModelNotConfiguredError,
@@ -25,13 +14,7 @@ import {
 import { type WorkflowStudioDsl } from "../app/workflow.app.ts";
 
 /**
- * The terminal fallback model, the registry flagship.
- *
- * The same value the platform app's `DEFAULT_MODEL` resolved to, derived from
- * the same registry call rather than copied as a literal: seeding model
- * defaults must never be a precondition for creating a runnable workflow, and
- * a fresh install with zero configuration still gets the newest plain OpenAI
- * chat flagship.
+ * Terminal fallback model (registry flagship); derived from registry call, not hardcoded.
  */
 const REGISTRY_FLAGSHIP_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
@@ -71,15 +54,7 @@ export class ModelProviderWorkflowStudioDslAdapter implements WorkflowStudioDsl 
   }
 
   /**
-   * Fills every modelless LLM parameter, in this order:
-   *
-   *   1. the payload's legacy `default_llm` (old clients still send it) — the
-   *      same folding the spec_version 1.5 migration applies on read;
-   *   2. the project's cascade-resolved `workflows.create_default` model;
-   *   3. the registry flagship.
-   *
-   * The legacy field is dropped afterwards. Mutates the graph in place and
-   * touches the model providers only when there is a gap to fill.
+   * Fills modelless LLM parameters from legacy default, project cascade, or registry flagship.
    */
   private async materialiseNodeLlmConfigs(input: {
     projectId: string;

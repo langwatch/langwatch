@@ -1,6 +1,5 @@
 /**
- * Moved here from `@langwatch/workflow-web/surfaces/platform-defaults`: the prefix a KSUID-backed id is
- * minted with, per resource.
+ * KSUID resource prefixes (moved from @langwatch/workflow-web/surfaces/platform-defaults).
  */
 export const KSUID_RESOURCES = {
   BATCH_RESULT: "batchresult",

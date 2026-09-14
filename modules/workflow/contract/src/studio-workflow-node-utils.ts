@@ -100,18 +100,8 @@ export const getEntryInputs = (
 };
 
 /**
- * Returns the set of entry-node fields that should appear on the scenario
- * mapping surface — one row per declared entry output, with the optional flag
- * set when there is at least one downstream edge AND every such edge targets
- * an evaluator node.
- *
- * Unwired declared outputs (no downstream edges at all) are included without
- * the optional flag: they are real workflow inputs that simply have not been
- * connected yet.
- *
- * Falls back to `getEntryInputs` when the entry node is absent or declares no
- * outputs — fallback for legacy DSLs without a declared entry node, should be
- * unreachable for current schemas.
+ * Returns entry-node fields for scenario mapping; optional flag for evaluator-only
+ * connections.
  */
 export const getMappingSurfaceInputs = (
   edges: StudioEdge[],
@@ -129,7 +119,7 @@ export const getMappingSurfaceInputs = (
     : [];
 
   if (declaredOutputs.length === 0) {
-    // fallback for legacy DSLs without a declared entry node — should be unreachable for current schemas
+    // Fallback for legacy DSLs without entry node.
     return getEntryInputs(edges, nodes).map((edge) => ({
       identifier: edge.sourceHandle?.split(".")[1] ?? "",
       type: "str" as Field["type"],

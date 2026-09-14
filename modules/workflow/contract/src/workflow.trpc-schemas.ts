@@ -129,13 +129,7 @@ export type WorkflowApiGetByIdOutput = WorkflowWithVersion;
 export type WorkflowApiGetVersionsOutput = WorkflowVersionHistoryEntry[];
 
 /**
- * The five writes the studio makes, answered with the row each one wrote.
- *
- * Every one of them is a contract DTO already — `WorkflowVersion` and
- * `Workflow` are the zod-inferred shapes this package declares — so stating
- * the outputs here restates nothing and leaks no Prisma row: `saveVersion`,
- * `restoreVersion` and `publish` on {@link WorkflowService} return exactly
- * these.
+ * Five studio writes answered with the rows they wrote (zod-inferred DTOs, no Prisma leaks).
  */
 export type WorkflowApiAutosaveOutput = WorkflowVersion;
 export type WorkflowApiCommitVersionOutput = WorkflowVersion;

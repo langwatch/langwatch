@@ -1,11 +1,6 @@
 /**
- * The numbers on an endpoint's health card.
- *
- * A customer reads these to decide whether their receiver is healthy, so each
- * one has to mean what it says. The two that can quietly lie are the rate and
- * the percentile: a success rate over zero attempts is not 100%, it is
- * unknown, and a p95 taken from an unsorted list is whichever sample happened
- * to land in that slot.
+ * Endpoint health metrics must accurately represent receiver health; success rates over
+ * zero attempts are unknown, and p95 from unsorted lists is arbitrary.
  */
 
 import { describe, expect, it } from "vitest";

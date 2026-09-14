@@ -133,29 +133,13 @@ export const componentTypeSchema = z.enum([
 export type ComponentType = z.infer<typeof componentTypeSchema>;
 
 /**
- * The per-node execution state the engine streams back.
- *
- * Written as a type alias, not an interface, so it carries the implicit index
- * signature every other graph value in this file has: `executionStateSchema`
- * is a `looseObject` and keeps whatever a newer engine sends, so the TypeScript
- * shape has to stay open the same way or a `StudioWorkflow` cannot be handed
- * back to the wire schema it was parsed from.
+ * Per-node execution state; stays open with looseObject for engine compatibility.
  */
 export type ExecutionState = {
   status: ExecutionStatus;
   trace_id?: string;
   span_id?: string;
-  /**
-   * The raw engineer-facing failure message — it can name a URL or a Go net
-   * error, so it is never a headline.
-   *
-   * The studio presents from `error_type` via the registry; this string stays
-   * in the node properties panel and the logs, where an engineer looks for it
-   * (see ADR-045 and `utils/executionStateError`). Where there is no code — a
-   * client-side timeout, the stream's top-level error frame, the optimization
-   * runner — the customer gets the generic unknown state plus the trace id,
-   * not this, because nothing has vetted what is in it.
-   */
+  /** Raw engineer-facing failure message; customer sees generic "unknown" instead. */
   error?: string;
   /**
    * Stable code for the failure — the nlpgo engine's `NodeError.Type`
@@ -230,14 +214,7 @@ export type Signature = BaseComponent & {
   /** Specific version reference */
   promptVersionId?: string;
   /**
-   * Set to `true` when the dispatched config diverges from the saved
-   * version (e.g. user edited inline via localPromptConfig without
-   * persisting). Stamped onto the Prompt.compile span as
-   * `langwatch.prompt.draft = true` so the trace-UI can surface
-   * "Open <handle>:<version> (unsaved edits)" while keeping the base
-   * id / handle / versionMetadata reference for resume. Omitted (not
-   * `false`) on saved-version executions, matching python-sdk's
-   * `_set_attribute_if_not_none` convention.
+   * Set to true when dispatched config diverges from saved version (unsaved edits).
    */
   promptDraft?: boolean;
 };

@@ -3,19 +3,7 @@ import { checkIsEvaluator } from "./studio-workflow-node-utils.ts";
 import type { WorkflowField } from "./workflow.ts";
 
 /**
- * Check if an entry output is connected to at least one non-evaluator node.
- * Only outputs that feed into non-evaluator nodes (LLM, code, etc.) should
- * be included in required field mappings.
- *
- * Outputs that are:
- * - Not connected to anything → excluded (not used by workflow)
- * - Only connected to evaluator nodes → excluded (evaluator-only inputs)
- * - Connected to at least one non-evaluator → included
- *
- * @param outputIdentifier - The identifier of the entry output
- * @param edges - The workflow edges
- * @param nodes - The workflow nodes
- * @returns True if the output is connected to at least one non-evaluator node
+ * Checks if entry output is connected to non-evaluator nodes; used for required field mappings.
  */
 export function isOutputConnectedToNonEvaluator(
   outputIdentifier: string,
@@ -42,16 +30,7 @@ export function isOutputConnectedToNonEvaluator(
 }
 
 /**
- * Extract entry node outputs from a workflow DSL.
- * These represent the fields that can be mapped to trace data when
- * using the workflow as an evaluator.
- *
- * Outputs that only connect to evaluator nodes are excluded since
- * evaluators are optional processing nodes and their inputs don't
- * need to be mapped from trace data.
- *
- * @param workflow - The workflow DSL object
- * @returns Array of field definitions from the entry node outputs
+ * Extracts entry node outputs that can be mapped to trace data; excludes evaluator-only outputs.
  */
 export function getWorkflowEntryOutputs(
   workflow: StudioWorkflow | null | undefined,

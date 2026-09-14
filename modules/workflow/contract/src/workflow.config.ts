@@ -2,15 +2,7 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The AWS account the studio's per-project NLP Lambda functions live in.
- *
- * `LANGWATCH_NLP_LAMBDA_CONFIG` is one JSON document, and it carries the
- * account's own credentials, so it is parsed at the process boundary and the
- * feature stays pure functions over the result. A deployment that named the
- * variable but wrote something unusable is a configuration mistake, not a
- * deployment with no fleet, which is why {@link nlpLambdaFleetSchema} refuses
- * rather than warning: falling back to the shared engine address would run a
- * customer's code somewhere the operator did not put it.
+ * AWS account for per-project NLP Lambda functions; refuses invalid config to ensure correct fleet.
  */
 export const nlpLambdaFleetSchema = z.object({
   AWS_REGION: z.string().min(1),

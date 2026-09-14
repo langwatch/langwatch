@@ -113,7 +113,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       where: { id: input.workflowId, projectId: input.projectId },
       data: { currentVersionId: null, latestVersionId: null },
     });
-    // Version pointers and parentage must be cleared before restrictive foreign keys allow deletion.
+    // Clear version pointers and parentage before deleting (foreign key constraints).
     await this.database.workflowVersion.updateMany({ where, data: { parentId: null } });
     await this.database.workflowVersion.deleteMany({ where });
     await this.database.workflow.delete({
