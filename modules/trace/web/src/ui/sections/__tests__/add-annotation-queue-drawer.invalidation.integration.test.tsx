@@ -1,7 +1,6 @@
 /**
- * A queue nobody can see yet is a queue nobody can send to, so saving one has to refresh every list and badge that reads queues.
  * @vitest-environment jsdom
- * Spec: specs/traces-v2/bulk-actions.feature.
+ * Unseen queue: refresh all lists and badges when saved.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -1,14 +1,5 @@
-/**
- * What `POST /api/trace/search` accepts, and the sentence it refuses with.
- *
- * The vocabulary is the deployment's shared analytics filter input plus this
- * family's own four additive fields, parsed STRICTLY — that endpoint has always
- * rejected an unknown key rather than stripping it, and loosening it would
- * silently accept a typo a caller currently gets told about.
- *
- * Transcribed from the process mount this family used to be composed by, so the
- * body a deployed SDK sends parses exactly as it did there.
- */
+// POST /api/trace/search body; shared analytics filter plus four additive
+// fields, parsed STRICTLY to reject unknown keys as it always has
 import { traceListInputSchema } from "@langwatch/trace-contract";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";

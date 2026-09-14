@@ -38,9 +38,7 @@ describe("useFocusSectionStore", () => {
     describe("when the chip is clicked a second time", () => {
       /** @scenario The focus glow runs a single short pulse so the eye lands without distracting */
       it("bumps the nonce so the observer re-fires the glow + scroll", () => {
-        // Without the nonce bump, a second click during the ~1.5s glow window would set the same {traceId,
-        // section} state and the observer's effect dep array wouldn't trigger again, the operator would feel
-        // like the chip stopped responding.
+        // Nonce bump: second click during glow window re-triggers observer.
         useFocusSectionStore.getState().request({ traceId: "trace-abc", section: "exceptions" });
         const first = useFocusSectionStore.getState().pending!.nonce;
         useFocusSectionStore.getState().request({ traceId: "trace-abc", section: "exceptions" });

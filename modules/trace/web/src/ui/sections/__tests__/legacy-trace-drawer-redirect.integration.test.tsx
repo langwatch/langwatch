@@ -1,12 +1,6 @@
 /**
- * The legacy trace drawer is gone; `drawer.open=traceDetails` in an address has
- * to keep resolving, because links shared before the removal name it and the
- * drawer shell is resolved straight from the URL.
- *
- * Exercises the real `useDrawer` and the real address serialisation — only the
- * router is harnessed, so what is asserted is the navigation the redirect
- * actually performs.
  * @vitest-environment jsdom
+ * Legacy drawer redirect: drawer.open=traceDetails keeps resolving via URL.
  */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

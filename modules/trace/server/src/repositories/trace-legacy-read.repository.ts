@@ -15,7 +15,9 @@ import type {
 } from "@langwatch/trace-contract";
 
 /**
- * Partition-key bound a multi-trace read prunes on: earliest and latest occurrence time (epoch ms) in the requested set. A one-trace caller passes an exact point range (from===to); the store widens it by its own safety margin.
+ * Partition-key bound for multi-trace reads: earliest and latest occurrence
+ * time (epoch ms) in the requested set. A one-trace caller passes an exact
+ * point range (from===to); the store widens it by its own safety margin.
  */
 export interface TraceOccurredAtRange {
   from: number;

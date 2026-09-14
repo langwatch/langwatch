@@ -1,9 +1,5 @@
-/**
- * JSONL serialization for trace export.
- *
- * Summary mode: one JSON line per trace with trace-level fields (no spans).
- * Full mode: one JSON line per trace with complete spans and evaluations arrays.
- */
+// JSONL serialization for trace export; summary mode (trace only) and full mode
+// (spans + evaluations)
 
 import type { LLMSpan, RAGSpan, Span, Trace } from "@langwatch/trace-contract";
 import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
@@ -12,15 +8,8 @@ import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
 // Summary JSONL
 // ---------------------------------------------------------------------------
 
-/**
- * Serialize a single trace to a Summary JSONL line.
- *
- * Includes trace-level fields only. Spans are excluded.
- * Each call produces one line; the caller concatenates lines separated by \n.
- *
- * @param trace - The trace to serialize
- * @returns A single JSON string (no trailing newline)
- */
+// Serialize trace to Summary JSONL line; trace-level fields only, no spans.
+// Caller concatenates lines separated by \n.
 export function serializeTraceToSummaryJson({ trace }: { trace: Trace }): string {
   const obj = {
     trace_id: trace.trace_id,
@@ -48,14 +37,8 @@ export function serializeTraceToSummaryJson({ trace }: { trace: Trace }): string
 // Full JSONL
 // ---------------------------------------------------------------------------
 
-/**
- * Serialize a single trace to a Full JSONL line.
- *
- * Includes the complete trace object with spans array and evaluations array.
- *
- * @param trace - The trace to serialize (should have populated spans)
- * @returns A single JSON string (no trailing newline)
- */
+// Serialize trace to Full JSONL line; includes complete trace with spans and
+// evaluations arrays. Caller concatenates lines separated by \n.
 export function serializeTraceToFullJson({ trace }: { trace: Trace }): string {
   const obj = {
     trace_id: trace.trace_id,

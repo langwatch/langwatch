@@ -1,6 +1,5 @@
-/**
- * The scoped data-privacy content DROP wired into EventingRecordSpanAdapter — runs at this single command choke point, so the emitted SpanReceivedEvent carries the already-dropped span and both the span store and trace-summary fold see no dropped content. Policy is supplied directly (DB-backed resolution has its own tests in @langwatch/data-privacy-server); the real drop logic + real fold run end-to-end.
- */
+// Data-privacy content DROP wired into EventingRecordSpanAdapter; runs at
+// command choke point so SpanReceivedEvent carries already-dropped span
 import { createTenantId, type Command, type TenantId } from "@langwatch/eventing";
 import {
   PRIVACY_DROPPED_MARKER_ATTR,

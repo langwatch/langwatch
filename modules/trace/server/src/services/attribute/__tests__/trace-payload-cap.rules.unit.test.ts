@@ -1,17 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The content-lift cap, and specifically that its default is DERIVED.
- *
- * There were two `capPayloadString`s: this one, whose default comes from
- * `DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES` in `trace-attribute-cap.rules`, and a
- * copy in `payload-cap.rules.ts` that declared its own `256 * 1024`. The three
- * claude-code content-lift sites imported the copy. They agreed on the number,
- * so nothing was miscounted — but tuning the shared constant would have moved
- * the exported path and left those three at the old ceiling.
- *
- * These cases are written against the shared constant rather than against
- * 262144, so they follow it wherever it goes.
+ * Content-lift cap default is DERIVED from shared constant, not hardcoded, so
+ * tests follow it wherever it goes.
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../../rules/trace-payload-cap.rules.ts";

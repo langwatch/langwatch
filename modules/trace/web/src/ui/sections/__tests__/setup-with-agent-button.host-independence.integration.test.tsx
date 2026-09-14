@@ -1,12 +1,6 @@
 /**
- * Regression: `SetupWithAgentButton` is shared by screens that never mount a
- * `TraceHostProvider` (the project home page, scenario suites, simulations  - 
- * see `onboard-agent-pill.tsx`, `run-history-panel.tsx`,
- * `connected-agent-drawers.tsx`). It must read scope through the canonical,
- * host-optional `@langwatch/ui-host` hook rather than trace/web's own
- * `useOrganizationTeamProject`, which requires `useTraceHost` and throws
- * outside a trace screen.
  * @vitest-environment jsdom
+ * SetupWithAgentButton: shared by non-trace screens, uses host-optional hook.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";

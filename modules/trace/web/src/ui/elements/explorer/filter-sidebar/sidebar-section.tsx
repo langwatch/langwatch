@@ -197,9 +197,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
                   // inherits.
                   textAlign="start"
                   _hover={{ color: "fg" }}
-                  // flex+minWidth=0 lets the title claim all the Button's free width before `truncate`
-                  // engages; without flex it shrinks to min-content and ellipsises far too early (e.g.
-                  // "TRACE ATTRIBUT…" at the default 220px rail).
+                  // flex+minWidth=0: title claims width, truncate engages late.
                   flex={1}
                   minWidth={0}
                   truncate
@@ -228,17 +226,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               <Text textStyle="2xs">{valueCount}</Text>
             </Box>
           )}
-          {/* The chevron and search toggle render as siblings of the
-              Collapsible.Trigger (not inside it) so the search button
-              can sit between them without its clicks bubbling through
-              to collapse the section. The chevron is a small button
-              that mirrors the trigger's open state and forwards to
-              the same handler.
-
-              Both occupy a fixed 16px slot — the search slot reserves
-              its width even when the section has no items (no toggle
-              rendered) so the chevron position stays consistent across
-              rows whether or not a search toggle is present. */}
+          {/* Chevron and search toggle as siblings: fixed 16px slots, consistent position. */}
           <Box width="16px" height="16px" flexShrink={0}>
             {searchToggleProps && (
               <chakra.button

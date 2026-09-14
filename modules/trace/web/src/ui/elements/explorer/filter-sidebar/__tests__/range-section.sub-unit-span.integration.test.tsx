@@ -1,7 +1,6 @@
 /**
- * Sub-unit range facets (cost facets are USD values like 0…0.0139) used to mount the slider with the default step of 1, which left the
- * thumbs snapping only to the two endpoints, no intermediate cost filter could be set by dragging.
  * @vitest-environment jsdom
+ * Sub-unit range facets: slider step of 1 snaps to endpoints only; now respects unit.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

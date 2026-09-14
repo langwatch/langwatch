@@ -102,9 +102,8 @@ describe("Dialog backdrop", () => {
     it("references the shared --lw-backdrop-blur CSS variable instead of a hardcoded value", () => {
       renderOpenDialog();
 
-      // This backdrop covers the full viewport behind every dialog in the app (see src/components/ui/dialog.tsx) -- if its blur is ever
-      // hardcoded again instead of routed through --lw-backdrop-blur, reduced-graphics mode would still pay for a full-screen blur on
-      // every dialog open, silently defeating the fix everywhere dialogs are used.
+      // Backdrop blur via --lw-backdrop-blur, not hardcoded (reduced-graphics mode).
+      //
       const backdrop = getBackdrop();
       expect(cssRulesForElement(backdrop)).toContain("--lw-backdrop-blur");
     });

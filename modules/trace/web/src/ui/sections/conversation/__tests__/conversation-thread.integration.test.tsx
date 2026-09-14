@@ -1,21 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * What the shared conversation renderer actually draws.
- *
- * `flattenMessages.unit.test.ts` covers the flattening — which wire shapes
- * become which parts. This covers the half after it: given those parts, what
- * a reader sees. Together they are the path the playground runs, which is
- * `flattenMessages` then `ConversationThread` and nothing in between, so the
- * fixtures here start from raw messages rather than hand-built parts wherever
- * the scenario says the conversation was loaded from a trace.
- *
- * These are the behaviours CopilotKit dropped: it rendered text and only text,
- * so a tool call, a reasoning block and an attachment all vanished from the
- * playground even though the trace held them.
- *
- * Spec: specs/prompts/playground-conversation.feature
- * Spec: specs/prompts/undefined-variable-banner-stability.feature
+ * Conversation renderer output: flattenMessages → ConversationThread drawing.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

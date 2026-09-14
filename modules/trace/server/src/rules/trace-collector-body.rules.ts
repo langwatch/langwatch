@@ -1,12 +1,5 @@
-/**
- * The collector body's own stages: the retrocompatibility rewrites the door has always applied,
- * and the refusals it answers with a 4xx. Each stage keeps the log line and the body it had
- * inside the single handler this was split out of.
- *
- * Rules rather than transport: none of it reads a request, opens a connection or holds a
- * collaborator - it is a package of functions over a body that has already been read, and
- * `POST /api/collector` is only its first caller.
- */
+// Collector body stages: retrocompatibility rewrites and 4xx refusals.
+// Pure functions over already-read bodies, not transport-specific
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodError } from "zod";

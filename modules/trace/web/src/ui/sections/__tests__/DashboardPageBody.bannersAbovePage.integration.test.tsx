@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The plan-limit banners are chrome. A page that paints positioned layers
- * outside its own box (the home hero's light-mode bloom bleeds upward by
- * almost half its height) used to wash the "You reached the limit" alert
- * out to a faint smear, because the alert was a static box and the page's
- * container was a positioned `zIndex` layer above it. Customer report: the
- * message-limit banner was unreadable on the home page.
+ * Plan-limit banners: positioned layers outside box. Message-limit readable.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

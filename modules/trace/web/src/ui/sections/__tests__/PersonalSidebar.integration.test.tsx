@@ -1,15 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The Me sidebar's Traces entry addresses the personal workspace by project
- * slug, and a user who belongs to several organizations owns one personal
- * workspace per organization. The entry has to follow the organization the
- * chrome is currently showing: pointing at another organization's personal
- * project navigates away from the selected organization, and the header then
- * re-derives the organization from the project slug in the URL, so the
- * organization visibly flips.
- *
- * Spec: specs/navigation/product-sidebars.feature
+ * Personal sidebar: Traces entry by project slug, org follows chrome organization.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

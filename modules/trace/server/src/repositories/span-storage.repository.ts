@@ -12,19 +12,13 @@ import type { SpanInsertData } from "@langwatch/trace-contract";
 
 export type { ModelSpanSampleRow, ModelUsageStatsRow } from "@langwatch/trace-contract";
 
-/**
- * Per-trace safety ceiling for read-time derivation queries (trace events + scenario role costs). Production p999 span-count per trace is 312, so this covers >99.9% of real traces; exists only so a pathological leaked/looping trace_id (seen up to ~27k spans) can't make a derivation read unbounded. Below the ceiling derivations are exact; above it only the hoisted event list/scenario metrics truncate — the paginated span detail view is a separate, complete query.
- */
+// Safety ceiling for read-time derivations; prevents unbounded reads on pathological trace_ids
 export const MAX_DERIVATION_SPANS = 512;
 
-/**
- * Per-query safety ceiling for light single-shot per-trace projections (span summaries, signal keys, resource info, events, summary deltas). Rows are slim (no SpanAttributes values, I/O, Events payloads), so the ceiling is generous, but traces have been seen with 20k-100k+ spans and an unbounded read materializes every row at once. The complete view of huge traces is the Trace feature's cursor-paged span-tree read, needing only one page in memory.
- */
+// Safety ceiling for light per-trace projections that materialize all rows at once
 export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
-/**
- * How many distinct event names one trace contributes to a list-page rollup — a distinct-name ceiling, not an event ceiling (474 tool.output events is one entry). Exists for instrumentation minting a fresh name per call site (an OTel bridge naming events after file.rs:236 produces dozens per trace), where the untrimmed list would be neither renderable nor useful. totalCount/distinctCount are computed before the trim, so a trimmed rollup still reports its true size.
- */
+// Distinct event name ceiling for instrumentation that mints fresh names per call site
 export const MAX_EVENT_NAMES_PER_TRACE = 12;
 
 export interface TraceEventRollupParams {
@@ -40,7 +34,10 @@ export interface TraceEventRollupParams {
 }
 
 /**
- * Ordered list of LangWatch signal buckets projected per-span — a flat array of bucket names so the wire payload stays tiny, one entry per active bucket, fixed order. Empty means the span carries no LangWatch-instrumented attributes surfaced in the UI.
+ * Ordered list of LangWatch signal buckets projected per-span — a flat array
+ * of bucket names so the wire payload stays tiny, one entry per active bucket,
+ * fixed order. Empty means the span carries no LangWatch-instrumented
+ * attributes surfaced in the UI.
  */
 export const LANGWATCH_SIGNAL_BUCKETS = [
   "prompt",
@@ -61,16 +58,16 @@ export interface SpanLangwatchSignalsRow {
 }
 
 /**
- * Optional partition-pruning hint. stored_spans is partitioned by toYearWeek(StartTime); an approximate trace timestamp lets the repo restrict the scan to a small window instead of walking every weekly partition (cold S3 included).
+ * Optional partition-pruning hint. stored_spans is partitioned by
+ * toYearWeek(StartTime); an approximate trace timestamp lets the repo
+ * restrict the scan to a small window instead of walking every weekly
+ * partition (cold S3 included).
  */
 export interface OccurredAtHint {
   occurredAtMs?: number;
 }
 
-/**
- * @see ADR-069
- * Params for the claim-check resolution read. The partition hint is REQUIRED here, unlike the optional {@link OccurredAtHint} every other read takes — this one runs fallback:"none", and a windowed read with no hint has no narrow window to accept, so it'd run the unbounded scan the read exists to avoid. Making the hint part of the contract keeps that promise for the next adopter.
- */
+// @see ADR-069 — partition hint is REQUIRED here for windowed claim-check reads
 export interface NormalizedSpanByIdParams {
   tenantId: string;
   traceId: string;
@@ -95,7 +92,10 @@ export abstract class SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<Span[]>;
   /**
-   * Normalized spans for a trace, used by read-time derivations (trace events + scenario role cost/latency) needing canonicalized attributes and parent links. Bounded by MAX_DERIVATION_SPANS so a pathological trace can't make the read unbounded.
+   * Normalized spans for a trace, used by read-time derivations (trace
+   * events + scenario role cost/latency) needing canonicalized attributes and
+   * parent links. Bounded by MAX_DERIVATION_SPANS so a pathological trace
+   * can't make the read unbounded.
    */
   abstract getNormalizedSpansByTraceId(
     params: {
@@ -113,19 +113,30 @@ export abstract class SpanStorageRepository {
   ): Promise<Span | null>;
   /**
    * @see ADR-069
-   * Claim-check resolution read: one canonical span by identity, windowed by the reference's partition hint with no unbounded fallback — a miss stays cheap since the caller retries via the queue. Derivation-shaped: the returned span carries empty events/links; a caller needing a whole span wants tryGetSpanByIds.
+   * Claim-check resolution read: one canonical span by identity, windowed by
+   * the reference's partition hint with no unbounded fallback — a miss stays
+   * cheap since the caller retries via the queue. Derivation-shaped: the
+   * returned span carries empty events/links; a caller needing a whole span
+   * wants tryGetSpanByIds.
    */
   abstract tryFindNormalizedSpanById(
     params: NormalizedSpanByIdParams,
   ): Promise<NormalizedSpan | null>;
   /**
-   * Trace-level events ({spanId, timestamp, name, attributes}) for the trace-detail read, derived from spans' OTel events. Events-only (ARRAY JOIN over Events.*, no heavy attribute scan), far cheaper than fetching whole spans. Includes exception events for parity with the fold's old list.
+   * Trace-level events ({spanId, timestamp, name, attributes}) for the
+   * trace-detail read, derived from spans' OTel events. Events-only (ARRAY
+   * JOIN over Events.*, no heavy attribute scan), far cheaper than fetching
+   * whole spans. Includes exception events for parity with the fold's old
+   * list.
    */
   abstract getTraceEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]>;
   /**
-   * Event rollups for a page of traces, for the trace list's Events column. Same Events.* ARRAY JOIN as {@link getTraceEventsByTraceId}, grouped by name and batched across the page (one query, not one per row). Attributes aren't read — a badge needs only a name and count.
+   * Event rollups for a page of traces, for the trace list's Events column.
+   * Same Events.* ARRAY JOIN as {@link getTraceEventsByTraceId}, grouped by
+   * name and batched across the page (one query, not one per row). Attributes
+   * aren't read — a badge needs only a name and count.
    */
   abstract getTraceEventRollupsByTraceIds(
     params: TraceEventRollupParams,
@@ -192,7 +203,10 @@ export abstract class SpanStorageRepository {
     limit: number;
   }): Promise<ModelSpanSampleRow[]>;
   /**
-   * Clamps a requested span-read limit to [1, max] (default MAX_DERIVATION_SPANS). Ceiling is hard — a caller can only lower it, never raise it. Missing/non-finite limit (undefined, NaN, Infinity) defaults to the ceiling so it never propagates into a CH UInt32 param.
+   * Clamps a requested span-read limit to [1, max] (default
+   * MAX_DERIVATION_SPANS). Ceiling is hard — a caller can only lower it,
+   * never raise it. Missing/non-finite limit (undefined, NaN, Infinity)
+   * defaults to the ceiling so it never propagates into a CH UInt32 param.
    */
   static clampSpanReadLimit(
     limit?: number,

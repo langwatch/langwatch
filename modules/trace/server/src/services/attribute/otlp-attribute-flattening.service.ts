@@ -8,23 +8,7 @@ const INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/;
 
 type ArrayPatternMap = Map<string, Map<number, Map<string, unknown>>>;
 
-/**
- * Scans all keys to find potential flattened array patterns.
- * Groups them by prefix, index, and relative path.
- *
- * For input like:
- *   "llm.input_messages.0.message.content" => "hello"
- *   "llm.input_messages.0.message.role" => "user"
- *   "llm.input_messages.1.message.content" => "hi"
- *   "llm.input_messages.1.message.role" => "assistant"
- *
- * Returns a Map where:
- *   key: "llm.input_messages"
- *   value: Map {
- *     0 => Map { "message.content" => "hello", "message.role" => "user" },
- *     1 => Map { "message.content" => "hi", "message.role" => "assistant" }
- *   }
- */
+// Scan keys to find flattened array patterns; groups by prefix, index, relative path
 const detectArrayPatterns = (
   attrs: NormalizedAttributes,
 ): { patterns: ArrayPatternMap; matchedKeys: Set<string> } => {
@@ -90,16 +74,8 @@ const isValidArrayPattern = (indexMap: Map<number, Map<string, unknown>>): boole
   return keySignatures.size === 1;
 };
 
-/**
- * Reconstructs a nested object from flattened key-value pairs.
- * Delegates to shared safeUnflatten for prototype pollution protection.
- *
- * For input:
- *   Map { "message.content" => "hello", "message.role" => "user" }
- *
- * Returns:
- *   { message: { content: "hello", role: "user" } }
- */
+// Reconstruct nested object from flattened pairs; delegates to safeUnflatten
+// for prototype pollution protection
 const unflattenObject = (flatMap: Map<string, unknown>): Record<string, unknown> => {
   const record: Record<string, unknown> = Object.create(null);
   for (const [k, v] of flatMap) {
@@ -131,17 +107,8 @@ const buildArrayItems = (
   return indices.map((index) => unflattenObject(indexMap.get(index)!));
 };
 
-/**
- * Post-processes normalized attributes to reconstruct flattened arrays.
- *
- * Converts patterns like:
- *   "llm.input_messages.0.message.content" => "hello"
- *   "llm.input_messages.0.message.role" => "user"
- *   "llm.input_messages.1.message.content" => "hi"
- *
- * Into:
- *   "llm.input_messages" => [{message:{content:"hello",role:"user"}},{message:{content:"hi"}}]
- */
+// Post-process normalized attributes to reconstruct flattened arrays from
+// indexed key patterns
 const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttributes => {
   const { patterns, matchedKeys } = detectArrayPatterns(attrs);
 
@@ -179,15 +146,8 @@ const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttr
  */
 const MAX_JSON_PARSE_SIZE = 2_000_000;
 
-/**
- * Fixes invalid JSON escape sequences introduced by PII redaction.
- * PII redaction replaces content with `<PII_TYPE>` tokens (e.g. `<US_DRIVER_LICENSE>`).
- * When this happens inside a JSON string value, it can create invalid escapes
- * like `\<` if the replacement lands right after a backslash.
- *
- * Specifically targets `\<` and `\>` which are the known invalid escapes
- * from PII redaction tokens like `<US_DRIVER_LICENSE>`.
- */
+// Fix invalid JSON escapes from PII redaction tokens; targets \< and \>
+// introduced when replacement lands after backslash
 /** @internal Exported for unit testing */
 function sanitizeInvalidJsonEscapes(json: string): string {
   return json.replace(/\\([<>])/g, "$1");

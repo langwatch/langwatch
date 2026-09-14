@@ -1,12 +1,8 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { SpanCostService } from "../services/span/span-cost.service.ts";
 
-/**
- * Minimal per-span shape needed to aggregate scenario role cost/latency.
- * Decoupled from NormalizedSpan so the aggregator is a pure, dependency-free
- * function: the caller resolves cost (which needs model-cost matching) and
- * passes it in.
- */
+// Minimal shape for scenario role cost/latency aggregation; decoupled from
+// NormalizedSpan so the aggregator is pure and dependency-free
 export interface ScenarioRoleSpanInput {
   spanId: string;
   parentSpanId: string | null;
@@ -22,22 +18,8 @@ export interface ScenarioRoleMetrics {
   scenarioRoleLatencies: Record<string, number>;
 }
 
-/**
- * Aggregates per-role cost and latency for scenario traces from the COMPLETE
- * set of spans.
- *
- * A role is declared on agent spans via `scenario.role`, but the cost lives on
- * descendant LLM spans. A span's effective role is its nearest ancestor (or
- * itself) carrying a direct role; cost is summed per effective role, latency
- * only over spans that directly carry the role.
- *
- * This is the read-time counterpart of the per-event fold bookkeeping that
- * used to accumulate `scenarioRoleSpans` + `spanCosts` on the trace summary.
- * Because the whole span set is present here, role resolution is a single
- * O(n) nearest-ancestor walk (memoized) rather than the incremental
- * retroactive propagation the fold needed for out-of-order arrival — keeping
- * the fold state O(1) per event instead of growing with span count.
- */
+// Read-time aggregation of per-role cost/latency; role lives on descendants,
+// effective role is nearest ancestor carrying one
 type RoleResolution = Readonly<{
   bySpanId: Record<string, ScenarioRoleSpanInput>;
   cache: Record<string, string | null>;

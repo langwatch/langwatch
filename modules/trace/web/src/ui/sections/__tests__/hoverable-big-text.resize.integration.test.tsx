@@ -1,7 +1,6 @@
 /**
- * HoverableBigText only offers its tooltip and its expand dialog once it has measured itself as clipped.
  * @vitest-environment jsdom
- * Spec: specs/components/hoverable-big-text-overflow.feature
+ * HoverableBigText: tooltip and dialog only when measured as clipped.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -2,9 +2,7 @@ import { useState } from "react";
 import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
 
 /**
- * Canonical person avatar: renders the uploaded/SSO `image` when present and falls back to the initials of
- * `name`, then a silhouette when neither is set — the single fallback chain every person-avatar surface shares.
- * Spec: specs/settings/user-avatar.feature
+ * Person avatar: image → initials → silhouette. Single fallback chain shared.
  */
 export function UserAvatar({
   name,

@@ -1,7 +1,9 @@
 import type { TraceEditOverlayAuthor, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 /**
- * One stored reviewer correction, with the two attribution lines a trace view renders. patch is the raw stored document — the service parses it, since a document this build can't interpret must read as no correction, not a failed trace read.
+ * One stored reviewer correction with attribution lines a trace view renders.
+ * patch is raw — service parses it; unparseable document reads as no
+ * correction, not a failed trace read.
  */
 export interface TraceEditOverlayRow {
   id: string;

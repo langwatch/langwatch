@@ -1,7 +1,6 @@
 /**
- * HoverableBigText measures its own box on a timer, because the measurement is only meaningful once the browser has laid the box out.
  * @vitest-environment jsdom
- * Spec: specs/components/hoverable-big-text-overflow.feature
+ * HoverableBigText: measures box on timer after browser layout.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";

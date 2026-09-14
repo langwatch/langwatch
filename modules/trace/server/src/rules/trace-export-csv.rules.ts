@@ -1,5 +1,7 @@
 /**
- * CSV serialization for trace export (PapaParse, RFC 4180). Summary mode: one row per trace with evaluation columns. Full mode: one row per span, trace fields denormalized. Every heading and cell goes through the shared formula guard — trace input/output and evaluator display names are all somebody's typing.
+ * CSV serialization for trace export (PapaParse, RFC 4180). Summary mode: one
+ * row per trace with evaluation columns. Full mode: one row per span, trace
+ * fields denormalized. Every heading and cell goes through formula guard.
  */
 
 import Parse from "papaparse";
@@ -16,7 +18,10 @@ import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 
 /**
- * RFC 4180 line ending, stated explicitly rather than relying on PapaParse's default. Every chunk must both use this internally AND end with it: a streamed export concatenates chunks straight into one file, so a missing trailing newline glues rows together and a mismatched terminator makes the remainder parse as one row — neither shows up until an export exceeds one batch. Exported so export.service.ts strips the header on the same sequence it was written with.
+ * RFC 4180 line ending, explicit not relying on PapaParse default. Every
+ * chunk must both use and end with this — a streamed export concatenates
+ * chunks straight into file, so a missing trailing newline glues rows together.
+ * Exported so export.service.ts strips header on same sequence it was written.
  */
 export const CSV_NEWLINE = "\r\n";
 

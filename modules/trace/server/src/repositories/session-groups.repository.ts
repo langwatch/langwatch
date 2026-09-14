@@ -18,7 +18,10 @@ export interface SessionGroupSort {
 }
 
 /**
- * Keyset cursor for the session list. Sort value is the exact number the repository computed (floats rounded in SQL so comparison is bit-stable across requests); conversation id is the unique tie-breaker turning every sort into a total order.
+ * Keyset cursor for the session list. Sort value is the exact number the
+ * repository computed (floats rounded in SQL so comparison is bit-stable across
+ * requests); conversation id is the unique tie-breaker turning every sort into
+ * a total order.
  */
 export interface SessionGroupCursor {
   sortValue: number;
@@ -67,7 +70,9 @@ export interface SessionGroupRow {
   warningCount: number;
   totalSpans: number;
   /**
-   * The session's most recent trace, by occurrence then version — what the row's previews were read from and what a click opens. Empty only for a session the rollup found no trace for, which the group itself rules out.
+   * The session's most recent trace, by occurrence then version — what the
+   * row's previews were read from and what a click opens. Empty only for a
+   * session the rollup found no trace for, which the group itself rules out.
    */
   lastTraceId: string;
   /** Latest trace's computed previews, read separately for the page only. */

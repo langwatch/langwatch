@@ -1,14 +1,5 @@
-/**
- * Shared shard-bucketing helper for the trace-processing command group key.
- *
- * `spanCommandGroupKey` (recordSpan) fans a hot trace's spans across
- * `traceId:<shard>` lanes on the GroupQueue, bucketing on the record's span id
- * with the rolling hash and clamp shape defined here. Holding the shard math in
- * one module keeps a record's bucket byte-stable — deterministic across
- * processes and restarts, the property a record's retries and its dedup squash
- * window depend on. `spanCommandGroupKey` keeps its own public API and its own
- * `MAX_SPAN_SHARD_COUNT` constant.
- */
+// Shard-bucketing helper for trace-processing command group key; keeps bucket
+// byte-stable and deterministic across processes and restarts
 
 // FNV-1a (32-bit) constants. A record's bucket must be deterministic across
 // processes and restarts - a record's retries and its dedup squash window must
@@ -33,12 +24,8 @@ export function shardIndexFor(key: string, shardCount: number): number {
   return (hash >>> 0) % shardCount;
 }
 
-/**
- * Clamp a numeric shard count to the safe range `[1, maxShardCount]`. Non-integer
- * or below-one values fall back to `1` (sharding disabled) rather than throwing
- * on the ingest path; values above `maxShardCount` are clamped down. Callers pass
- * their own `MAX_*_SHARD_COUNT`.
- */
+// Clamp shard count to [1, maxShardCount]; non-integer or below-one values
+// fall back to 1 (sharding disabled) on ingest path
 export function clampShardCount(n: number, maxShardCount: number): number {
   if (!Number.isInteger(n) || n < 1) return 1;
   return Math.min(n, maxShardCount);
