@@ -70,15 +70,7 @@ export interface PromptInfrastructure {
    * `LoggedApiPromptNurturing`, before b383462d96).
    */
   afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
-  /**
-   * The read/write engine this application forwards to. A bridge, not a
-   * design choice: the four repositories behind it have not moved onto
-   * `defineRepositories` yet (ADR-133's persistence half), so `create()`
-   * still builds this from `PostgresPromptAdapter` over the `prisma` member
-   * rather than the app taking it from a framework-supplied repository
-   * bundle. Move it to a declared `repositories` bundle once the memory twins
-   * exist.
-   */
+/** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
   prompts: PromptService;
 }
 

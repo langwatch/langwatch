@@ -1,18 +1,4 @@
-/**
- * The input shapes the prompt library's tRPC surface parses.
- *
- * Kept apart from the service commands in `prompt.commands.ts`: those are
- * `.strict()` and require non-empty ids, while these have always accepted (and
- * dropped) unknown keys. Tightening one to match the other would turn a
- * forward-compatible client into a validation error, so the two shapes stay
- * named separately rather than collapsed into one.
- *
- * The two write shapes are built rather than declared. Their `demonstrations`
- * field is a workflow dataset, and the workflow contract already depends on
- * this one — importing it back would close a package cycle — so the caller
- * hands the dataset schema in. The generic keeps the field's exact type on the
- * way out, so a client still sees the dataset shape rather than `unknown`.
- */
+/** tRPC input shapes; accept unknown keys for forward-compatible clients. */
 import { z } from "zod";
 import {
   handleSchema,
@@ -173,22 +159,7 @@ export const promptAssignTagTrpcInputSchema = z.object({
   tag: z.string().min(1),
 });
 
-/**
- * The two write payloads a browser sends, as declared types.
- *
- * `platform/app`'s prompt surfaces read these off
- * `RouterInputs["prompts"]["create"]["data"]`, which is an inference through
- * the whole application router and is exactly what a browser package may not
- * name. The producer is PACKAGED — `@langwatch/prompt-server`'s tRPC transport
- * builds `createInputSchema` and `updateInputSchema` from the two factories
- * above — so this is a real declaration rather than a restatement: both halves
- * of the wire now resolve to the same schema.
- *
- * The demonstrations schema is this contract's own `nodeDatasetSchema`. The
- * transport hands `@langwatch/workflow-contract`'s, and the two are the same
- * shape; taking the workflow one here would close a package cycle, which is the
- * reason the factories take it as an argument in the first place.
- */
+/** Write payload types for create and update prompts (inferred from schema factories). */
 export type PromptCreateTrpcInput = z.infer<
   ReturnType<typeof createPromptCreateTrpcInputSchema<typeof nodeDatasetSchema>>
 >;
@@ -213,20 +184,7 @@ export type PromptHandleUniquenessTrpcInput = z.infer<typeof promptHandleUniquen
 export type PromptConfigTagsTrpcInput = z.infer<typeof promptConfigTagsTrpcInputSchema>;
 export type PromptAssignTagTrpcInput = z.infer<typeof promptAssignTagTrpcInputSchema>;
 
-/**
- * What those procedures answer.
- *
- * Every one of them is this contract's own DTO already: `VersionedPrompt` and
- * `PromptTagAssignment` are the zod-inferred shapes `prompt.ts` declares, and
- * {@link PromptService} — which `@langwatch/prompt-server`'s application layer
- * implements and its tRPC transport returns straight through — declares
- * exactly these returns. So stating them here restates nothing and leaks no
- * Prisma row.
- *
- * `getByIdOrHandle` answers `null` rather than refusing: the transport calls
- * the application's `findByIdOrHandle`, and the drawer renders an empty form
- * for a prompt that is not there yet.
- */
+/** tRPC output types; VersionedPrompt and PromptTagAssignment DTOs. */
 export type PromptGetAllForProjectTrpcOutput = VersionedPrompt[];
 export type PromptGetByIdOrHandleTrpcOutput = VersionedPrompt | null;
 export type PromptGetAllVersionsTrpcOutput = VersionedPrompt[];

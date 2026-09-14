@@ -2,15 +2,7 @@ import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
 import { SchemaVersion } from "./prompt.enums.ts";
 
-/**
- * The parameter types a prompt input may declare.
- *
- * Exported because both halves of the wire need the list itself and not only
- * the schema built from it: the prompt studio's type picker renders one option
- * per member, and it used to read `platform/app/src/types.ts`'s identical copy
- * — an application module a browser package may not reach. The two lists were
- * kept in step by hand; now there is one.
- */
+/** Parameter types a prompt input may declare; shared between studio and contract. */
 export const LlmConfigInputTypes = [
   "str",
   "float",

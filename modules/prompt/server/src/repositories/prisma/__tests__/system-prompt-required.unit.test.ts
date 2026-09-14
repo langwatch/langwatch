@@ -1,24 +1,4 @@
-/**
- * Regression test for Issue #3196 / Bug 3.
- *
- * Today, when `prompts.create` is called with neither `prompt` nor a system
- * message in `messages`, the server throws `SystemPromptConflictError` with
- * no `httpStatus` field. The tRPC `handledErrorMiddleware` doesn't recognise
- * it as a `HandledError`, so the call bubbles up as INTERNAL_SERVER_ERROR
- * (HTTP 500) and is captured as an "uncaught" bug.
- *
- * After the fix:
- *   - A dedicated `SystemPromptRequiredError` (extends `HandledError`,
- *     `httpStatus: 400`) is thrown for the missing-system-prompt case.
- *   - The original `SystemPromptConflictError` (both prompt + system
- *     message set) is preserved as a separate, still-409 `HandledError`.
- *   - The middleware auto-maps both to the correct tRPC codes
- *     (BAD_REQUEST and CONFLICT) — no manual try/catch in the router.
- *
- * This test runs at the service layer (no DB / tRPC plumbing) so the
- * regression signal is fast and atomic. The integration coverage that
- * follows verifies the BAD_REQUEST mapping end-to-end via `appRouter`.
- */
+/** Regression for Issue #3196 — SystemPromptRequiredError vs SystemPromptConflictError. */
 
 import {
   PromptSystemPromptConflictError,

@@ -695,7 +695,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
           })
         )?.model ?? "openai/gpt-5";
 
-      // Set the version data to the provided version data, or undefined if no version data is provided.
+      // Set version data to provided value or undefined if not provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined = versionData;
 
       // If no version data is provided, we'll create a default (draft) version.

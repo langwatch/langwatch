@@ -1,12 +1,4 @@
-/**
- * The wire contract between the playground UI and its execution endpoint.
- *
- * Framework-free on purpose: the browser imports the endpoint path and event
- * type, the server route imports the request schema, and neither drags the
- * other's world along. The version is spelled in the path the client calls —
- * there is no unversioned way to reach the endpoint worth teaching the client
- * ([ADR-112 direction]: omitting a version must never silently mean "latest").
- */
+/** Wire contract between playground UI and execution endpoint (framework-free; versioned path). */
 import { z } from "zod";
 
 import { runtimeInputsSchema } from "./prompt.field-schemas.ts";

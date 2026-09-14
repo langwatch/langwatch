@@ -25,16 +25,7 @@ const PROMPT_ATTRIBUTE_KEYS = [
   "langwatch.prompt.variables",
 ] as const;
 
-/**
- * Converts nested span params (e.g. `{ langwatch: { prompt: { id: "..." } } }`)
- * to the flat dot-notation attributes expected by parsePromptTraceReference
- * (e.g. `{ "langwatch.prompt.id": "..." }`).
- *
- * Only extracts prompt-relevant keys to keep the mapping minimal and safe.
- *
- * @param params - Nested params object from an ES or frontend span
- * @returns Flat attributes record with dot-notation keys
- */
+/** Flatten nested span params to dot-notation attributes for prompt trace reference parsing. */
 export function flattenParamsToPromptAttributes(
   params: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> {
@@ -67,25 +58,7 @@ export function flattenParamsToPromptAttributes(
   return attrs;
 }
 
-/**
- * Finds the nearest prompt reference relative to a target span by searching
- * both ancestors and their children (siblings/cousins of the target).
- *
- * Algorithm:
- * 1. Walk up the parent chain from the target span.
- * 2. At each ancestor, find its children (excluding the current path) that
- *    have a prompt reference AND started BEFORE the target span.
- * 3. Among matches, pick the one with the latest startTime (closest preceding).
- * 4. If found, return it. Otherwise check the ancestor itself, then continue up.
- *
- * This handles the common SDK pattern where `langwatch.prompt.id` is on
- * `Prompt.compile` or `PromptApiService.get` spans that are siblings of the
- * LLM span, not parents.
- *
- * @param params.targetSpanId - The span to start searching from
- * @param params.spans - All spans in the trace
- * @returns The closest preceding PromptReference, or null if none found
- */
+/** Find nearest prompt reference by walking up ancestors and checking their children. */
 export function findPromptReferenceInAncestors({
   targetSpanId,
   spans,
@@ -151,26 +124,7 @@ export function findPromptReferenceInAncestors({
   return null;
 }
 
-/**
- * Among the children of a given parent, finds the closest preceding sibling
- * with a prompt reference AND merges variables across all matching preceding
- * siblings. The "closest preceding" sibling supplies the prompt identity
- * (handle, version, tag, versionId). Variables from earlier siblings are
- * unioned underneath later ones — later wins on key collision.
- *
- * Why the merge: the python-sdk emits prompts as a pair of sibling spans —
- * `PromptApiService.get` first, then `Prompt.compile` — both carry a
- * prompt reference, both have their own `langwatch.prompt.variables`. Get's
- * variables map carries the dispatch internals (e.g. `prompt_id`), compile's
- * carries the user's actual template kwargs. ClickHouse stores StartTime at
- * millisecond resolution, so the two spans typically share the same
- * `startTime` — strict greater-than tie-breaking made get win on iteration
- * order, dropping the user-facing variables from compile and leaving the
- * playground variables panel empty.
- *
- * Same-millisecond siblings are included because SDK patterns like
- * `Prompt.compile` and the LLM span often start at the exact same ms.
- */
+/** Find closest preceding sibling with prompt ref; merge variables across siblings. */
 function findClosestPrecedingSibling({
   parentId,
   childrenByParent,
@@ -208,25 +162,7 @@ function findClosestPrecedingSibling({
   return { ...identity, promptVariables: mergedVariables };
 }
 
-/**
- * Keys that the python-sdk emits onto `langwatch.prompt.variables` as
- * part of the dispatch envelope rather than as user template variables.
- * Surfacing them in the playground's Variables panel on resume creates
- * meaningless rows ("prompt_id = prompt_gg9YhtFllFNrMixRXXslv", "messages
- * = [object Object]") — caught in the 2026-05-17 post-merge dogfood.
- *
- * Sources:
- *  - `prompt_id` + `tag`: kwargs python's PromptApiService.get records
- *    onto its variables map (prompt_service_tracing.py).
- *  - `messages` + `chat_messages`: conversation history the
- *    PromptStudioAdapter / Studio engine injects into the signature
- *    node's inputs alongside user vars; nlpgo's filter strips them on
- *    emit going forward but old traces still carry them.
- *
- * Filtering at the merger (rather than at parse) keeps the user's
- * intent crystal clear in storage — the trace still records what the
- * SDK actually sent — and only hides the noise at the resume UI.
- */
+/** SDK dispatch envelope keys; filtered out to keep Variables panel noise-free on resume. */
 const INTERNAL_PROMPT_VARIABLE_KEYS = new Set<string>([
   "prompt_id",
   "tag",
@@ -234,15 +170,7 @@ const INTERNAL_PROMPT_VARIABLE_KEYS = new Set<string>([
   "chat_messages",
 ]);
 
-/**
- * Union prompt variables across multiple references in iteration order.
- * Later entries override earlier on key collision (so compile beats get
- * on overlap, and a stale ancestor never displaces a fresh closer match).
- * Dispatch-internal keys (see {@link INTERNAL_PROMPT_VARIABLE_KEYS}) are
- * skipped — they belong to the SDK's call envelope, not the prompt's
- * declared variables. Returns null only when every remaining entry is
- * null/empty.
- */
+/** Union prompt variables across refs (later wins); skip dispatch-internal keys. */
 function mergeVariables(refs: PromptReference[]): Record<string, string> | null {
   const merged: Record<string, string> = {};
   for (const r of refs) {

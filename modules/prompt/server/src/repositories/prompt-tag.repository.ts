@@ -5,7 +5,7 @@
  */
 import type { PromptTag } from "@langwatch/prompt-contract";
 
-/** Tags that cannot be created or deleted. Only 'latest' is protected — it is resolved at query time. */
+/** Tags that cannot be created or deleted; 'latest' is resolved at query time. */
 export const PROTECTED_TAGS = ["latest"] as const;
 export type ProtectedTag = (typeof PROTECTED_TAGS)[number];
 

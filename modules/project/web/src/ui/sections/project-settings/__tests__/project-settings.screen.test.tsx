@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings → General: one address, two things it edits. A PERSONAL workspace is never offered as the org's project; a project-less org (ADR-038 v6) still gets settings; a VIEW-only reader gets read-only fields and no storage credentials; a LITE MEMBER gets no Save button.
+ * Settings → General: role-based access control for workspace, project, and storage credentials.
  */
 
 import { cleanup, screen } from "@testing-library/react";

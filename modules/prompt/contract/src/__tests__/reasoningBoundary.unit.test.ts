@@ -1,15 +1,4 @@
-/**
- * Unit tests for reasoning boundary layer functions.
- *
- * These functions handle the mapping between the unified 'reasoning' field
- * and provider-specific parameters at the boundary when calling LLM APIs.
- *
- * IMPORTANT: LiteLLM expects 'reasoning_effort' for ALL providers and transforms
- * it internally to provider-specific parameters:
- * - Anthropic: reasoning_effort -> output_config={"effort": ...} + beta header
- * - Gemini: reasoning_effort -> thinking_level or thinking with budget
- * - OpenAI: reasoning_effort -> passed as-is
- */
+/** Unit tests for reasoning boundary — mapping unified reasoning to provider-specific params. */
 import { describe, expect, it } from "vitest";
 import {
   LITELLM_PARAMETER_TRANSLATION,

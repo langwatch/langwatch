@@ -1,6 +1,4 @@
-/**
- * The organization and its project, at `/settings`. `isPersonal` gates the project form — a personal workspace is never the organization's project. Primary-use switch saves first, then checks what's missing (ADR-038).
- */
+/** Organization and project settings; personal workspaces cannot be the org's project (ADR-038). */
 
 import {
   Badge,

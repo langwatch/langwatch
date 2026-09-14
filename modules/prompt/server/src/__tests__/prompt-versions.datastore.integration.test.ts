@@ -1,11 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Versions are the Prompt service's own history: it hands back what a prompt
- * has been, and a version write it refuses leaves the prompt reading exactly
- * as it did before.
- *
- * @see modules/prompt/specs/prompt.feature
+ * Versions are the Prompt service's own history (spec: modules/prompt/specs/prompt.feature).
  */
 import {
   PrismaConfigService,

@@ -54,16 +54,7 @@ const baseFormSchema = z.object({
   }),
 });
 
-/**
- * Returns a refined form schema with dynamic model limits validation.
- *
- * Note: the system-prompt-required refinement (#3196) is applied separately
- * via {@link withSystemPromptRequired} so both this dynamic schema and the
- * static `formSchema` share the same client-side requirement.
- *
- * @param modelLimits - Optional model limits from server
- * @returns Zod schema with refined maxTokens validation based on model limits
- */
+/** Refined form schema with dynamic model limits validation; system-prompt requirement applied. */
 export function refinedFormSchemaWithModelLimits(
   modelLimits?: {
     maxOutputTokens?: number;
@@ -126,17 +117,7 @@ function baseFormSchemaWithModelLimits(
   });
 }
 
-/**
- * Refinement: require a non-empty system message in `messages`.
- *
- * Pre-#3196 the prompt form let users save a workflow whose system message
- * was empty (or simply absent), then surprised them with a 500 from the
- * server. The server now rejects with a friendly 400, but the form should
- * still block the submit client-side so the round-trip is never attempted.
- *
- * Trim before checking so whitespace-only content also fails — empty +
- * whitespace are functionally identical to the user.
- */
+/** Require non-empty system message; trim before checking so whitespace-only content also fails. */
 export const hasNonEmptySystemMessage = (
   messages: readonly { role?: string; content?: string }[] | undefined | null,
 ): boolean =>
@@ -168,42 +149,11 @@ function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T) {
   });
 }
 
-/**
- * The base form schema used for parsing prompts already persisted in the
- * DB and for typing form values. Does NOT include the system-prompt-required
- * refinement — DB records may pre-date the refinement and must still parse.
- *
- * Save-time validation uses {@link formSchemaForSave} (via
- * `refinedFormSchemaWithModelLimits` in the form resolver) so submits are
- * blocked when the system message is empty.
- */
+/** Base form schema; no system-prompt-required refinement for legacy prompt compatibility. */
 export const formSchema = baseFormSchema;
 
-/**
- * The form schema with the system-prompt-required refinement applied.
- * Used by `usePromptConfigForm`'s zodResolver so the Save button reflects
- * the requirement and shows the inline message-path error when violated.
- *
- * Read paths (`versionedPromptToPromptConfigFormValues`,
- * `useLoadSpanIntoPromptPlayground`) keep using {@link formSchema} so
- * legacy / pre-#3196 prompts still hydrate.
- */
+/** Form schema for saving; system-prompt-required refinement applied (zodResolver). */
 export const formSchemaForSave = withSystemPromptRequired(baseFormSchema);
 
-/**
- * Form values for prompt configuration management, inferred from formSchema.
- *
- * Represents the complete shape of a prompt config form including:
- * - handle, scope, and version metadata
- * - prompt/messages content
- * - inputs/outputs definitions
- * - LLM settings (model, temperature, max_tokens, litellm_params)
- * - demonstrations and prompting_technique
- *
- * Used throughout the prompt-configs module for form handling, validation,
- * and state management in usePromptConfigForm, PromptConfigForm, and related
- * components.
- *
- * @see formSchema - Source schema definition
- */
+/** Form values for prompt configuration management, inferred from formSchema. */
 export type PromptConfigFormValues = z.infer<typeof formSchema>;

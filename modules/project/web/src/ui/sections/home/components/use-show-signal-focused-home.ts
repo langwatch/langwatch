@@ -7,16 +7,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
  */
 export const SIGNAL_FOCUSED_HOME_FLAG = "release_ui_home_signal_focused_enabled" as const;
 
-/**
- * The home composition gate — "does this user get the signal-focused home?"
- * (spec: specs/home/signal-focused-home-rollout.feature). Purely the rollout
- * flag, evaluated for the current project: page access is already
- * DashboardLayout's job, and Langy access is deliberately NOT part of the
- * answer — the redesigned home rolls out on its own schedule. Langy access
- * still gates the hand-to-Langy affordances INSIDE the sheet (useShowLangy
- * in HomeBriefingSection and QuietHeadline), so the two rollouts compose
- * without either implying the other.
- */
+/** Gate for signal-focused home rollout (spec: specs/home/signal-focused-home-rollout.feature). */
 export function useShowSignalFocusedHome(): boolean {
   return useSignalFocusedHomeVisibility().show;
 }
