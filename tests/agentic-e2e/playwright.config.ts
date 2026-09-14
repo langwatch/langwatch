@@ -105,8 +105,23 @@ export default defineConfig({
      * Chromium provides sufficient coverage for our use case */
   ],
 
-  /* Global timeout */
-  timeout: 60000,
+  /* Whole-test budget. This is a SUM, not a hang detector: `actionTimeout`
+   * and `navigationTimeout` above are what catch a genuinely stuck step, and
+   * they are unchanged, so a hang still fails at the step in 15-30s either
+   * way. What this bounds is how many steps one test may spend.
+   *
+   * The front-door journeys sign a fresh account in through the real screens
+   * repeatedly, and on a CI runner (software-rendered Chrome, no GPU) every
+   * Playwright actionability check costs several hundred milliseconds — a
+   * single `Continue` click measures ~4.2s there against well under a second
+   * locally, spread evenly over resolve/stable/scroll/click/navigate rather
+   * than stuck on any one of them. That per-step tax is what pushed the
+   * five-cycle sign-in/sign-out test (~90s of honest work) past 60s, and it
+   * left the passkeys journey passing with only 7s to spare.
+   *
+   * So CI gets twice the budget while local keeps the tighter one, which is
+   * where a newly-slow test should be noticed. */
+  timeout: IS_CI ? 120000 : 60000,
 
   /* Expect timeout */
   expect: {
