@@ -124,16 +124,16 @@ export type GatewaySpendApp = Readonly<{
    * there are no figures to report at all — the routes refuse rather than
    * answering a reconciliation query with a confident zero.
    */
-  spendEvents: GatewaySpendEventsService | undefined;
+  spendEvents(): GatewaySpendEventsService | undefined;
   /** The budget ledger the per-end-user caps are read against. */
-  budgetSpend: GatewayBudgetSpend | undefined;
+  budgetSpend(): GatewayBudgetSpend | undefined;
 
   /** The endpoint registry a replay names its destination in. */
-  webhookEndpoints: GatewaySpendWebhookEndpoints;
+  webhookEndpoints(): GatewaySpendWebhookEndpoints;
   /** The emitted-envelope log a replay walks. */
-  webhookEvents: GatewaySpendWebhookEvents | undefined;
+  webhookEvents(): GatewaySpendWebhookEvents | undefined;
   /** The live delivery path a replay appends to. */
-  webhookDelivery: GatewaySpendWebhookDelivery | undefined;
+  webhookDelivery(): GatewaySpendWebhookDelivery | undefined;
 
   /**
    * One spend row rendered as the canonical billing envelope. The wire format
@@ -149,7 +149,7 @@ export type GatewaySpendApp = Readonly<{
    * How long after a request an outcome may still arrive, which is what makes
    * a recent grouping unstable under a page walk.
    */
-  settlementPolicy: GatewaySettlementPolicy;
+  settlementPolicy(): GatewaySettlementPolicy;
 
   /** Resolves Postgres filters to CH ids. A no-match resolves to EMPTY, never "unfiltered". */
   resolveSpendScope(input: {
@@ -193,7 +193,7 @@ export const gatewaySpendBillingPlanGate = defineRestMiddleware(
 
 /** The ledger is the only store spend accrues in; without it we say so, not a zero. */
 function requireSpendEvents(app: GatewaySpendApp): GatewaySpendEventsService {
-  const service = app.spendEvents;
+  const service = app.spendEvents();
   if (!service) throw app.spendStoreUnavailable();
   return service;
 }
@@ -613,7 +613,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       toMs: input.to,
       nowMs: nowInstant().epochMilliseconds,
       allowUnstable: input.allow_unstable,
-      settlementPolicy: app.settlementPolicy,
+      settlementPolicy: app.settlementPolicy(),
     });
     const resolved = await app.resolveSpendScope({
       organizationId: scope.id,
@@ -727,7 +727,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       toMs,
       virtualKeyId: input.virtual_key_id,
     });
-    const budgetRepository = app.budgetSpend;
+    const budgetRepository = app.budgetSpend();
     if (!budgetRepository) {
       // The ledger is the only store spend accrues in, so without ClickHouse
       // there are no figures to report against these caps.
@@ -777,7 +777,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     responses: spendResponses,
   })
   .handle(async ({ app, input, scope }) => {
-    const endpoint = await app.webhookEndpoints.tryGetDeliverable({
+    const endpoint = await app.webhookEndpoints().tryGetDeliverable({
       organizationId: scope.id,
       endpointId: input.endpoint_id,
     });
@@ -785,9 +785,9 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       throw new BadRequestError("unknown or inactive endpoint for this organization");
     }
 
-    const events = app.webhookEvents;
+    const events = app.webhookEvents();
     if (!events) throw app.spendStoreUnavailable();
-    const delivery = app.webhookDelivery;
+    const delivery = app.webhookDelivery();
     if (!delivery) throw app.spendStoreUnavailable();
 
     // One replay identity per call: it salts batch ids and inbox source

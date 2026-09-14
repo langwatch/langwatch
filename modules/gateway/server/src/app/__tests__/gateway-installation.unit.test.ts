@@ -59,6 +59,9 @@ function peer(name: string): never {
     {},
     {
       get(_target, property) {
+        // Inspection (Symbol.toStringTag, util.inspect) is not a call: a peer
+        // handed back through an app method may be looked at, never invoked.
+        if (typeof property === "symbol") return undefined;
         throw new Error(`The ${name} peer was called for "${String(property)}".`);
       },
     },
@@ -113,30 +116,21 @@ describe("gateway app installation", () => {
             eventType: "gateway.spend.settled",
           }),
         ).toBe(true);
-      } finally {
-        await runtime.stop();
-      }
-    });
 
-    /**
-     * Recorded, not accepted. `moduleApi` resolves to a proxy that answers
-     * callable operations ONLY (`packages/runtime-composition/src/local-feature-api.ts`),
-     * and both `runtime.service(GatewayApi)` and `runtime.module(...).provided`
-     * ARE that proxy — so the six property members the four `/api/gateway/v1`
-     * spend routes read (`spendEvents`, `budgetSpend`, `webhookEndpoints`,
-     * `webhookEvents`, `webhookDelivery`, `settlementPolicy`) throw a
-     * TypeError at request time no matter what the control plane holds. This
-     * test pins the defect so the fix — the six becoming methods on both
-     * `GatewayApp` and `GatewaySpendApp` — deletes it rather than silently
-     * passing.
-     */
-    it("cannot yet answer a property member through the module API", async () => {
-      const runtime = await process().boot();
-
-      try {
-        const installed = runtime.module(gatewayServer).provided;
-
-        expect(() => installed.spendEvents).toThrow(/exposes operations only/);
+        // `moduleApi` resolves to a proxy that answers callable operations
+        // ONLY (`packages/runtime-composition/src/local-feature-api.ts`), and
+        // both `runtime.service(GatewayApi)` and `runtime.module(...).provided`
+        // ARE that proxy — so the six members the four `/api/gateway/v1` spend
+        // routes read are methods, not properties, and answer through a call.
+        expect(installed.spendEvents()).toBeDefined();
+        expect(installed.budgetSpend()).toBeDefined();
+        expect(installed.webhookEndpoints()).toBeDefined();
+        expect(installed.webhookEvents()).toBeDefined();
+        // The replay path resolves through the webhook peer itself now that
+        // WebhookApi publishes appendReplayToEndpointStream — same reference,
+        // no second delivery path of the gateway's own.
+        expect(Object.is(installed.webhookDelivery(), installed.webhookEvents())).toBe(true);
+        expect(installed.settlementPolicy()).toBeDefined();
       } finally {
         await runtime.stop();
       }

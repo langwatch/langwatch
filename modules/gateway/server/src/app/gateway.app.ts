@@ -501,15 +501,17 @@ export class GatewayApp implements GatewayApi {
           evaluators: setup.dependencies.evaluators,
           monitors: setup.dependencies.monitors,
         },
-        virtualKeyPepper: setup.config.virtualKeyPepper,
+        virtualKeyPepper: setup.config?.virtualKeyPepper,
       }),
       {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
         // `settlementGraceMs` owns the parse, the bound and the warning on the
         // raw `LW_SPEND_SETTLEMENT_GRACE_MS` string, so this carries it as
-        // written and never reads a second answer out of it.
-        settlementGraceMs: settlementGraceMs(setup.config.spendSettlementGraceMs),
+        // written and never reads a second answer out of it. `setup.config`
+        // is undefined only in a test stub that does not care about billing
+        // config; a real boot always parses one through `configSchema`.
+        settlementGraceMs: settlementGraceMs(setup.config?.spendSettlementGraceMs),
       },
     );
   }
@@ -572,7 +574,7 @@ export class GatewayApp implements GatewayApi {
   // than the push half already uses.
 
   /** The endpoint registry a replay names its destination in. */
-  get webhookEndpoints(): {
+  webhookEndpoints(): {
     tryGetDeliverable(input: {
       organizationId: string;
       endpointId: string;
@@ -584,19 +586,17 @@ export class GatewayApp implements GatewayApi {
   }
 
   /** The emitted-envelope log a replay walks, one page at a time. */
-  get webhookEvents(): WebhookApi {
+  webhookEvents(): WebhookApi {
     return this.#spendCollaborators.webhooks;
   }
 
   /**
-   * The live delivery path a replay appends to. `undefined` until the webhook
-   * platform publishes its replay append on `WebhookApi`: the service that
-   * owns it (`WebhookDeliveryService.appendReplayToEndpointStream`) is that
-   * module's private runtime, so a replay refuses by name rather than being
-   * shipped through a second delivery path of the gateway's own.
+   * The live delivery path a replay appends to: the webhook platform's own
+   * `WebhookApi.appendReplayToEndpointStream`, reached through the same
+   * declared peer `webhookEvents()` above already uses.
    */
-  get webhookDelivery(): undefined {
-    return void 0;
+  webhookDelivery(): WebhookApi {
+    return this.#spendCollaborators.webhooks;
   }
 
   /** One spend row rendered as the canonical billing envelope. */
@@ -612,7 +612,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   /** How long after a request an outcome may still arrive. */
-  get settlementPolicy(): FixedGatewaySettlementPolicyAdapter {
+  settlementPolicy(): FixedGatewaySettlementPolicyAdapter {
     return (this.#settlementPolicy ??= FixedGatewaySettlementPolicyAdapter.create(
       this.#spendCollaborators.settlementGraceMs,
     ));
@@ -663,11 +663,11 @@ export class GatewayApp implements GatewayApi {
    * control plane, which the routes refuse by name rather than answering a
    * reconciliation query with a confident zero.
    */
-  get spendEvents(): GatewaySpendEventsService | undefined {
+  spendEvents(): GatewaySpendEventsService | undefined {
     return this.#coreDependencies?.spendEvents;
   }
 
-  get budgetSpend(): GatewayBudgetSpend | undefined {
+  budgetSpend(): GatewayBudgetSpend | undefined {
     return this.#coreDependencies?.budgetSpend;
   }
 

@@ -106,14 +106,14 @@ function buildApp(): void {
     throw new Error("the replay path is not under test here");
   };
   const spend: GatewaySpendApp = {
-    spendEvents: GatewaySpendEventsService.create(repo),
-    budgetSpend: budgets,
-    webhookEndpoints: { tryGetDeliverable: refuse },
-    webhookEvents: undefined,
-    webhookDelivery: undefined,
+    spendEvents: () => GatewaySpendEventsService.create(repo),
+    budgetSpend: () => budgets,
+    webhookEndpoints: () => ({ tryGetDeliverable: refuse }),
+    webhookEvents: () => undefined,
+    webhookDelivery: () => undefined,
     spendEventEnvelope: testEnvelope,
     endpointAcceptsEvent: () => true,
-    settlementPolicy: FixedGatewaySettlementPolicyAdapter.create(15 * 60_000),
+    settlementPolicy: () => FixedGatewaySettlementPolicyAdapter.create(15 * 60_000),
     resolveSpendScope: (input) => {
       scope.clearCache();
       return scope.resolveSpendScope(input);
