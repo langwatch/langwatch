@@ -33,54 +33,82 @@ type MigrationAuthenticationDecision =
       connection: { id: string; organizationId: string };
     };
 
-export function migrationAuthenticationDecision({
+type AuthenticationMatch = {
+  connection: { id: string; organizationId: string };
+  replacementPhase: string | null;
+  legacy: boolean;
+};
+
+/**
+ * What one legacy/replacement pair makes of this callback.
+ *
+ * `namedWithoutBinding` is the case a bare absence cannot express: the
+ * callback names this pair's replacement, but the account presented is not
+ * bound to it. That is a refusal, not a miss — treating it as a miss would let
+ * an unrelated account through a provider it was never linked to.
+ */
+function matchAuthenticationPair({
   callback,
   account,
-  pairs,
+  pair,
 }: {
   callback: { kind: "direct" | "legacy"; providerId: string };
   account: { provider: string; providerAccountId: string };
-  pairs: readonly AuthenticationPair[];
-}): MigrationAuthenticationDecision {
-  const matches: Array<{
-    connection: { id: string; organizationId: string };
-    replacementPhase: string | null;
-    legacy: boolean;
-  }> = [];
-  let directMigrationNamedWithoutBinding = false;
-  for (const pair of pairs) {
-    if (callback.kind === "direct") {
-      const exactAccount = account.provider === pair.replacement.id;
-      if (callback.providerId === pair.replacement.id && exactAccount) {
-        matches.push({
-          connection: {
-            id: pair.replacement.id,
-            organizationId: pair.replacement.organizationId,
-          },
-          replacementPhase: pair.replacement.migrationPhase,
-          legacy: false,
-        });
-      } else if (callback.providerId === pair.replacement.id) {
-        directMigrationNamedWithoutBinding = true;
-      }
-      continue;
+  pair: AuthenticationPair;
+}): { match: AuthenticationMatch | null; namedWithoutBinding: boolean } {
+  if (callback.kind === "direct") {
+    if (callback.providerId !== pair.replacement.id) {
+      return { match: null, namedWithoutBinding: false };
     }
-    const legacyAccount = legacyCallbackMatches({
-      callbackProviderId: callback.providerId,
-      legacyProviderId: pair.legacy.providerId,
-      account,
-    });
-    if (legacyAccount) {
-      matches.push({
+    if (account.provider !== pair.replacement.id) {
+      return { match: null, namedWithoutBinding: true };
+    }
+    return {
+      match: {
         connection: {
-          id: pair.legacy.id,
-          organizationId: pair.legacy.organizationId,
+          id: pair.replacement.id,
+          organizationId: pair.replacement.organizationId,
         },
         replacementPhase: pair.replacement.migrationPhase,
-        legacy: true,
-      });
-    }
+        legacy: false,
+      },
+      namedWithoutBinding: false,
+    };
   }
+
+  const legacyAccount = legacyCallbackMatches({
+    callbackProviderId: callback.providerId,
+    legacyProviderId: pair.legacy.providerId,
+    account,
+  });
+  if (!legacyAccount) return { match: null, namedWithoutBinding: false };
+  return {
+    match: {
+      connection: {
+        id: pair.legacy.id,
+        organizationId: pair.legacy.organizationId,
+      },
+      replacementPhase: pair.replacement.migrationPhase,
+      legacy: true,
+    },
+    namedWithoutBinding: false,
+  };
+}
+
+/**
+ * What the pairs, taken together, say about this callback.
+ *
+ * More than one match is ambiguous: two pairs claiming the same callback and
+ * account cannot be ordered, and recording either would attribute the sign-in
+ * to an organization we are guessing at.
+ */
+function decideFromMatches({
+  matches,
+  directMigrationNamedWithoutBinding,
+}: {
+  matches: readonly AuthenticationMatch[];
+  directMigrationNamedWithoutBinding: boolean;
+}): MigrationAuthenticationDecision {
   if (matches.length > 1) {
     return { action: "reject", code: "SSO_MIGRATION_AUTH_AMBIGUOUS" };
   }
@@ -94,6 +122,65 @@ export function migrationAuthenticationDecision({
     return { action: "reject", code: "SSO_LEGACY_AUTH_RETIRED" };
   }
   return { action: "record", connection: match.connection };
+}
+
+export function migrationAuthenticationDecision({
+  callback,
+  account,
+  pairs,
+}: {
+  callback: { kind: "direct" | "legacy"; providerId: string };
+  account: { provider: string; providerAccountId: string };
+  pairs: readonly AuthenticationPair[];
+}): MigrationAuthenticationDecision {
+  const outcomes = pairs.map((pair) =>
+    matchAuthenticationPair({ callback, account, pair }),
+  );
+  return decideFromMatches({
+    matches: outcomes
+      .map((outcome) => outcome.match)
+      .filter((match): match is AuthenticationMatch => match !== null),
+    directMigrationNamedWithoutBinding: outcomes.some(
+      (outcome) => outcome.namedWithoutBinding,
+    ),
+  });
+}
+
+/**
+ * Whether the replacement's own evidence proves this email domain.
+ *
+ * Verification rows that do not parse are dropped rather than trusted: a proof
+ * we cannot read is not a proof, and reading it as one would qualify a domain
+ * on the strength of a malformed row.
+ */
+function replacementProvesDomain({
+  replacement,
+  domain,
+}: {
+  replacement: {
+    id: string;
+    organizationId: string;
+    replacesConnectionId: string | null;
+    verifiedDomains: string[];
+    domainVerifications: unknown;
+  };
+  domain: string;
+}): boolean {
+  const parsed = ssoDomainVerificationSchema
+    .array()
+    .safeParse(replacement.domainVerifications);
+  return (
+    qualifySsoDomainOwnership({
+      state: {
+        connectionId: replacement.id,
+        organizationId: replacement.organizationId,
+        replacesConnectionId: replacement.replacesConnectionId,
+        verifiedDomains: replacement.verifiedDomains,
+        domainVerifications: parsed.success ? parsed.data : [],
+      },
+      domain,
+    }).status === "QUALIFIED"
+  );
 }
 
 /** Better Auth's migration callback policy, backed only by persisted facts. */
@@ -121,22 +208,46 @@ export class PrismaSsoMigrationCallbackPolicy
       return await this.decideStandaloneLegacyConnection(args);
     }
 
+    const resolved = this.resolveLinkPair({ context, args });
+    if (resolved.kind === "reject") return resolved;
+    const { pair, direct } = resolved;
+
+    const keep = await this.keepAccountsFor({ args, pair });
+    if (keep.kind === "reject") return keep;
+
+    return {
+      kind: "allow_replacement_pair",
+      arrivalConnectionId: direct ? pair.replacement.id : pair.legacy.id,
+      keepAccounts: keep.accounts,
+    } as const;
+  }
+
+  /**
+   * The one pair this account may link through, or the refusal.
+   *
+   * Exactly one: an account matching several pairs is ambiguous rather than a
+   * free choice, because picking one of them would silently decide which
+   * organization the user joins.
+   */
+  private resolveLinkPair({
+    context,
+    args,
+  }: {
+    context: { pairs: readonly AuthenticationPair[] };
+    args: { providerId: string; accountId: string };
+  }) {
     const matching = context.pairs.filter(({ legacy, replacement }) =>
       this.accountMatchesPair({ account: args, legacy, replacement }),
     );
-    if (matching.length === 0) {
+    if (matching.length > 1) {
+      return { kind: "reject", code: "SSO_MIGRATION_LINK_AMBIGUOUS" } as const;
+    }
+    const pair = matching[0];
+    if (!pair) {
       return {
         kind: "reject",
         code: "SSO_MIGRATION_LINK_NOT_ALLOWED",
       } as const;
-    }
-    if (matching.length > 1) {
-      return { kind: "reject", code: "SSO_MIGRATION_LINK_AMBIGUOUS" } as const;
-    }
-
-    const pair = matching[0];
-    if (!pair) {
-      return { kind: "reject", code: "SSO_MIGRATION_LINK_AMBIGUOUS" } as const;
     }
     const direct = args.providerId === pair.replacement.id;
     if (
@@ -145,6 +256,25 @@ export class PrismaSsoMigrationCallbackPolicy
     ) {
       return { kind: "reject", code: "SSO_LEGACY_AUTH_RETIRED" } as const;
     }
+    return { kind: "pair", pair, direct } as const;
+  }
+
+  /**
+   * The at-most-two accounts the pair may keep: the one arriving, and the one
+   * already linked on the other side of the cutover.
+   *
+   * De-duplicated on the exact (provider, account) tuple, so re-presenting the
+   * same account is not counted twice. More than two distinct accounts means
+   * the user holds identities on this pair we cannot order, which is ambiguous
+   * rather than a reason to pick one.
+   */
+  private async keepAccountsFor({
+    args,
+    pair,
+  }: {
+    args: { userId: string; providerId: string; accountId: string };
+    pair: AuthenticationPair;
+  }) {
     const accounts = await this.prisma.account.findMany({
       where: { userId: args.userId, provider: { not: "credential" } },
       select: { provider: true, providerAccountId: true },
@@ -181,11 +311,9 @@ export class PrismaSsoMigrationCallbackPolicy
         code: "SSO_MIGRATION_LINK_NOT_ALLOWED",
       } as const;
     }
-    const second = keepAccounts[1] ?? first;
     return {
-      kind: "allow_replacement_pair",
-      arrivalConnectionId: direct ? pair.replacement.id : pair.legacy.id,
-      keepAccounts: [first, second],
+      kind: "accounts",
+      accounts: [first, keepAccounts[1] ?? first],
     } as const;
   }
 
@@ -255,6 +383,66 @@ export class PrismaSsoMigrationCallbackPolicy
     );
   }
 
+  /**
+   * The legacy/replacement pairs this user's organizations are migrating on.
+   *
+   * A replacement whose predecessor is missing, is not the grandfathered
+   * legacy connection, or whose metadata does not parse yields NO pair rather
+   * than a half-populated one: the callers below decide authentication from a
+   * pair, so an incomplete pair would be a decision made on absent evidence.
+   */
+  private async loadPairs({
+    reads,
+    organizationIds,
+  }: {
+    reads: PrismaClient | Prisma.TransactionClient;
+    organizationIds: string[];
+  }) {
+    const replacements = await reads.ssoConnection.findMany({
+      where: {
+        organizationId: { in: organizationIds },
+        replacesConnectionId: { not: null },
+        migrationPhase: { not: null },
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        replacesConnectionId: true,
+        migrationPhase: true,
+        verifiedDomains: true,
+        domainVerifications: true,
+      },
+    });
+    const predecessors = await reads.ssoConnection.findMany({
+      where: {
+        id: {
+          in: replacements.flatMap(({ replacesConnectionId }) =>
+            replacesConnectionId ? [replacesConnectionId] : [],
+          ),
+        },
+        source: "legacy-grandfathered",
+      },
+      select: { id: true, organizationId: true, idpMetadata: true },
+    });
+    return replacements.flatMap((replacement) => {
+      const predecessor = predecessors.find(
+        (candidate) =>
+          candidate.id === replacement.replacesConnectionId &&
+          candidate.organizationId === replacement.organizationId,
+      );
+      if (!predecessor) return [];
+      const metadata = ssoIdpMetadataSchema.safeParse(predecessor.idpMetadata);
+      if (!metadata.success) return [];
+      return [
+        {
+          replacement,
+          legacy: { ...predecessor, providerId: metadata.data.providerId },
+        },
+      ];
+    });
+  }
+
   private async contextForUser(
     reads: PrismaClient | Prisma.TransactionClient,
     userId: string,
@@ -273,50 +461,11 @@ export class PrismaSsoMigrationCallbackPolicy
         decision: { kind: "not_migrating" } as const,
       } as const;
     }
-    const organizationIds = user.orgMemberships.map(
-      ({ organizationId }) => organizationId,
-    );
-    const replacements = await reads.ssoConnection.findMany({
-      where: {
-        organizationId: { in: organizationIds },
-        replacesConnectionId: { not: null },
-        migrationPhase: { not: null },
-        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
-      },
-      select: {
-        id: true,
-        organizationId: true,
-        replacesConnectionId: true,
-        migrationPhase: true,
-        verifiedDomains: true,
-        domainVerifications: true,
-      },
-    });
-    const predecessorIds = replacements.flatMap(({ replacesConnectionId }) =>
-      replacesConnectionId ? [replacesConnectionId] : [],
-    );
-    const predecessors = await reads.ssoConnection.findMany({
-      where: {
-        id: { in: predecessorIds },
-        source: "legacy-grandfathered",
-      },
-      select: { id: true, organizationId: true, idpMetadata: true },
-    });
-    const pairs = replacements.flatMap((replacement) => {
-      const predecessor = predecessors.find(
-        (candidate) =>
-          candidate.id === replacement.replacesConnectionId &&
-          candidate.organizationId === replacement.organizationId,
-      );
-      if (!predecessor) return [];
-      const metadata = ssoIdpMetadataSchema.safeParse(predecessor.idpMetadata);
-      if (!metadata.success) return [];
-      return [
-        {
-          replacement,
-          legacy: { ...predecessor, providerId: metadata.data.providerId },
-        },
-      ];
+    const pairs = await this.loadPairs({
+      reads,
+      organizationIds: user.orgMemberships.map(
+        ({ organizationId }) => organizationId,
+      ),
     });
     if (pairs.length === 0) {
       return {
@@ -358,25 +507,12 @@ export class PrismaSsoMigrationCallbackPolicy
         } as const,
       } as const;
     }
-    const domain = normalizeDomain(rawDomain);
-    const qualifiedPairs = pairs.filter(({ replacement }) => {
-      const parsed = ssoDomainVerificationSchema
-        .array()
-        .safeParse(replacement.domainVerifications);
-      const domainVerifications = parsed.success ? parsed.data : [];
-      return (
-        qualifySsoDomainOwnership({
-          state: {
-            connectionId: replacement.id,
-            organizationId: replacement.organizationId,
-            replacesConnectionId: replacement.replacesConnectionId,
-            verifiedDomains: replacement.verifiedDomains,
-            domainVerifications,
-          },
-          domain,
-        }).status === "QUALIFIED"
-      );
-    });
+    const qualifiedPairs = pairs.filter(({ replacement }) =>
+      replacementProvesDomain({
+        replacement,
+        domain: normalizeDomain(rawDomain),
+      }),
+    );
     if (qualifiedPairs.length === 0) {
       return {
         kind: "unproved",

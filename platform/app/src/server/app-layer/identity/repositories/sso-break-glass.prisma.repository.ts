@@ -20,6 +20,56 @@ import type {
  * has already been said. That is what keeps "the date it previously ended is
  * still readable in the history" true after somebody renewed.
  */
+/**
+ * Refuse a revocation that would leave the organization with no way back in.
+ *
+ * The guard applies while an ACTIVE connection exists OR while an activation
+ * is mid-flight — the reservation row is the in-flight case, and without it
+ * two administrators revoking concurrently could each see no ACTIVE connection
+ * yet, remove the last two bindings between them, and lock the organization
+ * out the moment the activation lands.
+ *
+ * Counted inside the caller's transaction, under the organization lock it
+ * already holds, so the count cannot change between the check and the update.
+ */
+async function assertNotTheLastWayIn({
+  tx,
+  bindingId,
+  organizationId,
+  nowMs,
+}: {
+  tx: Prisma.TransactionClient;
+  bindingId: string;
+  organizationId: string;
+  nowMs: number;
+}): Promise<void> {
+  const protectedConnection = await tx.ssoConnection.findFirst({
+    where: { organizationId, state: "ACTIVE" },
+    select: { id: true },
+  });
+  const pendingReservations = await tx.$queryRaw<Array<{ commandId: string }>>`
+    SELECT "commandId"
+    FROM "SsoActivationRecoveryReservation"
+    WHERE "organizationId" = ${organizationId}
+    LIMIT 1
+  `;
+  if (protectedConnection === null && pendingReservations.length === 0) return;
+
+  const otherLive = await tx.ssoBreakGlassBinding.count({
+    where: {
+      organizationId,
+      id: { not: bindingId },
+      supersededAt: null,
+      expiresAt: { gt: new Date(nowMs) },
+    },
+  });
+  if (otherLive === 0) {
+    throw new SsoBreakGlassLastWayInError(
+      `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
+    );
+  }
+}
+
 export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -103,33 +153,7 @@ export class PrismaSsoBreakGlassRepository implements SsoBreakGlassRepository {
       const binding = rowToBinding(row);
       if (!breakGlassIsLive({ binding, nowMs })) return binding;
 
-      const protectedConnection = await tx.ssoConnection.findFirst({
-        where: { organizationId, state: "ACTIVE" },
-        select: { id: true },
-      });
-      const pendingReservations = await tx.$queryRaw<
-        Array<{ commandId: string }>
-      >`
-        SELECT "commandId"
-        FROM "SsoActivationRecoveryReservation"
-        WHERE "organizationId" = ${organizationId}
-        LIMIT 1
-      `;
-      if (protectedConnection !== null || pendingReservations.length > 0) {
-        const otherLive = await tx.ssoBreakGlassBinding.count({
-          where: {
-            organizationId,
-            id: { not: bindingId },
-            supersededAt: null,
-            expiresAt: { gt: new Date(nowMs) },
-          },
-        });
-        if (otherLive === 0) {
-          throw new SsoBreakGlassLastWayInError(
-            `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
-          );
-        }
-      }
+      await assertNotTheLastWayIn({ tx, bindingId, organizationId, nowMs });
 
       const revoked = await tx.ssoBreakGlassBinding.update({
         where: { id: bindingId },

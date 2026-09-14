@@ -20,6 +20,62 @@ import { rowToConnection } from "./sso-connection-projection.prisma.repository";
  * what lets the picker say "your organization has paused this" instead of
  * silently offering a password form.
  */
+/** The other half of a migrating pair, if this row is in one. */
+function partnerOf(
+  rows: SsoConnection[],
+  row: SsoConnection,
+): SsoConnection | undefined {
+  return rows.find(
+    (candidate) =>
+      candidate.organizationId === row.organizationId &&
+      (candidate.id === row.replacesConnectionId ||
+        candidate.replacesConnectionId === row.id),
+  );
+}
+
+/**
+ * Which side of this row, if any, normal sign-in can be offered.
+ *
+ * A paired row keeps whichever side the cutover currently routes to, while
+ * that side is ACTIVE or SUSPENDED — a suspended connection is still where
+ * that organization's people belong. An unpaired row is kept only while
+ * ACTIVE: there is no second side to fall back to.
+ */
+function routableSideOf(
+  row: SsoConnection,
+  partner: SsoConnection | undefined,
+): SsoConnection | null {
+  if (partner === undefined) return row.state === "ACTIVE" ? row : null;
+  const routed = selectMigrationRoute([row, partner], "normal");
+  if (routed === null) return null;
+  return routed.state === "ACTIVE" || routed.state === "SUSPENDED"
+    ? routed
+    : null;
+}
+
+/**
+ * One row per organization, with a migrating pair collapsed to the side normal
+ * sign-in goes through.
+ *
+ * A pair is taken together or not at all: offering both halves would present
+ * an organization mid-cutover as two separate places to sign in.
+ */
+function routableRows(rows: SsoConnection[]): SsoConnection[] {
+  const paired = new Set<string>();
+  const selected: SsoConnection[] = [];
+  for (const row of rows) {
+    if (paired.has(row.id)) continue;
+    const partner = partnerOf(rows, row);
+    if (partner !== undefined) {
+      paired.add(row.id);
+      paired.add(partner.id);
+    }
+    const side = routableSideOf(row, partner);
+    if (side !== null) selected.push(side);
+  }
+  return selected;
+}
+
 export class SsoConnectionDomainRoutingRepository
   implements SignInDomainRoutingPort
 {
@@ -107,31 +163,7 @@ export class SsoConnectionDomainRoutingRepository
       where: { state: { notIn: ["DISCARDED", "TORN_DOWN"] } },
       orderBy: { createdAt: "asc" },
     });
-    const paired = new Set<string>();
-    const selected: SsoConnection[] = [];
-    for (const row of rows) {
-      if (paired.has(row.id)) continue;
-      const partner = rows.find(
-        (candidate) =>
-          candidate.organizationId === row.organizationId &&
-          (candidate.id === row.replacesConnectionId ||
-            candidate.replacesConnectionId === row.id),
-      );
-      if (partner === undefined) {
-        if (row.state === "ACTIVE") selected.push(row);
-        continue;
-      }
-      paired.add(row.id);
-      paired.add(partner.id);
-      const routed = selectMigrationRoute([row, partner], "normal");
-      if (
-        routed !== null &&
-        (routed.state === "ACTIVE" || routed.state === "SUSPENDED")
-      ) {
-        selected.push(routed);
-      }
-    }
-    return Promise.all(selected.map((row) => this.routable(row)));
+    return Promise.all(routableRows(rows).map((row) => this.routable(row)));
   }
 
   /**
