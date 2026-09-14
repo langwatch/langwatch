@@ -86,16 +86,26 @@ export type AuthSignUpCollaborators = Readonly<{
  */
 export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
   Readonly<{
-    /** The address the identifier ledger holds for a person, where it holds one. */
-    identityEmails: IdentityEmailService;
-    /** The shared counter every front-door throttle meters through. */
-    rateLimit(
-      input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-    ): Promise<Readonly<{ allowed: boolean }>>;
-    /** Where an address signs in. The decision object IS the contract. */
-    route(
-      input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
-    ): Promise<RoutingDecision>;
+    /** The address the identifier ledger holds for a person, where it holds
+     * one. `undefined` until the front-door wiring lane supplies identity's
+     * service — the session read then falls back to the stored user's own
+     * address, which is the documented chain, not a degraded one. */
+    identityEmails: IdentityEmailService | undefined;
+    /** The shared counter every front-door throttle meters through.
+     * `undefined` until the front-door wiring lane supplies it; the throttled
+     * operations then refuse by name rather than crash. */
+    rateLimit:
+      | ((
+          input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+        ) => Promise<Readonly<{ allowed: boolean }>>)
+      | undefined;
+    /** Where an address signs in. The decision object IS the contract.
+     * `undefined` until the front-door wiring lane supplies it. */
+    route:
+      | ((
+          input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
+        ) => Promise<RoutingDecision>)
+      | undefined;
     /**
      * The sign-up ceremony, or nothing. Absent together and that is not an
      * accident: without a base URL a confirmation link points at nowhere, and
@@ -104,8 +114,9 @@ export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
     signUp: AuthSignUpCollaborators | null;
     /** The invitation reads, or nothing where this process composed none. */
     invites: AuthInviteDirectory | null;
-    /** This deployment's sign-in mode, ADR-027's single source of truth. */
-    authProvider(): Promise<string>;
+    /** This deployment's sign-in mode, ADR-027's single source of truth.
+     * `undefined` until the front-door wiring lane supplies it. */
+    authProvider: (() => Promise<string>) | undefined;
     /** Names this process in every refusal below. */
     processName: string;
     /** Process time, injected so session expiry has deterministic tests. */
@@ -347,13 +358,27 @@ export class AuthApp implements AuthApiContract {
   async isWithinBudget(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<boolean> {
-    return (await this.#members.rateLimit(input)).allowed;
+    const rateLimit = this.#members.rateLimit;
+    if (!rateLimit) {
+      throw new AuthUnavailableError({
+        capability: "rate-limit counter, so it cannot meter this operation",
+        processName: this.#members.processName,
+      });
+    }
+    return (await rateLimit(input)).allowed;
   }
 
   route(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
   ): Promise<RoutingDecision> {
-    return this.#members.route(input);
+    const route = this.#members.route;
+    if (!route) {
+      throw new AuthUnavailableError({
+        capability: "sign-in routing directory, so it cannot decide where this address signs in",
+        processName: this.#members.processName,
+      });
+    }
+    return route(input);
   }
 
   async addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean> {
@@ -379,7 +404,14 @@ export class AuthApp implements AuthApiContract {
   }
 
   resolveAuthProvider(): Promise<string> {
-    return this.#members.authProvider();
+    const authProvider = this.#members.authProvider;
+    if (!authProvider) {
+      throw new AuthUnavailableError({
+        capability: "sign-in mode configuration, so it cannot name this deployment's auth provider",
+        processName: this.#members.processName,
+      });
+    }
+    return authProvider();
   }
 
   /** The ceremony, or the refusal that names why this process has none. */

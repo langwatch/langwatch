@@ -24,7 +24,9 @@ export interface BrowserSessionDeps {
   sessions: AuthSessionRepository;
   /** Absent where the deployment composed no cache: the database still answers. */
   cache: AuthSessionCacheRepository | null;
-  identityEmails: IdentityEmailService;
+  /** Absent until the front-door wiring lane lands; the read then falls back
+   * to the stored user's own address, per the chain below. */
+  identityEmails: IdentityEmailService | undefined;
   users: UserApi;
   now(): Instant;
 }
@@ -56,7 +58,7 @@ export class BrowserSessionService {
         id: verified.user.id,
         name: verified.user.name ?? null,
         email:
-          (await this.deps.identityEmails.tryResolveEmail({ userId: verified.user.id })) ??
+          (await this.deps.identityEmails?.tryResolveEmail({ userId: verified.user.id })) ??
           user?.email ??
           verified.user.email ??
           null,
@@ -89,7 +91,7 @@ export class BrowserSessionService {
         id: impersonation.data.id,
         name: impersonation.data.name ?? null,
         email:
-          (await this.deps.identityEmails.tryResolveEmail({ userId: impersonation.data.id })) ??
+          (await this.deps.identityEmails?.tryResolveEmail({ userId: impersonation.data.id })) ??
           impersonatedUser.email ??
           impersonation.data.email ??
           null,
