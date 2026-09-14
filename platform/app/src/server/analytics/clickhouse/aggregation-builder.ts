@@ -84,6 +84,17 @@ const SPAN_TIME_FILTER_START_END =
   "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
+/**
+ * The event the feedbacks query reads, as a SQL literal.
+ *
+ * One constant because two places have to agree on it: the outer filter that
+ * selects the exploded event, and the predicate pushed into the stored_spans
+ * subquery so `Events.Attributes` is only read for spans that carry the event.
+ * The second is only result-preserving while it names the same event as the
+ * first, so they are not allowed to drift apart.
+ */
+const FEEDBACK_EVENT_NAME_SQL = "'thumbs_up_down'";
+
 // Partition-pruning bounds for the evaluation_runs JOIN subquery. The query
 // windows on trace OccurredAt, but evaluation_runs is partitioned by
 // ScheduledAt per the migrations (and by UpdatedAt on long-lived deployments
@@ -3224,6 +3235,19 @@ export function buildFeedbacksQuery(
   // Prune the stored_spans JOIN to identity columns plus the Events.* arrays
   // the feedback ARRAY JOIN reads, and push the StartTime window into the
   // subquery, instead of joining the full analytics column set (#2551 / #2605).
+  //
+  // The event-name predicate rides along for a different reason. It prunes no
+  // granules, because nothing indexes `Events.Name`; what it does is reach
+  // PREWHERE, so the light `Array(LowCardinality(String))` is read first and
+  // `Events.Attributes` is materialised only for the spans that carry a vote
+  // event. That map is `Array(Map(LowCardinality(String), String))` and is by
+  // far the widest column in the select list, and a span carrying a vote is a
+  // small minority of the window.
+  //
+  // It cannot change the result: the outer query ARRAY JOINs these arrays and
+  // then keeps only `event_name = 'thumbs_up_down'`, which a span satisfies
+  // exactly when its `Events.Name` contains that value. Every row this drops is
+  // one the outer filter would have dropped anyway.
   const spanJoin = buildJoinClause({
     table: "stored_spans",
     requiredColumns: new Set([
@@ -3232,6 +3256,7 @@ export function buildFeedbacksQuery(
       '"Events.Attributes"',
     ]),
     spanTimeFilter: SPAN_TIME_FILTER_START_END,
+    spanRowFilter: `AND has("Events.Name", ${FEEDBACK_EVENT_NAME_SQL})`,
   });
 
   const sql = `
@@ -3250,7 +3275,7 @@ export function buildFeedbacksQuery(
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
-      AND event_name = 'thumbs_up_down'
+      AND event_name = ${FEEDBACK_EVENT_NAME_SQL}
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
     ORDER BY event_timestamp DESC

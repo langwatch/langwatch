@@ -481,6 +481,17 @@ export function getTableAlias(table: CHTable): string {
 }
 
 /**
+ * Render an optional WHERE fragment, leading space and all, or nothing.
+ *
+ * The subqueries below append several of these, and each one written inline is
+ * a branch the reader has to hold; naming it once keeps the clause assembly
+ * readable as a list of what may be appended.
+ */
+function optionalPredicate(fragment: string | undefined): string {
+  return fragment ? ` ${fragment}` : "";
+}
+
+/**
  * Build JOIN clause for a table, selecting only the columns needed.
  *
  * @param table - The table to JOIN
@@ -493,6 +504,14 @@ export function getTableAlias(table: CHTable): string {
  *   on `TenantId` only and cold-scans every weekly partition (incl. S3-tiered
  *   ones). The caller passes the fragment matching its date regime; the referenced
  *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
+ * @param spanRowFilter - Optional SQL fragment restricting which `stored_spans`
+ *   rows the subquery returns (e.g. `AND has("Events.Name", 'thumbs_up_down')`).
+ *   Distinct from `spanTimeFilter`, which prunes partitions: this one prunes
+ *   nothing, and exists so a predicate on a light column reaches PREWHERE ahead
+ *   of the heavy columns in the select list. A caller may only pass a predicate
+ *   its outer query already implies, since the subquery feeds an inner JOIN and
+ *   a row dropped here is a row the outer query never sees. Ignored for
+ *   non-`stored_spans` tables.
  * @param evalTimeFilter - Optional SQL fragment bounding the `evaluation_runs`
  *   subquery's partition column (e.g. `AND ScheduledAt >= {startDate} - INTERVAL
  *   7 DAY AND UpdatedAt >= {startDate} - INTERVAL 7 DAY`). Same disease as
@@ -506,11 +525,13 @@ export function buildJoinClause({
   table,
   requiredColumns,
   spanTimeFilter,
+  spanRowFilter,
   evalTimeFilter,
 }: {
   table: CHTable;
   requiredColumns?: ReadonlySet<string>;
   spanTimeFilter?: string;
+  spanRowFilter?: string;
   evalTimeFilter?: string;
 }): string {
   const alias = tableAliases[table];
@@ -521,14 +542,15 @@ export function buildJoinClause({
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
-      const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      const timeBound = optionalPredicate(spanTimeFilter);
+      const rowBound = optionalPredicate(spanRowFilter);
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${timeBound}${rowBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
         : EVALUATION_ANALYTICS_COLUMNS;
-      const evalTimeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
+      const evalTimeBound = optionalPredicate(evalTimeFilter);
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
         WHERE TenantId = {tenantId:String}${evalTimeBound}

@@ -1713,6 +1713,37 @@ describe("aggregation-builder", () => {
       );
     });
 
+    it("pushes the event-name predicate into the stored_spans subquery", () => {
+      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+
+      // Located rather than merely matched. The predicate is only worth
+      // anything inside the subquery, where it reaches PREWHERE ahead of the
+      // heavy Events.Attributes map; asserting the fragment alone would pass on
+      // a query that had it in the outer WHERE, which is where it already was.
+      const subqueryStart = result.sql.indexOf("FROM stored_spans WHERE");
+      const subqueryEnd = result.sql.indexOf(") ss ON", subqueryStart);
+      const predicate = result.sql.indexOf(
+        `has("Events.Name", 'thumbs_up_down')`,
+      );
+      expect(subqueryStart).toBeGreaterThan(-1);
+      expect(subqueryEnd).toBeGreaterThan(subqueryStart);
+      expect(predicate).toBeGreaterThan(subqueryStart);
+      expect(predicate).toBeLessThan(subqueryEnd);
+    });
+
+    it("names the same event in the subquery predicate and the outer filter", () => {
+      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+
+      // The subquery predicate only preserves the result while it names the
+      // event the outer filter keeps. If someone changes one literal, this
+      // fails rather than silently dropping every feedback row.
+      const pushed = /has\("Events\.Name", ('[^']+')\)/.exec(result.sql);
+      const outer = /event_name = ('[^']+')/.exec(result.sql);
+      expect(pushed?.[1]).toBeDefined();
+      expect(outer?.[1]).toBeDefined();
+      expect(pushed?.[1]).toBe(outer?.[1]);
+    });
+
     it("includes filters when provided with parameterized values", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
