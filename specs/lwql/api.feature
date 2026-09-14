@@ -1131,6 +1131,18 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       And an organization key passes the union of its analytics:view projects
       And a key with the permission on no project passes an empty scope, which reads zero rows
 
+    # Advisory, never a refusal: a key that can read several projects gets the
+    # union of their rows unless the query narrows to one, so a result spanning
+    # more than one is flagged with the count for a caller who did not mean to
+    # aggregate across them. Computed from the returned rows, only when the
+    # project column was selected.
+    @unit
+    Scenario: A result spanning several projects carries a diagnostic naming the count
+      Given a query result carrying the project column with rows from more than one project
+      When the diagnostics are computed
+      Then a MULTI_PROJECT_RESULT diagnostic names how many projects contributed
+      And a result confined to one project, or one that did not select the project column, carries no such diagnostic
+
   Rule: Narrow to one project inside the query
 
     @e2e @unimplemented

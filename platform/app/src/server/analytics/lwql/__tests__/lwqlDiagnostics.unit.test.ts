@@ -137,6 +137,48 @@ describe("given a LangWatchQL query that ran", () => {
     });
   });
 
+  describe("when the result spans more than one project", () => {
+    const PROJECT_SQL =
+      "SELECT TenantId FROM analytics.traces " +
+      "WHERE OccurredAt >= toDateTime64('2026-02-16 00:00:00', 3)";
+    const TENANT_COLUMN: LangWatchQLColumn = { name: "TenantId", type: "String" };
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("names how many projects contributed", () => {
+      const diagnostics = diagnose({
+        sql: PROJECT_SQL,
+        columns: [TENANT_COLUMN],
+        rows: [{ TenantId: "a" }, { TenantId: "b" }, { TenantId: "a" }],
+      });
+
+      expect(codesOf(diagnostics)).toEqual(["MULTI_PROJECT_RESULT"]);
+      expect(find(diagnostics, "MULTI_PROJECT_RESULT")!.meta).toMatchObject({
+        projectCount: 2,
+      });
+    });
+
+    it("stays silent when every row belongs to one project", () => {
+      const diagnostics = diagnose({
+        sql: PROJECT_SQL,
+        columns: [TENANT_COLUMN],
+        rows: [{ TenantId: "a" }, { TenantId: "a" }],
+      });
+
+      expect(codesOf(diagnostics)).toEqual([]);
+    });
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("does not fire when the project column was not selected", () => {
+      const diagnostics = diagnose({
+        sql: BOUNDED_TRACES,
+        columns: [{ name: "TraceId", type: "String" }],
+        rows: [{ TraceId: "a" }, { TraceId: "b" }],
+      });
+
+      expect(codesOf(diagnostics)).toEqual([]);
+    });
+  });
+
   describe("when a join widens the grain", () => {
     it("names the repeated dataset, its measures, and the key the join left unmatched", () => {
       const diagnostics = diagnose({

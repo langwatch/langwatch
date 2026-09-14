@@ -12292,6 +12292,7 @@
                           "code": {
                             "type": "string",
                             "enum": [
+                              "MULTI_PROJECT_RESULT",
                               "POSSIBLE_FANOUT",
                               "UNBOUNDED_TIME_RANGE",
                               "MISSING_TIME_BUCKETS",

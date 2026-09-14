@@ -8912,7 +8912,7 @@ export interface operations {
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;

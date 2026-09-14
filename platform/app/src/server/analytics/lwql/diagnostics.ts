@@ -57,6 +57,8 @@ import type {
  * that shape.
  */
 export const LWQL_DIAGNOSTIC_CODES = [
+  /** The result carries rows from more than one project the key can read. */
+  "MULTI_PROJECT_RESULT",
   /** A join repeats one dataset's rows once per row of another. */
   "POSSIBLE_FANOUT",
   /** A dataset was read with no predicate on the column that prunes it. */
@@ -127,9 +129,57 @@ export function lwqlDiagnostics(
   input: LangWatchQLDiagnosticsInput,
 ): readonly LangWatchQLDiagnostic[] {
   return [
+    ...multiProjectDiagnostics(input),
     ...fanoutDiagnostics(input),
     ...unboundedTimeRangeDiagnostics(input),
     ...timeBucketDiagnostics(input),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Multi-project result
+// ---------------------------------------------------------------------------
+
+/** The project-identifier column, matched however the caller cased it. */
+const PROJECT_ID_COLUMN = "tenantid";
+
+/**
+ * Notes when a result draws rows from more than one project.
+ *
+ * A key that can read several projects gets the union of their rows unless the
+ * query narrows to one, and a caller who did not mean to aggregate across
+ * projects would misread the total. The count is computed from the rows already
+ * returned — no second query — and only when the caller selected the project
+ * column: without it the projects are not in the result to count, and guessing
+ * would mean inventing the fact the diagnostic reports.
+ *
+ * Fires only for a count above one: a single-project result is the ordinary
+ * case and says nothing worth reading twice.
+ */
+function multiProjectDiagnostics({
+  columns,
+  rows,
+}: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
+  const column = columns.find(
+    (candidate) => candidate.name.trim().toLowerCase() === PROJECT_ID_COLUMN,
+  );
+  if (!column) return [];
+
+  const projects = new Set(rows.map((row) => row[column.name]));
+  if (projects.size <= 1) return [];
+
+  return [
+    {
+      code: "MULTI_PROJECT_RESULT",
+      message:
+        `This result draws rows from ${projects.size} projects this key can read. ` +
+        `If you meant one, filter on ${column.name} — for example ` +
+        `WHERE ${column.name} = '<project id>'.`,
+      meta: {
+        /** How many distinct projects contributed rows to this result. */
+        projectCount: projects.size,
+      },
+    },
   ];
 }
 
