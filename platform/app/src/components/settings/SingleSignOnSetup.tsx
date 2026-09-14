@@ -179,7 +179,7 @@ function ConnectedJourney({
   view: SelfServeSetupView;
   connection: NonNullable<SelfServeSetupView["connection"]>;
 }) {
-  const { availability, claims, record, serviceProvider, goLive } = view;
+  const { availability, goLive } = view;
   // The caller already refused an unavailable organization, but destructuring
   // here starts from the whole union again — so `proof`, which only the
   // available branch carries, was being read off a type that may not have it.
@@ -204,105 +204,14 @@ function ConnectedJourney({
       )}
       <ConnectionSummary connection={connection} goLive={goLive} />
 
-      <SetupSteps>
-        <SetupStep
-          number={1}
-          title="Your identity provider"
-          state={progress.provider}
-          summary={connection.providerId}
-        >
-          <ServiceProviderDetails
-            serviceProvider={serviceProvider}
-            connected
-            protocol={connection.type}
-          />
-        </SetupStep>
-
-        <SetupStep
-          number={2}
-          title="Prove a domain is yours"
-          state={progress.domain}
-          summary={
-            connection.verifiedDomains.length > 0
-              ? `${connection.verifiedDomains.join(", ")} proved`
-              : undefined
-          }
-        >
-          <DomainsSection
-            claims={claims}
-            connection={connection}
-            record={record}
-            canManage={canManage}
-            organizationId={organizationId}
-            connectionId={connection.connectionId}
-            provesWithLicense={provesWithLicense}
-          />
-        </SetupStep>
-
-        <SetupStep
-          number={3}
-          title="Sign in through it once"
-          state={progress.testSignIn}
-          summary={
-            goLive?.testSignIn.atMs
-              ? `Worked on ${new Date(goLive.testSignIn.atMs).toLocaleString()}`
-              : undefined
-          }
-        >
-          <TestSignInSection
-            connectionId={connection.connectionId}
-            providerName={connection.providerId}
-            canManage={canManage}
-            testSignIn={goLive?.testSignIn ?? { done: false, atMs: null }}
-          />
-        </SetupStep>
-
-        <SetupStep
-          number={4}
-          title="Name someone who can still get in"
-          state={progress.breakGlass}
-        >
-          <BreakGlassSection
-            organizationId={organizationId}
-            canManage={canManage}
-          />
-        </SetupStep>
-
-        {/* The closed step keeps the answer somebody gave — a tick alone
-            would hide the very fact the step exists to establish — and it
-            keeps it in the shared vocabulary, so the summary here is the
-            label on the radio and the row on the overview, word for word. */}
-        <SetupStep
-          number={5}
-          title="Say who it lets in"
-          state={progress.arrivals}
-          summary={arrivalAnswerLabel(
-            SSO_ANSWER_BY_POLICY[connection.arrivalPolicy],
-          )}
-        >
-          <ArrivalsSection
-            organizationId={organizationId}
-            connectionId={connection.connectionId}
-            canManage={canManage}
-            policy={connection.arrivalPolicy}
-          />
-        </SetupStep>
-
-        <SetupStep
-          number={6}
-          title="Turn it on"
-          state={progress.goLive}
-          note={progress.goLiveBlockedBecause ?? undefined}
-          last
-        >
-          <GoLiveSection
-            organizationId={organizationId}
-            connectionId={connection.connectionId}
-            canManage={canManage}
-            goLive={goLive}
-          />
-        </SetupStep>
-      </SetupSteps>
+      <SetupJourneySteps
+        organizationId={organizationId}
+        canManage={canManage}
+        connection={connection}
+        view={view}
+        progress={progress}
+        provesWithLicense={provesWithLicense}
+      />
 
       {canManage && (
         <RemoveConnectionSection
@@ -366,6 +275,29 @@ function LegacyMigrationStart({
   );
 }
 
+/**
+ * A domain the replacement inherited, and what it was proved by.
+ *
+ * The provenance is named rather than implied: a domain carried over from the
+ * legacy configuration was trusted because LangWatch trusted it then, which is
+ * not the same evidence as a record the customer published, and an
+ * administrator reviewing the cutover is entitled to tell them apart.
+ */
+function inheritedDomainLine(entry: {
+  domain: string;
+  method: string;
+}): string {
+  const proof =
+    entry.method === "operator-attested"
+      ? "operator attestation"
+      : entry.method === "dns-txt" || entry.method === "https-file"
+        ? "published domain proof"
+        : entry.method === "license-token"
+          ? "installation licence"
+          : "existing legacy configuration";
+  return `${entry.domain} (${proof})`;
+}
+
 function MigrationProgress({
   organizationId,
   canManage,
@@ -405,19 +337,7 @@ function MigrationProgress({
       </SettingList>
       {migration.inheritedDomains.length > 0 && (
         <Text fontSize="xs" color="fg.muted">
-          {migration.inheritedDomains
-            .map((entry) => {
-              const proof =
-                entry.method === "operator-attested"
-                  ? "operator attestation"
-                  : entry.method === "dns-txt" || entry.method === "https-file"
-                    ? "published domain proof"
-                    : entry.method === "license-token"
-                      ? "installation licence"
-                      : "existing legacy configuration";
-              return `${entry.domain} (${proof})`;
-            })
-            .join(", ")}
+          {migration.inheritedDomains.map(inheritedDomainLine).join(", ")}
         </Text>
       )}
       {migration.members.stragglers.length > 0 && (
@@ -730,5 +650,164 @@ function ConnectionSummary({
         </Text>
       )}
     </SettingsCard>
+  );
+}
+
+/**
+ * The six steps of setting a connection up, in the order they are done.
+ *
+ * A CLOSED step keeps the answer somebody gave — a tick alone would hide the
+ * very fact the step exists to establish — and keeps it in the shared
+ * vocabulary, so the summary here is the label on the radio and the row on the
+ * overview, word for word.
+ */
+function SetupJourneySteps({
+  organizationId,
+  canManage,
+  connection,
+  view,
+  progress,
+  provesWithLicense,
+}: {
+  organizationId: string;
+  canManage: boolean;
+  connection: NonNullable<SelfServeSetupView["connection"]>;
+  view: SelfServeSetupView;
+  progress: ReturnType<typeof setupProgressFor>;
+  provesWithLicense: boolean;
+}) {
+  const { claims, record, serviceProvider, goLive } = view;
+  return (
+    <SetupSteps>
+      <SetupStep
+        number={1}
+        title="Your identity provider"
+        state={progress.provider}
+        summary={connection.providerId}
+      >
+        <ServiceProviderDetails
+          serviceProvider={serviceProvider}
+          connected
+          protocol={connection.type}
+        />
+      </SetupStep>
+
+      <SetupStep
+        number={2}
+        title="Prove a domain is yours"
+        state={progress.domain}
+        summary={
+          connection.verifiedDomains.length > 0
+            ? `${connection.verifiedDomains.join(", ")} proved`
+            : undefined
+        }
+      >
+        <DomainsSection
+          claims={claims}
+          connection={connection}
+          record={record}
+          canManage={canManage}
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+          provesWithLicense={provesWithLicense}
+        />
+      </SetupStep>
+
+      <SetupStep
+        number={3}
+        title="Sign in through it once"
+        state={progress.testSignIn}
+        summary={
+          goLive?.testSignIn.atMs
+            ? `Worked on ${new Date(goLive.testSignIn.atMs).toLocaleString()}`
+            : undefined
+        }
+      >
+        <TestSignInSection
+          connectionId={connection.connectionId}
+          providerName={connection.providerId}
+          canManage={canManage}
+          testSignIn={goLive?.testSignIn ?? { done: false, atMs: null }}
+        />
+      </SetupStep>
+
+      <GoLiveSteps
+        organizationId={organizationId}
+        canManage={canManage}
+        connection={connection}
+        progress={progress}
+        goLive={goLive}
+      />
+    </SetupSteps>
+  );
+}
+
+/**
+ * The last three steps: a way back in, who it lets in, and turning it on.
+ *
+ * They are the ones that change what happens to OTHER PEOPLE, which is why
+ * they come after the connection has been proved and signed into once.
+ */
+function GoLiveSteps({
+  organizationId,
+  canManage,
+  connection,
+  progress,
+  goLive,
+}: {
+  organizationId: string;
+  canManage: boolean;
+  connection: NonNullable<SelfServeSetupView["connection"]>;
+  progress: ReturnType<typeof setupProgressFor>;
+  goLive: SelfServeSetupView["goLive"];
+}) {
+  return (
+    <>
+      <SetupStep
+        number={4}
+        title="Name someone who can still get in"
+        state={progress.breakGlass}
+      >
+        <BreakGlassSection
+          organizationId={organizationId}
+          canManage={canManage}
+        />
+      </SetupStep>
+
+      {/* The closed step keeps the answer somebody gave — a tick alone
+          would hide the very fact the step exists to establish — and it
+          keeps it in the shared vocabulary, so the summary here is the
+          label on the radio and the row on the overview, word for word. */}
+      <SetupStep
+        number={5}
+        title="Say who it lets in"
+        state={progress.arrivals}
+        summary={arrivalAnswerLabel(
+          SSO_ANSWER_BY_POLICY[connection.arrivalPolicy],
+        )}
+      >
+        <ArrivalsSection
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+          canManage={canManage}
+          policy={connection.arrivalPolicy}
+        />
+      </SetupStep>
+
+      <SetupStep
+        number={6}
+        title="Turn it on"
+        state={progress.goLive}
+        note={progress.goLiveBlockedBecause ?? undefined}
+        last
+      >
+        <GoLiveSection
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+          canManage={canManage}
+          goLive={goLive}
+        />
+      </SetupStep>
+    </>
   );
 }
