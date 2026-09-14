@@ -68,6 +68,17 @@ const harness = vi.hoisted(() => ({
    */
   lanesReport: true,
   /**
+   * Whether the METERED lane is the only one reporting.
+   *
+   * The shape an organization with gateway traffic and no provider bill
+   * produces: no hidden governance project, so the billed lane, the provider
+   * bars and the seats hold nothing, while the ledger scoped to the
+   * organization's own projects answers for real. Its own knob because the
+   * page has to treat that as connected — one lane reporting IS a source
+   * reporting — and `lanesReport` alone cannot say "some of them".
+   */
+  meteredOnly: false,
+  /**
    * The billed lane's per-provider window totals, as the summary read answers
    * them. Empty by default: the provider panel is not what most of this file
    * is about, and an empty list renders nothing.
@@ -174,25 +185,26 @@ vi.mock("~/utils/api", () => ({
                 // In the DTO's own shape: the US dollar line IS the lane's
                 // dollar figure, and a lane that reported nothing has no line
                 // at all.
-                billed: harness.lanesReport
-                  ? {
-                      amountUsd: 123.45,
-                      cellsWithoutAmount: 0,
-                      currenciesWithoutUsdAmount: [],
-                      currencyTotals: [
-                        {
-                          currencyCode: "USD",
-                          amount: 123.45,
-                          cellsWithoutAmount: 0,
-                        },
-                      ],
-                    }
-                  : {
-                      amountUsd: null,
-                      cellsWithoutAmount: 0,
-                      currenciesWithoutUsdAmount: [],
-                      currencyTotals: [],
-                    },
+                billed:
+                  harness.lanesReport && !harness.meteredOnly
+                    ? {
+                        amountUsd: 123.45,
+                        cellsWithoutAmount: 0,
+                        currenciesWithoutUsdAmount: [],
+                        currencyTotals: [
+                          {
+                            currencyCode: "USD",
+                            amount: 123.45,
+                            cellsWithoutAmount: 0,
+                          },
+                        ],
+                      }
+                    : {
+                        amountUsd: null,
+                        cellsWithoutAmount: 0,
+                        currenciesWithoutUsdAmount: [],
+                        currencyTotals: [],
+                      },
                 gateway: harness.lanesReport
                   ? {
                       amountUsd: 67.89,
@@ -219,7 +231,7 @@ vi.mock("~/utils/api", () => ({
                     ? [
                         costDay({
                           day: "2026-08-01",
-                          billedUsd: 123.45,
+                          billedUsd: harness.meteredOnly ? null : 123.45,
                           gatewayUsd: 67.89,
                           // A real day that reported dollars metered tokens
                           // too. Left out, the token chart folds `undefined`
@@ -270,6 +282,7 @@ beforeEach(() => {
   };
   harness.spenders = { data: undefined, isError: false, refetch: vi.fn() };
   harness.lanesReport = true;
+  harness.meteredOnly = false;
   harness.providers = [];
   harness.dailyByProvider = undefined;
   harness.periodRecords = undefined;
@@ -555,6 +568,43 @@ describe("the cost breakdown panels", () => {
           "Fills from the activity a connected source reports.",
         ),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * An organization with gateway traffic and no provider bill.
+   *
+   * Its summary holds a metered figure and nothing else, because the lanes it
+   * is missing are the ones keyed by a hidden governance project it has never
+   * minted. The screen must read that as connected: one lane reporting is a
+   * source reporting, and the headcount beside it is a measurement of the
+   * organization, not of the bill.
+   */
+  describe("given only the metered lane reports", () => {
+    /** @scenario "A metered figure with nothing billed still counts the organization's people" */
+    it("shows the headcount and does not say nothing was recorded", () => {
+      harness.lanesReport = true;
+      harness.meteredOnly = true;
+      harness.activity.summary = {
+        activeUsersThisWindow: 7,
+        newUsersThisWindow: 2,
+        spentThisWindowUsd: "0",
+      };
+
+      renderScreen();
+
+      const adoption = screen
+        .getByText("Adoption")
+        .closest("[data-testid='cost-panel']") as HTMLElement;
+      expect(within(adoption).getByText("7")).toBeInTheDocument();
+      // The banner and the headcount are decided by one test, so a screen
+      // showing either must not be showing the other.
+      expect(
+        screen.queryByTestId("cost-lanes-unavailable"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(adoption).queryByRole("link", { name: /Add a source/ }),
+      ).not.toBeInTheDocument();
     });
   });
 

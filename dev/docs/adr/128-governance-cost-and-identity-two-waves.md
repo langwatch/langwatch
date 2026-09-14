@@ -2070,6 +2070,74 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.20 (2026-09-14, captain: Sergio Esteban).** Removes the two null-gates
+  that answered an organization question with the existence of one hidden
+  project, and records why the invariant they were defending survives without
+  them. Supersedes the **Second** limit on Ruling 6 in v3.18 (which v3.19 left
+  standing). No schema change; no change to the money scope.
+
+  - **What the gates were.** Both services short-circuited on
+    `resolveGovProjectId` returning null. The activity monitor returned
+    `EMPTY_SUMMARY` before issuing any read; the cost service returned
+    `unavailable({ reason: "no_governance_project" })` above every lane of the
+    summary. The first is deleted by commit `74d53ad732` ("count adoption
+    without a governance project, and show failed reads as failed"), which
+    touched no ADR; the second is deleted in this PR, where `summary()` moves
+    its five governance-tenant-scoped reads into a private
+    `readGovernanceTenantLanes()` that returns empty answers when the tenant is
+    null, and lets the organization-scoped lanes — the gateway metered lane
+    through `sumDaysForOrganizationProjects({ tenantIds })`, plus two Prisma
+    reads — answer for real. `summary()` can no longer report
+    `no_governance_project` at all. The reason survives only on the four
+    breakdowns (`spenderBreakdown`, `dailyByProvider`, `spendByModel`,
+    `periodRecords`), which read the governance rollup and nothing else, so for
+    them it is the true answer rather than a gate.
+
+  - **Why the ruling was wrong.** The hidden governance project scopes the
+    **bill**, not the organization. It is minted lazily by
+    `ensureHiddenGovernanceProject` when the org's first `IngestionSource` is
+    created — i.e. when somebody connects a provider bill — and nothing mints
+    it from ordinary SDK trace traffic or from gateway requests
+    (`platform/app/ee/governance/services/govProject.ts:7-18`). So an
+    organization serving real gateway traffic and buying no provider bill had
+    never minted one, and both screens told it that nothing had been recorded
+    and that nobody had used an AI tool. Both statements were false, and both
+    were produced by a gate, not by a read. A tenant id that exists to key
+    ClickHouse rows for the money is not evidence about an organization's
+    people or about its gateway spend.
+
+  - **The invariant the gate was defending still holds, by a better
+    mechanism.** "An adoption count of zero with nothing connected must not be
+    reported as a measurement" was the right concern; one hidden project's
+    existence was never the right test of it. The connectedness test now lives
+    in `summaryHoldsFigures`
+    (`platform/app/src/pages/governance/costs.tsx:2001-2011`), which requires
+    `unavailableReason === null` **and** at least one lane to have actually
+    reported — `summaryAsRead`
+    (`platform/app/src/components/governance/costs/costSampleMode.ts:50-66`)
+    counts the billed lane, the gateway lane and reported seats. An
+    organization with nothing connected has zero reporting lanes, so the banner
+    still says nothing was recorded and the adoption card still names what
+    would fill it. Banner and headcount are derived from the *same* lane count,
+    so they cannot disagree the way a gate and a read could. The two scenarios
+    the superseded limit cited still pin this and are unchanged in substance —
+    *"An adoption count of zero from a connected source is shown as the
+    measurement it is"* and *"An adoption count of zero with nothing connected
+    is not reported as a measurement"* in
+    `specs/governance/governance-cost-screen.feature`.
+
+  - **A residual, stated rather than glossed.** The adoption card's
+    connectedness still comes from the **cost** summary. An organization with
+    SDK trace traffic, no gateway requests and no provider bill has genuinely
+    empty cost lanes, so `summaryHoldsFigures` stays false and the card still
+    says to add a source — even though the activity monitor now measures its
+    people. This widening unlocks the card for **gateway** organizations only.
+    Closing the rest requires giving the activity read its own way to say "not
+    measured": `activeUsersThisWindow` is a plain zero-filled number today
+    (`activityMonitor.service.ts:84`, zeroed at `:273`), so it cannot
+    distinguish "measured, nobody" from "not measured". That is a different DTO
+    and a separate decision, deliberately not taken here.
+
 - **v3.19 (2026-09-13, captain: Sergio Esteban).** Corrects three rulings in
   v3.18 that a red-team round disproved before any code was written. Two of
   them rested on premises this document asserted without checking, and each
@@ -2363,6 +2431,16 @@ money tables, only the identity tables and read paths.
     correctly for the one project it was given. Fixed by giving it the org's
     project list, the same way `spendByDepartment` already does. The panel's
     own guard (`costs.tsx:1908-1919`) is correct and is not touched.
+
+    > **[SUPERSEDED in part — see revision v3.20.]** The **Second** limit
+    > below is wrong. The `resolveGovProjectId` null-gate does not stay: it
+    > is deleted, here and in the cost service, because the hidden governance
+    > project is minted by connecting a provider bill and therefore says
+    > nothing about an organization's people or its gateway traffic. The
+    > connectedness test it claimed to be now lives in `summaryHoldsFigures`,
+    > not in that gate, and the scenarios cited still hold. The First and Third
+    > limits, and the ruling itself, stand. The reasoning is kept because the
+    > mistake is easy to make twice.
 
     **Three limits on the widening, none of which an earlier draft stated.**
     First, `findSummarySpend` returns `thisSpend`, `prevSpend` and `thisUsers`

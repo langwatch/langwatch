@@ -591,6 +591,63 @@ Feature: One cost screen, three honest lanes
   # governance-cost-rollup.feature, beside the comparator.
 
   # =========================================================================
+  # THE HIDDEN GOVERNANCE PROJECT SCOPES THE BILL, NOT THE ORGANIZATION.
+  #
+  # That project is minted the first time somebody connects a provider bill,
+  # and nothing else mints it. So an organization serving real gateway
+  # traffic and buying no provider bill has none — and the screen used to
+  # answer its whole summary with "nothing has been recorded", including the
+  # two answers that were never the governance project's to give: what the
+  # gateway metered across the organization's own projects, and, through the
+  # connectedness test the adoption card reads, how many of its people used
+  # an AI tool.
+  #
+  # The reads that DO belong to that project stay empty. The billed lane,
+  # the provider bars, the per-currency lines, the seat lane and the Azure
+  # billing note are all keyed by its tenant, and answering any of them from
+  # a wider scope would move a money figure as a side effect of fixing a
+  # headcount.
+  #
+  # The screen does not gain a new word for this. An organization with no
+  # governance project and no gateway traffic has nothing to show and is
+  # told so by the same sentence as an organization whose window is simply
+  # empty, because that is the same fact. What must never happen is the
+  # other order: a figure stated under a banner saying nothing was recorded.
+  # The two are decided by one test — whether any lane reported — so they
+  # cannot disagree.
+  # =========================================================================
+
+  @unit
+  Scenario: The metered lane answers for an organization that has connected no provider bill
+    Given an organization whose gateway served priced requests
+    And no hidden governance project has ever been minted for it
+    When the cost summary is read
+    Then the metered lane reports what those requests cost
+    And the screen does not say nothing was recorded
+
+  @unit
+  Scenario: No read scoped to the hidden governance project is issued without one
+    Given an organization whose gateway served priced requests
+    And no hidden governance project has ever been minted for it
+    When the cost summary is read
+    Then the billed lane, the provider bars and the seat lane hold no figure
+    And no read keyed by the governance tenant is issued at all
+
+  @unit
+  Scenario: An organization with neither a governance project nor gateway traffic reports nothing
+    Given an organization with no hidden governance project and no gateway requests
+    When the cost summary is read
+    Then no lane reports anything
+    And the screen's connectedness test reads it as nothing recorded
+
+  @integration
+  Scenario: A metered figure with nothing billed still counts the organization's people
+    Given a summary whose metered lane reports and whose billed lane and seats hold nothing
+    When a permitted viewer opens the cost screen
+    Then the adoption panel shows the headcount
+    And the screen does not say nothing was recorded
+
+  # =========================================================================
   # A LANE CARD ANSWERS ONE QUESTION AND RAISES ANOTHER. The money cards
   # showed a figure at the top, a sentence at the bottom, and a hand's width
   # of nothing between them, which a reader is owed an answer about. A total
