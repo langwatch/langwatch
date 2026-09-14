@@ -95,6 +95,7 @@ vi.mock(
     // These two are re-exported from ./signin-method-policy rather than built
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
+    deploymentOffersPasskeys: () => true,
     resolveSignInMethodPolicy: async () => ({}),
     priorSession: () => ({}),
     signInDomainRoutingPort: () => ({}),
