@@ -82,6 +82,24 @@ describe("given the LangWatchQL schema catalog", () => {
       }
     });
 
+    /**
+     * A caller narrowing a query to one project (`WHERE TenantId = '...'`) has
+     * to know the column exists and what it is called before it can write that
+     * predicate — the schema endpoint is the only place it can learn either.
+     */
+    /** @scenario "Every dataset publishes a project identifier column to filter on" */
+    it("lists an ungated, joinable TenantId column on every dataset", () => {
+      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+        const tenantColumn = dataset.columns.find(
+          (column) => column.name === "TenantId",
+        );
+        expect(tenantColumn, `${dataset.name} has no TenantId column`).toBeDefined();
+        expect(tenantColumn?.gates, dataset.name).toEqual([]);
+        expect(tenantColumn?.available, dataset.name).toBe(true);
+        expect(dataset.joinKeys, dataset.name).toContain("TenantId");
+      }
+    });
+
     it("gives every column a type and a description", () => {
       for (const column of columnsOf(FULLY_PERMITTED)) {
         expect(column.type, `${column.dataset}.${column.name}`).not.toBe("");

@@ -1135,6 +1135,14 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       Then every returned row belongs to tenant-a
       And no row of tenant-b is returned
 
+    @unit
+    Scenario: Every dataset publishes a project identifier column to filter on
+      Given the LangWatchQL schema for a fully permitted caller
+      When each published dataset's columns are inspected
+      Then every dataset lists a TenantId column
+      And that column is ungated and available
+      And it is included in the dataset's join keys
+
   Rule: Never see a project the key cannot read
 
     @e2e @unimplemented
