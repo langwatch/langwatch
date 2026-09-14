@@ -332,6 +332,32 @@ describe("the instance sign-in method policy", () => {
       expect(methodIds(policy.defaultMethods)).toEqual(["auth0", "passkey"]);
     });
 
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("mounts and offers nothing in email mode, whatever credentials linger", async () => {
+      // Email mode is exactly what ADR-027 means by DENY, and the federation
+      // request hook stands down entirely there — a provider mounted in email
+      // mode would be a live, license-ungated sign-in endpoint.
+      envMock.NEXTAUTH_PROVIDER = "email";
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["password", "passkey"]);
+    });
+
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("keeps the password offered when the named provider is a typo", async () => {
+      // The typo coerces to email mode; a stray credential's social method
+      // must not overrule that landing — a federated method in the default
+      // set is the exact predicate that 403s the password and reset routes.
+      envMock.NEXTAUTH_PROVIDER = "gogle";
+      socialCredentials("github");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["password", "passkey"]);
+    });
+
     /** @scenario "A social provider this deployment never mounted is never offered" */
     it("never offers a provider whose credentials are incomplete", async () => {
       envMock.NEXTAUTH_PROVIDER = "google";

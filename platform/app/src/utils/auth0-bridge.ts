@@ -1,3 +1,8 @@
+import {
+  AUTH0_SOCIAL_STRATEGIES,
+  auth0SocialStrategyOfSubject,
+} from "@langwatch/identity";
+
 /**
  * The Auth0 connection bridge (D09, deliberately short-term): the branded
  * buttons SaaS shows while its social sign-ins still broker through Auth0.
@@ -12,44 +17,30 @@
  * callback and the account rows are exactly the ones the generic button
  * uses, and tearing the bridge down (D10) deletes ids, never accounts.
  *
- * HARDCODED ON PURPOSE. The connection names are Auth0 strategy defaults
- * (`google-oauth2`, `github`, `windowslive`) and true only of OUR tenant; a
- * self-hosted deployment's Auth0 carries connections we cannot name, which
- * is why the bridge activates only on SaaS (`auth0BridgeActive`) and
- * everyone else keeps the generic hand-off to Auth0's own screen. `waad`
- * (enterprise Azure AD) is deliberately absent even on SaaS: those
- * connections are named per tenant, and guessing sends someone to the wrong
- * organization's door.
- *
- * Framework-free on purpose: the sign-in policy (server) offers these ids,
- * the account lookup (server) maps stored Auth0 subjects onto them, and the
- * auth client (browser) dials them — one table, three readers.
+ * The strategy vocabulary — which upstreams exist behind the broker, and
+ * what each is called — is `@langwatch/identity`'s ONE table
+ * (`AUTH0_SOCIAL_STRATEGIES`); this module only projects it into buttons.
+ * The connection Auth0 dials is the strategy's own default name, true only
+ * of OUR tenant — which is why the bridge activates only on SaaS
+ * (`auth0BridgeActive`) and every self-hosted Auth0 deployment keeps the
+ * generic hand-off to Auth0's own screen. Enterprise strategies (`waad`,
+ * `samlp`) are per-tenant-named and deliberately absent from the table.
  */
 
 export interface Auth0BridgeMethod {
   /** The id the sign-in surfaces offer and dial. */
   methodId: string;
   /** The Auth0 connection the dial names — what Universal Login would have
-   *  set when its own button for this provider was clicked. */
+   *  set when its own button for this provider was clicked. The strategy's
+   *  default connection name, which is also the strategy itself. */
   connection: string;
-  /** The strategy prefix Auth0 subjects for this connection carry, pipe
-   *  included, so a stored account can be routed to its own button. */
-  subjectPrefix: string;
 }
 
-export const AUTH0_BRIDGE_METHODS: readonly Auth0BridgeMethod[] = [
-  {
-    methodId: "auth0-google",
-    connection: "google-oauth2",
-    subjectPrefix: "google-oauth2|",
-  },
-  { methodId: "auth0-github", connection: "github", subjectPrefix: "github|" },
-  {
-    methodId: "auth0-microsoft",
-    connection: "windowslive",
-    subjectPrefix: "windowslive|",
-  },
-];
+export const AUTH0_BRIDGE_METHODS: readonly Auth0BridgeMethod[] =
+  AUTH0_SOCIAL_STRATEGIES.map((row) => ({
+    methodId: `auth0-${row.nativeProviderId}`,
+    connection: row.strategy,
+  }));
 
 /** Whether this deployment offers the bridge at all. */
 export function auth0BridgeActive({
@@ -71,16 +62,14 @@ export function auth0BridgeConnectionOf(methodId: string): string | null {
 }
 
 /**
- * The bridge method an Auth0 subject belongs to, or null where none does —
- * the broker's own database users (`auth0|`), enterprise connections
- * (`samlp|`, `waad|`), and anything the bridge does not name. Null keeps the
- * plain `auth0` method, which is a real answer: those sign-ins belong on
- * Auth0's own screen.
+ * The bridge method a stored Auth0 subject belongs to, or null where none
+ * does — the broker's own database users (`auth0|`), enterprise connections
+ * (`samlp|`, `waad|`), and a bare strategy with no subject behind it. Null
+ * keeps the plain `auth0` method, which is a real answer: those sign-ins
+ * belong on Auth0's own screen.
  */
 export function auth0BridgeMethodForSubject(subject: string): string | null {
-  return (
-    AUTH0_BRIDGE_METHODS.find((method) =>
-      subject.startsWith(method.subjectPrefix),
-    )?.methodId ?? null
-  );
+  const row = auth0SocialStrategyOfSubject(subject);
+  if (row === null) return null;
+  return `auth0-${row.nativeProviderId}`;
 }

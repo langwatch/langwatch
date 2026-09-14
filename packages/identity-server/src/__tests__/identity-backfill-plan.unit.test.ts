@@ -76,6 +76,62 @@ describe("the identifier backfill plan", () => {
     });
   });
 
+  describe("given a native row already asserting the unfolded pair", () => {
+    /** @scenario "An Auth0-brokered social account is adopted under its own provider too" */
+    it("stands the derivation down rather than planning a colliding identifier", () => {
+      // The grace window's shape: the native providers mount beside the
+      // broker, so a user can hold both the brokered and the native row for
+      // one Google identity. Two live identifiers for the same (provider,
+      // subject) pair would hit the projection's unique index — the loser
+      // parks and the parity diff never clears — and the adopted native row
+      // already states everything the derivation would have.
+      const planned = planIdentifiers({
+        user: USER,
+        accounts: [
+          account({}),
+          account({
+            id: "acct_native_google",
+            provider: "google",
+            issuer: "https://accounts.google.com",
+            providerAccountId: "107698336211125",
+          }),
+        ],
+      });
+
+      expect(planned.map((plan) => plan.providerId)).toEqual([
+        null,
+        "auth0",
+        "google",
+      ]);
+      // The one google identifier is the ADOPTED native row, not a derived
+      // twin of the broker's.
+      const google = planned.find((plan) => plan.providerId === "google");
+      expect(google).toMatchObject({ accountId: "acct_native_google" });
+    });
+
+    it("still derives when the native row asserts a different subject", () => {
+      const planned = planIdentifiers({
+        user: USER,
+        accounts: [
+          account({}),
+          account({
+            id: "acct_native_google",
+            provider: "google",
+            issuer: "https://accounts.google.com",
+            providerAccountId: "another-google-account",
+          }),
+        ],
+      });
+
+      expect(planned.map((plan) => plan.providerId)).toEqual([
+        null,
+        "auth0",
+        "google",
+        "google",
+      ]);
+    });
+  });
+
   describe("given rows whose subjects name no native upstream", () => {
     /** @scenario "An Auth0-brokered social account is adopted under its own provider too" */
     it("derives nothing for broker database users, Microsoft, and non-Auth0 rows", () => {

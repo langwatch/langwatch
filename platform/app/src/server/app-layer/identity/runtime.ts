@@ -443,6 +443,12 @@ const signInRouterService = new SignInRouterService({
     heads: identityHeads,
     legacy: identityUsers,
     isLatched,
+    // The same predicate the method policy gates the branded buttons on
+    // (`signin-method-policy.ts`). The policy additionally requires the
+    // resolved, license-checked method to be auth0; this composition-time
+    // read cannot await that, and does not need to — a bridge id the policy
+    // never offered drops out of ranking, which intersects with the policy's
+    // own default set.
     auth0BridgeIsActive: auth0BridgeActive({
       isSaas: env.IS_SAAS,
       authProvider: env.NEXTAUTH_PROVIDER,

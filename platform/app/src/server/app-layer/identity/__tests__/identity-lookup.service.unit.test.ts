@@ -400,11 +400,12 @@ describe("platform operator identity lookup service", () => {
       const nextSignIn = await router(account).route({
         identifier: "sam@acme.com",
       });
-      // The linked connection is the account's one federated method, so the
-      // router hands the next sign-in straight to it rather than drawing a
-      // picker whose single button restates the address just typed.
+      // The linked connection is the account's one federated method, but a
+      // CONNECTION-scoped method never auto-redirects from the account
+      // branch — its lifecycle (SUSPENDED, unconfigured) is invisible there,
+      // so the picker stands and the click goes through the gates.
       expect(nextSignIn).toMatchObject({
-        outcome: "redirect_to_connection",
+        outcome: "method_picker",
         reasonCode: "account_methods",
       });
       expect(nextSignIn.methodSet.map((method) => method.id)).toEqual(["oidc"]);

@@ -99,17 +99,26 @@ type SocialProviderEnv = Pick<
 
 /**
  * Builds BetterAuth's `socialProviders` map from environment configuration.
- * A social provider mounts when its client credentials are present — the
- * credentials ARE the operator's intent, since they exist for no other
- * reason. `NEXTAUTH_PROVIDER` no longer gates this map; it still selects the
- * generic-OAuth branch (auth0, okta, oidc) and still leads the sign-in rail,
- * so a single-provider deployment reads exactly as it always did.
+ * On a deployment that names ANY federated provider, a social provider
+ * mounts when its client credentials are present — the credentials ARE the
+ * operator's intent, since they exist for no other reason. The named
+ * provider still selects the generic-OAuth branch (auth0, okta, oidc) and
+ * still leads the sign-in rail, so a single-provider deployment reads
+ * exactly as it always did.
  *
  * This retired the NextAuth-era "exactly one provider" rule on purpose
  * (D09): migrating off the Auth0 broker means the native providers mount
  * BESIDE it during grace, and a rule that could mount only the broker made
  * that impossible. `sso-gate.ts#authProviderIsMounted` answers for the named
  * provider specifically, so the typo protection did not widen with this.
+ *
+ * EMAIL MODE STAYS AUTHORITATIVE. A deployment that chose email mode mounts
+ * no social provider whatever credentials linger in its environment: email
+ * mode is exactly what ADR-027 means by DENY, and the federation request
+ * hook stands down entirely in email mode
+ * (`deploymentIsFederationCapable`), so a provider mounted here would be a
+ * live, license-ungated sign-in endpoint nothing offered and nothing
+ * refuses.
  *
  * Exported for unit testing — lets us exercise google/github/gitlab/azure
  * selection directly, without re-initializing the module under a different
@@ -119,6 +128,9 @@ export const buildSocialProviders = (
   e: SocialProviderEnv,
 ): NonNullable<BetterAuthOptions["socialProviders"]> => {
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
+  if (!e.NEXTAUTH_PROVIDER || e.NEXTAUTH_PROVIDER === "email") {
+    return socialProviders;
+  }
 
   if (e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET) {
     socialProviders.google = {

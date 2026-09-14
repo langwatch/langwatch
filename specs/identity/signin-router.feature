@@ -105,6 +105,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision is a redirect to that method's identity provider
     And the decision carries the reason code "account_methods"
     And an account also holding a second method still gets the picker
+    And a method belonging to an organization's connection keeps the picker, whose route can see the connection's state
 
   @unit
   Scenario: A connected domain routes before the account is consulted
@@ -262,6 +263,8 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the sign-in page is requested
     Then both providers are among the offered methods
     And a provider whose credentials are absent is still never offered
+    And a deployment that chose email mode mounts and offers no social provider, whatever credentials linger
+    And a provider env naming something unmountable still lands in email mode with the password offered
 
   # ── The Auth0 connection bridge (deliberately short-term, D09) ─────────
   #

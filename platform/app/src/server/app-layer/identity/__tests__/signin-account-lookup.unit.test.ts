@@ -79,10 +79,13 @@ class FakeLegacyDirectory implements LegacySignInAccountDirectory {
   }
 }
 
-function legacyAccount(
-  overrides: Partial<LegacySignInAccount["methods"]> = {},
-  auth0Subjects: readonly string[] = [],
-): LegacySignInAccount {
+function legacyAccount({
+  methods = {},
+  auth0Subjects = [],
+}: {
+  methods?: Partial<LegacySignInAccount["methods"]>;
+  auth0Subjects?: readonly string[];
+} = {}): LegacySignInAccount {
   return {
     userId: USER_ID,
     methods: {
@@ -90,7 +93,7 @@ function legacyAccount(
       hasPasskey: false,
       providerIds: [],
       connectionIds: [],
-      ...overrides,
+      ...methods,
     },
     auth0Subjects,
   };
@@ -159,7 +162,7 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
   /** @scenario "An account the sign-up form just made is not mistaken for no account" */
   it("offers the password held by an unlatched account", async () => {
     const decision = await routeLegacyAccount({
-      account: legacyAccount({ hasPassword: true }),
+      account: legacyAccount({ methods: { hasPassword: true } }),
       methods: [PASSWORD, PASSKEY],
     });
 
@@ -172,7 +175,9 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
 
   it("keeps Auth0 alongside a passkey for an unlatched account without an SSO domain", async () => {
     const decision = await routeLegacyAccount({
-      account: legacyAccount({ hasPasskey: true, providerIds: ["auth0"] }),
+      account: legacyAccount({
+        methods: { hasPasskey: true, providerIds: ["auth0"] },
+      }),
       methods: [AUTH0, PASSKEY],
     });
 
@@ -238,7 +243,7 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
 
   it("offers a passkey held by an unlatched account", async () => {
     const decision = await routeLegacyAccount({
-      account: legacyAccount({ hasPasskey: true }),
+      account: legacyAccount({ methods: { hasPasskey: true } }),
       methods: [PASSWORD, PASSKEY],
     });
 
@@ -264,7 +269,7 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
 
   it("does not use legacy rows after the identifier migration latches", async () => {
     const lookup = build({
-      account: legacyAccount({ hasPassword: true }),
+      account: legacyAccount({ methods: { hasPassword: true } }),
       latched: true,
     });
 
@@ -284,9 +289,10 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
     /** @scenario "An account brokered through a social connection routes to its own button" */
     it("redirects an unlatched Google-through-Auth0 account to the branded method", async () => {
       const lookup = build({
-        account: legacyAccount({ providerIds: ["auth0"] }, [
-          "google-oauth2|107698336211125",
-        ]),
+        account: legacyAccount({
+          methods: { providerIds: ["auth0"] },
+          auth0Subjects: ["google-oauth2|107698336211125"],
+        }),
         auth0Bridge: true,
       });
 
@@ -302,7 +308,10 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
     /** @scenario "An account brokered through a social connection routes to its own button" */
     it("keeps the broker's own database users on the generic method", async () => {
       const lookup = build({
-        account: legacyAccount({ providerIds: ["auth0"] }, ["auth0|64f1c9"]),
+        account: legacyAccount({
+          methods: { providerIds: ["auth0"] },
+          auth0Subjects: ["auth0|64f1c9"],
+        }),
         auth0Bridge: true,
       });
 
@@ -352,9 +361,10 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
 
     it("changes nothing while the bridge is inactive", async () => {
       const lookup = build({
-        account: legacyAccount({ providerIds: ["auth0"] }, [
-          "google-oauth2|107698336211125",
-        ]),
+        account: legacyAccount({
+          methods: { providerIds: ["auth0"] },
+          auth0Subjects: ["google-oauth2|107698336211125"],
+        }),
       });
 
       await expect(
@@ -382,7 +392,7 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
       detachedAtMs: null,
     };
     const lookup = build({
-      account: legacyAccount({ hasPasskey: true }),
+      account: legacyAccount({ methods: { hasPasskey: true } }),
       projectedHolder: {
         userId: USER_ID,
         identifierId: partialCredential.identifierId,

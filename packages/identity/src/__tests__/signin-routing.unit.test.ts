@@ -216,7 +216,11 @@ describe("the identifier-first sign-in router", () => {
     });
 
     /** @scenario "An account whose only method is federated redirects straight to it" */
-    it("carries the connection id when the sole method belongs to a connection", () => {
+    it("keeps the picker when the sole method belongs to a connection", () => {
+      // A connection carries a lifecycle this branch cannot see — SUSPENDED,
+      // unconfigured — and every other redirect to one passes those gates.
+      // Until the account branch can ask for the connection's state, a
+      // connection-scoped sole method draws the picker it always did.
       const decision = route({
         raw: "sam@home.net",
         account: {
@@ -229,8 +233,7 @@ describe("the identifier-first sign-in router", () => {
       });
 
       expect(decision).toEqual({
-        outcome: "redirect_to_connection",
-        connectionId: "conn_acme",
+        outcome: "method_picker",
         methodSet: [okta],
         reasonCode: "account_methods",
       });

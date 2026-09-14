@@ -27,6 +27,7 @@ export {
   type AccountWhere,
   IdentityUnsupportedStorageQueryError,
   issuerForProviderId,
+  nativeSocialIssuerFor,
   parseAccountQuery,
 } from "./better-auth/account-queries";
 export {

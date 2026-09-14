@@ -243,7 +243,7 @@ services:
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
       # Use email login for dev (no Auth0 dependency)
-      NEXTAUTH_PROVIDER: "email"
+      AUTH_PROVIDER: "email"
     env_file:
       - platform/app/.env
       - path: platform/app/.env.dev-up

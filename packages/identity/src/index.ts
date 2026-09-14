@@ -10,8 +10,12 @@
  * `@langwatch/identity-server`.
  */
 export {
+  AUTH0_SOCIAL_STRATEGIES,
+  type Auth0SocialStrategy,
   type Auth0UpstreamIdentity,
+  auth0SocialStrategyOfSubject,
   derivedAccountId,
+  nativeProviderIdOfAuth0Strategy,
   sourceOfDerivedAccountId,
   upstreamOfAuth0Subject,
 } from "./auth0-upstream";

@@ -309,7 +309,8 @@ function redirectOrFall({
  *   domain on a live conn      → redirect             domain_routed
  *   domain on a paused conn    → picker               connection_suspended
  *   no account for the address → sign-up              identifier_unknown
- *   account, one federated     → redirect             account_methods
+ *   account, one instance-     → redirect             account_methods
+ *     level federated method
  *   account, methods it holds  → picker               account_methods
  *   anything else              → picker               no_domain_match
  *   policy refuses the method  → picker (local)       method_not_*
@@ -390,13 +391,19 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
   // picker with a single button costs a click and tells the person nothing
   // they did not just type. Only federated — a sole passkey gets its ceremony
   // from the screen, and a sole password needs the form the picker draws.
+  //
+  // And only an INSTANCE-LEVEL method. A connection-scoped method carries a
+  // lifecycle this branch cannot see — SUSPENDED, unconfigured — and every
+  // other redirect to a connection passes those gates (`redirectOrFall`);
+  // auto-redirecting on the account's say-so alone would send somebody into
+  // a connection an operator has paused, where the identical domain route
+  // draws the guidance picker. When D04 puts connection methods in the
+  // default set, this branch needs the connection's state before it may
+  // widen.
   const sole = held.length === 1 ? held[0] : undefined;
-  if (sole?.kind === "federated") {
+  if (sole?.kind === "federated" && sole.connectionId === null) {
     return {
       outcome: "redirect_to_connection",
-      ...(sole.connectionId === null
-        ? {}
-        : { connectionId: sole.connectionId }),
       methodSet: [sole],
       reasonCode: "account_methods",
     };

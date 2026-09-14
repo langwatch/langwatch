@@ -8,20 +8,63 @@
  * lets a native provider's callback resolve a user who has only ever signed
  * in through the broker.
  *
- * Only strategies whose upstream subject survives the unfolding are listed.
- * `windowslive|` and `waad|` are deliberately absent: better-auth keys a
- * Microsoft account by the per-tenant issuer in the token itself (see the
- * `account_issuer` migration), so no issuer we could state ahead of a real
- * sign-in would be the one the callback asks for. `auth0|` is the broker's
- * own database — a password, not an upstream identity. `samlp|` is an
- * enterprise connection, which is D09's per-tenant wizard, never a bulk
- * derivation.
+ * THE ONE TABLE. Three surfaces read the broker's strategy vocabulary — the
+ * backfill's native derivation here, the connection bridge's branded buttons
+ * (`platform/app/src/utils/auth0-bridge.ts`), and the linked-accounts
+ * screen's row identity (`components/me/signInAccounts.ts`) — and they must
+ * agree byte-for-byte for a brokered account to route to the same provider
+ * everywhere. So the strategies live once, with each surface's asymmetry a
+ * FLAG rather than an omission: `windowslive` is bridgeable (Auth0 routes
+ * the connection) but never derivable, because better-auth keys a Microsoft
+ * account by the per-tenant issuer in the token itself (see the
+ * `account_issuer` migration) and no issuer stated ahead of a real sign-in
+ * would be the one the callback asks for. Strategies absent from the table —
+ * `auth0|` (the broker's own database: a password, not an upstream
+ * identity), `samlp|`/`waad|` (enterprise connections, D09's per-tenant
+ * wizard) — are deliberately unmapped everywhere.
  */
 
-const AUTH0_UPSTREAM_STRATEGIES = [
-  { prefix: "google-oauth2|", providerId: "google" },
-  { prefix: "github|", providerId: "github" },
-] as const;
+export interface Auth0SocialStrategy {
+  /** The strategy segment of the broker's subject, pipe excluded. */
+  strategy: string;
+  /** better-auth's own provider id for the native identity. */
+  nativeProviderId: string;
+  /** Whether the backfill may state the native identifier ahead of a real
+   *  sign-in — true exactly where the native issuer is knowable. */
+  derivable: boolean;
+}
+
+export const AUTH0_SOCIAL_STRATEGIES: readonly Auth0SocialStrategy[] = [
+  { strategy: "google-oauth2", nativeProviderId: "google", derivable: true },
+  { strategy: "github", nativeProviderId: "github", derivable: true },
+  { strategy: "windowslive", nativeProviderId: "microsoft", derivable: false },
+];
+
+/** The table row a subject's strategy names, or null — requiring a non-empty
+ *  subject behind the pipe, because a bare strategy asserts nobody. */
+export function auth0SocialStrategyOfSubject(
+  subject: string,
+): (Auth0SocialStrategy & { providerAccountId: string }) | null {
+  for (const row of AUTH0_SOCIAL_STRATEGIES) {
+    const prefix = `${row.strategy}|`;
+    if (!subject.startsWith(prefix)) continue;
+    const providerAccountId = subject.slice(prefix.length);
+    if (providerAccountId.length === 0) return null;
+    return { ...row, providerAccountId };
+  }
+  return null;
+}
+
+/** The native provider a strategy segment names, or null. For display
+ *  surfaces that already split the subject themselves. */
+export function nativeProviderIdOfAuth0Strategy(
+  strategy: string,
+): string | null {
+  return (
+    AUTH0_SOCIAL_STRATEGIES.find((row) => row.strategy === strategy)
+      ?.nativeProviderId ?? null
+  );
+}
 
 export interface Auth0UpstreamIdentity {
   /** better-auth's own provider id for the native provider. */
@@ -33,20 +76,20 @@ export interface Auth0UpstreamIdentity {
 }
 
 /**
- * The upstream identity an Auth0 subject encodes, or null where it encodes
- * none we can act on. A null is an answer, not a failure: most subjects are
- * the broker's own database users or an enterprise connection.
+ * The DERIVABLE upstream identity an Auth0 subject encodes, or null where it
+ * encodes none we may state ahead of a sign-in. A null is an answer, not a
+ * failure: most subjects are the broker's own database users, an enterprise
+ * connection, or a Microsoft identity whose issuer only a token can name.
  */
 export function upstreamOfAuth0Subject(
   subject: string,
 ): Auth0UpstreamIdentity | null {
-  for (const strategy of AUTH0_UPSTREAM_STRATEGIES) {
-    if (!subject.startsWith(strategy.prefix)) continue;
-    const providerAccountId = subject.slice(strategy.prefix.length);
-    if (providerAccountId.length === 0) return null;
-    return { providerId: strategy.providerId, providerAccountId };
-  }
-  return null;
+  const row = auth0SocialStrategyOfSubject(subject);
+  if (row === null || !row.derivable) return null;
+  return {
+    providerId: row.nativeProviderId,
+    providerAccountId: row.providerAccountId,
+  };
 }
 
 const DERIVED_ACCOUNT_ID_PREFIX = "drvacct:";
@@ -61,6 +104,14 @@ const DERIVED_ACCOUNT_ID_PREFIX = "drvacct:";
  * compensation can follow the SOURCE row's liveness: delete the broker's
  * `Account` row and the derived identifier detaches with the adopted one
  * (`sourceOfDerivedAccountId`, read by `orphanedIdentifierRows`).
+ *
+ * D10 CONSTRAINT: a derived identifier may be what a person's working native
+ * sign-in resolves through — the adapter answers the callback from it, so
+ * better-auth never writes a native `Account` row of its own. The broker
+ * teardown must therefore restate still-used derived identifiers as
+ * self-standing (a real native row, or an identifier with its own account
+ * id) BEFORE deleting broker rows, or the compensation detaches a sign-in
+ * that works today.
  */
 export function derivedAccountId({
   sourceAccountId,

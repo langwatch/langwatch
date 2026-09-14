@@ -141,10 +141,22 @@ const federatedMethod = (id: string): SignInMethod => ({
  */
 function resolveSocialMethods({
   federationLicensed,
+  federatedResolved,
 }: {
   federationLicensed: boolean;
+  /**
+   * Whether the deployment's NAMED provider actually resolved
+   * (`resolveFederatedMethod` answered a method rather than email mode).
+   * The anchor that keeps stray credentials from overruling the landing: a
+   * provider-name typo coerces to email mode, and offering a mounted social
+   * anyway would put a federated method in `defaultMethods` — which is
+   * exactly the predicate `refusesCredentialRoute` reads to 403 the
+   * password and reset routes, locking every credential user out of a
+   * deployment whose one misconfiguration was a typo.
+   */
+  federatedResolved: boolean;
 }): readonly SignInMethod[] {
-  if (!federationLicensed) return [];
+  if (!federationLicensed || !federatedResolved) return [];
   return configuredSocialProviderIds(env).map(federatedMethod);
 }
 
@@ -180,7 +192,10 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   // gate read to reach the same answer. When the gate allows, the memo is
   // warm and the call costs nothing.
   const federated = federationLicensed ? await resolveFederatedMethod() : null;
-  const social = resolveSocialMethods({ federationLicensed });
+  const social = resolveSocialMethods({
+    federationLicensed,
+    federatedResolved: federated !== null,
+  });
   // Offered alongside whatever else answers, never instead of it: somebody
   // without a passkey on THIS device must still find the way they used last
   // time. It is appended, so the order the screen renders does not move — and
@@ -197,6 +212,11 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   // pre-scoped to the connection its own screen would have offered — so they
   // stand ahead of the generic button, which stays for the sign-ins only
   // Auth0's screen can finish (its database users, enterprise connections).
+  // The account lookup's subject routing is wired off the same
+  // `auth0BridgeActive` predicate in `runtime.ts`; this site additionally
+  // requires the RESOLVED method to be auth0, so an unmounted or unlicensed
+  // broker offers no branded buttons — and then ranks nothing bridged either,
+  // since ranking intersects with exactly this default set.
   const bridge =
     federated?.id === "auth0" &&
     auth0BridgeActive({

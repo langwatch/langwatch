@@ -7,6 +7,7 @@ import {
   deploymentOffersTwoStepVerification,
   resolveSignInMethodPolicy,
 } from "~/server/app-layer/identity/signin-method-policy";
+import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
 import { publicProcedure } from "../trpc";
@@ -61,8 +62,19 @@ export const publicEnvRouter = publicProcedure
       // licensed — as the sign-in method policy's own answer, so the
       // linked-accounts offer and the sign-in rail can never disagree. Ids
       // only: the policy's method objects carry nothing else a browser needs.
+      //
+      // LESS the connection bridge's branded ids: they are sign-in buttons,
+      // not providers — the dial maps them back to `auth0` — and the
+      // linked-accounts screen's Connect flow dials `linkAccount`, which has
+      // no bridge mapping and would ship a provider better-auth never
+      // mounted. A brokered identity links (and shows) through the generic
+      // provider, exactly as before the bridge.
       SIGNIN_FEDERATED_PROVIDERS: signInPolicy.defaultMethods
-        .filter((method) => method.kind === "federated")
+        .filter(
+          (method) =>
+            method.kind === "federated" &&
+            auth0BridgeConnectionOf(method.id) === null,
+        )
         .map((method) => method.id),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,

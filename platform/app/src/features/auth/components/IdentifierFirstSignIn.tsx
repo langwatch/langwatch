@@ -206,11 +206,12 @@ export function IdentifierFirstSignIn() {
     rememberPendingMethod(method);
     // The address already typed rides along as the OIDC login hint, so the
     // provider's own screen arrives prefilled instead of asking again for
-    // the thing this screen just asked. Absent on the cold rail, where
-    // nothing has been typed.
+    // the thing this screen just asked. Trimmed — a provider matches on the
+    // hint verbatim, and stray whitespace defeats the prefill. Absent on
+    // the cold rail, where nothing has been typed.
     void signIn(method.id, {
       callbackUrl,
-      loginHint: routing.identifier?.trim() ? routing.identifier : undefined,
+      loginHint: routing.identifier?.trim() || undefined,
     });
   };
 
@@ -325,7 +326,7 @@ export function IdentifierFirstSignIn() {
         decision={decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
-        loginHint={submittedIdentifier ?? undefined}
+        loginHint={submittedIdentifier?.trim() || undefined}
       />
     );
   }

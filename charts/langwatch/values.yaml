@@ -629,7 +629,7 @@ app:
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
     # Authentication provider to use. This value is passed to the app verbatim
-    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    # as AUTH_PROVIDER, so it has to be one the app recognises:
     #   email (default), google, github, gitlab, azure-ad, auth0, okta,
     #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under
