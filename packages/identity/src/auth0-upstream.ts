@@ -107,11 +107,13 @@ const DERIVED_ACCOUNT_ID_PREFIX = "drvacct:";
  *
  * D10 CONSTRAINT: a derived identifier may be what a person's working native
  * sign-in resolves through — the adapter answers the callback from it, so
- * better-auth never writes a native `Account` row of its own. The broker
- * teardown must therefore restate still-used derived identifiers as
- * self-standing (a real native row, or an identifier with its own account
- * id) BEFORE deleting broker rows, or the compensation detaches a sign-in
- * that works today.
+ * better-auth never writes a native `Account` row of its own, and the
+ * provider tokens each callback carries land on an `updateMany` that
+ * matches no credential row (a deliberate no-op: nothing reads a social
+ * provider's tokens after sign-in). The broker teardown must therefore
+ * restate still-used derived identifiers as self-standing — a real native
+ * row, which is also where tokens would start persisting — BEFORE deleting
+ * broker rows, or the compensation detaches a sign-in that works today.
  */
 export function derivedAccountId({
   sourceAccountId,

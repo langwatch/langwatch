@@ -472,7 +472,7 @@ export function VerificationFirstSignUp() {
         decision={routing.decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
-        loginHint={routedEmail?.trim() || undefined}
+        loginHint={routedEmail.trim() || undefined}
         title="Create your LangWatch account"
         footer={
           <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
