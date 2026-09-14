@@ -26,14 +26,19 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 
 import {
-  type FieldTypeOption,
   FieldTypeSelect,
-} from "~/prompts/components/ui/FieldTypeSelect";
-import { VariableTypeIcon } from "~/prompts/components/ui/VariableTypeIcon";
+  VariableTypeIcon,
+} from "@langwatch/prompt-web/surfaces/variables";
+// GAP: the custom-chart-playground schema (`dashboardWidgetDefinition.ts`,
+// with `DASHBOARD_CONTEXT_PARAMETER_PREFIX` and `RESERVED_PARAMETERS`) is not
+// yet ported — see the web-imports-sweep handoff.
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
 } from "~/server/analytics/dashboardWidgetDefinition";
+
+/** Structurally identical to prompt-web's own (unexported) `FieldTypeOption`. */
+type FieldTypeOption = { value: string; label: string };
 
 /** A declared parameter's name colliding with the dashboard-context prefix. */
 export function reservedPrefixProblem(name: string): string | undefined {

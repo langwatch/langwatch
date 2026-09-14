@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useRouter } from "~/utils/compat/next-router";
+import { useModelProviderHost } from "../model/model-provider-host.ts";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
@@ -69,17 +69,15 @@ export function useAnnotationQueues(
   const { enabled = true } = options;
   const { project } = useOrganizationTeamProject();
 
-  const router = useRouter();
+  const host = useModelProviderHost();
+  const { query } = host.route();
   // Both arrive from the URL, so both are whatever the address bar says.
   // Clamped to the range the procedure accepts: an out-of-range page is worth
   // a smaller list, not a failed request.
-  const pageOffset = Math.max(
-    0,
-    parseInt(router.query.pageOffset as string) || 0,
-  );
+  const pageOffset = Math.max(0, parseInt(query.pageOffset as string) || 0);
   const pageSize = Math.min(
     100,
-    Math.max(1, parseInt(router.query.pageSize as string) || 25),
+    Math.max(1, parseInt(query.pageSize as string) || 25),
   );
 
   const optimizedData = api.annotation.getOptimizedAnnotationQueues.useQuery(

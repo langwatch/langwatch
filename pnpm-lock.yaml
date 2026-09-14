@@ -3752,6 +3752,9 @@ importers:
       '@langwatch/evaluator-web':
         specifier: workspace:*
         version: link:../../evaluator/web
+      '@langwatch/prompt-web':
+        specifier: workspace:*
+        version: link:../../prompt/web
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9623,6 +9626,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -9686,6 +9692,9 @@ importers:
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
+      nanoid:
+        specifier: 'catalog:'
+        version: 5.1.16
       posthog-js:
         specifier: 'catalog:'
         version: 1.415.6

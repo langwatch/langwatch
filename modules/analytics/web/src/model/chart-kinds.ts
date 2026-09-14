@@ -22,3 +22,17 @@ export const BUILDER_CHART_KIND = "builder";
 
 /** The kind a saved LangWatchQL workbench chart carries. */
 export const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
+
+/**
+ * The kind a persisted dashboard widget carries. Its `graph` column holds
+ * `{ srcdocHtml, sql }`: the author HTML rendered in a sandboxed frame and the
+ * LangWatchQL statement the parent executes on the frame's behalf. Filtered on
+ * by the playground's own reads, so a dashboard widget is never interpreted as
+ * a builder or workbench definition.
+ *
+ * The playground's own editor/renderer (`DashboardWidgetInPlaceEditor`,
+ * `DashboardWidgetFrame`) is a recorded gap, not ported here — see the
+ * web-imports-sweep handoff. This constant alone is what lets a report grid
+ * tell such a row apart from a builder or workbench one.
+ */
+export const DASHBOARD_SRCDOC_CHART_KIND = "dashboard_srcdoc";

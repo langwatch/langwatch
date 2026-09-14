@@ -9,13 +9,13 @@
  */
 
 import { useCallback } from "react";
-import type { useDrawer } from "~/hooks/useDrawer";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type {
   EvaluatorAttachment,
   ScenarioMapping,
-} from "~/server/scenarios/evaluator-attachments";
-import type { api } from "~/utils/api";
+} from "@langwatch/scenario-contract";
+import type { useDrawer } from "@langwatch/ui-drawer";
+import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,
   newAttachment,

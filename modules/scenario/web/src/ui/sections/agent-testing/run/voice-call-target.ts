@@ -18,7 +18,7 @@
 import {
   type VoiceTransport,
   voiceAgentConfigSchema,
-} from "~/server/agents/voice/voice-agent.config";
+} from "@langwatch/scenario-contract";
 import type { RunDialogSubject } from "./run-dialog-types";
 import type { RunDialogForm } from "./use-run-dialog-form.ts";
 

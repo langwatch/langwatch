@@ -4,8 +4,10 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
-import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
-import type { SuiteFieldDefinition } from "~/server/scenarios/suite-fields";
+import type {
+  EvaluatorAttachment,
+  SuiteFieldDefinition,
+} from "@langwatch/scenario-contract";
 
 /** A scenario as the table reads it. */
 export type TestCase = {

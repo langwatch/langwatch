@@ -6,15 +6,17 @@ import {
   MoreVertical,
   Trash2,
 } from "lucide-react";
-import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
-import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
+import { Menu } from "@langwatch/design-system/menu";
+import { toaster } from "@langwatch/design-system/toaster";
 import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
-} from "~/server/analytics/lwql/timeWindow";
+} from "@langwatch/analytics-contract";
+import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+// GAP: `dashboardWidgets` (assignDashboard/list) is not yet on `analyticsApi` —
+// the custom-chart-playground router has not been ported. See the handoff.
 import { api } from "~/utils/api";
-import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * How each offered datapoint step is named in the menu: the noun form, because
@@ -139,7 +141,7 @@ export function GraphCardMenu({
   onDelete,
   isDeleting,
 }: GraphCardMenuProps) {
-  const router = useRouter();
+  const host = useAnalyticsHost();
   const { hasDashboard, isAssigning, handleAddToDashboard } =
     useAddToDashboardHandler({
       projectId,
@@ -178,7 +180,7 @@ export function GraphCardMenu({
                 onEdit();
                 return;
               }
-              void router.push(builderEditUrl);
+              host.navigate(builderEditUrl);
             }}
           >
             <Edit /> {onEdit || isDashboardWidget ? "Edit" : "Edit Graph"}

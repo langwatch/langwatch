@@ -5,7 +5,7 @@
  * only the voice name, so a catalog model id would be the wrong shape.
  */
 
-import { CALLER_VOICES } from "~/server/scenarios/voice/caller-voice.config";
+import { CALLER_VOICES } from "@langwatch/scenario-contract";
 
 /** The provider fields the picker needs from the frontend provider query. */
 export interface ProviderCredentialView {

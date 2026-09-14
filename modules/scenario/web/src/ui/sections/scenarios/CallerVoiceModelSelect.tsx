@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../behavior/scenario-api.ts";
 import {
   INHERIT_SENTINEL,
   ProviderModelSelector,

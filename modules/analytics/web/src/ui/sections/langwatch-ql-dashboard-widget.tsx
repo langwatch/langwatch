@@ -36,11 +36,11 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
-import { usePeriodSelector } from "~/components/PeriodSelector";
-import { HandledErrorAlert } from "~/features/errors";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
-import { api } from "~/utils/api";
+import { useDashboardRefreshedAt } from "./useDashboardAutoRefresh.ts";
+import { usePeriodSelector } from "../elements/period-selector.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";

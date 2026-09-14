@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { readHandledError } from "~/features/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   type EvaluatorAttachment,
   parseEvaluatorAttachments,

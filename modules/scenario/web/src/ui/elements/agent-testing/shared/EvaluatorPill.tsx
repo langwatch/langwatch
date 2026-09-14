@@ -13,9 +13,9 @@
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { formatScore } from "~/components/shared/formatters";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { formatScore } from "@langwatch/design-system/metric-value-formatters";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import type {
   EvaluatorSummary,
   RunEvaluation,

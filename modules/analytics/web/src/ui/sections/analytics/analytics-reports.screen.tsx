@@ -14,28 +14,31 @@ import {
   DashboardRefreshedAtContext,
   useDashboardAutoRefresh,
 } from "../useDashboardAutoRefresh.ts";
-import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import { useFilterToggle } from "~/components/filters/FilterToggle";
-import GraphsLayout from "~/components/GraphsLayout";
-import { toaster } from "~/components/ui/toaster";
-import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
-import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
-import { api } from "~/utils/api";
-import { useRouter } from "~/utils/compat/next-router";
+import { FilterSidebar } from "../filter-sidebar.tsx";
+import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
+import AnalyticsLayout from "../analytics-layout.tsx";
+import { toaster } from "@langwatch/design-system/toaster";
+import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
+import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
+import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ReportGrid } from "../report-grid.tsx";
 import { Link } from "../../elements/analytics-link.tsx";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+// GAP: the custom-chart-playground drawer (`CreateDashboardWidgetDrawer`) and
+// the chart-grid shared unit (`ChartGridPlacement`) are not yet ported — see
+// the web-imports-sweep handoff.
+import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
+import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 
 function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
-  const router = useRouter();
+  const host = useAnalyticsHost();
   const projectId = project?.id ?? "";
 
   // Get dashboard ID from URL, or use first dashboard
-  const urlDashboardId = router.query.dashboard as string | undefined;
+  const urlDashboardId = host.route().query.dashboard;
 
   // Get or create first dashboard
   const getOrCreateFirst = api.dashboards.getOrCreateFirst.useQuery(
@@ -185,8 +188,9 @@ function ReportsContent() {
     : `/${project?.slug}/analytics/custom`;
 
   return (
-    <GraphsLayout
+    <AnalyticsLayout
       title={dashboardTitle}
+      railEntry="reports"
       analyticsHeaderProps={{
         isEditable: true,
         onTitleSave: handleTitleSave,
@@ -280,7 +284,7 @@ function ReportsContent() {
           {showFilters ? <FilterSidebar /> : null}
         </HStack>
       </DashboardRefreshedAtContext.Provider>
-    </GraphsLayout>
+    </AnalyticsLayout>
   );
 }
 

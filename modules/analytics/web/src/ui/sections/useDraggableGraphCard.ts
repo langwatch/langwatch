@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
-import { usePeriodSelector } from "~/components/PeriodSelector";
-import { toaster } from "~/components/ui/toaster";
+import { usePeriodSelector } from "../elements/period-selector.tsx";
+import { toaster } from "@langwatch/design-system/toaster";
+import { describeError } from "../../model/describe-error.ts";
+import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
+// GAP: the custom-chart-playground widget editor (`DashboardWidgetInPlaceEditor`,
+// `dashboardWidgetDefinitionSchema`) and the `dashboardWidgets` router are not
+// yet ported — see the web-imports-sweep handoff.
 import type { DashboardWidgetDraft } from "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor";
-import { describeError } from "~/features/errors";
-import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 import { api } from "~/utils/api";
 import type { GraphData } from "./draggable-graph-card.tsx";

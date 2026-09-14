@@ -1,21 +1,22 @@
 import { Box, Card } from "@chakra-ui/react";
+import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
+import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget.tsx";
 import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "~/components/analytics/CustomGraph";
-import { LangWatchQLDashboardWidget } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
+  DASHBOARD_SRCDOC_CHART_KIND,
+  WORKBENCH_SQL_CHART_KIND,
+} from "../../model/chart-kinds.ts";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import type { FilterField } from "@langwatch/analytics-contract";
+// GAP: the chart-grid shared unit (`chartGridCardHeightPx`) and the
+// custom-chart-playground widget editor/renderer (`DashboardWidgetFrame`,
+// `DashboardWidgetInPlaceEditor`) are not yet ported — see the
+// web-imports-sweep handoff.
 import { DashboardWidgetFrame } from "~/features/custom-chart-playground/DashboardWidgetFrame";
 import {
   type DashboardWidgetDraft,
   DashboardWidgetInPlaceEditor,
 } from "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor";
 import { chartGridCardHeightPx } from "~/server/analytics/chartGrid";
-import {
-  DASHBOARD_SRCDOC_CHART_KIND,
-  WORKBENCH_SQL_CHART_KIND,
-} from "~/server/analytics/chartKinds";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
-import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./graph-card-header.tsx";
 import { useDraggableGraphCard } from "./useDraggableGraphCard";
 

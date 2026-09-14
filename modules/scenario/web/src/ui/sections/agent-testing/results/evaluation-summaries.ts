@@ -12,8 +12,10 @@
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
+import {
+  ScenarioRunStatus,
+  type ScenarioEvaluationResult,
+} from "@langwatch/scenario-contract";
 
 export type RunEvaluation = ScenarioEvaluationResult;
 

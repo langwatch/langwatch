@@ -6,7 +6,7 @@
 import { Button } from "@chakra-ui/react";
 import { RefreshCw } from "lucide-react";
 
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 import {
   DASHBOARD_AUTO_REFRESH_LABEL,

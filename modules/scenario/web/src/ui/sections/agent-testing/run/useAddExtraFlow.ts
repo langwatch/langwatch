@@ -7,10 +7,9 @@
  */
 
 import { useCallback } from "react";
-import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
-import { setFlowCallbacks, type useDrawer } from "~/hooks/useDrawer";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
-import type { api } from "~/utils/api";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import { setFlowCallbacks, type useDrawer } from "@langwatch/ui-drawer";
+import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,
   evaluatorFitsPlanLevel,
@@ -50,20 +49,17 @@ export function useAddExtraFlow({
     setFlowCallbacks("evaluatorList", { onSelect: attach });
     // An evaluator created from the list is attached like a picked one once
     // it is saved, and the flow lands back on the dialog.
-    setFlowCallbacks(
-      "evaluatorEditor",
-      createEvaluatorEditorCallbacks({
-        onSave: async (saved) => {
-          const evaluator = await utils.evaluators.getById.fetch({
-            id: saved.id,
-            projectId,
-          });
-          closeDrawer();
-          if (evaluator) attach(evaluator);
-          return true;
-        },
-      }),
-    );
+    setFlowCallbacks("evaluatorEditor", {
+      onSave: async (saved: { id: string }) => {
+        const evaluator = await utils.evaluators.getById.fetch({
+          id: saved.id,
+          projectId,
+        });
+        closeDrawer();
+        if (evaluator) attach(evaluator);
+        return true;
+      },
+    });
     openDrawer("evaluatorList", {
       hiddenEvaluatorIds: hiddenEvaluatorIdsOf(evaluatorsById),
     });

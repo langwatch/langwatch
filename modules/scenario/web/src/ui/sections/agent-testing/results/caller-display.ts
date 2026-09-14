@@ -6,7 +6,7 @@
  * themselves. A text run records none, so the column stays hidden.
  */
 
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 export type CallerKind = "simulated" | "human";
 
