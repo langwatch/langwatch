@@ -97,3 +97,80 @@ func outputOf(runs []JobRun, name string) []string {
 	}
 	return nil
 }
+
+// The viewer polls Runs on every beat of its event loop, so the combined
+// stream must be read incrementally: a stack whose lane crash-looped leaves a
+// stream far too large to re-parse per keystroke (2026-09-14, seconds of input
+// latency on the splash screen). Appended lines still arrive, and a rotated
+// (shrunken) stream starts the parse over instead of showing stale output.
+func TestCombinedStreamIsParsedIncrementallyAcrossPolls(t *testing.T) {
+	dir := t.TempDir()
+	combined := filepath.Join(dir, "stack.log")
+	writeJournal(t, dir,
+		`{"name":"codegen","at":"2026-09-14T10:00:00Z","durationMs":100,"exit":0}`,
+	)
+	if err := os.WriteFile(combined, []byte("23:35:08.662  codegen           first line\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jobs := NewFileJobs(dir, combined)
+	if got := strings.Join(outputOf(jobs.Runs(), "codegen"), "\n"); !strings.Contains(got, "first line") {
+		t.Fatalf("first poll output = %q, want the first line", got)
+	}
+
+	t.Run("when the stream grows between polls", func(t *testing.T) {
+		file, err := os.OpenFile(combined, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.WriteString("23:35:09.100  codegen           second line\n"); err != nil {
+			t.Fatal(err)
+		}
+		_ = file.Close()
+		got := strings.Join(outputOf(jobs.Runs(), "codegen"), "\n")
+		if !strings.Contains(got, "first line") || !strings.Contains(got, "second line") {
+			t.Errorf("output = %q, want both lines", got)
+		}
+	})
+
+	t.Run("when a partial last line completes on a later poll", func(t *testing.T) {
+		file, err := os.OpenFile(combined, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.WriteString("23:35:09.200  codegen           half"); err != nil {
+			t.Fatal(err)
+		}
+		_ = file.Close()
+		if got := strings.Join(outputOf(jobs.Runs(), "codegen"), "\n"); !strings.Contains(got, "half") {
+			t.Errorf("output = %q, want the still-unterminated line shown", got)
+		}
+		file, err = os.OpenFile(combined, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.WriteString(" and the rest\n"); err != nil {
+			t.Fatal(err)
+		}
+		_ = file.Close()
+		got := strings.Join(outputOf(jobs.Runs(), "codegen"), "\n")
+		if !strings.Contains(got, "half and the rest") {
+			t.Errorf("output = %q, want the completed line", got)
+		}
+		if strings.Count(got, "half") != 1 {
+			t.Errorf("output = %q, want the completed line exactly once", got)
+		}
+	})
+
+	t.Run("when the stream is rotated to a shorter file", func(t *testing.T) {
+		if err := os.WriteFile(combined, []byte("23:36:00.000  codegen           fresh start\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got := strings.Join(outputOf(jobs.Runs(), "codegen"), "\n")
+		if !strings.Contains(got, "fresh start") {
+			t.Errorf("output = %q, want the rotated stream's line", got)
+		}
+		if strings.Contains(got, "first line") {
+			t.Errorf("output = %q, want the pre-rotation lines gone", got)
+		}
+	})
+}

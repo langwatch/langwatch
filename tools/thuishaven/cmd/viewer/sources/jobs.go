@@ -3,6 +3,8 @@ package sources
 import (
 	"bufio"
 	"encoding/json"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,27 +20,41 @@ import (
 // they are written by different things - the journal by the orchestrator that
 // ran the job, the stream by the lane itself - and joining them here is
 // cheaper than making either one know about the other.
+//
+// The combined stream is read incrementally: the viewer polls Runs on every
+// beat of its event loop, and a stack that has been up for a while - or one
+// whose lane crash-looped - leaves a stream far too large to re-parse per
+// keystroke. Only the bytes appended since the last poll are parsed; a stream
+// that shrank was rotated, and the parse starts over.
 type FileJobs struct {
 	// dir is the stack's log directory, holding the journal.
 	dir string
 	// combined is the stack's whole-launcher log, where a one-shot lane's own
 	// output is labeled with the lane that wrote it.
 	combined string
+	// offset is how much of the combined stream has been parsed already.
+	offset int64
+	// carry is the trailing line the last read left unterminated: a live
+	// process appends, so a partial last line is expected, not corruption.
+	carry string
+	// lanes is each one-shot lane's accumulated lines.
+	lanes map[string][]string
 }
 
 // NewFileJobs opens a source over one stack's log directory and combined log.
-func NewFileJobs(dir, combined string) FileJobs {
-	return FileJobs{dir: dir, combined: combined}
+func NewFileJobs(dir, combined string) *FileJobs {
+	return &FileJobs{dir: dir, combined: combined}
 }
 
 // Runs returns this stack's one-shot history, most recent last. A stack with no
 // journal yet has no history rather than an error: an up that has not reached
 // its first job is the ordinary case on frame one.
-func (f FileJobs) Runs() []JobRun {
+func (f *FileJobs) Runs() []JobRun {
 	records := f.journal()
 	if len(records) == 0 {
 		return nil
 	}
+	f.ingestCombined()
 	output := f.laneOutput()
 	out := make([]JobRun, 0, len(records))
 	for _, rec := range records {
@@ -57,7 +73,7 @@ func (f FileJobs) Runs() []JobRun {
 // journal reads every record in the stack's job journal. A malformed line is
 // skipped rather than failing the read: the file is appended to by a live
 // process, so a partial last line is expected, not corruption.
-func (f FileJobs) journal() []domain.OnceJobRun {
+func (f *FileJobs) journal() []domain.OnceJobRun {
 	file, err := os.Open(filepath.Join(f.dir, domain.OnceJobJournal))
 	if err != nil {
 		return nil
@@ -86,14 +102,17 @@ func (f FileJobs) journal() []domain.OnceJobRun {
 var laneLabel = regexp.MustCompile(`^(?:\x1b\[[0-9;]*m)*\s*([a-z0-9-]+)\s*(?:\x1b\[[0-9;]*m)*\s*[|│]\s?(.*)$`)
 
 // laneColumns matches the rendered form: a clock, then the lane column, then
-// the level column (blank for a passthrough line) and the message.
+// the level column (blank for a passthrough line) and the message. It is tried
+// first because it is what the launcher writes now, and because the labeled
+// shape's pattern backtracks on the long rendered lines it will never match.
 var laneColumns = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}\.\d{3}\s{2}([a-z0-9-]+)\s+(.*)$`)
 
 // laneOf reads which lane wrote one line of the combined stream, in either
 // shape, and what it said.
 func laneOf(raw string) (lane, text string, ok bool) {
-	for _, shape := range []*regexp.Regexp{laneLabel, laneColumns} {
-		if match := shape.FindStringSubmatch(stripSGR(raw)); len(match) == 3 {
+	plain := stripSGR(raw)
+	for _, shape := range []*regexp.Regexp{laneColumns, laneLabel} {
+		if match := shape.FindStringSubmatch(plain); len(match) == 3 {
 			return match[1], match[2], true
 		}
 	}
@@ -103,6 +122,9 @@ func laneOf(raw string) (lane, text string, ok bool) {
 // stripSGR removes the escape sequences a rendered line carries, so the columns
 // can be counted in characters a person would see.
 func stripSGR(line string) string {
+	if strings.IndexByte(line, 0x1b) < 0 {
+		return line
+	}
 	var b strings.Builder
 	for i := 0; i < len(line); i++ {
 		if line[i] != 0x1b {
@@ -118,19 +140,59 @@ func stripSGR(line string) string {
 
 func isSGRFinal(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 
-// laneOutput slices the combined stream into each one-shot lane's own lines.
-func (f FileJobs) laneOutput() map[string][]string {
-	data, err := os.ReadFile(f.combined)
+// ingestCombined parses whatever the combined stream appended since the last
+// poll into the per-lane lines. A stream shorter than the parsed offset was
+// rotated or truncated, so the accumulated state is discarded and the parse
+// starts over from the beginning.
+func (f *FileJobs) ingestCombined() {
+	file, err := os.Open(f.combined)
 	if err != nil {
-		return nil
+		return
 	}
-	out := map[string][]string{}
-	for _, raw := range strings.Split(string(data), "\n") {
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return
+	}
+	if info.Size() < f.offset {
+		f.offset, f.carry, f.lanes = 0, "", nil
+	}
+	if info.Size() == f.offset {
+		return
+	}
+	if _, err := file.Seek(f.offset, io.SeekStart); err != nil {
+		return
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return
+	}
+	f.offset += int64(len(data))
+	lines := strings.Split(f.carry+string(data), "\n")
+	f.carry = lines[len(lines)-1]
+	if f.lanes == nil {
+		f.lanes = map[string][]string{}
+	}
+	for _, raw := range lines[:len(lines)-1] {
 		lane, text, ok := laneOf(raw)
 		if !ok || !domain.IsOnceJobLane(lane) {
 			continue
 		}
-		out[lane] = append(out[lane], text)
+		f.lanes[lane] = append(f.lanes[lane], text)
 	}
+}
+
+// laneOutput is each one-shot lane's lines as parsed so far, with the carried
+// partial line included for the lane it belongs to - a job's last line arrives
+// without its newline while the lane is still writing, and the drill-in should
+// show it rather than hold it back.
+func (f *FileJobs) laneOutput() map[string][]string {
+	lane, text, ok := laneOf(f.carry)
+	if !ok || !domain.IsOnceJobLane(lane) {
+		return f.lanes
+	}
+	out := make(map[string][]string, len(f.lanes)+1)
+	maps.Copy(out, f.lanes)
+	out[lane] = append(out[lane][:len(out[lane]):len(out[lane])], text)
 	return out
 }
