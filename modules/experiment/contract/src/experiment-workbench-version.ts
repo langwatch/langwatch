@@ -17,16 +17,9 @@ export const WORKBENCH_ACTOR_LABELS = ["user", "langy", "api"] as const;
 export const workbenchActorLabelSchema = z.enum(WORKBENCH_ACTOR_LABELS);
 export type WorkbenchActorLabel = z.infer<typeof workbenchActorLabelSchema>;
 
-/**
- * The freshness signal a workbench save broadcasts, as the listener reads it.
- *
- * Signal-then-refetch: it names WHAT changed and at which version, never the
- * state itself. The client compares versions and refetches through the normal
- * read path when it is behind. The publisher is
- * `ExperimentWorkbenchUpdates.publish`; this is the same shape with the
- * event name on it, and it lives here because the two ends of that wire belong
- * to one contract.
- */
+// Signal-then-refetch: names WHAT changed and at which version, never the
+// state itself. Client compares versions and refetches through the normal
+// read path when it is behind. Shape lives here with the wire publisher.
 export const experimentUpdateSignalSchema = z.object({
   event: z.literal("experiment_updated"),
   experimentId: z.string(),

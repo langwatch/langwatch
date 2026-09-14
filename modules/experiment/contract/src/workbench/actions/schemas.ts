@@ -67,9 +67,8 @@ export const duplicateTargetPayloadSchema = z
   .object({
     targetId: z.string().describe("Id of the column to copy."),
     /**
-     * Only evaluator targets carry a name in workbench state (`localEvaluatorConfig.name`); for prompt, agent
-     * and workflow targets the displayed name comes from the referenced entity, so the override is reported
-     * back as unapplied rather than invented.
+     * Only evaluator targets carry a name in workbench state; for prompt,
+     * agent, and workflow targets the name comes from the referenced entity.
      */
     name: z
       .string()
@@ -263,16 +262,8 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
         "Where each field reads from, per dataset and per column: mappings[datasetId][targetId][inputField]. Given mappings win, and every gap is inferred from the dataset and the column output names.",
       ),
   })
-  /**
-   * Two rules the field types alone cannot state, both refused with the reason
-   * so the caller can correct the payload instead of guessing:
-   *
-   * - the type has to name an evaluator that exists, otherwise the column is
-   *   added and every row of it fails at run time;
-   * - only the comparison judge may carry a `comparison` config, otherwise the
-   *   column renders as a standalone comparison and runs as something that
-   *   never receives the candidates it is asked to compare.
-   */
+  // Validates that the evaluator type exists and that only the comparison
+  // judge carries a comparison config, giving reasons the caller can act on.
   .superRefine((payload, ctx) => {
     if (!isKnownEvaluatorType(payload.evaluatorType)) {
       ctx.addIssue({

@@ -347,8 +347,10 @@ describe("executionScope utilities", () => {
       // Only this specific cell should be in execution
       expect(cells).toHaveLength(1);
       expect(isCellInExecution(cellSet, 0, "target-1")).toBe(true);
-      expect(isCellInExecution(cellSet, 0, "target-2")).toBe(false); // Same row, different target - NOT in execution
-      expect(isCellInExecution(cellSet, 1, "target-1")).toBe(false); // Different row - NOT in execution
+      expect(isCellInExecution(cellSet, 0, "target-2")).toBe(false);
+      // Same row, different target - NOT in execution
+      expect(isCellInExecution(cellSet, 1, "target-1")).toBe(false);
+      // Different row - NOT in execution
     });
 
     it("scenario: user selects 2 specific rows to run", () => {

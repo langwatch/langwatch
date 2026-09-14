@@ -85,21 +85,9 @@ const targetsInScope = (scope: ExecutionScope): string[] => {
   }
 };
 
-/**
- * The other columns a comparison needs before it can judge this one.
- *
- * Two carrier shapes reach this, and both leave the same hole in a scoped run:
- *
- *   - a column-style comparison target, whose own `comparison` names the
- *     variants it compares. Running that column alone produces nothing without
- *     them.
- *   - a chip-style comparison evaluator, whose `comparison` names variants that
- *     are plain target columns. Running ONE of those variants alone leaves the
- *     judge with no output for the others, and Phase 2 reports every one of
- *     them as "Waiting on …" over verdicts nobody asked to re-run.
- *
- * The scoped column itself is never returned: it is already in the run.
- */
+// The variant columns a comparison needs before it can judge. Column-style
+// comparisons need their variants; chip evaluators need all variants for full
+// output.
 export const comparisonDependencies = ({
   targets,
   evaluators,
@@ -225,15 +213,8 @@ const cellsCoveredByRun = ({
   return covered;
 };
 
-/**
- * The board cells a run carries rather than produces.
- *
- * One click stays one run. What the run CONTAINS grows: every cell the run does
- * not cover is copied in from the board as it stood, so opening the run shows
- * the whole board instead of the one column the person clicked.
- *
- * A full run carries nothing, because it covers every cell itself.
- */
+// Cells a run carries rather than produces. Every cell the run doesn't cover
+// is copied from the board as it stood, so opening shows the whole board.
 export const planBoardCarryOver = ({
   targets,
   scope,
@@ -277,24 +258,9 @@ export const datasetRowsOf = (dataset: DatasetReference): Record<string, unknown
     ? transposeColumnsFirstToRowsFirstWithId(dataset.inline.records)
     : (dataset.savedRecords ?? []);
 
-/**
- * Build the request for one run, plus the cells it will dispatch.
- *
- * `executionCells` is the caller's, not the engine's: the page uses it to mark
- * cells as running and to size its progress bar. The engine plans its own cells
- * from `scope` and `seedTargetOutputs`, and reaches the same set.
- */
-/**
- * One target as the server reads it.
- *
- * `comparison` is normalized rather than passed through: a state loaded from a
- * pre-merge experiment still carries the legacy `pairwise` shape, and the
- * server only understands `comparison`. Column-targets need it on the wire so
- * the orchestrator can skip the column in Phase 1 and emit Phase 2 synthetic
- * cells with every variant's output baked in; without it the server falls
- * through to a normal evaluator-target dispatch whose mappings have no per-row
- * candidate outputs, and the judge endpoint rejects the empty payload.
- */
+// executionCells is the caller's: the page marks cells as running and sizes
+// progress. Comparison config is normalized: legacy pairwise becomes comparison
+// so the orchestrator can handle column-style targets correctly.
 const targetOnTheWire = (target: TargetConfig): ExecutionRequest["targets"][number] => ({
   id: target.id,
   type: target.type,

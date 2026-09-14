@@ -1,12 +1,6 @@
-/**
- * @see specs/experiments-v3/run-board-snapshot.feature
- *
- * A run holds a snapshot of the board it was started from: every cell outside
- * the execution scope is copied in as it stood, and the cells inside it fill in
- * as they execute. Before this, a run scoped to one column declared every
- * column in its target metadata but held rows for one of them, and the results
- * page drew a column with no data in it.
- */
+// A run holds a snapshot of the board: cells outside execution scope are
+// copied as they stood; cells inside fill in as they execute.
+// @see specs/experiments-v3/run-board-snapshot.feature
 import { describe, expect, it } from "vitest";
 import type { TargetConfig } from "../../../experiment-workbench.ts";
 import type { BoardResults } from "../build-execution-request.ts";

@@ -48,19 +48,9 @@ export type ExecutionScope =
       traceIds: Record<number, string | undefined>;
     };
 
-/**
- * One board cell a run carries rather than produces.
- *
- * A run holds a snapshot of the whole board, so opening it shows what the
- * person was looking at instead of the single column they clicked. The cells
- * outside the execution scope are copied in from the board at run start; the
- * cells inside it fill in as they execute.
- *
- * The cell keeps what it cost and how long it took when it was produced,
- * because the results page reads those to draw the column's header metrics.
- * The run's own totals leave them out, which is what the recorded item's
- * `carriedOver` flag is for.
- */
+// Cell a run carries from the board snapshot. Cells outside execution scope
+// are copied at run start; cells inside fill in as they execute. Cost and
+// duration are kept for results page header metrics.
 export type CarriedOverCell = {
   rowIndex: number;
   targetId: string;
@@ -228,15 +218,9 @@ export const runInputsBodySchema = z
   });
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
 
-/**
- * True when a run evaluates the experiment's own saved dataset, untouched.
- *
- * Only such a run may write its cells back into the workbench state. Rows sent
- * in the request, a different saved dataset, or constant parameters all make
- * the outputs disagree with the rows the workbench shows, so those runs leave
- * the saved cells alone. A row subset is not an override: it fills the rows it
- * ran and leaves the rest as they were.
- */
+// True when a run evaluates the experiment's own saved dataset untouched.
+// Only such runs may write cells back; rows sent in request or different
+// dataset make outputs disagree with workbench rows.
 export const runsSavedDataset = (runInputs?: RunInputsBody): boolean => {
   if (!runInputs) return true;
   if (runInputs.data !== undefined) return false;
@@ -270,18 +254,8 @@ export type EvaluationV3EvaluatorResult = SingleEvaluationResult & {
   domainError?: SerializedHandledError;
 };
 
-/**
- * The `message` an error frame carries when the failure has no code.
- *
- * A marker, deliberately not a sentence. An unhandled failure has nothing safe
- * to say — its own message can carry a hostname, a Prisma string or a Go net
- * error — and the generic line that replaced it was still SERVER-authored copy,
- * which then got persisted and painted into a cell on read-back. The words for
- * an unnamed failure belong in the client's presentation registry with every
- * other error's words (ADR-045); this only says "there were none".
- *
- * The failure's own words go to the log line, beside the trace id.
- */
+// Marker when an error frame has no code (ADR-045). Unhandled failures have
+// nothing safe to say; the words live in the client registry instead.
 export const UNNAMED_FAILURE = "lw.unnamed_failure";
 
 /**
@@ -333,15 +307,9 @@ export type EvaluationV3Event =
   | { type: "progress"; completed: number; total: number }
   | {
       type: "error";
-      /**
-       * Wire message. For a coded failure this is the code itself (#5984); for
-       * an unhandled one it is {@link UNNAMED_FAILURE} — a marker, not copy.
-       *
-       * Never a thrown error's own `message`: that is server prose naming
-       * internal services, and it is not the app's UI copy either. The words a
-       * customer reads are written in the client's presentation registry,
-       * keyed by code.
-       */
+      // Wire message: the code for a handled failure (#5984), or
+      // UNNAMED_FAILURE marker for unhandled. Never the thrown error's message;
+      // customer copy comes from the client presentation registry keyed by code.
       message: string;
       /**
        * The coded failure, when we knew what went wrong. The client presents
@@ -384,14 +352,8 @@ export type ExecutionCell = {
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
   /**
-   * Comparison candidates baked into the cell after Phase 1 target execution,
-   * in the order the config lists its variants. Set ONLY for synthetic
-   * comparison cells; `targetId` on those cells points at a real TargetConfig
-   * so the workflow builder has something to lean on, but the target step
-   * itself is skipped via `skipTarget`.
-   *
-   * Two candidates is not a special case — a pairwise comparison is simply a
-   * `candidates` array of length 2.
+   * Candidates for synthetic comparison cells only: baked after Phase 1 target
+   * execution in config variant order. Two candidates (pairwise) is not special.
    */
   comparison?: {
     candidates: Array<{

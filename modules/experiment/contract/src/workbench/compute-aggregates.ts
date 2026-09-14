@@ -211,9 +211,8 @@ export const computeTargetAggregates = (
 };
 
 /**
- * Compute a TargetAggregate-shaped object for a comparison column-target so the workbench header can render the
- * same Rows / Avg Latency / Total Cost / Execution Time chip prompt/agent columns render (dogfood: "I already
- * have the scores on the results page — I want the same in the workbench").
+ * Compute aggregate stats for a comparison column so the workbench header
+ * renders the same Rows/Latency/Cost/Time chip as prompt/agent columns.
  */
 export const computeComparisonColumnTargetAggregate = (
   target: {

@@ -112,37 +112,8 @@ export const localEvaluatorConfigSchema = z.object({
 });
 export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
 
-/**
- * Zod schema for evaluator config validation.
- *
- * Note: Settings are NOT used at execution time - they are always fetched
- * fresh from the database via dbEvaluatorId. This prevents sync issues.
- * The settings field is kept for backward compatibility but is ignored.
- *
- * Mappings are stored per-dataset AND per-target:
- * mappings[datasetId][targetId][inputFieldName] = FieldMapping
- *
- * This allows different mappings for:
- * - Each dataset (same column might have different names)
- * - Each target (target A outputs "output", target B outputs "result")
- */
-/**
- * Pairwise evaluator config. Set only for evaluators of type
- * "langevals/pairwise_compare" (and future n-way variants). Picks two
- * existing target columns to compare against a dataset golden field.
- *
- * - variantA / variantB: TargetConfig ids whose per-row outputs are
- *   the two candidates.
- * - hasGoldenAnswer: whether the judge compares against a reference
- *   answer at all (#5378). When false, goldenField is not required —
- *   the judge compares the two candidates directly on their own merits.
- *   Mirrors the evaluator's `settings.has_golden_answer` (source of
- *   truth the judge reads), same dual-representation pattern as
- *   includeMetrics/settings.include_metrics below.
- * - goldenField: dataset field name whose value is the reference answer.
- *   Only meaningful when hasGoldenAnswer is true.
- * - includeMetrics: per-candidate metrics injected into the judge prompt.
- */
+// Settings are fetched at execution time from DB, not from workbench state.
+// Mappings are per-dataset and per-target to allow different column names.
 export const pairwiseEvaluatorConfigSchema = z.object({
   variantA: z.string(),
   variantB: z.string(),
@@ -161,16 +132,8 @@ export const pairwiseEvaluatorConfigSchema = z.object({
 });
 export type PairwiseEvaluatorConfig = z.infer<typeof pairwiseEvaluatorConfigSchema>;
 
-/**
- * Whether a comparison config's golden-field requirement is satisfied: either
- * a golden field is set, or the user has explicitly opted out of
- * golden-answer comparison (#5378). Checking `hasGoldenAnswer === false`
- * (rather than `!== true`) is deliberate — old saved configs that predate this
- * field have `hasGoldenAnswer` undefined and must still default to
- * golden-required. Single source of truth for the UI gating
- * (EvaluationsV3Table), client validation (mappingValidation), and server
- * cell-generation (orchestrator) call sites — they must never drift.
- */
+// Single source of truth for whether goldenField is needed, checked by UI,
+// validation, and server cell-generation — they must never drift.
 export function isGoldenFieldSatisfied(config: {
   goldenField?: string;
   hasGoldenAnswer?: boolean;
@@ -178,45 +141,9 @@ export function isGoldenFieldSatisfied(config: {
   return !!config.goldenField || config.hasGoldenAnswer === false;
 }
 
-/**
- * Comparison evaluator config — the single shape behind every column-vs-column
- * preference judgement, whether there are two candidates or ten. Backed by
- * `langevals/select_best_compare`, which handles N=2 without a special case.
- *
- * Supersedes the two-slot `pairwiseEvaluatorConfigSchema` above, which is now
- * read-only legacy: `toComparisonConfig` folds it into this shape on load and
- * nothing writes it again.
- *
- * - variants: ordered TargetConfig ids whose per-row outputs are the
- *   candidates. At least 2 entries required.
- * - variantOutputPaths: per-variant output-field path. When a variant emits a
- *   structured object (e.g. `{answer, confidence}`) the judge shouldn't see the
- *   whole blob — narrow it to one subfield. Missing / empty means "use the
- *   whole output". Generalises pairwise's variantAOutputPath/variantBOutputPath.
- * - hasGoldenAnswer: whether the judge compares against a reference answer at
- *   all. When false, goldenField is not required — the judge compares the
- *   candidates on their own merits (#5378). Mirrors the evaluator's
- *   `settings.has_golden_answer`, same dual-representation pattern as
- *   includeMetrics/settings.include_metrics.
- * - goldenField: dataset field name holding the reference answer. Only
- *   meaningful when hasGoldenAnswer is true.
- * - inputField: optional dataset field used as task/context for the judge.
- *   When omitted, the runtime falls back to the historical auto-detected
- *   `input` column, then the golden field for old datasets.
- * - includeMetrics: per-candidate metrics injected into the judge prompt.
- * - randomizeOrder: when true (default), candidate order is shuffled
- *   deterministically per row (seeded by rowIndex) to mitigate position bias.
- *   Mirrors the Python evaluator's `randomize_order`.
- */
-/**
- * The one judge behind every comparison. Kept as a constant so no call site
- * hard-codes the wire slug: the display name is "Comparison", but the
- * langevals module is still `select_best_compare`, and renaming that module
- * would break every saved DB Evaluator row pointing at it.
- *
- * Legacy `langevals/pairwise_compare` rows are still runnable through their own
- * endpoint, but the workbench never creates or dispatches them any more.
- */
+// Single shape for column-vs-column comparison. The wire name is
+// `select_best_compare` so no call site hard-codes it; legacy pairwise rows
+// are still runnable but never created by the workbench.
 export const COMPARISON_EVALUATOR_TYPE = "langevals/select_best_compare";
 
 /** @deprecated Legacy two-slot judge. Read for back-compat; never written. */
@@ -245,16 +172,8 @@ export const comparisonEvaluatorConfigSchema = z.object({
 });
 export type ComparisonEvaluatorConfig = z.infer<typeof comparisonEvaluatorConfigSchema>;
 
-/**
- * Comparison evaluators judge target columns against each other, so they render
- * as their own dedicated verdict column rather than as a chip attached to each
- * target. Everywhere the per-target chip list is built, these must be filtered
- * out — otherwise the same comparison appears once per column and reads as N
- * separate evaluations.
- *
- * Tolerates the legacy `pairwise` shape so that a saved experiment is
- * classified correctly even before `toComparisonConfig` has folded it in.
- */
+// Renders as a dedicated verdict column, not a chip on each target, so it
+// must be filtered when building the per-target chip list to avoid duplication.
 export const isComparisonEvaluator = (e: { pairwise?: unknown; comparison?: unknown }): boolean =>
   !!e.comparison || !!e.pairwise;
 
@@ -312,28 +231,9 @@ export const httpConfigSchema = z.object({
 });
 export type HttpConfig = z.infer<typeof httpConfigSchema>;
 
-/**
- * Zod schema for target config validation.
- *
- * Mappings are stored per-dataset:
- * mappings[datasetId][inputFieldName] = FieldMapping
- *
- * This allows different mappings for each dataset in the evaluation.
- *
- * Note: Evaluators are NOT tied to targets. All evaluators in the store
- * apply to ALL targets. Only the mappings differ per target (and per dataset).
- */
-/**
- * The target's shape, without the cross-field rule below.
- *
- * Named because callers need to `.extend()` it, and an extended schema has to
- * start from an object. Under zod 3 they reached it with
- * `targetConfigSchema.innerType()`, because `.superRefine()` wrapped the
- * object in a `ZodEffects`. Zod 4 refines in place — the method is gone, and
- * the call was a TypeError thrown at module load, which took the whole
- * experiments-v3 action surface with it. Exporting the base is what makes the
- * extension possible without a wrapper to unwrap.
- */
+// The target's base shape, exported so callers can .extend() it. Mappings
+// are per-dataset; evaluators apply to ALL targets but map differently per
+// target.
 export const targetConfigObjectSchema = z.object({
   id: z.string(),
   type: z.enum(["prompt", "agent", "evaluator", "workflow"]),
@@ -435,16 +335,8 @@ export const targetRowMetadataSchema = z.object({
   cost: z.number().optional(),
   duration: z.number().optional(),
   traceId: z.string().optional(),
-  /**
-   * The failure's stable code, when this row failed.
-   *
-   * Stored beside the raw error string rather than instead of it, and never
-   * as rendered copy: the cell derives what the customer reads from the code
-   * at render time, so the words stay re-derivable after they are rewritten
-   * (ADR-045). Shape owned by `@langwatch/handled-error`; validated here only
-   * as "an object", because a persisted payload from an older or newer client
-   * must survive the round trip rather than be silently stripped.
-   */
+  // Failure's stable code (ADR-045): cell derives customer-facing text from
+  // this at render time so it stays re-derivable if rewritten.
   domainError: z
     .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
     .optional(),
@@ -579,17 +471,8 @@ export type EvaluationsV3State = {
    */
   workbenchVersion?: number | undefined;
 
-  /**
-   * Set when the server holds a newer version than this store and the
-   * workbench has unsaved edits, so reloading is the user's call. A clean
-   * workbench reloads silently and never sets this.
-   *
-   * It carries the version to reload to and, when the server named one, who
-   * wrote it: the banner says "Langy changed this" rather than telling the
-   * reader the change came from somewhere else while Langy was driving their
-   * own tab. Clearing it is what resumes autosave, so it is state rather than
-   * a derived flag.
-   */
+  // Set when server holds a newer version with unsaved edits here, so
+  // reloading is the user's call. Clearing it resumes autosave.
   staleWorkbench?: { serverVersion: number; actorLabel?: string } | undefined;
 
   /**
@@ -662,17 +545,8 @@ export type EvaluationsV3Actions = {
    * the entity they reference.
    */
   duplicateTarget: (args: { targetId: string; name?: string }) => string | undefined;
-  /**
-   * Run one transform-backed workbench action from the host's action manifest
-   * against the live store — the browser leg of the agent's UI-action channel
-   * (specs/langy/langy-ui-actions.feature). Parses the payload with the
-   * action's own schema, applies its transform in ONE `set` (one undo entry),
-   * and returns the transform's result. THROWS on an unknown or non-transform
-   * kind, an invalid payload, or a transform refusal — unlike the silent
-   * no-op UI actions, the caller here is a machine that needs the reason.
-   * Typed loosely because this contract cannot import the manifest: the
-   * manifest's schemas are built from the shapes in this file.
-   */
+  // Apply a transform-backed action from the manifest against the live store.
+  // THROWS on unknown, invalid, or refused actions (unlike silent UI actions).
   applyWorkbenchAction: (args: { kind: string; payload: unknown }) => unknown;
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
@@ -769,17 +643,8 @@ export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
 export type TableRowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  /**
-   * True when the dataset row contains no user-entered values. The table
-   * always renders a trailing empty row for Excel-style "click to add,"
-   * but that phantom row must not show target outputs or evaluator chips.
-   *
-   * Required (non-optional) — every TableRowData built by the rowData
-   * builder in EvaluationsV3Table.tsx sets this. Was briefly optional during
-   * the #3441 sweep because DatasetSection/TableCell.tsx carried a parallel
-   * RowData shape without the field; that parallel shape has been unified
-   * with this type (#3460 item 5), so the optional can go.
-   */
+  // True when the dataset row has no user-entered values. The trailing
+  // empty row for "click to add" must not show outputs or evaluator chips.
   isEmpty: boolean;
   targets: Record<
     string,

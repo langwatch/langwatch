@@ -1,20 +1,5 @@
-/**
- * What the workbench's doors reach beyond the experiment application itself:
- * the permission probe behind the two browser doors, the run loop this
- * deployment composed, and the two best-effort sinks a run reports through.
- *
- * They live here rather than in the transport because the application answers
- * them and the transports only ask: `ExperimentApp` names these as the types
- * of the members it is composed from, and a declaration inside a transport
- * could not be one of them without pointing the app layer at its own door.
- *
- * Every shape below is the one the retired process composed, restored rather
- * than re-derived — `ExperimentV3RunLoop` and the two types beside it from
- * `apps/api/src/app/api-experiment-run.composition.ts`, the permission probe
- * from `ApiHandlerManagedSessionPort.permitted` — because an interface
- * rebuilt from its call sites compiles and then lies about what a caller may
- * pass.
- */
+// Types the workbench composes beyond the experiment application: permission
+// probe, run loop, and two best-effort sinks. Live here so app can answer them.
 import type { AuthzPermission } from "@langwatch/authz-contract";
 
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";

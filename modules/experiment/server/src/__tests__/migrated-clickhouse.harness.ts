@@ -1,15 +1,5 @@
-/**
- * A ClickHouse endpoint carrying the *shipped* migrations, for experiment
- * suites that must read the real `experiment_runs` / `experiment_run_items`
- * schema rather than a transcription of it.
- *
- * The endpoint comes from `startTestClickHouseEndpoints`, so the suite runs
- * against the always-on native server when one is configured and a reusable
- * container otherwise, and the schema comes from `ClickHouseMigrateTask` —
- * the same goose run production performs. `CarriedOver` arrived in a
- * migration, and a suite carrying its own DDL would prove the transcription
- * rather than the column the product deploys.
- */
+// ClickHouse endpoint with real shipped migrations for experiment suites.
+// Schema from ClickHouseMigrateTask (production goose run), not a suite DDL.
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";

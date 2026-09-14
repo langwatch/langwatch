@@ -1,13 +1,5 @@
-/**
- * Every `experiments.*` procedure, declared once. Twenty of them, in the three
- * groups the pages are laid out in: the workbench a tab has open, the
- * experiments a project lists, and the runs recorded against one.
- *
- * The legacy wizard's stored setup is declared here as the open record the
- * REST family already publishes rather than as the host's own wizard schema.
- * A contract carries no process generic, and the setup is stored verbatim: the
- * only field any handler reads out of it is `name`.
- */
+// Every `experiments.*` procedure in three groups: workbench, project list,
+// and runs. Legacy wizard setup stored as open record, verbatim.
 
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { studioWorkflowSchema } from "@langwatch/workflow-contract";

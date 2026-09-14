@@ -101,17 +101,9 @@ export type ExperimentWorkflowCopyInput = Readonly<{
   copiedFromWorkflowId?: string;
 }>;
 
-/**
- * Callable capability exposed by the composed Experiment application.
- *
- * This is the former `ExperimentService` contract-service, folded in here per
- * ADR-133: a contract package names only its callable API, never a standalone
- * abstract service class. Four workbench writes stay App-only
- * (`saveWorkbenchState`, `createEvaluationsV3`, `commitWorkbenchVersion`,
- * `restoreWorkbenchVersion`) because the App reshapes their input to take the
- * caller as a separate argument rather than an `actor` field; that reshaping
- * is server-private, not part of the portable token.
- */
+// Callable API of the composed Experiment application. Four workbench writes
+// stay App-only because they reshape input to take the caller as a separate
+// argument (ADR-133).
 export interface ExperimentApi {
   getById(input: ExperimentLookup): Promise<Experiment>;
   getBySlug(input: ExperimentSlugLookup): Promise<Experiment>;

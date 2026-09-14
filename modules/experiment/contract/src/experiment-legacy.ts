@@ -7,19 +7,9 @@ import { experimentRunWorkflowVersionSchema } from "./experiment-run.ts";
 // z.infer, so schema and type stay in lock-step.
 // ---------------------------------------------------------------------------
 
-/**
- * One Python object as DSPy dumped it: a `__class__` tag beside whatever keys
- * that class carries.
- *
- * The value type stays `any` deliberately. The payload is DSPy's own
- * `dump_state()` output, and its shape moves between DSPy releases — a
- * predictor holds `signature` or `extended_signature`, `fields` arrives as a
- * mapping or a list, and an LLM call's `response` is whatever the provider
- * returned. Encoding any of that here would make the ingest route reject
- * payloads it accepts today, for a payload the DSPy views only read
- * defensively (`a?.b ?? c?.b`) and stringify. The record arm is also what keeps
- * every unlisted key through parsing, so the stored dump stays whole.
- */
+// Value type is `any` by design: DSPy's shape varies between releases, and
+// we preserve all keys so the stored dump stays whole and views can read it
+// defensively.
 const anyJSONDumpedClassSchema = z
   .object({ __class__: z.string().optional() })
   .and(z.record(z.string(), z.any()));

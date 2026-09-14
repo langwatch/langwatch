@@ -1,17 +1,6 @@
-/**
- * What a connected agent reads as a workbench column.
- *
- * A connected agent runs in the customer's own process and answers one turn
- * at a time (ADR-128). A workbench row is one such turn, so the column reads
- * a single input, the message to send, and writes a single output, the answer.
- *
- * The parameters the function declares become optional inputs beside it. That
- * is what makes "the same agent on two models" two columns rather than two
- * agents: each column maps its own value, from the dataset or as a fixed
- * value, and the rest keep whatever default the function declares.
- *
- * @see specs/experiments-v3/connected-agent-target.feature
- */
+// Connected agent: runs in customer's process, answers one turn at a time
+// (ADR-128). A workbench row is one turn; each column maps its own parameter
+// values (dataset or fixed), the rest keep function defaults.
 
 import type { Field } from "@langwatch/workflow-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";

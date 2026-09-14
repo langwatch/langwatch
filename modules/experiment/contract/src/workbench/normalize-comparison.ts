@@ -10,21 +10,8 @@ import {
 
 export { resolveExperimentVerdictLabel as resolveVerdictLabel };
 
-/**
- * Reroutes a stored evaluator type to the judge that will actually run: a row
- * whose persisted type is the legacy two-slot `pairwise_compare` judge is sent
- * to the current N-way `select_best_compare` one instead — the legacy endpoint
- * is never called again. Every other type passes through unchanged.
- *
- * Called at exactly one site — the legacy evaluations route
- * (`evaluations-legacy.ts`), together with `translateLegacyPairwisePayload`,
- * which reshapes the request body in the same breath. Keeping the type reroute
- * and the payload translation co-located is the whole point: #5528 happened
- * because the dispatched type was changed in one place while the payload shape
- * was decided in another, so a 2-slot body could reach the N-way judge. Every
- * upstream caller (the orchestrator, a monitor's scheduled run) keeps emitting
- * the 2-slot shape it always has and is unaware of the reroute.
- */
+// Reroutes legacy pairwise_compare to select_best_compare. Co-located type
+// reroute and payload translation prevent #5528-style mismatches.
 export const resolveDispatchEvaluatorType = (
   storedEvaluatorType: string | undefined,
 ): string | undefined =>
@@ -32,16 +19,8 @@ export const resolveDispatchEvaluatorType = (
     ? COMPARISON_EVALUATOR_TYPE
     : storedEvaluatorType;
 
-/**
- * Comparison configs are stored in one shape today (`comparison`), but
- * experiments saved before pairwise and N-way were merged carry a two-slot
- * `pairwise` shape instead. This is the ONE place that reads the legacy shape;
- * everything downstream sees `comparison` only, and nothing ever writes
- * `pairwise` again. That is the whole of the "read old, write new" contract.
- *
- * Keep this as the single reader. A second `.pairwise` access anywhere else is
- * how the two shapes start diverging again.
- */
+// Single reader of legacy pairwise shape: everything downstream sees
+// comparison only. Keep this as the one access or both shapes diverge.
 
 type ComparisonCarrier = {
   pairwise?: PairwiseEvaluatorConfig;
@@ -51,27 +30,9 @@ type ComparisonCarrier = {
 /** A carrier that also names the evaluator type deciding what it may carry. */
 type EvaluatorCarrier = ComparisonCarrier & { evaluatorType?: string };
 
-/**
- * Fold a legacy pairwise config into the canonical comparison shape.
- *
- * `variantA`/`variantB` become the first two entries of `variants`, preserving
- * their order — the judge's legacy `"A"` / `"B"` slot labels are resolved
- * against those positions, so the order is load-bearing, not cosmetic.
- * The two per-slot output paths collapse into the per-variant map.
- *
- * Deliberately NOT filtering out an empty slot: a pairwise config always has
- * exactly two positions, and dropping an empty one would shift the other
- * into position 0, so a stored `"A"` verdict would resolve to whatever is in
- * `variantB` instead of the (missing) `variantA` slot. Keeping both
- * positions — even when one is empty — means an incomplete pairwise config
- * fails resolveVariants' "variant target not found" check instead of
- * silently misresolving to the wrong candidate.
- *
- * Legacy pairwise had no `randomizeOrder`, leaning on swap-and-confirm alone
- * for position bias. Defaulting it on gives a re-run of an old column both
- * mitigations the comparison judge offers rather than just the one it came in
- * with.
- */
+// Fold legacy pairwise into comparison shape. variantA/B become variants[0/1]
+// in order (labels resolve by position). Output paths collapse to per-variant
+// map. Default randomizeOrder on for position bias mitigation.
 const fromPairwise = (pairwise: PairwiseEvaluatorConfig): ComparisonEvaluatorConfig => {
   const variants = [pairwise.variantA, pairwise.variantB];
 
@@ -116,17 +77,8 @@ const normalizeCarrier = <T extends ComparisonCarrier>(carrier: T): T => {
   return { ...rest, comparison } as T;
 };
 
-/**
- * Drop a `comparison` config from an evaluator whose type cannot own a
- * standalone comparison column.
- *
- * Rows written before that invariant was enforced can hold one: a plain
- * evaluator with a `comparison` renders as a comparison column and runs as a
- * judge that never receives the candidates it is asked to compare. Everything
- * else on the evaluator, its per-target mappings included, is already what an
- * attached evaluator needs, so the repair is to remove the one field and leave
- * the rest alone.
- */
+// Drop comparison config from evaluators that can't own a standalone
+// comparison column. Only the comparison judge can; others render wrong.
 const stripInvalidComparison = <T extends EvaluatorCarrier>(evaluator: T): T => {
   if (!evaluator.comparison) return evaluator;
   if (isComparisonEvaluatorType(evaluator.evaluatorType)) return evaluator;
@@ -144,16 +96,8 @@ const stripInvalidComparison = <T extends EvaluatorCarrier>(evaluator: T): T => 
 export const normalizeEvaluators = <T extends EvaluatorCarrier>(evaluators: T[]): T[] =>
   evaluators.map((evaluator) => stripInvalidComparison(normalizeCarrier(evaluator)));
 
-/**
- * Drop a `comparison` config from a target that cannot own a comparison column.
- *
- * A comparison column is always an evaluator target: the target names a DB
- * evaluator row rather than carrying an evaluator type, so its kind is the only
- * check this seam can make. A persisted prompt or agent target holding a stale
- * comparison reached the store, where every comparison edit silently skipped it
- * and its editor saved nothing. The repair matches the evaluator one: remove
- * the field the target cannot own and leave the rest alone.
- */
+// Drop comparison from non-evaluator targets. Only evaluator targets can own
+// a comparison column; prompt/agent targets can't.
 const stripNonEvaluatorComparison = (target: TargetConfig): TargetConfig => {
   if (!target.comparison) return target;
   if (target.type === "evaluator") return target;
@@ -165,24 +109,9 @@ const stripNonEvaluatorComparison = (target: TargetConfig): TargetConfig => {
 export const normalizeTargets = (targets: TargetConfig[]): TargetConfig[] =>
   targets.map((target) => stripNonEvaluatorComparison(normalizeCarrier(target)));
 
-/**
- * Whether a stored verdict label names this variant.
- *
- * Today's orchestrator (`variantIdentifierFor`) only ever records the prompt
- * handle (`"concise-support-v2"`) when it could resolve one, or the internal
- * target id otherwise — it deliberately never falls back to the prompt's
- * KSUID. `resolvedName` is the handle as the UI knows it — pass "" when it
- * hasn't loaded yet.
- *
- * The `target.promptId` check below is a compatibility shim, not a live path:
- * an earlier version of the orchestrator did fall back to the raw promptId
- * KSUID before that was found to break label matching and dropped. It stays
- * here so verdicts recorded during that window still resolve; current runs
- * never produce a label that hits it.
- *
- * Shared by every surface that maps a verdict back onto a column, so the
- * winner-by-identifier contract has exactly one interpretation.
- */
+// Single interpretation of verdict labels: check target.id, then promptId,
+// then resolvedName. promptId check is for compatibility with older
+// orchestrator versions.
 export const labelNamesVariant = ({
   label,
   target,
