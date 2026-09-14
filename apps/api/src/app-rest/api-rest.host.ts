@@ -1,14 +1,5 @@
-/**
- * The process's ONE REST door table, and the host boot mounts every module's
- * declared family on.
- *
- * A module never mounts itself and the process never re-declares a route: what
- * the process owns is the DOORS - which credential kinds it opens, what each
- * resolves, and the envelope a refusal is written in. The host is built by BOOT
- * rather than by the composition literal because every door here is built from
- * a peer App (api-key, authz, organization, scim), and those are resolved by
- * the same boot that mounts the routes.
- */
+// The process's ONE REST door table: credential kinds it opens and how each
+// resolves. Built by boot from peer Apps.
 import type { Actor } from "@langwatch/actor";
 import {
   bindRestMiddleware,
@@ -67,6 +58,23 @@ import {
 const unsubscribeCallerAddress = defineRestMiddleware(
   "unsubscribeCallerAddress",
   z.string().nullable(),
+);
+
+/**
+ * `modules/experiment` — the two SDK doors (`/api/experiment/init`,
+ * `/api/dspy/log_steps`) are PUBLIC routes that answer their own bodies, so
+ * the key is resolved here with `experiments:manage` as its ceiling — the
+ * deleted mounts' own resolution (b383462d96^ experiment-*-rest.mount.ts).
+ */
+const experimentInitCaller = defineRestMiddleware(
+  "experimentInitCaller",
+  z.object({ projectId: z.string(), projectSlug: z.string() }),
+);
+
+/** @see experimentInitCaller — the optimizer step log's caller, same ceiling. */
+const dspyStepsCaller = defineRestMiddleware(
+  "dspyStepsCaller",
+  z.object({ projectId: z.string() }),
 );
 
 /** The impersonator the back office renders beside the person being acted as. */
@@ -450,16 +458,8 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     };
   }
 
-  /**
-   * A deployment's own shared secret - the instance administrator bearer, the
-   * cron bearer, the agent manager's. Holding it IS the authority, so the door
-   * asks no permission and the check runs HERE rather than as a family
-   * middleware: these credentials are raised per ROUTE as often as per family,
-   * and a gate mounted under the family's paths would miss every one of them.
-   *
-   * Unconfigured answers 404 rather than 401: whether this deployment holds a
-   * given secret is not something a caller presenting the wrong one learns.
-   */
+  // Shared secret authority: check per route, not per family. Unconfigured
+  // answers 404 not 401.
   private bearerDoor(options: {
     secret: string | undefined;
     door: string;
@@ -543,6 +543,26 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       // What this process knows about a caller that no module can: the address
       // a request actually came from, behind the deployment's trusted proxies.
       bindRestMiddleware(unsubscribeCallerAddress, (context) => apiClientAddress(context) ?? null),
+
+      // The experiment SDK doors sit on public routes, so their facts resolve
+      // the key themselves; a missing or refused key throws the handled 401
+      // the boundary renders, where the door would have answered it.
+      bindRestMiddleware(experimentInitCaller, async (context) => {
+        const credential = await this.credentials.authenticate({
+          request: context.req.raw,
+          permission: "experiments:manage",
+        });
+
+        return { projectId: credential.project.id, projectSlug: credential.project.slug };
+      }),
+      bindRestMiddleware(dspyStepsCaller, async (context) => {
+        const credential = await this.credentials.authenticate({
+          request: context.req.raw,
+          permission: "experiments:manage",
+        });
+
+        return { projectId: credential.project.id };
+      }),
 
       bindRestMiddleware(adminActor, async (context) => {
         const caller = await this.sessionOf(context.req.raw);

@@ -88,6 +88,10 @@ const readBack = async ({
 export const authzRoleBindingRest = defineRestRouter(AuthzApi)
   .withNamespace("role-bindings")
   .withVersion(MANAGEMENT_API_VERSION)
+  // The family reads the ORGANIZATION credential (roleBindingRestFacts calls
+  // organizationCredentialOfRequest), so it must answer behind that door —
+  // on the default project door the fact throws where the door should 401.
+  .withCredential("organization")
 
   .get("/", "listRoleBindings")
   .withQuery(roleBindingRestListQuerySchema)
