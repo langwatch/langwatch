@@ -105,117 +105,9 @@ export function TokensSection({
   organizationId: string;
   mayManage: boolean;
 }) {
-  const tokens = api.scimToken.list.useQuery({ organizationId });
-  const connections = api.scimReconciliation.getAll.useQuery({
-    organizationId,
-  });
-  const queryClient = api.useUtils();
-
-  const generateMutation = api.scimToken.generate.useMutation();
-  const revokeMutation = api.scimToken.revoke.useMutation();
-
-  const {
-    open: isGenerateOpen,
-    onOpen: onGenerateOpen,
-    onClose: onGenerateClose,
-  } = useDisclosure();
-
-  const [description, setDescription] = useState("");
-  const [connectionId, setConnectionId] = useState("");
-  /** A value the administrator already has. Empty means "mint one for me". */
-  const [secret, setSecret] = useState("");
-  const [newToken, setNewToken] = useState<string | null>(null);
-  const [tokenToRevoke, setTokenToRevoke] = useState<string | null>(null);
-
-  const connectionOptions = connections.data?.connections ?? [];
-  const labelFor = (id: string | null) =>
-    connectionOptions.find((option) => option.connectionId === id)
-      ?.providerId ?? id;
-  /**
-   * ONLY THE ONES THAT COULD CARRY IT. A token is bound to one connection and
-   * can only touch the people that connection provisioned, so a token issued
-   * against a draft, a rejected claim or a torn-down connection provisions
-   * nobody. Offering those was offering a dead end that authenticates
-   * perfectly and syncs nothing, discovered at the provider rather than here.
-   *
-   * The table below still resolves names from the full list: a token whose
-   * connection has since been retired is exactly the row whose name a reader
-   * needs, and drawing it as a bare identifier would be the worse half.
-   */
-  const issuableConnections = connectionOptions.filter(isActiveConnection);
-  const hasIssuableConnection = issuableConnections.length > 0;
-  /**
-   * Which connection the token will be issued against.
-   *
-   * With exactly ONE to choose from, the choice is already made and asking is
-   * an errand: the picker offers a list of one and the mint is refused until
-   * somebody picks the only option on it. With several, nothing is assumed —
-   * a token issued against the wrong connection is a token with the wrong
-   * write authority, and guessing that is worse than asking.
-   */
-  const chosenConnectionId =
-    connectionId ||
-    (issuableConnections.length === 1
-      ? (issuableConnections[0]?.connectionId ?? "")
-      : "");
-
-  const handleGenerate = () => {
-    const chosen = secret.trim();
-    generateMutation.mutate(
-      {
-        organizationId,
-        connectionId: chosenConnectionId || undefined,
-        description: description || undefined,
-        secret: chosen.length > 0 ? chosen : undefined,
-      },
-      {
-        onSuccess: (result) => {
-          // A value the administrator already had needs no "copy this now"
-          // ceremony — they have it. Only a generated one does.
-          setNewToken(chosen.length > 0 ? null : result.token);
-          if (chosen.length > 0) onGenerateClose();
-          setDescription("");
-          setConnectionId("");
-          setSecret("");
-          void queryClient.scimToken.list.invalidate();
-          void queryClient.scimReconciliation.invalidate();
-        },
-        onError: (error) => {
-          // The wire message for a handled error IS its code, so the words
-          // come from the code-keyed registry — a token minted without a
-          // connection has copy that names the field to fill in.
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't issue the provisioning token",
-          });
-        },
-      },
-    );
-  };
-
-  const handleRevoke = (tokenId: string) => {
-    revokeMutation.mutate(
-      { organizationId, tokenId },
-      {
-        onSuccess: () => {
-          setTokenToRevoke(null);
-          toaster.create({
-            title: "Token revoked",
-            type: "success",
-            duration: 3000,
-          });
-          void queryClient.scimToken.list.invalidate();
-          void queryClient.scimReconciliation.invalidate();
-        },
-        onError: (error) => {
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't revoke the provisioning token",
-          });
-        },
-      },
-    );
-  };
+  const tokensState = useScimTokens({ organizationId });
+  const { tokens, connections, labelFor, setTokenToRevoke, onGenerateOpen } =
+    tokensState;
 
   return (
     <>
@@ -275,223 +167,271 @@ export function TokensSection({
         />
       )}
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          <Table.Root variant="line" size="md" width="full">
-            <Table.Header>
+      <ScimTokensTable
+        tokens={tokens}
+        mayManage={mayManage}
+        labelFor={labelFor}
+        onRevoke={setTokenToRevoke}
+      />
+
+      <ScimTokenDialogs tokens={tokensState} mayManage={mayManage} />
+    </>
+  );
+}
+
+/**
+ * Which connection the token will be issued against.
+ *
+ * With exactly ONE to choose from, the choice is already made and asking is an
+ * errand: the picker would offer a list of one and refuse the mint until
+ * somebody picked the only option on it. With several, nothing is assumed — a
+ * token issued against the wrong connection has the wrong write authority, and
+ * guessing that is worse than asking.
+ */
+function chosenConnectionOf({
+  connectionId,
+  issuableConnections,
+}: {
+  connectionId: string;
+  issuableConnections: { connectionId: string }[];
+}): string {
+  if (connectionId) return connectionId;
+  if (issuableConnections.length !== 1) return "";
+  return issuableConnections[0]?.connectionId ?? "";
+}
+
+/**
+ * The provisioning tokens an organization holds, and the two acts on them.
+ *
+ * A token is bound to ONE connection and can only touch the people that
+ * connection provisioned, so only connections that could carry it are
+ * offered — a token issued against a draft, a rejected claim or a torn-down
+ * connection authenticates perfectly and syncs nobody, which is a dead end
+ * discovered at the provider rather than here.
+ */
+function useScimTokens({ organizationId }: { organizationId: string }) {
+  const tokens = api.scimToken.list.useQuery({ organizationId });
+  const connections = api.scimReconciliation.getAll.useQuery({
+    organizationId,
+  });
+
+  const generateMutation = api.scimToken.generate.useMutation();
+  const revokeMutation = api.scimToken.revoke.useMutation();
+
+  const {
+    open: isGenerateOpen,
+    onOpen: onGenerateOpen,
+    onClose: onGenerateClose,
+  } = useDisclosure();
+
+  const [description, setDescription] = useState("");
+  const [connectionId, setConnectionId] = useState("");
+  /** A value the administrator already has. Empty means "mint one for me". */
+  const [secret, setSecret] = useState("");
+  const [newToken, setNewToken] = useState<string | null>(null);
+  const [tokenToRevoke, setTokenToRevoke] = useState<string | null>(null);
+
+  const connectionOptions = connections.data?.connections ?? [];
+  const labelFor = (id: string | null) =>
+    connectionOptions.find((option) => option.connectionId === id)
+      ?.providerId ?? id;
+  /**
+   * ONLY THE ONES THAT COULD CARRY IT. A token is bound to one connection and
+   * can only touch the people that connection provisioned, so a token issued
+   * against a draft, a rejected claim or a torn-down connection provisions
+   * nobody. Offering those was offering a dead end that authenticates
+   * perfectly and syncs nothing, discovered at the provider rather than here.
+   *
+   * The table below still resolves names from the full list: a token whose
+   * connection has since been retired is exactly the row whose name a reader
+   * needs, and drawing it as a bare identifier would be the worse half.
+   */
+  const issuableConnections = connectionOptions.filter(isActiveConnection);
+  const hasIssuableConnection = issuableConnections.length > 0;
+  const chosenConnectionId = chosenConnectionOf({
+    connectionId,
+    issuableConnections,
+  });
+
+  const { handleGenerate, handleRevoke } = useScimTokenActions({
+    organizationId,
+    chosenConnectionId,
+    description,
+    secret,
+    generateMutation,
+    revokeMutation,
+    onGenerateClose,
+    setNewToken,
+    setDescription,
+    setConnectionId,
+    setSecret,
+    setTokenToRevoke,
+  });
+
+  return {
+    tokens,
+    connectionOptions,
+    labelFor,
+    issuableConnections,
+    hasIssuableConnection,
+    chosenConnectionId,
+    isGenerateOpen,
+    onGenerateOpen,
+    onGenerateClose,
+    description,
+    setDescription,
+    setConnectionId,
+    secret,
+    setSecret,
+    newToken,
+    setNewToken,
+    tokenToRevoke,
+    setTokenToRevoke,
+    generateMutation,
+    revokeMutation,
+    handleGenerate,
+    handleRevoke,
+  };
+}
+
+/**
+ * The tokens an organization holds, one row each.
+ *
+ * Names resolve from the FULL connection list, not the issuable one: a token
+ * whose connection has since been retired is exactly the row whose name a
+ * reader needs, and drawing it as a bare identifier would be the worse half.
+ */
+function ScimTokensTable({
+  tokens,
+  mayManage,
+  labelFor,
+  onRevoke,
+}: {
+  tokens: ReturnType<typeof api.scimToken.list.useQuery>;
+  mayManage: boolean;
+  labelFor: (id: string | null) => string | null;
+  onRevoke: (tokenId: string) => void;
+}) {
+  return (
+    <Card.Root width="full" overflow="hidden">
+      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+        <Table.Root variant="line" size="md" width="full">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Description</Table.ColumnHeader>
+              <Table.ColumnHeader>Connection</Table.ColumnHeader>
+              <Table.ColumnHeader>Issued</Table.ColumnHeader>
+              <Table.ColumnHeader>Last used</Table.ColumnHeader>
+              {mayManage && <Table.ColumnHeader width="80px" />}
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {!tokens.isError && tokens.data?.length === 0 && (
               <Table.Row>
-                <Table.ColumnHeader>Description</Table.ColumnHeader>
-                <Table.ColumnHeader>Connection</Table.ColumnHeader>
-                <Table.ColumnHeader>Issued</Table.ColumnHeader>
-                <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                {mayManage && <Table.ColumnHeader width="80px" />}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {!tokens.isError && tokens.data?.length === 0 && (
-                <Table.Row>
-                  <Table.Cell colSpan={mayManage ? 5 : 4}>
-                    <Text color="fg.muted" textAlign="center" paddingY={4}>
-                      No provisioning token has been issued yet.
-                    </Text>
-                  </Table.Cell>
-                </Table.Row>
-              )}
-              {tokens.data?.map((token) => (
-                <Table.Row key={token.id}>
-                  <Table.Cell>
-                    <HStack>
-                      <Key size={14} />
-                      <Text>{token.description ?? "No description"}</Text>
-                    </HStack>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {token.connectionId ? (
-                      <Text>{labelFor(token.connectionId)}</Text>
-                    ) : (
-                      // Issued before a token named a connection, so it keeps
-                      // the organization-wide reach it was sold with. Said
-                      // plainly rather than left blank: it is the one row on
-                      // this table whose authority is wider than the others.
-                      <Badge size="sm" colorPalette="gray">
-                        Every connection
-                      </Badge>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {new Date(token.createdAt).toLocaleDateString()}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {token.lastUsedAt ? (
-                      new Date(token.lastUsedAt).toLocaleDateString()
-                    ) : (
-                      // THE ONE ANSWER AVAILABLE for the most common setup
-                      // failure there is (ADR-126). A request carrying a token
-                      // we do not recognise cannot be attributed to anybody —
-                      // a SCIM token is an opaque value looked up by hash, so
-                      // there is no organization to file a mistyped one under
-                      // and it can never appear in the request list. This
-                      // badge is the whole remedy, so it says what it means
-                      // instead of leaving a reader to infer it from a date
-                      // that is missing, and it points at the provider rather
-                      // than at us.
-                      <VStack align="start" gap={0}>
-                        <Badge size="sm" colorPalette="gray">
-                          Never
-                        </Badge>
-                        <Text fontSize="xs" color="fg.muted">
-                          Nothing has presented this token yet. If your identity
-                          provider says it is syncing, check the token it is
-                          using.
-                        </Text>
-                      </VStack>
-                    )}
-                  </Table.Cell>
-                  {mayManage && (
-                    <Table.Cell>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        aria-label={`Revoke ${token.description ?? "token"}`}
-                        onClick={() => setTokenToRevoke(token.id)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </Table.Cell>
-                  )}
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card.Body>
-      </Card.Root>
-
-      <Dialog.Root
-        open={isGenerateOpen && !newToken}
-        onOpenChange={({ open }) => {
-          if (!open) {
-            onGenerateClose();
-            setDescription("");
-            setConnectionId("");
-          }
-        }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>
-              <Heading size="md">Issue a provisioning token</Heading>
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body paddingBottom={6}>
-            <VStack gap={4} align="start">
-              <Text>
-                This token manages only the people its connection provisioned,
-                so choose the connection your identity provider syncs from.
-              </Text>
-              <VStack gap={1} align="start" width="full">
-                <Text fontWeight="600" fontSize="sm">
-                  Connection
-                </Text>
-                {hasIssuableConnection ? (
-                  <NativeSelect.Root>
-                    <NativeSelect.Field
-                      aria-label="Connection"
-                      value={chosenConnectionId}
-                      onChange={(event) => setConnectionId(event.target.value)}
-                    >
-                      <option value="">Choose a connection</option>
-                      {issuableConnections.map((option) => (
-                        <option
-                          key={option.connectionId}
-                          value={option.connectionId}
-                        >
-                          {option.providerId}
-                          {option.verifiedDomains.length > 0
-                            ? ` — ${option.verifiedDomains.join(", ")}`
-                            : ""}
-                        </option>
-                      ))}
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
-                ) : (
-                  /* An empty dropdown is a fault a reader has to diagnose.
-                     Nothing to choose here has one cause and one remedy, so
-                     it says both rather than leaving a control that opens
-                     onto nothing. */
-                  <Text color="fg.muted" fontSize="sm">
-                    No single sign-on connection is live yet. Finish setting one
-                    up and turn it on, and it can carry a token.
+                <Table.Cell colSpan={mayManage ? 5 : 4}>
+                  <Text color="fg.muted" textAlign="center" paddingY={4}>
+                    No provisioning token has been issued yet.
                   </Text>
+                </Table.Cell>
+              </Table.Row>
+            )}
+            {tokens.data?.map((token) => (
+              <Table.Row key={token.id}>
+                <Table.Cell>
+                  <HStack>
+                    <Key size={14} />
+                    <Text>{token.description ?? "No description"}</Text>
+                  </HStack>
+                </Table.Cell>
+                <Table.Cell>
+                  {token.connectionId ? (
+                    <Text>{labelFor(token.connectionId)}</Text>
+                  ) : (
+                    // Issued before a token named a connection, so it keeps
+                    // the organization-wide reach it was sold with. Said
+                    // plainly rather than left blank: it is the one row on
+                    // this table whose authority is wider than the others.
+                    <Badge size="sm" colorPalette="gray">
+                      Every connection
+                    </Badge>
+                  )}
+                </Table.Cell>
+                <Table.Cell>
+                  {new Date(token.createdAt).toLocaleDateString()}
+                </Table.Cell>
+                <Table.Cell>
+                  {token.lastUsedAt ? (
+                    new Date(token.lastUsedAt).toLocaleDateString()
+                  ) : (
+                    // THE ONE ANSWER AVAILABLE for the most common setup
+                    // failure there is (ADR-126). A request carrying a token
+                    // we do not recognise cannot be attributed to anybody —
+                    // a SCIM token is an opaque value looked up by hash, so
+                    // there is no organization to file a mistyped one under
+                    // and it can never appear in the request list. This
+                    // badge is the whole remedy, so it says what it means
+                    // instead of leaving a reader to infer it from a date
+                    // that is missing, and it points at the provider rather
+                    // than at us.
+                    <VStack align="start" gap={0}>
+                      <Badge size="sm" colorPalette="gray">
+                        Never
+                      </Badge>
+                      <Text fontSize="xs" color="fg.muted">
+                        Nothing has presented this token yet. If your identity
+                        provider says it is syncing, check the token it is
+                        using.
+                      </Text>
+                    </VStack>
+                  )}
+                </Table.Cell>
+                {mayManage && (
+                  <Table.Cell>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorPalette="red"
+                      aria-label={`Revoke ${token.description ?? "token"}`}
+                      onClick={() => setTokenToRevoke(token.id)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </Table.Cell>
                 )}
-              </VStack>
-              <VStack gap={1} align="start" width="full">
-                <Text fontWeight="600" fontSize="sm">
-                  Description (optional)
-                </Text>
-                <Input
-                  aria-label="Description"
-                  placeholder="For example, Okta production"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </VStack>
-              {/* EITHER DIRECTION, BECAUSE THE USUAL ONE IS THE OTHER WAY.
-                  Somebody configuring an identity provider is usually
-                  standing in the provider's console with the value already
-                  decided; making them come here, take ours, and go back and
-                  paste it is an errand we invented. What matters is only that
-                  the two ends match.
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
+  );
+}
 
-                  Ours stays the default, because a value we generate is
-                  long and random and a typed one might not be. */}
-              <VStack gap={1} align="start" width="full">
-                <Text fontWeight="600" fontSize="sm">
-                  Token
-                </Text>
-                <HStack width="full" gap={2}>
-                  <Input
-                    aria-label="Token"
-                    type="password"
-                    placeholder="Leave empty and we will generate one"
-                    value={secret}
-                    onChange={(event) => setSecret(event.target.value)}
-                  />
-                </HStack>
-                <Text color="fg.muted" fontSize="xs">
-                  {secret.trim().length > 0
-                    ? "We store only a hash of it, the same as one we generate. It cannot be read back."
-                    : "Paste the value from your identity provider if it already has one, or leave this empty."}
-                </Text>
-              </VStack>
-              <Button
-                width="full"
-                onClick={handleGenerate}
-                // `connectionId` is the placeholder until one is chosen, and
-                // submitting without it is refused by the service as
-                // `scim_connection_required` — a rejection the reader could
-                // see coming, arriving as a toast. The control says so instead.
-                disabled={
-                  generateMutation.isPending ||
-                  !hasIssuableConnection ||
-                  !chosenConnectionId
-                }
-              >
-                {secret.trim().length > 0 ? "Save token" : "Generate token"}
-              </Button>
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+/**
+ * Minting a token and revoking one — the two dialogs the tokens table opens.
+ *
+ * A value the administrator ALREADY HAS needs no "copy this now" ceremony, so
+ * only a generated one gets the reveal step; a supplied one closes straight
+ * away.
+ */
+function ScimTokenDialogs({
+  tokens,
+  mayManage,
+}: {
+  tokens: ReturnType<typeof useScimTokens>;
+  mayManage: boolean;
+}) {
+  if (!mayManage) return null;
+  return (
+    <>
+      <GenerateTokenDialog tokens={tokens} />
 
       <Dialog.Root
-        open={!!newToken}
+        open={!!tokens.newToken}
         onOpenChange={({ open }) => {
           if (!open) {
-            setNewToken(null);
-            onGenerateClose();
+            tokens.setNewToken(null);
+            tokens.onGenerateClose();
           }
         }}
       >
@@ -507,8 +447,8 @@ export function TokensSection({
               <Text color="orange.500" fontWeight="600">
                 Copy this token now. It is shown once and never again.
               </Text>
-              {newToken && (
-                <CopyInput value={newToken} label="Provisioning token" />
+              {tokens.newToken && (
+                <CopyInput value={tokens.newToken} label="Provisioning token" />
               )}
             </VStack>
           </Dialog.Body>
@@ -516,9 +456,9 @@ export function TokensSection({
       </Dialog.Root>
 
       <Dialog.Root
-        open={!!tokenToRevoke}
+        open={!!tokens.tokenToRevoke}
         onOpenChange={({ open }) => {
-          if (!open) setTokenToRevoke(null);
+          if (!open) tokens.setTokenToRevoke(null);
         }}
       >
         <Dialog.Content bg="bg">
@@ -537,14 +477,17 @@ export function TokensSection({
               <HStack width="full" justify="end" gap={2}>
                 <Button
                   variant="outline"
-                  onClick={() => setTokenToRevoke(null)}
+                  onClick={() => tokens.setTokenToRevoke(null)}
                 >
                   Cancel
                 </Button>
                 <Button
                   colorPalette="red"
-                  onClick={() => tokenToRevoke && handleRevoke(tokenToRevoke)}
-                  disabled={revokeMutation.isPending}
+                  onClick={() =>
+                    tokens.tokenToRevoke &&
+                    tokens.handleRevoke(tokens.tokenToRevoke)
+                  }
+                  disabled={tokens.revokeMutation.isPending}
                 >
                   Revoke
                 </Button>
@@ -554,5 +497,239 @@ export function TokensSection({
         </Dialog.Content>
       </Dialog.Root>
     </>
+  );
+}
+
+/**
+ * Minting and revoking, as the two mutations plus what each leaves behind.
+ *
+ * A supplied value closes the dialog straight away; a generated one stays open
+ * on the reveal, because it is the only moment the token is readable.
+ */
+function useScimTokenActions({
+  organizationId,
+  chosenConnectionId,
+  description,
+  secret,
+  generateMutation,
+  revokeMutation,
+  onGenerateClose,
+  setNewToken,
+  setDescription,
+  setConnectionId,
+  setSecret,
+  setTokenToRevoke,
+}: {
+  organizationId: string;
+  chosenConnectionId: string;
+  description: string;
+  secret: string;
+  generateMutation: ReturnType<typeof api.scimToken.generate.useMutation>;
+  revokeMutation: ReturnType<typeof api.scimToken.revoke.useMutation>;
+  onGenerateClose: () => void;
+  setNewToken: React.Dispatch<React.SetStateAction<string | null>>;
+  setDescription: React.Dispatch<React.SetStateAction<string>>;
+  setConnectionId: React.Dispatch<React.SetStateAction<string>>;
+  setSecret: React.Dispatch<React.SetStateAction<string>>;
+  setTokenToRevoke: React.Dispatch<React.SetStateAction<string | null>>;
+}) {
+  const queryClient = api.useUtils();
+  const handleGenerate = () => {
+    const chosen = secret.trim();
+    generateMutation.mutate(
+      {
+        organizationId,
+        connectionId: chosenConnectionId || undefined,
+        description: description || undefined,
+        secret: chosen.length > 0 ? chosen : undefined,
+      },
+      {
+        onSuccess: (result) => {
+          // A value the administrator already had needs no "copy this now"
+          // ceremony — they have it. Only a generated one does.
+          setNewToken(chosen.length > 0 ? null : result.token);
+          if (chosen.length > 0) onGenerateClose();
+          setDescription("");
+          setConnectionId("");
+          setSecret("");
+          void queryClient.scimToken.list.invalidate();
+          void queryClient.scimReconciliation.invalidate();
+        },
+        onError: (error) => {
+          // The wire message for a handled error IS its code, so the words
+          // come from the code-keyed registry — a token minted without a
+          // connection has copy that names the field to fill in.
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't issue the provisioning token",
+          });
+        },
+      },
+    );
+  };
+
+  const handleRevoke = (tokenId: string) => {
+    revokeMutation.mutate(
+      { organizationId, tokenId },
+      {
+        onSuccess: () => {
+          setTokenToRevoke(null);
+          toaster.create({
+            title: "Token revoked",
+            type: "success",
+            duration: 3000,
+          });
+          void queryClient.scimToken.list.invalidate();
+          void queryClient.scimReconciliation.invalidate();
+        },
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't revoke the provisioning token",
+          });
+        },
+      },
+    );
+  };
+
+  return { handleGenerate, handleRevoke };
+}
+
+/**
+ * Minting a token, with the connection it will be bound to.
+ *
+ * With exactly ONE issuable connection the choice is already made and asking
+ * is an errand; with several, nothing is assumed — a token issued against the
+ * wrong connection has the wrong write authority, and guessing that is worse
+ * than asking.
+ */
+function GenerateTokenDialog({
+  tokens,
+}: {
+  tokens: ReturnType<typeof useScimTokens>;
+}) {
+  return (
+    <Dialog.Root
+      open={tokens.isGenerateOpen && !tokens.newToken}
+      onOpenChange={({ open }) => {
+        if (!open) {
+          tokens.onGenerateClose();
+          tokens.setDescription("");
+          tokens.setConnectionId("");
+        }
+      }}
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.Header>
+          <Dialog.Title>
+            <Heading size="md">Issue a provisioning token</Heading>
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body paddingBottom={6}>
+          <VStack gap={4} align="start">
+            <Text>
+              This token manages only the people its connection provisioned, so
+              choose the connection your identity provider syncs from.
+            </Text>
+            <VStack gap={1} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Connection
+              </Text>
+              {tokens.hasIssuableConnection ? (
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    aria-label="Connection"
+                    value={tokens.chosenConnectionId}
+                    onChange={(event) =>
+                      tokens.setConnectionId(event.target.value)
+                    }
+                  >
+                    <option value="">Choose a connection</option>
+                    {tokens.issuableConnections.map((option) => (
+                      <option
+                        key={option.connectionId}
+                        value={option.connectionId}
+                      >
+                        {option.providerId}
+                        {option.verifiedDomains.length > 0
+                          ? ` — ${option.verifiedDomains.join(", ")}`
+                          : ""}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              ) : (
+                /* An empty dropdown is a fault a reader has to diagnose.
+                   Nothing to choose here has one cause and one remedy, so
+                   it says both rather than leaving a control that opens
+                   onto nothing. */
+                <Text color="fg.muted" fontSize="sm">
+                  No single sign-on connection is live yet. Finish setting one
+                  up and turn it on, and it can carry a token.
+                </Text>
+              )}
+            </VStack>
+            <VStack gap={1} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Description (optional)
+              </Text>
+              <Input
+                aria-label="Description"
+                placeholder="For example, Okta production"
+                value={tokens.description}
+                onChange={(event) => tokens.setDescription(event.target.value)}
+              />
+            </VStack>
+            {/* EITHER DIRECTION, BECAUSE THE USUAL ONE IS THE OTHER WAY.
+                Somebody configuring an identity provider is usually
+                standing in the provider's console with the value already
+                decided; making them come here, take ours, and go back and
+                paste it is an errand we invented. What matters is only that
+                the two ends match.
+
+                Ours stays the default, because a value we generate is
+                long and random and a typed one might not be. */}
+            <VStack gap={1} align="start" width="full">
+              <Text fontWeight="600" fontSize="sm">
+                Token
+              </Text>
+              <HStack width="full" gap={2}>
+                <Input
+                  aria-label="Token"
+                  type="password"
+                  placeholder="Leave empty and we will generate one"
+                  value={tokens.secret}
+                  onChange={(event) => tokens.setSecret(event.target.value)}
+                />
+              </HStack>
+              <Text color="fg.muted" fontSize="xs">
+                {tokens.secret.trim().length > 0
+                  ? "We store only a hash of it, the same as one we generate. It cannot be read back."
+                  : "Paste the value from your identity provider if it already has one, or leave this empty."}
+              </Text>
+            </VStack>
+            <Button
+              width="full"
+              onClick={tokens.handleGenerate}
+              // `connectionId` is the placeholder until one is chosen, and
+              // submitting without it is refused by the service as
+              // `scim_connection_required` — a rejection the reader could
+              // see coming, arriving as a toast. The control says so instead.
+              disabled={
+                tokens.generateMutation.isPending ||
+                !tokens.hasIssuableConnection ||
+                !tokens.chosenConnectionId
+              }
+            >
+              {tokens.secret.trim().length > 0
+                ? "Save token"
+                : "Generate token"}
+            </Button>
+          </VStack>
+        </Dialog.Body>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
