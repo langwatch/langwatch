@@ -55,7 +55,7 @@ describe.each(backends)("given the $name authz backend", (backend) => {
       const { bindings } = backend.create();
 
       await expect(
-        bindings.tryFindBinding({ organizationId: ORGANIZATION_ID, bindingId: "rb_missing" }),
+        bindings.findBinding({ organizationId: ORGANIZATION_ID, bindingId: "rb_missing" }),
       ).resolves.toBeNull();
     });
   });
@@ -106,7 +106,7 @@ describe.each(backends)("given the $name authz backend", (backend) => {
       repositories.store.bindings.push(binding);
 
       await expect(
-        repositories.bindings.tryFindBinding({
+        repositories.bindings.findBinding({
           organizationId: ORGANIZATION_ID,
           bindingId: "rb_1",
         }),

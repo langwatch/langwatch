@@ -45,17 +45,17 @@ function authzFor({
   demoProjectId,
 }: World = {}): AuthzService {
   const overrides: Partial<AuthzReadRepository> = {
-    tryFindOrganizationMembership: vi
+    findOrganizationMembership: vi
       .fn()
       .mockResolvedValue(membership ? { role: membership, disabled: false } : null),
     findUserBindings: vi.fn().mockResolvedValue(bindings),
     findGroupBindings: vi.fn().mockResolvedValue(groupBindings),
     findLegacyTeamMemberships: vi.fn().mockResolvedValue(legacyTeams),
     findCustomRolePermissions: vi.fn().mockResolvedValue(customRoles),
-    tryFindProjectLineage: vi
+    findProjectLineage: vi
       .fn()
       .mockResolvedValue(projectKnown ? { teamId: TEAM, organizationId: ORG } : null),
-    tryFindTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
+    findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
   };
   return AuthzService.create({
     isOnEngine: async () => true,

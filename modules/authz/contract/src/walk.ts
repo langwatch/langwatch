@@ -2,7 +2,7 @@
  * Ordered decision steps; ORDER lives in AuthzEngine.decide() (engine.ts).
  * Legacy quirks tagged LEGACY-QUIRK(<stage>) (ADR-092 §2).
  */
-import { bindingGrants, legacyTeamFallbackGrants, matchResourceGrant } from "./matchers.ts";
+import { bindingGrants, legacyTeamFallbackGrants, findResourceGrant } from "./matchers.ts";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
 import type { ScopeChainLink } from "./scope.ts";
 import type {
@@ -45,7 +45,7 @@ export type DecideContext = {
  * principals are excluded here too, and an anonymous caller's only path stays
  * the resource tier.
  */
-export function demoProjectStep({
+export function findDemoProjectStep({
   grants,
   permission,
   scope,
@@ -62,7 +62,7 @@ export function demoProjectStep({
  * LEGACY-QUIRK(C): deny non-members outright at binding tiers; resource tier
  * allows share links so non-members + anonymous can see resources.
  */
-export function organizationMembershipGateStep({
+export function findOrganizationMembershipGateStep({
   grants,
   scope,
   base,
@@ -86,7 +86,7 @@ export function organizationMembershipGateStep({
  * floor, rbac.ts:1058). Applies to org checks only — project/team checks have
  * no floor.
  */
-export function organizationRoleFloorStep({
+export function findOrganizationRoleFloorStep({
   grants,
   permission,
   scope,
@@ -106,7 +106,7 @@ function principalLacksMembership(grants: CollectedGrants): boolean {
 }
 
 /** Bindings walk: union across every binding on the scope chain. */
-export function bindingsStep({
+export function findBindingsStep({
   grants,
   permission,
   chainBindings,
@@ -127,7 +127,7 @@ export function bindingsStep({
 }
 
 /** LEGACY-QUIRK(B): the TeamUser fallback (see legacyTeamFallbackGrants). */
-export function legacyTeamFallbackStep({
+export function findLegacyTeamFallbackStep({
   grants,
   permission,
   scope,
@@ -147,8 +147,8 @@ export function legacyTeamFallbackStep({
   return { ...base, allowed: true, via: "legacy-team-fallback" };
 }
 
-/** ADR-092 §8 — the resource tier (see matchResourceGrant). */
-export function resourceGrantStep({
+/** ADR-092 §8 — the resource tier (see findResourceGrant). */
+export function findResourceGrantStep({
   grants,
   permission,
   scope,
@@ -156,7 +156,7 @@ export function resourceGrantStep({
   base,
 }: DecideContext): AuthzDecision | undefined {
   if (scope.type !== "resource" || !resourceGrants) return;
-  const matched = matchResourceGrant({
+  const matched = findResourceGrant({
     scope,
     resourceGrants,
     grants,

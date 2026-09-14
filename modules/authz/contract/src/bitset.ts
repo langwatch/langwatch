@@ -3,12 +3,12 @@
  * ordered list, so an effective permission set is a few dozen bytes and a
  * membership test is a bit test.
  */
-import { ALL_PERMISSIONS, permissionIndex } from "./registry.ts";
+import { ALL_PERMISSIONS, findPermissionIndex } from "./registry.ts";
 
 export function encodePermissionBitset(permissions: Iterable<string>): Uint8Array {
   const bytes = new Uint8Array(Math.ceil(ALL_PERMISSIONS.length / 8));
   for (const permission of permissions) {
-    const index = permissionIndex(permission);
+    const index = findPermissionIndex(permission);
     if (index === undefined) continue;
     bytes[Math.floor(index / 8)]! |= 1 << (index % 8);
   }
@@ -22,7 +22,7 @@ export function bitsetHasPermission({
   bitset: Uint8Array;
   permission: string;
 }): boolean {
-  const index = permissionIndex(permission);
+  const index = findPermissionIndex(permission);
   if (index === undefined) return false;
   const byte = bitset[Math.floor(index / 8)];
   if (byte === undefined) return false;

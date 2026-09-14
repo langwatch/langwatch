@@ -209,7 +209,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     // exactly the visible change the migration promises not to make.
     const migrationSourced = AuthzMigrationOwnershipMapper.includes(grant.source);
 
-    const binding = AuthzGrantMapper.grantFactToCompatBinding({ grant, organizationId });
+    const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({ grant, organizationId });
     if (binding) {
       const { id, ...rest } = binding;
       if (migrationSourced) {
@@ -226,7 +226,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
       }
     }
 
-    const link = AuthzGrantMapper.grantFactToCompatShareLink({ grant, organizationId });
+    const link = AuthzGrantMapper.findCompatShareLinkFromGrantFact({ grant, organizationId });
     if (link) {
       const { id, ...rest } = link;
       if (migrationSourced) {
@@ -259,7 +259,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
       select: GRANT_FACT_COLUMNS,
     });
     if (!row) return;
-    const binding = AuthzGrantMapper.grantFactToCompatBinding({
+    const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({
       grant: AuthzGrantMapper.grantRowToFact(row),
       organizationId: row.organizationId,
     });

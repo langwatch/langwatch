@@ -116,7 +116,7 @@ class MemberAccessStore {
         SCOPES.filter((scope) =>
           scopes.some((asked) => asked.scopeType === scope.type && asked.scopeId === scope.id),
         ),
-      tryFindOrganizationRole: async ({ userId }: { userId: string }) => this.seatOf(userId),
+      findOrganizationRole: async ({ userId }: { userId: string }) => this.seatOf(userId),
       // Only rows this member actually holds — a staged id naming another
       // principal, or one a concurrent change already deleted, simply is not
       // among them, which is what makes both saves clean.
@@ -137,7 +137,7 @@ class MemberAccessStore {
       findUserGroups: async () => [],
       isGroupInOrganization: async () => true,
       isApiKeyInOrganization: async () => true,
-      tryFindBinding: async ({ bindingId }: { bindingId: string }) =>
+      findBinding: async ({ bindingId }: { bindingId: string }) =>
         this.rows.find((row) => row.id === bindingId) ?? null,
     } as unknown as AuthzBindingRepository;
   }

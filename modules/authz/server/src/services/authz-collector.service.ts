@@ -42,7 +42,7 @@ export class AuthzCollectorService {
    * their owning team + organization (the tenant comes from the resource, never from the
    * caller — same posture as the legacy project path).
    */
-  async tryResolveScopeRef({
+  async findScopeRef({
     projectId,
     teamId,
     organizationId,
@@ -52,7 +52,7 @@ export class AuthzCollectorService {
     organizationId?: string;
   }): Promise<AuthzScopeRef | null> {
     if (projectId) {
-      const lineage = await this.reader.tryFindProjectLineage({ projectId });
+      const lineage = await this.reader.findProjectLineage({ projectId });
       if (!lineage) {
         return null;
       }
@@ -66,7 +66,7 @@ export class AuthzCollectorService {
     }
 
     if (teamId) {
-      const team = await this.reader.tryFindTeamOrganization({ teamId });
+      const team = await this.reader.findTeamOrganization({ teamId });
       if (!team) {
         return null;
       }
@@ -84,7 +84,7 @@ export class AuthzCollectorService {
   /**
    * Resolve a resource-tier scope from a stored resource's own facts.
    */
-  async tryResolveResourceScopeRef({
+  async findResourceScopeRef({
     projectId,
     kind,
     id,
@@ -97,7 +97,7 @@ export class AuthzCollectorService {
     parentThreadId?: string;
     shareTokens?: readonly string[];
   }): Promise<AuthzScopeRef | null> {
-    const lineage = await this.reader.tryFindProjectLineage({ projectId });
+    const lineage = await this.reader.findProjectLineage({ projectId });
     if (!lineage) {
       return null;
     }
@@ -120,12 +120,12 @@ export class AuthzCollectorService {
    * AuthzService asks through here rather than holding its own reader: the
    * collector is the one seam in front of storage.
    */
-  async tryFindApiKeyOwner({
+  async findApiKeyOwner({
     apiKeyId,
   }: {
     apiKeyId: string;
   }): Promise<{ userId: string | null } | null> {
-    return this.reader.tryFindApiKeyOwner(apiKeyId);
+    return this.reader.findApiKeyOwner(apiKeyId);
   }
 
   async collectGrants({
@@ -292,7 +292,7 @@ export class AuthzCollectorService {
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
     const [membership, directBindings, groupBindings, legacyRows] = await Promise.all([
-      reader.tryFindOrganizationMembership({
+      reader.findOrganizationMembership({
         userId: principal.id,
         organizationId,
       }),

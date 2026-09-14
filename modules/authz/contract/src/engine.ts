@@ -11,14 +11,14 @@ import type {
   ResourceGrant,
 } from "./authz.ts";
 import {
-  bindingsStep,
+  findBindingsStep,
   type DecideContext,
-  demoProjectStep,
+  findDemoProjectStep,
   denyStep,
-  legacyTeamFallbackStep,
-  organizationMembershipGateStep,
-  organizationRoleFloorStep,
-  resourceGrantStep,
+  findLegacyTeamFallbackStep,
+  findOrganizationMembershipGateStep,
+  findOrganizationRoleFloorStep,
+  findResourceGrantStep,
 } from "./walk.ts";
 
 /**
@@ -68,12 +68,12 @@ export class AuthzEngine {
 
     // The order IS the contract — each step answers or defers to the next.
     return (
-      demoProjectStep(context) ??
-      organizationMembershipGateStep(context) ??
-      organizationRoleFloorStep(context) ??
-      bindingsStep(context) ??
-      legacyTeamFallbackStep(context) ??
-      resourceGrantStep(context) ??
+      findDemoProjectStep(context) ??
+      findOrganizationMembershipGateStep(context) ??
+      findOrganizationRoleFloorStep(context) ??
+      findBindingsStep(context) ??
+      findLegacyTeamFallbackStep(context) ??
+      findResourceGrantStep(context) ??
       denyStep(context)
     );
   }

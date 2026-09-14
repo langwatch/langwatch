@@ -228,7 +228,7 @@ export function resolveDeclaredScope({
  * The resolved scope, or null when the input carries none. Kept for callers
  * that only need the answer and not the reason for its absence.
  */
-export function declaredScopeId({
+export function findDeclaredScopeId({
   permission,
   input,
   via,

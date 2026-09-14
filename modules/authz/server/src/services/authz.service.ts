@@ -174,15 +174,15 @@ export class AuthzService extends AuthzServiceContract {
     const organizationId = scopeOrganizationId(scope);
     const [grants, resourceGrants, ownerGrants] = await Promise.all([
       this.snapshots.collectCached({ principal, organizationId }),
-      this.snapshots.tryResourceGrantsFor(scope),
-      this.snapshots.tryOwnerGrantsFor({ principal, organizationId }),
+      this.snapshots.findResourceGrantsFor(scope),
+      this.snapshots.findOwnerGrantsFor({ principal, organizationId }),
     ]);
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
       ownerGrants,
       permission,
       scope,
-      demoProjectId: this.snapshots.tryDemoProjectId(),
+      demoProjectId: this.snapshots.findDemoProjectId(),
       resourceGrants,
     });
     this.recordDenial(decision);
@@ -250,10 +250,10 @@ export class AuthzService extends AuthzServiceContract {
     const organizationId = scopeOrganizationId(scope);
     const [grants, resourceGrants, ownerGrants] = await Promise.all([
       this.snapshots.collectCached({ principal, organizationId }),
-      this.snapshots.tryResourceGrantsFor(scope),
-      this.snapshots.tryOwnerGrantsFor({ principal, organizationId }),
+      this.snapshots.findResourceGrantsFor(scope),
+      this.snapshots.findOwnerGrantsFor({ principal, organizationId }),
     ]);
-    const demo = this.snapshots.tryDemoProjectId();
+    const demo = this.snapshots.findDemoProjectId();
 
     return ALL_PERMISSIONS.filter(
       (permission) =>
@@ -304,15 +304,15 @@ export class AuthzService extends AuthzServiceContract {
     organizationId,
   }: ScopeIds): Promise<AuthzScopeRef | null> {
     if (projectId) {
-      return this.collector.tryResolveScopeRef({ projectId });
+      return this.collector.findScopeRef({ projectId });
     }
 
     if (teamId) {
-      return this.collector.tryResolveScopeRef({ teamId });
+      return this.collector.findScopeRef({ teamId });
     }
 
     if (organizationId) {
-      return this.collector.tryResolveScopeRef({ organizationId });
+      return this.collector.findScopeRef({ organizationId });
     }
 
     return null;

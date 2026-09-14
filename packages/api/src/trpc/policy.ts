@@ -26,7 +26,7 @@ import {
   type ScopeTierField,
   type ValidatePermissionForInput,
   type ViaFieldFor,
-  authzDeclarationOf,
+  findAuthzDeclaration,
 } from "@langwatch/authz-contract";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type RequestContext } from "@langwatch/observability";
@@ -1001,7 +1001,7 @@ export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext
         // organizations is refused before ANY declaration kind — declared,
         // custom, or opted-out — can pass on one id while the handler acts on
         // another. AuthZ owns the lineage decision; this is its tRPC adapter.
-        .use(middlewares.scopeLineageGuard(authzDeclarationOf(check)))
+        .use(middlewares.scopeLineageGuard(findAuthzDeclaration(check)))
         .use(check)
         .use(middlewares.enforceCheck)
         .use(middlewares.auditMutations) as unknown as Declared;

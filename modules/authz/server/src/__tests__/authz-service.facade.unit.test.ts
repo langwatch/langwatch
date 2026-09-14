@@ -36,7 +36,7 @@ describe("AuthzService portable facade", () => {
   it("routes declared and imperative checks through the same decision engine", async () => {
     const { service } = makeService({
       reader: makeReader({
-        tryFindOrganizationMembership: vi
+        findOrganizationMembership: vi
           .fn()
           .mockResolvedValue({ role: "ADMIN", disabled: false }),
       }),
@@ -77,7 +77,7 @@ describe("AuthzService portable facade", () => {
   it("preserves a membership-disabled denial through the compatibility decision", async () => {
     const { service } = makeService({
       reader: makeReader({
-        tryFindOrganizationMembership: vi
+        findOrganizationMembership: vi
           .fn()
           .mockResolvedValue({ role: "MEMBER", disabled: true }),
       }),
@@ -99,11 +99,11 @@ describe("AuthzService portable facade", () => {
   it("keeps the primary denial reason when none of a declared permission set allows", async () => {
     const { service } = makeService({
       reader: makeReader({
-        tryFindProjectLineage: vi.fn().mockResolvedValue({
+        findProjectLineage: vi.fn().mockResolvedValue({
           teamId: TEAM,
           organizationId: ORG,
         }),
-        tryFindOrganizationMembership: vi
+        findOrganizationMembership: vi
           .fn()
           .mockResolvedValue({ role: "MEMBER", disabled: true }),
       }),
@@ -125,11 +125,11 @@ describe("AuthzService portable facade", () => {
   it("fences project API-key checks to the resolved organization", async () => {
     const { service } = makeService({
       reader: makeReader({
-        tryFindProjectLineage: vi.fn().mockResolvedValue({
+        findProjectLineage: vi.fn().mockResolvedValue({
           teamId: TEAM,
           organizationId: ORG,
         }),
-        tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: null }),
+        findApiKeyOwner: vi.fn().mockResolvedValue({ userId: null }),
         findApiKeyBindings: vi.fn().mockResolvedValue([
           {
             role: "ADMIN",

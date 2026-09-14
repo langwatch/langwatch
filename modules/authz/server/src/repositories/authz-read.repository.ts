@@ -92,11 +92,11 @@ export type AuthzReadHeadSelector = (organizationId: string) => Promise<boolean>
  */
 export abstract class ScopeLineageRepository {
   /** A project's team + organization, or null when the project is unknown. */
-  abstract tryFindProjectLineage(args: {
+  abstract findProjectLineage(args: {
     projectId: string;
   }): Promise<{ teamId: string; organizationId: string } | null>;
   /** A team's organization, or null when the team is unknown. */
-  abstract tryFindTeamOrganization(args: {
+  abstract findTeamOrganization(args: {
     teamId: string;
   }): Promise<{ organizationId: string } | null>;
 }
@@ -110,7 +110,7 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
    * membership from an absent one - so a disabled member passed the engine's
    * membership gate and kept every permission.
    */
-  abstract tryFindOrganizationMembership(args: {
+  abstract findOrganizationMembership(args: {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationMembership | null>;
@@ -133,7 +133,7 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
    * `{ userId: null }` is a SERVICE key - it exists and has no owner, so it
    * carries no ceiling. `null` means the key itself is unknown.
    */
-  abstract tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null>;
+  abstract findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null>;
   abstract findLegacyTeamMemberships(args: {
     userId: string;
     organizationId: string;

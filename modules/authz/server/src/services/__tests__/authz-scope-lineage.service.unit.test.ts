@@ -9,7 +9,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 class TestScopeLineageRepository extends ScopeLineageRepository {
-  readonly tryFindProjectLineage = vi.fn(
+  readonly findProjectLineage = vi.fn(
     async ({
       projectId,
     }: {
@@ -23,7 +23,7 @@ class TestScopeLineageRepository extends ScopeLineageRepository {
     },
   );
 
-  readonly tryFindTeamOrganization = vi.fn(
+  readonly findTeamOrganization = vi.fn(
     async ({ teamId }: { teamId: string }): Promise<{ organizationId: string } | null> => {
       const organizationId = this.teamOrganizations[teamId];
       return organizationId ? { organizationId } : null;
@@ -62,8 +62,8 @@ describe("AuthzScopeLineageService", () => {
     await expect(service.check({ projectId: "project-1" })).resolves.toEqual({
       kind: "consistent",
     });
-    expect(repository.tryFindProjectLineage).not.toHaveBeenCalled();
-    expect(repository.tryFindTeamOrganization).not.toHaveBeenCalled();
+    expect(repository.findProjectLineage).not.toHaveBeenCalled();
+    expect(repository.findTeamOrganization).not.toHaveBeenCalled();
   });
 
   it("accepts project, team and organization ids in one organization", async () => {
@@ -154,7 +154,7 @@ describe("AuthzScopeLineageService", () => {
     await expect(service.check({ projectId: "", teamId: 42 })).resolves.toEqual({
       kind: "consistent",
     });
-    expect(repository.tryFindProjectLineage).not.toHaveBeenCalled();
-    expect(repository.tryFindTeamOrganization).not.toHaveBeenCalled();
+    expect(repository.findProjectLineage).not.toHaveBeenCalled();
+    expect(repository.findTeamOrganization).not.toHaveBeenCalled();
   });
 });

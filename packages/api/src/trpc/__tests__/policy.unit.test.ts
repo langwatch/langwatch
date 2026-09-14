@@ -7,7 +7,7 @@ import {
   type AuthzGetProjectAnyDecisionInput,
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
-  authzDeclarationOf,
+  findAuthzDeclaration,
   BlankScopeIdError,
   type DeclaredAuthzMiddleware,
   type PermissionDecision,
@@ -352,7 +352,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
       await middleware({ ctx, input: {}, next: vi.fn().mockReturnValue("next-called") });
       expect(ctx.permissionChecked).toBe(true);
 
-      expect(authzDeclarationOf(middleware)).toMatchObject({
+      expect(findAuthzDeclaration(middleware)).toMatchObject({
         kind: "no-permission",
         reason: "user-scoped preferences only",
       });
@@ -396,7 +396,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
       await middleware({ ctx, next: vi.fn().mockReturnValue("next-called") });
       expect(ctx.permissionChecked).toBe(true);
 
-      expect(authzDeclarationOf(middleware)).toMatchObject({
+      expect(findAuthzDeclaration(middleware)).toMatchObject({
         kind: "service-authorized",
         permissions: ["traces:view"],
       });

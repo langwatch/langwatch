@@ -22,6 +22,43 @@ export interface EventingAuthzAdapterOptions {
   authzAuditTrailStore: AuthzAuditTrailStore;
 }
 
+const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
+  return (
+    definePipeline<AuthzGrantsEvent>({
+      name: AUTHZ_GRANT_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: AUTHZ_GRANT_AGGREGATE_TYPE,
+        events: defineEvents(AUTHZ_GRANTS_EVENT_TYPES),
+      }),
+    })
+      .withClickHouseMapProjection(AuthzGrantProjection.create(options.authzGrantsWriteStore))
+      .withEventSubscriber(
+        "auditTrail",
+        EventingAuthzAuditAdapter.create({
+          store: options.authzAuditTrailStore,
+        }),
+      )
+      // One grant per lane via serializeByAggregate: prevents same-grant
+      // commands racing; batch folds one grant's jobs (ADR-114 amended).
+      .withCommand("attachGrant", AttachGrantCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      .withCommand("changeGrantRole", ChangeGrantRoleCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      .withCommand("revokeGrant", RevokeGrantCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      .withCommand("defineRole", DefineRoleCommand)
+      .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
+      .withCommand("deleteRole", DeleteRoleCommand)
+      .build()
+  );
+};
+
 /**
  * Explicit composition boundary for the AuthZ Eventing topology. Importing
  * this module creates no pipeline and registers nothing with a runtime.
@@ -33,46 +70,13 @@ export class EventingAuthzAdapter {
     return new EventingAuthzAdapter(options);
   }
 
-  static build(options: EventingAuthzAdapterOptions) {
+  static build(
+    options: EventingAuthzAdapterOptions,
+  ): ReturnType<typeof buildAuthzGrantPipeline> {
     return EventingAuthzAdapter.create(options).build();
   }
 
-  build() {
-    return (
-      definePipeline<AuthzGrantsEvent>({
-        name: AUTHZ_GRANT_PIPELINE_NAME,
-        aggregate: defineAggregate({
-          type: AUTHZ_GRANT_AGGREGATE_TYPE,
-          events: defineEvents(AUTHZ_GRANTS_EVENT_TYPES),
-        }),
-      })
-        .withClickHouseMapProjection(
-          AuthzGrantProjection.create(this.options.authzGrantsWriteStore),
-        )
-        .withEventSubscriber(
-          "auditTrail",
-          EventingAuthzAuditAdapter.create({
-            store: this.options.authzAuditTrailStore,
-          }),
-        )
-        // One grant per lane via serializeByAggregate: prevents same-grant
-        // commands racing; batch folds one grant's jobs (ADR-114 amended).
-        .withCommand("attachGrant", AttachGrantCommand, {
-          serializeByAggregate: true,
-          coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
-        })
-        .withCommand("changeGrantRole", ChangeGrantRoleCommand, {
-          serializeByAggregate: true,
-          coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
-        })
-        .withCommand("revokeGrant", RevokeGrantCommand, {
-          serializeByAggregate: true,
-          coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
-        })
-        .withCommand("defineRole", DefineRoleCommand)
-        .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
-        .withCommand("deleteRole", DeleteRoleCommand)
-        .build()
-    );
+  build(): ReturnType<typeof buildAuthzGrantPipeline> {
+    return buildAuthzGrantPipeline(this.options);
   }
 }

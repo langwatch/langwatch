@@ -109,7 +109,7 @@ export function legacyTeamFallbackGrants({
  * Resource grants with least-redacting audience win; only path for anonymous
  * principals (ADR-092 §8). Deterministic: not dependent on database row order.
  */
-export function matchResourceGrant({
+export function findResourceGrant({
   scope,
   resourceGrants,
   grants,

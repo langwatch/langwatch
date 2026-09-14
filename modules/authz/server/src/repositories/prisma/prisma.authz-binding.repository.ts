@@ -216,7 +216,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
     return z.array(userGroupRowSchema).parse(rows);
   }
 
-  async tryFindOrganizationRole({
+  async findOrganizationRole({
     organizationId,
     userId,
   }: {
@@ -260,7 +260,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
     return apiKey !== null;
   }
 
-  async tryFindBinding({
+  async findBinding({
     organizationId,
     bindingId,
   }: {

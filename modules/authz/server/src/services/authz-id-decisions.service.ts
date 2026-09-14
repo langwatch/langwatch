@@ -78,7 +78,7 @@ export class AuthzIdDecisionsService {
         reader: pass,
       }),
       ceiling
-        ? this.deps.snapshots.tryOwnerGrantsFor({
+        ? this.deps.snapshots.findOwnerGrantsFor({
             principal,
             organizationId: scopeOrg,
             reader: pass,
@@ -90,7 +90,7 @@ export class AuthzIdDecisionsService {
       ownerGrants,
       permission,
       scope,
-      demoProjectId: this.deps.snapshots.tryDemoProjectId(),
+      demoProjectId: this.deps.snapshots.findDemoProjectId(),
     });
     this.deps.recordDenial(decision);
 
@@ -120,7 +120,7 @@ export class AuthzIdDecisionsService {
     organizationRole: OrganizationRoleOrNull;
     denialReason?: AuthzDecision["denialReason"];
   }> {
-    const scope = await this.deps.collector.tryResolveScopeRef({ projectId });
+    const scope = await this.deps.collector.findScopeRef({ projectId });
     if (!scope) {
       return { allowed: false, organizationRole: null };
     }
@@ -138,13 +138,13 @@ export class AuthzIdDecisionsService {
         organizationId: scopeOrg,
         reader: pass,
       }),
-      this.deps.snapshots.tryOwnerGrantsFor({
+      this.deps.snapshots.findOwnerGrantsFor({
         principal,
         organizationId: scopeOrg,
         reader: pass,
       }),
     ]);
-    const demoProjectId = this.deps.snapshots.tryDemoProjectId();
+    const demoProjectId = this.deps.snapshots.findDemoProjectId();
     let matched: AuthzPermission | undefined;
     let firstDenied: AuthzDecision | undefined;
     for (const permission of permissions) {
@@ -250,9 +250,9 @@ export class AuthzIdDecisionsService {
         organizationId,
         reader: pass,
       }),
-      this.deps.snapshots.tryOwnerGrantsFor({ principal, organizationId, reader: pass }),
+      this.deps.snapshots.findOwnerGrantsFor({ principal, organizationId, reader: pass }),
     ]);
-    const demoProjectId = this.deps.snapshots.tryDemoProjectId();
+    const demoProjectId = this.deps.snapshots.findDemoProjectId();
     const allowedAt = (permission: AuthzPermission, scope: AuthzScopeRef | null): boolean =>
       scope
         ? this.deps.engine.decideWithCeiling({
@@ -269,7 +269,7 @@ export class AuthzIdDecisionsService {
         projectId,
         teamId
           ? { type: "project", id: projectId, teamId, organizationId }
-          : await this.deps.collector.tryResolveScopeRef({ projectId }),
+          : await this.deps.collector.findScopeRef({ projectId }),
       ]),
     );
 

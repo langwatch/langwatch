@@ -1000,7 +1000,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       where: legacyWhere,
       select: { id: true },
     });
-    const grantWhere = AuthzLedgerMapper.grantWhereFromBindingWhere(where, organizationId);
+    const grantWhere = AuthzLedgerMapper.findGrantWhereFromBindingWhere(where, organizationId);
     const grantRows = grantWhere
       ? await this.options.database.grant.findMany({
           where: grantWhere,
@@ -1363,7 +1363,17 @@ export class AuthzLedgerMapper {
   }: {
     organizationId: string;
     binding: LedgerBindingAttach;
-  }) {
+  }): {
+    id: string;
+    organizationId: string;
+    userId: string | null;
+    groupId: string | null;
+    apiKeyId: string | null;
+    role: RoleBindingWrite["role"];
+    customRoleId: string | null;
+    scopeType: RoleBindingWrite["scopeType"];
+    scopeId: string;
+  } {
     return {
       id: binding.bindingId,
       organizationId,
@@ -1495,7 +1505,7 @@ export class AuthzLedgerMapper {
    * filtered revoke reaches Grant rows the compat head never represented (a `roleKey`-only
    * import, a PLATFORM-tier row).
    */
-  static grantWhereFromBindingWhere(
+  static findGrantWhereFromBindingWhere(
     where: AuthzRoleBindingFilter,
     organizationId: string,
   ): AuthzGrantFilter | null {

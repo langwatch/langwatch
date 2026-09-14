@@ -64,7 +64,7 @@ export function declareAuthzMiddleware<M extends (params: never) => Promise<unkn
   }) as DeclaredAuthzMiddleware<M>;
 }
 
-export function authzDeclarationOf(value: unknown): AuthzDeclaration | null {
+export function findAuthzDeclaration(value: unknown): AuthzDeclaration | null {
   if (typeof value !== "function") return null;
   const declaration = (
     value as Partial<DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>>

@@ -1,6 +1,6 @@
 /**
  * ADR-092 — the Prisma implementation of AuthzGrantsRepository's READ half:
- * the tenancy lookups (`tryFindTeamOrganization`, `tryFindProjectLineage`, ...)
+ * the tenancy lookups (`findTeamOrganization`, `findProjectLineage`, ...)
  * every write path validates with. `EventingAuthzGrantRepository` composes
  * this repository for reads and owns every write itself, by emitting commands
  * — see ../eventing/eventing.authz-grant.repository.ts.
@@ -11,10 +11,10 @@ import type { AuthzGrantRepository } from "../authz-grant.repository.ts";
 /** The subset of the write port this repository actually implements. */
 export type AuthzGrantsReadRepository = Pick<
   AuthzGrantRepository,
-  | "tryFindBinding"
-  | "tryFindCustomRole"
-  | "tryFindTeamOrganization"
-  | "tryFindProjectLineage"
+  | "findBinding"
+  | "findCustomRole"
+  | "findTeamOrganization"
+  | "findProjectLineage"
   | "findOwnedApiKeys"
   | "findPersonalTeams"
 >;
@@ -47,7 +47,7 @@ export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
 
   private constructor(private readonly prisma: PrismaAuthzGrantDatabase) {}
 
-  async tryFindBinding({
+  async findBinding({
     bindingId,
   }: {
     bindingId: string;
@@ -58,7 +58,7 @@ export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
     });
   }
 
-  async tryFindCustomRole({
+  async findCustomRole({
     customRoleId,
   }: {
     customRoleId: string;
@@ -69,7 +69,7 @@ export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
     });
   }
 
-  async tryFindTeamOrganization({
+  async findTeamOrganization({
     teamId,
   }: {
     teamId: string;
@@ -80,7 +80,7 @@ export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
     });
   }
 
-  async tryFindProjectLineage({
+  async findProjectLineage({
     projectId,
   }: {
     projectId: string;

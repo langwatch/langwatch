@@ -124,7 +124,7 @@ describe("compat binding mapping", () => {
         ["member", "MEMBER"],
         ["viewer", "VIEWER"],
       ] as const) {
-        const row = AuthzGrantMapper.grantFactToCompatBinding({
+        const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
           grant: fact({ roleKey }),
           organizationId: ORG,
         });
@@ -134,7 +134,7 @@ describe("compat binding mapping", () => {
     });
 
     it("carries the grant id as the binding id, so compat rows are ledger-recognisable", () => {
-      const row = AuthzGrantMapper.grantFactToCompatBinding({
+      const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
         grant: fact(),
         organizationId: ORG,
       });
@@ -144,7 +144,7 @@ describe("compat binding mapping", () => {
     });
 
     it("splits custom role keys into CUSTOM plus the role id", () => {
-      const row = AuthzGrantMapper.grantFactToCompatBinding({
+      const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
         grant: fact({ roleKey: "custom:role_sre" }),
         organizationId: ORG,
       });
@@ -157,7 +157,7 @@ describe("compat binding mapping", () => {
       // role's permission list is empty (matchers.ts). CUSTOM resolves to
       // viewer there, so normalizing an imported ADMIN row would demote the
       // principal the moment the custom role listed nothing.
-      const row = AuthzGrantMapper.grantFactToCompatBinding({
+      const row = AuthzGrantMapper.findCompatBindingFromGrantFact({
         grant: fact({ roleKey: "custom:role_sre", legacyRole: "ADMIN" }),
         organizationId: ORG,
       });
@@ -166,14 +166,14 @@ describe("compat binding mapping", () => {
     });
 
     it("sets exactly one principal column per principal type", () => {
-      const group = AuthzGrantMapper.grantFactToCompatBinding({
+      const group = AuthzGrantMapper.findCompatBindingFromGrantFact({
         grant: fact({ principal: { type: "group", id: "grp_1" } }),
         organizationId: ORG,
       });
       expect(group?.groupId).toBe("grp_1");
       expect(group?.userId).toBeNull();
       expect(group?.apiKeyId).toBeNull();
-      const key = AuthzGrantMapper.grantFactToCompatBinding({
+      const key = AuthzGrantMapper.findCompatBindingFromGrantFact({
         grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
@@ -182,7 +182,7 @@ describe("compat binding mapping", () => {
       expect(key?.userId).toBeNull();
       // The default fixture is a user grant - the third case, and the one
       // that proves "exactly one" rather than "at least the expected one".
-      const user = AuthzGrantMapper.grantFactToCompatBinding({
+      const user = AuthzGrantMapper.findCompatBindingFromGrantFact({
         grant: fact(),
         organizationId: ORG,
       });
@@ -207,7 +207,7 @@ describe("compat binding mapping", () => {
       ];
       for (const overrides of beyond) {
         expect(
-          AuthzGrantMapper.grantFactToCompatBinding({
+          AuthzGrantMapper.findCompatBindingFromGrantFact({
             grant: fact(overrides),
             organizationId: ORG,
           }),
@@ -220,7 +220,7 @@ describe("compat binding mapping", () => {
 describe("compat share link mapping", () => {
   describe("when the grant is a resource fact", () => {
     it("lands the whole link row, keyed by the grant id", () => {
-      const row = AuthzGrantMapper.grantFactToCompatShareLink({
+      const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
         grant: resourceFact(),
         organizationId: ORG,
       });
@@ -238,7 +238,7 @@ describe("compat share link mapping", () => {
     });
 
     it("keeps view accounting out of the shape entirely", () => {
-      const row = AuthzGrantMapper.grantFactToCompatShareLink({
+      const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
         grant: resourceFact(),
         organizationId: ORG,
       });
@@ -254,7 +254,7 @@ describe("compat share link mapping", () => {
         [{ type: "organization", id: ORG }, "ORGANIZATION"],
         [{ type: "project", id: "proj_chatbot" }, "PROJECT"],
       ] as const) {
-        const row = AuthzGrantMapper.grantFactToCompatShareLink({
+        const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
           grant: resourceFact({ principal }),
           organizationId: ORG,
         });
@@ -263,7 +263,7 @@ describe("compat share link mapping", () => {
     });
 
     it("carries the thread kind through in the stored spelling", () => {
-      const row = AuthzGrantMapper.grantFactToCompatShareLink({
+      const row = AuthzGrantMapper.findCompatShareLinkFromGrantFact({
         grant: resourceFact({
           resource: {
             kind: "thread",
@@ -294,7 +294,7 @@ describe("compat share link mapping", () => {
       ];
       for (const overrides of beyond) {
         expect(
-          AuthzGrantMapper.grantFactToCompatShareLink({
+          AuthzGrantMapper.findCompatShareLinkFromGrantFact({
             grant: resourceFact(overrides),
             organizationId: ORG,
           }),
@@ -309,7 +309,7 @@ describe("compat share link mapping", () => {
         scope: { type: "RESOURCE", id: "trace_t1" },
       });
       expect(
-        AuthzGrantMapper.grantFactToCompatShareLink({ grant: termless, organizationId: ORG }),
+        AuthzGrantMapper.findCompatShareLinkFromGrantFact({ grant: termless, organizationId: ORG }),
       ).toBeNull();
     });
   });

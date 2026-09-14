@@ -159,7 +159,7 @@ describe("Authz binding management reads", () => {
         customRole,
       }),
     ]);
-    bindings.tryFindOrganizationRole.mockResolvedValue("ADMIN");
+    bindings.findOrganizationRole.mockResolvedValue("ADMIN");
     bindings.findUserGroups.mockResolvedValue([
       {
         groupId: "group-1",

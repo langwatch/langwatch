@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  declaredScopeId,
+  findDeclaredScopeId,
   isPlatformTierPermission,
   permissionGrantTiers,
   resolveDeclaredScope,
@@ -39,12 +39,12 @@ describe("permissionGrantTiers", () => {
   });
 });
 
-describe("declaredScopeId", () => {
+describe("findDeclaredScopeId", () => {
   describe("when the input carries ids at several allowed tiers", () => {
     /** @scenario "The most specific tier the permission allows decides the check scope" */
     it("resolves the most specific tier the permission allows", () => {
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "traces:view",
           input: { projectId: "proj_1", organizationId: "org_1" },
         }),
@@ -55,7 +55,7 @@ describe("declaredScopeId", () => {
   describe("when the permission is organization-only and the input carries a projectId too", () => {
     it("ignores the tier the permission cannot be granted at", () => {
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "organization:manage",
           input: { projectId: "proj_1", organizationId: "org_1" },
         }),
@@ -67,7 +67,7 @@ describe("declaredScopeId", () => {
     /** @scenario "A scope derivation is written at the call site, never inferred" */
     it("resolves the named field at its own tier", () => {
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "organization:manage",
           input: { teamId: "team_1" },
           via: "teamId",
@@ -77,14 +77,14 @@ describe("declaredScopeId", () => {
 
     it("returns null when the named field is absent or empty", () => {
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "organization:manage",
           input: { teamId: "" },
           via: "teamId",
         }),
       ).toBeNull();
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "organization:manage",
           input: {},
           via: "teamId",
@@ -95,9 +95,9 @@ describe("declaredScopeId", () => {
 
   describe("when the input carries no id the permission can use", () => {
     it("returns null so the caller treats it as a wiring bug", () => {
-      expect(declaredScopeId({ permission: "governance:view", input: {} })).toBeNull();
+      expect(findDeclaredScopeId({ permission: "governance:view", input: {} })).toBeNull();
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "governance:view",
           input: { projectId: "proj_1" },
         }),
@@ -106,7 +106,7 @@ describe("declaredScopeId", () => {
 
     it("never reads a non-string id", () => {
       expect(
-        declaredScopeId({
+        findDeclaredScopeId({
           permission: "traces:view",
           input: { projectId: 42 as unknown as string },
         }),

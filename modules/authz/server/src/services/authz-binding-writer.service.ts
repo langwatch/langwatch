@@ -99,7 +99,7 @@ export class AuthzBindingWriterService {
   }
 
   async update(input: AuthzUpdateBindingInput): Promise<AuthzCreateBindingOutput> {
-    const binding = await this.options.bindings.tryFindBinding(input);
+    const binding = await this.options.bindings.findBinding(input);
     if (!binding) {
       throw new RoleBindingNotFoundError(input.bindingId);
     }
@@ -122,7 +122,7 @@ export class AuthzBindingWriterService {
     });
 
     if (binding.userId) {
-      const organizationRole = await this.options.bindings.tryFindOrganizationRole({
+      const organizationRole = await this.options.bindings.findOrganizationRole({
         organizationId: input.organizationId,
         userId: binding.userId,
       });
@@ -154,7 +154,7 @@ export class AuthzBindingWriterService {
   }
 
   async delete(input: AuthzDeleteBindingInput): Promise<AuthzBindingMutationSuccess> {
-    const binding = await this.options.bindings.tryFindBinding(input);
+    const binding = await this.options.bindings.findBinding(input);
     if (!binding) {
       throw new RoleBindingNotFoundError(input.bindingId);
     }
@@ -262,7 +262,7 @@ export class AuthzBindingWriterService {
     apiKeyId?: string;
   }): Promise<{ organizationRole: OrganizationRole | null }> {
     if (input.userId) {
-      const role = await this.options.bindings.tryFindOrganizationRole({
+      const role = await this.options.bindings.findOrganizationRole({
         organizationId: input.organizationId,
         userId: input.userId,
       });

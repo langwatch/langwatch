@@ -198,27 +198,23 @@ export const authzGrantEventPayloadSchema = z.discriminatedUnion("type", [
 ]);
 export type AuthzGrantEventPayload = z.infer<typeof authzGrantEventPayloadSchema>;
 
-export const grantFactSchema = attachGrantEntryFactSchema();
+export const grantFactSchema = z
+  .object({
+    grantId: z.string().min(1),
+    principal: ledgerPrincipalSchema,
+    roleKey: z.string().min(1).nullable(),
+    scope: ledgerScopeSchema,
+    resource: resourceGrantTermsSchema.optional(),
+    legacyRole: legacyBindingRoleSchema.optional(),
+    source: grantEventSourceSchema,
+    occurredAtMs: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(grantShapeRefinement.check, {
+    message: grantShapeRefinement.message,
+    path: [...grantShapeRefinement.path],
+  });
 export type GrantFact = z.infer<typeof grantFactSchema>;
-
-function attachGrantEntryFactSchema() {
-  return z
-    .object({
-      grantId: z.string().min(1),
-      principal: ledgerPrincipalSchema,
-      roleKey: z.string().min(1).nullable(),
-      scope: ledgerScopeSchema,
-      resource: resourceGrantTermsSchema.optional(),
-      legacyRole: legacyBindingRoleSchema.optional(),
-      source: grantEventSourceSchema,
-      occurredAtMs: z.number().int().nonnegative(),
-    })
-    .strict()
-    .refine(grantShapeRefinement.check, {
-      message: grantShapeRefinement.message,
-      path: [...grantShapeRefinement.path],
-    });
-}
 
 export const roleFactSchema = z
   .object({

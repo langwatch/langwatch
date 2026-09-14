@@ -46,12 +46,12 @@ export class AuthzScopeLineageService {
       case "organization":
         return { ...scope, organizationId: scope.id };
       case "team": {
-        const team = await this.repository.tryFindTeamOrganization({ teamId: scope.id });
+        const team = await this.repository.findTeamOrganization({ teamId: scope.id });
 
         return { ...scope, organizationId: team?.organizationId ?? null };
       }
       case "project": {
-        const project = await this.repository.tryFindProjectLineage({ projectId: scope.id });
+        const project = await this.repository.findProjectLineage({ projectId: scope.id });
 
         return { ...scope, organizationId: project?.organizationId ?? null };
       }

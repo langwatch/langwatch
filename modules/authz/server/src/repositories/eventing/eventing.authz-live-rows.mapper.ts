@@ -6,7 +6,12 @@ type QueryArgs = Readonly<{
   [key: string]: unknown;
 }>;
 
-export function liveGrants(database: Pick<AuthzDatabase, "grant">) {
+type LiveRowsDelegate = Readonly<{
+  findMany: (args?: QueryArgs) => Promise<unknown[]>;
+  findFirst: (args?: QueryArgs) => Promise<unknown>;
+}>;
+
+export function liveGrants(database: Pick<AuthzDatabase, "grant">): LiveRowsDelegate {
   return {
     findMany: (args: QueryArgs = {}) =>
       database.grant.findMany({
@@ -22,7 +27,7 @@ export function liveGrants(database: Pick<AuthzDatabase, "grant">) {
   };
 }
 
-export function liveRoles(database: Pick<AuthzDatabase, "role">) {
+export function liveRoles(database: Pick<AuthzDatabase, "role">): LiveRowsDelegate {
   return {
     findMany: (args: QueryArgs = {}) =>
       database.role.findMany({

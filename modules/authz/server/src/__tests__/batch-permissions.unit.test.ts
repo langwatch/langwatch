@@ -57,9 +57,9 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
       // One collection serves permissions × projects: the whole point of the
       // batch is that 40 projects and 2 permissions cost the same reads as 1.
       expect(stub.findApiKeyBindings).toHaveBeenCalledTimes(1);
-      expect(stub.tryFindApiKeyOwner).toHaveBeenCalledTimes(1);
+      expect(stub.findApiKeyOwner).toHaveBeenCalledTimes(1);
       // Every project's team was given, so no scope needed resolving.
-      expect(stub.tryFindProjectLineage).not.toHaveBeenCalled();
+      expect(stub.findProjectLineage).not.toHaveBeenCalled();
     });
 
     it("answers each permission per project from the same snapshot", async () => {
@@ -109,9 +109,9 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
   describe("given a key bound admin whose owner is only a viewer", () => {
     const reader = () =>
       makeReader({
-        tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
+        findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
         findApiKeyBindings: vi.fn().mockResolvedValue([binding("ADMIN", "proj-0")]),
-        tryFindOrganizationMembership: vi
+        findOrganizationMembership: vi
           .fn()
           .mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue([binding("VIEWER", "proj-0")]),

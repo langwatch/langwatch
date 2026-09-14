@@ -226,7 +226,7 @@ export function isRegistryPermission(value: string): value is AuthzPermission {
 }
 
 /** Bitset index for a permission, or undefined for unknown strings. */
-export function permissionIndex(permission: string): number | undefined {
+export function findPermissionIndex(permission: string): number | undefined {
   return PERMISSION_INDEX.get(permission);
 }
 

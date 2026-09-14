@@ -181,7 +181,11 @@ export class PostgresAuthzAdapter {
    * see what the engine sees (the share ledger's cut-over check does). The
    * repository stays private; this is the one door to it.
    */
-  static createReader({ database }: { database: PostgresAuthzDatabase }) {
+  static createReader({
+    database,
+  }: {
+    database: PostgresAuthzDatabase;
+  }): PrismaAuthzReadRepository {
     return PrismaAuthzReadRepository.create(database as unknown as AuthzDatabase);
   }
 

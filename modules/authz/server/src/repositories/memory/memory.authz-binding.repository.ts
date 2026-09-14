@@ -67,7 +67,7 @@ export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
       .map((row) => ({ groupId: row.groupId, group: row.group }));
   }
 
-  async tryFindOrganizationRole(input: {
+  async findOrganizationRole(input: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRole | null> {
@@ -92,7 +92,7 @@ export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
     );
   }
 
-  async tryFindBinding(input: {
+  async findBinding(input: {
     organizationId: string;
     bindingId: string;
   }): Promise<AuthzManagedBindingRow | null> {

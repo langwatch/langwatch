@@ -114,7 +114,7 @@ export class AuthzBindingReaderService {
     userEmail,
   }: AuthzAccessBreakdownInput): Promise<AuthzAccessBreakdownOutput> {
     const [organizationRole, groupMemberships] = await Promise.all([
-      this.options.bindings.tryFindOrganizationRole({ organizationId, userId }),
+      this.options.bindings.findOrganizationRole({ organizationId, userId }),
       this.options.bindings.findUserGroups({ organizationId, userId }),
     ]);
     const groupIds = groupMemberships.map((membership) => membership.groupId);

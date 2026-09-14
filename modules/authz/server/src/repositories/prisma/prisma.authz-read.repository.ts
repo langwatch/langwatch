@@ -29,7 +29,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     return this;
   }
 
-  async tryFindOrganizationMembership({
+  async findOrganizationMembership({
     userId,
     organizationId,
   }: {
@@ -229,7 +229,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
    * `{ userId: null }` is a service key - it exists and has no owner, so the
    * §9 ceiling does not apply to it; `null` is a key that is not there at all.
    */
-  async tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
+  async findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
     return (await this.database.apiKey.findUnique({
       where: { id: apiKeyId },
       select: { userId: true },
@@ -271,7 +271,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     }));
   }
 
-  async tryFindProjectLineage({
+  async findProjectLineage({
     projectId,
   }: {
     projectId: string;
@@ -287,7 +287,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     };
   }
 
-  async tryFindTeamOrganization({
+  async findTeamOrganization({
     teamId,
   }: {
     teamId: string;

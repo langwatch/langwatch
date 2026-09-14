@@ -40,7 +40,7 @@ export class AuthzGrantSnapshotService {
     private readonly options: AuthzGrantSnapshotServiceOptions,
   ) {}
 
-  tryDemoProjectId(): string | undefined {
+  findDemoProjectId(): string | undefined {
     return this.options.demoProjectId?.();
   }
 
@@ -84,7 +84,7 @@ export class AuthzGrantSnapshotService {
     return grants;
   }
 
-  async tryOwnerGrantsFor({
+  async findOwnerGrantsFor({
     principal,
     organizationId,
     reader,
@@ -97,7 +97,7 @@ export class AuthzGrantSnapshotService {
       return null;
     }
 
-    const owner = await this.collector.tryFindApiKeyOwner({ apiKeyId: principal.id });
+    const owner = await this.collector.findApiKeyOwner({ apiKeyId: principal.id });
     if (!owner?.userId) {
       return null;
     }
@@ -118,7 +118,7 @@ export class AuthzGrantSnapshotService {
     return this.collectCached({ principal: ownerPrincipal, organizationId });
   }
 
-  async tryResourceGrantsFor(scope: AuthzScopeRef): Promise<readonly ResourceGrant[] | undefined> {
+  async findResourceGrantsFor(scope: AuthzScopeRef): Promise<readonly ResourceGrant[] | undefined> {
     if (scope.type !== "resource") {
       return void 0;
     }

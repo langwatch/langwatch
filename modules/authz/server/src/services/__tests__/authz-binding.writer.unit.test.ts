@@ -40,7 +40,7 @@ function ledger() {
 function setup() {
   const bindings = new StubAuthzBindingRepository();
   bindings.findScopeRows.mockResolvedValue([scope]);
-  bindings.tryFindOrganizationRole.mockResolvedValue("MEMBER");
+  bindings.findOrganizationRole.mockResolvedValue("MEMBER");
   bindings.isGroupInOrganization.mockResolvedValue(true);
   bindings.isApiKeyInOrganization.mockResolvedValue(true);
   const writes = ledger();
@@ -80,7 +80,7 @@ describe("Authz binding management writes", () => {
 
   it("checks every principal against the target organization", async () => {
     const { bindings, writes, writer } = setup();
-    bindings.tryFindOrganizationRole.mockResolvedValue(null);
+    bindings.findOrganizationRole.mockResolvedValue(null);
 
     await expect(writer.create(createInput)).rejects.toMatchObject({
       code: "user_not_in_organization",
@@ -174,7 +174,7 @@ describe("Authz binding management writes", () => {
 
   it("ceilings lite members to viewer outside organization scope", async () => {
     const { bindings, writes, writer } = setup();
-    bindings.tryFindOrganizationRole.mockResolvedValue("EXTERNAL");
+    bindings.findOrganizationRole.mockResolvedValue("EXTERNAL");
 
     await expect(writer.create(createInput)).rejects.toMatchObject({
       code: "lite_member_viewer_only",
@@ -214,7 +214,7 @@ describe("Authz binding management writes", () => {
 
   it("does not reveal or mutate a binding from another organization", async () => {
     const { bindings, writes, writer } = setup();
-    bindings.tryFindBinding.mockResolvedValue(null);
+    bindings.findBinding.mockResolvedValue(null);
 
     await expect(
       writer.update({
@@ -276,7 +276,7 @@ describe("Authz binding management writes", () => {
 
   it("rejects a foreign member batch before emitting either command", async () => {
     const { bindings, writes, writer } = setup();
-    bindings.tryFindOrganizationRole.mockResolvedValue(null);
+    bindings.findOrganizationRole.mockResolvedValue(null);
 
     await expect(
       writer.applyMemberBindings({

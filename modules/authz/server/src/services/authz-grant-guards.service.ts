@@ -33,7 +33,7 @@ export class AuthzGrantGuardsService {
     bindingId: string;
     organizationId: string;
   }): Promise<void> {
-    const binding = await this.repository.tryFindBinding({ bindingId });
+    const binding = await this.repository.findBinding({ bindingId });
     if (!binding || binding.organizationId !== organizationId) {
       throw AuthzGrantGuardsService.bindingNotFound({ bindingId });
     }
@@ -51,7 +51,7 @@ export class AuthzGrantGuardsService {
     }
 
     if (where.type === "team") {
-      const team = await this.repository.tryFindTeamOrganization({ teamId: where.id });
+      const team = await this.repository.findTeamOrganization({ teamId: where.id });
       if (team?.organizationId !== organizationId) {
         throw new GrantValidationError("Team is not in this organization", {
           teamId: where.id,
@@ -61,7 +61,7 @@ export class AuthzGrantGuardsService {
       return;
     }
 
-    const lineage = await this.repository.tryFindProjectLineage({
+    const lineage = await this.repository.findProjectLineage({
       projectId: where.id,
     });
     if (lineage?.organizationId !== organizationId || lineage.teamId !== where.teamId) {
@@ -83,7 +83,7 @@ export class AuthzGrantGuardsService {
     }
 
     const { customRoleId } = role;
-    const customRole = await this.repository.tryFindCustomRole({ customRoleId });
+    const customRole = await this.repository.findCustomRole({ customRoleId });
     if (!customRole || customRole.organizationId !== organizationId) {
       throw new GrantValidationError("Custom role does not belong to this organization", {
         customRoleId,

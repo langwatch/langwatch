@@ -48,7 +48,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Membership is not a grant: the same query the legacy repository runs. */
-  async tryFindOrganizationMembership({
+  async findOrganizationMembership({
     userId,
     organizationId,
   }: {
@@ -229,7 +229,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Membership again, not a grant: the legacy query, unchanged. */
-  async tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
+  async findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
     return (await this.database.apiKey.findUnique({
       where: { id: apiKeyId },
       select: { userId: true },
@@ -250,7 +250,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }): Promise<ShareLinkRow[]> {
     if (tokens.length === 0 || links.length === 0) return [];
     const resolvedOrganizationId =
-      organizationId ?? (await this.tryFindProjectLineage({ projectId }))?.organizationId;
+      organizationId ?? (await this.findProjectLineage({ projectId }))?.organizationId;
     if (!resolvedOrganizationId) return [];
 
     const rows = await this.findResourceGrantCandidates({
@@ -303,7 +303,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
           maxViews: true,
         },
       })) as Array<Omit<ShareLinkGrantCandidateRow, "expiresAt"> & { expiresAt: unknown }>
-    ).map((row) => ({ ...row, expiresAt: storedInstant(row.expiresAt) }));
+    ).map((row) => ({ ...row, expiresAt: findStoredInstant(row.expiresAt) }));
   }
 
   /** The view budget lives on its own table (decision 22); a resource with no
@@ -325,7 +325,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Lineage is not a grant: the legacy query, unchanged. */
-  async tryFindProjectLineage({
+  async findProjectLineage({
     projectId,
   }: {
     projectId: string;
@@ -342,7 +342,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Lineage is not a grant: the legacy query, unchanged. */
-  async tryFindTeamOrganization({
+  async findTeamOrganization({
     teamId,
   }: {
     teamId: string;
@@ -510,6 +510,6 @@ type ShareLinkGrantCandidateRow = {
 };
 
 /** A nullable stored timestamp column, as the store hands it back. */
-function storedInstant(value: unknown): Instant | null {
+function findStoredInstant(value: unknown): Instant | null {
   return value instanceof Date ? fromDate(value) : null;
 }

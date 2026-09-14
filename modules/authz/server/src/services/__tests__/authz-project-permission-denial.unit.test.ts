@@ -21,7 +21,7 @@ function authzWithNoBindings() {
   return AuthzService.create({
     isOnEngine: async () => true,
     repository: makeReader({
-      tryFindProjectLineage: vi.fn().mockResolvedValue(PROJECT),
+      findProjectLineage: vi.fn().mockResolvedValue(PROJECT),
     }),
     listing: new StubAuthzListingRepository(),
     bindings: new StubAuthzBindingRepository(),

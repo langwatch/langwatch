@@ -32,7 +32,7 @@ describe("PrismaAuthzBindingRepository", () => {
   it("finds a binding only inside the named organization", async () => {
     const { database, repository } = setup();
 
-    await repository.tryFindBinding({
+    await repository.findBinding({
       organizationId: "org-1",
       bindingId: "binding-1",
     });

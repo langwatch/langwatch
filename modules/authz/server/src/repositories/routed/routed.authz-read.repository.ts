@@ -57,11 +57,11 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return new RoutedAuthzReadRepository(this.selectHead, this.repositories);
   }
 
-  async tryFindOrganizationMembership(args: {
+  async findOrganizationMembership(args: {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationMembership | null> {
-    return this.repositories.legacy.tryFindOrganizationMembership(args);
+    return this.repositories.legacy.findOrganizationMembership(args);
   }
 
   async findUserBindings(args: {
@@ -85,8 +85,8 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return (await this.readerFor(args.organizationId)).findApiKeyBindings(args);
   }
 
-  async tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
-    return this.repositories.legacy.tryFindApiKeyOwner(apiKeyId);
+  async findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
+    return this.repositories.legacy.findApiKeyOwner(apiKeyId);
   }
 
   async findLegacyTeamMemberships(args: {
@@ -109,7 +109,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkRow[]> {
-    const lineage = await this.repositories.legacy.tryFindProjectLineage({
+    const lineage = await this.repositories.legacy.findProjectLineage({
       projectId: args.projectId,
     });
     if (!lineage) return this.repositories.legacy.findShareLinks(args);
@@ -125,16 +125,16 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     });
   }
 
-  async tryFindProjectLineage(args: {
+  async findProjectLineage(args: {
     projectId: string;
   }): Promise<{ teamId: string; organizationId: string } | null> {
-    return this.repositories.legacy.tryFindProjectLineage(args);
+    return this.repositories.legacy.findProjectLineage(args);
   }
 
-  async tryFindTeamOrganization(args: {
+  async findTeamOrganization(args: {
     teamId: string;
   }): Promise<{ organizationId: string } | null> {
-    return this.repositories.legacy.tryFindTeamOrganization(args);
+    return this.repositories.legacy.findTeamOrganization(args);
   }
 
   private async readerFor(organizationId: string): Promise<AuthzReadRepository> {

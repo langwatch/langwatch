@@ -48,7 +48,9 @@ const commandIdentitySchema = z
   })
   .strict();
 
-function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+function commandDataSchema<Shape extends z.ZodRawShape>(
+  shape: Shape,
+): z.ZodType<z.infer<ReturnType<typeof commandIdentitySchema.extend<Shape>>>> {
   return commandIdentitySchema.extend(shape).refine(
     (data) => {
       const identity = data as { tenantId: string; organizationId: string };

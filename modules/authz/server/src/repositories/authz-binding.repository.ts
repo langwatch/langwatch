@@ -72,7 +72,7 @@ export abstract class AuthzBindingRepository {
     userId: string;
   }): Promise<AuthzUserGroupRow[]>;
 
-  abstract tryFindOrganizationRole(input: {
+  abstract findOrganizationRole(input: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRole | null>;
@@ -87,7 +87,7 @@ export abstract class AuthzBindingRepository {
     apiKeyId: string;
   }): Promise<boolean>;
 
-  abstract tryFindBinding(input: {
+  abstract findBinding(input: {
     organizationId: string;
     bindingId: string;
   }): Promise<AuthzManagedBindingRow | null>;

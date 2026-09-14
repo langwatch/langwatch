@@ -291,7 +291,7 @@ export class AuthzGrantMapper {
    * Project legacy-expressible shapes only (scopes ORGANIZATION|TEAM|PROJECT;
    * roleKey mapping with legacyRole fallback for custom bindings).
    */
-  static grantFactToCompatBinding({
+  static findCompatBindingFromGrantFact({
     grant,
     organizationId,
   }: {
@@ -349,7 +349,7 @@ export class AuthzGrantMapper {
    * RESOURCE facts only; other scopes/audiences map to null (silently skipped;
    * legacy table never held them).
    */
-  static grantFactToCompatShareLink({
+  static findCompatShareLinkFromGrantFact({
     grant,
     organizationId: _organizationId,
   }: {

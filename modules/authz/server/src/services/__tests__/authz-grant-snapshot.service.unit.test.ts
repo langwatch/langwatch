@@ -27,7 +27,7 @@ function snapshotWith(options: Options = {}) {
       collected.push({ principalId: principal.id, organizationId });
       return { marker: `${principal.id}@${organizationId}` };
     },
-    tryFindApiKeyOwner: async () =>
+    findApiKeyOwner: async () =>
       options.owner === undefined ? { userId: "user-1" } : options.owner,
     collectResourceGrants: async () => [{ marker: "resource" }],
   };
@@ -172,13 +172,13 @@ describe("AuthzGrantSnapshotService.collectCached", () => {
   });
 });
 
-describe("AuthzGrantSnapshotService.tryOwnerGrantsFor", () => {
+describe("AuthzGrantSnapshotService.findOwnerGrantsFor", () => {
   describe("given a principal that is not an API key", () => {
     it("has no owner to fall back to", async () => {
       const { service } = snapshotWith({});
 
       await expect(
-        service.tryOwnerGrantsFor({ principal: user, organizationId: "org-a" }),
+        service.findOwnerGrantsFor({ principal: user, organizationId: "org-a" }),
       ).resolves.toBeNull();
     });
   });
@@ -187,7 +187,7 @@ describe("AuthzGrantSnapshotService.tryOwnerGrantsFor", () => {
     it("answers with the owner's grants, not the key's", async () => {
       const { service, collected } = snapshotWith({});
 
-      const grants = await service.tryOwnerGrantsFor({
+      const grants = await service.findOwnerGrantsFor({
         principal: { type: "apiKey", id: "key-1" },
         organizationId: "org-a",
       });
@@ -202,7 +202,7 @@ describe("AuthzGrantSnapshotService.tryOwnerGrantsFor", () => {
       const { service, collected } = snapshotWith({ owner: { userId: null } });
 
       await expect(
-        service.tryOwnerGrantsFor({
+        service.findOwnerGrantsFor({
           principal: { type: "apiKey", id: "key-1" },
           organizationId: "org-a",
         }),
@@ -212,7 +212,7 @@ describe("AuthzGrantSnapshotService.tryOwnerGrantsFor", () => {
   });
 });
 
-describe("AuthzGrantSnapshotService.tryResourceGrantsFor", () => {
+describe("AuthzGrantSnapshotService.findResourceGrantsFor", () => {
   describe("given a scope that is not a resource", () => {
     it("answers with nothing to say, rather than an empty grant list", async () => {
       // undefined and [] mean different things to the caller: one is "this
@@ -220,7 +220,7 @@ describe("AuthzGrantSnapshotService.tryResourceGrantsFor", () => {
       const { service } = snapshotWith({});
 
       await expect(
-        service.tryResourceGrantsFor({ type: "organization", id: "org-a" } as never),
+        service.findResourceGrantsFor({ type: "organization", id: "org-a" } as never),
       ).resolves.toBeUndefined();
     });
   });
@@ -230,7 +230,7 @@ describe("AuthzGrantSnapshotService.tryResourceGrantsFor", () => {
       const { service } = snapshotWith({});
 
       await expect(
-        service.tryResourceGrantsFor({ type: "resource", id: "resource-1" } as never),
+        service.findResourceGrantsFor({ type: "resource", id: "resource-1" } as never),
       ).resolves.toEqual([{ marker: "resource" }]);
     });
   });
