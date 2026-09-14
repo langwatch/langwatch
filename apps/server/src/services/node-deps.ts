@@ -31,15 +31,7 @@ export const APP_PACKAGE_NAMES = [
   "@langwatch/tasks",
 ] as const;
 
-/**
- * The argv for the workspace install both boot passes run — dev-deps-included
- * before the build, prod-only after it. One builder rather than two inline
- * arrays so the two invariants an end-user install depends on cannot drift
- * apart silently: `--frozen-lockfile` (the install is reproducible or it
- * fails) and the `...` filter (the SDK, skills compiler and test suites never
- * install on a customer machine). Exported for tests — the spec scenario
- * "The install still refuses to drift from the lockfile" binds to this.
- */
+// Workspace install argv for dev and prod passes; one builder keeps invariants from drifting.
 export function workspaceInstallArgs(rootDir: string, { prod }: { prod: boolean }): string[] {
   return [
     "-C",
@@ -92,22 +84,7 @@ export async function ensureLangwatchDeps(
   // and index.html is the file that proves it landed whole: an interrupted
   // vite build leaves assets without a shell.
   const distAlreadyBuilt = existsSync(join(distPath, "client", "index.html"));
-  // Hash key combines the lockfile + workspace definition + package.json —
-  // any of them changing means we need to re-run install. Use sha256 (not
-  // just mtime) because rsync during ensureAppDir resets mtimes. The sequence
-  // tag versions the whole install recipe: bumping it re-runs the cycle on
-  // existing installs, which is how trees installed before the prod-prune
-  // step existed get pruned.
-  // seq3: re-run on installs whose tree predates the tarball shipping the
-  // workspace packages (3.6.0) — their pnpm links dangled and the member
-  // packages' own dependencies were never installed.
-  // seq4: re-run on installs made against the old per-app lockfile. Those
-  // trees have no root-level workspace at all, so the filtered install below
-  // would otherwise be skipped as fresh and leave the app on a layout the
-  // rest of this function no longer expects.
-  // seq5: re-run on installs whose tree predates the split into apps/api,
-  // apps/worker and apps/ui. Those trees are keyed on the monolith's manifest
-  // and hold its bundles, neither of which exists now.
+  // Install key from lockfile + workspace + package.json; seq5 forces re-run on old tree layouts.
   const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(apiDir, "package.json"))}|seq5-three-applications`;
 
   // Top-level symlinks are the strongest "install completed" signal:
@@ -128,30 +105,10 @@ export async function ensureLangwatchDeps(
   bus.emit({ type: "starting", service: "prepare:langwatch" as never });
   const start = nowInstant().epochMilliseconds;
 
-  // We use `pnpm -C <dir>` instead of a cwd because pnpm's
-  // workspace-aware mode resolves the workspace ROOT package.json when
-  // invoked through corepack (or sometimes plain pnpm too) — leading to
-  // "Missing script: build. Did you mean pnpm run build:cli?" because
-  // build:cli is on root. `-C` is the official "change to package dir
-  // and only that dir" flag.
-  //
-  // For the binary, prefer `pnpm` directly on PATH when present (CI via
-  // pnpm/action-setup, end users via corepack-shimmed PATH) and fall back
-  // to `corepack pnpm`. corepack is *not* the primary because `corepack
-  // pnpm -C <dir>` swallows the `-C` flag in some cases and pnpm
-  // re-resolves cwd to its own dir, defeating the workspace-isolation
-  // intent above. See resolvePnpm() below.
+  // Use pnpm -C to isolate package dir; prefer pnpm on PATH over corepack shimmed one.
   const pnpm = await resolvePnpm(ctx.paths);
 
-  // npm pack unconditionally drops .npmrc from published artifacts (it often
-  // carries auth tokens), so the repo's .npmrc never reaches an npx install.
-  // Recreate it before the first install: without these hoists OpenTelemetry's
-  // ESM loader shims land deep in the virtual store and its instrumentation
-  // cannot patch them.
-  //
-  // At the ROOT, not in an application directory: hoisting is a property of the install
-  // root, and since ADR-076 that is the tarball root. A copy written into
-  // langwatch/ would be read for nothing.
+  // Recreate .npmrc (npm pack strips it). Hoisting at root, not in application directories.
   const npmrcPath = join(rootDir, ".npmrc");
   if (!existsSync(npmrcPath)) {
     writeFileSync(
@@ -167,20 +124,8 @@ export async function ensureLangwatchDeps(
   }
 
   if (!installFresh) {
-    // Install everything, dev dependencies included, because the steps that
-    // follow genuinely need them: prisma generate needs the prisma CLI's
-    // build tooling and the full build needs vite. Installing with `--prod`
-    // up front was tried once and broke exactly those two steps. The dev
-    // dependencies come OUT again below (the --prod pass, after the build),
-    // which is the same order the production Dockerfile uses — the pruned
-    // tree it produces is what every helm and docker deployment runs.
-    //
-    // `--filter` is what keeps an end user's install to the app: the tarball
-    // ships the whole workspace definition, so an unfiltered install would
-    // also pull the TypeScript SDK, the skills compiler and the e2e suites,
-    // none of which the server ever runs. The trailing `...` selects the
-    // app AND everything it depends on, which is how the workspace members
-    // under packages/ and mcp/typescript/ still get installed.
+    // Install dev deps first (prisma and vite need them), then prune in the second pass.
+    // --filter keeps install to app + dependencies only, excluding SDK/compiler/tests.
     await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
       ...pnpm.args,
       ...workspaceInstallArgs(rootDir, { prod: false }),
@@ -222,23 +167,8 @@ export async function ensureLangwatchDeps(
     );
   }
 
-  // Take the dev dependencies back out, the way the production Dockerfile
-  // does after ITS build (install → build → prod-only pass → prisma generate).
-  // This is what drops vite, vitest, playwright and the rest of the
-  // build tooling from the tree the server actually runs — on the order of a
-  // gigabyte — while prisma stays, because migrations run through the prisma
-  // CLI and apps/api declares it as a runtime dependency. Nothing equivalent
-  // is needed for TypeScript any more: every application boots its entry point
-  // through Node's own type stripping.
-  //
-  // A re-install with `--prod` rather than `pnpm prune --prod`: prune has no
-  // `--filter`, so in a workspace it reasons about every project rather than
-  // the one subtree we installed. A filtered `--prod` install converges on
-  // the same prod-only tree and stays scoped to the app.
-  //
-  // ONLY on the relocated copy under LANGWATCH_HOME. A dev checkout runs the
-  // CLI against its own working tree, and pruning that would strip the
-  // developer's test and build tooling out from under them.
+  // Prune dev dependencies (vite, vitest, playwright); keep prisma for migrations.
+  // Only on relocated copy; dev checkout keeps its own build tooling intact.
   if (shouldPruneToProd(apiDir, ctx.paths)) {
     await execAndPipe(
       bus,
@@ -266,23 +196,12 @@ export async function ensureLangwatchDeps(
     ]);
   }
 
-  // Workspace members living OUTSIDE langwatch/ (mcp-server, packages/*)
-  // cannot reach apps/api/node_modules by walking up, so their declared
-  // peerDependencies resolve nowhere in the relocated tree. Materialize
-  // each peer as a member-local link to the app's resolved instance —
-  // the "consumer provides the peer" contract made explicit on disk.
-  // Only on the relocated copy: a dev checkout resolves these through its
-  // own root-workspace install.
+  // Link external members' peers to app-resolved instances; only on relocated copy.
   if (shouldPruneToProd(apiDir, ctx.paths)) {
     linkExternalMemberPeers(appRoot());
   }
 
-  // pnpm quietly tolerates a workspace member listed in the lockfile whose
-  // directory is absent: install exits 0 and leaves dangling @langwatch/*
-  // links, and the first runtime import dies minutes later inside a
-  // migration. Turn that into an install-time failure that names the
-  // packaging gap. (Exactly how 3.6.0 shipped: both .npmignore files still
-  // excluded the app's packages/ after runtime packages moved in.)
+  // Fail at install time if workspace member links are missing; prevent runtime import errors.
   assertWorkspaceLinksResolve(nodeModulesPath);
 
   // Written LAST so an interrupted run never records success: any of the
@@ -297,17 +216,7 @@ export async function ensureLangwatchDeps(
   });
 }
 
-/**
- * For every app-workspace member outside langwatch/, link its declared
- * peerDependencies to the app's own resolved instances. Runtime imports in
- * those members (zod in @langwatch/langy, @opentelemetry/api in
- * @langwatch/handled-error) are peers on purpose: both packages must share
- * the CONSUMER's instance — a second copy of either breaks it (zod schemas
- * from two majors cannot merge; a second otel api loses the global
- * registrations). The links make the relocated tree resolve them the way
- * every other deployment already does. Idempotent; skips peers the app
- * doesn't carry. Exported for tests.
- */
+// Link external members' peerDependencies to app-resolved instances; idempotent.
 export function linkExternalMemberPeers(appRootDir: string): string[] {
   const appNodeModules = join(appRootDir, "apps", "api", "node_modules");
   const memberDirs = [
@@ -391,22 +300,7 @@ export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
   }
 }
 
-/**
- * Whether `prisma generate` has produced a client in any of these trees. Under
- * pnpm the generated files live inside the virtual store
- * (node_modules/.pnpm/@prisma+client@<ver>/node_modules/.prisma/client/), NOT
- * the top-level node_modules/.prisma/ that npm and yarn use. The old
- * top-level-only check could never pass on a pnpm tree, so every single boot
- * re-ran the entire prepare step — install, build, generate — for minutes,
- * believing the client was missing.
- *
- * Takes several roots because ADR-076 moved the store. The install root is now
- * the workspace root, so the store is at <root>/node_modules/.pnpm and
- * an application's node_modules holds only symlinks — checking that alone
- * reintroduced exactly the bug described above, silently, for every npx user.
- * Both are checked: the root for current trees, the application's for ones
- * installed before the merge. Exported for tests.
- */
+// Check prisma client in both pnpm virtual store and top-level node_modules.
 export function prismaClientGenerated(...nodeModulesPaths: string[]): boolean {
   return nodeModulesPaths.some(prismaClientGeneratedIn);
 }
@@ -446,29 +340,7 @@ function computeInstallKey(...files: string[]): string {
   return h.digest("hex");
 }
 
-/**
- * Resolve which `pnpm` to use for our outer invocations (the `pnpm install`,
- * `pnpm run build`, `pnpm run prisma:migrate` calls we make from
- * services/{node-deps,migrate,langwatch,langwatch-workers}.ts).
- *
- * Order:
- *  1. The bundled pnpm we install as a predep into `<paths.bin>/pnpm` —
- *     see predeps/pnpm.ts. This is the canonical end-user path.
- *     Self-contained, no corepack dependency, deterministic version.
- *  2. Direct `pnpm` on PATH — for dev checkouts and CI runners that
- *     already have pnpm/action-setup or a global pnpm install.
- *  3. `corepack pnpm` — last-ditch fallback for environments with
- *     corepack but no pnpm on PATH and no bundled pnpm yet.
- *
- * The bundled pnpm wins over PATH-pnpm so the version is whatever the
- * predep pinned, regardless of the user's globals. ctx.paths.bin is also
- * prepended to PATH for spawned children, so any nested `pnpm` call inside
- * langwatch's package.json scripts (e.g. `sh -c 'pnpm prisma migrate
- * deploy'`) resolves to the same bundled binary.
- *
- * Pass `paths` from any caller that has runtime context; callers who
- * don't (legacy ensureLangwatchDeps before predeps run) skip step 1.
- */
+// Resolve pnpm: bundled > PATH > corepack fallback. Prefer deterministic bundled version.
 export async function resolvePnpm(
   paths?: LangwatchPaths,
 ): Promise<{ command: string; args: string[] }> {
@@ -485,15 +357,7 @@ export async function resolvePnpm(
   throw new Error("pnpm not found in <bin>/pnpm, on PATH, or via corepack");
 }
 
-/**
- * The three deployables, in the relocated tree.
- *
- * `appRoot()` returns LANGWATCH_HOME/app once ensureAppDir has run, or the dev
- * workspace fallback otherwise. Each is located separately because each is a
- * separate process with its own work: apps/api runs both schema migrations and
- * serves everything (including the browser bundle apps/ui builds), and
- * apps/worker runs the background stack.
- */
+// Locate deployable app directories (api, worker, ui, tasks) in relocated tree.
 function locateAppDir(name: "api" | "worker" | "ui" | "tasks"): string | null {
   const dir = join(appRoot(), "apps", name);
   return existsSync(join(dir, "package.json")) ? dir : null;
