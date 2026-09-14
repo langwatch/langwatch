@@ -1,4 +1,5 @@
 import { AuthShell, VerificationFirstSignUp } from "~/features/auth";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 /**
  * The sign-up screen (ADR-117).
@@ -8,9 +9,16 @@ import { AuthShell, VerificationFirstSignUp } from "~/features/auth";
  * always get back into.
  */
 export default function SignUp() {
+  const publicEnv = usePublicEnv();
+  const isHosted = publicEnv.data?.IS_SAAS === true;
+
   return (
-    // The pitch is the hosted product's, and it lives OUTSIDE the card: the
-    // card itself is the same on every installation.
+    // The pitch lives OUTSIDE the card: the card itself is the same on every
+    // installation, and since the shell stopped branching on the deployment,
+    // so is the room. What still differs is the WORDS — "free to start, no
+    // credit card" is the hosted product selling a trial, and it would be a
+    // lie on a company's own installation, where nobody is being sold
+    // anything. Same seats, different sentence.
     //
     // Nothing sits under the tagline. `trustStrip` stayed empty because the
     // one thing that belongs there is a customer — a quote or a logo row —
@@ -25,7 +33,11 @@ export default function SignUp() {
       // Names the thing they are seconds away from, rather than listing what
       // the product has. "Traces, evaluations and monitoring" was a feature
       // list read by somebody who has not agreed to want any of them yet.
-      tagline="You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
+      tagline={
+        isHosted
+          ? "You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
+          : "Create your account on this installation and pick up where your team is working."
+      }
     >
       <VerificationFirstSignUp />
     </AuthShell>

@@ -451,11 +451,11 @@ export const userRouter = createTRPCRouter({
    *
    * Each half keeps its own gate and its own reason to be absent:
    *
-   *   - the passkey half is gated on the sign-in screens actually TAKING a
-   *     passkey, not just on the plugin being mounted (a deployment on the
-   *     legacy auth screens would otherwise nudge people into minting a
-   *     credential no screen has a button for), and never appears for
-   *     somebody who already holds one — whatever they signed in with today;
+   *   - the passkey half is gated on `deploymentOffersPasskeys()`, the same
+   *     read that mounts the plugin and puts the button on the screens — one
+   *     function, so the nudge can never offer a credential no screen has a
+   *     button for — and never appears for somebody who already holds one,
+   *     whatever they signed in with today;
    *   - the two-step half is gated on `MFA_ENROLLMENT_OPEN`, so with the flag
    *     off nothing about it is offered, and never appears for somebody who
    *     has already set one up.

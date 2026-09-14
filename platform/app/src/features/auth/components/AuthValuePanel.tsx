@@ -5,12 +5,13 @@ import "../auth.css";
 import { AUTH_GRADIENT, HEADING_FONT } from "../authTheme";
 
 /**
- * The case the hosted product makes, next to the door rather than inside it.
+ * The case the product makes, next to the door rather than inside it.
  *
  * Everything here is a slot the shell fills, and none of it is in the auth
  * card: the card that authenticates a person is the same component on every
- * installation, and this panel is simply not rendered on one that has nothing
- * to sell.
+ * installation, and this panel renders on every installation too — the WORDS
+ * are the page's to choose, so a company's own door greets rather than
+ * pitches. A screen with no headline renders no panel at all.
  *
  * The panel owns no ground of its own — it reads directly off the shell's
  * field, standing on the side the ground keeps clean. What it owns is the

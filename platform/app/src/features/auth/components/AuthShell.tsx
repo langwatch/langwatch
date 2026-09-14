@@ -31,13 +31,13 @@ export function AuthShell({
   trustStrip,
   children,
 }: {
-  /** Shown beside (or above) the card on hosted surfaces. */
+  /** Shown beside (or above) the card. */
   headline?: string;
   /** The one word of the headline that carries the gradient. */
   headlineAccent?: string;
   /** A short line under the headline, in the mono face. Desktop only. */
   tagline?: string;
-  /** Shown under the panel on hosted desktops. Empty until there is something
+  /** Shown under the panel on desktops. Empty until there is something
    *  true to put in it: an invented customer logo is worse than a gap. */
   trustStrip?: ReactNode;
   children: ReactNode;
