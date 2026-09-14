@@ -181,29 +181,10 @@ local function reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
 end
 `;
 
-/**
- * How long (ms) a tenant stays a "claimant" after its last enqueue/dispatch.
- * A brand-new tenant whose burst is still entirely in ready (no in-flight, none
- * parked) is invisible to a count-only demand measure, so the water-level would
- * keep W at the full budget and the newcomer would never be admitted (a stable
- * starvation behind a higher-priority incumbent, not a one-tick lag). We instead
- * treat any freshly-active tenant as a claimant that pulls a full fair share.
- * The window is several recompute intervals (= 8x RECONCILE_INTERVAL_MS, longer
- * than the dynamic-cap TTL) so a tenant that briefly goes quiet is not dropped
- * mid-burst; once it stops enqueueing AND drains, it ages out and its reserved
- * share is released. Interpolated into the Lua for one source.
- */
+/** How long (ms) a tenant is treated as a claimant (prevents newcomer starvation). */
 export const CLAIMANT_WINDOW_MS = 8 * RECONCILE_INTERVAL_MS;
 
-// Lua helper for the DYNAMIC per-tenant cap (option C, 2026-05-29 follow-up to
-// the fixed soft cap). The hot path is unchanged — it still parks a group when
-// its tenant's in-flight count reaches the cap — but the cap is now a water-level
-// W recomputed off the existing 2s reconcile pass instead of a fixed constant.
-// W water-fills a global in-flight budget G across the tenants with demand: a
-// lone tenant gets W=G (bursts to full), N contenders converge to a max-min fair
-// share, all emergent with no per-tenant allocation and no new dispatch path.
-// Requires tenantActiveCount (from TENANT_ACTIVE_HELPER_LUA via PARK_HELPER_LUA),
-// so it is always concatenated after PARK_HELPER_LUA.
+// Lua helper: dynamic water-level cap divides global budget fairly across tenants.
 const WATER_LEVEL_HELPER_LUA = `
 -- Effective per-tenant cap = the dynamic water-level W when present, else the
 -- static operator cap. A lapsed/never-written dynamic-cap key (recompute stalled
@@ -344,20 +325,7 @@ local function gqRoutingMeta(jobDataJson)
 end
 `;
 
-// What a staged job will weigh once a worker holds it, which is NOT its stored
-// length: a body over the inline ceiling lives in the blob store and leaves a
-// ~200-byte reference behind, and a body over the compression threshold is
-// stored compressed. The encoder records the pre-compression, pre-offload
-// payload size in the envelope header (`s`), so the drain's byte budget can be
-// about the batch a worker will actually assemble rather than about Redis
-// occupancy.
-//
-// A value with no usable `s` gets the reading that cannot let the batch
-// overshoot. See the TypeScript twin in jobEnvelope.ts.
-//
-// The two are one budget read from two ends, so an envelope-format change —
-// new prefix, renamed header field, different length-prefix encoding — has to
-// land in both or they silently disagree.
+// Payload size as seen by worker (pre-compression, pre-offload); must match TS twin.
 const PAYLOAD_SIZE_HELPER_LUA = `
 local function gqPayloadSize(value)
   local prefix = string.sub(value, 1, 4)
@@ -389,16 +357,7 @@ local function gqPayloadSize(value)
 end
 `;
 
-// Lua side of the GQ2 blob-lease lifecycle for staging. A genuine stage takes
-// its lease in the same eval as the staged value becomes visible. A squash
-// transfers the displaced lease atomically with that replacement. Releases
-// never delete content-addressed blobs: Redis TTL and the durable-store
-// lifecycle sweep are the only reclaim paths. Retiring the LAST lease does
-// shorten the Redis-tier blob's expiry to the release grace window, which any
-// later take re-arms — see `blobGraceLua.ts`.
-//
-// Envelope lease parse mirrors the TS readEnvelopeLease: "GQ2|<len>|<headerJson>"
-// with header.ref = {tier, projectId, hash} and header.h = the lease holder id.
+// GQ2 blob-lease lifecycle: leases move atomically with blob refs.
 const BLOB_LEASE_HELPER_LUA =
   GQ_BLOB_GRACE_LUA +
   `
