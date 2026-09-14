@@ -280,6 +280,12 @@ export const PhoneVoiceTargetSchema = z.object({
       fromNumber: z.string(),
     })
     .nullable(),
+  /**
+   * The agent under test greets on connect: the run opens with the agent's turn
+   * so the callee's greeting is captured, then hands over to the simulator/judge
+   * loop. Defaulted so a job queued before it existed still parses.
+   */
+  agentSpeaksFirst: z.boolean().default(false),
 });
 export const VoiceTargetSchema = z.discriminatedUnion("transport", [
   ElevenLabsVoiceTargetSchema,

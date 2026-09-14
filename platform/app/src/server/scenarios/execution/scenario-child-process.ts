@@ -33,6 +33,10 @@ import {
 } from "../voice/caller-voice.config";
 import { buildCallerVoiceSimulatorConfig } from "../voice/caller-voice.simulator";
 import { voiceTransportRegistry } from "../voice/voice-transport.registry";
+import {
+  buildAgentSpeaksFirstScript,
+  isAgentSpeaksFirst,
+} from "./agent-first-script";
 import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
@@ -345,7 +349,11 @@ function buildRunCast({
   script?: ScenarioRunner.ScriptStep[];
 } {
   if (jobData.script) {
-    return buildAgentTestRun({ adapter, script: jobData.script });
+    return buildAgentTestRun({
+      adapter,
+      script: jobData.script,
+      agentSpeaksFirst: isAgentSpeaksFirst(jobData.adapterData),
+    });
   }
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
@@ -368,6 +376,13 @@ function buildRunCast({
         )
       : null;
 
+  // A phone agent that greets on connect opens the run with its own turn (so
+  // the greeting is captured first), then hands over to the simulator/judge
+  // loop; every other run keeps the default cast, which opens with the caller.
+  const agentSpeaksFirstScript = buildAgentSpeaksFirstScript(
+    jobData.adapterData,
+  );
+
   return {
     agents: [
       adapter,
@@ -380,6 +395,7 @@ function buildRunCast({
         model: judgeModel,
       }),
     ],
+    ...(agentSpeaksFirstScript ? { script: agentSpeaksFirstScript } : {}),
   };
 }
 

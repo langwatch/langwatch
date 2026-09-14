@@ -259,7 +259,11 @@ export class AgentService {
     // stays valid without a cast.
     const config: VoiceAgentConfig =
       input.transport === "phone"
-        ? { transport: "phone", phoneNumber: input.agentId }
+        ? {
+            transport: "phone",
+            phoneNumber: input.agentId,
+            agentSpeaksFirst: false,
+          }
         : { transport: input.transport, agentId: input.agentId };
     try {
       return await this.repository.create({
