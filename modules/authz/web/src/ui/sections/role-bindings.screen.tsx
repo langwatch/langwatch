@@ -1,22 +1,4 @@
-/**
- * Role Bindings — every grant in the organization, grouped by who holds it.
- *
- * Moved from `platform/app/src/pages/settings/role-bindings.tsx`. It is an
- * AUDIT surface: one read, no writes, and the reason it is gated at
- * `organization:manage` is that the payload names every user, every group and
- * every scope in the organization.
- *
- * WHAT THE FILTER IS, AND IS NOT. Four buttons over a list already in memory,
- * held in component state. Two earlier families corrected a filter that
- * MIRRORED the URL into `useState`; there is nothing to correct here, because
- * this one has never been in the URL at all. Putting it there would be a new
- * behaviour rather than a preserved one, and a page move is not where that
- * belongs.
- *
- * The scope-picker surface next door is deliberately not used: that control
- * WRITES which scopes a rule applies to, and this page only reads which tier a
- * binding sits at.
- */
+// Audit surface: organization grants grouped by holder; filter in state, not URL.
 
 import {
   Badge,

@@ -1,22 +1,5 @@
-/**
- * @vitest-environment jsdom
- *
- * Scope selection as a shared surface.
- *
- * The picker and the chips left `platform/app/src/components/settings` so the
- * governance tool catalogue and, next, the gateway can both render them without
- * either owning the other's copy. What matters after a move like this is that
- * the two behaviours a caller relies on came with it: the chips say which KIND
- * of scope they name, and the picker collapses a selection that is already
- * implied by a broader one rather than offering both.
- *
- * THREE SCENARIOS ARRIVED WITH THE API KEY FAMILY, and they belong here rather
- * than with the callers. `/cli/auth` and the API Keys page used to assert the
- * picker's empty label and the filter's option list against their own page
- * suites, because the components were `platform/app`'s and had no home of their
- * own. The surface owns those behaviours now, so it owns their tests: a caller
- * asserting them again would be testing this package through a page.
- */
+/** @vitest-environment jsdom */
+// Scope selection surface; chips name KIND; picker collapses implied scopes.
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

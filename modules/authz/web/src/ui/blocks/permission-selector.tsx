@@ -1,15 +1,4 @@
-/**
- * The permission matrix a custom role is written in.
- *
- * Moved from `platform/app/src/components/settings/PermissionSelector.tsx` with
- * one change of shape and none of behaviour: the five rules that decide what a
- * click does are now {@link togglePermission} in `model/permission-matrix.ts`,
- * so they are a table a test can drive rather than closures over a `useMemo`.
- * This component renders the grid and reports the next list.
- *
- * The `manage` tooltip is what tells a reader why four boxes tick themselves
- * when they tick one, so it travels verbatim.
- */
+// Permission matrix grid; rules moved to togglePermission for testability.
 
 import { Box, Fieldset, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { AuthzPermission } from "@langwatch/authz-contract";

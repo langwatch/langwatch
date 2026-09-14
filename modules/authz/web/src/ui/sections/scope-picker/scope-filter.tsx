@@ -3,24 +3,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useState } from "react";
 
-/**
- * Which scope a settings page is LOOKING AT, as opposed to which scopes a rule
- * is written to.
- *
- * The read-side twin of `ScopeChipPicker`, harvested from
- * `platform/app/src/components/settings/ScopeFilter.tsx` with its one platform
- * seam substituted: `AvailableScopes` was declared in `~/hooks/useAvailableScopes`
- * and is declared here instead, because a surface may not reach an application.
- * The platform copy stays for the four settings pages that still render it —
- * model providers, API keys, default models — and dies with the last of them.
- *
- * It lives beside the picker rather than in a surface of its own for the reason
- * that surface's own docblock gives: a page that offers scope selection also
- * shows what is selected, and every consumer of one is a consumer of the other.
- *
- * Presentational only. `value` is the active filter and `onChange` swaps it;
- * the component owns no state but the submenu's open flag.
- */
+// Read-side scope filter; read-only twin of picker; presentational only.
 
 /** The organization, teams and projects a reader may narrow the page to. */
 export interface AvailableScopes {

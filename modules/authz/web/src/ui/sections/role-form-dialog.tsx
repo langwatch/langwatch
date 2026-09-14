@@ -1,19 +1,4 @@
-/**
- * The create/edit form for a custom role.
- *
- * Moved from `platform/app/src/components/settings/RoleFormDialog.tsx`. Two
- * substitutions, both precedented and both worth naming:
- *
- * - `Dialog` is the Design System's, not `~/components/ui/dialog`. The platform
- *   wrapper adds an inline error boundary around the body and stands
- *   `trapFocus` and `preventScroll` down; a package may reach for none of that.
- *   Ten package dialogs already made this substitution, so it is precedent
- *   rather than a decision — but it IS a behaviour difference, and the ops
- *   family's warning to diff before substituting is why it is written here.
- * - The permission type is `AuthzPermission` throughout rather than the
- *   `Permission` alias re-exported from `~/server/api/rbac`. They were the same
- *   type; only one of them is reachable from a browser package.
- */
+// Custom role form; Dialog from Design System; AuthzPermission type.
 
 import { Button, Field, Heading, Input, Separator, Text, Textarea, VStack } from "@chakra-ui/react";
 import type { AuthzPermission } from "@langwatch/authz-contract";

@@ -1,12 +1,5 @@
-/**
- * @vitest-environment jsdom
- *
- * Guards the scope quick-picks against bypassing `allowedScopeTypes`.
- * The tile catalog offers ORGANIZATION + DEPARTMENT only, so the Team /
- * Project quick-pick chips must never render even when the current team /
- * project ids are supplied - otherwise a quick-pick could emit a scope kind
- * the caller explicitly disallowed.
- */
+/** @vitest-environment jsdom */
+// Guards quick-picks against bypassing allowedScopeTypes.
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

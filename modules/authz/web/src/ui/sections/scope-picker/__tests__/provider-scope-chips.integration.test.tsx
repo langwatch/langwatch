@@ -1,16 +1,5 @@
-/**
- * @vitest-environment jsdom
- *
- * Integration tests for ProviderScopeChips.
- *
- * Pins the "System" chip behaviour the model-providers settings table
- * relies on: env-var-fed providers (no DB row, no scope attachments)
- * render a "System" chip rather than an empty Scope cell.
- *
- * Specs bound here:
- *   - specs/model-providers/role-based-default-models.feature
- *     ("System chip renders for env-var-fed providers")
- */
+/** @vitest-environment jsdom */
+// Tests System chip for env-var-fed providers.
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

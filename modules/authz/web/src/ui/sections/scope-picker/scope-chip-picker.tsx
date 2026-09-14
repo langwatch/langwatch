@@ -237,33 +237,7 @@ function groupProjectOptions({
   return { teamGroups, orphanProjects };
 }
 
-/**
- * Collapses redundant selections after the user picks a new scope.
- *
- * Rules (lineage-only, never touches scopes outside the picked one's
- * branch - so cross-team and cross-department selections survive):
- *
- *   - Picking an ORGANIZATION drops every TEAM, PROJECT, and DEPARTMENT.
- *     The org-wide row supersedes them; keeping both would render two
- *     chips with one effective grant.
- *   - Picking a TEAM drops the parent organization AND every PROJECT
- *     under that team. The narrower team scope is the user's intent.
- *   - Picking a PROJECT drops the parent organization AND the parent
- *     team (if either is selected). Same intent narrowing - without
- *     this an "Org X + Project P" pair silently means "everyone in X
- *     including P", which is the trip-up the user flagged.
- *   - Picking a DEPARTMENT drops the organization (department narrows
- *     from org-wide). Departments are mutually-compatible SIBLINGS -
- *     picking one never clears another, so a tile can target several
- *     departments at once.
- *
- * ORGANIZATION and DEPARTMENT are mutually exclusive: an org-wide pick
- * clears departments, and a department pick clears the org. The tile
- * catalog (the only DEPARTMENT consumer today) relies on exactly this.
- *
- * Pure function so it stays trivially unit-testable. Exported for
- * tests.
- */
+// Collapse redundant scopes per lineage; org/dept mutually exclusive.
 export function collapseRedundantScopes(
   next: ScopeChipPickerEntry[],
   prev: ScopeChipPickerEntry[],
@@ -356,17 +330,7 @@ export function collapseRedundantScopes(
   return cleaned;
 }
 
-/**
- * Controlled chip-based scope picker. Pure presentation: takes the active
- * scope selection and a setter, renders a grouped multi-select over the
- * organization, the teams the caller can reach, and the projects inside
- * those teams. Selected entries render as removable chips above the field.
- *
- * Extracted from the model-provider create-drawer so the role-based default
- * model lines, gateway provider bindings, and any future "pick scopes here"
- * surface can render the same primitive without inheriting the drawer's
- * form-state machinery.
- */
+// Chip-based scope picker; extracted for reuse across surfaces.
 export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadType>({
   value: inputValue,
   onChange: inputOnChange,
@@ -427,16 +391,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
    *  more than one, so the single-scope contract holds even if a caller passes
    *  a longer array. */
   singleSelect?: boolean;
-  /** Rendering variant.
-   *  - "chips" (default): the chip + multi-select / quick-pick UI, governed by
-   *    `singleSelect` / `showQuickPicks`.
-   *  - "single-select": a single-value dropdown over the full option list. The
-   *    component guarantees exactly one selection (or none), so callers never
-   *    constrain `onChange` themselves. PROJECT options nest under their team
-   *    (using `availableProjects[].teamId` + `availableTeams`) so the list
-   *    stays organised, and the trigger collapses to the picked option. Use
-   *    this to pick one concrete scope (e.g. the project an SDK key is minted
-   *    for) rather than choose a scope level for a config. */
+  // Variant: chips multi-select or single-select dropdown.
   variant?: "chips" | "single-select";
   /** Placeholder for the single-select trigger when nothing is picked yet.
    *  Defaults to "Select an option". Only consulted by the single-select
@@ -643,16 +598,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
     );
   }, [scopes, quickPicks]);
 
-  // `multipleMode` is local UI state: when true the dropdown is
-  // visible and the "Multiple" chip is highlighted. Derived from the
-  // current selection on mount; afterwards it only auto-FLIPS-ON (when
-  // an external selection change creates a multi-scope state) and
-  // NEVER auto-flips-off. The reverse direction would collapse the
-  // dropdown mid-edit - e.g. a user in Multiple mode who deselects
-  // one of two scopes transiently has a single-quick-pick value, and
-  // collapsing the dropdown before they pick the second team is the
-  // exact UX paper-cut that surfaced on 2026-05-18. Quick-pick chip
-  // clicks are the only path that turns multipleMode off.
+  // Local UI state; auto-flips on external multi-scope, never off except quick-pick.
   const derivedMultiple = !matchingQuickPick;
   const [multipleMode, setMultipleMode] = useState(derivedMultiple);
   useEffect(() => {

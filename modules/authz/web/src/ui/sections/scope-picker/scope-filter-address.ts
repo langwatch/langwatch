@@ -1,23 +1,6 @@
 import type { AvailableScopes, ScopeFilterValue } from "./scope-filter.tsx";
 
-/**
- * The scope filter as an ADDRESS, and as a predicate over rows.
- *
- * Harvested from `platform/app/src/hooks/useUrlScopeFilter.ts` and
- * `~/utils/filterProvidersByScope`, minus the parts that were the
- * application's: the router. What is left is pure, which is what lets two
- * packages share it and a test drive it without a browser. Each screen wires
- * these to its own host's route port; the platform hook stays for the settings
- * pages that still use it.
- *
- * ## The URL contract, unchanged
- *
- *   - `?scope=ORGANIZATION:<id>` / `TEAM:<id>` / `PROJECT:<id>` — a specific pick
- *   - absent, malformed, or naming a scope the reader can no longer see — `all`
- *
- * The last case is the one worth keeping: a stale link to a deleted team must
- * read as "everything you can see" rather than rendering "Team: undefined".
- */
+// Scope filter as address and predicate; pure shared function; stale link reads all.
 
 /** The org tree a filter is resolved against, as narrow as the resolution needs. */
 export type ScopeHierarchy = {

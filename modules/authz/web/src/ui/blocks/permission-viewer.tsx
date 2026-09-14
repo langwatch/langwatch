@@ -1,22 +1,4 @@
-/**
- * A role's permissions, read-only, grouped by resource.
- *
- * Moved from `platform/app/src/components/settings/PermissionViewer.tsx`; the
- * catalogue it reads is this package's copy rather than
- * `~/utils/permissionsConfig`, which kept three server-side test consumers.
- *
- * TWO DISPLAY RULES TRAVEL WITH IT, and both are about not repeating yourself
- * at the reader. A resource with nothing granted renders no heading at all. And
- * a resource granted `manage` shows only `manage` (and `share`, which manage
- * does not imply), because listing view/create/update/delete underneath it says
- * the same thing four more times.
- *
- * Membership is read RAW here rather than through the hierarchy: what this
- * shows is the permission list as stored, which for a built-in role is the bag
- * the authorization contract publishes. `__tests__/builtin-roles.unit.test.ts`
- * pins that the bag and the engine's hierarchy-aware verdict agree over
- * everything the catalogue offers, so raw membership cannot under-report.
- */
+// Read-only role permissions; hides implied actions under manage.
 
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { AuthzPermission } from "@langwatch/authz-contract";

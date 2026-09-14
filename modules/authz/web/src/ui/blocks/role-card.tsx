@@ -1,13 +1,4 @@
-/**
- * One role, built-in or custom, as a card in the grid.
- *
- * Moved from `platform/app/src/components/settings/RoleCard.tsx`, whose only
- * caller was the page that moved with it. The one substitution is the grant
- * type: the platform component took `hasPermission: (permission: Permission) => boolean`
- * where `Permission` was an alias re-exported from `~/server/api/rbac`, a
- * server module a browser package may not reach. The grant is asked of the host
- * as a string, so the prop is one too.
- */
+// Role card; moved with its caller; grant type changed to string.
 
 import { Badge, Button, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { Edit, Eye, Shield, Trash2 } from "lucide-react";

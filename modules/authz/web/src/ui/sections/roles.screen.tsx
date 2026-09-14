@@ -1,25 +1,4 @@
-/**
- * Roles & Permissions — the custom roles an organization has defined, beside
- * the three built-in ones it did not.
- *
- * Moved from `platform/app/src/pages/settings/roles.tsx`. What did NOT come
- * with it: `SettingsLayout` and `withPermissionGuard`, which are the frontend
- * feature's to apply (`apps/ui/src/features/authz/ui/sections/authz-routes.tsx`),
- * and `getTeamRolePermissions` from `~/server/api/rbac`, which is rebuilt on
- * `@langwatch/authz-contract` in `model/builtin-roles.ts`.
- *
- * THE PLAN GATE IS THREE-STATE, and the order it is read in is the policy:
- * still asking renders a spinner, not Enterprise renders the sales block, and
- * only then does the management surface exist at all. Collapsing the first into
- * the second would pitch Enterprise at an Enterprise customer for the length of
- * one round trip.
- *
- * THE GRANT IS ASKED TWICE, on purpose. The route refuses a reader without
- * `organization:manage` outright — that is the guard the frontend feature
- * applies — and every write control asks again, because the same components are
- * what a future read-only view would reuse and a control that is live without
- * the grant is a refusal the reader only discovers after typing.
- */
+// Roles screen; three-state plan gate; grant asked twice for future reuse.
 
 import {
   Alert,
@@ -50,15 +29,7 @@ import { PermissionViewer } from "../blocks/permission-viewer.tsx";
 import { RoleCard } from "../blocks/role-card.tsx";
 import { RoleFormDialog, type RoleFormData } from "./role-form-dialog.tsx";
 
-/**
- * A stored role's permission list, as the editor reads it.
- *
- * The wire carries `string[]`, because a custom role written before a
- * permission was retired still lists it. Everything downstream filters through
- * the registry-backed catalogue, so an unrecognised string is shown by nothing
- * and offered by nothing — which is the same thing the platform page's
- * `role.permissions as Permission[]` did, said out loud.
- */
+// Permission list cast; wire carries strings; registry filters unrecognised.
 function asPermissions(permissions: readonly string[]): AuthzPermission[] {
   return permissions as AuthzPermission[];
 }
@@ -396,15 +367,7 @@ const BUILTIN_ROLE_ICONS = {
   VIEWER: Eye,
 } as const;
 
-/**
- * A role's permissions, read-only.
- *
- * ONE COMPONENT FOR BOTH DIALOGS. The platform page carried the same eighty
- * lines of dialog twice — once for a custom role and once for a built-in one —
- * differing only in whether the description fell back to a sentence. That is
- * the sort of duplication where the two copies drift, and the fallback is the
- * only thing that ever differed.
- */
+// Read-only permissions dialog; one component for both; fallback only difference.
 function PermissionsDialog({
   open,
   onClose,

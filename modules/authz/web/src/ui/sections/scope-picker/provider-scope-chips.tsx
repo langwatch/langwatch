@@ -13,16 +13,7 @@ import {
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-/**
- * Scope kinds a chip can render. ORGANIZATION/TEAM/PROJECT mirror the
- * Prisma `ModelProviderScopeType` enum; DEPARTMENT is a picker/badge-only
- * capability (no enum row - see scope-selector-and-badges.md). GROUP,
- * PRINCIPAL, VIRTUAL_KEY and ATTRIBUTED_USER are render-only kinds that
- * gateway budgets target; they are not offered by `ScopeChipPicker`.
- * Surfaces that key on the Prisma enum (model providers) never pass
- * anything but the triad; the tile catalog opts into ORGANIZATION +
- * DEPARTMENT only.
- */
+// Scope kinds chip renders; mirrors Prisma enum or picker/badge-only.
 export type ProviderScopeType =
   | "ORGANIZATION"
   | "TEAM"
@@ -132,21 +123,7 @@ export function scopeChipTooltip(entry: {
   return entry.detail ? `${style.kind}: ${label} · ${entry.detail}` : `${style.kind}: ${label}`;
 }
 
-/**
- * Renders a horizontal list of scope chips. Each chip shows the
- * scope's icon + name (e.g. "LangWatch", "Acme Team", "web-app") with
- * a hover tooltip naming the scope type so the kind is unambiguous
- * even when the icon is small or the row is dense. Callers that only
- * have access to the scope type fall back to the bare type label -
- * that's the legacy behaviour for surfaces that haven't been wired up
- * to pass names yet.
- *
- * For surfaces that render personal-owner state (personal VKs etc.)
- * pass `principal` and an extra "Personal" chip is appended after the
- * scope chips. Personal is orthogonal to scope (a personal VK still
- * has a scope row), so the chip rendering keeps them visually
- * adjacent rather than collapsing one into the other.
- */
+// Scope chips list; tooltip for scope kind; personal chip orthogonal.
 export function ProviderScopeChips({
   scopes,
   fallbackScopeType,

@@ -1,15 +1,5 @@
-/**
- * @vitest-environment jsdom
- *
- * Role Bindings, driven the way an administrator reads an access audit.
- *
- * `platform/app/src/pages/settings/role-bindings.tsx` had no test of its own,
- * so these are new. They pin the plan gate, the read that only fires once there
- * is an organization AND the plan admits the feature, the grouping a reader
- * sees, and the four-button scope filter.
- *
- * Spec: specs/rbac/role-binding-audit.feature
- */
+/** @vitest-environment jsdom */
+// Role Bindings test; pins plan gate, one-time read, grouping, scope filter.
 
 import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
