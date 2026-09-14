@@ -12,19 +12,8 @@ export abstract class WorkerGithubBranchMaintenance {
 }
 
 /**
- * Worker registration for GitHub pull-request linkage maintenance.
- *
- * The sweep used to be a `setTimeout` chain booted on every replica with no
- * lock, so the fleet ran the same cross-tenant scan N times every ten minutes.
- * It is a scheduled process manager now, and the wake commit is what fences
- * racing workers.
- *
- * The pipeline is built HERE rather than received, for the same reason the
- * API-key sweep's is: the outbox rows the recheck writes have to be the ones
- * this graph's own process store prunes, and a definition built against another
- * store prunes another process's rows. What made that impossible until now was
- * the definition's dependency — the whole `GithubService`, an organization
- * service and a project service behind it — for two methods that read neither.
+ * Worker registration for GitHub pull-request linkage maintenance. The pipeline
+ * is built here (not received) so outbox rows are pruned by this graph's process store.
  */
 export class GithubWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

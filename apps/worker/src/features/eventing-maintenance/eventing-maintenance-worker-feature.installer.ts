@@ -13,15 +13,8 @@ export abstract class WorkerBlobSweep {
 }
 
 /**
- * Maintenance for the Eventing substrate itself: the Group Queue blob keyspace
- * and the process-manager inbox/outbox tables.
- *
- * Neither belongs to a product feature, and hanging either off a domain
- * pipeline's schedule is how retention ends up covering only that domain —
- * which is the failure that let the inbox reach 2.8M rows. They install
- * together and in this order because that is the order the live registry
- * mounts them in, and because both are unconditional: the substrate exists in
- * every worker whether or not any feature pipeline is registered.
+ * Maintenance for the Eventing substrate: Group Queue blob keyspace and
+ * process-manager inbox/outbox tables. Unconditional (not tied to a domain pipeline).
  */
 export class EventingMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

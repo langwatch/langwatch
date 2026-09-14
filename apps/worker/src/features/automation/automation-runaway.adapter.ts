@@ -50,19 +50,8 @@ export type WorkerAutomationNextStepResolver = Readonly<{
 }>;
 
 /**
- * The infrastructure behind Automation's runaway containment, in this process.
- *
- * The POLICY is `RunawayContainmentService`'s — when an automation counts as
- * misconfigured, whether this pod may be the one to pause it, and how often an
- * organization may be told. What this adapter owns is the six substrates that
- * policy names: the project's 24-hour trace count, the admin roll, the mailer,
- * the fleet-wide claim leases, the deployment's own links, and the three
- * counters.
- *
- * Recovered from the platform application's adapter rather than rewritten, so
- * the pause a customer sees from a background process is the pause they saw
- * from the interactive one — the same ClickHouse count, the same ADMIN-only
- * roll, the same suppression fall-open, the same claim keys.
+ * Infrastructure for Automation's runaway containment, in this process. Owns the
+ * substrates that policy names (trace counts, admin roll, mailer, etc.).
  */
 export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
   static create(input: {
@@ -204,13 +193,8 @@ const CLAIM_EXPIRE_SECONDS = 90_000;
 const CLAIM_SWEEP_INTERVAL_MS = 60_000;
 
 /**
- * The per-pod fallback, and why it is not a second lease.
- *
- * A claim exists so one pod out of the fleet sends the mail. Redis is what
- * makes it fleet-wide; when Redis is unreachable the choice is between
- * notifying once per pod and notifying not at all, and not at all is the
- * failure that leaves a runaway automation silently uncontained. So the memory
- * map is deliberately the weaker guarantee, taken only after Redis has failed.
+ * The per-pod fallback when Redis is unreachable. Notifies once per pod rather
+ * than not at all (which would silently leave runaway automations uncontained).
  */
 const claimMemory = new Map<string, { token: string; expiresAt: number }>();
 let lastClaimSweepAt = 0;

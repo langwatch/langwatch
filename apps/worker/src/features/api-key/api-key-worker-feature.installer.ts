@@ -9,19 +9,8 @@ export abstract class WorkerAgentSandboxKeyReap {
 }
 
 /**
- * Worker registration for agent-sandbox credential maintenance.
- *
- * A sandbox key is minted per code agent run and has nothing that retires it at
- * the end of one, so this hourly sweep is the only thing that revokes an elapsed
- * key. The sweep used to be a closure the legacy registry built over the App's
- * Prisma client; the revoke now belongs to `@langwatch/api-key-server`, and this
- * installer composes the feature's own service rather than being handed a
- * pipeline somebody else built.
- *
- * The pipeline is built HERE rather than received, for the same reason the
- * Eventing substrate's sweeps are: the outbox rows the reap writes have to be
- * the ones this graph's own process store prunes, and a definition built against
- * another store prunes another process's rows.
+ * Worker registration for agent-sandbox credential maintenance. The pipeline is
+ * built here (not received) so outbox rows are pruned by this graph's process store.
  */
 export class ApiKeyWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

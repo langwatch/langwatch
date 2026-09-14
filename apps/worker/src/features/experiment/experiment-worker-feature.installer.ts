@@ -14,19 +14,8 @@ export interface ExperimentWorkerCapability {
 }
 
 /**
- * Worker registration for the Experiment run pipeline.
- *
- * Trace's experiment-metrics sync dispatches `computeExperimentRunMetrics`,
- * and in the legacy registry that subscriber was wired AFTER this pipeline
- * registered, through a mutable late-bound reference. The proxy this installer
- * publishes replaces that reference: the subscriber can be built first and
- * still cannot dispatch into an unregistered pipeline, because the proxy
- * throws until registration resolves it.
- *
- * The run-id to experiment-id lookup that subscriber also needs is a
- * repository read rather than a command, so it stays with the composition root
- * that owns the ClickHouse resolver; it is deliberately not part of this
- * feature's worker surface.
+ * Worker registration for the Experiment run pipeline. The proxy allows
+ * subscribers to dispatch computeExperimentRunMetrics after registration.
  */
 export class ExperimentWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

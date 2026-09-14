@@ -36,13 +36,8 @@ type SettlementDigestEntry = {
 const DIGEST_PREVIEW_MAX_CHARS = 140;
 
 /**
- * A settled match, as the digest template asks for one.
- *
- * `occurredAt` and `preview` come from what settlement already hydrated onto
- * this candidate — the trace's own start time and its computed input — so no
- * new read is needed to fill them. `value`/`unit` stay unset: nothing in the
- * settlement pipeline threads a matched metric alongside the trace id, so
- * naming one here would be a guess rather than a fact.
+ * A settled match for the digest template, using pre-hydrated trace timestamps
+ * and computed inputs.
  */
 function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
   const preview = entry.input.trim();
@@ -62,32 +57,9 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
 }
 
 /**
- * Everything an automation alert can leave this process through.
- *
- * Automation decides WHEN an alert is sent, to whom, and what it says; this
- * adapter owns the transports, the secrets they carry, and the mail-envelope
- * conventions that are a deployment's rather than a feature's — the no-reply
- * `To`, the BCC fan-out, the unsubscribe footer and its one-click headers.
- *
- * ## The two legacy methods
- *
- * `sendLegacyEmail` and `sendLegacySlackWebhook` are the trace-settlement
- * digest's, and the graph path reaches neither — `GraphAlertDispatchService`
- * calls `sendEmail`, `sendSlackWebhook`, `sendSlackBot` and `sendWebhook`, and
- * nothing else. They are NOT a legacy corner of settlement, though: they are
- * its DEFAULT. An automation only takes the rendered path once its author has
- * written a custom subject or body, so an unedited automation — which is most
- * of them — sends through these two.
- *
- * ## The webhook transport
- *
- * A webhook destination is a URL the CUSTOMER typed, which is the one outbound
- * address in this file that can be pointed at a private network. The
- * application fences it behind an SSRF-validating sender with its own URL
- * admission policy, its own dispatch budget and its own signing; none of that
- * is packaged yet, and re-implementing an egress fence per process is how two
- * fences end up disagreeing. So the transport is INJECTED: a process that has
- * one supplies it, and a process that does not refuses webhook alerts by name.
+ * Owns the transports, secrets, and mail-envelope conventions for automation
+ * alerts. The webhook transport is SSRF-fenced and injected (not every process
+ * has one).
  */
 export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotificationDelivery {
   static create(options: {
@@ -147,14 +119,8 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
   }
 
   /**
-   * The default digest: the deployment's own template rather than the
-   * customer's.
-   *
-   * The render happens INSIDE the `DispatchError` wrap and is classified
-   * non-retryable, because a tree that fails to render fails identically on
-   * every attempt — the outbox has to promote the row to dead rather than loop
-   * on a payload that can never succeed. The send that follows keeps the
-   * default classification, since a provider failure usually is transient.
+   * The default digest using the deployment's own template. Render failures are
+   * non-retryable (they fail deterministically).
    */
   async sendLegacyEmail(input: {
     recipients: string[];
@@ -231,13 +197,8 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
   }
 
   /**
-   * One envelope per recipient (ADR-031).
-   *
-   * Each recipient gets the no-reply `To` so addresses cannot be enumerated
-   * from a header, the rendered body with a footer bound to that recipient,
-   * and one-click `List-Unsubscribe` headers. The idempotency pair makes the
-   * fan-out safe under queue redelivery at RECIPIENT granularity: a retry
-   * after a partial send resumes rather than starting over.
+   * One envelope per recipient (ADR-031). Safe under queue redelivery via
+   * idempotency key at recipient granularity.
    */
   async sendEmail(input: {
     recipients: string[];

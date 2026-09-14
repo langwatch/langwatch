@@ -1,12 +1,6 @@
 /**
- * Where a project's organization can go for a higher automation ceiling.
- *
- * The decision is `PlanNextStepService`'s, over the one `PLAN_LIMITS` ladder
- * every process reads. What this adapter adds is the two facts the ladder does
- * not hold: the hop from the breached PROJECT to the organization that pays for
- * it, and this deployment's own checkout address. A ceiling notice sent from a
- * background process therefore offers the same rung, at the same price, as the
- * usage-limit notice the interactive process sends.
+ * Where a project's organization can upgrade its automation ceiling. This adapter
+ * provides the hop from project to organization and the deployment's checkout address.
  */
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import type { PlanProvider, PricingModel } from "@langwatch/entitlement-contract";

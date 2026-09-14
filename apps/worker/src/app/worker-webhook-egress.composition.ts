@@ -11,29 +11,15 @@ import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The SSRF-fenced outbound sender this process reaches customer-supplied
- * webhook destinations through.
- *
- * A webhook URL is the one outbound address in the product a customer can point
- * at our own private network, so nothing about this composition is a default:
- * the address fence is the strict one, the TLS answer is the deployment's, and
- * the hourly dispatch cap counts in whatever counter this process shares.
- *
- * It composes with no new configuration. Both leaves it needs are already read:
- * `IS_SAAS` (as `deployment.saas`) decides whether TLS certificates are
- * verified, exactly as it does in the application, and the Redis this process
- * already opened is where the cap is counted.
+ * The SSRF-fenced outbound sender for webhook delivery. Webhook URLs are the one
+ * outbound address customers can point at private networks, so this composition
+ * uses strict address fencing and no new configuration.
  */
 export type WorkerWebhookEgressCompositionOptions = Readonly<{
   config: WorkerConfig;
   /**
-   * The shared Redis the hourly dispatch cap counts in.
-   *
-   * Absent falls back to a per-process counter, which is the application's own
-   * behaviour when its Redis is down: a ceiling enforced per pod rather than per
-   * fleet, so the burst is larger than intended but still bounded. It is not a
-   * fail-open — a cap that stopped refusing is how one automation becomes an
-   * outbound flood.
+   * The shared Redis counter for the hourly dispatch cap. Absent falls back to a
+   * per-process counter, bounding the burst per pod rather than per fleet.
    */
   redis?: RedisConnection | null;
 }>;

@@ -24,13 +24,8 @@ type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
 >;
 
 /**
- * The two Evaluation command senders other pipelines dispatch to.
- *
- * Trace's evaluation trigger and its custom-evaluation sync both close over
- * these, and both mount on a pipeline registered after this one. They are
- * named rather than passed as an opaque command map because these two are the
- * whole cross-pipeline surface — anything else Evaluation registers is its own
- * business.
+ * The two Evaluation command senders that other pipelines dispatch to. Named
+ * (not opaque) because they are the whole cross-pipeline surface.
  */
 export interface EvaluationWorkerCommands<
   TExecuteEvaluation = unknown,
@@ -51,14 +46,8 @@ export interface EvaluationWorkerCapability<TEvent extends Event = Event> {
 }
 
 /**
- * Worker registration for Evaluation's durable processing pipeline.
- *
- * It installs BEFORE Trace, Metric and Log, because the subscribers those
- * pipelines mount dispatch `executeEvaluation` and `reportEvaluation`. The
- * registration order is the composition root's to choose; what this installer
- * guarantees is that `commands` is unusable until the pipeline it names has
- * actually been registered, so a mis-ordered graph fails loudly at boot
- * instead of dispatching into a pipeline that does not exist yet.
+ * Worker registration for Evaluation's durable processing pipeline. Must install
+ * before Trace, Metric and Log (they dispatch evaluation commands).
  */
 export class EvaluationWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create<TEvent extends Event>(options: {

@@ -1,15 +1,6 @@
 /**
- * Whether the worker's GitHub feature composes the sweep it claims to.
- *
- * The pipeline used to arrive built, from a registry that had already closed
- * over the App's GitHub service; it is built here now, against this graph's own
- * process store. Two things have to hold for that to be the same sweep: the
- * registered pipeline must carry the routing keys the shared queue was staged
- * with, and the intents behind its schedule must call THIS graph's sweep rather
- * than an inert stand-in. A pipeline that registers and never re-checks looks
- * identical from every health signal the fleet watches.
- *
- * Spec: modules/github/specs/github-branch-maintenance.feature
+ * Verify the worker's GitHub feature composes the correct branch maintenance sweep.
+ * See modules/github/specs/github-branch-maintenance.feature.
  */
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "@langwatch/github-server";

@@ -8,13 +8,9 @@ import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter.ts";
 
 /**
+ * The expected envelope was recorded from the application's own sender. It is a
+ * literal because a recipient cannot tell which process wrote to them.
  * Spec: modules/automation/specs/graph-alert-delivery-envelope.feature
- *
- * The expected envelope below was RECORDED from the application's own sender,
- * `platform/app/src/server/mailer/triggerEmail.ts`, under the key and host
- * spelled here. It is a literal because a recipient cannot tell which process
- * wrote to them: the footer link they click is served by the application's
- * route, and the `To` address is what a bounce processor attributes by.
  */
 const SIGNING_KEY = "0f".repeat(32);
 const BASE_HOST = "https://app.langwatch.test";
@@ -179,13 +175,8 @@ describe("WorkerAutomationNotificationDeliveryAdapter", () => {
   });
 
   /**
-   * Spec: specs/automations/worker-automation-settlement-conversion.feature
-   *
-   * The digest most automations actually send. It is not a legacy corner: an
-   * automation only takes the rendered path once its author has written a
-   * custom subject or body, so an unedited one comes through here — which is
-   * why the refusal this used to be was a settlement half that quietly sent
-   * nothing.
+   * The digest most automations send (when the author hasn't written a custom
+   * subject or body). Spec: specs/automations/worker-automation-settlement-conversion.feature
    */
   describe("given an automation whose author wrote no template", () => {
     /** @scenario "The settlement digest renders and sends from this process" */

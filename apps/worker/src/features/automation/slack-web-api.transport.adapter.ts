@@ -7,22 +7,8 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
 
 /**
- * The HTTPS call behind a Slack bot delivery.
- *
- * Both destinations `SlackWebApiDeliveryAdapter` uses are constants compiled
- * into that adapter — `slack.com/api/chat.postMessage` and
- * `slack.com/api/conversations.list`. Nothing a customer supplies reaches this
- * transport, which is why it is a plain fetch rather than the application's
- * SSRF-fenced sender: there is no address here for a customer to point
- * anywhere.
- *
- * Redirects are refused rather than followed. A 3xx from this host would mean
- * the endpoint is not the Slack that was compiled in, and the request carries
- * a customer's bot token — precisely the case where it must not be re-sent.
- *
- * The response is read up to a bound. A hostile or broken endpoint answering
- * with an endless body would otherwise stream into memory, and everything this
- * caller needs is in the first few hundred bytes.
+ * The HTTPS call behind a Slack bot delivery. Uses constant endpoints (not
+ * customer-supplied) and bounds response size to prevent memory exhaustion.
  */
 export class WorkerSlackWebApiTransportAdapter implements SlackApiTransport {
   static create(

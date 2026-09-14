@@ -9,25 +9,15 @@ type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"
 export interface BillingReportingWorkerCapability<TReportUsage = unknown> {
   buildProcessing(): WorkerPipelineDefinition;
   /**
-   * Hands the month-report command its own pipeline's sender.
-   *
-   * The command re-dispatches itself to walk a month forward, so the sender it
-   * needs is produced by the very registration that consumes it. The legacy
-   * registry closed that loop by looking the pipeline up by name at dispatch
-   * time; binding it once at registration moves a mis-registered graph's
-   * failure from the first monthly roll-up to boot.
+   * Hands the month-report command its own pipeline's sender. Binding at
+   * registration moves failures from first roll-up to boot.
    */
   connectSelfDispatch(sendReportUsageForMonth: (data: TReportUsage) => Promise<void>): void;
 }
 
 /**
- * Worker registration for the Billing reporting pipeline.
- *
- * On a SaaS install the global billable-events meter projection mounts a
- * subscriber that dispatches `reportUsageForMonth`. That projection is
- * registered on the Eventing runtime itself rather than on a pipeline, so it
- * is configured before any pipeline exists — which is exactly why the sender
- * it closes over is the proxy published here and not a direct handle.
+ * Worker registration for the Billing reporting pipeline. Uses a proxy sender
+ * because the projection is configured before the pipeline exists.
  */
 export class BillingReportingWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

@@ -26,14 +26,8 @@ export interface CodingAgentWorkerCapability {
 }
 
 /**
- * Worker registration for the Coding Agent session pipeline (ADR-056).
- *
- * It installs BEFORE Metric, Log and Trace. That is not a preference: the
- * dispatch subscribers those three mount close over this pipeline's
- * contribution commands, so a graph that registered them first would build
- * subscribers around commands that did not exist. The proxies published here
- * make that ordering checkable — a subscriber built too early still cannot
- * dispatch, and says so.
+ * Worker registration for the Coding Agent session pipeline (ADR-056). Must
+ * install before Metric, Log and Trace (ordering matters for proxy commands).
  */
 export class CodingAgentWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
