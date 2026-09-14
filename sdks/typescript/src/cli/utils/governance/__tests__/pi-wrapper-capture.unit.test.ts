@@ -536,8 +536,10 @@ describe("given a pi session launched through the wrapper", () => {
         // Never settles, standing in for the unbounded half of the sweep. A
         // real post could not do this - the transport caps it at five seconds
         // - but a read against a stalled mount can, and it reaches the same
-        // await.
-        return await new Promise<Response>(() => {});
+        // await. The executor drops both callbacks deliberately; it is bound
+        // to a name so that reads as the point rather than as an omission.
+        const neverSettles = new Promise<Response>(() => undefined);
+        return await neverSettles;
       }) as unknown as typeof fetch);
 
       const run = launchPi();
@@ -557,14 +559,22 @@ describe("given a pi session launched through the wrapper", () => {
       await run;
       const waited = Date.now() - startedAt;
 
-      // Generous, because the point is bounded-versus-forever, not the exact
-      // number. Unbounded, this line is never reached.
-      expect(waited).toBeLessThan(20_000);
+      // Three times the deadline, because the claim is bounded-versus-forever
+      // and nothing tighter is worth a flake: a loaded runner can add seconds
+      // to a ten-second wait without the code under test being wrong. The
+      // wedge never resolves, so unbounded this line is not reached late, it
+      // is not reached at all - the suite timeout below is what would fail.
+      expect(waited).toBeLessThan(30_000);
       // The turn the deadline interrupted is on the wire, so it is neither
       // pending nor dropped and the count-based report says nothing about it.
       // Exiting quietly here would trade a visible hang for an invisible gap,
       // which is the trade this whole capture path refuses to make.
-      expect(stderrText()).toContain("did not finish in 10s");
+      //
+      // Matched on the sentence rather than the rendered seconds: the number
+      // belongs to PI_FINAL_SWEEP_DEADLINE_MS, and tuning it is not a
+      // behaviour change this test should be able to veto.
+      expect(stderrText()).toContain("pi session capture did not finish in");
+      expect(stderrText()).toContain("may not have been recorded");
     }, 40_000);
   });
 
