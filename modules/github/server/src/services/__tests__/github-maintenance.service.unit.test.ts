@@ -1,16 +1,6 @@
 /**
- * The names this pipeline registers, pinned as literals.
- *
- * FROZEN TWIN. Two graphs register this definition today: apps/worker builds it
- * from this package, and platform/app's legacy `pipelineRegistry` builds it from
- * the same class over its own runtime. They share one `event-sourcing/jobs`
- * queue, which routes by `${pipeline}:${jobType}:${jobName}` and rejects an
- * unroutable job for redelivery rather than dropping it. A name changed on one
- * side is therefore not a rename — it is a second routing key that only one
- * consumer stages, and the work behind it simply stops. These literals may only
- * change in a commit that changes the twin too.
- *
- * Spec: modules/github/specs/github-branch-maintenance.feature
+ * FROZEN TWIN: pipeline name literals shared between apps/worker and
+ * platform/app; queue routes by `${pipeline}:${jobType}:${jobName}`.
  */
 import { describe, expect, it, vi } from "vitest";
 

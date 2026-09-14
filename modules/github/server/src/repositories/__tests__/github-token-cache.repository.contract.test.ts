@@ -1,12 +1,6 @@
 /**
- * The installation-token cache's contract: a token read back under its own
- * scope key, a liveness verdict that expires, and the two locks that make one
- * process mint at a time.
- *
- * The memory twin is the only backend registered here. The Redis twin speaks
- * the same operations to a real connection, and its key layout is pinned by
- * `../../adapters/__tests__/github-app-token.unit.test.ts`, which drives the
- * minter over a fake connection and asserts on the keys it touches.
+ * Installation-token cache contract: tokens under scope keys, expiring
+ * liveness verdicts, and minting locks for single-process access.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 

@@ -76,21 +76,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * One pull request, written only when its snapshot is at least as fresh as
-   * the stored one.
-   *
-   * Prisma's `upsert` cannot express it: its `update` is unconditional, and the
-   * whole point is that an older snapshot must match nothing. So the write is
-   * a guarded `updateMany` first, and a `create` only when that matched no row.
-   *
-   * `create` racing another writer is expected rather than exceptional, and the
-   * unique index is what decides it. The loser catches the violation and runs
-   * the same guarded update against the winner's committed row, so whichever
-   * order the two arrive in, the fresher snapshot is the one left stored.
-   *
-   * A strictly older snapshot walks all three steps and changes nothing, which
-   * is the intended outcome and is not reported: a late delivery is ordinary,
-   * not a failure the caller can act on.
+   * Upsert with freshness guard: guarded updateMany + create ensures only
+   * fresher snapshots overwrite stored rows.
    */
   private async writeSnapshot(pullRequest: UpsertGithubPullRequestInput): Promise<void> {
     const key = {
@@ -272,14 +259,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * The bookkeeping write. `lastRequestedAt` is the one column a caller may
-   * decline to write: null leaves whatever demand is stored, which is what
-   * keeps the sweep from renewing the signal it selects on.
-   *
-   * A create still needs a value, because the column is not nullable, so it
-   * falls back to `lastCheckedAt`, the same instant. That only applies to a
-   * row a sweep somehow creates, and the sweep reads its branches off rows that
-   * already exist, so in practice every create comes from demand.
+   * Bookkeeping write where lastRequestedAt is optional: null keeps stored value.
+   * Create falls back to lastCheckedAt when demand hasn't recorded one yet.
    */
   async upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void> {
     const repositoryFullName = PrismaGithubPullRequestsRepository.normalizeFullName(
@@ -316,23 +297,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * The atomic claim. One INSERT ... ON CONFLICT DO UPDATE ... WHERE, so the
-   * decision "may I ask GitHub about this branch" and the record of having
-   * taken it are the same write.
-   *
-   * Raw SQL for the WHERE on the conflict path, which Prisma's `upsert` cannot
-   * express: its `update` is unconditional, and the whole point here is that
-   * the update must match nothing when another caller already holds the claim.
-   * The statement names its organization, so this is not a tenancy opt-out  - 
-   * the guard is a Prisma middleware and simply does not see raw SQL.
-   *
-   * Both concurrent callers reach the same conflict target; Postgres serializes
-   * them on the unique index, so the second evaluates its predicate against the
-   * first's committed row and updates zero rows.
-   *
-   * `shouldRecordDemand` picks whether the conflict path refreshes
-   * `lastRequestedAt` or keeps the stored value. A CASE rather than two
-   * statements, so the claim stays the one write it has to be.
+   * Atomic claim via INSERT ... ON CONFLICT DO UPDATE WHERE. Raw SQL needed
+   * because Prisma's upsert update is unconditional.
    */
   async claimBranchLookup({
     organizationId,
@@ -482,21 +448,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * The retention prune: the branch bookkeeping past the horizon, and nothing
-   * else. `GithubPullRequest` rows are kept for good, because they are the
-   * answer the Pull Requests page reads and their count is bounded by the pull
-   * requests the organization actually opened.
-   *
-   * Raw SQL, with the `-- @tenancy:` opt-out every other retention sweep in the
-   * platform uses. Retention is system-owned maintenance and cannot name an
-   * organization: the alternative is enumerating every organization and issuing
-   * a delete per tenant, which is a query per tenant to do one table scan's
-   * work.
-   *
-   * One unbounded DELETE over a predicate with no index of its own, and that is
-   * the deliberate trade: this runs once a day, while an index to serve it
-   * would be paid on every write to a table that takes a row per agent branch.
-   * Measured on 200k rows: 254 ms.
+   * Retention prune for stale branch bookkeeping. Raw SQL with tenancy opt-out
+   * because retention is system-owned maintenance.
    */
   async deleteStaleBefore({ before }: { before: Instant }): Promise<{
     branchChecks: number;
@@ -525,17 +478,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * The host half of the same key, folded for the same reason.
-   *
-   * Every key this table is addressed by spans (organization, host, repository,
-   * branch or number), so folding the repository alone still lets one repository
-   * split in two: a caller naming `GitHub.com` matches no row a caller naming
-   * `github.com` wrote. Hosts are case insensitive, `host` arrives straight off a
-   * public query parameter, and a session records whatever casing its git remote
-   * carries, so both spellings genuinely reach this layer.
-   *
-   * `headBranch` is deliberately never folded: `feat/X` and `feat/x` really are
-   * two branches.
+   * Host normalization to lowercase for case-insensitive matching. Branches are
+   * deliberately not folded.
    */
   private static normalizeHost(repositoryHost: string): string {
     return repositoryHost.toLowerCase();
@@ -563,14 +507,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * The predicate that makes a snapshot write monotonic: accept it only when the
-   * stored row has no source timestamp, or has one at or before the incoming
-   * snapshot's.
-   *
-   * `lte` rather than `lt` on purpose. GitHub redelivers, and two events can
-   * share one `updated_at` (a label added in the same second as an edit, say), so
-   * refusing an equal timestamp would make the winner depend on which delivery
-   * arrived first.
+   * Freshness guard for monotonic snapshot writes: accept when stored row has
+   * no timestamp or one at or before incoming snapshot's.
    */
   private static freshnessGuard(prUpdatedAt: Instant | null) {
     return {

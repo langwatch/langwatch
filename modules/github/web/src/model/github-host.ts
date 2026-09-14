@@ -1,29 +1,6 @@
 /**
- * What the Integrations settings screen asks of the application it is mounted
- * in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton, the
- * session client or `window`: those are the imports and globals ADR-004 seals
- * off from a feature-web package, and reaching for any of them is also what
- * would make this screen untestable outside a running application. It asks this
- * port instead, and the frontend feature that owns it —
- * `apps/ui/src/features/github` — answers it by adapting the browser
- * capabilities the application resolves.
- *
- * THE SEVENTEENTH HOST PORT OF THE SAME SHAPE. Every family before this one
- * recorded that a repeat is the signal to promote it into one place, and every
- * one left it, for the same reason: promotion changes packages a page-family
- * move does not own. Recorded again in
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS FAMILY ASKS THAT NO OTHER DID is a LEAVING navigation. Both halves
- * of the install ceremony finish on github.com: connecting replaces this
- * document with GitHub's installation flow, and disconnecting opens GitHub's
- * uninstall page in a new tab. `navigate` cannot serve either — it is the
- * application's own router — so the port names the two departures separately
- * and the adapter owns the wire. That split is what lets a suite assert WHERE
- * the screen sends somebody without a jsdom navigation that is never
- * implemented.
+ * Host port for the Integrations screen: application capabilities with external
+ * navigation support for connecting/disconnecting on GitHub.
  */
 
 import { createContext, useContext } from "react";

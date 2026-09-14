@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The fleet-wide scheduling of pull-request linkage maintenance: one sweep per
- * tick across the whole fleet rather than one per replica, and a retention
- * prune riding the same schedule.
- *
- * @see specs/coding-agent/pull-request-linkage.feature
+ * Fleet-wide pull-request maintenance: one sweep per tick with retention pruning.
  */
 import { InMemoryProcessStore, type ProcessHandlerContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";

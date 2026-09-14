@@ -97,7 +97,10 @@ export const STICKY_PIN_TTL_SECONDS = 10 * 60;
 /** `Agent.lastSeenAt` is written at most once per agent in this window. */
 export const LAST_SEEN_WRITE_INTERVAL_MS = 60_000;
 
-/** The concurrency an instance advertises when it says nothing; the SDKs default to the same number. */
+/**
+ * The concurrency an instance advertises when it says nothing;
+ * SDKs default to the same number.
+ */
 export const DEFAULT_CONCURRENCY = 10;
 
 /** The delay a full agent asks the caller to wait before it tries again. */

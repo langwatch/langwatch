@@ -1,17 +1,6 @@
 /**
- * Data-access layer for the pull requests discovered through the
- * organization's GitHub connection (`GithubPullRequest`) and the per-branch
- * bookkeeping behind the lookup (`GithubBranchPullRequestCheck`).
- *
- * The mapping, status and usage services are the only callers; no transport
- * layer touches Prisma for this feature. Repository methods use findAll /
- * findBy naming; services expose getAll / getBy.
- *
- * `repositoryFullName` is stored and matched LOWERCASED, because a session reports
- * whatever casing the developer's remote had, and the same repository must not
- * map twice. Normalisation happens at this boundary so no caller can forget it.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
+ * Data-access layer for pull requests and branch bookkeeping, called by
+ * mapping/status/usage services. Normalizes repository names to lowercase.
  */
 
 import type { Instant } from "@langwatch/time";
@@ -101,33 +90,16 @@ export interface UpsertGithubBranchCheckInput {
   recheckAfter: Instant | null;
   attempts: number;
   /**
-   * When demand for this branch was last recorded, or null to keep whatever is
-   * stored.
-   *
-   * The sweep passes null. It selects branches by this column, so writing it
-   * from inside the sweep renews the signal the sweep reads and no branch ever
-   * leaves it: an unmapped branch would be asked about once a day for as long
-   * as the connection existed.
+   * When demand was last recorded; null to keep stored value. The sweep passes
+   * null to avoid renewing the signal it reads.
    */
   lastRequestedAt: Instant | null;
 }
 
 export abstract class GithubPullRequestsRepository {
   /**
-   * Idempotent write of a mapping run's pull requests, by the unique key, and
-   * ONLY when the incoming snapshot is at least as fresh as the stored one.
-   *
-   * Both writers into this table can arrive late. GitHub permits out-of-order
-   * webhook delivery, so a delayed `opened` or `edited` can land after `closed`
-   * was applied, and a slow REST listing can answer after a webhook already
-   * stored a newer state. Written last-write-wins, either one reopens a merged
-   * pull request and clears `prClosedAt` and `prMergedAt` — the two columns
-   * session-to-pull-request attribution reads to decide which sessions belong
-   * to which pull request — and regresses the title the page shows.
-   *
-   * `prUpdatedAt` orders the writes. A strictly older snapshot is skipped
-   * silently; an equal one still writes, so a redelivery stays idempotent
-   * rather than becoming a no-op that depends on delivery order.
+   * Idempotent upsert by unique key, ordered by `prUpdatedAt` freshness. Both
+   * GitHub webhooks and REST requests can arrive out-of-order and late.
    */
   abstract upsertPullRequests(params: {
     pullRequests: readonly UpsertGithubPullRequestInput[];
@@ -164,13 +136,8 @@ export abstract class GithubPullRequestsRepository {
   }): Promise<GithubPullRequestRow | null>;
 
   /**
-   * Refresh the snapshot columns a live status read found to have drifted.
-   * A no-op when the row is gone; a live read must never resurrect a mapping
-   * the mapping run has not made.
-   *
-   * Guarded by `prUpdatedAt` exactly as `upsertPullRequests` is: this read runs
-   * while a page is open, so its answer can be overtaken by a webhook before
-   * the write lands.
+   * Refresh snapshot columns that drifted. Guarded by `prUpdatedAt` since
+   * webhook may overtake this read's answer before write lands.
    */
   abstract refreshSnapshot(input: RefreshGithubPullRequestSnapshotInput): Promise<void>;
 
@@ -184,22 +151,8 @@ export abstract class GithubPullRequestsRepository {
   abstract upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void>;
 
   /**
-   * Take the right to ask GitHub about one branch, atomically. `true` means
-   * this caller holds it; `false` means the stored bookkeeping already answers
-   * the question, or another caller is holding it right now.
-   *
-   * ONE statement, deliberately. Reading the row and then writing it is two,
-   * and two concurrent sessions on one branch — the workload agent worktrees
-   * produce — both read "not yet asked" before either writes, so both call
-   * GitHub. An upsert whose UPDATE carries the claimability predicate cannot
-   * split that way: the loser blocks on the unique index, re-evaluates against
-   * the winner's row and matches nothing.
-   *
-   * The claim arms `recheckAfter` as a short lease, which is the same column
-   * the backoff uses. That is not an overload of its meaning — both say "do not
-   * ask again before this instant" — and the answer overwrites it: a found
-   * branch clears it, an empty one replaces it with the real backoff, and only
-   * a caller that crashed mid-lookup leaves the lease to expire on its own.
+   * Atomic claim to ask GitHub about one branch. One statement prevents
+   * concurrent sessions from both calling GitHub for the same branch.
    */
   abstract claimBranchLookup(params: {
     organizationId: string;
@@ -236,15 +189,8 @@ export abstract class GithubPullRequestsRepository {
   }): Promise<void>;
 
   /**
-   * Pull a branch's next question forward to `dueAt`, and put its attempt count
-   * back to zero, for a branch fresh session activity says is still being
-   * worked on.
-   *
-   * Only ever brings it forward: a row already due at or before `dueAt` is left
-   * alone, so this cannot push a question further away, and a branch that has
-   * already mapped (`recheckAfter` is null) is not touched at all. That bound is
-   * what makes it safe to call on every fold: several agent worktrees folding
-   * on one branch within a minute all land on the same due date.
+   * Pull forward a branch's next question and reset attempt count when fresh
+   * session activity indicates it's still being worked on.
    */
   abstract bringBranchRecheckForward(params: {
     organizationId: string;
@@ -255,18 +201,8 @@ export abstract class GithubPullRequestsRepository {
   }): Promise<void>;
 
   /**
-   * The branches the background sweep should ask GitHub about again: mapped to
-   * nothing, past their backoff, and still being asked about by a reader within
-   * the last week.
-   *
-   * This is the ONE deliberately cross-organization read in the feature. Every
-   * other query names its organization; this one cannot, because the sweep's
-   * whole job is to walk every tenant's due branches on a timer with no
-   * request context to scope it. It is admitted by a bound in
-   * `dbOrganizationIdProtection.ts` matched to this exact predicate and to
-   * `findMany` alone, in the same shape the platform's expired-key sweep is
-   * admitted, and it selects bookkeeping columns only: a repository name, a
-   * branch name and the timestamps, never a title, a body or a diff.
+   * Branches the sweep should re-ask about: mapped to nothing, past backoff,
+   * still being asked by a reader within the last week.
    */
   abstract findRecheckDue(params: {
     now: Instant;
@@ -276,29 +212,8 @@ export abstract class GithubPullRequestsRepository {
   }): Promise<GithubBranchCheckRow[]>;
 
   /**
-   * Delete the branch bookkeeping past the activity horizon.
-   *
-   * Bookkeeping ONLY. The pull requests a branch resolved to are kept for good:
-   * they are a record of work that was done, they are bounded by the number of
-   * pull requests the organization actually opened, and the Pull Requests page
-   * is mostly a place to look back at merged work. Deleting them with the
-   * bookkeeping emptied that page of every pull request whose branch had been
-   * quiet for a week.
-   *
-   * Bounded by the SAME horizon the sweep uses, deliberately rather than by a
-   * retention knob of its own: a branch with no session demand for a week has
-   * already dropped out of the sweep, so the feature has already stopped
-   * maintaining it. Keeping the row after that is keeping a row that is never
-   * read and never refreshed, at one row per agent branch per repository, which
-   * is the shape that turns into millions a year.
-   *
-   * Self-healing, which is what makes the horizon safe to be this short. A
-   * session folding on the branch again re-maps it from GitHub and writes the
-   * bookkeeping back.
-   *
-   * Cross-tenant by nature, like the sweep it follows: system-owned
-   * maintenance, so it takes the raw-SQL opt-out the platform's other retention
-   * sweeps take.
+   * Delete stale branch bookkeeping past activity horizon. Keeps pull request
+   * records forever; they are bounded work history.
    */
   abstract deleteStaleBefore(params: { before: Instant }): Promise<{
     branchChecks: number;

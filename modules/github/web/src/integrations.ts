@@ -1,18 +1,6 @@
 /**
- * The Integrations family, as the browser application mounts it.
- *
- * ONE SCREEN, ONE ADDRESS: `/settings/integrations`. The route table declares a
- * single `/settings/integrations` row and the loader registry a single
- * `pages/settings/integrations` key.
- *
- * WHY THIS PACKAGE. A key belongs to the family that owns its TRANSPORT. Both
- * calls are `github.*`, mounted out of `@langwatch/github-server`, and every
- * type the page renders is `@langwatch/github-contract`'s.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is the tRPC Provider this
- * package's hooks run on, the settings chrome, the `organization:manage` guard,
- * and the host port that answers for the organization, the address, the failure
- * notice and the two departures to github.com.
+ * Integrations screen at `/settings/integrations`. The owning frontend must
+ * mount the tRPC Provider, settings chrome, guards, and host port.
  */
 
 import type { ComponentType } from "react";

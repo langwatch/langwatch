@@ -1,13 +1,6 @@
 /**
- * An in-process stand-in for the `redis` member, for the tests that exercise
- * the connected-agent relay.
- *
- * The relay is a real read of the process's Redis now, so a test that drives
- * it has to supply one. Everything the session-state store calls is here and
- * nothing else is: strings, sorted sets, hashes, counters, the compare-and-set
- * script and pub/sub, all over plain maps shared with every connection
- * `duplicate()` hands out. Time to live is accepted and ignored, because no
- * test outlives an entry.
+ * Test double for the `redis` member in relay tests. Uses maps instead of
+ * persistence since test data outlives no entry.
  */
 import type { RedisConnection } from "@langwatch/redis-client";
 

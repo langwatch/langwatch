@@ -1,14 +1,6 @@
 /**
- * The half of pull-request linkage that knows a project.
- *
- * Demand arrives with a tenant: a session is looking at a branch right now, so
- * the organization has to be resolved from the project, the branch's next sweep
- * is pulled forward, and a mapping that finds a pull request is what marks the
- * project as having seen coding-agent activity. The fleet-wide sweep does none
- * of that — it has no project in hand — which is why the two are separate
- * services and only this one takes a `ProjectApi`.
- *
- * Spec: modules/github/specs/github-branch-maintenance.feature
+ * The demand half that knows a project and resolves organization/marks
+ * activity; the sweep is separate because it has no project.
  */
 import { describe, expect, it } from "vitest";
 

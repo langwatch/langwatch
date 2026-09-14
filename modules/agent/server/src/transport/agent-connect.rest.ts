@@ -1,15 +1,6 @@
 /**
- * `/api/v1/agents/connect/*` - the connected-agent instance protocol: register,
- * poll for work, post results. The credential is not the project door's own:
- * a connecting instance presents its key and project explicitly over headers,
- * and the app verifies them itself. Routes are declared public so the
- * framework resolves no credential of its own; the protocol's own headers
- * arrive as a bound fact.
- *
- * A refusal is thrown as its own `HandledError` (`AgentRegisterRefusedError`),
- * never returned as a 200 body: each reason carries the HTTP status origin/main
- * answered it with, and `meta.frame` is the refused frame the SDK reads, which
- * the REST boundary spreads onto the flat error body.
+ * The connected-agent instance protocol: register, poll, post results with
+ * credentials presented in headers. Refusals are thrown, not returned.
  */
 import {
   ackFrameSchema,

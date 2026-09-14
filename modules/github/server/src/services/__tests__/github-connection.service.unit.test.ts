@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Pins what the organization's settings surface is told about its GitHub
- * connection, and what disconnecting hands back: the uninstall deep link
- * follows the host the instance is bound to, the install link disappears on an
- * instance that cannot start an installation, a member learns how wide a
- * "selected" install reaches without learning which repositories it names, and
- * an installation owned by another organization is reported as a missing one.
+ * GitHub connection settings surface: uninstall links, install availability,
+ * repository selection scope, and missing installation handling.
  */
 import {
   GithubNotConnectedError,

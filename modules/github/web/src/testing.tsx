@@ -1,19 +1,6 @@
 /**
- * What this package's suites mount the Integrations screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to do — where it tried to LEAVE to, what it opened in a new tab,
- * the address writes and the failures it reported — which is exactly the
- * surface the real adapter answers.
- *
- * BOTH DEPARTURES ARE RECORDED SEPARATELY, and that is the whole reason they
- * are two port methods rather than one. Connecting REPLACES this document;
- * disconnecting opens a second one. jsdom performs neither, so a screen that
- * called `window` directly could only be asserted by spying on a global.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Test harness for Integrations screen that records port interactions:
+ * departures, external opens, query writes, and failures.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

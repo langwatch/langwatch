@@ -1,14 +1,6 @@
 /**
- * Whether a process that holds nothing but a database can run the sweep.
- *
- * The sweep used to be reachable only through `composeGithubApi`, which
- * takes an `OrganizationService` and a `ProjectApi` — so a worker could not
- * compose it without composing the application those two live in, even though
- * the sweep calls neither. The test that matters is therefore not "does it
- * construct": it is that a branch which is due maps all the way to a stored
- * pull request through a graph with no organization and no project in it.
- *
- * Spec: modules/github/specs/github-branch-maintenance.feature
+ * Tests that branch-refresh sweep works with just a database, without the
+ * full GitHub API composition.
  */
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";

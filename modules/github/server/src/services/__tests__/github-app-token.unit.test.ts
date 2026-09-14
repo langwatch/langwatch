@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Pins the security + correctness invariants of the GitHub App token service:
- *   - the app JWT is RS256, backdated, ≤10min, issued by the app id
- *   - installation tokens are minted with a scoped repository_ids + minimal
- *     permissions, and cached per (installation, scope)
- *   - a differently-scoped mint gets a different cache key (and thus a fresh
- *     mint), while a repeat of the same scope is served from cache
- *   - the scope key is stable + order-independent
+ * GitHub App token service security: RS256 app JWT, scoped installation tokens,
+ * per-scope caching with stable key ordering.
  */
 import { generateKeyPairSync } from "node:crypto";
 import jwt from "jsonwebtoken";

@@ -1,16 +1,6 @@
 /**
- * One GitHub account the organization's installation reaches.
- *
- * Split out of the page body it was declared in, and typed by
- * `GithubInstallationSummary` rather than by the seven-field restatement the
- * page carried beside it — the contract is the producer, and a field the server
- * adds should not be invisible to the row that renders it.
- *
- * THE ROW HOLDS NO STATE ANY MORE. `platform/app` kept the "finish on GitHub"
- * hint in a `useState` inside the row and set it from the mutation's
- * `onSuccess`, which meant the row and the mutation both had to be reasoned
- * about to know when the hint appears. The screen owns the mutation, so it owns
- * the answer; the row is told.
+ * One GitHub installation, typed by the contract summary. Stateless:
+ * mutations own the answers, the row is told.
  */
 
 import { Badge, Box, Button, HStack, Link, Text, VStack } from "@chakra-ui/react";

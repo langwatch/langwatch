@@ -1,15 +1,6 @@
 /**
- * The two GitHub repositories' contract: the freshness guard on a snapshot
- * write, the atomic branch claim, the demand stamp and the retention delete.
- *
- * The memory twin is the only backend registered here. The Prisma twin runs the
- * same operations against a real database in
- * `github-installations.persistence.integration.test.ts` (the unique-index race
- * `insertOrGetExisting` is built on) and in
- * `../../__tests__/github-pull-request-mapping.persistence.integration.test.ts`
- * (the claim and the snapshot guard), because both statements are raw SQL whose
- * behaviour only Postgres can answer for. This suite pins the twin to the same
- * observable answers so the app can be driven without a database.
+ * GitHub repositories contract: freshness guard on snapshot writes, atomic
+ * branch claims, demand stamps, and retention deletes.
  */
 import { Temporal, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";

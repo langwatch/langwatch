@@ -2,13 +2,8 @@ import type { GithubRepositoryRef } from "@langwatch/github-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
- * Data-access layer for the organization's GitHub connection. The
- * installations service is the only caller; no transport touches Prisma for
- * this feature.
- *
- * Repository methods use findAll / findBy naming; the service exposes getAll /
- * getBy. No secret is stored — the App private key is the only credential and
- * it lives in the control-plane env, not the database.
+ * Data-access layer for GitHub connections. Only called by the
+ * installations service; no secrets stored.
  */
 
 export type { GithubRepositoryRef } from "@langwatch/github-contract";
@@ -44,13 +39,8 @@ export abstract class GithubInstallationsRepository {
   abstract upsert(input: UpsertGithubInstallationInput): Promise<void>;
 
   /**
-   * Atomically claims `installationId` for `input.organizationId`, or reports
-   * who already holds it. The unique index on `installationId` — not a
-   * read-then-write check the caller does itself — is what makes this
-   * race-safe: two concurrent callers racing for the same fresh installation
-   * id can never both see "absent" and both write, because only one `create`
-   * can win the unique constraint. The loser always observes the winner's
-   * committed row here, never a stale null.
+   * Atomic claim of installationId using the unique index for race safety.
+   * Returns who holds it if already claimed.
    */
   abstract insertOrGetExisting(
     input: UpsertGithubInstallationInput,

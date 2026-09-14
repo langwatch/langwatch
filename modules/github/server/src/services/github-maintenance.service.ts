@@ -21,36 +21,16 @@ import type { GithubBranchMaintenance } from "../app/github.members.ts";
 
 export interface GithubMaintenancePipelineDeps {
   /**
-   * The sweep, named by the two operations the schedule calls.
-   *
-   * It used to be the whole `GithubService`, which is what made this pipeline
-   * unmountable by any graph that had not composed the App: the facade carries
-   * an organization service and a project service the sweep never reaches. The
-   * published service still satisfies this, so the registration in platform's
-   * legacy registry is unchanged.
+   * The sweep, named by the two operations the schedule calls. Abbreviated from
+   * the full GithubService to make the pipeline mountable without composing it.
    */
   github: GithubBranchMaintenance;
   processStore: ProcessStore;
 }
 
 /**
- * GitHub pull-request linkage maintenance, in its own pipeline for the same
- * reason blob_maintenance and langy_maintenance are in theirs: re-asking GitHub
- * about branches that mapped to nothing, and pruning the rows nobody reads any
- * more, are neither a session concern nor a queue concern.
- *
- * WHY IT MOVED HERE. The sweep was a `setTimeout` chain booted from
- * `startWorkers`, with no lock of any kind. Every replica ran the same
- * cross-tenant scan every ten minutes and asked GitHub about the same due
- * branches; the only nod to the fleet was a 30-second boot jitter, which
- * staggers a stampede rather than preventing one. Exactly-once per tick is
- * inherited here rather than implemented: the wake commits at the revision it
- * was scheduled at, so when several workers race one tick a single commit wins
- * and the losers stand down, and the GitHub calls run behind the outbox lease.
- *
- * The pipeline carries no events and no commands. A process manager with no
- * event handlers registers no subscriber, so this costs nothing beyond the
- * scheduled wake it exists for.
+ * GitHub maintenance pipeline for branch sweep and retention prune. The wake
+ * commit serializes workers so only one runs per tick.
  */
 export class EventingGithubMaintenanceAdapter {
   private constructor(private readonly deps: GithubMaintenancePipelineDeps) {}

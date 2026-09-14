@@ -1,11 +1,6 @@
 /**
- * The platform's own deep link back to ONE agent, built from the app's own
- * `publicBaseUrl` config: the agents page with the editor drawer for that
- * agent open. `apps/api/src/features/agent/agent-platform-url.ts` computes
- * the same drawer path for Langy's navigate fallback, over the process's
- * shared `PlatformUrlBuilder`; this copy exists because the REST declaration
- * is a static, module-load-time object with no request-scoped builder to
- * receive, so the app composes the link itself from config it already holds.
+ * Deep link to one agent's editor drawer. Computed locally because the
+ * REST declaration is static and can't receive a request-scoped builder.
  */
 const AGENT_DRAWER_BY_TYPE: Record<string, string> = {
   http: "agentHttpEditor",

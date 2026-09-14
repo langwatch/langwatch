@@ -28,15 +28,8 @@ type GithubBranchDemandDeps = {
 };
 
 /**
- * A branch somebody is looking at right now, as opposed to one the sweep found.
- *
- * Demand is the only side of pull-request linkage that knows a project: the
- * caller arrives with a tenant, the organization has to be resolved from it,
- * and a mapping that finds a pull request is what marks the project as having
- * seen coding-agent activity. None of that is true of the fleet-wide sweep,
- * which walks branch bookkeeping across every tenant with no project in hand —
- * so keeping the two in one service meant every graph that wanted the sweep
- * composed a project service the sweep never called.
+ * Branch demand: knows a project and marks activity. Separate from sweep
+ * because the sweep walks every tenant with no project.
  */
 export class GithubBranchDemandService {
   static create(deps: GithubBranchDemandDeps): GithubBranchDemandService {

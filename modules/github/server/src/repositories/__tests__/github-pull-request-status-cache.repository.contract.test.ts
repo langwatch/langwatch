@@ -1,12 +1,6 @@
 /**
- * The live status cache's contract: a status read back for the same reference,
- * nothing for a reference nobody cached, and case-folded repository names, so
- * "Acme/Widgets" and "acme/widgets" are one row rather than two.
- *
- * The memory twin is the only backend registered here. The Redis twin misses
- * every read on a process with no connection, which
- * `../../services/__tests__/github-pull-request-status.service.unit.test.ts`
- * drives directly.
+ * Status cache contract: reads return cached values or nothing, with
+ * case-folded repository names so different casings map to one row.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 

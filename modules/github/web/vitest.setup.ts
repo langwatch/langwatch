@@ -1,14 +1,6 @@
 /**
- * What every test in this package needs before it renders anything.
- *
- * The same shape `@langwatch/gateway-web`, `@langwatch/organization-web` and
- * the rest of the governed web packages state for themselves.
- * `@testing-library/jest-dom` registers the DOM matchers the suites moved from
- * `platform/app` were written against, and the rest are browser APIs jsdom does
- * not ship and Chakra's overlays reach for on the way to positioning
- * themselves. A missing `ResizeObserver` surfaces as an unhandled rejection out
- * of an animation frame rather than as a failure, so a shard fails with its own
- * summary all green.
+ * Test setup: DOM matchers and browser APIs jsdom doesn't ship (ResizeObserver,
+ * matchMedia) that Chakra overlays need for positioning.
  */
 
 import "@testing-library/jest-dom/vitest";

@@ -4,13 +4,8 @@ import { z } from "zod";
 export const GITHUB_BRANCH_RECHECK_PROCESS_NAME = "githubBranchRecheck";
 
 /**
- * How often the sweep runs, fleet-wide.
- *
- * Fleet-wide is the operative word. This used to be a `setTimeout` chain booted
- * on every worker replica with no lock, so a fleet of N replicas ran the same
- * cross-tenant scan N times every ten minutes and asked GitHub about the same
- * due branches N times. Nothing coordinated them but a 30-second boot jitter,
- * which staggers the collision rather than removing it.
+ * How often the sweep runs, fleet-wide, to avoid duplicate runs across
+ * worker replicas.
  */
 export const GITHUB_BRANCH_RECHECK_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -44,14 +39,8 @@ export type GithubBranchRecheckIntents = {
 };
 
 /**
- * Pure and synchronous, like every wake handler: the commit that persists this
- * evolution is what fences racing workers, so exactly one of them proceeds and
- * the losers observe a stale wake and stand down. The GitHub calls run as
- * intents behind the outbox lease instead.
- *
- * The prune rides the same wake, emitted only once its own interval has
- * elapsed. `ctx.at` is the slot the wake was scheduled for, which is the clock
- * a pure handler is allowed to read.
+ * Pure handler coordinating workers via commit; the prune rides the same
+ * wake, gated by its own interval.
  */
 export const githubBranchRecheckWake: WakeHandler<
   GithubBranchRecheckState,

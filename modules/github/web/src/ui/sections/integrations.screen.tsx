@@ -1,29 +1,6 @@
 /**
- * Settings → Integrations. The organization's GitHub connection: connect the
- * app, see which GitHub accounts and repositories it reaches, and open GitHub
- * to change or remove the installation. Future integrations slot in here as
- * additional cards.
- *
- * `platform/app/src/pages/settings/integrations.tsx`, moved whole. What changed
- * is only what a feature-web package may not own:
- *
- * - `SettingsLayout` does not travel. Chrome belongs to the route tree, and
- *   `apps/ui` mounts the harvested settings layout around this screen.
- * - `withPermissionGuard("organization:manage")` does not travel either; the
- *   frontend feature states the same policy in front of the same loader.
- * - The organization, the address, the toast and BOTH DEPARTURES to github.com
- *   are the host's. `window.location.href` and `window.open` are the two the
- *   page called directly, and a screen may call neither.
- * - The local seven-field `Installation` type is gone. It restated
- *   `GithubInstallationSummary`, which the procedure already answers with.
- *
- * WHAT DID NOT SURVIVE THE MOVE, named rather than quietly dropped: the page
- * rendered a bare `<SettingsLayout />` while the organization was still
- * arriving, so the menu appeared before the card did. The frontend feature
- * mounts the same chrome unconditionally now, so this screen renders its own
- * loading state inside it instead - the same frame, one fewer flash.
- *
- * Spec: specs/integrations/github-connection.feature
+ * GitHub connection settings card: connect, view installations, manage. Moved
+ * from platform/app; chrome, permissions, navigation delegated to host.
  */
 
 import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";

@@ -34,13 +34,8 @@ function database(): PrismaClient {
 }
 
 /**
- * `insertOrGetExisting`'s whole point is that a real Postgres unique-index
- * violation — not application-level timing — resolves the race between two
- * organizations claiming the same installation id. The service/route unit
- * tests mock this repository, so they can only prove the SERVICE correctly
- * interprets whatever the repo returns; they can't prove Postgres actually
- * serializes the concurrent writes the way the fix assumes. This exercises
- * the real Prisma path against the real test database.
+ * Tests the real Postgres unique-index behavior for concurrent installation
+ * writes that the service/route unit tests can't verify.
  */
 const namespace = `langy-install-${nanoid(10)}`;
 

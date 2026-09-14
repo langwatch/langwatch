@@ -1,12 +1,6 @@
 /**
- * The installation nonce's contract: a nonce is registered for a lifetime and
- * taken exactly once, so a replayed Setup URL cannot record an installation
- * twice.
- *
- * The memory twin is the only backend registered here. The Redis twin answers
- * null for every operation on a process that opened no connection, which
- * `../../services/__tests__/github-install-state.service.unit.test.ts` drives
- * directly, because "no store" is not a state the memory twin can be in.
+ * Installation nonce contract: register once, consume once to prevent replayed
+ * Setup URLs from recording installations twice.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 

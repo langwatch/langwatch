@@ -1,16 +1,6 @@
 /**
- * Whether a process that holds a database and one project seam can run the
- * demand half of pull-request linkage.
- *
- * Demand was reachable only through `composeGithubApi`, which takes an
- * `OrganizationService` and a full `ProjectApi`. It genuinely needs two
- * project facts — the organization a tenant belongs to, and the activity stamp
- * a successful mapping writes — and nothing else in either service. What
- * matters here is therefore not that it constructs: it is that a branch a
- * session is looking at maps all the way to a stored pull request through a
- * graph holding neither service.
- *
- * Spec: modules/github/specs/github-branch-maintenance.feature
+ * Tests that branch-to-pull-request mapping works through a minimal graph
+ * without full services.
  */
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";

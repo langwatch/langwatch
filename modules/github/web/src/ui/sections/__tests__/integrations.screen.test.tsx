@@ -1,18 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Settings → Integrations: what an organization manager sees about its GitHub
- * connection, and where each action sends them.
- *
- * THE PLATFORM PAGE HAD NO SUITE AT ALL. Nothing mounted it, so nothing
- * asserted the three decisions it actually makes: that an unconfigured instance
- * is told so instead of being offered a dead button, that the install address is
- * the server's own with the redirect mode and the return address appended, and
- * that a failed round-trip is reported once and then dropped out of the URL.
- * The last is the one worth pinning - left in the address, the same failure is
- * reported again on every reload.
- *
- * Spec: specs/integrations/github-connection.feature
+ * Integrations screen for organization managers: connection status, install
+ * address construction, and failed round-trip handling.
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
