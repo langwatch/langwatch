@@ -11,11 +11,16 @@
     "./dev/lint/oxlint.baseline.jsonc"
   ],
 
-  // Oxlint's default plugin set plus vitest and jest, which is what lets the
+  // Oxlint's default plugin set plus vitest, which is what lets the
   // test-quality rules in the baseline (noFocusedTests and friends, carried
   // from the deleted biome.jsonc) be named at all. Setting this key
   // REPLACES the default set, so the four defaults are restated here.
-  "plugins": ["react", "unicorn", "typescript", "oxc", "vitest", "jest"],
+  //
+  // jest is deliberately absent. The runner here is vitest, and enabling both
+  // made oxlint report one finding twice under two plugin names — 1,488
+  // duplicate warnings across valid-expect, no-conditional-expect,
+  // require-to-throw-message and five others.
+  "plugins": ["react", "unicorn", "typescript", "oxc", "vitest"],
   "rules": {
     "complexity": ["error", { "max": 25 }],
     "no-nested-ternary": "error"

@@ -1054,10 +1054,17 @@
       ],
       "rules": {
         "vitest/no-focused-tests": "error", // was noFocusedTests, 0
-        "jest/no-export": "error", // was noExportsInTest, 0
-        "jest/max-nested-describe": "error", // was noExcessiveNestedTestSuites, 0
-        "jest/no-duplicate-hooks": "error", // was noDuplicateTestHooks, 3
-        "jest/prefer-hooks-on-top": "error", // was useTestHooksOnTop, 1
+        "vitest/max-nested-describe": "error", // was noExcessiveNestedTestSuites, 0
+        "vitest/no-duplicate-hooks": "error", // was noDuplicateTestHooks, 3
+        "vitest/prefer-hooks-on-top": "error", // was useTestHooksOnTop, 1
+        // The jest twin of every rule above was dropped with the jest plugin
+        // (2026-09-14): the runner here is vitest, and carrying both plugins
+        // made oxlint report the same finding twice under two names, 1,488
+        // duplicate warnings' worth. `jest/no-export` (noExportsInTest) had no
+        // vitest counterpart and went with it, measured at 0 violations; if a
+        // test file starts exporting, that guard belongs in
+        // packages/architecture-enforcer rather than in a plugin kept for one
+        // rule.
 
         // A suite spends three callback levels on describe("given") /
         // describe("when") / it() before it nests anything of its own, so
