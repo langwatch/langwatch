@@ -229,6 +229,10 @@ function OrganizationEditDrawer({
       license: organization.license ?? "",
       licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
       useCustomS3: !!organization.useCustomS3,
+      // Credentials are write-only: the server doesn't echo them back in
+      // list/getOne responses (see ee/admin/safeSelects.ts), so the form
+      // always starts empty. A non-empty value on save is the user typing
+      // a *new* secret; an empty value is left unchanged.
       s3Endpoint: "",
       s3AccessKeyId: "",
       s3SecretAccessKey: "",
@@ -241,7 +245,46 @@ function OrganizationEditDrawer({
 
   const handleSave = () => {
     if (!organization || !form) return;
-    const data = buildUpdateData(organization, form);
+    const data: Record<string, unknown> = {};
+    if (form.name !== organization.name) data.name = form.name;
+    if (form.slug !== organization.slug) data.slug = form.slug;
+    if (form.phoneNumber !== (organization.phoneNumber ?? ""))
+      data.phoneNumber = nullIfEmpty(form.phoneNumber);
+    // No `ssoDomain` / `ssoProvider` diff: this drawer no longer edits them,
+    // so it can no longer send them. The server refuses such a write once
+    // connection routing is enforced; not sending one is how this surface
+    // stops asking for a refusal.
+    const nextLimit = numOrNull(form.usageSpendingMaxLimit);
+    if (nextLimit !== organization.usageSpendingMaxLimit) {
+      data.usageSpendingMaxLimit = nextLimit;
+    }
+    if (form.signedDPA !== !!organization.signedDPA)
+      data.signedDPA = form.signedDPA;
+    if (form.promoCode !== (organization.promoCode ?? ""))
+      data.promoCode = nullIfEmpty(form.promoCode);
+    if (form.stripeCustomerId !== (organization.stripeCustomerId ?? ""))
+      data.stripeCustomerId = nullIfEmpty(form.stripeCustomerId);
+    if (form.currency !== organization.currency) data.currency = form.currency;
+    if (form.pricingModel !== organization.pricingModel)
+      data.pricingModel = form.pricingModel;
+    if (form.license !== (organization.license ?? ""))
+      data.license = nullIfEmpty(form.license);
+    const nextExpires = dateInputToISO(form.licenseExpiresAt);
+    if (nextExpires !== organization.licenseExpiresAt) {
+      data.licenseExpiresAt = nextExpires;
+    }
+    if (form.useCustomS3 !== !!organization.useCustomS3)
+      data.useCustomS3 = form.useCustomS3;
+    // Credentials are write-only — the form starts empty and the server
+    // never echoes the stored value. Only forward fields the user typed
+    // into; an empty input is treated as "leave the stored secret alone".
+    if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
+    if (form.s3AccessKeyId.trim() !== "")
+      data.s3AccessKeyId = form.s3AccessKeyId;
+    if (form.s3SecretAccessKey.trim() !== "")
+      data.s3SecretAccessKey = form.s3SecretAccessKey;
+    if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
+
     if (Object.keys(data).length === 0) {
       onClose();
       return;
@@ -281,11 +324,187 @@ function OrganizationEditDrawer({
         <Drawer.CloseTrigger />
         <Drawer.Body>
           {organization && form && (
-            <OrganizationFormContent
-              form={form}
-              organization={organization}
-              setField={setField}
-            />
+            <VStack gap={4} align="stretch">
+              <SectionHeading>Identity</SectionHeading>
+              <Field.Root>
+                <Field.Label>Name</Field.Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setField("name", e.target.value)}
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Slug</Field.Label>
+                <Input
+                  value={form.slug}
+                  onChange={(e) => setField("slug", e.target.value)}
+                />
+                <Field.HelperText>
+                  URL-safe identifier. Changing this can break existing links.
+                </Field.HelperText>
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Phone number</Field.Label>
+                <Input
+                  type="tel"
+                  value={form.phoneNumber}
+                  onChange={(e) => setField("phoneNumber", e.target.value)}
+                />
+              </Field.Root>
+
+              <SectionHeading>Billing</SectionHeading>
+              <HStack gap={3} align="start">
+                <Field.Root>
+                  <Field.Label>Currency</Field.Label>
+                  <EnumSelect
+                    value={form.currency}
+                    options={Object.values(Currency)}
+                    onChange={(v) => setField("currency", v as Currency)}
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Pricing model</Field.Label>
+                  <EnumSelect
+                    value={form.pricingModel}
+                    options={Object.values(PricingModel)}
+                    onChange={(v) =>
+                      setField("pricingModel", v as PricingModel)
+                    }
+                  />
+                </Field.Root>
+              </HStack>
+              <Field.Root>
+                <Field.Label>Stripe customer ID</Field.Label>
+                <Input
+                  value={form.stripeCustomerId}
+                  onChange={(e) => setField("stripeCustomerId", e.target.value)}
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Promo code</Field.Label>
+                <Input
+                  value={form.promoCode}
+                  onChange={(e) => setField("promoCode", e.target.value)}
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Usage spending max limit</Field.Label>
+                <Input
+                  type="number"
+                  value={form.usageSpendingMaxLimit}
+                  onChange={(e) =>
+                    setField("usageSpendingMaxLimit", e.target.value)
+                  }
+                  placeholder="Leave empty for no cap"
+                />
+              </Field.Root>
+              <ToggleRow
+                label="Signed DPA"
+                hint="Enterprise data processing agreement on file."
+                checked={form.signedDPA}
+                onChange={(v) => setField("signedDPA", v)}
+              />
+
+              <SectionHeading>Authentication</SectionHeading>
+              {/*
+                The two free-text single sign-on fields used to live here.
+                They are gone rather than disabled: a connection is a guarded
+                lifecycle with history, and an input that writes a string
+                cannot express claiming a domain, approving that claim, or
+                vouching for it. Editing them is refused once connection
+                routing is enforced, so leaving them here would have offered a
+                control whose only answer is a refusal.
+              */}
+              <Text fontSize="sm" color="fg.muted">
+                Single sign-on for this organization is set up on its
+                connection, under Backoffice &rarr; Single Sign-On.
+              </Text>
+
+              <SectionHeading>License</SectionHeading>
+              <Field.Root>
+                <Field.Label>License key</Field.Label>
+                <Textarea
+                  rows={4}
+                  value={form.license}
+                  onChange={(e) => setField("license", e.target.value)}
+                  fontFamily="mono"
+                  fontSize="xs"
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>License expires at</Field.Label>
+                <Input
+                  type="date"
+                  value={form.licenseExpiresAt}
+                  onChange={(e) => setField("licenseExpiresAt", e.target.value)}
+                />
+              </Field.Root>
+
+              <SectionHeading>Custom S3</SectionHeading>
+              <Text fontSize="xs" color="fg.muted">
+                Credentials below are write-only — the server never reads them
+                back. Leave blank to keep the stored value; type to replace.
+              </Text>
+              <ToggleRow
+                label="Use custom S3"
+                hint="Store large blobs (datasets, uploads) in the tenant's own bucket."
+                checked={form.useCustomS3}
+                onChange={(v) => setField("useCustomS3", v)}
+              />
+              <Field.Root>
+                <Field.Label>Endpoint</Field.Label>
+                <Input
+                  type="url"
+                  value={form.s3Endpoint}
+                  onChange={(e) => setField("s3Endpoint", e.target.value)}
+                  placeholder="Leave blank to keep current"
+                  disabled={!form.useCustomS3}
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Bucket</Field.Label>
+                <Input
+                  value={form.s3Bucket}
+                  onChange={(e) => setField("s3Bucket", e.target.value)}
+                  placeholder="Leave blank to keep current"
+                  disabled={!form.useCustomS3}
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Access key ID</Field.Label>
+                <Input
+                  type="password"
+                  value={form.s3AccessKeyId}
+                  onChange={(e) => setField("s3AccessKeyId", e.target.value)}
+                  placeholder="Leave blank to keep current"
+                  disabled={!form.useCustomS3}
+                  autoComplete="new-password"
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Secret access key</Field.Label>
+                <Input
+                  type="password"
+                  value={form.s3SecretAccessKey}
+                  onChange={(e) =>
+                    setField("s3SecretAccessKey", e.target.value)
+                  }
+                  placeholder="Leave blank to keep current"
+                  autoComplete="new-password"
+                  disabled={!form.useCustomS3}
+                />
+              </Field.Root>
+
+              <Separator my={2} />
+              <VStack align="start" gap={0}>
+                <Text fontSize="xs" color="fg.muted">
+                  Organization ID: {organization.id}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Created: {formatDate(organization.createdAt)}
+                </Text>
+              </VStack>
+            </VStack>
           )}
         </Drawer.Body>
         <Drawer.Footer>
@@ -301,300 +520,6 @@ function OrganizationEditDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
-  );
-}
-
-function buildUpdateData(
-  organization: AdminOrganization,
-  form: FormState,
-): Record<string, unknown> {
-  const data: Record<string, unknown> = {};
-  buildIdentityUpdates(data, organization, form);
-  buildBillingUpdates(data, organization, form);
-  buildLicenseUpdates(data, organization, form);
-  buildS3Updates(data, form);
-  return data;
-}
-
-function buildIdentityUpdates(
-  data: Record<string, unknown>,
-  organization: AdminOrganization,
-  form: FormState,
-) {
-  if (form.name !== organization.name) data.name = form.name;
-  if (form.slug !== organization.slug) data.slug = form.slug;
-  if (form.phoneNumber !== (organization.phoneNumber ?? ""))
-    data.phoneNumber = nullIfEmpty(form.phoneNumber);
-}
-
-function buildBillingUpdates(
-  data: Record<string, unknown>,
-  organization: AdminOrganization,
-  form: FormState,
-) {
-  const nextLimit = numOrNull(form.usageSpendingMaxLimit);
-  if (nextLimit !== organization.usageSpendingMaxLimit)
-    data.usageSpendingMaxLimit = nextLimit;
-  if (form.signedDPA !== !!organization.signedDPA)
-    data.signedDPA = form.signedDPA;
-  if (form.promoCode !== (organization.promoCode ?? ""))
-    data.promoCode = nullIfEmpty(form.promoCode);
-  if (form.stripeCustomerId !== (organization.stripeCustomerId ?? ""))
-    data.stripeCustomerId = nullIfEmpty(form.stripeCustomerId);
-  if (form.currency !== organization.currency) data.currency = form.currency;
-  if (form.pricingModel !== organization.pricingModel)
-    data.pricingModel = form.pricingModel;
-  if (form.useCustomS3 !== !!organization.useCustomS3)
-    data.useCustomS3 = form.useCustomS3;
-}
-
-function buildLicenseUpdates(
-  data: Record<string, unknown>,
-  organization: AdminOrganization,
-  form: FormState,
-) {
-  if (form.license !== (organization.license ?? ""))
-    data.license = nullIfEmpty(form.license);
-  const nextExpires = dateInputToISO(form.licenseExpiresAt);
-  if (nextExpires !== organization.licenseExpiresAt)
-    data.licenseExpiresAt = nextExpires;
-}
-
-function buildS3Updates(data: Record<string, unknown>, form: FormState) {
-  if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
-  if (form.s3AccessKeyId.trim() !== "") data.s3AccessKeyId = form.s3AccessKeyId;
-  if (form.s3SecretAccessKey.trim() !== "")
-    data.s3SecretAccessKey = form.s3SecretAccessKey;
-  if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
-}
-
-function OrganizationFormContent({
-  form,
-  organization,
-  setField,
-}: {
-  form: FormState;
-  organization: AdminOrganization;
-  setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
-}) {
-  return (
-    <VStack gap={4} align="stretch">
-      <IdentitySection form={form} setField={setField} />
-      <BillingSection form={form} setField={setField} />
-      <SectionHeading>Authentication</SectionHeading>
-      <Text fontSize="sm" color="fg.muted">
-        Single sign-on for this organization is set up on its connection, under
-        Backoffice &rarr; Single Sign-On.
-      </Text>
-      <LicenseSection form={form} setField={setField} />
-      <S3Section form={form} setField={setField} />
-      <Separator my={2} />
-      <VStack align="start" gap={0}>
-        <Text fontSize="xs" color="fg.muted">
-          Organization ID: {organization.id}
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
-          Created: {formatDate(organization.createdAt)}
-        </Text>
-      </VStack>
-    </VStack>
-  );
-}
-
-function IdentitySection({
-  form,
-  setField,
-}: {
-  form: FormState;
-  setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
-}) {
-  return (
-    <>
-      <SectionHeading>Identity</SectionHeading>
-      <Field.Root>
-        <Field.Label>Name</Field.Label>
-        <Input
-          value={form.name}
-          onChange={(e) => setField("name", e.target.value)}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Slug</Field.Label>
-        <Input
-          value={form.slug}
-          onChange={(e) => setField("slug", e.target.value)}
-        />
-        <Field.HelperText>
-          URL-safe identifier. Changing this can break existing links.
-        </Field.HelperText>
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Phone number</Field.Label>
-        <Input
-          type="tel"
-          value={form.phoneNumber}
-          onChange={(e) => setField("phoneNumber", e.target.value)}
-        />
-      </Field.Root>
-    </>
-  );
-}
-
-function BillingSection({
-  form,
-  setField,
-}: {
-  form: FormState;
-  setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
-}) {
-  return (
-    <>
-      <SectionHeading>Billing</SectionHeading>
-      <HStack gap={3} align="start">
-        <Field.Root>
-          <Field.Label>Currency</Field.Label>
-          <EnumSelect
-            value={form.currency}
-            options={Object.values(Currency)}
-            onChange={(v) => setField("currency", v as Currency)}
-          />
-        </Field.Root>
-        <Field.Root>
-          <Field.Label>Pricing model</Field.Label>
-          <EnumSelect
-            value={form.pricingModel}
-            options={Object.values(PricingModel)}
-            onChange={(v) => setField("pricingModel", v as PricingModel)}
-          />
-        </Field.Root>
-      </HStack>
-      <Field.Root>
-        <Field.Label>Stripe customer ID</Field.Label>
-        <Input
-          value={form.stripeCustomerId}
-          onChange={(e) => setField("stripeCustomerId", e.target.value)}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Promo code</Field.Label>
-        <Input
-          value={form.promoCode}
-          onChange={(e) => setField("promoCode", e.target.value)}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Usage spending max limit</Field.Label>
-        <Input
-          type="number"
-          value={form.usageSpendingMaxLimit}
-          onChange={(e) => setField("usageSpendingMaxLimit", e.target.value)}
-          placeholder="Leave empty for no cap"
-        />
-      </Field.Root>
-      <ToggleRow
-        label="Signed DPA"
-        hint="Enterprise data processing agreement on file."
-        checked={form.signedDPA}
-        onChange={(v) => setField("signedDPA", v)}
-      />
-    </>
-  );
-}
-
-function LicenseSection({
-  form,
-  setField,
-}: {
-  form: FormState;
-  setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
-}) {
-  return (
-    <>
-      <SectionHeading>License</SectionHeading>
-      <Field.Root>
-        <Field.Label>License key</Field.Label>
-        <Textarea
-          rows={4}
-          value={form.license}
-          onChange={(e) => setField("license", e.target.value)}
-          fontFamily="mono"
-          fontSize="xs"
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>License expires at</Field.Label>
-        <Input
-          type="date"
-          value={form.licenseExpiresAt}
-          onChange={(e) => setField("licenseExpiresAt", e.target.value)}
-        />
-      </Field.Root>
-    </>
-  );
-}
-
-function S3Section({
-  form,
-  setField,
-}: {
-  form: FormState;
-  setField: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
-}) {
-  return (
-    <>
-      <SectionHeading>Custom S3</SectionHeading>
-      <Text fontSize="xs" color="fg.muted">
-        Credentials below are write-only — the server never reads them back.
-        Leave blank to keep the stored value; type to replace.
-      </Text>
-      <ToggleRow
-        label="Use custom S3"
-        hint="Store large blobs (datasets, uploads) in the tenant's own bucket."
-        checked={form.useCustomS3}
-        onChange={(v) => setField("useCustomS3", v)}
-      />
-      <Field.Root>
-        <Field.Label>Endpoint</Field.Label>
-        <Input
-          type="url"
-          value={form.s3Endpoint}
-          onChange={(e) => setField("s3Endpoint", e.target.value)}
-          placeholder="Leave blank to keep current"
-          disabled={!form.useCustomS3}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Bucket</Field.Label>
-        <Input
-          value={form.s3Bucket}
-          onChange={(e) => setField("s3Bucket", e.target.value)}
-          placeholder="Leave blank to keep current"
-          disabled={!form.useCustomS3}
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Access key ID</Field.Label>
-        <Input
-          type="password"
-          value={form.s3AccessKeyId}
-          onChange={(e) => setField("s3AccessKeyId", e.target.value)}
-          placeholder="Leave blank to keep current"
-          disabled={!form.useCustomS3}
-          autoComplete="new-password"
-        />
-      </Field.Root>
-      <Field.Root>
-        <Field.Label>Secret access key</Field.Label>
-        <Input
-          type="password"
-          value={form.s3SecretAccessKey}
-          onChange={(e) => setField("s3SecretAccessKey", e.target.value)}
-          placeholder="Leave blank to keep current"
-          autoComplete="new-password"
-          disabled={!form.useCustomS3}
-        />
-      </Field.Root>
-    </>
   );
 }
 
