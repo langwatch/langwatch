@@ -52,6 +52,78 @@ const TERMINAL_STATES: readonly SsoConnectionLifecycleState[] = [
  * configuration change, it is a value the next event or the next replay
  * overwrites — which is exactly why the backoffice goes through commands.
  */
+/**
+ * The stored row for one folded connection state.
+ *
+ * Every timestamp comes from the events, never from `now()`: a row stamped
+ * with the clock would differ from the row a replay rebuilds, and whole-row
+ * parity is what this projection promises.
+ */
+function projectionColumns(
+  projection: StoredProjection<SsoConnectionFoldState>,
+) {
+  const { state } = projection;
+  return {
+    organizationId: state.organizationId,
+    type: state.type,
+    state: state.state,
+    claimedDomains: state.claimedDomains,
+    // The claim rows the tier-3 queue reads and sorts. Asserted at the
+    // column boundary for the same reason `domainVerifications` is.
+    domainClaims: state.domainClaims as unknown as Prisma.InputJsonValue,
+    approvedDomains: state.approvedDomains,
+    verifiedDomains: state.verifiedDomains,
+    // The subset of `verifiedDomains` whose published record stayed missing
+    // through its grace (ADR-123). A column of its own rather than a read
+    // over the JSON above, because the two questions that consult it —
+    // "may this person be provisioned" and "may this person join by
+    // domain" — are asked on a sign-in path and have to be one indexed
+    // predicate, not a fold.
+    lapsedDomains: lapsedDomains(state),
+    // Prisma's `InputJsonValue` does not accept a typed array directly (it
+    // wants an index signature), so the shape is asserted at the column
+    // boundary. `rowToConnection` asserts it back on the way out, and both
+    // sides name `SsoDomainVerification` — the reducer is what actually
+    // decides the shape.
+    domainVerifications:
+      state.domainVerifications as unknown as Prisma.InputJsonValue,
+    pendingVerification: state.pendingVerification ?? undefined,
+    idpMetadata: state.idpMetadata,
+    arrivalPolicy: state.arrivalPolicy,
+    arrivalPolicyDecidedAt:
+      state.arrivalPolicyDecidedAtMs === null
+        ? null
+        : new Date(state.arrivalPolicyDecidedAtMs),
+    source: state.source,
+    testLoginAccountId: state.testLoginAccountId,
+    replacesConnectionId: state.replacesConnectionId,
+    migrationPhase: state.migrationPhase,
+    graceStartedAt:
+      state.graceStartedAtMs === null ? null : new Date(state.graceStartedAtMs),
+    routeChangedAt:
+      state.routeChangedAtMs === null ? null : new Date(state.routeChangedAtMs),
+    finalizationRequestedAt:
+      state.finalizationRequestedAtMs === null
+        ? null
+        : new Date(state.finalizationRequestedAtMs),
+    finalizedAt:
+      state.finalizedAtMs === null ? null : new Date(state.finalizedAtMs),
+    rejection: state.rejection ?? undefined,
+    createdBy: state.createdBy,
+    tearDownAfter:
+      state.tearDownAfterMs === null ? null : new Date(state.tearDownAfterMs),
+    occurredAt: new Date(projection.occurredAt),
+    lastEventId: projection.cursor.eventId,
+    acceptedAt: new Date(projection.cursor.acceptedAt),
+    projectionVersion: projection.version,
+    // Business time, from the events — not `now()`. A row whose timestamps
+    // came from the clock would differ from the row a replay rebuilds, and
+    // whole-row parity is what this projection promises.
+    createdAt: new Date(state.createdAtMs),
+    updatedAt: new Date(state.updatedAtMs),
+  };
+}
+
 export class PrismaSsoConnectionProjectionRepository
   implements StateProjectionStore<SsoConnectionFoldState>
 {
@@ -101,69 +173,7 @@ export class PrismaSsoConnectionProjectionRepository
   ): Promise<void> {
     const id = context.aggregateId;
     const { state } = projection;
-    const columns = {
-      organizationId: state.organizationId,
-      type: state.type,
-      state: state.state,
-      claimedDomains: state.claimedDomains,
-      // The claim rows the tier-3 queue reads and sorts. Asserted at the
-      // column boundary for the same reason `domainVerifications` is.
-      domainClaims: state.domainClaims as unknown as Prisma.InputJsonValue,
-      approvedDomains: state.approvedDomains,
-      verifiedDomains: state.verifiedDomains,
-      // The subset of `verifiedDomains` whose published record stayed missing
-      // through its grace (ADR-123). A column of its own rather than a read
-      // over the JSON above, because the two questions that consult it —
-      // "may this person be provisioned" and "may this person join by
-      // domain" — are asked on a sign-in path and have to be one indexed
-      // predicate, not a fold.
-      lapsedDomains: lapsedDomains(state),
-      // Prisma's `InputJsonValue` does not accept a typed array directly (it
-      // wants an index signature), so the shape is asserted at the column
-      // boundary. `rowToConnection` asserts it back on the way out, and both
-      // sides name `SsoDomainVerification` — the reducer is what actually
-      // decides the shape.
-      domainVerifications:
-        state.domainVerifications as unknown as Prisma.InputJsonValue,
-      pendingVerification: state.pendingVerification ?? undefined,
-      idpMetadata: state.idpMetadata,
-      arrivalPolicy: state.arrivalPolicy,
-      arrivalPolicyDecidedAt:
-        state.arrivalPolicyDecidedAtMs === null
-          ? null
-          : new Date(state.arrivalPolicyDecidedAtMs),
-      source: state.source,
-      testLoginAccountId: state.testLoginAccountId,
-      replacesConnectionId: state.replacesConnectionId,
-      migrationPhase: state.migrationPhase,
-      graceStartedAt:
-        state.graceStartedAtMs === null
-          ? null
-          : new Date(state.graceStartedAtMs),
-      routeChangedAt:
-        state.routeChangedAtMs === null
-          ? null
-          : new Date(state.routeChangedAtMs),
-      finalizationRequestedAt:
-        state.finalizationRequestedAtMs === null
-          ? null
-          : new Date(state.finalizationRequestedAtMs),
-      finalizedAt:
-        state.finalizedAtMs === null ? null : new Date(state.finalizedAtMs),
-      rejection: state.rejection ?? undefined,
-      createdBy: state.createdBy,
-      tearDownAfter:
-        state.tearDownAfterMs === null ? null : new Date(state.tearDownAfterMs),
-      occurredAt: new Date(projection.occurredAt),
-      lastEventId: projection.cursor.eventId,
-      acceptedAt: new Date(projection.cursor.acceptedAt),
-      projectionVersion: projection.version,
-      // Business time, from the events — not `now()`. A row whose timestamps
-      // came from the clock would differ from the row a replay rebuilds, and
-      // whole-row parity is what this projection promises.
-      createdAt: new Date(state.createdAtMs),
-      updatedAt: new Date(state.updatedAtMs),
-    };
+    const columns = projectionColumns(projection);
     // THE HEAD AND THE OWNERSHIP ROWS TOGETHER, or neither.
     //
     // `SsoVerifiedDomain` makes the organization owner globally unique;

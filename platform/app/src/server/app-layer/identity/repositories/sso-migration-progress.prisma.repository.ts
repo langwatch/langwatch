@@ -12,6 +12,231 @@ import { rowToConnection } from "./sso-connection-projection.prisma.repository";
 
 const MIGRATION_QUIET_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
+type ConnectionState = ReturnType<typeof rowToConnection>;
+
+/** Which connection normal sign-in currently goes through. */
+function routeOf(
+  migrationPhase: ConnectionState["migrationPhase"],
+): SelfServeMigrationView["selectedRoute"] {
+  return migrationPhase === "SETUP" || migrationPhase === "GRACE_LEGACY"
+    ? "legacy"
+    : "direct";
+}
+
+/**
+ * Where directory provisioning points.
+ *
+ * A connection the legacy side never provisioned has nothing to repoint, which
+ * is why the absence of a legacy sync is "not-applicable" rather than "ready":
+ * the checklist must not credit an organization for a step it never had.
+ */
+function scimStatusOf({
+  legacySyncs,
+  replacementSyncState,
+}: {
+  legacySyncs: boolean;
+  replacementSyncState: string | null | undefined;
+}): SelfServeMigrationView["scim"]["status"] {
+  if (!legacySyncs) return "not-applicable";
+  return replacementSyncState === "SYNCING" ? "ready" : "needs-repointing";
+}
+
+/**
+ * Everything standing between the organization and a finalized cutover.
+ *
+ * One list, in the order a customer reads it. A new condition on finalizing
+ * belongs beside these rather than in whichever branch of `getProgress`
+ * happens to compute the evidence for it.
+ */
+function migrationBlockers({
+  selectedRoute,
+  testSignInDone,
+  liveRecoveryCount,
+  linkedCount,
+  activeCount,
+  quietComplete,
+  scimStatus,
+  sharedLegacyIdentifiers,
+}: {
+  selectedRoute: SelfServeMigrationView["selectedRoute"];
+  testSignInDone: boolean;
+  liveRecoveryCount: number;
+  linkedCount: number;
+  activeCount: number;
+  quietComplete: boolean;
+  scimStatus: SelfServeMigrationView["scim"]["status"];
+  sharedLegacyIdentifiers: boolean;
+}): SsoMigrationBlockerView[] {
+  const blockers: SsoMigrationBlockerView[] = [];
+  if (selectedRoute !== "direct") {
+    blockers.push({
+      code: "direct-route-not-selected",
+      message: "Switch normal sign-in to the replacement connection first.",
+    });
+  }
+  if (!testSignInDone) {
+    blockers.push({
+      code: "replacement-not-tested",
+      message: "Complete a successful test sign-in through the replacement.",
+    });
+  }
+  if (liveRecoveryCount === 0) {
+    blockers.push({
+      code: "recovery-path-missing",
+      message: "Keep at least one live way back in before finalizing.",
+    });
+  }
+  if (linkedCount < activeCount) {
+    const unlinked = activeCount - linkedCount;
+    blockers.push({
+      code: "members-not-linked",
+      message: `${unlinked} active member${unlinked === 1 ? " is" : "s are"} not linked to the replacement yet.`,
+    });
+  }
+  if (!quietComplete) {
+    blockers.push({
+      code: "legacy-activity-not-quiet",
+      message: "Wait for seven days without a successful legacy sign-in.",
+    });
+  }
+  if (scimStatus === "needs-repointing") {
+    blockers.push({
+      code: "scim-needs-repointing",
+      message: "Repoint directory provisioning to the replacement connection.",
+    });
+  }
+  if (sharedLegacyIdentifiers) {
+    blockers.push({
+      code: "shared-legacy-identifiers",
+      message:
+        "A legacy identity is shared with another organization and needs review.",
+    });
+  }
+  return blockers;
+}
+
+/**
+ * The three member filters the checklist counts over.
+ *
+ * All three share one definition of "a member who still counts" — in this
+ * organization and not disabled — so it is written once and spread. `linked`
+ * and `straggler` are exact complements over that set, which is what lets
+ * `linkedCount` be compared against `activeCount` at all.
+ */
+function memberWhereClauses({
+  organizationId,
+  replacementConnectionId,
+  liveStates,
+  cursor,
+}: {
+  organizationId: string;
+  replacementConnectionId: string;
+  liveStates: string[];
+  cursor: string | null;
+}) {
+  const memberWhere = { organizationId, disabledAt: null } as const;
+  const onReplacement = {
+    connectionId: replacementConnectionId,
+    state: { in: liveStates },
+  } as const;
+  return {
+    memberWhere,
+    linkedWhere: {
+      ...memberWhere,
+      user: { identifiers: { some: onReplacement } },
+    } as const,
+    stragglerWhere: {
+      ...memberWhere,
+      ...(cursor ? { userId: { gt: cursor } } : {}),
+      user: { identifiers: { none: onReplacement } },
+    } as const,
+  };
+}
+
+/** How a connection names itself on either side of the cutover. */
+function connectionRefOf(
+  connection: ConnectionState,
+): SelfServeMigrationView["legacy"] {
+  return {
+    connectionId: connection.connectionId,
+    source: connection.source,
+    providerId: connection.idpMetadata.providerId,
+  };
+}
+
+/**
+ * The membership half of the checklist: how many are linked, and who is not.
+ *
+ * `stragglerRows` is deliberately one longer than the page. Having the extra
+ * row is the only way to know whether a next page exists without a second
+ * count, and it is dropped here rather than at the query so the paging rule
+ * and the cursor it produces stay in one place.
+ */
+function membersViewOf({
+  evidence,
+  limit,
+}: {
+  evidence: {
+    activeCount: number;
+    linkedCount: number;
+    stragglerRows: {
+      userId: string;
+      user: { name: string | null; email: string | null };
+    }[];
+    pageRows: {
+      userId: string;
+      user: { name: string | null; email: string | null };
+    }[];
+    legacyActivityByUser: Map<string, Date>;
+  };
+  limit: number;
+}): SelfServeMigrationView["members"] {
+  const { activeCount, linkedCount, stragglerRows, pageRows } = evidence;
+  return {
+    activeCount,
+    linkedCount,
+    stragglers: pageRows.map((row) => ({
+      userId: row.userId,
+      name: row.user.name,
+      email: row.user.email,
+      lastLegacyAuthenticationAtMs:
+        evidence.legacyActivityByUser.get(row.userId)?.getTime() ?? null,
+    })),
+    nextCursor:
+      stragglerRows.length > limit ? (pageRows.at(-1)?.userId ?? null) : null,
+  };
+}
+
+/**
+ * The domains the replacement carries over from the legacy connection.
+ *
+ * Membership of the legacy set is not on its own enough: the replacement's own
+ * proof still has to qualify, so a domain whose evidence lapsed is not
+ * inherited as though it had never been checked.
+ */
+function inheritedDomainsOf({
+  replacement,
+  legacy,
+}: {
+  replacement: ConnectionState;
+  legacy: ConnectionState;
+}): SelfServeMigrationView["inheritedDomains"] {
+  return replacement.domainVerifications
+    .filter(
+      (proof) =>
+        legacy.verifiedDomains.includes(proof.domain) &&
+        qualifySsoDomainOwnership({ state: replacement, domain: proof.domain })
+          .status === "QUALIFIED",
+    )
+    .map((proof) => ({
+      domain: proof.domain,
+      method: proof.method,
+      proofState: proof.proofState,
+      evidenceRef: proof.evidenceRef ?? proof.tokenHash,
+      verifiedAtMs: proof.verifiedAtMs,
+    }));
+}
+
 /** Operational evidence for the customer-visible Auth0 cutover checklist. */
 export class PrismaSsoMigrationProgressRepository
   implements SsoMigrationProgressReadPort
@@ -58,45 +283,173 @@ export class PrismaSsoMigrationProgressRepository
     });
     if (!legacyRow) return null;
 
-    const replacement = rowToConnection(replacementRow);
-    const legacy = rowToConnection(legacyRow);
-    const liveStates = [...LIVE_IDENTIFIER_STATES];
-    const memberWhere = { organizationId, disabledAt: null } as const;
-    const linkedWhere = {
-      ...memberWhere,
-      user: {
-        identifiers: {
-          some: {
-            connectionId: replacement.connectionId,
-            state: { in: liveStates },
-          },
-        },
-      },
-    } as const;
-    const stragglerWhere = {
-      ...memberWhere,
-      ...(cursor ? { userId: { gt: cursor } } : {}),
-      user: {
-        identifiers: {
-          none: {
-            connectionId: replacement.connectionId,
-            state: { in: liveStates },
-          },
-        },
-      },
-    } as const;
+    return this.progressFor({
+      organizationId,
+      replacement: rowToConnection(replacementRow),
+      legacy: rowToConnection(legacyRow),
+      migrationPhase,
+      cursor,
+      limit,
+    });
+  }
 
-    const [
+  /**
+   * Everything the checklist counts, for one resolved legacy/replacement pair.
+   *
+   * Split from {@link getProgress} so the question "is there a migration here
+   * at all" and the question "how far along is it" are answered in separate
+   * places: the first can say no, and only the second needs the evidence.
+   */
+  private async progressFor({
+    organizationId,
+    replacement,
+    legacy,
+    migrationPhase,
+    cursor,
+    limit,
+  }: {
+    organizationId: string;
+    replacement: ConnectionState;
+    legacy: ConnectionState;
+    migrationPhase: NonNullable<ConnectionState["migrationPhase"]>;
+    cursor: string | null;
+    limit: number;
+  }): Promise<SelfServeMigrationView> {
+    const evidence = await this.loadEvidence({
+      organizationId,
+      replacement,
+      legacy,
+      cursor,
+      limit,
+    });
+    const {
       activeCount,
       linkedCount,
-      stragglerRows,
-      replacementTest,
       lastLegacyAuthentication,
       liveRecoveryCount,
       legacyScim,
       replacementScim,
-      legacyIdentifiers,
-    ] = await Promise.all([
+      replacementTest,
+      sharedLegacyIdentifiers,
+    } = evidence;
+
+    const selectedRoute = routeOf(replacement.migrationPhase);
+    const quietStartMs = Math.max(
+      replacement.routeChangedAtMs ??
+        replacement.graceStartedAtMs ??
+        replacement.createdAtMs,
+      lastLegacyAuthentication?.authenticatedAt.getTime() ?? 0,
+    );
+    const quietComplete =
+      this.now() - quietStartMs >= MIGRATION_QUIET_PERIOD_MS;
+    const scimStatus = scimStatusOf({
+      legacySyncs: legacyScim !== null,
+      replacementSyncState: replacementScim?.state,
+    });
+    const testSignIn = replacementTest
+      ? { done: true, atMs: replacementTest.authenticatedAt.getTime() }
+      : { done: false, atMs: null };
+    const blockers = migrationBlockers({
+      selectedRoute,
+      testSignInDone: testSignIn.done,
+      liveRecoveryCount,
+      linkedCount,
+      activeCount,
+      quietComplete,
+      scimStatus,
+      sharedLegacyIdentifiers,
+    });
+
+    return {
+      legacy: connectionRefOf(legacy),
+      replacement: connectionRefOf(replacement),
+      phase: migrationPhase,
+      selectedRoute,
+      inheritedDomains: inheritedDomainsOf({ replacement, legacy }),
+      testSignIn,
+      members: membersViewOf({ evidence, limit }),
+      quietPeriod: {
+        lastLegacyAuthenticationAtMs:
+          lastLegacyAuthentication?.authenticatedAt.getTime() ?? null,
+        complete: quietComplete,
+      },
+      scim: { status: scimStatus },
+      blockers,
+      canFinalize:
+        blockers.length === 0 &&
+        (replacement.migrationPhase === "GRACE_DIRECT" ||
+          replacement.migrationPhase === "FINALIZING"),
+    };
+  }
+
+  /**
+   * Every count and row the checklist reads, in one round of queries.
+   *
+   * Gathered together rather than beside the branch that uses each one: they
+   * are independent, so they belong in a single `Promise.all`, and keeping the
+   * assembly above free of database calls is what makes it readable as the
+   * shape of the answer.
+   */
+  /**
+   * Every count and row the checklist reads.
+   *
+   * Two halves, started together: what the organization's members look like
+   * against the replacement, and what the two connections themselves have been
+   * doing. They share no inputs, so serialising them would only add latency.
+   */
+  private async loadEvidence({
+    organizationId,
+    replacement,
+    legacy,
+    cursor,
+    limit,
+  }: {
+    organizationId: string;
+    replacement: ConnectionState;
+    legacy: ConnectionState;
+    cursor: string | null;
+    limit: number;
+  }) {
+    const [members, connections] = await Promise.all([
+      this.loadMemberEvidence({
+        organizationId,
+        replacement,
+        legacy,
+        cursor,
+        limit,
+      }),
+      this.loadConnectionEvidence({ organizationId, replacement, legacy }),
+    ]);
+    return { ...members, ...connections };
+  }
+
+  /**
+   * Who is linked to the replacement and who is still a straggler.
+   *
+   * One row past the page is fetched so `membersViewOf` can tell whether a
+   * next page exists; the legacy activity for the page is a second round,
+   * because the ids it asks about are not known until the page is.
+   */
+  private async loadMemberEvidence({
+    organizationId,
+    replacement,
+    legacy,
+    cursor,
+    limit,
+  }: {
+    organizationId: string;
+    replacement: ConnectionState;
+    legacy: ConnectionState;
+    cursor: string | null;
+    limit: number;
+  }) {
+    const { memberWhere, linkedWhere, stragglerWhere } = memberWhereClauses({
+      organizationId,
+      replacementConnectionId: replacement.connectionId,
+      liveStates: [...LIVE_IDENTIFIER_STATES],
+      cursor,
+    });
+    const [activeCount, linkedCount, stragglerRows] = await Promise.all([
       this.prisma.organizationUser.count({ where: memberWhere }),
       this.prisma.organizationUser.count({ where: linkedWhere }),
       this.prisma.organizationUser.findMany({
@@ -108,6 +461,40 @@ export class PrismaSsoMigrationProgressRepository
           user: { select: { name: true, email: true } },
         },
       }),
+    ]);
+    const pageRows = stragglerRows.slice(0, limit);
+    const legacyActivityByUser = await this.latestLegacyActivityByUser({
+      organizationId,
+      connectionId: legacy.connectionId,
+      userIds: pageRows.map((row) => row.userId),
+    });
+    return {
+      activeCount,
+      linkedCount,
+      stragglerRows,
+      pageRows,
+      legacyActivityByUser,
+    };
+  }
+
+  /** What the two connections have been doing: sign-ins, recovery, sync. */
+  private async loadConnectionEvidence({
+    organizationId,
+    replacement,
+    legacy,
+  }: {
+    organizationId: string;
+    replacement: ConnectionState;
+    legacy: ConnectionState;
+  }) {
+    const [
+      replacementTest,
+      lastLegacyAuthentication,
+      liveRecoveryCount,
+      legacyScim,
+      replacementScim,
+      legacyIdentifiers,
+    ] = await Promise.all([
       this.prisma.ssoAuthenticationActivity.findFirst({
         where: { organizationId, connectionId: replacement.connectionId },
         orderBy: { authenticatedAt: "desc" },
@@ -130,147 +517,25 @@ export class PrismaSsoMigrationProgressRepository
         where: { organizationId, connectionId: replacement.connectionId },
       }),
       this.prisma.identifier.findMany({
-        where: { connectionId: legacy.connectionId, state: { in: liveStates } },
+        where: {
+          connectionId: legacy.connectionId,
+          state: { in: [...LIVE_IDENTIFIER_STATES] },
+        },
         distinct: ["userId"],
         select: { userId: true },
       }),
     ]);
-
-    const pageRows = stragglerRows.slice(0, limit);
-    const legacyActivityByUser = await this.latestLegacyActivityByUser({
-      organizationId,
-      connectionId: legacy.connectionId,
-      userIds: pageRows.map((row) => row.userId),
-    });
     const sharedLegacyIdentifiers = await this.hasSharedLegacyIdentifiers({
       organizationId,
       userIds: legacyIdentifiers.map((identifier) => identifier.userId),
     });
-    const selectedRoute =
-      replacement.migrationPhase === "SETUP" ||
-      replacement.migrationPhase === "GRACE_LEGACY"
-        ? "legacy"
-        : "direct";
-    const quietStartMs = Math.max(
-      replacement.routeChangedAtMs ??
-        replacement.graceStartedAtMs ??
-        replacement.createdAtMs,
-      lastLegacyAuthentication?.authenticatedAt.getTime() ?? 0,
-    );
-    const quietComplete =
-      this.now() - quietStartMs >= MIGRATION_QUIET_PERIOD_MS;
-    const scimStatus =
-      legacyScim === null
-        ? "not-applicable"
-        : replacementScim?.state === "SYNCING"
-          ? "ready"
-          : "needs-repointing";
-    const testSignIn = replacementTest
-      ? { done: true, atMs: replacementTest.authenticatedAt.getTime() }
-      : { done: false, atMs: null };
-    const blockers: SsoMigrationBlockerView[] = [];
-
-    if (selectedRoute !== "direct") {
-      blockers.push({
-        code: "direct-route-not-selected",
-        message: "Switch normal sign-in to the replacement connection first.",
-      });
-    }
-    if (!testSignIn.done) {
-      blockers.push({
-        code: "replacement-not-tested",
-        message: "Complete a successful test sign-in through the replacement.",
-      });
-    }
-    if (liveRecoveryCount === 0) {
-      blockers.push({
-        code: "recovery-path-missing",
-        message: "Keep at least one live way back in before finalizing.",
-      });
-    }
-    if (linkedCount < activeCount) {
-      blockers.push({
-        code: "members-not-linked",
-        message: `${activeCount - linkedCount} active member${activeCount - linkedCount === 1 ? " is" : "s are"} not linked to the replacement yet.`,
-      });
-    }
-    if (!quietComplete) {
-      blockers.push({
-        code: "legacy-activity-not-quiet",
-        message: "Wait for seven days without a successful legacy sign-in.",
-      });
-    }
-    if (scimStatus === "needs-repointing") {
-      blockers.push({
-        code: "scim-needs-repointing",
-        message:
-          "Repoint directory provisioning to the replacement connection.",
-      });
-    }
-    if (sharedLegacyIdentifiers) {
-      blockers.push({
-        code: "shared-legacy-identifiers",
-        message:
-          "A legacy identity is shared with another organization and needs review.",
-      });
-    }
-
     return {
-      legacy: {
-        connectionId: legacy.connectionId,
-        source: legacy.source,
-        providerId: legacy.idpMetadata.providerId,
-      },
-      replacement: {
-        connectionId: replacement.connectionId,
-        source: replacement.source,
-        providerId: replacement.idpMetadata.providerId,
-      },
-      phase: migrationPhase,
-      selectedRoute,
-      inheritedDomains: replacement.domainVerifications
-        .filter(
-          (proof) =>
-            legacy.verifiedDomains.includes(proof.domain) &&
-            qualifySsoDomainOwnership({
-              state: replacement,
-              domain: proof.domain,
-            }).status === "QUALIFIED",
-        )
-        .map((proof) => ({
-          domain: proof.domain,
-          method: proof.method,
-          proofState: proof.proofState,
-          evidenceRef: proof.evidenceRef ?? proof.tokenHash,
-          verifiedAtMs: proof.verifiedAtMs,
-        })),
-      testSignIn,
-      members: {
-        activeCount,
-        linkedCount,
-        stragglers: pageRows.map((row) => ({
-          userId: row.userId,
-          name: row.user.name,
-          email: row.user.email,
-          lastLegacyAuthenticationAtMs:
-            legacyActivityByUser.get(row.userId)?.getTime() ?? null,
-        })),
-        nextCursor:
-          stragglerRows.length > limit
-            ? (pageRows.at(-1)?.userId ?? null)
-            : null,
-      },
-      quietPeriod: {
-        lastLegacyAuthenticationAtMs:
-          lastLegacyAuthentication?.authenticatedAt.getTime() ?? null,
-        complete: quietComplete,
-      },
-      scim: { status: scimStatus },
-      blockers,
-      canFinalize:
-        blockers.length === 0 &&
-        (replacement.migrationPhase === "GRACE_DIRECT" ||
-          replacement.migrationPhase === "FINALIZING"),
+      replacementTest,
+      lastLegacyAuthentication,
+      liveRecoveryCount,
+      legacyScim,
+      replacementScim,
+      sharedLegacyIdentifiers,
     };
   }
 
