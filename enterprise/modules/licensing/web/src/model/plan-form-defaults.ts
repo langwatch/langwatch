@@ -12,19 +12,9 @@ export interface PlanFormDefaults {
 }
 
 /**
- * What the mint form fills in for each plan the operator can pick. Templates
- * already define all values, no fallbacks needed.
- *
- * Only the enforced levers (seats, messages, entitlements) + identity are
- * templated — projects, teams, and experimentation resources are OSS/uncapped
- * and not part of licenses.
- *
- * Every key a template answers is present here even when its value is
- * undefined: the form spreads these over what is already typed in, so a key
- * left out would keep the previous plan's value after switching plans.
- * CUSTOM answers nothing on purpose. It has no tier to inherit from and no
- * tier decides its entitlements later, so what the operator ticks is the only
- * thing a custom contract carries.
+ * Mint form defaults for each plan type. All keys present even when undefined
+ * so the form doesn't carry forward previous values. CUSTOM answers nothing
+ * (operator-determined only).
  */
 export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
   PRO: {

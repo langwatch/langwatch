@@ -1,18 +1,6 @@
 /**
- * What an admin is told when choosing between a full and a lite seat.
- *
- * Seats are the one thing a paid plan still meters, so this is a billing
- * question, and admins were asking their account manager instead of reading
- * the form. The line to hold: a seat type follows from what the person can
- * do, not from a switch someone flips. Someone who can only look at what the
- * team produces holds a lite seat; the moment they can change something they
- * hold a full one, and a custom role granting anything beyond viewing moves
- * them across on its own (`classifyMemberType`).
- *
- * The short description stays scannable and the boundary goes behind the (i),
- * per `dev/docs/best_practices/copywriting.md`. The list is pinned by
- * `seatTypeCopy.unit.test.ts` so it cannot drift from
- * `EXTERNAL_MEMBER_PERMISSIONS` unnoticed.
+ * Admin guidance on seat types. A seat type follows from what the person can
+ * do, not a switch. Read-only → lite seat; can change anything → full seat.
  */
 export const LITE_MEMBER_SHORT_DESCRIPTION = "Can view the work, but not change it";
 
@@ -26,17 +14,8 @@ export const LITE_MEMBER_EXPLANATION =
   "permission to change something and they hold a full seat instead.";
 
 /**
- * Shown when someone is about to invite a lite member and has named no team.
- *
- * A lite seat carries no organization-wide access of its own — the invite
- * grants only what its teams grant (`applyInviteGrants` skips the
- * organization-scoped grant for a lite member on purpose). So a lite invite
- * with no team produces someone who can sign in, see nothing, and still hold
- * a seat.
- *
- * A warning rather than a refusal: assigning the team later is a legitimate
- * way to work, and the admin is the one who knows. It says what will happen
- * and how to undo it, and does not explain how grants are put together.
+ * Warning when inviting a lite member with no team. A lite seat carries no
+ * organization-wide access, so no team means they sign in but see nothing.
  */
 export const LITE_MEMBER_NEEDS_TEAM_WARNING =
   "Add a team, or this person will not see anything. A lite member reaches " +

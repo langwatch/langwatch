@@ -1,16 +1,6 @@
 /**
- * What a workbench column sends to a connected agent, and what it reads back.
- *
- * A connected agent runs in the customer's own process and is reached through
- * the relay (ADR-128). A workbench row is one turn: the column sends the
- * mapped input as a single user message, carries the parameter values the
- * agent declares, and writes the answer in the cell.
- *
- * The call itself is dispatched by the orchestrator. This module holds the
- * parts that need no runtime: what to send, what the answer reads as, and
- * what a failure is called.
- *
- * @see specs/experiments-v3/connected-agent-target.feature
+ * Structures for workbench columns sending input to a connected agent and reading the answer back.
+ * See ADR-128 and specs/experiments-v3/connected-agent-target.feature for the full contract.
  */
 
 import type { SerializedHandledError } from "@langwatch/handled-error";

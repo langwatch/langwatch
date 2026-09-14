@@ -1,14 +1,6 @@
 /**
- * EvaluatorScoreFilter - Determines which evaluators should have their scores stripped.
- *
- * Some evaluators only produce pass/fail results (0 or 1 score), making the score
- * meaningless for aggregation purposes. This utility identifies such evaluators
- * so their scores can be omitted from results.
- *
- * Criteria for stripping score:
- * 1. Evaluator has isGuardrail=true (guardrails are binary by nature)
- * 2. Evaluator is "langevals/exact_match" (always 0 or 1)
- * 3. Evaluator is "langevals/llm_answer_match" (always 0 or 1)
+ * Determines which evaluators produce only binary scores (0 or 1) and should have their scores
+ * omitted from results. Strips scores for guardrails and specific binary-only evaluators.
  */
 
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";

@@ -1,16 +1,6 @@
 /**
- * A run that carries the board in holds two columns at once: the one it ran and
- * the one it copied. Both are scored by the same evaluator on the same row, and
- * those are two different facts.
- *
- * `experiment_run_items` is a ReplacingMergeTree, so two rows sharing an
- * identity become one row. While the verdict's identity left the target out,
- * the second column's score was dropped on the way to storage and the results
- * page drew that column with its output and its cost but no score. Carrying the
- * board in is what makes a run with two columns the normal case, so this walks
- * the whole chain: the command's identity, the stored row, the dedup key the
- * read query groups on, and what comes back out.
- *
+ * Tests that runs carrying the board hold two scored columns correctly. Walks the chain from
+ * command identity through dedup key to stored row to final output.
  * @see specs/experiments-v3/run-board-snapshot.feature
  *
  * @integration

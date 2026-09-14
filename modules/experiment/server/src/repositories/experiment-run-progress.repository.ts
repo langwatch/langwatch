@@ -2,15 +2,8 @@ import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { EvaluationV3Event, ExecutionSummary } from "@langwatch/experiment-contract";
 
 /**
- * One run's progress, where a poller can read it.
- *
- * `POST /run` answers with a run id and leaves the run streaming on one
- * process; `GET /runs/:runId` is served by whichever process took the poll. So
- * the progress cannot live in the run's own memory. The retired application
- * kept it in Redis under a 24-hour TTL and skipped every write when the process
- * had no connection; the skip is now a composition choice — a deployment that
- * composes no store cannot serve the polling API at all, which is the honest
- * version of the same fact.
+ * One run's progress that a poller can read. The run streams on one process but polls are
+ * served by any process, so progress must live outside the run's memory.
  */
 export type ExperimentRunProgressSummary = ExecutionSummary & {
   /** Extended summary for CI output */

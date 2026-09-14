@@ -1,12 +1,6 @@
 /**
- * The workflow-version lookup a run listing shows beside each experiment.
- *
- * It reads Postgres while the runs themselves are read from ClickHouse, which
- * is why it sits behind a port rather than inside the ClickHouse repository.
- * What matters here is what it asks the database for and how it keys the answer
- * — a listing passes every version id it saw across every run, so the same id
- * arrives many times and an unknown one has to come back absent rather than
- * null.
+ * The workflow-version lookup shown in run listings. Reads Postgres while runs come from
+ * ClickHouse; returns absent for unknown ids even when they appear many times.
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,12 +1,6 @@
 /**
- * The stop signal and the owner record for a running workbench execution.
- *
- * A run is a long loop over cells on one process, and the request to stop it
- * arrives on another, so both facts have to live somewhere every replica sees.
- * The owner is part of the same port rather than a second one because the
- * interactive workbench never creates a polling run-state record, so the
- * project recorded at the start is the only thing an abort can be authorized
- * against.
+ * The stop signal and owner record for a running workbench execution. Both live in one place
+ * so every replica sees them; abort authorization is tied to the project recorded at start.
  */
 export abstract class ExperimentRunAbortRepository {
   /** Asks the run to stop. */

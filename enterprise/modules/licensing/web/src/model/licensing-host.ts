@@ -1,17 +1,7 @@
 /**
- * What the license screen asks of the application it is mounted in.
- *
- * The same port shape every settings family since governance has written:
- * declared here without importing anything of the composing application's, so
- * everything the platform page read off `useOrganizationTeamProject`,
- * `usePublicEnv` and the toaster arrives through these methods.
- *
- * `isSaaS` IS A PAIR AND NOT A BOOLEAN — `isSaaS()` and `isDeploymentSettled()`
- * — for the reason `useLicenseActions` states inline: only a CONFIRMED hosted
- * deployment may drop the "restart the server to enable single sign-on" line,
- * and while the environment is still resolving, showing it is the harmless
- * reading. Collapsing the two would omit an operator's one instruction for the
- * length of a round trip.
+ * What the license screen asks of its host application. isSaaS is a pair
+ * (isSaaS() and isDeploymentSettled()) because a confirmed deployment may hide
+ * the restart line; during resolution, showing it is harmless.
  */
 
 import { createContext, useContext } from "react";

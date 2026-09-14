@@ -5,18 +5,9 @@ import type { LicensePlanLimits } from "./license.ts";
 const KNOWN_USAGE_UNITS = ["traces", "events"] as const;
 
 /**
- * The plan limits that are actually surfaced on the active plan (PlanInfo).
- *
- * Only the enforced levers (member seats, messages volume, webhook endpoints)
- * plus plan identity are resolved. Workspace structure (projects, teams) and
- * experimentation resources are OSS/uncapped, so their license fields — even
- * when present in an older signed payload — are ignored and never resolved
- * here.
- *
- * `webhookEndpointsEnabled` is an enforced lever, not a workspace resource: it
- * gates the webhook endpoints surface and the gateway spend pull APIs, which
- * are sold with Enterprise rather than shipped in the OSS baseline. It is
- * therefore resolved here and deliberately not floored by `floorAtOssBaseline`.
+ * The plan limits surfaced on the active plan. Only enforced levers (seats,
+ * messages volume, webhook endpoints) are resolved; workspace/experiments are
+ * OSS/uncapped.
  */
 export type ResolvedPlanLimits = {
   type: string;
@@ -30,20 +21,12 @@ export type ResolvedPlanLimits = {
 };
 
 /**
- * Resolves the enforced plan limits from a license payload, applying defaults
- * to optional fields that may be missing in older licenses:
- * - maxMembersLite: DEFAULT_MEMBERS_LITE (1)
- * - usageUnit: "traces"
- *
- * `webhookEndpointsEnabled` is deliberately NOT defaulted here. A payload that
- * omits it has said nothing, and saying nothing has to stay distinguishable
- * from saying no: the plan's tier decides it later (`planEntitlements.ts`),
- * which is what entitles a license signed before the flag existed. Turning
- * absent into false here would be an answer the contract never gave, and the
- * tier map correctly refuses to overrule an explicit false.
+ * Resolves enforced plan limits from a license, defaulting maxMembersLite and
+ * usageUnit but NOT webhookEndpointsEnabled (absence must stay distinguishable
+ * from false, since the tier map decides it for older licenses).
  *
  * @param plan - License plan limits (the signed payload)
- * @returns The enforced limits, with the levers the license does set resolved
+ * @returns The enforced limits with the levers the license does set resolved
  */
 export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits {
   return {

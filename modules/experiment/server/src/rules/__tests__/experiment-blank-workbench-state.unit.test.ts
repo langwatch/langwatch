@@ -1,11 +1,6 @@
 /**
- * The blank workbench the REST create call builds, pinned against the client
- * default it replicates.
- *
- * The two definitions live apart on purpose — one is what a create call
- * builds server-side, the other is what a browser's store starts from — so
- * this is what keeps them from drifting. Only the setup is compared: the
- * client default carries three sample rows a REST caller has not asked for.
+ * The blank workbench the REST create call builds, compared against the client default.
+ * Keeps server-side and browser definitions from drifting.
  */
 import { describe, expect, it } from "vitest";
 import {

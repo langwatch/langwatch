@@ -1,6 +1,6 @@
 /**
- * Ported from `platform/app/src/server/experiments/__tests__/experiment-slug-deduplication.integration.test.ts`, which drove the same logic through a
- * real Postgres repository. The service only reads `findSlugsByPrefix`, so a fake repository proves the same behaviour without a datastore.
+ * Ported from the legacy integration test. The service only reads `findSlugsByPrefix`, so a
+ * fake repository proves the same behaviour without a datastore.
  * @see specs/experiments-v3/experiment-slug-deduplication.feature
  */
 import { describe, expect, it } from "vitest";

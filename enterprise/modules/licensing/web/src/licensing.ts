@@ -1,18 +1,6 @@
 /**
- * The licensing family, as the browser application mounts it.
- *
- * ONE SCREEN, ONE ADDRESS: `/settings/license`.
- *
- * WHY THIS PACKAGE. The credentials family's rule, read strictly: a key belongs
- * to the family that owns its TRANSPORT. `license.*` is mounted from
- * `@langwatch/enterprise-licensing-server`, `LicenseStatus` is
- * `@langwatch/enterprise-licensing-contract`'s, and every card the page renders
- * — the details card, the seat callout, the load states — was already in this
- * package before the page arrived.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is the tRPC Provider this
- * package's hooks run on and the host port that answers for the organization,
- * the deployment, the purchase link, the cache drop and the two notices.
+ * Licensing UI family mounted at `/settings/license`. Owns the license details
+ * card and seat callout; the server owns the transport (tRPC).
  */
 
 import type { ComponentType } from "react";

@@ -7,7 +7,8 @@ const dispatches = ExperimentResultDispatchService.create();
 const buildTargetMetadata = dispatches.buildTargetMetadata.bind(dispatches);
 
 /**
- * Which model gets RECORDED on the run — stored rather than read live, so an evaluator's config edited afterwards does not retroactively reattribute a historical run to today's config.
+ * Which model gets RECORDED on the run — stored rather than read live, so edits to
+ * evaluator config don't retroactively reattribute historical runs.
  * @see specs/experiments/comparison-leaderboard.feature
  * @see specs/experiments-v3/evaluation-execution.feature
  */

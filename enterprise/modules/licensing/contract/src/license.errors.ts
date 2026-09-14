@@ -1,12 +1,6 @@
 /**
- * Handled errors for the licensing domain.
- *
- * Each one is a named cause the caller can act on — pick a different
- * organization, paste a valid key, renew — so each carries a stable `code`
- * and the client renders copy keyed off it
- * (`src/features/errors/logic/presentation.ts`). Nothing here needs a
- * try/catch at the router: the shared handled-error middleware maps
- * `httpStatus` and keeps the error as the `cause`.
+ * Handled errors for licensing with stable codes the client renders copy from.
+ * Each error is a named cause the caller can act on (pick org, paste key, renew).
  */
 
 import { HandledError, ValidationError } from "@langwatch/handled-error";
@@ -113,13 +107,8 @@ export class LicenseSigningKeyEncryptedError extends HandledError {
 }
 
 /**
- * A well-formed PEM that OpenSSL still refused to sign with — wrong key type,
- * a truncated body, or a public key wearing a private-key label.
- *
- * OpenSSL's own error is never re-thrown: it names internals and can quote key
- * material. It rides along as a `reason`, which `serialize()` masks to
- * `{ code: "unknown" }` — so it reaches the server logs and stops there, while
- * the client only ever sees this error's code.
+ * A well-formed PEM OpenSSL refused to sign with. OpenSSL's error is masked
+ * (names internals/key material) so only this error's code reaches the client.
  */
 export class LicenseSigningFailedError extends HandledError {
   declare readonly code: "license_signing_failed";
@@ -151,15 +140,9 @@ export class LicenseExpiryNotInFutureError extends ValidationError {
 }
 
 /**
- * Turns a `ValidationResult`'s failure verdict into the handled error for it.
- *
- * `validateLicense` reports its verdict as one of the `LICENSE_ERRORS`
- * literals rather than throwing, and that literal is a *server* discriminant,
- * not copy — it used to be string-matched on the client to pick a sentence,
- * which is exactly the coupling the code-keyed presentation registry removes.
- *
- * An unrecognised verdict maps to "invalid", never to success: a licence check
- * must fail closed.
+ * Converts ValidationResult failure verdicts to handled errors. The verdict is
+ * a server discriminant (not copy), and unrecognized verdicts fail closed to
+ * "invalid".
  */
 export function licenseValidationError(verdict: LicenseError | string | undefined): HandledError {
   return verdict === LICENSE_ERRORS.EXPIRED

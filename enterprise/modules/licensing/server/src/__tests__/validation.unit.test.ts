@@ -383,16 +383,9 @@ describe("validateLicense", () => {
 describe("backward compatibility: licenses issued before experimentation limits were removed", () => {
   /** @scenario A pre-existing signed license that still encodes experimentation limits stays valid */
   it("validates a pre-existing license that still encodes experimentation caps, and drops those caps", () => {
-    // ENTERPRISE_LICENSE_KEY was signed (with TEST_PRIVATE_KEY) with a payload
-    // that still carries maxPrompts/maxWorkflows/maxScenarios/maxAgents/... —
-    // exactly what a self-hosted customer's already-issued license contains.
-    // It MUST keep validating: LicensePlanLimitsSchema intentionally retains
-    // those fields so that verifySignature re-serializes byte-identical JSON
-    // and the signature still verifies (no re-issuance). The caps are then
-    // dropped from the active plan rather than enforced. If a future change
-    // strips those schema fields, Zod would discard them on parse, the
-    // re-serialized JSON would differ, and this test would fail — guarding
-    // every already-issued customer license.
+    // This license MUST validate: the schema intentionally retains old fields so
+    // re-serialized JSON matches the original signature, protecting already-issued
+    // customer licenses.
     const result = validateLicense({
       licenseKey: ENTERPRISE_LICENSE_KEY,
       publicKey: TEST_PUBLIC_KEY,

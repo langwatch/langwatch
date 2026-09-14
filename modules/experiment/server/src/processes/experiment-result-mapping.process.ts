@@ -1,12 +1,6 @@
 /**
- * ResultMapper - Maps NLP server events to Evaluations V3 SSE events.
- *
- * The workflow builder creates node IDs in the format:
- * - Target nodes: "{targetId}" (e.g., "target-1")
- * - Evaluator nodes: "{targetId}.{evaluatorId}" (e.g., "target-1.eval-1")
- *
- * This mapper extracts those IDs and transforms NLP events into the
- * appropriate SSE event format for the frontend.
+ * Maps NLP server events to Evaluations V3 SSE events, extracting node IDs from the workflow
+ * builder's format and transforming them for the frontend.
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -78,7 +72,8 @@ export const coerceScore = (value: unknown): number | undefined => {
 
 /**
  * Coerces a value to a boolean passed status.
- * Handles native booleans and string representations (e.g. "true"/"false" from workflow evaluators).
+ * Handles native booleans and string representations (e.g., "true"/"false" from workflow
+ * evaluators).
  */
 export const coercePassed = (value: unknown): boolean | undefined => {
   if (typeof value === "boolean") return value;
@@ -112,17 +107,8 @@ const classifyEvaluatorExecutionError = (
 };
 
 /**
- * Extracts target output from execution outputs.
- *
- * Strategy:
- * 1. If isEvaluatorAsTarget -> filter null/undefined values, return undefined if empty
- *    This handles evaluator-as-target where the evaluator outputs become target output.
- *    Uses an explicit marker instead of a heuristic so custom-only evaluators are detected.
- * 2. If outputs has exactly one key named "output" -> return its value (backward compatible)
- * 3. Otherwise -> return full outputs object (preserves structure for custom fields)
- *
- * The client-side formatTargetOutput utility handles display formatting.
- * This ensures structured outputs like {pizza: false} are preserved for display.
+ * Extracts target output from execution outputs, handling evaluator-as-target and backward
+ * compatibility for the "output" key. Client-side formatTargetOutput handles display.
  */
 export const extractTargetOutput = (
   outputs: Record<string, unknown> | undefined,
@@ -162,12 +148,7 @@ export const extractTargetOutput = (
 
 /**
  * Wall-clock duration from a pair of epoch-millisecond timestamps.
- *
- * Guards on `undefined` rather than truthiness. The target and evaluator
- * paths each computed this inline and had already drifted on that point, and
- * a truthy test reads a `started_at` of 0 as "no timestamp" — unreachable
- * with real epoch milliseconds, but the two readers of one field disagreeing
- * is worth removing rather than reasoning about.
+ * Guards on `undefined` rather than truthiness to avoid treating 0 as "no timestamp".
  */
 const durationOf = (
   timestamps: { started_at?: number; finished_at?: number } | undefined,
@@ -225,21 +206,8 @@ export const mapTargetResult = (
 };
 
 /**
- * The part of an evaluator's request worth keeping forever.
- *
- * Only the candidate IDS are ever read back — `readCandidateIds` rebuilds the
- * per-row matchup set from them for the leaderboard. The rest of the payload
- * (every candidate's full output text, the golden answer, the task input,
- * per-candidate cost and duration) duplicates data the run already stores per
- * target, and it is not cheap duplication: it reaches ClickHouse twice, in the
- * event log and in `experiment_run_items.EvaluationInputs`, is handed to the
- * browser by a `SELECT *`, and is billed against the storage meter — all at
- * rows × targets × evaluators. On main this column was null for orchestrator
- * runs, so persisting the whole payload would have been a new cost introduced
- * by this branch rather than an existing one it inherited.
- *
- * Returns undefined when there is no candidate list, so every non-Comparison
- * evaluator persists nothing here rather than an empty object.
+ * Persists only candidate IDs from an evaluator's request; other fields duplicate data already
+ * stored per target. Returns undefined for non-Comparison evaluators.
  */
 const persistableInputs = (
   inputs: Record<string, unknown> | undefined,
@@ -258,10 +226,6 @@ const persistableInputs = (
 /**
  * Maps an evaluator completion event to an evaluator_result SSE event.
  *
- * @param nodeId - The node ID in format "{targetId}.{evaluatorId}"
- * @param rowIndex - The dataset row index
- * @param executionState - The execution state from langwatch_nlp
- * @param options - Additional options
  * @param options.stripScore - If true, the score will be omitted from the result
  */
 export const mapEvaluatorResult = (
@@ -348,16 +312,10 @@ export const mapEvaluatorResult = (
 };
 
 /**
- * Maps an NLP server event to an Evaluations V3 SSE event.
+ * Maps an NLP server event to an Evaluations V3 SSE event, or null if the event should be ignored.
  *
- * @param event - The NLP server event
- * @param rowIndex - The dataset row index this event corresponds to
- * @param targetNodes - Set of node IDs that are target nodes (not evaluators)
- * @param config - Optional configuration for result mapping
- * @param evaluatorInputs - The request payload sent to the evaluator for this
- * cell (only relevant when the event's node is an evaluator node); passed
- * through untouched to `mapEvaluatorResult`.
- * @returns The mapped SSE event, or null if the event should be ignored
+ * @param evaluatorInputs - The request payload sent to the evaluator; passed through to
+ * `mapEvaluatorResult`.
  */
 export const mapNlpEvent = ({
   event,
@@ -433,19 +391,8 @@ export const mapNlpEvent = ({
 };
 
 /**
- * Maps a *thrown* failure to an error SSE event.
- *
- * A handled error travels as its code on `domainError`, and the client renders
- * the registry's copy for it. An unhandled one has nothing safe to say — its
- * `message` can carry a Prisma string, a hostname or a Go net error — so the
- * frame carries {@link UNNAMED_FAILURE}, a marker, and the client's own
- * fallback copy owns the words. See ADR-045.
- *
- * The failure's own message is neither sent nor stored. It goes to the log
- * line at the catch site, beside the trace id this frame carries, which is
- * what ties "it broke" to what actually broke. Storing it instead put a
- * `connect ECONNREFUSED 10.0.0.5:5432` into the customer's cell every time
- * they reloaded the run.
+ * Maps a *thrown* failure to an error SSE event. Handled errors send their code; unhandled
+ * errors send UNNAMED_FAILURE with a trace id for log correlation (see ADR-045).
  */
 export const mapThrownErrorEvent = ({
   error,
@@ -484,14 +431,8 @@ export const mapThrownErrorEvent = ({
 };
 
 /**
- * Maps a studio workflow evaluator node's execution state to an
- * evaluator_result event.
- *
- * Unlike mapEvaluatorResult (which parses the v3 "{targetId}.{evaluatorId}"
- * node-id convention of a generated mini-workflow), this maps an evaluator node
- * from a real studio workflow run, keyed by the evaluator's own DSL node id.
- * Workflow evaluators can return stringy score/passed values, so they go
- * through coerceScore/coercePassed like the legacy workflow-evaluation path.
+ * Maps a studio workflow evaluator node's execution state to an evaluator_result event.
+ * Unlike mapEvaluatorResult, this handles stringy score/passed values through coercion.
  */
 export const mapWorkflowEvaluatorResult = (
   rowIndex: number,

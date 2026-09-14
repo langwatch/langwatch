@@ -1,13 +1,6 @@
 /**
+ * Seat copy is a billing promise pinned to the lite-member permission set.
  * See specs/licensing/seat-type-explained.feature.
- *
- * The seat copy is a billing promise, so it is pinned to the permission set it
- * describes. If the lite-member role gains or loses a resource, the sentence an
- * admin reads before paying for a seat has to move with it.
- *
- * The permission set was `EXTERNAL_MEMBER_PERMISSIONS` in the application's
- * `rbac.ts`; the engine owns the role bags now, and
- * `builtinRolePermissions("lite-member")` is the same bag read from its owner.
  */
 
 import { builtinRolePermissions } from "@langwatch/authz-contract";

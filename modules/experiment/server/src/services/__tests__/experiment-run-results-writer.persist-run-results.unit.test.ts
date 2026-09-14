@@ -1,6 +1,7 @@
 /**
- * `ExperimentRunResultsWriterService.persistRunResults` is the seam both execution paths write through: the polling runner calls it directly when a run completes or stops, and the streaming writer calls it once
- * the last frame arrives. This exercises the merge it performs against the saved workbench state, mocking only the `ExperimentService` persistence boundary — the real fold and merge run.
+ * `ExperimentRunResultsWriterService.persistRunResults` is the seam both execution paths
+ * write through. Tests the merge against saved workbench state, mocking only the
+ * `ExperimentService` persistence boundary; the real fold and merge run.
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { describe, expect, it, vi } from "vitest";

@@ -38,8 +38,8 @@ export const licensePlanLimitsSchema = z.object({
   // Webhook endpoints platform: optional so licenses signed before the
   // feature existed keep validating; absent means false.
   webhookEndpointsEnabled: z.boolean().optional(),
-  // Usage counting mode - optional for backward compatibility with existing signed licenses
-  // Uses z.string() (not z.enum) for forward compatibility: future values won't break old deployments
+  // Usage counting mode - optional for backward compatibility. Uses z.string()
+  // (not z.enum) for forward compatibility so future values won't break old deployments.
   usageUnit: z.string().optional(),
 });
 

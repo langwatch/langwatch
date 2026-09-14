@@ -12,10 +12,8 @@ import type { ExperimentRunStateData } from "../../projections/experiment-run-st
 
 export class ClickhouseExperimentRunStateStoreRepository {
   /**
-   * Takes the resolver rather than the client itself, the way Scenario's does. The process has a `resolveClient`
-   * function to hand, and the previous call site passed exactly that where the repository declares an {@link
-   * ExperimentClickHouseRepository} — a bare function has no `resolveClient` on it, so the first read would have
-   * thrown.
+   * Takes the resolver rather than the client itself, like Scenario's does. A bare function
+   * has no `resolveClient` property, so the first read would throw without the resolver.
    */
   static create(options: {
     type: "clickhouse";

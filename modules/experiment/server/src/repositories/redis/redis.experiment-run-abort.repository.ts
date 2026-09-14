@@ -1,14 +1,7 @@
 /**
- * The workbench run's stop signal, in Redis.
- *
- * Two keys, both short-lived: the abort flag a running loop reads between
- * cells, and the owner record an abort request is authorized against. Both
- * expire on their own after an hour, which is longer than any run can be and
- * short enough that nothing accumulates.
- *
- * The connection is injected rather than resolved from a process singleton.
- * Two replicas answering from two different Redis instances would let a run
- * ignore the stop its own caller asked for.
+ * The workbench run's stop signal in Redis. Two short-lived keys: the abort flag a running
+ * loop reads, and the owner record an abort request is authorized against. Connection injected
+ * to ensure both replicas answer from the same Redis instance.
  */
 import { createLogger } from "@langwatch/observability";
 import type { Redis } from "ioredis";

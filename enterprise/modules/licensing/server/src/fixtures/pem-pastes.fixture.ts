@@ -1,11 +1,6 @@
 /**
- * The ways a PEM key arrives after a real copy/paste — a chat message, a code
- * block, a YAML value, a `.env` one-liner.
- *
- * One list, three layers: `pem.unit.test.ts` (the normalizer),
- * `signing.unit.test.ts` (`signLicense`) and `license.integration.test.ts` (the
- * tRPC procedure) all iterate it, so a new paste shape is covered everywhere the
- * moment it is added here rather than in whichever list someone remembered.
+ * PEM key paste shapes from copy/paste. Three test layers iterate this list, so
+ * new shapes added here cover all layers automatically.
  */
 export function mangledPemPastes(canonicalKey: string): Record<string, string> {
   const perLine = (transform: (line: string) => string) =>

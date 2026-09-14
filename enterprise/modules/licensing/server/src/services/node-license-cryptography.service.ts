@@ -15,30 +15,16 @@ import { type LicenseCryptography } from "../app/licensing.members.ts";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 /**
- * PEM normalization for license signing keys.
- *
- * OpenSSL's PEM reader is unforgiving about layout: it wants `-----BEGIN X-----`
- * at the start of a line and the base64 body on its own lines. A key that has
- * been through a copy/paste — a chat message, a code block, a YAML value, a
- * `.env` one-liner — arrives indented, space-prefixed or with its newlines
- * collapsed, and signing fails with an opaque `ERR_OSSL_UNSUPPORTED`.
- *
- * Only the base64 payload carries meaning, so we re-emit the block in canonical
- * form and let the layout of the paste be irrelevant.
+ * PEM normalization for license signing keys. OpenSSL is unforgiving about
+ * layout; copy/pasted keys are re-emitted in canonical form.
  */
 
 /** Matches a PEM block, capturing the label (`PRIVATE KEY`, `RSA PRIVATE KEY`, …) and its body. */
 const PEM_BLOCK = /-----BEGIN ([A-Z0-9 ]+?)-----([\s\S]*?)-----END \1-----/;
 
 /**
- * The same, restricted to a private-key block (`PRIVATE KEY`, `RSA PRIVATE
- * KEY`, `EC PRIVATE KEY`, `ENCRYPTED PRIVATE KEY`).
- *
- * Preferred over the first block in the input, because a PEM file is legally a
- * *bundle*: operators keep a certificate or the public half in the same file,
- * often ahead of the private key. OpenSSL scans a bundle for the key it needs
- * and signs happily; canonicalizing whichever block came first would hand it
- * the certificate alone and break a key that worked before.
+ * Matches private-key blocks only. PEM files can be bundles; this finds the
+ * private key instead of any certificate that might precede it.
  */
 const PEM_PRIVATE_KEY_BLOCK =
   /-----BEGIN ((?:[A-Z0-9]+ )*PRIVATE KEY)-----([\s\S]*?)-----END \1-----/;

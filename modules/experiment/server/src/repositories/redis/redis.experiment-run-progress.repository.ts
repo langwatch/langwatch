@@ -1,14 +1,7 @@
 /**
- * One run's progress, in Redis, under a 24-hour TTL.
- *
- * This is what makes the polling API work across processes: `POST /run` starts
- * execution on one replica and answers immediately, and `GET /runs/{runId}` is
- * served by whichever replica took the poll, so the progress has to live where
- * both can see it. Completed runs stay queryable until the TTL drops them.
- *
- * The connection is injected rather than resolved from a process singleton:
- * two replicas answering from two different Redis instances would let a poll
- * report a run that another replica has already finished.
+ * One run's progress in Redis under a 24-hour TTL. Enables polling across processes; `POST
+ * /run` starts on one replica, `GET /runs/{runId}` is served by any. Connection injected to
+ * ensure both see the same Redis instance.
  */
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationV3Event } from "@langwatch/experiment-contract";

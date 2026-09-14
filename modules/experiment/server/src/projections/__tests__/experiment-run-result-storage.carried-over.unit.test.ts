@@ -1,6 +1,6 @@
 /**
- * The stored row is where the difference between a cell the run produced and a cell it copied from the
- * board has to survive. Every reader of the run's money and time keys off this one column.
+ * The stored row is where the difference between a produced cell and a copied cell has to
+ * survive. Every reader of the run's money and time keys off this one column.
  * @see specs/experiments-v3/run-board-snapshot.feature
  */
 import { createTenantId } from "@langwatch/eventing";

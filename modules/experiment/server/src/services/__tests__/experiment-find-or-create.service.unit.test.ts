@@ -1,12 +1,6 @@
 /**
- * The one rule an SDK's `experiment_slug` is resolved through.
- *
- * Two things are pinned here and both are wire facts rather than preferences:
- * the four characters the deployment's slug rule pre-replaces before slugify
- * runs (an experiment named `my_batch_run` must reach `my-batch-run`, not
- * `mybatchrun` — a different URL for the same name), and that an existing slug
- * is TAKEN BACK rather than duplicated, which is what makes repeated runs
- * group together.
+ * The rule an SDK's `experiment_slug` is resolved through. Pinned behavior: character
+ * pre-replacement before slugify, and existing slugs are taken back (not duplicated).
  */
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "../experiment.service.ts";

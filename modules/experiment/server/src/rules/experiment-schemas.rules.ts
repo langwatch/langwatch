@@ -1,14 +1,6 @@
 /**
  * OpenAPI schemas for the API-key half of the experiments REST surface.
- *
- * Only the routes an integrator calls with a project API key live here: the
- * create call (`POST /api/experiment/init`, registered over in `misc.ts`), the
- * run trigger, and the three read endpoints. `execute` and `abort`
- * authenticate with a browser session and belong to the workbench UI, so they
- * are not described and do not reach the published document.
- *
- * These describe responses the handlers already send. They do not validate
- * anything at runtime; the handlers keep their own parsing.
+ * Describe responses the handlers already send; handlers keep their own parsing.
  */
 
 import { z } from "zod";
@@ -24,15 +16,8 @@ const paginationSchema = z.object({
 });
 
 /**
- * What the REST boundary sends when a route throws a `HandledError`.
- *
- * `handledErrorResponseBody` builds `{ error: code, message }` and then spreads
- * the error's `meta` at the TOP level, plus `tips` / `docsUrl` / `fault` /
- * `reasons` when present — so this is deliberately open: `meta`'s keys differ
- * per code and arrive as siblings of `error`, not nested under it.
- *
- * `error` carries the stable code, not prose. Branch on it; write the words a
- * customer reads from your own registry keyed on that code (ADR-045).
+ * What the REST boundary sends when a route throws a `HandledError`. `error` carries the
+ * stable code; branch on it and render customer-facing copy from your own registry (ADR-045).
  */
 export const handledErrorEnvelopeSchema = z
   .object({
@@ -63,15 +48,8 @@ export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.extend(
 });
 
 /**
- * A failure we could name, serialised for a client to branch on (ADR-045).
- *
- * This is the NESTED form, carried as a `domainError` field on a run or a row —
- * distinct from {@link handledErrorEnvelopeSchema}, which is the flat body the
- * boundary returns when the request itself fails.
- *
- * `code` is the stable discriminant and the only field to key logic off.
- * Nothing here is sensitive — that is what makes an error handled — but the
- * copy a customer reads is still yours to write from the code, not `message`.
+ * A failure we could name, serialized for clients to branch on (ADR-045). Nested form on runs
+ * or rows; distinct from handledErrorEnvelopeSchema (flat body on request failures).
  */
 const handledErrorSchema = z.object({
   code: z.string().describe("Stable failure code; branch on this"),
@@ -102,13 +80,8 @@ const evaluationSummarySchema = z.object({
 });
 
 /**
- * The aggregate a run row carries in the LIST response — costs and durations
- * rolled up per evaluator.
- *
- * Not to be confused with {@link executionSummarySchema}: both are called
- * `summary` on the wire, and they are different objects. This one is
- * `ExperimentRunSummary`, folded from ClickHouse; the other is the live
- * execution's tally, held in Redis for the poll endpoint.
+ * The aggregate a run row carries in LIST response — costs and durations per evaluator.
+ * Distinct from executionSummarySchema (live execution tally in Redis for polling).
  */
 const runAggregateSummarySchema = z.object({
   datasetCost: z.number().optional(),
@@ -306,13 +279,8 @@ export const runResultsResponseSchema = z.object({
 // ── workbench state and version history ─────────────────────────────────────
 
 /**
- * The workbench setup, as the API carries it.
- *
- * Deliberately open: the canonical shape is
- * `persistedEvaluationsV3StateSchema`, which the service parses on every
- * write, and re-declaring its ~40 nested objects here would give integrators a
- * second definition that drifts. What the document promises is the contract
- * that matters: an object you read, edit and send back whole.
+ * The workbench setup as the API carries it. Deliberately open to avoid duplicating the
+ * canonical shape; the contract is: read, edit, send back whole.
  */
 export const workbenchStateSchema = z
   .record(z.string(), z.unknown())
@@ -441,13 +409,8 @@ export const experimentInitBadRequestSchema = z.union([
 ]);
 
 /**
- * What a refused create call sends.
- *
- * Two different refusals share the 403: the API key ceiling denying
- * `experiments:manage`, and the plan's experiment limit. Both arrive in the
- * flat handled-error envelope, so `error` is the code to branch on —
- * `api_key_permission_denied` for the first, `resource_limit_exceeded` for the
- * second, which also carries the counts below.
+ * What a refused create call sends. Two 403 refusals: API key permission denied or plan
+ * experiment limit. `error` code distinguishes them; limit case carries counts.
  */
 export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.extend({
   limitType: z

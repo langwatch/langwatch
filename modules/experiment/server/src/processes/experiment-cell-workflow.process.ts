@@ -479,11 +479,8 @@ export const buildSignatureNodeFromPrompt = ({
     verbosity: prompt.verbosity,
   });
 
-  // The VersionedPrompt read model prepends a synthesized `{role:"system", content: prompt.prompt}` to `messages`
-  // (storage keeps system text only in the `prompt` column — see hoistSystemMessage). `instructions` below already
-  // carries that same text, so forwarding the synthesized entry would send the system prompt twice. Strip system
-  // roles here: for a prompt with no template messages this leaves the list empty, which makes the engine fold the
-  // scalar inputs into a user turn instead of sending a request with no user message at all.
+  // Strip system roles: VersionedPrompt prepends a synthesized system message, but `instructions`
+  // already carries it, so forwarding both would duplicate it.
   const messages: ChatMessage[] = prompt.messages
     .filter((m) => m.role !== "system")
     .map((m) => ({
@@ -534,8 +531,9 @@ export const buildSignatureNodeFromPrompt = ({
 
 /**
  * Builds the prompt-identity fields (configId / handle / versionMetadata) that nlpgo reads to emit
- * PromptApiService.get + Prompt.compile spans. Mirrors signatureComponentSchema in @langwatch/workflow-contract
- * and the Go-side dsl.Component (PromptConfigID / PromptHandle / VersionMetadata).
+ * PromptApiService.get + Prompt.compile spans. Mirrors signatureComponentSchema in
+ * @langwatch/workflow-contract and the Go-side dsl.Component (PromptConfigID / PromptHandle /
+ * VersionMetadata).
  */
 const buildPromptIdentity = (identity: {
   configId?: string | null;

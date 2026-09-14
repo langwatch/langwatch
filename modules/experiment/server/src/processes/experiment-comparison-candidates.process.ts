@@ -1,7 +1,6 @@
 /**
- * Turning a variant's stored output into the text a judge reads, and naming the candidates. Pure — no port, no
- * class. These are the seven inner closures of `generateComparisonCells` that read nothing but their arguments;
- * moving them is what brings the comparison plan service under the module ceiling.
+ * Seven pure closures that turn a variant's output into judge-readable text and name candidates.
+ * Moving them is what brings the comparison plan service under the module ceiling.
  */
 
 import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service.ts";
