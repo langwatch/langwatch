@@ -320,12 +320,17 @@ provisions its users and groups the way Okta or Entra would.</p>
   <div class="field"><dt>With the token</dt><dd class="mono">{{.Provisioning.Token}} <span class="hint">— enough to tell it is the one you pasted</span></dd></div>
 </dl>
 <div class="row">
-  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/push"><button class="primary" type="submit">Push the directory</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/sync"><button class="primary" type="submit">Sync the difference</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/push"><button type="submit">Push everything</button></form>
   <form method="post" action="{{.Tenant.BaseURL}}/provisioning/pull"><button type="submit">Read it back</button></form>
   <form method="post" action="{{.Tenant.BaseURL}}/provisioning/delete"><button type="submit">Forget</button></form>
 </div>
-<p class="hint">Pushing sends every user then every group as a SCIM create. Reading back asks
-LangWatch what it holds now, which is the half that tells you what it made of them.</p>
+<p class="hint"><strong>Sync</strong> reads what LangWatch holds and sends only what changed —
+creates for arrivals, updates for renames, deactivations for departures — so you can run it
+after every round of churn and the numbers describe the round. It is the one to use.</p>
+<p class="hint"><strong>Push everything</strong> is the original: every user and group as a SCIM
+create, which is right exactly once and all conflicts afterwards. <strong>Read it back</strong>
+asks LangWatch what it holds now, which is the half that tells you what it made of them.</p>
 {{else}}
 <form method="post" action="{{.Tenant.BaseURL}}/provisioning">
   <label>SCIM address
@@ -339,6 +344,43 @@ LangWatch what it holds now, which is the half that tells you what it made of th
   <p style="margin-top:1.1rem"><button class="primary" type="submit">Connect</button></p>
 </form>
 {{end}}
+{{/* Directory at scale. Two users is the right size for "does a sign-in work"
+     and the wrong size for every question about provisioning — whether a sync is
+     incremental, whether the receiving side pages its lists, what a thousand
+     joiners does to the screen an administrator is reading. */}}
+<section class="panel">
+<h2>Directory at scale</h2>
+<p>Generate a directory big enough to be worth syncing, then put it through the changes a
+real one goes through between syncs.</p>
+<form method="post" action="{{.Tenant.BaseURL}}/population" class="row" style="align-items:flex-end">
+  <label>People <input name="users" type="number" min="0" max="50000" value="{{.Scale.Users}}" style="width:9ch"></label>
+  <label>Groups <input name="groups" type="number" min="0" max="500" value="{{.Scale.Groups}}" style="width:7ch"></label>
+  <button class="primary" type="submit">Generate</button>
+</form>
+<p class="hint">The admin and member you sign in as are kept, and growing keeps everybody
+already there — so a second generate at a larger size adds joiners rather than replacing
+the organization. Same numbers, same people, every time.</p>
+
+<form method="post" action="{{.Tenant.BaseURL}}/churn" class="row" style="align-items:flex-end;margin-top:1.4rem">
+  <label>Join <input name="join" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Leave <input name="leave" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Deactivate <input name="deactivate" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Reactivate <input name="reactivate" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Rename <input name="rename" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Regroup <input name="regroup" type="number" min="0" value="0" style="width:7ch"></label>
+  <button type="submit">Churn</button>
+</form>
+<p class="hint"><strong>Deactivate</strong> is what most identity providers actually send for
+somebody who has left — the record stays and <code>active</code> goes false. <strong>Leave</strong>
+is the rarer outright removal. <strong>Rename</strong> changes the name and the address but not
+the external id, which is the case that proves the receiving side matches on the id rather than
+on the email.</p>
+<p class="hint">Then press <em>Sync the difference</em> above and read the counts.</p>
+{{with .Scale.Last}}
+<p class="hint" style="margin-top:1.2rem">Last change: {{.}}</p>
+{{end}}
+</section>
+
 {{with .Outcome}}
 <p class="hint" style="margin-top:1.2rem">Last {{if eq .Kind "push"}}push{{else}}read-back{{end}}:
 <span class="pill {{if .Refused}}refused{{else}}ok{{end}}">{{if .Refused}}refused{{else}}ok{{end}}</span>
@@ -671,6 +713,7 @@ func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
 		"Records":      s.publishedRecords(t.Domain),
 		"Provisioning": provisioningViewOf(t),
 		"Outcome":      t.LastProvisioning(),
+		"Scale":        scaleViewOf(t),
 	}
 	// ?registered=<client id> is where the registration POST lands, so the
 	// credentials are shown once, at the top, right after they are minted.
