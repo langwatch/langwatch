@@ -6,7 +6,7 @@
  * per request and handed to the read unchanged.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { SpanNotFoundError, TraceApi, spansTrpc } from "@langwatch/trace-contract";
+import { SpanNotFoundError, TraceApi, promptStudioSpanSchema, spansTrpc } from "@langwatch/trace-contract";
 
 export const spansTrpcTransport = defineTrpcRouter(TraceApi, spansTrpc)
   .procedure("getAllForTrace")
@@ -34,6 +34,6 @@ export const spansTrpcTransport = defineTrpcRouter(TraceApi, spansTrpc)
 
     if (!result) throw new SpanNotFoundError(spanId);
 
-    return result;
+    return promptStudioSpanSchema.parse(result);
   })
   .build();

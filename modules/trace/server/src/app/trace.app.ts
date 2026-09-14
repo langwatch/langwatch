@@ -774,6 +774,16 @@ export class TraceApp implements TraceApi {
   // The process's broadcast fabric
   // -------------------------------------------------------------------------
 
+  /** The tenant's broadcast emitter, for a caller that streams events itself. */
+  getTenantEmitter(tenantId: string): NodeJS.EventEmitter {
+    return this.#dependencies.broadcast.getTenantEmitter(tenantId);
+  }
+
+  /** Releases the tenant's broadcast emitter once a stream ends. */
+  cleanupTenantEmitter(tenantId: string): void {
+    this.#dependencies.broadcast.cleanupTenantEmitter(tenantId);
+  }
+
   async *streamUpdates(input: {
     projectId: string;
     channel: "trace_updated" | "discover_updated";

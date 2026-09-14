@@ -7,7 +7,15 @@
  */
 import { on } from "node:events";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { TraceApi, TraceNotFoundError, tracesTrpc } from "@langwatch/trace-contract";
+import {
+  customersAndLabelsResultSchema,
+  distinctFieldNamesResultSchema,
+  evaluationSchema,
+  TraceApi,
+  TraceNotFoundError,
+  topicCountsResultSchema,
+  tracesTrpc,
+} from "@langwatch/trace-contract";
 
 import { TraceReadableSpanService } from "../services/read/trace-readable-span.service.ts";
 
@@ -61,7 +69,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       protections,
     });
 
-    return evaluations[input.traceId];
+    return evaluationSchema.array().optional().parse(evaluations[input.traceId]);
   })
 
   .procedure("getEvaluationInputs")
@@ -78,13 +86,24 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       userId: actor.id,
     });
 
-    return app.readEvaluations({ projectId: input.projectId, traceIds: input.traceIds, protections });
+    const evaluations = await app.readEvaluations({
+      projectId: input.projectId,
+      traceIds: input.traceIds,
+      protections,
+    });
+
+    return Object.fromEntries(
+      Object.entries(evaluations).map(([traceId, traceEvaluations]) => [
+        traceId,
+        evaluationSchema.array().parse(traceEvaluations),
+      ]),
+    );
   })
 
   .procedure("getTopicCounts")
   .withPermission("traces:view")
   .handle(async ({ app, input }) => {
-    const result = await app.readTopicCounts(input);
+    const result = topicCountsResultSchema.parse(await app.readTopicCounts(input));
 
     const topicsMap = Object.fromEntries(
       (await app.readTopics({ projectId: input.projectId })).map((topic) => [topic.id, topic]),
@@ -118,7 +137,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("getCustomersAndLabels")
   .withPermission("traces:view")
-  .handle(({ app, input }) => app.readCustomersAndLabels(input))
+  .handle(async ({ app, input }) => customersAndLabelsResultSchema.parse(await app.readCustomersAndLabels(input)))
 
   .procedure("getTracesByThreadId")
   .withPermission("traces:view")
@@ -214,12 +233,14 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("getFieldNames")
   .withPermission("traces:view")
-  .handle(({ app, input }) =>
-    app.readFieldNames({
-      projectId: input.projectId,
-      startDate: input.startDate,
-      endDate: input.endDate,
-    }),
+  .handle(async ({ app, input }) =>
+    distinctFieldNamesResultSchema.parse(
+      await app.readFieldNames({
+        projectId: input.projectId,
+        startDate: input.startDate,
+        endDate: input.endDate,
+      }),
+    ),
   )
 
   .procedure("getAllForDownload")

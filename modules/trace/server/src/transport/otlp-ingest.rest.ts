@@ -353,7 +353,7 @@ function requestForDecompression(request: Request, bytes: Uint8Array): Request {
   return new Request(request.url, {
     method: request.method,
     headers: request.headers,
-    body: bytes as BodyInit,
+    body: bytes,
   });
 }
 

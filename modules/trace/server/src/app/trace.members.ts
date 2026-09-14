@@ -1,9 +1,11 @@
 import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
+import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EventSourcing, QueueSendOptions, TenantId } from "@langwatch/eventing";
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { OrgAdminResolution, Project, UpdateProjectMetadataInput } from "@langwatch/project-contract";
-import type { AssignTopicCommandData, CustomersAndLabelsResult, DerivedTraceEvent, DistinctFieldNamesResult, Evaluation, NormalizedAttributes, NormalizedSpan, OtlpInstrumentationScope, OtlpResource, OtlpSpan, PromptStudioSpanResult, TopicCountsResult, Trace, TraceDerivedEventsInput, TraceLegacyFilterInput, TraceLegacyListInput, TraceQueryClassification, TraceRecordValue, TracesForProjectResult } from "@langwatch/trace-contract";
+import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
+import type { AnnotationAddedEventData, AnnotationRemovedEventData, AssignTopicCommandData, CustomersAndLabelsResult, DerivedTraceEvent, DistinctFieldNamesResult, Evaluation, NormalizedAttributes, NormalizedSpan, OtlpInstrumentationScope, OtlpResource, OtlpSpan, PIIRedactionLevel, PromptStudioSpanResult, RecordSpanCommandData, TopicCountsResult, Trace, TraceDerivedEventsInput, TraceLegacyFilterInput, TraceLegacyListInput, TraceNameChangedEventData, TraceQueryClassification, TraceRecordValue, TraceTopicAssignment, TracesForProjectResult } from "@langwatch/trace-contract";
 import type { Readable } from "node:stream";
 export interface TraceInfrastructure {  traceEdgeMediaTelemetry: TraceEdgeMediaTelemetry;
   traceEvaluationDispatch: TraceEvaluationDispatch;
