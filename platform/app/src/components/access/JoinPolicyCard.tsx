@@ -75,6 +75,32 @@ const OPTIONS: Array<{
   help: HELP_BY_ANSWER[answer],
 }));
 
+/** The comma-separated field, as the list of domains it means. */
+function splitDomains(value: string): string[] {
+  return value
+    .split(",")
+    .map((domain) => domain.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Whether the plan still carries this control, and what to say when it does not.
+ *
+ * Two different sentences on purpose. An organization that never had it is
+ * being offered something; one whose plan lapsed WHILE the door was open needs
+ * to know their setting still stands and that closing it is always available —
+ * only reopening needs the plan back.
+ */
+function useJoinPolicyLock(domainJoin: DomainJoinSetting) {
+  return useEnterpriseLock({
+    held: domainJoin !== "off",
+    offExplanation:
+      "Choosing who can join without an invitation is part of the Enterprise plan. You can still invite people by email on any plan.",
+    heldExplanation:
+      "Your plan no longer includes this control. Your current setting is still in force, and you can close the door at any time — reopening it needs the Enterprise plan.",
+  });
+}
+
 export function JoinPolicyCard({
   domainJoin,
   joinDomains,
@@ -93,14 +119,7 @@ export function JoinPolicyCard({
 }) {
   const [selected, setSelected] = useState<DomainJoinSetting>(domainJoin);
   const [domains, setDomains] = useState(joinDomains.join(", "));
-
-  const lock = useEnterpriseLock({
-    held: domainJoin !== "off",
-    offExplanation:
-      "Choosing who can join without an invitation is part of the Enterprise plan. You can still invite people by email on any plan.",
-    heldExplanation:
-      "Your plan no longer includes this control. Your current setting is still in force, and you can close the door at any time — reopening it needs the Enterprise plan.",
-  });
+  const lock = useJoinPolicyLock(domainJoin);
 
   /**
    * An option this organization cannot move to. Closing the door is free, and
@@ -110,10 +129,7 @@ export function JoinPolicyCard({
   const isLocked = (value: DomainJoinSetting) =>
     lock.locked && value !== "off" && value !== domainJoin;
 
-  const parsedDomains = domains
-    .split(",")
-    .map((domain) => domain.trim())
-    .filter(Boolean);
+  const parsedDomains = splitDomains(domains);
   const unchanged =
     selected === domainJoin &&
     parsedDomains.join(",") === joinDomains.join(",");
@@ -147,29 +163,7 @@ export function JoinPolicyCard({
       }
       data-testid="join-policy-card"
     >
-      {lock.locked && (
-        <HStack gap={2} align="start" data-testid="join-policy-notice">
-          {/* One pixel down: the glyph optically aligned to the line beside
-              it, which mathematical alignment always misses. */}
-          <Box color="fg.muted" marginTop="1px" flexShrink={0}>
-            <Lock size={14} />
-          </Box>
-          <Text color="fg.muted" fontSize="11.5px" lineHeight="1.55">
-            {lock.explanation}{" "}
-            {/* THE WAY OUT IS THE BRAND COLOUR, NOT A SECOND BLUE. This link
-                used to wear `blue.600`, a colour nothing else on these pages
-                speaks; the way to a plan is an action, and actions here are
-                orange. */}
-            <Link
-              href={lock.linkHref}
-              colorPalette="orange"
-              color="colorPalette.fg"
-            >
-              {lock.linkLabel}
-            </Link>
-          </Text>
-        </HStack>
-      )}
+      {lock.locked && <JoinPolicyLockNotice lock={lock} />}
 
       <RadioGroup.Root
         value={selected}
@@ -254,5 +248,42 @@ export function JoinPolicyCard({
         </Text>
       )}
     </SettingsCard>
+  );
+}
+
+/**
+ * Why the control is locked, and the way out of it.
+ *
+ * THE WAY OUT IS THE BRAND COLOUR, NOT A SECOND BLUE. This link used to wear
+ * `blue.600`, a colour nothing else on these pages speaks; the way to a plan
+ * is an action, and actions here are orange.
+ */
+function JoinPolicyLockNotice({
+  lock,
+}: {
+  lock: ReturnType<typeof useJoinPolicyLock>;
+}) {
+  return (
+    <HStack gap={2} align="start" data-testid="join-policy-notice">
+      {/* One pixel down: the glyph optically aligned to the line beside
+          it, which mathematical alignment always misses. */}
+      <Box color="fg.muted" marginTop="1px" flexShrink={0}>
+        <Lock size={14} />
+      </Box>
+      <Text color="fg.muted" fontSize="11.5px" lineHeight="1.55">
+        {lock.explanation}{" "}
+        {/* THE WAY OUT IS THE BRAND COLOUR, NOT A SECOND BLUE. This link
+            used to wear `blue.600`, a colour nothing else on these pages
+            speaks; the way to a plan is an action, and actions here are
+            orange. */}
+        <Link
+          href={lock.linkHref}
+          colorPalette="orange"
+          color="colorPalette.fg"
+        >
+          {lock.linkLabel}
+        </Link>
+      </Text>
+    </HStack>
   );
 }
