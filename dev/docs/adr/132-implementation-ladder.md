@@ -71,7 +71,7 @@ needs no entry there. ADR-132 is right on both.
 
 - **Files** — `sdks/typescript/src/cli/utils/governance/platform-tool-policy.ts` (`PlatformToolSlug`, `PLATFORM_TOOL_POLICIES`), `platform/app/ee/governance/services/platformToolPolicy.service.ts` (`PLATFORM_TOOL_SLUGS`, `PLATFORM_TOOL_POLICY_DEFAULTS`, **and `PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE` at `:88`**), new drift test under `platform/app/ee/governance/services/__tests__/`
 - **Scenarios** — "The two copies of the governed tool list name the same tools"
-- **Proves it** — `pnpm test:unit platform/app/ee/governance/services/__tests__/<new>.unit.test.ts`
+- **Proves it** — `pnpm test:unit platform/app/ee/governance/services/__tests__/platformToolPolicy.drift.unit.test.ts`
 - **Depends on** — 1
 
 Order inside this commit matters. The two lists are byte-identical today, so a
@@ -197,8 +197,22 @@ has simply never seen an agent that fills them.
 
 The first two scenarios are the Gates-table gate against posting transcripts
 twice: the streamer must be absent when the run is not in the no-virtual-key
-mode. The third is the start-time stamp — a file pi wrote before this run is out
-of window.
+mode. The third is the start-time stamp.
+
+That stamp needs stating precisely, because a loose reading of it loses data.
+The existing filter compares the file's **modification** time, not its creation
+time — `findRecentRollouts` keeps a file when `s.mtimeMs >= sinceMs`
+(`codex-rollout-otlp.ts:320`). So a session resumed with `--resume` is *in*
+window: pi reopens the old file and appends, the modification time moves, and
+the file is picked up. Only a file untouched during this run is skipped.
+
+The real consequence is the opposite of exclusion. A resumed file enters the
+window carrying its entire prior history, not just the new rows, so the same
+turns are offered again on every resume. Nothing is lost; the thing that stops
+them being sent twice is the de-duplication key from rung 12. That is why rung
+12 comes before this one, and why its two scenarios are the ones that hold here.
+No extra scenario is needed: "The same turn is not recorded twice" covers the
+re-offer, and "Resuming a session does not create a second one" covers identity.
 
 ### 16. Capture never disturbs the coding session
 
@@ -285,6 +299,10 @@ All 33 assigned, none orphaned: rung 1 ×1, 2 ×1, 4 ×2, 5 ×1, 7 ×1, 8 ×1, 9
   endpoint and headers only, which is right for a tool that emits no telemetry of
   its own, but nothing confirms it. Rung 1's test is the first thing that will
   say.
-- Whether the ADR's count of nineteen registration sites reconciles. Counting the
-  list in issue #8128 plus the four tile lists gives twenty distinct symbols. The
-  ladder works from the symbols, not the number.
+- ~~Whether the ADR's count of nineteen registration sites reconciles.~~
+  Resolved, and the ladder was wrong. Issue #8128's sixteen already include
+  `SUPPORTED_ASSISTANT_KINDS`, which is also one of the four tile lists, so the
+  union adds three symbols and not four: **nineteen distinct sites**, matching
+  the ADR. Counting basis, stated so the next reader does not redo it: the
+  sixteen from #8128, plus `ASSISTANT_KINDS`, `ASSISTANT_PRESETS` and
+  `ASSISTANT_KIND_TO_TOOL_SLUG`.
