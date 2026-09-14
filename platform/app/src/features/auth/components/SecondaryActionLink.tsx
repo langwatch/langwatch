@@ -33,7 +33,11 @@ export function SecondaryActionLink({
   testId?: string;
 }) {
   return (
-    <Box width="full" textAlign="center" paddingY="1">
+    // Top padding only. The stack's own 14px gap already separates this row,
+    // and symmetric padding made a card that ENDS with this link read
+    // bottom-heavier than one that ends with a solid button — the two doors
+    // looked unevenly padded when their last rows differed.
+    <Box width="full" textAlign="center" paddingTop="1">
       <Box
         asChild
         display="inline-block"

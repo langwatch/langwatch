@@ -93,7 +93,11 @@ export function AuthCard({
             ) : null}
           </VStack>
         </Card.Header>
-        <Card.Body paddingX="32px" paddingTop="22px" paddingBottom="32px">
+        {/* Bottom matches the header's 34px top exactly: the card used to sit
+            on 32px and read bottom-heavy or bottom-light depending on whether
+            the last row was a solid button or a bare text link. One number,
+            same as the top, is the version nobody's eye snags on. */}
+        <Card.Body paddingX="32px" paddingTop="22px" paddingBottom="34px">
           {/* Named for the entrance: the rows rise in one after another, and
               the stagger is applied from the stylesheet rather than by giving
               every screen an animation prop to pass down. */}
