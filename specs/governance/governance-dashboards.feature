@@ -91,6 +91,16 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     # simply not readable yet, and the widget says that in as many words
     # rather than rendering a chart of nothing or a red card.
 
+  @integration
+  Scenario: Every widget is drawn in the colour mode the reader is in
+    Given the member is reading in dark mode
+    When the page renders
+    Then every chart is drawn dark
+    And every chart is drawn light for a member reading in light mode
+    # The chart runs in a sandboxed frame, so the author code inside it has
+    # no way of its own to see the page around it. A chart fixed to one mode
+    # paints white panels down a dark page.
+
   # ---------------------------------------------------------------------------
   # Honesty — the page is a picture, not a workspace
   # ---------------------------------------------------------------------------

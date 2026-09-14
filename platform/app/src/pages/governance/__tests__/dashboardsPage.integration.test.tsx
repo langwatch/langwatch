@@ -34,6 +34,7 @@ import {
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
   flagEnabled: true,
+  colorMode: "light" as "light" | "dark",
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
@@ -60,6 +61,19 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
         ? harness.flagEnabled
         : true,
     isLoading: false,
+  }),
+}));
+/**
+ * The reader's colour mode, driven from the harness. Only the hook is
+ * replaced — everything else in the module is the design system's own tokens,
+ * which the page renders against.
+ */
+vi.mock("~/components/ui/color-mode", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/components/ui/color-mode")>()),
+  useColorMode: () => ({
+    colorMode: harness.colorMode,
+    setColorMode: () => undefined,
+    toggleColorMode: () => undefined,
   }),
 }));
 vi.mock("~/hooks/useActivePlan", () => ({
@@ -172,6 +186,7 @@ const writeControls = (role: "button" | "menuitem") =>
 beforeEach(() => {
   harness.permissions = getOrganizationRolePermissions("ADMIN");
   harness.flagEnabled = true;
+  harness.colorMode = "light";
   frameProps.length = 0;
   gridPlacements.length = 0;
   // The choice is section-wide and lives in session storage, which the lane
@@ -382,6 +397,35 @@ describe("given the page is open with sample data on", () => {
 
     expect(writeControls("button")).toHaveLength(0);
     expect(writeControls("menuitem")).toHaveLength(0);
+  });
+});
+
+describe("given a reader who has chosen a colour mode", () => {
+  beforeEach(() => {
+    writeSampleChoice(true);
+  });
+
+  /** @scenario "Every widget is drawn in the colour mode the reader is in" */
+  it("tells every chart the mode the reader is actually in", () => {
+    harness.colorMode = "dark";
+    renderPage();
+
+    // A chart fixed to light paints white panels down a dark page, and the
+    // author code inside the frame has no other way to know.
+    expect(recordedFrames()).toHaveLength(4);
+    for (const frame of recordedFrames()) {
+      expect(frame.dashboardContext.theme).toBe("dark");
+    }
+
+    cleanup();
+    frameProps.length = 0;
+    harness.colorMode = "light";
+    renderPage();
+
+    expect(recordedFrames()).toHaveLength(4);
+    for (const frame of recordedFrames()) {
+      expect(frame.dashboardContext.theme).toBe("light");
+    }
   });
 });
 

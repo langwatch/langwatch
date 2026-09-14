@@ -2,6 +2,7 @@ import { Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "~/components/analytics/reports/ChartGrid";
+import { useColorMode } from "~/components/ui/color-mode";
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
@@ -73,16 +74,24 @@ export function GovernanceWidgetCard({
   timeWindow,
   onShowSample,
 }: GovernanceWidgetCardProps) {
+  const { colorMode } = useColorMode();
+
   // Built literally, with no project key present at all: an absent key cannot
   // be forwarded by mistake the way an undefined one can.
+  //
+  // The theme is the reader's own, read the same way `DashboardWidgetFrame`
+  // reads it: author code inside the frame has no other way to know which mode
+  // the page is in, and a chart fixed to light paints white panels down a dark
+  // page. Anything other than dark falls to light, because `colorMode` is
+  // undefined until the theme has resolved.
   const dashboardContext = useMemo<ChartFrameDashboardContext>(
     () => ({
       timeWindow,
       granularitySeconds: GOVERNANCE_GRANULARITY_SECONDS,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      theme: "light",
+      theme: colorMode === "dark" ? "dark" : "light",
     }),
-    [timeWindow],
+    [timeWindow, colorMode],
   );
 
   const frameMaxHeight = Math.max(
