@@ -70,11 +70,13 @@ export async function walkSessionFiles({
  * skipped rather than failing the sweep.
  *
  * `sinceMs` is compared against a clock this function does not control. A
- * modification time comes from the kernel, and on Linux the kernel's is behind
- * the one `Date.now()` reads — by up to about a millisecond, measured. A caller
- * whose `sinceMs` is a `Date.now()` taken moments before the file was written
- * is therefore asking a question whose answer is a coin flip, and gets silence
- * either way. Such a caller must subtract its own grace before calling; see
+ * modification time comes from the kernel, and on Linux it advances in
+ * one-millisecond steps while `Date.now()` does not, so a file written after a
+ * `Date.now()` can carry an mtime up to a millisecond before it — measured.
+ * A caller whose `sinceMs` is a `Date.now()` taken moments before the file was
+ * written is therefore asking a question whose answer is a coin flip, and gets
+ * silence either way. Such a caller must subtract its own grace before calling;
+ * see
  * `FS_CLOCK_SKEW_GRACE_MS` in `pi-capture.ts` for the reasoning and for why a
  * grace is safe only where a second, finer window enforces the real boundary.
  */

@@ -1361,11 +1361,23 @@ prefilter — but it drops whole files, so when it is wrong the run captures
 nothing and says nothing.
 
 The two numbers come from different clocks. The run's start is `Date.now()`; an
-mtime is the kernel's. Measured on Linux 6.x: a file written immediately after a
-`Date.now()` carries an EARLIER mtime 98% of the time, by up to 1.2ms. Measured
-on macOS: never, 0 of 5000. The margin between the stamp and the write in that
-test is 1.2–1.9ms — the same size as the skew, which is why it is a coin flip on
-Linux and impossible locally.
+mtime is the kernel's. On Linux 6.8, mtimes advance in one-millisecond steps —
+300 consecutive writes produced 29 distinct values, every gap exactly 1ms —
+while `Date.now()` is not quantised to that step. So a file written after the
+stamp can carry an mtime up to a millisecond before it. Driving the shape the
+wrapper actually has (a few awaited hops, then one async write): Linux reported
+an mtime earlier than the stamp in 373 of 400 runs, median −0.485ms; macOS in 0
+of 400. Same probe on three filesystems (overlay, tmpfs, ext4 volume): no
+difference.
+
+Corrected mid-review. The first version of this note compared that skew against
+a 1.2–1.9ms stamp-to-write margin and called them "the same size". The margin
+was measured on macOS and the skew only exists on Linux, so the comparison was
+invalid and the conclusion it supported was not earned. The Linux margin inside
+the real wrapper path was never measured, and the CI failure was never
+reproduced. What stands is narrower: the comparison is unsound, it is the only
+filter that can drop a whole file silently, and it is Linux-only — which is the
+shape of the flake. It is fixed on those grounds, not on a reproduction.
 
 Fixed by widening the prefilter alone, `FS_CLOCK_SKEW_GRACE_MS` (1s) in
 `pi-capture.ts`. Free, because every row it lets through still meets the row
