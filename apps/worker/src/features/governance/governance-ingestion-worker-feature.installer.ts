@@ -28,17 +28,7 @@ export interface GovernanceIngestionWorkerCapability {
 
 /**
  * Worker registration for Enterprise Governance's ingestion pipelines.
- *
- * Two pipelines register here, and their order is fixed by a binding rather
- * than by preference: pulled usage first, because the ingestion-pull run port
- * dispatches its observations, and ingestion pull second, whose own lifecycle
- * commands are bound back into a deferred pipeline handle immediately after.
- * The Enterprise adapter owns that sequence; this installer owns only when it
- * runs relative to the rest of the worker graph.
- *
- * Schedule reconciliation is the adapter's, fired once per boot and
- * deliberately not awaited: a Governance installation whose reconcile pass
- * fails logs and retries next boot rather than refusing to start the worker.
+ * Two pipelines in fixed order: pulled usage first, then ingestion pull.
  */
 export class GovernanceIngestionWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

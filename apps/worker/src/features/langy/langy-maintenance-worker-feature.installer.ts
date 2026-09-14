@@ -10,17 +10,7 @@ export abstract class WorkerLangySessionKeyReap {
 
 /**
  * Worker registration for Langy's session-key reaper.
- *
- * Registered unconditionally, on the same footing as the Eventing substrate's
- * own sweeps: the reaper existed, was tested and was routed for cron, and then
- * never scheduled, because the chart ships no CronJobs. Mounting it here is
- * what finally gives the backstop for keys orphaned by a SIGKILLed manager a
- * caller.
- *
- * The pipeline is built HERE rather than received, for the same reason the
- * API-key sweep's is: the outbox rows the reap writes have to be the ones this
- * graph's own process store prunes, and a definition built against another
- * store prunes another process's rows.
+ * Pipeline built here to ensure outbox rows match this process's store.
  */
 export class LangyMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

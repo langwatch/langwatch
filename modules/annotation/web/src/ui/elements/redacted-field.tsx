@@ -1,17 +1,6 @@
 /**
- * The shared redacted-content marker: a lock and "Redacted", with a tooltip
- * saying who a privacy rule does let read it.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/ui/RedactedField`, which keeps thirteen callers
- * across the trace surfaces and so did not travel.
- *
- * WHAT THE NARROWING TOOK OUT is the explicit-props half. The platform
- * component can be driven either by its own per-field query or by a DTO's own
- * redaction flags, because the traces-v2 drawer passes what the server already
- * nulled; an annotation row has no such DTO, so this copy has one source of
- * truth and no branch. The "Open privacy settings" link is kept, and so is the
- * grant that decides whether to offer it.
+ * Redacted-content marker: lock, tooltip, and privacy settings link.
+ * Narrowed local copy (see platform/app/src/components/ui/RedactedField).
  */
 
 import { HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";

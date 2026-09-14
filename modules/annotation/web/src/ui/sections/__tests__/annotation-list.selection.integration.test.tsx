@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Reviewers curate in the annotations list, send what they judged straight to a
- * dataset, and take what nobody can review out of the queue.
- *
- * MOVED from
- * `platform/app/src/components/annotations/__tests__/AnnotationsTable.selection.integration.test.tsx`.
- * What changed is which modules are mocked and how an overlay is observed —
- * `openDrawer(...)` calls are query writes now, so the assertions read the
- * host's recorded address instead of a spy on the application's registry. What
- * is asserted is the same, scenario for scenario.
- *
- * Spec: modules/annotation/specs/annotations-list-selection.feature.
+ * List curation: send to dataset, remove from queue. Moved from platform/app
+ * annotations table (see annotations-list-selection.feature).
  */
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";

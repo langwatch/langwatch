@@ -1,27 +1,6 @@
 /**
- * The annotations sidebar: the three standing lists, then a queue per entry the
- * reviewer is a member of, each with the work still waiting on it.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/AnnotationsLayout`. The
- * platform component stays where it is, because the annotation queue walker
- * (`/annotations/my-queue`) still renders it and that key did not move — it
- * mounts four thousand lines of `features/traces-v2`' conversation view, which
- * belongs to the traces family. The two die together when it does.
- *
- * WHAT THE COPY DROPPED, and it is the same drop every moved family takes:
- * `DashboardLayout`. Chrome belongs to the route tree, and these pages are
- * children of a layout route the composing application still serves; the
- * platform layout's job here was the annotations sub-sidebar, and that is what
- * travelled.
- *
- * ALSO DROPPED: the Langy context targets on the sidebar entries.
- * `@langwatch/langy-web` is ungoverned and `apps/ui` may not import it, which is
- * the same loss the me, automations, agents and datasets families recorded.
- *
- * THE ACTIVE ENTRY IS NOT READ FROM THE ADDRESS. The platform layout compared
- * `usePathname()` to a built href, which is why it needed the concrete path
- * rather than the route pattern. The screen was told which view it is, so the
- * sidebar is told too, and the queue entry compares slugs rather than paths.
+ * Annotations sidebar: three standing lists and per-entry queues.
+ * Local copy (see platform/app/src/components/AnnotationsLayout).
  */
 
 import { Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";

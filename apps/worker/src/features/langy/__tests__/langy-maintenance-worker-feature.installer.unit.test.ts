@@ -1,15 +1,6 @@
 /**
- * Whether the worker's Langy maintenance feature composes the sweep it claims to.
- *
- * The pipeline used to arrive built, from a registry that had already closed
- * over the App's session-key service; it is built here now, from the feature
- * package's own maintenance adapter. Two things have to hold for that to be the
- * same sweep: the registered pipeline must still carry the routing keys the
- * shared queue was staged with, and the intent behind its schedule must call
- * THIS graph's revoke rather than an inert stand-in. A pipeline that registers
- * and never revokes looks identical from every health signal the fleet watches.
- *
  * Spec: modules/langy/specs/langy-session-key-maintenance.feature
+ * Verifies the pipeline composes with correct routing keys and revoke intent.
  */
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { LANGY_SESSION_KEY_REAP_PROCESS_NAME } from "@langwatch/langy-server";

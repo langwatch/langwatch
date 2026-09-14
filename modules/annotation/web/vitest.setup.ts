@@ -1,19 +1,5 @@
 /**
- * What every test in this package needs before it renders anything.
- *
- * The same shape `@langwatch/agent-web`, `@langwatch/gateway-web`,
- * `@langwatch/user-web` and `@langwatch/automation-web` state for themselves,
- * for the same reasons. `@testing-library/jest-dom` registers the DOM matchers
- * the suites moved from `platform/app` were written against —
- * `toBeInTheDocument`, `toBeDisabled`, `toHaveTextContent` — which that
- * application registered in its own global setup, so the assertions travel
- * unchanged rather than being rewritten into `.textContent` comparisons.
- *
- * The rest are browser APIs jsdom does not ship and Chakra's overlays reach for
- * on the way to positioning themselves. A missing `ResizeObserver` surfaces as
- * an unhandled rejection out of an animation frame rather than as a failure, so
- * a shard fails with its own summary all green — which is why the stub that
- * used to sit in `src/__tests__/setup.ts` is now stated here with the rest.
+ * Test setup: testing-library matchers and browser APIs for jsdom.
  */
 
 import "@testing-library/jest-dom/vitest";

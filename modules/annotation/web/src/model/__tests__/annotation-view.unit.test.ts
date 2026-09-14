@@ -1,11 +1,6 @@
 /**
- * Which of the four lists a page key means, and what that decides.
- *
- * The view is a PROP rather than something read back out of the address, so
- * these are the assertions that used to be four page files handing four sets of
- * props to one table.
- *
- * Spec: modules/annotation/specs/annotations-list-selection.feature.
+ * Page key to list view mapping. Spec:
+ * modules/annotation/specs/annotations-list-selection.feature.
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,16 +1,6 @@
 /**
- * One entry in the annotations sidebar.
- *
- * A NARROWED FAMILY-LOCAL COPY of `platform/app/src/components/MenuLink`, which
- * keeps sixteen callers across the application and so did not travel.
- *
- * WHAT THE NARROWING TOOK OUT is the part that made the platform component
- * three components in one: it resolved "am I the current entry?" itself from
- * `usePathname` when the caller passed neither `isSelected` nor
- * `isSelectedAnnotation`, and it carried an `includePath` prefix rule and a
- * `disabled` state that no annotation entry uses. Selection here is always the
- * caller's answer, because the caller knows it without reading the address: the
- * screen was told which view it is.
+ * Sidebar menu entry: selection passed by caller, not derived from route.
+ * Narrowed local copy (see platform/app/src/components/MenuLink).
  */
 
 import { HStack, Spacer, Text } from "@chakra-ui/react";

@@ -1,11 +1,6 @@
 /**
- * What an annotation export says.
- *
- * Both exports were closures inside a component, so neither had a test that did
- * not first render a table. These assert on the header row and the cells, which
- * is what a reviewer opens the file to read.
- *
- * Spec: modules/annotation/specs/annotations-list-selection.feature.
+ * Annotation export format: header row and cells. Spec:
+ * modules/annotation/specs/annotations-list-selection.feature.
  */
 
 import { describe, expect, it } from "vitest";

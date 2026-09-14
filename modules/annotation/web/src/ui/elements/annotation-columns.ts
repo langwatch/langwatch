@@ -1,13 +1,5 @@
 /**
- * Which columns the annotations list can show, and which of them a reviewer
- * sees before they have said anything.
- *
- * A project that collects a dozen score types used to get a dozen columns,
- * nearly all of them empty on any given row, pushing input and output — the
- * two things a reviewer actually judges — into a narrow strip and the row's
- * actions off the right edge. So the score types now arrive folded into one
- * "Scores" column, and each type is still available on its own for anyone who
- * wants the matrix.
+ * Annotation list columns: score types are folded into one with per-type matrix available.
  */
 
 /** One column the list can show, as the column picker names it. */

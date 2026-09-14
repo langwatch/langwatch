@@ -3,33 +3,8 @@ import type { MailRender } from "@langwatch/mail";
 import type { EmailDelivery } from "@langwatch/notification-server";
 
 /**
- * The two join-request mails this process's wakes send (D12).
- *
- * The ENVELOPE lives here, in the composition root: which address is written
- * to, which gateway the message leaves through, and the deployment's own host
- * that every link is built from. None of that is a fact the identity feature
- * knows, and what the feature owns is who is told and what happens when
- * telling them fails.
- *
- * The WORDS do not live here. They are `@langwatch/mail`'s, rendered through
- * `MailRender`, because this file used to hold a `createElement`
- * translation of the same two mails the mail package already rendered from
- * JSX — a twin, and one that put react-email on the worker's boot graph. A
- * drift between twins is invisible in production: two admins on one
- * organization would receive two differently-worded reminders depending on
- * which process happened to hold the wake, and nobody sees both.
- *
- * Two rules run through both messages, and they are pinned where the words
- * are.
- *
- * No mail carries an action link that decides anything. An admin approves in
- * the members area, behind their session; a link in mail that approved a
- * request would be a second, unauthenticated way to add somebody to an
- * organization.
- *
- * And the lapse notice says nothing about why, and does not name who said no.
- * The ending is deliberately quiet: a requester who learns which colleague
- * turned them down has learned something that is not theirs.
+ * The two join-request mails this process sends (D12).
+ * ENVELOPE here (from, gateway, host); WORDS in @langwatch/mail via MailRender.
  */
 export class JoinRequestMailAdapter implements JoinRequestMail {
   static create(options: {
@@ -88,24 +63,8 @@ export class JoinRequestMailAdapter implements JoinRequestMail {
 }
 
 /**
- * The join-request mail port for a process that has no mail gateway.
- *
- * A NAMED absence rather than a quiet one. The pipeline mounts either way and
- * must: `join-requests` names five commands, a state projection and the
- * lifecycle subscriber in the checked-in job registry, and a consumer missing
- * any of them rejects those jobs for redelivery forever while every health
- * signal stays green. Expiry in particular is a fold this graph still performs
- * — a request lapses on time whether or not anybody can be told.
- *
- * So the send throws, loudly and by name, and the notification fan-out logs it
- * and lets the request stand — which is exactly what a deployment with no
- * email provider configured already does today. What this must never become is
- * a no-op that resolves: a silent success would report every notification as
- * sent, and the one thing worse than an unsent reminder is a graph that says
- * it sent one.
- *
- * A process that CLAIMS `event-sourcing/jobs` never gets here:
- * `WorkerProductionComposition` refuses to compose that graph without mail.
+ * The join-request mail port for a process with no mail gateway.
+ * Throws loudly rather than silently succeeding — avoids false "sent" claims.
  */
 export class AbsentJoinRequestMail implements JoinRequestMail {
   static create(): AbsentJoinRequestMail {

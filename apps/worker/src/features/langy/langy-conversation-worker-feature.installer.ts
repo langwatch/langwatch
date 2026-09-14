@@ -60,16 +60,7 @@ export interface LangyConversationWorkerCapability<
  */
 export class LangyConversationWorkerFeatureInstaller implements WorkerFeatureInstaller {
   /**
-   * The registration is captured as a closure, and that is what erases the
-   * event union.
-   *
-   * A definition is generic in the discriminated union its feature owns, and
-   * `prepareEventForProjection` is contravariant in it — so a field typed
-   * against the base `Event` would refuse the very definition Langy publishes,
-   * and a class generic in the union would make two instantiations of this
-   * installer mutually unassignable wherever the composition root names it.
-   * Registering inside `create`, where the union is still known, leaves the
-   * class itself free of it.
+   * Registration inside create() erases the event union through closure.
    */
   static create<TEvent extends Event>(options: {
     installer: LangyConversationWorkerCapability<TEvent>;

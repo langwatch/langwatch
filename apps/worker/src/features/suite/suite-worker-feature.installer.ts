@@ -18,26 +18,15 @@ export interface SuiteWorkerCommands<TRecordItemStarted = unknown, TCompleteItem
 /** Suite's worker-facing capability after its server graph is composed. */
 export interface SuiteWorkerCapability {
   /**
-   * Builds the suite-run processing definition, deduplication included.
-   *
-   * The three commands register WITH deduplication options, and that is
-   * load-bearing rather than incidental: `withCommand` reads deduplication
-   * only from its options and never from a handler's static `makeJobId`, and
-   * the run-state fold accumulates by addition. Registered without them, a
-   * redelivered item event double-counts a suite run's progress and can flip
-   * its status to SUCCESS or FAILURE before the run has finished.
+   * Builds the suite-run processing definition with deduplication.
+   * Required to prevent redelivered events from double-counting progress.
    */
   buildProcessing(): SuiteRunProcessingPipeline;
 }
 
 /**
  * Worker registration for the Suite run pipeline.
- *
- * It installs before Scenario, whose simulation process manager reports item
- * starts and completions into this pipeline. Suite itself subscribes to
- * nothing — every cross-pipeline subscriber in this pair lives on the
- * simulation side — so this installer has no ordering requirement of its own
- * beyond preceding the pipeline that dispatches to it.
+ * Installs before Scenario, which dispatches item starts and completions to it.
  */
 export class SuiteWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

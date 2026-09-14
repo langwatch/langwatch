@@ -9,27 +9,7 @@ import { JoinRequestMailAdapter } from "../join-request-mail.adapter.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
- *
- * The guarantee is that both graphs send the SAME words, and it is checked by
- * rendering them rather than by transcribing them.
- *
- * This file used to hold the two mails as byte literals, captured while this
- * adapter wrote its own `createElement` translation of them. That pin did its
- * job — it proved the move to `@langwatch/mail` changed no message, character
- * for character — and it stopped being the right shape once the words moved
- * for good: a copy change in the mail package would now fail a worker test
- * that has no opinion about copy, and the words themselves are pinned where
- * they live, by `packages/mail/src/templates/__tests__/mail-templates.unit.test.tsx`.
- *
- * What is left here is the part only this package can get wrong: that the
- * adapter reaches the right renderer with the right props, so the mail it
- * sends is the mail the application would have sent. The renderer is the real
- * one rather than a double for the same reason as before — a stub would assert
- * the test's own strings back at itself.
- *
- * A drift here is invisible in production: two admins on one organization
- * would receive two differently-worded reminders depending on which process
- * happened to hold the wake, and nobody sees both.
+ * Verifies the adapter reaches the right renderer with the right props.
  */
 const MEMBERS_URL = "https://langwatch.acme.example/settings/members";
 

@@ -55,13 +55,8 @@ export class TraceWorkerFeatureInstaller implements WorkerFeatureInstaller {
   );
 
   /**
-   * The registered `recordSpan` command, as a callable proxy.
-   *
-   * Trace is the one feature that dispatches into ITSELF: the tracked-event
-   * reactor mints a synthetic span and has to send it the way an SDK export
-   * would, which means the command only exists after the definition that
-   * contains the reactor has been registered. The proxy closes that circle in
-   * one place rather than making every caller carry a late-bound reference.
+   * The `recordSpan` command as callable proxy for self-dispatch.
+   * Allows the tracked-event reactor to send synthetic spans.
    */
   readonly commands: TraceProcessingCommands = {
     recordSpan: this.recordSpan.fn,

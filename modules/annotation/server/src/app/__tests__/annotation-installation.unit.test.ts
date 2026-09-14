@@ -23,18 +23,7 @@ import {
 } from "./annotation.fixture.ts";
 
 /**
- * One process, stated once: what it is, which backends it wants, and the
- * members it hands in itself. Memory is asked for BY NAME — it is never a
- * default and never what a missing database falls back to — so this is the
- * same seam production uses with `repositories: "postgres"`, not a test-only
- * builder that can rot apart from it.
- *
- * The five `withProvided` lines are the one thing the declarative shape has no
- * word for. A peer is not a member of the pool, so it is not one of the named
- * arguments above; and installing the peer's own module instead would install
- * its peers after it, down to the authz ledger, which is not a unit test. The
- * seam that hands one peer's Api in by its token has to survive the rename,
- * whatever it ends up called.
+ * Test setup that mirrors production: named memory access and injected peers.
  */
 function process() {
   return createApp({ role: "api", config: {} })

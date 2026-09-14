@@ -1,20 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The window a list is reading has to stay STILL between renders.
- *
- * A REGRESSION PIN for the defect the move introduced and the list suite found.
- * `readAnnotationPeriod` is pure and takes `now`, which is what makes it
- * testable; calling it straight out of a render body gave a relative range a
- * new end timestamp every render. Everything keyed on the window then moved
- * with it — the list's "the picks belong to these rows" effect set state, which
- * rendered, which moved the window again — and the queue read's tRPC input
- * carries the two dates, so in a browser every frame would also have been a
- * round trip on a fresh cache key.
- *
- * The assertion is referential, not structural: two windows that are EQUAL are
- * not enough, because a new pair of Date objects with the same milliseconds
- * still busts every dependency array they reach.
+ * Regression: window must stay still between renders to avoid circular updates.
  */
 
 import { render } from "@testing-library/react";

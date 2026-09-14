@@ -34,18 +34,7 @@ export interface SsoConnectionWorkerCapability<TEvent extends Event = Event> {
 
 /**
  * Worker registration for the SSO connection pipeline.
- *
- * This is the only graph that can advance TEARDOWN_PENDING to TORN_DOWN: the
- * transition happens through the process manager's wake and nowhere else, so
- * a connection whose teardown was requested sits at the pending state for as
- * long as no process registers this pipeline.
- *
- * It runs today: the legacy `PipelineRegistry` registers this pipeline, so
- * this is where it MOVES to. What keeps the move quiet is `SSOCONN_ROUTING`,
- * which defaults to `off`, so no sign-in decision reads this projection and
- * the grandfather migration remains the only production writer. Whoever makes
- * the worker composition the live one drops the legacy registration in the
- * same change.
+ * Only graph that advances TEARDOWN_PENDING to TORN_DOWN via process manager wake.
  */
 export class SsoConnectionWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create<TEvent extends Event>(options: {

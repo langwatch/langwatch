@@ -1,13 +1,6 @@
 /**
- * The addresses an annotation row opens, as query writes.
- *
- * These used to be `openDrawer(...)` calls the platform pages made through the
- * application's registry. They are the family's own now, and the assertions
- * that follow are what says a moved row still means what it meant — because
- * the chrome that mounts the two application drawers is not above these screens
- * yet, so nothing about the rendered result can tell you the address was right.
- *
- * Spec: modules/annotation/specs/annotations-list-selection.feature.
+ * Addresses that annotation rows open. Spec:
+ * modules/annotation/specs/annotations-list-selection.feature.
  */
 
 import { describe, expect, it } from "vitest";

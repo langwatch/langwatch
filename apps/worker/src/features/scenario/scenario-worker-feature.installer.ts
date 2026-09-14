@@ -68,24 +68,7 @@ export interface ScenarioWorkerCapability<
 
 /**
  * Worker registration for the Scenario (simulation run) pipeline.
- *
- * It installs after Suite, because the simulation process manager reports item
- * starts and completions into the suite run, and before nothing in
- * particular — Trace reaches it the other way round, through the
- * `computeRunMetrics` proxy this installer publishes.
- *
- * The delayed metrics retry is registered as a durable queue job, never as an
- * in-process timer. The legacy registry kept a `setTimeout` fallback for the
- * case where Eventing had no queue at all; a worker whose whole purpose is to
- * own the durable graph has no such case, and silently degrading to a timer
- * there would lose every scheduled retry on restart. A missing queue is
- * therefore a boot failure, stated rather than absorbed.
- *
- * What that job is called and how it deduplicates is not this installer's to
- * choose, and no longer arrives with the composed capability either: it is read
- * from `@langwatch/scenario-server`, so the graph that still registers the same
- * job from the legacy registry cannot disagree with this one about the routing
- * key both consumers stage.
+ * Installs after Suite; metrics retry is durable queue job, not timer.
  */
 export class ScenarioWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create<TComputeRunMetrics extends Record<string, unknown>, TEvent extends Event>(options: {

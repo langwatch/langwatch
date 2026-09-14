@@ -1,12 +1,6 @@
 /**
- * The date range these lists read.
- *
- * The rule worth pinning is `isDefault`: a queue is work still to do and the
- * sidebar badge counts all of it, so the list narrows its read only once a
- * range has actually been picked. Reading the fallback window as a pick would
- * leave the badge and the list disagreeing about how much work is waiting.
- *
- * Spec: modules/annotation/specs/annotations-list-selection.feature.
+ * Date range for lists; `isDefault` keeps badges and lists in sync. Spec:
+ * modules/annotation/specs/annotations-list-selection.feature.
  */
 
 import { describe, expect, it } from "vitest";

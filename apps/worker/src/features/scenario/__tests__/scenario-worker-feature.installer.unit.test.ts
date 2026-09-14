@@ -1,16 +1,6 @@
 /**
- * Whether the worker stages the retry the scenario package decided, or one of
- * its own.
- *
- * The retry used to arrive with the composed capability, synthesized in
- * platform/app; the description belongs to `@langwatch/scenario-server` now and
- * the installer reads it. That is only a move while the registration keeps
- * carrying the package's own routing key, delay and deduplication into the
- * queue — a job registered under a name the other consumer never staged, or
- * with a deduplication id of the installer's own devising, registers cleanly
- * and then quietly never runs.
- *
  * Spec: modules/scenario/specs/simulation-service.feature
+ * Verifies the worker stages the correct retry with matching routing/deduplication.
  */
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,

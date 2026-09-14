@@ -1,19 +1,6 @@
 /**
- * Who a set of traces is being sent to: people, queues, or both.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/traces/AddParticipants`.
- * That component is exclusive to the send dialog, but the dialog itself is not
- * exclusive to this family — the trace table's bulk bar and the trace drawer's
- * overflow menu both open it — so the platform pair stays for them and this one
- * travels with the annotation lists.
- *
- * The two lists come from two reads and are ordered deliberately: QUEUES FIRST,
- * because a queue reaches whoever is on it and so is the answer most of the
- * time; a person is the exception.
- *
- * NARROWED: the platform component takes an `isTrigger` flag that hides its own
- * Send button for a caller that renders one. Both callers here render the
- * dialog's footer, so the flag has no caller and is gone.
+ * Participant picker for traces: queues first, then people.
+ * Family-local copy (see platform/app/src/components/traces/AddParticipants).
  */
 
 import {

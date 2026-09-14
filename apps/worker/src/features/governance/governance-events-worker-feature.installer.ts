@@ -31,14 +31,7 @@ export interface GovernanceEventsWorkerCapability {
 
 /**
  * Worker registration for the Governance events pipeline.
- *
- * It installs immediately before Gateway spend and only alongside it. In the
- * legacy registry both were registered under one `if (gatewaySpend)` guard,
- * because the spend pipeline's debit adapter delivers through this pipeline's
- * commands: registering this one without the spend pipeline mounts a webhook
- * delivery process with no producer, and registering spend without this one
- * leaves its debits with nowhere to land. Keeping them a pair is what
- * preserves that.
+ * Installs alongside Gateway spend — they're paired in the delivery contract.
  */
 export class GovernanceEventsWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
@@ -46,14 +39,7 @@ export class GovernanceEventsWorkerFeatureInstaller implements WorkerFeatureInst
     eventing: WorkerEventingRuntime;
     /**
      * The spend-spike anomaly evaluator, when this process composed one.
-     *
-     * It rides this installer rather than one of its own because a spend-spike
-     * alert IS a governance signal: the rules it reads are Governance's, the
-     * `governance_kpis` window it evaluates is the one this feature's roll-up
-     * writes, and the webhook it fires leaves through the same fence the
-     * webhook delivery process manager uses. A second installer would also have
-     * to claim a routing key on the shared queue — the evaluator claims none,
-     * because it is a five-minute Postgres loop rather than a queue consumer.
+     * Rides this installer because its alerts are governance signals sharing the delivery path.
      */
     anomalySchedule?: GovernanceAnomalySchedule;
   }): GovernanceEventsWorkerFeatureInstaller {

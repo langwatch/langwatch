@@ -16,20 +16,7 @@ export interface ScimSyncWorkerCapability {
 
 /**
  * Worker registration for the directory-sync pipeline.
- *
- * It has NO process manager, deliberately: a SCIM push is a request an
- * identity provider makes and retries on its own schedule, so the retry this
- * aggregate records is the directory's rather than ours. That means this
- * installer registers a fold and five command lanes and nothing that wakes on
- * a timer — an unregistered pipeline here loses writes, not a sweep.
- *
- * It runs today: the legacy `PipelineRegistry` registers this pipeline as
- * well, and the two definitions are twins until the cutover — the application
- * keeps its own for the producer surface, and this graph is the consumer.
- * What keeps the move quiet is `SCIM_V2_GRANTS`, which defaults off, so no
- * SCIM request path dispatches these commands and the previous write path is
- * unchanged. Whoever makes the worker composition the live one drops the
- * legacy registration in the same change.
+ * Has no process manager — SCIM retries are provider-driven, not timer-based.
  */
 export class ScimSyncWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {

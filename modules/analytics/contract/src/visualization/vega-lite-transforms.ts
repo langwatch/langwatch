@@ -1,14 +1,4 @@
-/**
- * The reviewed transform set: what each step reads, and what it leaves behind.
- *
- * This table is the single definition of the set. The policy's allowlist is its
- * keys, so a transform can never be permitted without an analyzer — which would
- * contribute no columns and turn a working chart into an unknown-field refusal
- * blaming the wrong thing entirely.
- *
- * Its own module because both the policy and the field walk read it, and the
- * field walk already reads the policy's error builder.
- */
+/** The reviewed transform set shared by policy validation and field walk. */
 
 import { isPlainObject, visitPredicate } from "./vega-lite-structure.ts";
 

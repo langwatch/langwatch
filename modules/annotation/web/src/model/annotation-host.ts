@@ -61,10 +61,16 @@ export abstract class AnnotationHostApi {
 
   abstract hasPermission(permission: string): boolean;
 
-  /** Whether the reader holds the lite `EXTERNAL` role; the sidebar hides queue editing from them. */
+  /**
+   * Whether the reader holds the lite `EXTERNAL` role; sidebar hides queue
+   * editing from them.
+   */
   abstract isLiteMember(): boolean;
 
-  /** Whether the project is the reader's own personal workspace; the dataset hand-off asks first there. */
+  /**
+   * Whether the project is the reader's own personal workspace; dataset
+   * hand-off asks first there.
+   */
   abstract isOwnPersonalWorkspace(): boolean;
 
   abstract route(): AnnotationRouteReading;

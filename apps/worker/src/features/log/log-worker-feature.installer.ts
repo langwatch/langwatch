@@ -13,13 +13,7 @@ export interface LogWorkerCapability {
 
 /**
  * Worker registration for Log's durable processing pipeline.
- *
- * Subscribers are injected rather than resolved here. A dispatch subscriber
- * that feeds another pipeline's contribution commands has to close over
- * commands that only exist once that pipeline is registered, so the ordering
- * constraint belongs to the composition root that owns both — this installer
- * only guarantees that whatever it was given is mounted before queue
- * readiness.
+ * Subscribers injected to handle cross-pipeline command dependencies.
  */
 export class LogWorkerFeatureInstaller implements WorkerFeatureInstaller {
   static create(options: {
