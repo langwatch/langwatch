@@ -1,12 +1,4 @@
-/**
- * Two projects called "Personal Workspace" under different teams are two
- * different projects, and a filter that lists them both as "Personal Workspace"
- * gives the reader no way to pick the one they meant.
- *
- * Moved from `platform/app/src/utils/__tests__/disambiguateLabels.unit.test.ts`
- * with the helper it drove: the audit trail's Project filter was its only
- * caller, so both travel and the platform pair is deleted.
- */
+/** Disambiguate labels: different projects with same name need unique filter labels. */
 
 import { describe, expect, it } from "vitest";
 import { disambiguateLabels } from "../disambiguate-labels.ts";

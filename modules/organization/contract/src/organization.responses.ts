@@ -1,20 +1,4 @@
-/**
- * What the organization feature's tRPC transport answers, stated once.
- *
- * The chain declares each procedure's `withOutput` from here, so the shape a
- * client reads is written down in the contract rather than implied by
- * whatever a handler happened to return. The schemas are checked against
- * real answers in development and test; production returns the handler's
- * own value.
- *
- * Three procedures on this surface (`getAll`, `getOrganizationWithMembersAndTheirTeams`,
- * `getMemberById`) answer with a deeply nested cross-row aggregate — Organization
- * joined to Team, TeamUser, CustomRole, the project feature's Project row and
- * User, several of them mutated in place for per-viewer redaction — that has
- * no existing contract schema. Giving `organization.rows.ts`'s row types their
- * own zod schemas is a follow-up in its own right; those three stay
- * `withoutOutput` until then.
- */
+/** Contract schemas for the organization feature's tRPC responses. */
 import { z } from "zod";
 
 /** A write with nothing else to report. */

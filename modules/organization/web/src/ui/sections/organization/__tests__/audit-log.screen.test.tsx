@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings > Audit Log. Guards one property: a pre-filtered deep-link's report must not quietly widen to the whole organization's history. Spec: specs/audit-log/audit-log.feature
+ * Audit-log screen: guards pre-filtered deep-links from widening to full history.
+ * @see specs/audit-log/audit-log.feature
  */
 
 import { cleanup, screen, waitFor, within } from "@testing-library/react";

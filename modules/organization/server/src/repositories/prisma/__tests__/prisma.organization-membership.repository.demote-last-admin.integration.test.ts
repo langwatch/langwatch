@@ -1,5 +1,5 @@
 /**
- * Moved from `organization.member-roles.planLimit.integration.test.ts` on platform/app, whose real subject was the plan-limit gate exercised through the deleted `appRouter` — a process-owned tRPC boundary this package does not own. The one scenario that belongs here is the repository's own invariant: demoting the organization's last ADMIN is refused before any plan check runs.
+ * Repository invariant: demoting the last ADMIN is refused before plan checks.
  * @vitest-environment node
  * @see specs/licensing/seat-reconciliation.feature
  */

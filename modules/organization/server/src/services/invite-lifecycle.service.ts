@@ -155,15 +155,7 @@ export class InviteLifecycleService {
     };
   }
 
-  /**
-   * Seats held against the seats the plan covers, where that is a fact.
-   *
-   * Nothing is returned for an organization on enterprise or negotiated terms:
-   * its ceiling was agreed rather than bought, so the number on the public
-   * page is not its number and a mail that quoted it would be wrong in a way
-   * the administrator can see. A census that cannot be read returns nothing
-   * too — a seat line is not worth failing a re-request over.
-   */
+  /** Seat census only for standard plans with public pricing; nothing for negotiated. */
   private async trySeatCensus({
     organizationId,
   }: {

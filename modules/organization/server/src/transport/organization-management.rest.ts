@@ -1,13 +1,4 @@
-/**
- * `/api/organization` - the management surface's own profile, membership and
- * invitations, no `{orgId}` segment since it is implied by the organization
- * credential. The orchestration (seat guards, the invitation ceremony, the
- * Enterprise plan gate over custom roles, trace-share revocation after a
- * settings write, the invite acceptance link, the authorization feature's
- * member access breakdown) lives in the application, the same one
- * `organization.*` administers over tRPC; this file states wire access and
- * maps between the wire and the application's own shapes.
- */
+/** `/api/organization`: management surface wiring with implied organization credential. */
 import { toDate, type Instant } from "@langwatch/time";
 import {
   OrganizationApi,

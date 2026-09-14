@@ -1,16 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The seat counts on the member list.
- *
- * An admin reconciling an organization down to its plan decides person by
- * person, and the two decisions available to them, moving somebody to a Lite
- * Member seat and disabling them, are each refused once the matching allowance
- * runs out. Reading the allowance off a refusal means learning it after picking
- * the person and clicking save, so both counts belong on the page where the
- * picking happens.
- *
- * Spec: specs/licensing/seat-reconciliation.feature
+ * Seat counts on member list for per-person reconciliation decisions.
+ * @see specs/licensing/seat-reconciliation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

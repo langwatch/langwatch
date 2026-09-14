@@ -104,24 +104,7 @@ export type ClaimOrganizationBillingCustomerInput = z.infer<
   typeof claimOrganizationBillingCustomerInputSchema
 >;
 
-/**
- * One audit-log row, with its actor and its project already resolved.
- *
- * DECLARED HERE RATHER THAN INFERRED FROM THE ROUTER because the screen that
- * renders it lives in `@langwatch/organization-web`, and a web package may
- * neither import `@langwatch/organization-server` nor name an `AppRouter` that
- * does not exist until a process instantiates one. `OrganizationApp.getAuditLogs`
- * is annotated with this type, so widening what the audit trail answers is a
- * compile error at the producer rather than a silent disclosure at the table.
- *
- * ONE TABLE, TWO SHAPES. Gateway writes carry `targetKind` plus a `before`/
- * `after` diff; platform writes carry `args` and `metadata`. `source` is
- * COMPUTED from the presence of `targetKind` rather than stored, which is why
- * it is not nullable while the four fields it is derived from are.
- *
- * `userId` is nullable so a background job, a migration or any other system
- * actor can write a row without inventing a person to blame it on.
- */
+/** Audit log row with resolved actor and project; nullable userId for system actors. */
 export type EnrichedAuditLog = {
   id: string;
   createdAt: Date;

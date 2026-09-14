@@ -6,8 +6,7 @@ import { InviteService } from "../invite.service.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
 /**
- * A self-hosted deployment runs uncapped without a license, so an organization can hold more active members than the seats it just bought. Activation itself always succeeds (see `LicensePlanSourceService`, which accepts any signed key regardless of the org's
- * current headcount); this suite pins the OTHER half of "the org lands in an over-seats state": new invitations are refused while the active count exceeds the license, and a disabled member's freed seat is what lets a new invite succeed again.
+ * Over-seated orgs refuse new invites until a disabled member frees a seat.
  * @see specs/licensing/seat-reconciliation.feature
  */
 function buildService(options: { maxMembers: number; currentFullMembers: number }) {

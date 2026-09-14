@@ -14,13 +14,7 @@ export function useDepartmentColumn(
   organizationId: string,
   /**
    * Whether AI governance is switched on for this organization.
-   *
-   * TAKEN, NOT READ, and that is load-bearing. This hook used to ask a
-   * `useFeatureFlag` shim, which asked the ORGANIZATION host — and the general
-   * settings page in `@langwatch/project-web` renders the same control under
-   * the PROJECT host, where that read throws. A shim over a host port is only
-   * safe for a module one composition ever mounts, and this one has two. The
-   * caller already holds its own host, so it answers the flag.
+   * Taken as param to avoid host-specific reads in a multi-composition module.
    */
   governanceEnabled: boolean,
 ) {

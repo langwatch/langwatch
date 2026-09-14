@@ -1,12 +1,4 @@
-/**
- * The status code and the message a tRPC failure carries, read structurally.
- *
- * `platform/app` reached for `error instanceof TRPCClientError`, which needs
- * `@trpc/client` — one of the imports ADR-004 seals off from a screen's
- * closure — and which is the wrong test anyway once an error has crossed a
- * serialisation boundary. Reading the shape is what the house rule asks for:
- * assert on `code`, never on the class.
- */
+/** Read tRPC error shape structurally: assert on code, never on class. */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -1,5 +1,6 @@
 /**
- * Moved from `organization.setMemberDisabled.integration.test.ts` on platform/app. That file drove its assertions through the deleted `appRouter`, the authz engine's `permissions.getDecision`, and the license seat-counting service — none of which this package owns any more (the seat counter moved to `@langwatch/entitlement-server`, the permission decision to the authz package). What is left as this repository's own invariant is the disable/re-enable write itself: it flips `disabledAt` without touching role or department, and it refuses to take the last active admin down.
+ * Disable/re-enable flips disabledAt without touching role or department,
+ * and refuses to disable the last active admin.
  * @vitest-environment node
  * @see specs/licensing/seat-reconciliation.feature
  */

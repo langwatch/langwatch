@@ -273,7 +273,7 @@ export class ServerOrganizationApp implements OrganizationApi {
     users: UserApi,
     shares: ShareApi,
     apiKeys: ApiKeyApi,
-    /** The SAME identity application `user.*` answers from, for the caller's own verified addresses (D11 invitation matching). */
+    /** Identity application that answers for the caller's verified addresses. */
     identity: IdentityApi,
     /**
      * The ONE plan application every allowance in this process is read

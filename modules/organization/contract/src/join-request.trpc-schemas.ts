@@ -1,18 +1,6 @@
 import { z } from "zod";
 
-/**
- * The transport inputs the join-request surface publishes.
- *
- * Every one of them is deliberately narrow. `lookup` takes no input at all —
- * it answers about the caller's own verified addresses — and `request` takes
- * only the organization it re-derives server-side, so there is no field a
- * caller can vary to probe for other people's organizations.
- *
- * The joining SETTING's input is not here: its `domainJoin` values are
- * `DOMAIN_JOIN_SETTINGS`, which the identity package owns, and a portable
- * contract restating them would be a second source of truth for the same
- * three words.
- */
+/** Transport inputs: deliberately narrow to prevent probing for other organizations. */
 
 /** The organization an admin-side call is about. */
 export const joinRequestApiOrganizationScopeSchema = z.object({

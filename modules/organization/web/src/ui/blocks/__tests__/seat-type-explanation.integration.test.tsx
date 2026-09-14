@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Both surfaces where the seat-type choice is made must carry the same answer. See specs/licensing/seat-type-explained.feature.
+ * Seat-type choice must be consistent across surfaces.
+ * @see specs/licensing/seat-type-explained.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

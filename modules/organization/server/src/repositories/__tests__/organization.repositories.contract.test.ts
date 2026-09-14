@@ -1,15 +1,4 @@
-/**
- * The organization repositories' contract: organization settings, team
- * creation and archival, group management, membership read paths, personal
- * workspace protection, and tenant ownership routing.
- *
- * The memory tier is the only backend registered here. The Prisma tier is
- * tested separately in
- * `../prisma/__tests__/prisma.organization-repositories.integration.test.ts`,
- * because complex membership writes with role binding ledger interaction need
- * a real database. This suite pins the memory twin to observable answers so
- * the app can be driven without database members for bootstrapping tests.
- */
+/** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
 import { vi, beforeEach, describe, expect, it } from "vitest";
 import {
   OrganizationNotFoundError,

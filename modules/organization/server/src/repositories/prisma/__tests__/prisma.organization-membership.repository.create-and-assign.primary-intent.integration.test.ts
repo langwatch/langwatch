@@ -1,7 +1,8 @@
 /**
- * the Organization row inside the same create (atomic by construction — no separate write that can fail on its own), produces an identical result shape regardless of intent, and persists NULL when no intent is given (legacy default).
+ * createAndAssign persists the declared primary intent atomically with the
+ * organization row, producing identical result regardless of intent.
  * @vitest-environment node
- * ADR-038 I4/I5: `createAndAssign` persists the declared primary intent on
+ * @see ADR-038 I4/I5
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";

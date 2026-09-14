@@ -1,15 +1,7 @@
 import { z } from "zod";
 import { organizationIntentSchema } from "./organization.ts";
 
-/**
- * The transport inputs the organization, membership and invitation surface
- * publishes.
- *
- * They live in the contract rather than beside the router because the input a
- * caller has to send is part of what this feature promises. The service-level
- * command shapes in `organization.ts` are a different contract: those describe
- * what `OrganizationService` accepts, these describe what a client sends.
- */
+/** Transport inputs: what callers must send to the tRPC surface. */
 
 /** The organization a call is about, and the only scope most of them carry. */
 export const organizationApiScopeSchema = z.object({ organizationId: z.string() });

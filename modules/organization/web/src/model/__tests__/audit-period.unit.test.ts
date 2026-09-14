@@ -1,13 +1,4 @@
-/**
- * The window the audit trail is read over.
- *
- * A narrowed copy of the platform period selector, with the router taken out —
- * which is what lets the reading and the writes be asserted at all. `now` is a
- * parameter everywhere, because a relative window anchored to a hidden clock is
- * a function whose answer nobody can state.
- *
- * Spec: specs/audit-log/audit-log.feature
- */
+/** Audit period window: narrowed copy without router; `now` as parameter. */
 
 import { describe, expect, it } from "vitest";
 import {

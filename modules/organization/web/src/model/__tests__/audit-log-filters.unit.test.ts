@@ -1,13 +1,4 @@
-/**
- * What the address says the audit table is showing.
- *
- * Every filter this page applies is in the URL, because a compliance reviewer's
- * workflow is sending somebody else the exact view they are looking at. These
- * are the readings and the writes that make that true, asserted without a
- * router — which is the whole reason they are pure functions.
- *
- * Spec: specs/audit-log/audit-log.feature
- */
+/** Audit-log filters in URL for sharing views; pure function assertions. */
 
 import { describe, expect, it } from "vitest";
 import {

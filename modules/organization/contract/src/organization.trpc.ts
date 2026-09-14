@@ -1,14 +1,4 @@
-/**
- * Every `organization.*` procedure, declared once. An organization, the people
- * in it and the invitations that put them there are all organization subjects,
- * so one namespace owns all three.
- *
- * Three reads answer a deeply nested cross-row aggregate that has no contract
- * schema yet - Organization joined to Team, TeamUser, CustomRole, the project
- * feature's Project row and User, several fields redacted per viewer. They
- * declare an unknown answer rather than a wrong one; deriving the real schemas
- * from `organization.rows.ts` is a follow-up of its own.
- */
+/** All organization, membership, and invitation procedures in one namespace. */
 
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";

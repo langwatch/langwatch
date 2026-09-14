@@ -1,25 +1,4 @@
-/**
- * `editProject`, as the address spells it.
- *
- * RECOVERED FROM `platform/app/src/components/projects/EditProjectDrawer.tsx`,
- * deleted in `cc91631cd8`. The Teams page's per-project overflow menu kept
- * writing the address after the component went, so renaming a project or moving
- * it to another team changed the URL and opened nothing.
- *
- * ONLY THE CHANGED FIELDS ARE SENT. `project.update` is the same procedure that
- * saves the whole project-settings page, so posting the untouched fields back
- * would overwrite settings this drawer never showed the reader.
- *
- * A PERSONAL WORKSPACE IS NEVER OFFERED as somewhere to move a project to: it
- * holds only the project provisioned with it, and the server refuses the move
- * anyway. Filtering it out of the picker is what keeps the refusal from being
- * the way the reader finds that out.
- *
- * The three names that came out of `~/features/errors` are answered by
- * `behavior/handled-error-form`, which places a field-level rejection where the
- * reader is looking; the words still come from the application's registry
- * through the host.
- */
+/** Edit-project drawer: sends only changed fields; filters personal workspaces. */
 
 import {
   Button,

@@ -18,7 +18,7 @@ import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
  */
 type LimitType = "members" | "membersLite";
 
-/** Click-then-modal license enforcement: `checkAndProceed` runs the action or shows the upgrade modal. */
+/** License enforcement: check and proceed with action or show upgrade modal. */
 export function useLicenseEnforcement(limitType: LimitType) {
   const { organization } = useOrganizationTeamProject();
   const openUpgradeModal = useUpgradeModalStore((state) => state.open);

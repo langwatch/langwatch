@@ -1,18 +1,4 @@
-/**
- * The generated Prisma enums these screens name, restated.
- *
- * `~/generated/prisma/client` is the application's generated client and a
- * browser package may not reach it. Each value below is an ENUM the product
- * offers in a picker or compares a membership against, restated with the
- * alignment obligation `@langwatch/enterprise-billing-contract` states about
- * its own Prisma enum copies: these must stay identical to
- * `packages/prisma-client/prisma/schema.prisma` or a role stops matching and a
- * scope stops resolving.
- *
- * `@langwatch/trace-web` carries the same three, byte for byte, and for the
- * same reason — no contract publishes the enum VALUES today. Both die when one
- * does.
- */
+/** Prisma enum values: must stay identical to schema or roles and scopes break. */
 
 export const OrganizationUserRole = {
   ADMIN: "ADMIN",

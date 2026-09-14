@@ -1,13 +1,4 @@
-/**
- * The two membership writes that straddle a grants-ledger append, seen from
- * the crash window between them.
- *
- * A ledger command cannot join a Prisma transaction, so both `deleteMember`
- * and `updateMemberRole` write twice with a gap in the middle. These tests
- * kill the ledger inside that gap and assert the end state is the fail-safe
- * one: the member keeps their old access, never a seat and a grant that
- * disagree in the direction of more access.
- */
+/** Crash window between Prisma write and ledger append: member keeps old access on failure. */
 
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";

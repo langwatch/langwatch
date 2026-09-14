@@ -1,15 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The sign-up ceremony: which steps the declared intent selects, which of them
- * may fail without costing the customer the organization they just created,
- * what the first project is named when nobody named it, and what the client is
- * handed back.
- *
- * The ceremony used to live in the `onboarding.*` transport, where nothing
- * could reach it without a router. It is the onboarding service's now, and this
- * drives it directly over the two members interfaces it runs through.
- *
+ * Sign-up ceremony: intent-driven step selection, failure isolation, response.
  * @see specs/features/onboarding/intent-fork.feature
  */
 import type {

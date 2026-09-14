@@ -1,14 +1,4 @@
-/**
- * A read-only field whose whole job is being copied.
- *
- * A FAMILY-LOCAL COPY of the field the SCIM page took whole. A core package may
- * not import an enterprise one, so the members page's invitation link carries
- * its own; the two are byte-identical and die together when the field lands in
- * the Design System, where both halves could name it.
- *
- * The three `react-icons/fi` glyphs became their `lucide-react` twins, which is
- * the icon set every moved package already uses.
- */
+/** Read-only field with copy, show/hide toggle, and clipboard handler. */
 
 import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";

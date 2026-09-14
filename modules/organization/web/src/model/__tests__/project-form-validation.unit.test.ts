@@ -1,12 +1,4 @@
-/**
- * The two rules the create-project form applies before anything is sent.
- *
- * PORTED WITH THE FORM from
- * `platform/app/src/components/projects/__tests__/ProjectForm.unit.test.ts`,
- * deleted in `cc91631cd8` along with its subject. Only the import path changed.
- *
- * @see specs/projects/create-project-drawer.feature
- */
+/** Create-project form validation rules. */
 
 import { describe, expect, it } from "vitest";
 

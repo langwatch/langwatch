@@ -1,17 +1,4 @@
-/**
- * The notice a surface shows in place of content the reader may not see.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/PermissionAlert.tsx`,
- * with one change: the platform version typed its `permission` prop as
- * `Permission` from `~/server/api/rbac`, a deprecated bare alias for
- * `AuthzPermission` that reached the engine gate and through it a Node-only
- * logger. The RBAC family already replaced that alias everywhere it moved a
- * page; this takes the same line — a permission is a string here, and the one
- * caller passes a literal.
- *
- * Its `react-feather` glyph became the `lucide-react` twin, which is the icon
- * set every moved package already uses.
- */
+/** Permission restriction notice: shown in place of restricted content. */
 
 import { Alert, Box, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";

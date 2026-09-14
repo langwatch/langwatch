@@ -1,12 +1,4 @@
-/**
- * What the group feature's tRPC transport answers, stated once.
- *
- * The chain declares each procedure's `withOutput` from here, so the shape a
- * client reads is written down in the contract rather than implied by
- * whatever a handler happened to return. The schemas are checked against
- * real answers in development and test; production returns the handler's
- * own value.
- */
+/** Contract schemas for the group feature's tRPC responses. */
 import { z } from "zod";
 import { organizationGroupBindingSchema, organizationGroupMemberSchema } from "./group.ts";
 

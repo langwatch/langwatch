@@ -2,15 +2,7 @@ import { Button, Card, Heading, HStack, Input, RadioGroup, Text, VStack } from "
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useState } from "react";
 
-/**
- * How colleagues on a matching domain get in (D12).
- *
- * Three settings and no fourth. The copy says what each one does FOR the
- * reader and never how it is built — no "domain matcher", no "identifier
- * projection" — and the automatic option names its own cost in the same
- * breath as its benefit, because somebody walking in with nobody in the loop
- * is a thing an administrator should agree to on purpose.
- */
+/** Domain join settings: auto/request/off onboarding. Copy says what, not how. */
 const OPTIONS: Array<{
   value: DomainJoinSetting;
   label: string;

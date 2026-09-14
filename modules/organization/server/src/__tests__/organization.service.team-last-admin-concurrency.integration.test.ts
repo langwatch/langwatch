@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The team's last-admin guard under two removals landing at once — read-then-write means both could pass and commit, leaving a team nobody administers. Stopped by the team row's compare-and-swap fence on `updatedAt`.
+ * Last-admin guard under concurrent removals: stopped by compare-and-swap on updatedAt.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

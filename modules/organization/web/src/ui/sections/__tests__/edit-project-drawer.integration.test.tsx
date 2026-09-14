@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The drawer that renames a project or moves it to another team.
- *
- * NEW WITH THE RECOVERY, like its create-side sibling: `platform/app` shipped
- * this drawer with no test that rendered it, and the spec's UI half is a block
- * of `@unimplemented` scenarios saying exactly that.
- *
- * WHAT IT PINS is the property a REST-level test cannot see: only the fields
- * the reader actually changed are sent. `project.update` is the same procedure
- * that saves the whole project-settings page, so a drawer that posted its
- * untouched fields back would overwrite settings it never showed anybody.
- *
+ * Edit-project drawer: sends only changed fields (name/team).
  * @see specs/projects/edit-project-team.feature
  */
 

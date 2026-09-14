@@ -1,28 +1,4 @@
-/**
- * A server's rejection, placed where the reader is looking.
- *
- * The project drawers came back from `platform/app` calling four names out of
- * `~/features/errors` — an application module a feature-web package may not
- * reach. Three of the four are answered here and one is not: the words a
- * customer reads still come from the composing application's code-keyed
- * registry through `OrganizationHostApi.failed`, which is what
- * `organization-feedback.ts` already binds. What lives here is only the part
- * that decides WHERE a refusal lands, which is layout rather than copy.
- *
- * THE FIFTH FAMILY-LOCAL COPY OF THIS SHAPE, after `@langwatch/workflow-web`'s
- * `studio-host/errors`, `@langwatch/langy-web`'s `behavior/errors`,
- * `@langwatch/enterprise-governance-web`'s `handled-error-alert` and
- * `@langwatch/trace-web`'s presentation module. Every one of those recorded
- * that a repeat is the signal to promote it into one place, and every one left
- * it there, because promotion changes packages a drawer recovery does not own.
- * Recorded again rather than quietly repeated a fifth time.
- *
- * WHY IT IS NOT A TOAST. A validation refusal names fields; a toast names none
- * of them, so the reader is left to work out which of two inputs the server
- * meant. `applyHandledErrorToForm` puts the sentence on the input and answers
- * whether it managed to, which is the caller's signal not to also raise a
- * toast — a refusal reported twice reads as two failures.
- */
+/** Server rejections placed where the reader is looking; field errors not toasts. */
 
 import { Alert, Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";

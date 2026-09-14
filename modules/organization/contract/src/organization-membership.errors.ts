@@ -12,19 +12,7 @@ export class OrganizationNotFoundForTeamError extends NotFoundError {
   }
 }
 
-/**
- * The organization has no ADMIN member, so an action that has to reach one —
- * a budget-increase request, for instance — has nowhere to go.
- *
- * `fault: "platform"` even at 412: nobody holding this screen can fix it. The
- * requester did everything right, and no retry of theirs will work until
- * somebody with the keys adds an administrator, which is why the registry copy
- * for `no_admin_configured` names who to ask instead of offering a retry.
- *
- * Before this the router threw `new TRPCError({ message: "no_admin_found" })`
- * and the page branched on that string — a second, hand-written code system of
- * exactly the kind ADR-045 exists to prevent, and one the customer read raw.
- */
+/** No administrator exists to approve actions. */
 export class NoAdminConfiguredError extends HandledError {
   declare readonly code: "no_admin_configured";
 
@@ -136,17 +124,7 @@ export class CannotRemoveSelfError extends HandledError {
   }
 }
 
-/**
- * The change needs a member seat the plan does not have left: re-enabling a
- * disabled member, moving an external member to a full seat, or inviting
- * beyond the allowance. 403, not 402: the plan exists and the credential is
- * fine, the allowance is simply used up, and freeing a seat fixes it without
- * a purchase.
- *
- * `meta` is typed to the three fields the client presentation registry and the
- * upgrade modal read, so a construction that omits them or misspells one is a
- * compile error rather than an allowance rendered as "undefined of undefined".
- */
+/** No member seats available: plan limit reached, not a billing issue. */
 export class MemberSeatLimitReachedError extends HandledError {
   declare readonly code: "member_seat_limit_reached";
 
@@ -181,17 +159,7 @@ export class OrganizationSlugTakenError extends HandledError {
   }
 }
 
-/**
- * A custom role was named for a binding it cannot grant: the role belongs to
- * another organization, or the id names a built-in rather than a role the
- * organization defined for itself.
- *
- * Moved here with the membership half rather than left behind in the platform
- * application's role-binding errors, because the only writer that raises it is
- * the team-role cascade in this package's repository. Code, status and meta are
- * verbatim: `custom_role_not_assignable` is what the client presentation
- * registry is keyed by.
- */
+/** Custom role is not assignable: belongs to another org or is built-in. */
 export class CustomRoleNotAssignableError extends HandledError {
   declare readonly code: "custom_role_not_assignable";
 

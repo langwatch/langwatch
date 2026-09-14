@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Custom team roles are an Enterprise capability, and an invitation is where
- * one is first handed out. The plan is asked BEFORE anything is written, so a
- * batch that mixes one custom-role invitation in with built-in ones creates
- * none of them rather than half.
- *
- * The rule used to live in the `organization.*` tRPC transport. It is the
- * invitation door's now, and this drives it there.
- *
+ * Custom team roles gate invitations before writing: all-or-nothing on batch.
  * @see specs/features/enterprise-feature-guards.feature
  */
 import type { OrganizationCaller } from "@langwatch/organization-contract";

@@ -1,13 +1,4 @@
-/**
- * The sign-up ceremony: one organization, its first team, the standard AI-tool
- * catalogue, a personal workspace where the track calls for one, the first
- * project, and the announcements a sign-up leaves behind.
- *
- * Everything after the organization itself is non-fatal. The organization is
- * the durable outcome; a catalogue that was not seeded is provisioned by the
- * portal's own read, and a personal workspace that was not created is
- * recovered by the next session's backfill.
- */
+/** Sign-up ceremony: organization is durable; everything after is non-fatal. */
 
 import type {
   OnboardingInitializeOrganizationInput,

@@ -1,12 +1,4 @@
-/**
- * An in-application link, as the organization screens render one.
- *
- * `platform/app`'s `~/components/ui/link` wrapped Chakra's anchor around the
- * router's own `Link`, which is a router import a feature-web package may not
- * make. A plain anchor navigates to the same address; what it gives up is the
- * client-side transition, and that is the same trade the gateway, automation,
- * coding-agent, annotation and licensing families made.
- */
+/** In-application link: plain anchor (no router import for feature-web). */
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps } from "react";

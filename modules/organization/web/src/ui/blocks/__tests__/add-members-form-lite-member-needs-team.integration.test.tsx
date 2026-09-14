@@ -1,18 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Warning an admin about a lite invite that names no team.
- *
- * A lite seat carries no organization-wide access of its own: the invite
- * grants what its teams grant and nothing else. So a lite invite with no team
- * produces somebody who can sign in, see nothing, and still consume a seat —
- * and the admin finds out when the person tells them. The form says so before
- * they send it.
- *
- * A warning, not a refusal: assigning the team afterwards is a legitimate way
- * to work, and the admin is the one who knows whether they mean to.
- *
- * Spec: specs/members/member-role-team-restrictions.feature
+ * Warning lite invites without team: seat consumed but no access without team assignment.
+ * @see specs/members/member-role-team-restrictions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

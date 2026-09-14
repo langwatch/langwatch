@@ -7,16 +7,7 @@ import { bindPersonalTeamScopeReader } from "./prisma.personal-team-scope.reposi
 import { bindTenantDirectoryReader } from "./prisma.tenant-directory.repository.ts";
 import { PrismaTeamRepository } from "./prisma.team.repository.ts";
 
-/**
- * The Postgres-backed provider for the organization module's own repositories
- * (`Organization`, `Team`, `Group`, `OrganizationUser`, plus the two
- * personal-workspace/tenant-routing readers). Written directly against the
- * registry's provider shape rather than `prismaRepositories()`: these
- * repositories still read `Project` (the personal workspace) directly, which
- * is not this feature's exclusive claim yet, so declaring `tables` ownership
- * here would be premature. The membership repository is bound over the AuthZ
- * peer at app creation, so the provider needs the client alone.
- */
+/** Postgres-backed provider for organization, team, group, and workspace repositories. */
 export const PostgresOrganizationRepositories = {
   requires: ["prisma"] as const,
   create: ({ prisma }: { prisma: PrismaClient }): OrganizationRepositories => ({

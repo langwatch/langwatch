@@ -1,17 +1,4 @@
-/**
- * The tenant purge, seen from the tables it has to leave empty.
- *
- * Deleting an organization is the one path that has to know about EVERY row
- * keyed to it, and the authorization read model (Grant, GrantUsage, Role) is
- * the easiest one to forget: those rows carry organizationId as a plain
- * column and never a relation, so the database will not cascade them and a
- * missed one leaves a deleted tenant's access standing as the surviving head.
- *
- * The list this pins is the whole transaction, in order, for the same reason:
- * a refactor that trims the tail is invisible in a diff that only looks like
- * it removed two dead tables, and what it actually removes is the delete of
- * the organization itself.
- */
+/** Tenant purge must clean all rows keyed to it, including non-cascading authorization tables. */
 
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";

@@ -1,19 +1,4 @@
-/**
- * How an organization surface tells the reader how an action turned out.
- *
- * `~/components/ui/toaster` and `~/features/errors`'s `showErrorToast` are
- * application singletons a feature-web package may not reach, so the names the
- * screens already call are re-bound to the host port. The call SHAPES are
- * carried over unchanged on purpose — `toaster.create({ title, type })` and
- * `showErrorToast({ error, fallbackTitle })` — so the move touches the lines
- * that acquire them and none of the call sites that use them. The same shape
- * `@langwatch/automation-web` states, for the same reasons.
- *
- * WHAT DOES NOT COME WITH THEM, and is a later slice: the code-keyed
- * presentation registry. The composing application resolves a handful of codes
- * and falls back to the action name plus the generic line; the full registry
- * still lives in `platform/app`.
- */
+/** Feedback methods re-bound to host port, preserving call shapes for migration. */
 
 import { useCallback, useMemo } from "react";
 import { useOrganizationHost } from "../model/organization-host.ts";

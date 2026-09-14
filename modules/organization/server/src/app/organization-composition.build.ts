@@ -1,15 +1,4 @@
-/**
- * Builds the {@link OrganizationInfrastructure} this module used to receive
- * hand-composed (`apps/api/src/features/organization/organization.composition.ts`,
- * deleted by b383462d96). `ServerOrganizationApp.create` now builds it itself
- * from the three members it reads — `prisma`, `encryption` and `logger` — its
- * two contract peers, and its own config.
- *
- * Every branch here is the deleted composition's own, kept verbatim: what it
- * built, it builds; what it refused by name, this refuses by the same name;
- * what it left `null` stays `null`, because the two doors that read those
- * members are declared conditional on them.
- */
+/** Builds OrganizationInfrastructure from prisma, encryption, logger, and config. */
 import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 import type { EntitlementApi, Plan, PlanProviderUser } from "@langwatch/entitlement-contract";
 import {
@@ -53,15 +42,7 @@ type OrganizationSeatAnswer = Readonly<{
   max: number;
 }>;
 
-/**
- * The seat licence, over the SAME plan application and the SAME membership
- * counts every other allowance in this process reads.
- *
- * Narrower than the port on purpose: every field is answered, always. The port
- * leaves `limitType`, `current` and `max` optional so a deployment with no seat
- * gate can refuse with `allowed` alone, and the licence-enforcement door needs
- * all four to render a limit.
- */
+/** Seat licence over the same plan and membership counts; all fields answered. */
 class EntitlementOrganizationSeatLicense {
   static create(options: {
     plans: Pick<EntitlementApi, "getActivePlan">;

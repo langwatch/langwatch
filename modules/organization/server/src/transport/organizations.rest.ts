@@ -1,12 +1,4 @@
-/**
- * `/api/organizations` - instance administrator organization provisioning,
- * self-hosted only. Answers behind the instance administrator bearer key
- * rather than a tenant credential, so every route resolves no organization
- * scope of its own; each one is handed the organization id it addresses as
- * plain input instead. Minting the bootstrap admin key and compensating a
- * failed provisioning run are the application's own orchestration, over its
- * `apiKeys` peer.
- */
+/** `/api/organizations`: admin-only provisioning with instance bearer key. */
 import { NotFoundError } from "@langwatch/handled-error";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { OrganizationApi } from "@langwatch/organization-contract";

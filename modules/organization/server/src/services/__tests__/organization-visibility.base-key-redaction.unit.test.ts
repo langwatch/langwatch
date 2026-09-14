@@ -1,16 +1,8 @@
 /**
  * @vitest-environment node
  *
+ * Project base key in organization.getAll payload must be gated by permissions.
  * @see specs/api-keys/project-key-read-access.feature
- *
- * The project base key travels inside the `organization.getAll` payload the
- * shell loads on every page, so gating the endpoints that return it is only
- * half the job: what the session already holds has to be gated too.
- *
- * The rule used to live in the tRPC transport, where nothing could reach it
- * without a router. It is the visibility service's now, and this exercises it
- * over a stubbed organization read and the two permission questions that
- * decide who gets the key.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FullyLoadedOrganization } from "@langwatch/organization-contract";

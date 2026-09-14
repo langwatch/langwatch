@@ -1,31 +1,4 @@
-/**
- * `createProject`, as the address spells it.
- *
- * RECOVERED FROM `platform/app/src/components/projects/CreateProjectDrawer.tsx`,
- * deleted in `cc91631cd8`. Three live surfaces kept writing the address after
- * the component went — the Teams page's header button and its per-team "+ New
- * Project", the team form, and the CLI-auth screen's "create one now" — so
- * every one of them changed the URL and opened nothing.
- *
- * IT SITS BESIDE `create-team-drawer.tsx` for the reason that file states of
- * itself: the drawer is not a page, so it carries the address rather than
- * answering one, and everything it asks for — the organization in scope, the
- * teams under it, the navigator, the toaster — is already this family's.
- *
- * TWO THINGS CHANGED IN THE LIFT, both because they were the application's:
- *
- * - `trackEvent("project_created", …)` wrote straight to `window.gtag`. The
- *   application owns its analytics client now, and it fans a single emit out to
- *   every provider configured for the deployment rather than to gtag alone.
- * - `window.location.href = "/<slug>"` was a hard redirect. It stays a hard
- *   navigation through the host's `navigate`, because that is what the comment
- *   asked for and why: a fresh document is what guarantees the new project's
- *   graph is read rather than served from the cache the old one filled.
- *
- * NO TOAST ON FAILURE, deliberately, and the reason is in `ProjectForm`: a
- * failed create is a state that is still true rather than a moment that has
- * passed, so the form renders it inline where the reader is looking.
- */
+/** Create-project drawer: inline error (no toast), hard nav after create. */
 
 import { Heading } from "@chakra-ui/react";
 import type React from "react";

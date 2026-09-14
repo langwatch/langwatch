@@ -1,13 +1,4 @@
-/**
- * The server half of `team.*`. `organization:view` reads, which the
- * application then narrows per caller; `team:manage` administers one team;
- * `organization:manage` creates one or reads the access matrix.
- *
- * The two capabilities the doors used to reach for - whether the caller may
- * administer the organization, and whether its plan carries custom roles  - 
- * are asked inside the application now, over the same permission service and
- * plan gate every other door uses.
- */
+/** Server-side team procedures with permission gates forwarding to application. */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { OrganizationApi, teamTrpc } from "@langwatch/organization-contract";

@@ -4,19 +4,7 @@ import { api } from "./organization-api.ts";
 import type { PendingJoinRequest } from "../model/pending-join-request.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 
-/**
- * The members area's join-requests state (D12): what is waiting, the two
- * answers an admin can give, and the setting behind them.
- *
- * Hooks rather than state inside the page, and they return props rather than
- * JSX: the page owns the layout, these own the queries, the mutations and what
- * a refusal says.
- *
- * Every refusal reaches the person as WORDS. `showErrorToast` reads the
- * handled payload and renders the copy the code-keyed registry carries — the
- * wire message is the code slug since #5984, so toasting `error.message` would
- * show an admin `join_request_not_pending` and nothing else.
- */
+/** Join-request state: queries, mutations, and settings; returns props not JSX. */
 export function useJoinRequests(scope: { organizationId: string; canManage: boolean }) {
   const answers = usePendingJoinRequests(scope);
   const joining = useDomainJoinSetting(scope);

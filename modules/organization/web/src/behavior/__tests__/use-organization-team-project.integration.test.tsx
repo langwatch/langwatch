@@ -1,17 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * A member whose current organization holds no project is never teleported
- * into another organization's project.
- *
- * On the platform this was a promise about a bouncer: the hook resolved the
- * whole organization graph itself and could push. Here it is a promise about
- * a SHAPE — the hook reads the host and nothing else, so there is no code path
- * that could navigate, whatever the graph looks like. Asserting the host
- * recorded no navigation is what pins that, and it is the assertion that would
- * fail the day someone puts the bouncer back.
- *
- * Spec: specs/navigation/navigation-v2-landing.feature
+ * Members in organizations with no project are never teleported elsewhere.
+ * @see specs/navigation/navigation-v2-landing.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -5,11 +5,7 @@ import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
 import { InviteService } from "../invite.service.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
-/**
- * A lapsed license keeps binding the seat count it sold (ADR/spec specs/licensing/expired-license-enforcement.feature): once
- * the resolved plan reports the license's own `maxMembers` and the organization already holds that many full members, adding
- * one more is refused exactly like an over-seats organization on a current license.
- */
+/** Lapsed licenses still bind their sold seat count. */
 function buildService(options: { maxMembers: number; currentFullMembers: number }) {
   const prisma = {
     customRole: { findMany: vi.fn().mockResolvedValue([]) },

@@ -1,26 +1,9 @@
 /**
  * @vitest-environment node
  *
- * Layer-1 invariant test for the hidden internal-governance Project filter.
- *
- * The hidden Governance Project (Project.kind = "internal_governance")
- * is an internal routing/tenancy artifact for IngestionSource data —
- * it must NEVER appear in user-visible Project surfaces. The single
- * choke point that prevents leakage is the `projects` include in
- * `PrismaOrganizationMembershipRepository.getAllForUser`. Every UI consumer
- * of "list my projects" flows through this method via
- * `useOrganizationTeamProject`.
- *
- * This test seeds an organization with both an "application" project
- * AND an "internal_governance" project, then asserts the latter is
- * filtered out of the `getAllForUser` result tree.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
- *
- * Pairs with:
- *   specs/ai-gateway/governance/architecture-invariants.feature
- *   specs/ai-gateway/governance/ui-contract.feature
+ * Internal governance projects must be filtered from user-visible surfaces.
+ * @see specs/ai-gateway/governance/architecture-invariants.feature
+ * @see specs/ai-gateway/governance/ui-contract.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

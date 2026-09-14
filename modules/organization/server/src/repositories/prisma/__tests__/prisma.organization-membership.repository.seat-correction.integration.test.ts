@@ -1,10 +1,5 @@
 /**
- * What a seat correction reaches, and what it reports back.
- *
- * Moving someone to a Lite Member seat caps every scope the seat caps — team
- * roles and project access alike — and a team that loses its only admin to that
- * correction is named back to the person who made it rather than silently left
- * headless.
+ * Seat correction caps scopes and reports back teams that lost their only admin.
  * @vitest-environment node
  * @see specs/members/member-role-team-restrictions.feature
  */

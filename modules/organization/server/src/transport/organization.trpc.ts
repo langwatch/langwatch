@@ -1,13 +1,4 @@
-/**
- * The server half of `organization.*`: a permission and a handler per
- * procedure the contract already named. The orchestration each door used to
- * carry - per-viewer redaction, the invitation ceremony, the seat and plan
- * guards - lives in the application, so this file states access and forwards.
- *
- * Two facts travel beside the input because three collaborators identify the
- * operator by more than their id: the plan provider, the seat guard and the
- * disable guard all read the signed-in person's display name and address.
- */
+/** Server-side organization procedures: permissions and handlers forward to application. */
 
 import { defineTrpcFact, defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";

@@ -324,11 +324,7 @@ describe("OrganizationService groups", () => {
     });
   });
 
-  /**
-   * Ported from the groups REST suite (`platform/app/src/app/api/groups/__tests__/groups-rest-api.integration.test.ts`), which
-   * reached these guards through HTTP and a real database. The guards themselves are the service's, so this is where they
-   * belong: the REST family only turns the refusal into a status.
-   */
+  /** Guards belong in the service, not the REST layer that turns refusals to status. */
   describe("given a group its identity provider owns", () => {
     const directoryManaged: OrganizationGroup = { ...group, scimSource: "okta" };
 

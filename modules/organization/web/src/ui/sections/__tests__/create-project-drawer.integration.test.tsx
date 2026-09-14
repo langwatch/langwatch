@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The drawer that creates a project, mounted the way the registry mounts it.
- *
- * NEW WITH THE RECOVERY. `platform/app` shipped this drawer with a validation
- * unit test and nothing that rendered it, and the spec says so in a note: "The
- * CreateProjectDrawer page-render flows have no JSDOM render fixture exercising
- * them today. Cheap follow-up: write a JSDOM render test." This is that test,
- * written while the drawer was being put back rather than left as a note.
- *
- * WHAT IT PINS is the half a validation test cannot see: that the drawer opens
- * at all, that the name and the team reach `project.create` as the customer
- * typed them, and that a rejected create is shown INLINE rather than as a toast
- * — which is the whole reason the mutation has no `onError`.
- *
+ * Create-project drawer: opens, sends name/team, shows errors inline.
  * @see specs/projects/create-project-drawer.feature
  * @see specs/projects/project-creation-flow.feature
  */

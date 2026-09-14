@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for MemberDetailDialog covering the save flow:
- * - Organization role field visibility gated by `canManage` and `isCurrentUser`
- * - Save wires up `organization.updateMemberRole` when only the role changed
- * - Save wires up `roleBinding.applyMemberBindings` when only bindings changed
- * - Save wires up both mutations when both changed (role first, then bindings)
- * - Cancel reverts pending state without firing mutations
- *
- * Covers P2 #4 from the CodeRabbit review on PR #3315 — restoring UI integration
- * coverage after the previous `member-details.integration.test.tsx` was removed
- * when the page was replaced by this dialog.
+ * Member-detail dialog: role/binding visibility, mutations, and cancellation.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

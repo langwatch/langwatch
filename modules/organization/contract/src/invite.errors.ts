@@ -50,16 +50,7 @@ export class AlreadyOrganizationMemberError extends HandledError {
   }
 }
 
-/**
- * The invitation exists but its window has passed. Distinct from `invite_not_found` on purpose:
- * an expired invitation is recoverable — the inviter resends it in one click (D11) — so the
- * person holding the link gets told to ask for a fresh one instead of a dead end.
- */
-/**
- * The invitation has already been spent. The client turns this into a redirect
- * into the organization rather than an error page: being already in is not a
- * failure, it is the outcome the person wanted, arrived at earlier.
- */
+/** Already accepted invites redirect to the organization, not an error page. */
 export class InviteAlreadyAcceptedError extends HandledError {
   declare readonly code: "invite_already_accepted";
 

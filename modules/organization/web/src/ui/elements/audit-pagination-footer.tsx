@@ -1,17 +1,4 @@
-/**
- * How the audit table walks its pages.
- *
- * A NARROWED FAMILY-LOCAL COPY of `platform/app/src/components/NavigationFooter.tsx`,
- * which is 443 lines and has a second caller — the experiments list — so it
- * stays where it is. What did not travel is everything that module carries for
- * TRACE SEARCH: the cursor mode, the walked-cursor stack, the base64 scroll id
- * and the tRPC total-hits hook. The audit trail is a Prisma read with `skip`,
- * pages by real offsets, and drove that component from its own state anyway —
- * the platform footer's own docblock says so.
- *
- * What survives is the part a reader sees: how many items there are, where in
- * them they are, and the two ways to move.
- */
+/** Audit pagination: page navigation showing count, position, and movement controls. */
 
 import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";

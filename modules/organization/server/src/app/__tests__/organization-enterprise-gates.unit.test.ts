@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The three Enterprise capabilities the organization application gates: a
- * custom team role on a team's member list, a custom team role on one member's
- * role change, and the audit trail. Each is asked BEFORE the write or the
- * query, so a deployment without the plan changes nothing and reads nothing.
- *
- * The gates used to live in the `organization.*` and `team.*` tRPC transports.
- * They are the application's now, and this drives them there.
- *
+ * Enterprise gates in the application: custom roles, audit trail.
  * @see specs/features/enterprise-feature-guards.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";

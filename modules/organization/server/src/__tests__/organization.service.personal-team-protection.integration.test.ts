@@ -1,5 +1,6 @@
 /**
- * A personal workspace is one team with exactly one member, its owner, and it cannot be archived: the uniqueness of one personal team per (organization, owner) covers archived rows while the provisioning lookup skips them, so an archived workspace holds the owner's only slot and nothing can hand it back.
+ * Personal workspaces cannot be archived without locking the owner's slot
+ * permanently, since uniqueness covers archived rows and provisioning skips them.
  * @vitest-environment node
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */

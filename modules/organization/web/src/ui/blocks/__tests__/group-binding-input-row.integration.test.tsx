@@ -1,11 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * See specs/members/member-access-editing.feature, "The Lite Member seat
- * ceiling". The BindingInputRow is where access rows are picked, so what it
- * offers is the policy the member dialog enforces: a Lite Member seat offers
- * the Viewer role only, no custom roles, and no organization scope. The group
- * editors render the same row with no seat, and must keep every role.
+ * BindingInputRow: access policy by seat type; lite seat limits roles offered.
+ * @see specs/members/member-access-editing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

@@ -1,16 +1,7 @@
 import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 
-/**
- * Disabling and re-enabling a membership, which is how an organization
- * reconciles down to the seats its license covers.
- *
- * Re-enabling can be refused by the server when it would take the organization
- * back over its seats. That refusal carries the license-limit shape, so the
- * global handler opens the limit modal with the current and licensed seat
- * counts and `showErrorToast` stays quiet rather than reporting it twice. See
- * seat-reconciliation.feature.
- */
+/** Disable/re-enable reconciles organization seats with license; refusal opens limit modal. */
 export function useMemberDisableAction({
   organizationId,
   onChanged,
