@@ -47,15 +47,8 @@ export type PresenceTenantEmitter = Readonly<{
 }>;
 
 /**
- * The read side of the process's per-tenant broadcast fabric, exposed as a
- * narrow peer token: exactly the two methods a live subscription outside
- * presence needs, never the rest of {@link PresenceApi}'s surface. Serves
- * every peer that watches a tenant's live updates — today `langy`'s
- * conversation broadcast and `trace`'s live-update subscriptions — because
- * one emitter per tenant is deliberately shared rather than each peer opening
- * a second fabric of its own, exactly as the deleted hand composition it
- * replaces did. Kept generic on purpose: no langy- or trace-specific shape
- * belongs on this token, only `getTenantEmitter`/`cleanupTenantEmitter`.
+ * Read-only peer token exposing per-tenant broadcast: one shared emitter per
+ * tenant avoids duplicate fabric subscriptions across peers.
  */
 export abstract class PresenceBroadcastFabric {
   abstract getTenantEmitter(tenantId: string): PresenceTenantEmitter;

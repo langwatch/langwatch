@@ -7,18 +7,8 @@ import {
 } from "../../services/governance-internal-project.service.ts";
 
 /**
- * The two project reads Governance's ingestion pull makes, over Postgres.
- *
- * A composition seam rather than the whole `ProjectService`: the pull resolves
- * a source's trace project and mints (or finds) the organization's internal
- * governance project, and the capability around those two additionally wants
- * an organization service, an LWQL key map, a stored-object runtime and a
- * diagnostics sink. `ProjectService` still satisfies the port, so an
- * application composition passes what it always passed.
- *
- * The oldest-team read arrives as a port for the same reason: it is ONE
- * question of the organization capability, and `OrganizationService` answers
- * it structurally.
+ * Two project reads for Governance ingestion: trace project + internal governance
+ * project (via ProjectService port; oldest-team via OrganizationService).
  */
 export class PrismaGovernanceInternalProjectRepository {
   static create(options: {

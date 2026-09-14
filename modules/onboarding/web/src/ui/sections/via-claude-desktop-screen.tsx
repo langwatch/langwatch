@@ -49,13 +49,8 @@ const APPS: {
 ];
 
 /**
- * Placeholder rendered in the config JSON before a fresh token is
- * available. Matches the shape of the real `sk-lw-...` token so the
- * config reads as "a key would go here" rather than "this is broken".
- * The x's are obviously fake — combined with the empty-state overlay
- * on the code block, the user can't accidentally copy this value out
- * because the surrounding chrome (copy button, reveal toggle) is
- * suppressed until a real token has been minted.
+ * Placeholder that matches real token shape; empty-state overlay prevents
+ * copying until a real token exists.
  */
 const PLACEHOLDER_API_KEY = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
 

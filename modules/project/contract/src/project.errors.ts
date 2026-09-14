@@ -1,15 +1,6 @@
 /**
- * The project's named refusals.
- *
- * Each one is a cause we can name AND the caller can act on, so each is a
- * `HandledError` with a stable code and the status that refusal has always
- * answered with. That is what lets a transport re-raise one untouched: the
- * REST boundary serialises it and the tRPC boundary derives its code from
- * `httpStatus`, so neither door has to hold its own translation table and the
- * two cannot drift apart.
- *
- * The messages here are server copy. What a customer reads is written against
- * the `code` in the app's presentation registry.
+ * Project-specific HandledErrors: REST/tRPC boundaries re-raise by code and
+ * httpStatus; customer-facing copy lives in the presentation registry.
  */
 import { HandledError } from "@langwatch/handled-error";
 

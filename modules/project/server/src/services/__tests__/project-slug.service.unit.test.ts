@@ -1,11 +1,6 @@
 /**
- * The slug a new project is given.
- *
- * It is the project's segment in every URL the customer sees, so what matters
- * is that it survives being typed, pasted and linked: ASCII only, lowercase,
- * no punctuation, and never a leading or trailing dash. Project names are not
- * unique, so distinctness comes from the id suffix rather than the name — two
- * projects called "Acme" must not mint the same slug.
+ * Project slug format: ASCII lowercase, no punctuation; ID suffix ensures
+ * uniqueness when names are shared.
  */
 
 import { describe, expect, it } from "vitest";

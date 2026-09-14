@@ -9,15 +9,8 @@ import { useIntegrationChecks } from "../integration-checks.tsx";
 import ObservabilityCard from "../../elements/welcome/observability-card.tsx";
 
 /**
- * THE API KEY IS ASKED FOR BY NAME.
- *
- * `project.apiKey` used to arrive on the scope reading, and it does not here:
- * `apps/ui`'s scope graph carries ids, names and slugs and no credential. The
- * key is a separate question on the host port — `revealProjectApiKey()` — which
- * the application answers off the organization graph it already holds, under the
- * server-side `project:update` redaction that decides who may hold one. A reader
- * who may not gets `undefined` and an empty field, which is exactly what the
- * platform page rendered for a redacted key.
+ * API key asked via host port respects server-side access redaction; credentials
+ * cannot ride in the scope graph.
  */
 const APICard: React.FC = () => {
   const host = useOnboardingHost();

@@ -9,28 +9,8 @@ import type { ProjectDiagnostics } from "./project.service.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**
- * The project reads and the one project write that ingestion performs.
- *
- * Five operations that stand on the repository and nothing else. They were
- * methods of `ProjectService`, which still answers all five — it composes this
- * and delegates, so there is one implementation and no twin to drift — but a
- * process that only ingests can now compose these WITHOUT the write graph.
- *
- * That distinction is the whole reason this class exists. `ProjectService`
- * requires a `ProjectCredentials` and an `OrganizationService` because
- * `create` mints an id and an ingestion key and `ensureInternal` resolves a
- * team, and it takes a key map and a stored-object deleter because `create`
- * syncs the LWQL column mapping and `archive` removes a project's blobs. Not
- * one of those five collaborators is reached by any operation below: the
- * ingestion path never creates, never archives and never ensures. Composing
- * them to satisfy a constructor would put an organization graph, an authz
- * service and an S3 client in a process that folds spans.
- *
- * WHY `resolveOrgAdmin` SWALLOWS ITS FAILURE. The caller is the first-trace
- * milestone, which decides who to tell that a project started receiving data.
- * A read that fails there must not fail the ingestion that triggered it, so
- * the absence is reported as an empty resolution and the cause goes to
- * diagnostics. The behaviour moved here verbatim with the method.
+ * Five repository-only operations for ingestion: reads and one write, composed
+ * without the write graph ProjectService requires (no credentials/S3/orgService).
  */
 export class ProjectMetadataService {
   private constructor(

@@ -15,14 +15,8 @@ import {
 export type PrismaCodingAgentActivityDatabase = Pick<PrismaClient, "project">;
 
 /**
- * The project reads and writes the coding-agent session pipeline performs.
- *
- * Three operations, one model, no service graph: resolving the organization a
- * tenant belongs to, and the two throttled activity stamps. The App reaches
- * the identical statements through `ProjectService`, which is composed from
- * this repository's wide sibling plus an authorization service, a topic
- * clustering port, a credentials adapter and both transports' collaborators —
- * none of which any of these three asks anything.
+ * Three operations on one model: resolve organization and timestamp activity.
+ * App uses ProjectService layer; this repo has no service dependencies.
  */
 export class PrismaCodingAgentActivityRepository implements CodingAgentActivityRepository {
   private constructor(private readonly prisma: PrismaCodingAgentActivityDatabase) {}

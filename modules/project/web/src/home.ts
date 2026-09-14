@@ -1,5 +1,6 @@
 /**
- * The project home, at `/[project]`. One of three compositions renders behind that one address; which one is a rollout decision the page makes itself. Reads reader/scope/grants/rollouts through `ProjectHomeHost`.
+ * Project home compositions at `/[project]`: rollout decides which one; reads
+ * reader/scope/grants/rollouts through ProjectHomeHost.
  */
 
 import type { ComponentType } from "react";

@@ -9,13 +9,8 @@ import type { ProjectCredentials } from "./project-credentials.service.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 /**
- * The one team read the internal-project mint makes.
- *
- * Narrowed off `OrganizationService`, which is a whole capability — members,
- * invites, billing tier, deletion — where this path asks a single question:
- * which team has been in this organization longest. `OrganizationService`
- * satisfies it structurally, so the application's own composition is
- * unchanged.
+ * Single question: which team has been in organization longest. Narrowed from
+ * full OrganizationService to keep composition unchanged.
  */
 export abstract class ProjectOldestTeam {
   abstract getOldestTeamId(input: { organizationId: string }): Promise<string>;
@@ -36,15 +31,8 @@ export abstract class GovernanceInternalProject {
 }
 
 /**
- * The internal governance project, minted the way the capability mints it.
- *
- * BYTE-FOR-BYTE THE SAME SEQUENCE as `ProjectService.ensureInternal`, and it
- * has to be: the slug is derived (`governance-<organizationId>`) and the mint
- * races — two processes pulling the same organization's usage at once both
- * reach this, and the repository's create-or-find-winner is what makes one of
- * them lose gracefully. A second mint that spelled the slug differently would
- * give one organization two internal projects and split its pulled usage
- * across both.
+ * Mints internal governance project with deterministic slug to prevent race-time
+ * duplication; must match ProjectService.ensureInternal exactly.
  */
 export class GovernanceInternalProjectService extends GovernanceInternalProject {
   static create(options: {

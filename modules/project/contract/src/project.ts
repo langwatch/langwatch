@@ -170,15 +170,8 @@ export const searchProjectsResultSchema = z.object({
 export type SearchProjectsResult = z.infer<typeof searchProjectsResultSchema>;
 
 /**
- * Who a project is, and nothing about how it is configured.
- *
- * This is the value a request boundary carries. Authenticating a credential
- * has to name the project it belongs to, and the transport has to answer
- * "which tenant, which team, which organization" — five indexed columns.
- * Carrying the whole project there instead would read two full rows and
- * validate thirty fields on every authenticated request, to serve handlers
- * that overwhelmingly want an id. A handler that needs configuration asks
- * {@link ProjectService} for it, which is the read it would have made anyway.
+ * Project identity for request boundaries: id, name, tenant/team/org; handlers
+ * needing config ask ProjectService.
  */
 export const projectIdentitySchema = z
   .object({

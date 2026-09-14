@@ -33,13 +33,8 @@ import type {
 } from "../project.repository.ts";
 
 /**
- * The two models this repository reads and writes, and nothing else in the
- * client.
- *
- * The composition root already holds a typed `PrismaClient`; naming the models
- * here is what lets a root that composes only the ingestion seam hand its
- * client straight down without describing the whole client at the seam. A full
- * `PrismaClient` still satisfies it, so every existing caller is unchanged.
+ * Models used by this repository; lets composition roots hand a typed client
+ * subset without describing full PrismaClient at the seam.
  */
 export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
 

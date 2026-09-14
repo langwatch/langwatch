@@ -14,10 +14,8 @@ export { ProjectService } from "./services/project.service.ts";
 export {
   ProjectCredentials,
   ProjectCredentialsService,
-  // `apps/api/src/features/evaluator/__tests__/evaluator-create-model-resolution.integration.test.ts`
-  // still imports the old name and sits under `apps/api/src/features/`, which
-  // this lane does not touch (owned elsewhere, on its way out). Drop this
-  // alias when that tree goes.
+  // evaluator-create-model-resolution.integration.test.ts still imports the old
+  // name (apps/api/src/features/). This lane doesn't touch it. Drop when removed.
   ProjectCredentialsService as ProjectCredentialsAdapter,
 } from "./services/project-credentials.service.ts";
 export { ProjectApp, type ProjectInfrastructure } from "./app/project.app.ts";
