@@ -1,25 +1,7 @@
 import { z } from "zod";
 
-/**
- * What a session proved, and what an organization does with it (D06, D07).
- *
- * `Organization.mfaRequired` is a MEMBERSHIP CONDITION — "every member of
- * this organization can prove a second factor" — and not a policy evaluated
- * per session. It is asked when a member reaches that organization's data,
- * it holds the ones who cannot prove one at an enrollment gate for THAT
- * organization alone, and it ends no session, ever.
- *
- * Three things satisfy it and the organization does not care which:
- *
- *   1. an enrollment on the person's own account (D06)
- *   2. a passkey on the sign-in that minted this session (D07, `phw`)
- *   3. an identity provider that ASSERTED a factor at sign-in (`amr`)
- *
- * (1) is a property of the account and travels with the person. (2) and (3)
- * are properties of the SIGN-IN, which is the whole reason a session records
- * `amr` at all: somebody whose only second factor is a passkey meets the gate
- * again when they sign in with a password instead, because that sign-in
- * proved nothing extra.
+/** What a session proved and how organizations enforce MFA requirements. A membership condition
+ * that holds members at an enrollment gate if they cannot prove a second factor. See D06/D07.
  */
 
 /**
@@ -52,14 +34,8 @@ export const AMR_VALUES = [
 export const amrSchema = z.enum(AMR_VALUES);
 export type Amr = (typeof AMR_VALUES)[number];
 
-/**
- * The `amr` values that assert a SECOND factor, and nothing else does.
- *
- * `pwd` is the first factor. `saml` and `oidc` name a protocol, not a proof —
- * a connection that asserts only those is asserting nothing, and its members
- * are held at the gate like anybody else. `swk` is deliberately absent: a
- * software key is a key the provider holds, and we are not going to read a
- * second factor into it on the provider's behalf.
+/** The `amr` values that assert a second factor. `pwd`, `saml`, and `oidc` are first-factor only;
+ * `swk` is absent because software keys don't count as proof the user holds a factor.
  */
 export const SECOND_FACTOR_AMR_VALUES = [
   "otp",
@@ -154,14 +130,8 @@ export type SecondFactorSatisfaction =
   /** Held at the enrollment gate for this organization alone. */
   | { satisfied: false; by: "none" };
 
-/**
- * The membership condition, in one place. Evaluated when a member reaches an
- * organization's data — never at session mint, and never as a step-up.
- *
- * The account is checked first because it is the durable answer: somebody who
- * has set one up is challenged at every sign-in, so a session of theirs that
- * never answered cannot exist, and the sign-in evidence would only restate
- * what the account already settles.
+/** Evaluates whether a member satisfies the organization's MFA requirement at access time. Checks
+ * account enrollment first because it is the durable answer across sessions.
  */
 export function satisfiesOrganizationMfaRequirement({
   mfaRequired,

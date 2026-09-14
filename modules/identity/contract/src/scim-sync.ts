@@ -1,36 +1,5 @@
-/**
- * The directory sync aggregate (D08, ADR-117 §5).
- *
- * One `ScimSync` per SSO connection: a token is minted for a connection, that
- * connection's pushes are its history, and tearing the connection down ends
- * it. The aggregate holds no PII — a person appears as a `userId` and the
- * directory's own `externalId`, never as an email or a name (the D01 payload
- * rule) — because what this history is FOR is answering "which connection
- * pushed this, and did it land", not "who is this person".
- *
- *   [*] ──token minted for a connection──► TOKEN_ISSUED
- *        TOKEN_ISSUED ──first push──────► SYNCING
- *        SYNCING ⇄ ERROR                 (apply failed / retried with backoff)
- *        SYNCING ──revoked or torn down─► REVOKED
- *        ERROR   ──revoked or torn down─► REVOKED
- *
- * Membership consequences are NOT facts here. A push that adds somebody to
- * an organization states `scim_user_pushed` on this aggregate and dispatches
- * `grants.attach` on the grants ledger, whose own `grant_attached` fact
- * carries `source: "scim"`. Two histories, each answering its own question:
- * this one says a directory asked, the ledger says who now holds what.
- *
- * The actor is NOT the connection. `SYSTEM_ACTORS` (@langwatch/actor) is a
- * closed registry of named principals and a connection id is a per-customer
- * value, so a membership fact is stamped `system:scim` however many
- * connections an organization has, and WHICH connection pushed it lives on
- * these events, which carry `connectionId`. Cross-organization safety comes
- * from what the TOKEN may reach, never from the actor stamp.
- *
- * Pure and isomorphic like the rest of this package: no reads, no writes, no
- * env, no node built-ins.
- *
- * See specs/identity/scim-connection-sync.feature.
+/** Directory sync aggregate: one per SSO connection, recording pushes and lifecycle. Audit history
+ * only; membership consequences dispatch to the grants ledger. See D08.
  */
 import { z } from "zod";
 import { identityActorSchema } from "./vocabulary.ts";
@@ -235,14 +204,8 @@ export interface ScimSyncState {
   updatedAtMs: number;
 }
 
-/**
- * The sync's aggregate id, derived rather than stored.
- *
- * A connection has exactly one directory sync — a second one would be a
- * second answer to "is this directory working", which is the question the
- * whole aggregate exists to answer — so the connection id IS the sync id.
- * Deriving it means no lookup table stands between a token and its history,
- * and no code path can mint a sync a connection does not know about.
+/** The sync's aggregate id, derived from the connection id. A connection has exactly one sync:
+ * deriving the id avoids a lookup table and ensures no sync escapes the connection.
  */
 export function scimSyncIdFor({ connectionId }: { connectionId: string }): string {
   return connectionId;
@@ -263,15 +226,8 @@ export function emptyScimSync({ scimSyncId }: { scimSyncId: string }): ScimSyncS
   };
 }
 
-/**
- * The reducer. Pure and total: every fact answers a next state, and the same
- * function runs in the framework's fold, in the replay proof and in a
- * browser tab.
- *
- * REVOKED is terminal and absorbing. A push that arrives after a teardown is
- * a token that should already have stopped verifying, so folding it as a
- * return to SYNCING would report a torn-down connection as healthy; the
- * refusal happens at the boundary, and this makes the history agree with it.
+/** Pure and total reducer: every fact answers a next state, runs identically in fold, replay proof,
+ * and browser. REVOKED is terminal and absorbing.
  */
 export function reduceScimSync({
   state,

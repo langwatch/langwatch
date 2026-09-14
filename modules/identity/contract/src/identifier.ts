@@ -1,25 +1,5 @@
-/**
- * Normalization at attach (D01): NFKC unicode fold, lowercase, trim. Applied
- * once, where the fact is made; only the normalized form ever reaches an event
- * or the projection.
- *
- * A plus tag is part of the address and is KEPT. `sam+work@acme.com` and
- * `sam@acme.com` are two identifiers, because to everyone outside this
- * function they are two addresses: the person typed one of them, their
- * provider routes them separately, and it is the address they will type again.
- *
- * This used to strip the tag, which is the conventional defence against one
- * mailbox minting unlimited accounts. It bought little — a second address or a
- * disposable domain costs no more effort — and it charged for it twice. The
- * screen said "we sent a link to sam+work@acme.com" and the link went to
- * sam@acme.com, which is the product lying about what it just did; and an
- * address somebody chose deliberately, to keep this account separable from
- * their others, was silently merged into an account they may already hold.
- *
- * Subaddressing is not universal, which is the other half of it: on a domain
- * that treats the tag as part of the mailbox name, the stripped address is a
- * DIFFERENT mailbox, and the confirmation goes somewhere the person cannot
- * read.
+/** Normalizes an identifier value: NFKC unicode fold, lowercase, trim. Keeps plus tags because they
+ * route separately and represent the person's deliberate choice to keep accounts separable.
  */
 export function normalizeIdentifierValue(raw: string): string {
   return raw.normalize("NFKC").trim().toLowerCase();

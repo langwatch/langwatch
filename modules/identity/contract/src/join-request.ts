@@ -1,31 +1,9 @@
 import { z } from "zod";
 import { identityActorSchema } from "./vocabulary.ts";
 
-/**
- * The join-request vocabulary (ADR-117, D12): what somebody asking to join an
- * organization is called, the states the ask moves through, what each of its
- * events SAYS, and the pure reducer that folds them into one request's state.
- *
- * Isomorphic like the rest of this package — no Prisma, no env, no framework,
- * no clock. The guards that decide whether a command may state a fact are
- * `@langwatch/identity-server`; the envelope that carries a fact into the
- * event log is the app's pipeline.
- *
- * The payload rule is ADR-101 §4's: ids, domains, enums, timestamps. The
- * requester's address never appears — the DOMAIN is the fact, and it is the
- * only part of an address a join decision is ever allowed to depend on.
- *
- * The lifecycle:
- *
- *   [*] ──request──► PENDING ──admin approves──► APPROVED
- *                       │    └─policy approves──► APPROVED  (auto-join)
- *                       │    └─invite answers it► APPROVED  (D11 supersedes)
- *                       ├────admin rejects─────► REJECTED
- *                       ├────14 days silent────► EXPIRED
- *                       └────requester cancels─► WITHDRAWN
- *
- * PENDING is the only state anything can be done from; the four endings are
- * terminal and differ only in who ended it and when.
+/** Join-request vocabulary: states, events, and reducer for the request lifecycle. Isomorphic and
+ * domain-only: requester address never appears, only domain and the admin/policy/invite decision.
+ * See ADR-117 D12.
  */
 
 export const JOIN_REQUEST_STATES = [
@@ -38,19 +16,8 @@ export const JOIN_REQUEST_STATES = [
 export const joinRequestStateSchema = z.enum(JOIN_REQUEST_STATES);
 export type JoinRequestState = z.infer<typeof joinRequestStateSchema>;
 
-/**
- * Who ended a request.
- *
- * `policy` is domain auto-join's own principal, and deliberately NOT the one
- * single sign-on auto-join already uses: SSO admits somebody because an
- * identity provider the organization configured asserted them, and domain
- * auto-join admits them because their address ends in the right string and an
- * administrator once said that was enough. Different evidence, different
- * trust — stamping both with one name would make "how did this person get
- * in?" unanswerable on the audit page.
- *
- * `invite` is D11's crossing point: a formal invitation sent while a request
- * is open answers it, and the invitation is what resolved it.
+/** Who ended a request: user (withdrawal), policy (auto-join), or invite (D11 crossing point). Each
+ * resolver type preserves different evidence for audit.
  */
 export const JOIN_RESOLVER_TYPES = ["user", "policy", "invite"] as const;
 export const joinResolverTypeSchema = z.enum(JOIN_RESOLVER_TYPES);

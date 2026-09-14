@@ -2,20 +2,8 @@ import { z } from "zod";
 import { joinMatchKindSchema, joinResolverSchema, joinWithdrawalCauseSchema } from "./join-request.ts";
 import { identityActorSchema } from "./vocabulary.ts";
 
-/**
- * The join-request commands (ADR-117, D12). Every verb the lifecycle has, and
- * no other way to change a request: the sign-up interstitial, the members
- * area, the auto-join policy and the expiry wake all arrive here.
- *
- * Each command carries a caller-minted `commandId` — the caller mints it
- * once, retries reuse it, and each emitted fact's idempotency key is
- * `<commandId>:<index>`, so a retried approval dedupes at the event store
- * while a legitimately repeated action never can. That is what makes "a
- * replayed approval attaches membership exactly once" a property of the
- * pipeline rather than a check somebody remembered to write.
- *
- * PII does not ride here: a command carries ids, the domain and enums. The
- * requester's address is not one of them.
+/** Join-request commands for the full lifecycle: request, approve, reject, withdraw, expire. Each
+ * carries a caller-minted commandId for idempotency, not PII. See ADR-117 D12.
  */
 
 export const REQUEST_JOIN_COMMAND_TYPE = "lw.identity.request_join" as const;

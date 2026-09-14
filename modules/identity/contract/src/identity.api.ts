@@ -265,9 +265,9 @@ export interface ScimSyncGuardsApi {
  * backoffice connection writer.
  */
 export interface IdentityApi {
-  /** The identifier-backed address for this user, or null while they keep the legacy `User.email`. */
+  /** Gets the identifier-backed address for this user, or null for legacy `User.email` holders. */
   findEmail(input: { userId: string }): Promise<string | null>;
-  /** Every address this user has PROVEN, through any method (D11 invitation matching), or null while they keep the legacy `User.email`. */
+  /** Gets every verified address this user has proven, or null for legacy `User.email` holders. */
   verifiedEmailsOf(input: { userId: string }): Promise<MatchableEmail[] | null>;
   /** Operations, not properties: a module boundary carries callable members only. */
   guards(): IdentityGuardsApi;

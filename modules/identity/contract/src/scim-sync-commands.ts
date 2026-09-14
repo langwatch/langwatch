@@ -1,18 +1,5 @@
-/**
- * The directory sync commands (D08). Every way a connection's sync history
- * changes, and no other: minting its token, recording what a push did,
- * recording that an apply failed, and ending it.
- *
- * Each command carries a caller-minted `commandId`, so a retried command
- * dedupes at the event store (`<commandId>:<index>`) while a legitimately
- * repeated push — which a directory makes every night — never can, because
- * it mints a fresh id.
- *
- * No PII rides here, for the same reason it does not ride on the facts: a
- * person is a `userId` and the directory's `externalId`, and a credential
- * appears as a token ROW id or not at all.
- *
- * See specs/identity/scim-connection-sync.feature.
+/** Directory sync commands: issue token, record pushes and failures, revoke sync. Each carries a
+ * caller-minted commandId for deduplication. No PII; persons are userId + externalId. See D08.
  */
 import { z } from "zod";
 import { scimApplyOpSchema, scimRevokeCauseSchema, scimUserOpSchema } from "./scim-sync.ts";

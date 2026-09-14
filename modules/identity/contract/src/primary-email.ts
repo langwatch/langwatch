@@ -1,26 +1,7 @@
 import type { IdentifierFact, IdentityHeads } from "./facts.ts";
 
-/**
- * Which of a user's identifiers answers "what is this person's email" —
- * the question the legacy `User.email` column used to answer on its own
- * (ADR-101 §5, the read fork D03 generalizes).
- *
- * The order is the lifecycle's own:
- *
- *   1. PRIMARY. It exists precisely to name the one identifier the user
- *      chose as theirs, so nothing else can outrank it.
- *   2. Otherwise the most recently VERIFIED one. A user who never marked a
- *      primary but proved a newer mailbox has told us something about which
- *      address is current; the older verified one is history.
- *   3. Otherwise nothing, and the caller keeps the legacy column. ATTACHED
- *      is deliberately not eligible: an unproven address must never become
- *      the address we mail, or attaching one would be a takeover.
- *
- * Ties break on identifier id so two pods answer identically — the ids are
- * derived from content, so this is stable across replay too.
- *
- * Erasure wipes `value`, so an erased identifier answers nothing here even
- * while its tombstone row stands.
+/** Gets the user's primary email: PRIMARY if set, else the most recent VERIFIED. Answers the legacy
+ * `User.email` column question; see ADR-101 §5 and D03.
  */
 export function primaryEmailOf({ heads }: { heads: IdentityHeads }): string | null {
   const identifiers = Object.values(heads.identifiers).filter(

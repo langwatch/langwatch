@@ -38,31 +38,8 @@ export type IdentityStream =
 /** One identifier's head as its own stream folds it: the row, or no row. */
 export type IdentifierHead = IdentifierFact | null;
 
-/**
- * The streams a fact is stated on — the routing table, and the whole decision
- * in one function.
- *
- * A fact about an identifier goes to that identifier. A fact about the PERSON —
- * a link proposal, which states that no identifier arrived, and the erasure
- * record — goes to the person's own stream, which is also where two-step
- * verification lives (D06). An erasure goes to both: the person's stream keeps
- * the record even for somebody holding nothing, and each named identifier's
- * stream is where the wipe lands.
- *
- * **One event per returned stream.** An event carries exactly one aggregate id,
- * so a fact that routes to N streams is appended as N events: the same payload,
- * N distinct aggregate ids, N distinct `<commandId>:<index>` idempotency keys.
- * A promotion that demotes somebody is therefore two events, and an erasure for
- * a person holding three identifiers is four. An implementation that picked one
- * of the returned streams instead would reproduce, on new events, exactly the
- * gap ADR-127 records for legacy ones.
- *
- * The aggregate TYPE is not decided here and does not change. It is the event
- * store's partition key and the store rejects an event whose type differs from
- * its pipeline's declared one, so `user_identity` stays what it is on a log
- * that already carries live events. The aggregate ID is checked by nothing,
- * which is what leaves it free to name the entity — the authz pipeline tells
- * grants and roles apart the same way, under one declared type.
+/** Routes a fact to its target streams: identifier facts to the identifier stream, person facts to
+ * the person stream. See ADR-127 for event idempotency and per-aggregate fold design.
  */
 export function identityStreamsFor({
   fact,
@@ -99,19 +76,8 @@ function identifierStreams(identifierIds: string[]): IdentityStream[] {
   }));
 }
 
-/**
- * One identifier's head, folded by one fact — the per-aggregate reducer.
- *
- * Total and conservative in the same way the per-user reducer is: a fact this
- * head cannot apply cleanly leaves it alone rather than throwing, because a
- * partial replay window is a normal thing to fold. It never refuses — the
- * guards that refuse run before any fact exists.
- *
- * It sees ONE head, which is the point and also the limit. A promotion demotes
- * this head if this head is standing PRIMARY, and cannot check whether the
- * promotion it names took: ADR-127 §"What one head cannot see" records the two
- * histories where that makes it disagree with the per-person fold, and both are
- * reachable only from a partial replay window.
+/** Per-aggregate reducer for one identifier's head. Total and conservative: unclean facts are left
+ * alone rather than thrown. See ADR-127 for visibility limits and partial replay.
  */
 export function reduceIdentifier({
   identifierId,
@@ -219,15 +185,8 @@ function foldDeadEnded({
   return { ...head, state: "DEAD_END" };
 }
 
-/**
- * Both halves of a promotion, as the one head in front of us sees them.
- *
- * The promoted half leaves a head that cannot take PRIMARY alone, so a fact
- * naming a tombstone or a dead end moves nothing. The demoted half is a
- * promotion of somebody else, delivered to a head standing PRIMARY: exactly one
- * PRIMARY per person is the invariant, and this is the half of it a stream can
- * enforce alone — the other half is `primaryChangeFacts` naming every stream
- * that has to be told.
+/** Applies both halves of a promotion to this head: promotion if eligible, demotion to enforce the
+ * per-stream invariant that only one identifier is PRIMARY.
  */
 function foldPrimaryChanged({
   identifierId,
@@ -274,18 +233,8 @@ function foldErased({ head }: { head: IdentifierHead }): IdentifierHead {
   return { ...head, value: null, identifierHash: null };
 }
 
-/**
- * The facts a primary change states — one per stream that has to move.
- *
- * The demotion used to be the fold's: it swept every head and demoted whatever
- * it found standing. A per-identifier fold has no such view, so the sweep moves
- * here, to the moment a command can still read the whole person. Normally that
- * is one demotion or none; more than one is only reachable when a partial
- * replay left two standing, and naming all of them is what keeps "exactly one
- * PRIMARY" true rather than approximately true.
- *
- * The caller has already refused an ineligible promotion (`markPrimary`), so a
- * demotion only ever exists alongside a promotion that took.
+/** Generates one fact per stream that must move to enforce exactly one PRIMARY. The sweep of all
+ * demotions happens here because a per-identifier fold cannot see the whole person. See ADR-127.
  */
 export function primaryChangeFacts({
   heads,
@@ -314,16 +263,8 @@ export function primaryChangeFacts({
   }));
 }
 
-/**
- * The erasure fact, naming every identifier the person holds.
- *
- * Today the fold ignores that list and wipes every head it has, so the list is
- * the writer's audit record. Once the fold keys per identifier (ADR-127 slice 3)
- * the list becomes the sweep's BOUND — nothing else says which streams the wipe
- * reaches — which is why it has to be a read of the WHOLE person rather than the
- * ids a caller passed. `heads` is that read: every row the projection holds for
- * this user, tombstones included, because a tombstone still carries the value
- * erasure exists to remove.
+/** Generates the erasure fact naming all identifiers the person holds. Because per-identifier folds
+ * cannot enforce a sweep, this reads the whole person to find all identifiers to wipe.
  */
 export function userErasureFacts({
   heads,

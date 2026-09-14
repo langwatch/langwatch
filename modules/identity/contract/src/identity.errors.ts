@@ -460,16 +460,8 @@ export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedErro
   }
 }
 
-/**
- * Removing this sign-in method would leave the person unable to get back
- * in. Covers both "nothing verified" and "only passkeys, no recoverable
- * address" — same remedy shape: add another way in FIRST.
- */
-/**
- * The SSO connection write surface, refused by name rather than answered
- * emptily: this deployment composed the identity app with no SSO connection
- * store, so `ssoConnections`/`ssoBackoffice` have nothing to write through.
- * Same code and shape as `OrganizationCapabilityUnavailableError`.
+/** Raised when an operation would leave a person unable to sign in or when a capability (e.g. SSO)
+ * is unavailable due to deployment configuration.
  */
 export class IdentityCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

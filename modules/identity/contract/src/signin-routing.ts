@@ -1,24 +1,8 @@
 import { z } from "zod";
 import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
-/**
- * The identifier-first sign-in router (D03, ADR-117 §1): a PURE decision
- * engine. Email in, decision out — no Prisma, no env, no framework, no clock,
- * and deliberately no user-level read of any kind.
- *
- * Everything the engine needs is assembled by a composition layer from two
- * injected ports: an org-level domain lookup and an instance-level method
- * policy. That split is the whole point of ADR-117 §1's "the router carries
- * no per-user fork": domain routing is ORG data, method policy is INSTANCE
- * data, and resolving a *person* — sign-in by any verified email, an OAuth
- * subject — belongs to the ADR-116 storage adapter, which forks per user
- * inside itself. A router that read `Identifier` would be an account-existence
- * oracle wearing a routing hat.
- *
- * Because the engine sees no user data, ADR-117 §2 holds by construction
- * rather than by care: an unknown address and a known one on the same
- * non-routing domain produce the same decision object, field for field.
- * There is no branch here that could tell them apart.
+/** Identifier-first sign-in router: a pure decision engine that routes by org domain and instance
+ * method policy, never by user data. See D03 and ADR-117 §1.
  */
 
 /**
@@ -209,15 +193,8 @@ function redirectOrFall({
   };
 }
 
-/**
- * The whole router. Read top to bottom, it is ADR-117 §1's table:
- *
- *   break-glass                → local method set     break_glass
- *   no address, sole conn      → redirect             sole_active_connection
- *   domain on a live conn      → redirect             domain_routed
- *   domain on a paused conn    → picker               connection_suspended
- *   anything else              → picker               no_domain_match
- *   policy refuses the method  → picker (local)       method_not_*
+/** Sign-in router: evaluates break-glass, address, domain connection, and policy to determine
+ * routing decision. See ADR-117 §1 for the decision table.
  */
 export function routeSignIn(input: RoutingInput): RoutingDecision {
   const { identifier, breakGlass, policy, domainConnection, activeConnections } = input;

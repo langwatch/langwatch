@@ -2,23 +2,8 @@ import { z } from "zod";
 import { userTenantedCommandSchema } from "./facts.ts";
 import { identityActorSchema } from "./vocabulary.ts";
 
-/**
- * The two-step verification facts (D06). One enrollment per PERSON: the
- * aggregate is tenanted by the user, exactly like `user_identity`, because
- * that is what better-auth models — `TwoFactor` is keyed on `userId` and
- * `twoFactorEnabled` is a column on `User`. No organization holds a copy.
- *
- * The consequence is what keeps this small. If an account is ENABLED, every
- * sign-in for it is challenged, so a session for that person that never
- * answered a challenge cannot exist. There is nothing to step up, and so
- * there is no freshness timestamp and no per-session policy anywhere here.
- *
- * What the facts carry is the LIFECYCLE and nothing else. The shared secret
- * and the backup codes are protocol state: they live at rest in the
- * two-factor plugin's own table, row-truth for good (ADR-101 R12), and no
- * fact in this module has a field that could hold one. `codeIndex` on a
- * consumption is a POSITION, not a code — it is what lets "how many are
- * left" be answered from the log without the log ever knowing a code.
+/** Two-step verification facts: one enrollment per person, user-tenanted. Records lifecycle only,
+ * not secrets or backup codes. See D06.
  */
 
 export const MFA_ENROLLED_EVENT_TYPE = "lw.identity.mfa_enrolled" as const;
@@ -152,15 +137,8 @@ export type MfaFact = MfaFactInput & { occurredAt: number };
 
 export type MfaFactOf<T extends MfaEventType> = Extract<MfaFact, { type: T }>;
 
-/**
- * Where an enrollment stands.
- *
- *   [*] ──► PENDING ──a correct code confirms──► ENABLED
- *              └──24h wake, never confirmed──► EXPIRED
- *   ENABLED ──password + a correct code, or an administrator's reset──► DISABLED
- *
- * `NONE` is the state of somebody who never started one; it is a real value
- * rather than a null so every read answers the same question the same way.
+/** Enrollment lifecycle states: NONE (never started), PENDING (awaiting confirmation), ENABLED
+ * (confirmed), EXPIRED (24h without confirmation), DISABLED (reset or password+code). See D06.
  */
 export const MFA_ENROLLMENT_STATES = ["NONE", "PENDING", "ENABLED", "EXPIRED", "DISABLED"] as const;
 export type MfaEnrollmentLifecycleState = (typeof MFA_ENROLLMENT_STATES)[number];

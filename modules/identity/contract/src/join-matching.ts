@@ -1,42 +1,7 @@
 import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
-/**
- * Which organizations will take an address (ADR-117, D12). One question, and
- * the answer is the most dangerous thing in the deliverable: a lookup that
- * answers freely is a directory of who works where.
- *
- *   address ──not verified yet──────────────► nothing, ever
- *           ──public email domain───────────► nothing, structurally
- *           ──verified, domain d────────────► organizations where
- *                                              · at least one member holds a
- *                                                VERIFIED address on d
- *                                              · no ACTIVE SSO connection
- *                                                admits people already
- *                                              · joining is not turned off
- *
- * Everything outside that funnel answers with the same nothing. "No such
- * organization", "closed to you" and "you have not verified yet" are ONE
- * answer, because telling them apart is the leak — which is why this module
- * returns a decision and never a reason.
- *
- * There is deliberately NO "personal organization" exclusion, and its absence
- * is a decision rather than an omission. This schema has no such concept —
- * `Team.isPersonal` and `Project.isPersonal` are per-member workspaces INSIDE
- * an organization, and every organization the product creates gets a shared
- * team — so a predicate for it could only ever be inert. The privacy it was
- * reaching for is held by the rules above instead: a consumer domain is
- * structurally excluded, automatic joining needs an admin-named domain AND two
- * verified members (which one person cannot be), and the request path ends
- * with an administrator who is free to ignore it.
- *
- * What is left is the solo WORK organization — one person at a real company
- * domain — and offering that is the orphan-organization fix doing its job. The
- * asker learns only that somebody at a domain they have already proved they
- * hold uses LangWatch, and the person there decides.
- *
- * Pure, like the rest of the package: the caller reads the organizations and
- * their verified-member counts, this decides. That split is what lets the
- * whole rule be unit-tested without a database.
+/** Determines which organizations will accept an address for joining based on domain verification,
+ * member status, and join settings. See ADR-117 D12 for the security model.
  */
 
 /**
@@ -66,18 +31,8 @@ export const JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD = 1;
  */
 export const JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD = 2;
 
-/**
- * Consumer mail providers, which are not companies.
- *
- * This list is the STRUCTURAL half of "a public email domain never matches":
- * one match on a consumer provider would offer strangers to each other by the
- * million, so the exclusion has to be impossible rather than unlikely. It is
- * applied in every mode — lookup, request and automatic — and an
- * administrator cannot turn automatic joining on for one of these at all.
- *
- * Deliberately a maintained deny-list rather than a heuristic: a probability
- * that gmail.com is a company is a probability of the worst leak this
- * deliverable can produce.
+/** A maintained deny-list of consumer email providers to prevent public addresses from enabling org
+ * matching or automatic joining. Prevents exposing who works where by matching strangers.
  */
 export const PUBLIC_EMAIL_DOMAINS: readonly string[] = [
   "aol.com",
@@ -117,14 +72,8 @@ export const PUBLIC_EMAIL_DOMAINS: readonly string[] = [
 
 const PUBLIC_EMAIL_DOMAIN_SET = new Set(PUBLIC_EMAIL_DOMAINS);
 
-/**
- * Whether a domain is a consumer mail provider. Compares the domain in the
- * fold `normalizeDomain` / `identifierDomain` produce, so a lookup and an
- * attach can never disagree about what "gmail.com" is.
- *
- * Subdomains are NOT treated as public: `mail.acme.com` is not `acme.com`,
- * and the same strictness that keeps a lookalike domain from matching a
- * company keeps it from being waved through as consumer mail.
+/** Checks if a domain is a consumer mail provider using the same normalization as attach-time
+ * processing. Subdomains are not treated as public.
  */
 export function isPublicEmailDomain(domain: string): boolean {
   return PUBLIC_EMAIL_DOMAIN_SET.has(domain.trim().toLowerCase());
