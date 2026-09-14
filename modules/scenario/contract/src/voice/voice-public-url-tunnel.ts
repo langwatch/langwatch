@@ -37,7 +37,14 @@ type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;
  * `openTunnel`, so a broken import here would otherwise surface for the first
  * time at worker boot in production.
  */
-export const defaultOpenTunnel = scenarioVoice.openTwilioTunnel;
+export const defaultOpenTunnel: (
+  // Written out rather than inferred: the SDK reaches this helper through a
+  // namespace re-export, so its own option and result types have no importable
+  // name and a declaration emit cannot write the inferred signature (TS4023).
+  // Deriving both sides off the value keeps the signature exact.
+  ...args: Parameters<typeof scenarioVoice.openTwilioTunnel>
+) => ReturnType<typeof scenarioVoice.openTwilioTunnel> =
+  scenarioVoice.openTwilioTunnel;
 
 /**
  * How long to wait for the fresh hostname to become globally resolvable.

@@ -21,7 +21,7 @@ import {
   VoiceScenarioNotFoundError,
   type VoiceSessionInfrastructure,
 } from "../voice-session.service";
-import type { VoiceSessionTokenPayload } from "../voice-session-token";
+import type { VoiceSessionTokenPayload } from "../voice-session-token.payload.ts";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,

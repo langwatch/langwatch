@@ -25,10 +25,26 @@ import { createHash } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
 
-import { getApp } from "~/server/app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { CallRecord, CallTurn } from "./call-record.ts";
+import type {
+  CallRecord,
+  CallTurn,
+  VoiceSessionInfrastructure,
+} from "@langwatch/scenario-contract";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  type RecordSpanCommandData,
+} from "@langwatch/trace-contract";
 import { HUMAN_CALLER_KIND } from "./voice-run-writer.ts";
+
+/**
+ * What recording a call's traces reaches outside itself: the trace ingress
+ * command the platform records every span through — the same one a simulated
+ * run's spans take. Injected rather than located globally, so a unit test
+ * records against an in-memory collector.
+ */
+export interface VoiceCallTraceRecorderCollaborators {
+  traces: { recordSpan(input: RecordSpanCommandData): Promise<void> };
+}
 
 const logger = createLogger("langwatch:voice:call-trace-writer");
 
@@ -239,9 +255,7 @@ function exchangeWindowMs({
   return { startMs, endMs: startMs + slice };
 }
 
-type RecordSpanInput = Parameters<
-  ReturnType<typeof getApp>["traces"]["recordSpan"]
->[0];
+type RecordSpanInput = RecordSpanCommandData;
 
 /** The raw-OTLP `recordSpan` payload for one exchange's root span. */
 function buildExchangeSpanInput({
@@ -307,12 +321,14 @@ function buildExchangeSpanInput({
 /** Record one exchange's root span; a failure is logged and swallowed
  *  (decision 7) so the caller can always attach the derived ids. */
 async function recordExchangeSpan({
+  traces,
   projectId,
   scenarioRunId,
   exchange,
   traceId,
   input,
 }: {
+  traces: VoiceCallTraceRecorderCollaborators["traces"];
   projectId: string;
   scenarioRunId: string;
   exchange: VoiceExchange;
@@ -320,7 +336,7 @@ async function recordExchangeSpan({
   input: RecordSpanInput;
 }): Promise<void> {
   try {
-    await getApp().traces.recordSpan(input);
+    await traces.recordSpan(input);
   } catch (err) {
     logger.error(
       {
@@ -340,54 +356,59 @@ async function recordExchangeSpan({
  * per `record.turns[i]`, in order). Failures are logged and swallowed; the ids
  * are returned regardless (decision 7).
  */
-export async function recordVoiceCallTraces({
-  projectId,
-  record,
-  scenario,
-  scenarioRunId,
-}: {
-  projectId: string;
-  record: CallRecord;
-  scenario?: VoiceTraceScenario;
-  scenarioRunId: string;
-}): Promise<{ turnTraceIds: string[] }> {
-  const exchanges = groupTurnsIntoExchanges(record.turns);
-  const useMeasuredOffsets = everyTurnHasOffsets(record.turns);
-  const turnTraceIds: string[] = new Array(record.turns.length);
+export function createVoiceCallTraceRecorder(
+  collaborators: VoiceCallTraceRecorderCollaborators,
+): VoiceSessionInfrastructure["recordCallTraces"] {
+  return async function recordVoiceCallTraces({
+    projectId,
+    record,
+    scenario,
+    scenarioRunId,
+  }: {
+    projectId: string;
+    record: CallRecord;
+    scenario?: VoiceTraceScenario;
+    scenarioRunId: string;
+  }): Promise<{ turnTraceIds: string[] }> {
+    const exchanges = groupTurnsIntoExchanges(record.turns);
+    const useMeasuredOffsets = everyTurnHasOffsets(record.turns);
+    const turnTraceIds: string[] = new Array(record.turns.length);
 
-  for (const exchange of exchanges) {
-    const { traceId, spanId } = voiceCallTraceIds({
-      conversationId: record.conversationId,
-      exchangeIndex: exchange.index,
-    });
-    for (const turnIndex of exchange.turnIndices)
-      turnTraceIds[turnIndex] = traceId;
+    for (const exchange of exchanges) {
+      const { traceId, spanId } = voiceCallTraceIds({
+        conversationId: record.conversationId,
+        exchangeIndex: exchange.index,
+      });
+      for (const turnIndex of exchange.turnIndices)
+        turnTraceIds[turnIndex] = traceId;
 
-    const { startMs, endMs } = exchangeWindowMs({
-      exchange,
-      exchangeCount: exchanges.length,
-      record,
-      useMeasuredOffsets,
-    });
-    const input = buildExchangeSpanInput({
-      projectId,
-      record,
-      scenario,
-      scenarioRunId,
-      exchange,
-      traceId,
-      spanId,
-      startMs,
-      endMs,
-    });
-    await recordExchangeSpan({
-      projectId,
-      scenarioRunId,
-      exchange,
-      traceId,
-      input,
-    });
-  }
+      const { startMs, endMs } = exchangeWindowMs({
+        exchange,
+        exchangeCount: exchanges.length,
+        record,
+        useMeasuredOffsets,
+      });
+      const input = buildExchangeSpanInput({
+        projectId,
+        record,
+        scenario,
+        scenarioRunId,
+        exchange,
+        traceId,
+        spanId,
+        startMs,
+        endMs,
+      });
+      await recordExchangeSpan({
+        traces: collaborators.traces,
+        projectId,
+        scenarioRunId,
+        exchange,
+        traceId,
+        input,
+      });
+    }
 
-  return { turnTraceIds };
+    return { turnTraceIds };
+  };
 }

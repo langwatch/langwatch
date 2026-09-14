@@ -8,32 +8,30 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockFindById = vi.fn();
-vi.mock("~/server/agents/agent.repository", () => ({
-  AgentRepository: class {
-    findById({ projectId, id }: { projectId: string; id: string }) {
-      return mockFindById({ projectId, id });
-    }
-  },
-}));
+import type { CallRecord } from "@langwatch/scenario-contract";
+import { createVoiceCallRunWriter } from "../voice-run-writer.ts";
 
+const mockFindById = vi.fn();
 const mockStartRun = vi.fn().mockResolvedValue(undefined);
 const mockMessageSnapshot = vi.fn().mockResolvedValue(undefined);
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn().mockReturnValue({
-    simulations: {
-      startRun: (...args: unknown[]) => mockStartRun(...args),
-      messageSnapshot: (...args: unknown[]) => mockMessageSnapshot(...args),
-      finishRun: (...args: unknown[]) => mockFinishRun(...args),
+
+// The writer is composed over in-memory collaborators, the same way the
+// module's composition composes it over the real ones.
+const writeVoiceCallRun = createVoiceCallRunWriter({
+  agents: { findById: (input) => mockFindById(input) },
+  simulations: {
+    startRun: async (input) => {
+      await mockStartRun(input);
     },
-  }),
-}));
-
-vi.mock("~/server/db", () => ({ prisma: {} }));
-
-import type { CallRecord } from "../call-record";
-import { writeVoiceCallRun } from "../voice-run-writer";
+    messageSnapshot: async (input) => {
+      await mockMessageSnapshot(input);
+    },
+    finishRun: async (input) => {
+      await mockFinishRun(input);
+    },
+  },
+});
 
 function fakeRecord(overrides: Partial<CallRecord> = {}): CallRecord {
   return {

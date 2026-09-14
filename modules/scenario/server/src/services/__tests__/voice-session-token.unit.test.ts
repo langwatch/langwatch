@@ -10,7 +10,7 @@ import {
   signVoiceSessionToken,
   type VoiceSessionTokenPayload,
   verifyVoiceSessionToken,
-} from "../voice-session-token";
+} from "../voice-session-token.ts";
 
 const SECRET = "test-secret-value";
 const NOW = 1_000_000;

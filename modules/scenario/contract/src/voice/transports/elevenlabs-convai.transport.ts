@@ -182,7 +182,7 @@ function elevenLabsCredentialOf(credential: VoiceTransportCredential): {
   return { apiKey: credential.apiKey, baseUrl: credential.baseUrl };
 }
 
-function authHeaders(credential: { apiKey: string }): HeadersInit {
+function authHeaders(credential: { apiKey: string }): Record<string, string> {
   return { [API_KEY_HEADER]: credential.apiKey, accept: "application/json" };
 }
 

@@ -10,21 +10,24 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockRecordSpan } = vi.hoisted(() => ({
-  mockRecordSpan: vi.fn().mockResolvedValue(undefined),
-}));
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    traces: { recordSpan: (...a: unknown[]) => mockRecordSpan(...a) },
-  }),
-}));
-
-import type { CallRecord, CallTurn } from "../call-record";
+import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import {
+  createVoiceCallTraceRecorder,
   groupTurnsIntoExchanges,
-  recordVoiceCallTraces,
   voiceCallTraceIds,
-} from "../voice-call-trace-writer";
+} from "../voice-call-trace-writer.ts";
+
+const mockRecordSpan = vi.fn().mockResolvedValue(undefined);
+
+// Composed over an in-memory span collector, the same way the module's
+// composition composes it over the real trace ingress command.
+const recordVoiceCallTraces = createVoiceCallTraceRecorder({
+  traces: {
+    recordSpan: async (input) => {
+      await mockRecordSpan(input);
+    },
+  },
+});
 
 function fakeRecord(over: Partial<CallRecord> = {}): CallRecord {
   return {

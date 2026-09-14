@@ -51,3 +51,15 @@ export * from "./suite-fields.ts";
 export * from "./scenario-field-values.ts";
 export * from "./scenario-evaluation-gate.ts";
 export * from "./voice/caller-voice.config.ts";
+// The voice vocabulary the server side of a call is written against: the
+// transport keys, the agent config stored on a voice agent row, the claims a
+// session token carries, and the two infrastructure interfaces the server
+// package implements. Named rather than star-exported so nothing else in the
+// voice cluster's runtime leaks onto the package's public surface.
+export * from "./voice/voice-agent.config.ts";
+export * from "./voice/voice-session-token.payload.ts";
+export * from "./voice/voice-transport.ts";
+export type { CallRecord, CallTurn } from "./voice/call-record.ts";
+export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
+export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
+export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.service.ts";

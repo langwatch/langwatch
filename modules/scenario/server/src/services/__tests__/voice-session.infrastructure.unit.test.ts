@@ -8,37 +8,64 @@
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { Scenario } from "~/generated/prisma/client";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { createVoiceSessionInfrastructureFromServices } from "../voice-session.infrastructure";
+import {
+  createVoiceSessionInfrastructureFromServices as composeVoiceSessionInfrastructure,
+  type VoiceSessionServices,
+} from "../voice-session.infrastructure.ts";
 
-// findExistingRun reaches the app layer directly for the run row; the fake lets
-// each case hand back a run (or none) without a datastore.
-const { getScenarioRunData } = vi.hoisted(() => ({
-  getScenarioRunData: vi.fn(),
-}));
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ simulations: { runs: { getScenarioRunData } } }),
-}));
+/** The agent row the fakes hand back, loose about the fields this file does
+ *  not read so the test does not restate the whole Agent shape. */
+interface AgentRow {
+  id: string;
+  projectId: string;
+  name: string;
+  type: string;
+  config: unknown;
+  [field: string]: unknown;
+}
+
+/** The scenario row `resolveScenarioSet` reads, narrowed to what it reads. */
+interface ScenarioRow {
+  id: string;
+  testSuiteId: string | null;
+}
+
+// findExistingRun reads the run through the injected simulation read; the fake
+// lets each case hand back a run (or none) without a datastore.
+const findScenarioRunData = vi.fn();
+
+/**
+ * Composes the infrastructure over defaults for every collaborator this file
+ * does not exercise, so each case names only the fakes it cares about.
+ */
+function createVoiceSessionInfrastructureFromServices(
+  over: Pick<VoiceSessionServices, "agentService" | "scenarioService"> &
+    Partial<VoiceSessionServices>,
+) {
+  return composeVoiceSessionInfrastructure({
+    elevenLabsCredentials: { resolveForProject: vi.fn(async () => null) },
+    simulations: {
+      findScenarioRunData: (input) => findScenarioRunData(input),
+    },
+    recordCallTraces: vi.fn(async () => ({ turnTraceIds: [] })),
+    writeCallRun: vi.fn(async () => {}),
+    signSessionToken: vi.fn(() => "signed-token"),
+    ...over,
+  });
+}
 
 function fakeAgentService(over: {
   getById?: (input: {
     id: string;
     projectId: string;
-  }) => Promise<AgentWithFields | null>;
-  create?: (input: unknown) => Promise<AgentWithFields>;
+  }) => Promise<AgentRow | null>;
   createVoiceAgent?: (input: unknown) => Promise<{ id: string }>;
   hasVoiceAgentForExternalId?: (input: unknown) => Promise<boolean>;
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
-    create:
-      over.create ??
-      vi.fn(async () => {
-        throw new Error("not stubbed");
-      }),
     createVoiceAgent:
       over.createVoiceAgent ??
       vi.fn(async () => {
@@ -53,14 +80,14 @@ function fakeScenarioService(over: {
   getById?: (input: {
     id: string;
     projectId: string;
-  }) => Promise<Scenario | null>;
+  }) => Promise<ScenarioRow | null>;
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
   };
 }
 
-function voiceAgentRow(over: Partial<AgentWithFields> = {}): AgentWithFields {
+function voiceAgentRow(over: Partial<AgentRow> = {}): AgentRow {
   return {
     id: "agent_row",
     projectId: "project_1",
@@ -77,7 +104,7 @@ function voiceAgentRow(over: Partial<AgentWithFields> = {}): AgentWithFields {
     outputFields: [],
     fieldsResolved: true,
     ...over,
-  } as unknown as AgentWithFields;
+  } as unknown as AgentRow;
 }
 
 describe("Feature: voice-session infrastructure composition", () => {
@@ -206,7 +233,7 @@ describe("Feature: voice-session infrastructure composition", () => {
           scenarioService: fakeScenarioService({
             getById: vi.fn(
               async () =>
-                ({ id: "scenario_1", testSuiteId: "suite_1" }) as Scenario,
+                ({ id: "scenario_1", testSuiteId: "suite_1" }) as ScenarioRow,
             ),
           }),
         });
@@ -226,7 +253,7 @@ describe("Feature: voice-session infrastructure composition", () => {
           agentService: fakeAgentService({}),
           scenarioService: fakeScenarioService({
             getById: vi.fn(
-              async () => ({ id: "scenario_1", testSuiteId: null }) as Scenario,
+              async () => ({ id: "scenario_1", testSuiteId: null }) as ScenarioRow,
             ),
           }),
         });
@@ -266,7 +293,7 @@ describe("Feature: voice-session infrastructure composition", () => {
 
     describe("when the run carries well-formed metadata", () => {
       it("maps agent id, source, recording and scenario set through", async () => {
-        getScenarioRunData.mockResolvedValueOnce({
+        findScenarioRunData.mockResolvedValueOnce({
           status: ScenarioRunStatus.SUCCESS,
           scenarioId: "scenario_1",
           scenarioSetId: "set_1",
@@ -295,7 +322,7 @@ describe("Feature: voice-session infrastructure composition", () => {
 
     describe("when the metadata fields are the wrong type", () => {
       it("narrows a non-source and a non-string recording to null", async () => {
-        getScenarioRunData.mockResolvedValueOnce({
+        findScenarioRunData.mockResolvedValueOnce({
           status: ScenarioRunStatus.SUCCESS,
           scenarioId: undefined,
           scenarioSetId: undefined,
@@ -320,7 +347,7 @@ describe("Feature: voice-session infrastructure composition", () => {
 
     describe("when no run exists for the id", () => {
       it("answers null", async () => {
-        getScenarioRunData.mockResolvedValueOnce(null);
+        findScenarioRunData.mockResolvedValueOnce(null);
 
         const existing = await ports().findExistingRun({
           projectId: "p1",

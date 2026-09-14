@@ -20,59 +20,23 @@
  * the token's project — there is no provider record yet to check it against.
  * The token is short-lived (the call budget plus a grace window).
  *
- * Server-only: it signs with `node:crypto` and the app's stored secret. The
- * ElevenLabs API key never appears in a token — only ids and the project it is
- * scoped to.
+ * Server-only: it signs with `node:crypto` and a secret the deployment holds.
+ * The ElevenLabs API key never appears in a token — only ids and the project
+ * it is scoped to.
+ *
+ * The secret is a required argument, never read here. Nothing in this package
+ * may reach for an environment variable of its own
+ * (`langwatch/secrets-through-source`): whoever composes the voice session
+ * infrastructure hands the signing secret down with the rest of its
+ * collaborators, so the one place a deployment's secret is resolved stays the
+ * composition root.
  */
 
+import {
+  type VoiceSessionTokenPayload,
+  voiceSessionTokenPayloadSchema,
+} from "@langwatch/scenario-contract";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
-import { env } from "~/env.mjs";
-import { VOICE_TRANSPORTS, type VoiceTransport } from "./voice-transport.ts";
-
-/** The claims carried in a signed voice session token. */
-export interface VoiceSessionTokenPayload {
-  /** Our correlation id for the call until the provider assigns one. */
-  sessionId: string;
-  /** The project the session was minted under; finish must match it. */
-  projectId: string;
-  /** The saved agent row id, or null when the drawer had not saved one yet
-   *  at mint time (finish creates the row in that case). */
-  agentId: string | null;
-  /** The vendor agent id the session was minted for: read off the row when
-   *  one exists, otherwise the mint request's own value for an unsaved
-   *  draft. The finished conversation's own agent id must equal this. */
-  agentExternalId: string;
-  transport: VoiceTransport;
-  /** Expiry, ms since epoch. A token is invalid once `now >= exp`. */
-  exp: number;
-}
-
-const payloadSchema = z.object({
-  sessionId: z.string().min(1),
-  projectId: z.string().min(1),
-  agentId: z.string().min(1).nullable(),
-  agentExternalId: z.string().min(1),
-  transport: z.enum(
-    VOICE_TRANSPORTS as unknown as [VoiceTransport, ...VoiceTransport[]],
-  ),
-  exp: z.number(),
-});
-
-/**
- * The signing secret for voice session tokens. Reuses the same
- * `CREDENTIALS_SECRET` / `NEXTAUTH_SECRET` pair the app already requires for
- * credential encryption and API-key hashing, so no new env var is introduced.
- */
-function signingSecret(): string {
-  const secret = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
-  if (!secret) {
-    throw new Error(
-      "voice session token secret not configured: set CREDENTIALS_SECRET or NEXTAUTH_SECRET",
-    );
-  }
-  return secret;
-}
 
 function sign(body: string, secret: string): string {
   return createHmac("sha256", secret).update(body).digest("base64url");
@@ -80,14 +44,14 @@ function sign(body: string, secret: string): string {
 
 /**
  * Encode and sign a payload as `<base64url(json)>.<base64url(hmac)>`. The
- * secret defaults to the app secret; tests pass their own.
+ * secret is always supplied by the caller.
  */
 export function signVoiceSessionToken({
   payload,
-  secret = signingSecret(),
+  secret,
 }: {
   payload: VoiceSessionTokenPayload;
-  secret?: string;
+  secret: string;
 }): string {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
     "base64url",
@@ -103,11 +67,11 @@ export function signVoiceSessionToken({
 export function verifyVoiceSessionToken({
   token,
   now,
-  secret = signingSecret(),
+  secret,
 }: {
   token: string;
   now: number;
-  secret?: string;
+  secret: string;
 }): VoiceSessionTokenPayload | null {
   const dot = token.indexOf(".");
   if (dot <= 0 || dot === token.length - 1) return null;
@@ -125,7 +89,7 @@ export function verifyVoiceSessionToken({
   } catch {
     return null;
   }
-  const parsed = payloadSchema.safeParse(raw);
+  const parsed = voiceSessionTokenPayloadSchema.safeParse(raw);
   if (!parsed.success) return null;
   if (now >= parsed.data.exp) return null;
   return parsed.data;

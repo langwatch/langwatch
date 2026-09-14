@@ -4,22 +4,43 @@
  *
  * Split from the resolution service the same way
  * `voice-session.infrastructure.ts` is split from `voice-session.service.ts`:
- * this is the only place the run-audio resolution touches the app's read
- * services (the run's traces, the trace's spans), so the service itself stays
+ * this is the only place the run-audio resolution touches the two reads it
+ * needs (the run's traces, the trace's spans), so the service itself stays
  * testable against a fake reader.
+ *
+ * Both reads arrive as collaborators from the module's composition — the run
+ * read is Scenario's own, the span read is Trace's — so nothing here reaches
+ * for a global application locator.
  */
 
-import { getApp } from "~/server/app-layer/app";
-import type { WholeCallAudioInfrastructure } from "./whole-call-audio.service.ts";
+import type {
+  SimulationService,
+  WholeCallAudioInfrastructure,
+} from "@langwatch/scenario-contract";
 
-/** Compose the production infrastructure from the app's read services. */
-export function createWholeCallAudioInfrastructure(): WholeCallAudioInfrastructure {
+/** What resolving a call's audio reaches outside itself. */
+export interface WholeCallAudioCollaborators {
+  /** The run the audio belongs to, read for the trace ids its messages carry. */
+  simulations: Pick<SimulationService, "findScenarioRunData">;
+  /** One trace's normalized spans, read for the attributes they carry. */
+  traces: {
+    getNormalizedSpansByTraceId(input: {
+      tenantId: string;
+      traceId: string;
+    }): Promise<ReadonlyArray<{ spanAttributes: Record<string, unknown> }>>;
+  };
+}
+
+/** Compose the production infrastructure from the two reads it needs. */
+export function createWholeCallAudioInfrastructure(
+  collaborators: WholeCallAudioCollaborators,
+): WholeCallAudioInfrastructure {
   return {
     /** The distinct trace ids the run's messages carry, in first-seen order.
      *  A voice run records one trace per exchange, so the whole-call handle a
      *  span carries is reachable from these. */
     async loadRunTraceIds({ projectId, scenarioRunId }) {
-      const run = await getApp().simulations.runs.getScenarioRunData({
+      const run = await collaborators.simulations.findScenarioRunData({
         projectId,
         scenarioRunId,
       });
@@ -45,7 +66,7 @@ export function createWholeCallAudioInfrastructure(): WholeCallAudioInfrastructu
      *  `voice.elevenlabs.conversation_id`), so the normalized spans' own
      *  attribute records are handed straight to the scan. */
     async readSpanAttributes({ projectId, traceId }) {
-      const spans = await getApp().traces.spans.getNormalizedSpansByTraceId({
+      const spans = await collaborators.traces.getNormalizedSpansByTraceId({
         tenantId: projectId,
         traceId,
       });
@@ -53,7 +74,3 @@ export function createWholeCallAudioInfrastructure(): WholeCallAudioInfrastructu
     },
   };
 }
-
-/** The real infrastructure the route runs against in production. */
-export const wholeCallAudioInfrastructure: WholeCallAudioInfrastructure =
-  createWholeCallAudioInfrastructure();

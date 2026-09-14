@@ -20,7 +20,7 @@ import {
   type CallRecord,
   scenarioRunIdForConversation,
 } from "./call-record.ts";
-import type { VoiceSessionTokenPayload } from "./voice-session-token.ts";
+import type { VoiceSessionTokenPayload } from "./voice-session-token.payload.ts";
 import {
   type ElevenLabsCredential,
   type VoiceTransportCredential,

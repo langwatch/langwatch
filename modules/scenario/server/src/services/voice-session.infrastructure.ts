@@ -1,54 +1,48 @@
 /**
- * The real {@link VoiceSessionInfrastructure} the "Talk to it" route runs against in
- * production.
+ * The real {@link VoiceSessionInfrastructure} the "Talk to it" route runs
+ * against in production.
  *
- * This is the only module in the voice-session flow allowed to touch
- * `prisma` (via `AgentService`/`ScenarioService`) — the route itself stays
- * HTTP-only (session auth, permission probe, zod validation, the feature-flag
- * gate) and calls `mintVoiceSession`/`finishVoiceSession` with the
- * infrastructure this module composes. See
- * `dev/docs/best_practices/error-handling.md` and
- * `platform/app/CLAUDE.md` ("Hono routes calling repositories directly").
+ * The route itself stays HTTP-only (session auth, permission probe, zod
+ * validation, the feature-flag gate) and calls
+ * `mintVoiceSession`/`finishVoiceSession` with the infrastructure this module
+ * composes. See `dev/docs/best_practices/error-handling.md` and the root
+ * CLAUDE.md ("Hono routes calling repositories directly").
+ *
+ * Every collaborator arrives as an argument: the agent reads, the scenario
+ * read, the run read, the provider credential, the two writers and the token
+ * signing secret. Nothing here reaches for a global application locator, a
+ * Prisma client or an environment variable — the module's composition binds
+ * all of it, which is also what lets a unit test compose the whole
+ * infrastructure over in-memory fakes.
  */
 
-import { nanoid } from "nanoid";
-import type { PrismaClient, Scenario } from "~/generated/prisma/client";
-import type { CreateAgentInput } from "~/server/agents/agent.repository";
-import { AgentService } from "~/server/agents/agent.service";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
+import type {
+  CallRecord,
+  SimulationService,
+  VoiceSessionInfrastructure,
+  VoiceTransport,
+  VoiceTransportCredential,
+} from "@langwatch/scenario-contract";
 import {
+  getOnPlatformSetId,
   parseVoiceAgentConfig,
   VOICE_TRANSPORT_PROVIDER,
-  type VoiceTransport,
   voiceAgentExternalId,
-} from "~/server/agents/voice/voice-agent.config";
-import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
-import {
-  findElevenLabsProviderForProject,
-  getElevenLabsApiCredential,
-} from "~/server/gateway/elevenLabsCredential.service";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { ScenarioService } from "~/server/scenarios/scenario.service";
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { recordVoiceCallTraces } from "./voice-call-trace-writer.ts";
-import { writeVoiceCallRun } from "./voice-run-writer.ts";
-import type { VoiceSessionInfrastructure } from "./voice-session.service.ts";
-import { signVoiceSessionToken } from "./voice-session-token.ts";
-import type { VoiceTransportCredential } from "./voice-transport.registry.ts";
+} from "@langwatch/scenario-contract";
+import { getSuiteSetId } from "@langwatch/suite-contract";
+import { nanoid } from "nanoid";
 
 /**
- * The narrow slice of `AgentService`/`ScenarioService` the infrastructure
- * needs — just enough to compose against in-memory fakes in a unit test, with
- * no Prisma in the loop.
+ * The narrow slice of the Agent, Scenario, Gateway and Simulation surfaces the
+ * infrastructure needs — just enough to compose against in-memory fakes in a
+ * unit test, with no persistence in the loop.
  */
 export interface VoiceSessionServices {
   agentService: {
     getById(input: {
       id: string;
       projectId: string;
-    }): Promise<AgentWithFields | null>;
-    create(input: CreateAgentInput): Promise<AgentWithFields>;
+    }): Promise<{ id: string; type: string; config: unknown } | null>;
     /** Creates the voice agent row deduped by its identity key, so a retried
      *  finish for a not-yet-saved agent reuses the one row (#8020). */
     createVoiceAgent(input: {
@@ -67,8 +61,28 @@ export interface VoiceSessionServices {
     }): Promise<boolean>;
   };
   scenarioService: {
-    getById(input: { id: string; projectId: string }): Promise<Scenario | null>;
+    getById(input: {
+      id: string;
+      projectId: string;
+    }): Promise<{ testSuiteId: string | null } | null>;
   };
+  /** The project's ElevenLabs key and host, or null when it has none
+   *  configured. Owned by the Gateway feature; handed in as one read so this
+   *  package never depends on that module's server package. */
+  elevenLabsCredentials: {
+    resolveForProject(input: {
+      projectId: string;
+    }): Promise<{ apiKey: string; baseUrl: string } | null>;
+  };
+  /** The run read a retried finish checks against. */
+  simulations: Pick<SimulationService, "findScenarioRunData">;
+  /** Records one trace per exchange — `createVoiceCallTraceRecorder`. */
+  recordCallTraces: VoiceSessionInfrastructure["recordCallTraces"];
+  /** Writes the finished call down as a run — `createVoiceCallRunWriter`. */
+  writeCallRun: VoiceSessionInfrastructure["writeCallRun"];
+  /** Signs the claims a browser carries from mint to finish. The deployment's
+   *  secret is resolved once, at composition, and travels as a value. */
+  signSessionToken: VoiceSessionInfrastructure["signSessionToken"];
 }
 
 /** The terminal-retry fields a finished run persisted, narrowed from the loose
@@ -78,7 +92,7 @@ export interface VoiceSessionServices {
  *  as-is. */
 function narrowPersistedRunFields(rawMetadata: unknown): {
   agentId: string | null;
-  source: "provider" | "browser" | null;
+  source: CallRecord["source"] | null;
   audioUrl: string | null;
 } {
   const metadata = rawMetadata as
@@ -93,13 +107,18 @@ function narrowPersistedRunFields(rawMetadata: unknown): {
 }
 
 /**
- * Compose the infrastructure from already-built services. Split out from
- * {@link createVoiceSessionInfrastructure} so a unit test can pass in-memory
- * fakes for `agentService`/`scenarioService` instead of a Prisma-backed pair.
+ * Compose the infrastructure from already-built collaborators. Every
+ * production caller goes through the module's composition, which supplies the
+ * Prisma-backed services; a unit test supplies in-memory fakes instead.
  */
 export function createVoiceSessionInfrastructureFromServices({
   agentService,
   scenarioService,
+  elevenLabsCredentials,
+  simulations,
+  recordCallTraces,
+  writeCallRun,
+  signSessionToken,
 }: VoiceSessionServices): VoiceSessionInfrastructure {
   return {
     /** Resolve the provider credential for a transport. Only ElevenLabs
@@ -110,10 +129,8 @@ export function createVoiceSessionInfrastructureFromServices({
       transport,
     }): Promise<VoiceTransportCredential | null> {
       if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
-      const provider = await findElevenLabsProviderForProject({ projectId });
-      if (!provider) return null;
-      const credential = await getElevenLabsApiCredential({
-        modelProviderId: provider.id,
+      const credential = await elevenLabsCredentials.resolveForProject({
+        projectId,
       });
       return credential ? { kind: "elevenlabs", ...credential } : null;
     },
@@ -141,7 +158,7 @@ export function createVoiceSessionInfrastructureFromServices({
     },
 
     async findExistingRun({ projectId, scenarioRunId }) {
-      const run = await getApp().simulations.runs.getScenarioRunData({
+      const run = await simulations.findScenarioRunData({
         projectId,
         scenarioRunId,
       });
@@ -174,9 +191,9 @@ export function createVoiceSessionInfrastructureFromServices({
       return { id: created.id };
     },
 
-    recordCallTraces: recordVoiceCallTraces,
+    recordCallTraces,
 
-    writeCallRun: writeVoiceCallRun,
+    writeCallRun,
 
     // A "Call it myself" run lands in the set the scenario's runs live in:
     // the scenario's test-suite set when it is filed in one, else the
@@ -199,22 +216,8 @@ export function createVoiceSessionInfrastructureFromServices({
       `/api/voice/session/${encodeURIComponent(
         conversationId,
       )}/audio?projectId=${encodeURIComponent(projectId)}`,
-    signSessionToken: (payload) => signVoiceSessionToken({ payload }),
+    signSessionToken,
     now: () => Date.now(),
     newSessionId: () => nanoid(),
   };
 }
-
-/** Compose the real infrastructure the voice-session service runs against. */
-export function createVoiceSessionInfrastructure(
-  prismaClient: PrismaClient,
-): VoiceSessionInfrastructure {
-  return createVoiceSessionInfrastructureFromServices({
-    agentService: AgentService.create(prismaClient),
-    scenarioService: ScenarioService.create(prismaClient),
-  });
-}
-
-/** The real infrastructure the route runs against in production. */
-export const voiceSessionInfrastructure =
-  createVoiceSessionInfrastructure(prisma);
