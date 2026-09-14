@@ -93,6 +93,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     tracesExplorerTourDismissedAt: null,
     passkeyNudgeDismissedAt: null,
     langyCodeAccessPreference: null,
+    joinOfferDismissedDomains: [],
     ...overrides,
   };
 }

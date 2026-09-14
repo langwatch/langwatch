@@ -20,7 +20,7 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
 import { IdentityLookupDrawer } from "./IdentityLookupDrawer";
-import { shortenIdentifier } from "./identityLookupCopy";
+import { shortenIdentifier, waitedFor } from "./identityLookupCopy";
 import { ShortId } from "./ShortId";
 
 const COLUMN_COUNT = 4;
@@ -39,7 +39,8 @@ const COLUMN_COUNT = 4;
  *
  * There is no pagination: the input is one address, and the answer is
  * everybody who holds any part of it, which is a handful of rows or a data
- * problem.
+ * problem. The claims queue below it is the one list on this page, and it is
+ * bounded server-side.
  */
 export default function IdentityLookupView() {
   const router = useRouter();
@@ -97,6 +98,7 @@ export default function IdentityLookupView() {
               />
             </>
           )}
+          <ClaimQueuePanel />
           <OperatorActivityPanel />
         </VStack>
       </BackofficeTable>
@@ -393,6 +395,51 @@ function PersonRowActions({
         )}
       </Menu.Content>
     </Menu.Root>
+  );
+}
+
+/**
+ * Domain claims awaiting a LangWatch decision, longest wait first.
+ *
+ * The claims themselves belong to the connection aggregate; this panel only
+ * reads them and links out to the connection surface that decides them. It
+ * says how long each has waited because that is the only thing a queue is
+ * ever really asked.
+ */
+function ClaimQueuePanel() {
+  const queue = api.identityLookup.claimQueue.useQuery({}, { retry: false });
+  const nowMs = Date.now();
+
+  return (
+    <Box>
+      <Heading size="sm" paddingBottom={2}>
+        Domain claims awaiting review
+      </Heading>
+      {queue.data?.length === 0 ? (
+        <Text color="fg.muted" fontSize="sm" data-testid="claim-queue-empty">
+          Nothing is waiting.
+        </Text>
+      ) : (
+        <VStack align="stretch" gap={1}>
+          {queue.data?.map((claim) => (
+            <HStack
+              key={`${claim.connectionId}:${claim.domain}`}
+              justify="space-between"
+            >
+              <Text fontSize="sm">
+                {claim.domain} ·{" "}
+                {claim.organizationName ??
+                  shortenIdentifier(claim.organizationId)}
+              </Text>
+              <Text fontSize="sm" color="fg.muted">
+                waiting {waitedFor({ sinceMs: claim.waitingSinceMs, nowMs })} ·{" "}
+                {formatDateTime(new Date(claim.waitingSinceMs))}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+      )}
+    </Box>
   );
 }
 

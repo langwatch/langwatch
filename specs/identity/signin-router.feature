@@ -1,4 +1,4 @@
-Feature: The identifier-first sign-in router - one auth screen, routed by data
+Feature: The identifier-first sign-in router - one auth screens, routed by data
   As a person signing in to LangWatch
   I need my email to route me to the right identity provider or method set
   So that every sign-in method works through one door and credential failures
@@ -75,13 +75,12 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up with the reason code "identifier_unknown"
 
   @unit
-  Scenario: An account still waiting for identifier backfill keeps its way in
+  Scenario: An unlatched legacy account with a password offers password sign-in
     Given "home.net" belongs to no ACTIVE connection
-    And an existing account holds "legacy@home.net"
-    And that account's identifier backfill is not finalized
-    When "legacy@home.net" is submitted to the router
-    Then the decision offers the account's legacy sign-in method
-    And the decision never routes to sign-up with the reason code "identifier_unknown"
+    And the legacy account for "sam@home.net" has not completed identifier backfill and holds a password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the password with the reason code "account_methods"
+    And the decision never routes to sign-up
 
   @unit
   Scenario: The methods offered are the ones that account holds

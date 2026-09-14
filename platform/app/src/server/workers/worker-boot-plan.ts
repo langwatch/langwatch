@@ -23,6 +23,9 @@ export type WorkerStageName =
   | "spend-spike-anomaly"
   | "usage-stats"
   | "realtime-session-poller"
+  | "break-glass-expiry"
+  | "sso-domain-reproof"
+  | "scim-request-log-retention"
   | "metrics";
 
 /**
@@ -66,5 +69,10 @@ export function resolveWorkerBootPlan(params: {
     "spend-spike-anomaly",
     "usage-stats",
     "realtime-session-poller",
+    // The identity lane (D05/D08). Each is a periodic sweep that depends on
+    // nothing an earlier stage sets up, so they sit at the tail.
+    "break-glass-expiry",
+    "sso-domain-reproof",
+    "scim-request-log-retention",
   ];
 }

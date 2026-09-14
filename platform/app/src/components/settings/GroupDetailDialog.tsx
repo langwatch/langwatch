@@ -12,7 +12,12 @@ import {
 } from "@chakra-ui/react";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { RandomColorAvatar } from "~/components/RandomColorAvatar";
+import {
+  IdentityChip,
+  IdentityRow,
+  IdentityRowList,
+} from "~/components/access/IdentityRow";
+import { QuietNotice } from "~/components/settings/QuietNotice";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
@@ -345,94 +350,84 @@ export function GroupDetailDialog({
                 <Text fontSize="sm" fontWeight="semibold" mb={3}>
                   Members
                 </Text>
+                {/* Said as a sentence, not as a disabled cursor. A group whose
+                    membership is the directory's looks identical to one an
+                    administrator simply cannot edit, and "why can't I add
+                    anybody" is the support ticket that difference causes. */}
                 {d.scimSource && (
-                  <Box
-                    px={3}
-                    py={2}
-                    bg="bg.muted"
-                    borderRadius="md"
-                    mb={3}
-                    fontSize="sm"
-                    color="fg.muted"
-                  >
-                    Membership managed by {d.scimSource.toUpperCase()} via SCIM.
+                  <Box marginBottom={3}>
+                    <QuietNotice
+                      title={`${d.scimSource.toUpperCase()} owns who is in this group`}
+                      testId="group-directory-managed"
+                    >
+                      Add and remove people at your identity provider. Changes
+                      made here would be undone on its next push. What this
+                      group GRANTS is still yours to change, above.
+                    </QuietNotice>
                   </Box>
                 )}
 
-                {d.members.length === 0 && pendingAdditions.length === 0 ? (
-                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-                    No members yet.
-                  </Text>
-                ) : (
-                  <>
-                    {d.members.map((m) => {
+                <IdentityRowList empty="Nobody is in this group yet.">
+                  {[
+                    ...d.members.map((m) => {
                       const markedForRemoval = pendingRemovals.has(m.userId);
                       return (
-                        <HStack
+                        <IdentityRow
                           key={m.userId}
-                          py={1}
-                          fontSize="sm"
-                          opacity={markedForRemoval ? 0.4 : 1}
-                          transition="opacity 0.15s"
-                        >
-                          <RandomColorAvatar
-                            name={m.name ?? m.email ?? "?"}
-                            image={m.image}
+                          id={m.userId}
+                          name={m.name}
+                          address={m.email}
+                          image={m.image}
+                          muted={markedForRemoval}
+                          trailing={
+                            canManage && !d.scimSource ? (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                color={
+                                  markedForRemoval ? "blue.500" : "fg.muted"
+                                }
+                                aria-label={
+                                  markedForRemoval
+                                    ? `Undo removal of ${m.name ?? m.email}`
+                                    : `Mark ${m.name ?? m.email} for removal`
+                                }
+                                onClick={() => toggleMemberRemoval(m.userId)}
+                              >
+                                <X size={14} />
+                              </Button>
+                            ) : null
+                          }
+                        />
+                      );
+                    }),
+                    ...pendingAdditions.map((a) => (
+                      <IdentityRow
+                        key={a.userId}
+                        id={a.userId}
+                        name={a.label}
+                        address={null}
+                        image={a.image}
+                        badges={<IdentityChip label="Adding" tone="good" />}
+                        trailing={
+                          <Button
                             size="xs"
-                          />
-                          <Text
-                            flex={1}
-                            textDecoration={
-                              markedForRemoval ? "line-through" : undefined
+                            variant="ghost"
+                            color="fg.muted"
+                            aria-label={`Undo adding ${a.label}`}
+                            onClick={() =>
+                              setPendingAdditions((prev) =>
+                                prev.filter((x) => x.userId !== a.userId),
+                              )
                             }
                           >
-                            {m.name ?? m.email}
-                          </Text>
-                          {canManage && !d.scimSource && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={
-                                markedForRemoval
-                                  ? `Undo removal of ${m.name ?? m.email}`
-                                  : `Mark ${m.name ?? m.email} for removal`
-                              }
-                              onClick={() => toggleMemberRemoval(m.userId)}
-                            >
-                              <X size={14} />
-                            </Button>
-                          )}
-                        </HStack>
-                      );
-                    })}
-                    {pendingAdditions.map((a) => (
-                      <HStack key={a.userId} py={1} fontSize="sm" opacity={0.7}>
-                        <RandomColorAvatar
-                          name={a.label}
-                          image={a.image}
-                          size="xs"
-                        />
-                        <Text flex={1} color="green.600">
-                          {a.label}
-                        </Text>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="fg.muted"
-                          aria-label={`Undo adding ${a.label}`}
-                          onClick={() =>
-                            setPendingAdditions((prev) =>
-                              prev.filter((x) => x.userId !== a.userId),
-                            )
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      </HStack>
-                    ))}
-                  </>
-                )}
+                            <X size={14} />
+                          </Button>
+                        }
+                      />
+                    )),
+                  ]}
+                </IdentityRowList>
 
                 {canManage &&
                   !d.scimSource &&
