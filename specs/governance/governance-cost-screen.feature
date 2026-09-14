@@ -975,6 +975,23 @@ Feature: One cost screen, three honest lanes
     # the whole screen exists to prevent.
 
   @integration
+  Scenario: A failed read is never shown as a read that has not happened yet
+    Given a panel that has no read of its own and folds the cost summary
+    And the read behind that summary failed
+    When a permitted viewer opens the cost screen
+    Then that panel says it could not be brought up to date
+    And it does not invite the reader to wait for traffic that was already served
+    # The two states this screen is most careful to keep apart meet here. A
+    # failed read hands the panel nothing, and nothing is this screen's word
+    # for "not measured yet" — so the panel told the reader to wait for
+    # traffic the gateway had already served and the read had lost on the way,
+    # while the money lanes one screen above said, correctly, that the read
+    # had failed. The two answers were one line of props apart.
+    # A read that failed on a REFRESH is the same finding from the other side:
+    # the last good figures are still in hand, and drawing them unmarked
+    # presents figures nobody could confirm as current.
+
+  @integration
   Scenario: A period that could not be read offers a way to try again
     Given the records behind a provider's period are open for a permitted viewer
     And that read failed
@@ -1585,6 +1602,18 @@ Feature: One cost screen, three honest lanes
       And it does not offer to try the read again
       # "Try again" is advice that cannot work against a decline.
 
+    @integration
+    Scenario: A declined summary read leaves its panels saying what would fill them
+      Given a reader whose cost read is declined
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then the panels folded from that read say what would fill them
+      And none of them says it could not be brought up to date
+      # Nothing failed and nothing needs retrying, so telling this reader that
+      # refreshing again is worth a try sends them after a fix that does not
+      # exist. The failure marker is for failures; a decline keeps the empty
+      # copy, the same line the billed-spend-by-person panel draws.
+
   Rule: A read that genuinely broke still reports the failure
 
     @integration
@@ -1861,6 +1890,19 @@ Feature: One cost screen, three honest lanes
       And the hidden governance project billed nothing in that earlier window
       When a permitted viewer opens the cost screen
       Then nobody is reported as new
+
+    # The hidden governance project exists to scope the MONEY, and an
+    # organization only mints one once somebody connects a provider bill. Its
+    # people are its people either way, so gating the headcount on that
+    # project answers an organization question with one hidden project's
+    # existence, and reports a busy organization as having nobody.
+    @unit
+    Scenario: People active in an organization with no governance project are still counted
+      Given an organization whose people ran assistant traffic in its own projects
+      And no hidden governance project has ever been minted for it
+      When a permitted viewer opens the cost screen
+      Then those people are counted among the people using AI tools
+      And no spend figure is reported for the organization
 
     @unit
     Scenario: An organization with no prior activity reports everybody as new

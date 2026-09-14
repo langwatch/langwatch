@@ -15,12 +15,12 @@
  * Tenancy: the money reads filter by `TenantId = govProjectId` where
  * `govProjectId` is the org's hidden internal_governance Project (lazily
  * minted by `ensureHiddenGovernanceProject`). When the org has no Gov
- * Project yet (no IngestionSource has ever been minted), the queries
+ * Project yet (no IngestionSource has ever been minted), those money reads
  * short-circuit to empty results. The reads that answer an organization
  * question rather than a governance-project one - the department rollup and
  * the adoption headcount - filter by `TenantId IN (...)` over every live
  * project of the org, resolved from Prisma so they can only ever read this
- * org's own projects.
+ * org's own projects, and run whether or not a Gov Project exists.
  *
  * Anomaly counts (`openAnomalyCount` / `anomalyBreakdown`) read from
  * `prisma.anomalyAlert` - unaffected by the trace-store path.
@@ -474,7 +474,8 @@ export class ActivityMonitorService {
   /**
    * Resolves the org's hidden internal_governance Project ID. Returns null
    * when the org has no Gov Project yet (no IngestionSource has ever been
-   * minted) - callers short-circuit to empty results in that case.
+   * minted) - the money reads short-circuit to empty results in that case.
+   * Reads answering an organization question do not consult this at all.
    */
   private async resolveGovProjectId(
     organizationId: string,
@@ -513,10 +514,6 @@ export class ActivityMonitorService {
       anomalyBreakdown.warning +
       anomalyBreakdown.info;
 
-    const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) {
-      return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
-    }
     if (!this.repository) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
@@ -526,18 +523,15 @@ export class ActivityMonitorService {
     const thisWindowStart = now - windowMs;
     const previousWindowStart = now - 2 * windowMs;
 
-    const row = await this.repository.findSummarySpend({
-      tenantId: govProjectId,
-      thisStart: thisWindowStart,
-      prevStart: previousWindowStart,
-      windowEnd: now,
-    });
-
     // Adoption is an organization question - a person who only ever worked in
     // an application project is still one of the org's people - so the
-    // headcount reads every project while the money above keeps the
+    // headcount reads every project while the money below keeps the
     // governance project's scope. Splitting the read is what keeps a spend
-    // figure from moving as a side effect of this (ADR-128 ruling 6).
+    // figure from moving as a side effect of this (ADR-128 ruling 6), and it
+    // is also why the two are gated separately: an org with no governance
+    // project yet has no spend to report, but its people are still its
+    // people, and returning the empty summary for all of them would answer
+    // the organization question with one hidden project's existence.
     const projectIds = (
       await this.organizationProjects(input.organizationId)
     ).map((p) => p.id);
@@ -551,10 +545,28 @@ export class ActivityMonitorService {
             windowEnd: now,
           });
 
+    // Money is the governance project's question. With no governance project
+    // there is nothing to ask, and the spend fields stay at their empty
+    // values rather than being answered from some wider scope.
+    const govProjectId = await this.resolveGovProjectId(input.organizationId);
+    const spend = govProjectId
+      ? await this.repository.findSummarySpend({
+          tenantId: govProjectId,
+          thisStart: thisWindowStart,
+          prevStart: previousWindowStart,
+          windowEnd: now,
+        })
+      : null;
+
     return {
-      spentThisWindowUsd: row.thisSpend,
-      windowOverPreviousPct: pctChange(row.thisSpend, row.prevSpend),
-      hasPriorBaseline: row.prevSpend > 0,
+      ...EMPTY_SUMMARY,
+      ...(spend
+        ? {
+            spentThisWindowUsd: spend.thisSpend,
+            windowOverPreviousPct: pctChange(spend.thisSpend, spend.prevSpend),
+            hasPriorBaseline: spend.prevSpend > 0,
+          }
+        : {}),
       activeUsersThisWindow: userCounts.thisUsers,
       // Naming the people who are actually new requires the per-user
       // first-seen fold, which is a follow-up (3b: governance_kpis

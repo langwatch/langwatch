@@ -348,6 +348,7 @@ function CostsPage() {
             sourcesConnected={holdsFigures}
             organizationId={organizationId}
             summaryDays={summary.data?.series ?? null}
+            hasSummaryFailure={summary.isError && !isRefusedRead(summary.error)}
             providerDays={providerDays.data?.rows ?? null}
             hasProviderDaysFailure={providerDays.isError}
           />
@@ -908,6 +909,15 @@ interface Breakdowns {
    * what stops it drawing one at all.
    */
   failed: {
+    /**
+     * The activity summary, which the adoption headcount is read off. Named
+     * here for the same reason as its three neighbours and missed for longer:
+     * its figure is `activeUsers`, a failed read leaves that null, and null is
+     * what the adoption card draws its "fills once a source reports" copy
+     * from — so a broken read asked the reader to go connect a source that was
+     * already connected and already reporting.
+     */
+    adoption: boolean;
     byDepartment: boolean;
     byUser: boolean;
     byModel: boolean;
@@ -983,9 +993,13 @@ function useBreakdownQueries({
     userRows: byUser.data ?? null,
     activeUsers: summary.data?.activeUsersThisWindow ?? null,
     failed: {
-      byDepartment: byDepartment.isError,
-      byUser: byUser.isError,
-      byModel: byModel.isError,
+      // A refusal is filtered out of every one of these: a declined read is
+      // not broken, and "refreshing again is worth a try" is advice that
+      // cannot work against one. `SpenderPanelBody` draws the same line.
+      adoption: summary.isError && !isRefusedRead(summary.error),
+      byDepartment: byDepartment.isError && !isRefusedRead(byDepartment.error),
+      byUser: byUser.isError && !isRefusedRead(byUser.error),
+      byModel: byModel.isError && !isRefusedRead(byModel.error),
     },
     isFetching:
       summary.isFetching ||
@@ -1516,6 +1530,7 @@ function BreakdownGrid({
   spenders,
   organizationId,
   summaryDays,
+  hasSummaryFailure,
   providerDays,
   hasProviderDaysFailure,
 }: {
@@ -1533,6 +1548,14 @@ function BreakdownGrid({
    * Null until the read answers, under the same rule `providerDays` follows.
    */
   summaryDays: readonly GovernanceCostDayDto[] | null;
+  /**
+   * Whether that read FAILED, which `summaryDays` cannot say on its own: a
+   * failed first read is null, which the panel reads as "not measured yet",
+   * and a failed refresh still holds the last good series, which the panel
+   * draws as though it were current. See `CostBreakdowns` for both. Refusals
+   * are filtered out before this.
+   */
+  hasSummaryFailure: boolean;
   /**
    * One figure per (day, provider) of the billed lane. NULL UNTIL THE READ
    * ANSWERS, which an empty list cannot say on its own: the panels below
@@ -1630,6 +1653,7 @@ function BreakdownGrid({
         interval={interval}
         showSample={showSample}
         summaryDays={summaryDays}
+        hasSummaryFailure={hasSummaryFailure}
       />
     </SimpleGrid>
   );
@@ -1662,12 +1686,20 @@ function CountPanels({
   interval,
   showSample,
   summaryDays,
+  hasSummaryFailure,
 }: {
   sample: SampleSeries;
   interval: TimeInterval;
   showSample: boolean;
   /** The summary's per-day series. Null is an unanswered read. */
   summaryDays: readonly GovernanceCostDayDto[] | null;
+  /**
+   * Whether the read behind that series FAILED, as opposed to answering
+   * nothing. Only the token panel reads it: the conversation panel beside it
+   * has no read behind it at all, so a failure it did not take part in has
+   * nothing to say about it.
+   */
+  hasSummaryFailure: boolean;
 }) {
   // The token panel folds the SAME series the dollar lanes fold, bucketed the
   // same way, because the only thing it has to agree with the lane beside it
@@ -1702,27 +1734,35 @@ function CountPanels({
         />
       </CostPanel>
       <CostPanel title="Tokens over time" sample={showSample}>
-        {/* The store is named on the panel's own face, in both states. Two
-            stores count tokens for the same call and they do not agree — the
-            gateway meters what it served, including the image and audio work
-            a span never carries — so an unlabelled figure invites a reader to
-            read the difference as a defect in one of them. The empty copy
-            below names the gateway too, but only while the panel is empty,
-            and the label has to survive the panel filling up. */}
-        <VStack align="stretch" gap={2}>
-          <Text fontSize="xs" color="fg.muted">
-            Counted by the gateway as it served the traffic.
-          </Text>
-          <CostLine
-            points={showSample ? sample.tokens : tokenPoints}
-            interval={interval}
-            empty={costPanelEmpty({
-              what: "How many tokens were spent, period by period.",
-              source: "Fills from traffic the gateway serves.",
-              action: ADD_A_SOURCE,
-            })}
-          />
-        </VStack>
+        {/* Sample mode outranks the failure, exactly as it does for the
+            provider-day panels above: the reader asked to be shown invented
+            figures, and a failure notice over the top of them reports on a
+            read this panel is not currently drawing. */}
+        {!showSample && hasSummaryFailure ? (
+          <CostPanelUnrefreshed />
+        ) : (
+          /* The store is named on the panel's own face, in both states. Two
+             stores count tokens for the same call and they do not agree — the
+             gateway meters what it served, including the image and audio work
+             a span never carries — so an unlabelled figure invites a reader to
+             read the difference as a defect in one of them. The empty copy
+             below names the gateway too, but only while the panel is empty,
+             and the label has to survive the panel filling up. */
+          <VStack align="stretch" gap={2}>
+            <Text fontSize="xs" color="fg.muted">
+              Counted by the gateway as it served the traffic.
+            </Text>
+            <CostLine
+              points={showSample ? sample.tokens : tokenPoints}
+              interval={interval}
+              empty={costPanelEmpty({
+                what: "How many tokens were spent, period by period.",
+                source: "Fills from traffic the gateway serves.",
+                action: ADD_A_SOURCE,
+              })}
+            />
+          </VStack>
+        )}
       </CostPanel>
     </>
   );
@@ -1746,6 +1786,7 @@ function CostBreakdowns({
   sourcesConnected: connected,
   organizationId,
   summaryDays,
+  hasSummaryFailure,
   providerDays,
   hasProviderDaysFailure,
 }: {
@@ -1764,6 +1805,21 @@ function CostBreakdowns({
    * does. Null until the read answers, for the reason below.
    */
   summaryDays: readonly GovernanceCostDayDto[] | null;
+  /**
+   * Whether the summary read FAILED, which `summaryDays` cannot say on its
+   * own for the reason it cannot be said for the provider rows either — and
+   * here the confusion runs the other way as well. A failed FIRST read leaves
+   * the series null, and null is this screen's word for "not read yet", so the
+   * token panel invited the reader to wait for traffic that had already been
+   * measured and lost on the way. A failed REFRESH leaves the last successful
+   * series in hand, and drawing it unmarked presents figures nobody could
+   * confirm as current. One flag answers both.
+   *
+   * A REFUSED read is not carried in here. It is not broken, retrying cannot
+   * help, and `CostsRefused` above has already said what happened — the same
+   * line `SpenderPanelBody` draws between a failure and a decline.
+   */
+  hasSummaryFailure: boolean;
   /**
    * One figure per (day, provider) of the billed lane. NULL UNTIL THE READ
    * ANSWERS, which an empty list cannot say on its own: the panels below
@@ -1804,6 +1860,7 @@ function CostBreakdowns({
         spenders={spenders}
         organizationId={organizationId}
         summaryDays={summaryDays}
+        hasSummaryFailure={hasSummaryFailure}
         providerDays={providerDays}
         hasProviderDaysFailure={hasProviderDaysFailure}
       />
@@ -1970,6 +2027,7 @@ function AdoptionRow({
       <AdoptionFigures
         invented={invented}
         measured={measured}
+        hasFailure={breakdowns.failed.adoption}
         sourcesConnected={connected}
       />
     </CostPanel>
@@ -1986,10 +2044,17 @@ function AdoptionRow({
 function AdoptionFigures({
   invented,
   measured,
+  hasFailure,
   sourcesConnected: connected,
 }: {
   invented: boolean;
   measured: number | null;
+  /**
+   * Whether the read behind the headcount FAILED, as opposed to answering
+   * nothing. Without it the card tells a reader whose read just broke to go
+   * connect a source, which is the one move that cannot help them.
+   */
+  hasFailure: boolean;
   sourcesConnected: boolean;
 }) {
   if (invented) {
@@ -2015,6 +2080,13 @@ function AdoptionFigures({
       </HStack>
     );
   }
+  // A THIRD way to have no figure, and the only one that is not a finding:
+  // the read broke. It is tested before the two below because both of them
+  // end in advice — go connect a source — and a reader whose source is
+  // already connected and reporting would be sent to do it again. Below the
+  // sample branch on purpose: sample mode outranks a failure everywhere on
+  // this screen.
+  if (hasFailure) return <CostPanelUnrefreshed height="72px" />;
   // Two ways to have no figure: the read never answered, or it answered with a
   // zero that no connected source stands behind. Both are unanswered in the
   // sense the panel cares about — nothing was measured — and both name the move

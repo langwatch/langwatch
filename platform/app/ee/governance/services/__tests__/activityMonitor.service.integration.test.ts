@@ -415,7 +415,13 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   });
 
   describe("when an org has no hidden Governance Project (no IngestionSource ever minted)", () => {
-    it("returns empty summary without touching ClickHouse", async () => {
+    // The organization below holds no projects at all, which is why nothing
+    // reaches ClickHouse: the money read has no governance project to scope
+    // to, and the org-wide headcount has no tenants to count. An org in the
+    // same state but holding application projects DOES run the headcount —
+    // adoption is an organization question and does not wait on a governance
+    // project (see activityMonitorAdoptionWithoutGovProject.unit.test.ts).
+    it("returns empty summary without touching ClickHouse when the org holds no projects", async () => {
       const orphanOrg = await prisma.organization.create({
         data: {
           name: `Orphan Org ${namespace}`,
