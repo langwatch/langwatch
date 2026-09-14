@@ -68,6 +68,19 @@ below. Every claim here was verified this session, not inherited.
    `grep -c async_hooks` is still 0, build the bundle, boot, and verify the
    SPA serves through the api's static surface (mounted at `8760a1f575`,
    precedence-tested, but never yet exercised with a real bundle).
+2a. **Typecheck scoreboard (2026-09-14 ~22:00)**: at ZERO — webhook,
+   evaluation, trace, hosted-mcp, identity, analytics, GATEWAY
+   (`eb08d4c77b`), plus agent-web and prompt-web. The `AppRestSecurity`
+   dead chain is ported everywhere except enterprise governance's five
+   relocated transport files (HELD until that directory's concurrent
+   restructure settles — .claude/handoffs/rest-chain-port.md §11-12 has
+   the plan and the stored-object-file.rest.ts precedent). The orphaned
+   `langwatch-ql/provisioning/` directory was deleted whole at
+   `213f74121f` (5044 lines, pre-rewrite copy of the wired services
+   family). Still queued: scenario's dead-monolith orphan files,
+   analytics-web's architectural 41, scenario-web's 10, and the
+   second-tier web packages (project 19, workflow 11, experiment 8,
+   model-provider 6, trace 2, langy 1, annotation 1).
 2. **Web typecheck unblock — DONE** (`1f748bb0a6` + `362a75c9fe`). The
    remaining web-package code errors are the module-web-typecheck-debt
    lane's (active). The server-side remainder (langy/experiment/prompt) is
@@ -93,7 +106,13 @@ below. Every claim here was verified this session, not inherited.
    `.claude/handoffs/observability-browser-logger.md`); audit remaining
    PROPERTY members on module apps — the operations-only proxy defect was
    confirmed three times (gateway, trace, searchBodySchema).
-7. **Small named items** — `specs/features/agents/voice-agents-v1.feature`
+7. **Small named items** — success-response restatement sweep: `5d466e14ef`
+   made a docs answer with only a description inherit `withOutput`'s content
+   (spec: specs/api-reference/response-documentation.feature) and converted
+   dashboard-widget.rest.ts as the exemplar; ~10 more files restate their own
+   schema the same way (`rg -l 'schema: resolver\(' modules --glob
+   '*.rest.ts'`) — mechanical lane, but each site needs an eyeball: only a
+   restatement of the route's OWN withOutput schema may drop its content; `specs/features/agents/voice-agents-v1.feature`
    carries two unbound scenario titles from a deleted test;
    `useOpenSuiteEditor`'s `attachmentId` is accepted but unread by the
    suiteEditor drawer; organization's tRPC `group.*` still gates through
