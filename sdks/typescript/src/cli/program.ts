@@ -410,6 +410,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // LangWatchQL query — the door a headless coding agent runs analytics SQL
+  // through. Project-implicit: no `--project` flag, no `X-Project-Id`
+  // header, the configured API key alone decides the reachable rows. Speaks
+  // the output port: `data` is the rows array, so `-o json` is the primary
+  // spelling; `table` is the human fallback.
+  emitsResult(
+    program
+      .command("query <sql>")
+      .description(
+        "Run a read-only LangWatchQL SELECT against your analytics data and print the rows.",
+      ),
+    async (sql: string) => {
+      try {
+        const { queryCommand } = await import("./commands/query.js");
+        return await queryCommand(sql);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
   // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing

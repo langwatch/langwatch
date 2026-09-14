@@ -136,6 +136,21 @@ Feature: CLI cross-project access with the user-scoped login key
       When it runs a query through the CLI
       Then it gets the rows in a form it can parse
 
+    @unit
+    Scenario: langwatch query -o json prints the rows and exits 0
+      Given the user is logged in with a working API key
+      When the user runs `langwatch query "SELECT 1" -o json`
+      Then the query runs against the configured API key with no project header
+      And stdout is exactly one JSON array of the returned rows
+      And the command exits 0
+
+    @unit
+    Scenario: langwatch query prints a coded error and exits non-zero on failure
+      Given the user is logged in with a working API key
+      When the query is refused by the platform
+      Then a structured error document naming the code, message, and meta is printed
+      And the command exits non-zero
+
 # --- AC Coverage Map ---
 # AC12 "whoami -o json secret-free shape, exit 0" → Scenario: whoami -o json prints one secret-free JSON object and exits 0
 # AC13 "whoami -o json when not logged in exits 1, structured error on stdout" → Scenario: whoami -o json when logged out emits a structured error and exits 1
