@@ -1,11 +1,6 @@
 /**
- * ADR-092 §2 — the ordered decision steps, one function each. Every step
- * reads the same DecideContext and either answers or defers to the next; the
- * ORDER lives in AuthzEngine.decide() (engine.ts), which is the one place it
- * can be read top to bottom.
- *
- * Deliberate legacy quirks are tagged `LEGACY-QUIRK(<stage>)` with the
- * migration stage that removes them.
+ * Ordered decision steps; ORDER lives in AuthzEngine.decide() (engine.ts).
+ * Legacy quirks tagged LEGACY-QUIRK(<stage>) (ADR-092 §2).
  */
 import { bindingGrants, legacyTeamFallbackGrants, matchResourceGrant } from "./matchers.ts";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
@@ -64,18 +59,8 @@ export function demoProjectStep({
 }
 
 /**
- * LEGACY-QUIRK(C): a user with no OrganizationUser row is denied outright at
- * every binding tier — organization (rbac.ts:1016), team, and project
- * (resolveProjectPermissionContext, rbac.ts:1083) all read membership before
- * they read bindings, so a stale binding left by a since-closed cross-org
- * path never authorizes. Api-key principals hold no org membership and pass
- * this gate untouched — past it they may still resolve through bindings or
- * an api-key-audience resource grant. The resource tier is deliberately
- * outside this OUTRIGHT denial: share links are how a non-member or an
- * anonymous caller sees anything at all. Membership-before-bindings still
- * holds there — bindingsStep and legacyTeamFallbackStep carry their own
- * non-member guard, so on a resource scope a non-member's only path is the
- * resource tier, never a leftover binding on the resource's lineage.
+ * LEGACY-QUIRK(C): deny non-members outright at binding tiers; resource tier
+ * allows share links so non-members + anonymous can see resources.
  */
 export function organizationMembershipGateStep({
   grants,
@@ -113,13 +98,8 @@ export function organizationRoleFloorStep({
 }
 
 /**
- * A user with no OrganizationUser row never resolves through bindings or the
- * legacy team fallback, at ANY tier. Non-resource scopes already denied at
- * the membership gate; this closes the resource tier, where the gate defers
- * so share links stay reachable — without it, a since-removed member's
- * leftover binding on the resource's project/team/org lineage would still
- * authorize a resource read. Api-key principals hold no membership by design
- * and pass.
+ * Non-members never resolve through bindings at any tier; closes resource
+ * tier to prevent stale leftover bindings from authorizing.
  */
 function principalLacksMembership(grants: CollectedGrants): boolean {
   return grants.principal.type === "user" && !grants.isOrgMember;

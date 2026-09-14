@@ -1,18 +1,6 @@
 /**
- * The typing behind declared permission checks (ADR-092 decision 25).
- *
- * The registry already states, per resource, the tiers it can be granted at.
- * Everything here derives from that one object, so a declaration surface —
- * the tRPC builder, the Hono policy, the imperative facade — can be checked
- * against the input it reads its scope from. The tier vocabulary itself comes
- * from `./vocabulary`; this module adds no spelling of its own.
- *
- * Client-safe by the same rule as the registry: no Prisma, no env, no server
- * imports.
- *
- * A declaration that fails validation resolves to `DeclarationError<Reason>`,
- * so the assignability failure the author reads names the problem in words
- * rather than a wall of conditional types.
+ * Derive type-safe declared permission checks from the registry's tier
+ * declarations (ADR-092 decision 25); fail with readable type errors.
  */
 import { AUTHZ_RESOURCES, type AuthzPermission, type AuthzResource } from "./registry.ts";
 import {
@@ -65,13 +53,8 @@ export type DeclarationError<Reason extends string> = {
 type FieldsForTiers<T> = T extends BindingScopeTier ? (typeof SCOPE_TIER_FIELDS)[T] : never;
 
 /**
- * One input shape (never a union — the caller distributes) against one
- * permission. Platform-tier permissions are refused outright: the operator
- * middleware owns them and they resolve a scope no procedure input carries.
- * Otherwise at least one tier the permission allows must be REQUIRED by the
- * input, so the runtime always has an id. An id from a tier the permission
- * cannot be granted at is fine alongside an allowed one — inputs routinely
- * carry child-tier ids as payload, and the runtime reads only allowed tiers.
+ * Validate one input against one permission; require at least one allowed
+ * tier id (platform permissions are operator-middleware-only).
  */
 type ValidateOne<P extends AuthzPermission, I> = [P] extends [PlatformTierPermission]
   ? DeclarationError<`'${P}' is platform-tier: declare it through the operator middleware, not a scoped input`>
@@ -92,12 +75,8 @@ export type ValidatePermissionForInput<P extends AuthzPermission, I> = [I] exten
     : never;
 
 /**
- * The fields a `via` derivation may name for P: required in the input, and
- * of a tier narrower than one P is grantable at. A field whose own tier
- * already satisfies P is excluded — plain `.permission(p)` covers it without
- * ceremony. Narrower means earlier in `BINDING_SCOPE_TIERS`, which is
- * ordered most specific first, and a narrower id always resolves its
- * ancestors.
+ * Via fields must be narrower than allowed tiers (earlier in
+ * BINDING_SCOPE_TIERS); narrower ids always resolve their ancestors.
  */
 export type ViaFieldFor<P extends AuthzPermission, I> = [P] extends [PlatformTierPermission]
   ? never
@@ -112,20 +91,8 @@ export type ViaFieldFor<P extends AuthzPermission, I> = [P] extends [PlatformTie
     : never;
 
 /**
- * Options for a no-permission declaration over input I. Every scope-tier
- * field the input carries must be individually allowed with a written
- * reason — the compile-time form of the legacy `skipPermissionCheck` guard.
- */
-/**
- * The access declaration any HTTP-surface endpoint must carry: exactly one
- * of a registry permission or an explicit opt-out with a written reason.
- *
- * The `undefined` counterkeys make the union exclusive, and a config
- * carrying neither matches neither arm — so "forgot to declare" is a compile
- * error at the registration call, not a route that mounts with service-level
- * auth only and reads as guarded. Frameworks that adopt it re-check at boot
- * (`@langwatch/api` refuses to build on a bare or blank-reason endpoint), so
- * a JS-level bypass of the types refuses to start.
+ * Exactly one of permission or opt-out with reason; undefined counterkeys
+ * make the union exclusive so "forgot to declare" is a compile error.
  */
 export type AccessDeclaration =
   | { permission: AuthzPermission; noPermission?: undefined }
@@ -193,17 +160,8 @@ function scopesOf(permission: AuthzPermission): readonly string[] {
 export type DeclaredScopeId = { tier: BindingScopeTier; id: string };
 
 /**
- * Why a declared check could not name a scope. The two are not the same
- * failure and must not answer alike: `blank` is a request that named the
- * field and left no usable id in it — the caller's to fix — while `absent` is
- * a declaration whose input has no scope field at all, which the types prevent
- * and the runtime treats as a wiring bug.
- *
- * The split is decided by whose mistake it is, not by the value's type. A
- * field the caller was asked to fill and filled badly — empty, undefined, or
- * (past a bypassed type layer) not a string at all — is `blank` in every case:
- * answering it as a wiring bug would page us for a caller's malformed request,
- * which is the exact failure this distinction exists to end.
+ * Distinguish caller mistakes (blank field) from wiring bugs (absent field)
+ * to avoid paging for malformed requests.
  */
 export type UnresolvedDeclaredScope =
   | { reason: "blank"; field: ScopeTierField }
@@ -224,14 +182,8 @@ const namesField = (input: unknown, field: string): boolean =>
   typeof input === "object" && input !== null && field in input;
 
 /**
- * The scope a declared check runs at: the narrowest tier the permission is
- * grantable at whose id the input carries, or the `via` field's tier when the
- * declaration names one.
- *
- * A field the input carries but leaves empty never resolves and never blocks a
- * wider tier that IS filled in — the walk keeps going, so an empty `projectId`
- * alongside a real `organizationId` still checks at the organization. Only
- * when no tier resolves does the emptiness become the answer.
+ * Resolve to the narrowest allowed tier id present in input, or the `via`
+ * field's tier; empty fields don't block wider filled tiers.
  */
 export function resolveDeclaredScope({
   permission,

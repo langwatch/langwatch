@@ -1,18 +1,6 @@
 /**
- * Credential arbitration: exactly one credential decides a request.
- *
- * The shape follows mojo's authenforce model. Every credential kind that is
- * in play on a request CLAIMS it; the runner requires exactly one claim.
- * Zero claims is structurally unauthenticated. Two or more is contested and
- * refused — arbitration never ranks credentials, because a precedence rule
- * is a guess about which identity the caller meant, and the guess is
- * invisible to them until it is wrong.
- *
- * The runner arbitrates; it does not resolve. Gathering each kind's claim —
- * "are these headers extractable API-key material", "does this cookie jar
- * resolve to a live session" — stays with the boundary that owns the
- * credential, which is also where a claimed-but-invalid credential turns
- * into that kind's own refusal rather than a fall-through to the next kind.
+ * Exactly one credential per request; no precedence guessing. Each boundary
+ * resolves its own kind's refusal, not a fall-through.
  */
 
 /** One credential kind's claim on a request, named for refusals. */

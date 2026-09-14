@@ -1,19 +1,15 @@
 /**
- * ADR-092 §2 — the grant rules themselves: given one binding (or one legacy
- * row, or one resource grant), does it carry the permission being asked for?
- * The walk in walk.ts decides WHICH of these to consult and in what order;
- * this module is the one copy of what each of them MEANS.
- *
- * Deliberate legacy quirks are tagged `LEGACY-QUIRK(<stage>)` with the
- * migration stage that removes them — the shadow comparison depends on this
- * file matching legacy behaviour, warts and all.
+ * Grant rules: does a binding/legacy row/resource grant carry the requested
+ * permission? Walk decides which to consult and order (ADR-092 §2).
  */
 import { bindingScopeCanGrantPermission, permissionSatisfiedBy } from "./registry.ts";
 import { builtinRoleGrants, roleKeyForTeamRole } from "./roles.ts";
 import { audienceMatches, type ScopeChainLink } from "./scope.ts";
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat, ordered sequence of legacy grant rules (fence → org-scoped semantics → custom role → EXTERNAL cap → built-in bag) whose ORDER is the stage-A parity contract; the score counts the guards, and splitting them would scatter the one place the rules read top to bottom.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: flat ordered
+// sequence of legacy grant rules whose ORDER is the stage-A parity contract;
+// splitting would scatter the one place the rules read top to bottom.
 export function bindingGrants({
   binding,
   grants,
@@ -110,16 +106,8 @@ export function legacyTeamFallbackGrants({
 }
 
 /**
- * ADR-092 §8 — the resource-tier step of the walk: a grant sitting on the
- * resource itself or a shareable ancestor (a trace inside a shared thread)
- * that carries the permission and includes this caller, matched on
- * (kind, id, projectId) plus audience. The ONLY path an anonymous
- * principal can take.
- *
- * When several grants match, the least-redacting audience wins: any
- * membership audience beats `anyone`, so a signed-in member who follows a
- * public link still gets the member view. Picking the first row instead
- * would make `decision.audience` depend on database row order.
+ * Resource grants with least-redacting audience win; only path for anonymous
+ * principals (ADR-092 §8). Deterministic: not dependent on database row order.
  */
 export function matchResourceGrant({
   scope,

@@ -1,21 +1,6 @@
 /**
- * ADR-092 §2 — the one resolver. Pure functions over a CollectedGrants
- * snapshot: COLLECT happens in the app's collector (Prisma), everything here
- * is deterministic and unit-testable without a database.
- *
- * The rules are split across siblings and this file holds only the walk
- * ORDER, which is the part worth reading first:
- *
- *   types.ts     the vocabulary (scopes, principals, grants, decisions)
- *   scope.ts     the scope chain and resource-grant audiences
- *   matchers.ts  what one binding / legacy row / resource grant MEANS
- *   walk.ts      the ordered steps, one function each, over DecideContext
- *
- * Stage-A contract: reproduce today's tRPC-path semantics EXACTLY, one
- * implementation replacing five. Deliberate legacy quirks are tagged
- * `LEGACY-QUIRK(<stage>)` with the migration stage that removes them —
- * the shadow comparison depends on this engine matching legacy behaviour,
- * warts and all.
+ * Pure deterministic resolver over CollectedGrants; walk order here, other
+ * rules in siblings (ADR-092 §2). Legacy quirks tagged for staged removal.
  */
 import { scopeChain, type ScopeChainLink } from "./scope.ts";
 import type {

@@ -1,15 +1,6 @@
 /**
- * The Governance page guards ask for `governance:view`, the same grant the
- * product switcher and the legacy Govern menu offer the product on. They used
- * to ask for `organization:manage`.
- *
- * The two are DISJOINT under the hierarchy rule — `<resource>:manage` implies
- * only `<resource>:view` for the same resource — so the swap is not a pure
- * widening, and this file is what makes it safe: it asserts against the real
- * built-in role tables (ADR-092) that nobody who could open a Governance page
- * before is locked out now.
- *
- * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
+ * Governance page guard moved from `organization:manage` to `governance:view`.
+ * Assert against real built-in roles that nobody gets locked out (ADR-092).
  */
 import { describe, expect, it } from "vitest";
 

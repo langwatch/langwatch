@@ -1,20 +1,6 @@
 /**
- * The action and resource vocabulary a permission string is built from.
- *
- * A leaf module on purpose: it imports nothing, so both halves of the product
- * can read it. A settings screen needs these to render the permission picker
- * and a server needs them to build permission strings — and when they lived
- * beside the engine gate, importing them from a React component pulled a
- * Node-only logger into the browser bundle and every chunk died on `process is
- * not defined`.
- *
- * So the rule this file exists to hold: a value both sides share lives
- * somewhere neither side owns. Keep it free of imports.
- *
- * Nothing here decides what a permission MEANS. The registry does, and a
- * resource or action that drifts out of it stops being offered rather than
- * being offered and refused — which is what bounds this table to a subset of
- * the engine's vocabulary rather than a second opinion about it.
+ * Action and resource vocabulary shared across browser and server; kept import-
+ * free. Registry decides what permissions mean; this table is a UI subset only.
  */
 
 /**
@@ -117,45 +103,14 @@ export const Resources = {
   // delivery, and billing consumers get keys that can ONLY read. Same
   // enterprise plan gate as the webhook platform.
   GATEWAY_SPEND: "gatewaySpend",
-  // The Langy in-product assistant. Its own resource rather than riding on
-  // `evaluations:view`, because starting a turn is not a read: it provisions
-  // credentials, spawns an OpenCode worker and spends the project's model
-  // budget. `langy:view` reads conversations; `langy:create` starts or
-  // continues a turn (and forks, which creates one); `langy:update` renames;
-  // `langy:delete` archives. Project-scoped, since conversations belong to a
-  // project — except `langy:manage`, which also appears in the ORG role bag
-  // for the Langy surfaces an admin configures. The organization's GitHub
-  // connection is not one of them: it belongs to the organization, so
-  // `organization:manage` gates it
-  // (specs/integrations/github-connection.feature).
-  //
-  // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
-  // nothing. The permission grain is not what keeps Langy scarce — the
-  // `release_langy_enabled` flag is — so it draws the line at "can this person
-  // act on the project at all" rather than trying to be finer than that.
+  // Langy: provisioning and running turns (separate from evaluations:view).
+  // Project-scoped; org-scoped langy:manage in ORG role bag.
   LANGY: "langy",
-  // The per-project agent cache. An agent stores a value it produced during a
-  // run (a login session, a handle it paid to obtain) and reads it back on the
-  // next row, so the work happens once for the run instead of once per row.
-  // Entries expire on their own and the platform encrypts them at rest.
-  //
-  // `agentCache:manage` guards every route, the read included: a caller that
-  // can overwrite an entry already chooses what the next read answers, so a
-  // read-only tier would divide nothing. `agentCache:view` is the read half of
-  // the vocabulary and reaches no route yet, so grant it only together with a
-  // route that can answer it safely. Granted from MEMBER upward; VIEWER and
-  // EXTERNAL get nothing, because a cache entry is agent-written state a
-  // reader has no call to see.
+  // Per-project agent cache; manage guards all routes (read+write unified).
+  // MEMBER upward only; entries are agent-written state.
   AGENT_CACHE: "agentCache",
-  // The organization's cost screen (ADR-128): the provider-billed lane, the
-  // gateway-metered lane and the seat lane, each labeled for what it is.
-  //
-  // Its own resource rather than a grain of `governance`, because reading
-  // what the organization spends is a strictly different capability from
-  // administering ingestion and anomaly rules — a finance reviewer needs the
-  // figures and nothing else, and `governance:view` today carries the whole
-  // admin surface with it. Read-only: `governanceCost:view` is the only
-  // grain, since nothing on the screen is editable.
+  // Organization cost screen (ADR-128): provider-billed, gateway-metered,
+  // and seat lanes. Read-only; separate from governance:* (ADR-128).
   GOVERNANCE_COST: "governanceCost",
 } as const;
 

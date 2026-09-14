@@ -1,18 +1,7 @@
 /**
- * The authorization vocabulary: every scope tier, every principal kind, and
- * every spelling each of them has, declared exactly once.
- *
- * Before this module the same five tiers existed four times over — the
- * registry's lowercase `AuthzScopeType`, the binding's uppercase
- * `RoleBindingScopeType`, the event stream's `LedgerScopeType` and the
- * Grant table's `GrantScopeTypeDb` — each with its own membership. Two of
- * them were missing `resource`, two were missing `platform`, and nothing
- * caught it because no type connected them. Principals were worse: `apiKey`,
- * `api_key` and `API_KEY` in three hand-written translation tables.
- *
- * The declarations below are the source. Every union, every conversion and
- * every guard in the codebase derives from them, so a term added here
- * appears everywhere and a term spelled wrong anywhere is a type error.
+ * Authorization vocabulary: scope tiers and principal kinds, declared once.
+ * Every union, conversion, guard derives from these; spelling errors are
+ * caught as type errors.
  */
 import { z } from "zod";
 

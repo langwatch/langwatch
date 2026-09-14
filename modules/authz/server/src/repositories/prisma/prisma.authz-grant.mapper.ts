@@ -25,15 +25,8 @@ import { type Instant, Temporal } from "@langwatch/time";
 export const SHARE_LINK_PERMISSION = AUTHZ_SHARE_PERMISSION;
 
 /**
- * Pure row mapping for the grants ledger's Postgres projection: reducer
- * facts ↔ `Grant`/`Role` rows (the future head) and reducer facts → the
- * legacy-shaped `RoleBinding`/`CustomRole` rows (the compat head). The
- * roleKey ↔ (role, customRoleId) translation lives ONLY here (delivery-plan
- * decision 10) — nothing else in the codebase may know both vocabularies.
- *
- * Storage-free on purpose (ADR-070): the row shapes below are the
- * projection's CONTRACT; the app's Prisma repository satisfies them
- * structurally — its generated enums are these same string literals.
+ * Pure row mapping: reducer facts ↔ future head (Grant/Role) and compat head
+ * (RoleBinding/CustomRole). roleKey translation only here (ADR-070).
  */
 
 /** The Grant table's principal and scope vocabularies. Both are the stored
@@ -116,15 +109,8 @@ export interface CompatBindingRowShape {
 }
 
 /**
- * The resource tier's compat head: a `ShareLink` row, minus the one column
- * the fold does not own.
- *
- * `viewCount` is deliberately absent from the shape, not merely unset.
- * View accounting has a different writer (ShareService, once per view) and
- * lives in `GrantUsage` (delivery-plan decision 22); a fold that carried the
- * column would reset every share's view budget on each projection pass, and
- * a shape that merely defaulted it would make that one edit away. The
- * column's own default (0) covers the create; the update never names it.
+ * ShareLink compat head without viewCount (fold doesn't own it; has its own
+ * writer in GrantUsage).
  */
 export interface CompatShareLinkRowShape {
   /** The grantId itself — the imported rows ADOPT their ShareLink id, so a
@@ -154,18 +140,8 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL: Partial<
 };
 
 /**
- * The same lookup, keyed by the Grant table's stored (uppercase) principal
- * spelling instead of the ledger's own - what a repository reading `Grant`
- * rows straight off Postgres needs, since the column never carries the
- * ledger's lowercase vocabulary. Derived from `SHARE_VISIBILITY_BY_PRINCIPAL`
- * and `PRINCIPAL_TO_DB` rather than listed a second time, so the two lookups
- * cannot silently diverge.
- *
- * Keyed by plain `string` rather than `GrantPrincipalTypeDb`: a caller reads
- * this off a stored, ungoverned column (see `resourceKindFromDb`'s own
- * reasoning), so the lookup has to accept whatever string is there and answer
- * `undefined` for anything outside the three visibility-bearing principals -
- * not refuse to compile against it.
+ * Same lookup keyed by stored (uppercase) principal; derived from base
+ * lookup so both stay in sync. Accepts any string (ungoverned column).
  */
 export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
   string,
@@ -199,15 +175,8 @@ export type ShareLinkAudience =
  */
 export class AuthzGrantMapper {
   /**
-   * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
-   * row can be read back from a database an older writer, a hand-run statement
-   * or a partially applied migration also touched. So the value is PARSED, not
-   * asserted: `undefined` for anything that is not one of the two kinds, which
-   * `grantRowToFact` then treats exactly as it treats a missing column.
-   *
-   * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
-   * engine as `kind: undefined`, which reads as a resource grant that names no
-   * kind of thing — a share row that matches whichever resource is asked about.
+   * Parse stored TEXT column (no Prisma enum); undefined for unknown values
+   * to safely handle stale database rows.
    */
   private static resourceKindFromDb(value: string | null): ResourceGrantTerms["kind"] | undefined {
     if (value === "TRACE" || value === "THREAD") {
@@ -319,26 +288,8 @@ export class AuthzGrantMapper {
   }
 
   /**
-   * The compat head projects only what the legacy tables can express:
-   * scope ∈ ORGANIZATION|TEAM|PROJECT, principal ∈ user|group|api_key, and a
-   * roleKey the `TeamUserRole` enum can carry. RESOURCE and PLATFORM rows,
-   * collective principals (team/organization/project/anyone), and
-   * `lite-member` (an org-level concept `RoleBinding` never represented) are
-   * future-head-only; the legacy resolver never answered for them, so their
-   * absence from the compat view changes nothing it reads.
-   *
-   * roleKey → (role, customRoleId), the inverse of
-   * `roleKeyForTeamRole` in @langwatch/authz-contract (roles.ts): admin→ADMIN,
-   * member→MEMBER, viewer→VIEWER, custom:<id>→(`legacyRole` ?? CUSTOM, id).
-   *
-   * That last arm is not cosmetic. `roleKey` alone cannot say which built-in
-   * role a custom binding ALSO carried, and the legacy resolver reads it: a
-   * custom role with an empty permission list falls through to the row's own
-   * `role`, so writing CUSTOM where the legacy row said ADMIN silently
-   * downgrades the principal to viewer (matchers.ts, `roleKeyForTeamRole`).
-   * Imported facts therefore carry `legacyRole` and the compat row reproduces
-   * it; ledger-born custom grants have no legacy row to preserve and stay
-   * CUSTOM.
+   * Project legacy-expressible shapes only (scopes ORGANIZATION|TEAM|PROJECT;
+   * roleKey mapping with legacyRole fallback for custom bindings).
    */
   static grantFactToCompatBinding({
     grant,
@@ -395,15 +346,8 @@ export class AuthzGrantMapper {
   }
 
   /**
-   * RESOURCE facts only. A fact at any other scope, a resource fact carrying
-   * no terms, or one whose principal names an audience `ShareVisibility`
-   * cannot express maps to null — the caller skips it, silently: these are
-   * shapes the legacy table never held, not failures.
-   *
-   * `organizationId` is taken, not stored: `ShareLink` has no organization
-   * column (its tenancy is the project). It is here so the signature matches
-   * every other mapping in this file, and so a caller cannot project a row
-   * without having resolved the organization it belongs to.
+   * RESOURCE facts only; other scopes/audiences map to null (silently skipped;
+   * legacy table never held them).
    */
   static grantFactToCompatShareLink({
     grant,

@@ -1,11 +1,6 @@
 /**
- * ADR-092 decision 25 — the declaration marker. In the package so every
- * framework (the tRPC declared middleware factories, the legacy vocabulary
- * module, any future surface) shares one vocabulary without forming a cycle,
- * and so `DeclaredAuthzMiddleware` can brand what `.use()` accepts.
- *
- * The sweep test walks the router and refuses any procedure whose chain
- * carries no declaration; this file is the vocabulary it reads.
+ * Common vocabulary for framework declarations and sweep tests (ADR-092
+ * decision 25), avoiding cycles while branding what .use() accepts.
  */
 import type { ScopeTierField } from "./declaration.ts";
 import type { AuthzPermission } from "./registry.ts";

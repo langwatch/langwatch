@@ -1,20 +1,6 @@
 /**
- * ADR-092 §13 — the ledger-backed implementation of AuthzGrantsRepository:
- * the write port's storage engine is command emission. Reads (tenancy
- * lookups, manifests) delegate to `PrismaAuthzGrantsRepository`; every write
- * appends to the grants ledger through `GrantsLedgerWriter`, which owns
- * read-your-writes convergence, instant revocation enforcement (decision 7),
- * and the epoch bump (decision 19).
- *
- * Atomicity: `replaceBinding` is a revoke command then an attach command in
- * per-org FIFO — a crash between the two leaves the principal with LESS
- * access than asked, never more (fail-safe by construction), and the retry
- * attaches cleanly. `offboardUser` appends the offboarding fact FIRST (the
- * ledger is the truth — a direct delete without its event would be
- * resurrected by the next fold), enforces the grant deletes synchronously,
- * then removes the membership rows and runs the proof in one transaction. A
- * proof failure rolls back the membership deletes but the revocations stand
- * — again the fail-safe direction — and the retry converges.
+ * Ledger-backed AuthzGrantsRepository: writes emit commands; reads delegate to
+ * Prisma. Fail-safe atomicity through per-org FIFO (ADR-092 §13).
  */
 import type { LedgerActor } from "@langwatch/actor";
 import {
@@ -42,19 +28,8 @@ import { PrismaAuthzGrantRepository } from "../prisma/prisma.authz-grant.reposit
 import { RoutedAuthzReadRepository } from "../routed/routed.authz-read.repository.ts";
 
 /**
- * The port's two typed failures, restored on the way out.
- *
- * Writes travel through the ledger writer, which owns a legacy path (raw
- * Prisma), a ledger path, and a synchronous enforcement write; a duplicate
- * or missing-row signal can surface from any of them. The port documents
- * `@throws DuplicateBindingError` / `@throws BindingMissingError`, and
- * GrantsService turns exactly those two into the customer's 409 and 404 —
- * anything that reaches it as a raw `PrismaClientKnownRequestError` degrades
- * to an unknown 500 instead, which is a silently broken REST contract
- * rather than a visible bug.
- *
- * Everything else passes through untouched: an infra failure has no action
- * for the caller and must degrade to "unknown" with its trace id.
+ * Restore the port's two typed failures (DuplicateBindingError,
+ * BindingMissingError) from any ledger write path; everything else passes.
  */
 class AuthzGrantPortFailureMapper {
   /** Run a write, and let only the port's own vocabulary out of it. */
@@ -81,14 +56,8 @@ class AuthzGrantPortFailureMapper {
 }
 
 /**
- * `offboardUser`'s membership-deletion transaction runs `prove` — a read
- * repository resolution through the transaction's own client — while still
- * holding whatever row locks the deletes took, so it needs the same explicit
- * budget every other multi-statement `$transaction` in this codebase sets
- * rather than Prisma's 5s default (see `dataset-lock.ts`,
- * the default-model repository and `prismaProcessStore.ts`): `timeout` bounds the
- * callback itself, `maxWait` bounds acquiring a connection from the pool
- * before it even starts.
+ * Membership-deletion transaction needs explicit budget (timeout + maxWait)
+ * because prove holds row locks while reading.
  */
 const OFFBOARD_MEMBERSHIP_TXN_OPTIONS = {
   timeout: 15_000,
@@ -271,17 +240,8 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     create: RoleBindingWrite;
     actor: LedgerActor;
   }): Promise<void> {
-    // Existence has to be established BEFORE anything is appended.
-    // `revokeBindingsWhere`'s returned count is advisory — a lagging compat
-    // projection can read 0 while the broad grant it is meant to narrow
-    // landed moments ago and is genuinely there (its own docstring says so).
-    // Deriving "missing" from that count AFTER the revoke has already
-    // appended used to mean: a selector-only `grant_revoked` sweeps the
-    // grant away once the fold catches up, while the caller is told nothing
-    // was there to replace — a replace that nets to zero access instead of
-    // narrowing it. This pre-read can still see stale-empty under the same
-    // fold lag, but that failure mode is safe: nothing has been appended
-    // yet, so the caller can retry with its access intact.
+    // Pre-read existence before appending to avoid false "missing" from
+    // lagging compat projection; safe failure mode keeps access intact.
     const existing = await this.options.database.roleBinding.findFirst({
       where: {
         organizationId: deleteWhere.organizationId,
@@ -331,18 +291,8 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
       where: { organizationId, userId },
       select: { id: true },
     });
-    // The compat head is not the whole head any more (delivery-plan PR 3). A
-    // cut-over organization carries user facts `RoleBinding` cannot express —
-    // the lite-member rows the cutover imports, the zero-binding-admin facts
-    // genesis wrote — and enumerating only compat rows would leave every one
-    // of them resolving for a user who has just been offboarded. So the
-    // revoked set is the UNION: the compat ids, plus every Grant-head row this
-    // organization holds for this user as a principal.
-    //
-    // The rows expressible both ways are counted once and revoked once:
-    // instant enforcement deletes by grant id, and the compat row SHARES that
-    // id by construction, so one revocation takes out both heads. That is also
-    // why the proof below means the same thing whichever head it reads.
+    // Compat head is incomplete: cut-over orgs carry facts RoleBinding cannot
+    // express. Revoke the UNION (compat ids + Grant-head rows).
     const grantHeads = await this.options.database.grant.findMany({
       where: { organizationId, principalType: "USER", principalId: userId },
       select: { id: true },
@@ -350,15 +300,8 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     const revokedGrantIds = [
       ...new Set([...bindings.map((row) => row.id), ...grantHeads.map((row) => row.id)]),
     ];
-    // The fact first (the ledger is the truth), enforcement with it — the
-    // deny holds before the membership rows move.
-    //
-    // The id list is what the compat projection could see, which is a fold
-    // behind the ledger; it is the audit record and the count this call
-    // answers with, NOT the instruction. The fold removes every grant the
-    // principal holds (the reducer's `member_offboarded` sweep), so a grant
-    // appended between this query and the append cannot outlive the
-    // departure.
+    // Append fact first (ledger is truth); fold removes every grant so
+    // mid-flight appends cannot outlive the departure.
     await this.options.writer.offboardMember({
       organizationId,
       userId,
@@ -390,16 +333,9 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
           })
         : { count: 0 };
 
-      // The DIRECT postcondition, before the collector-shaped proof: no
-      // grant source keyed to this user's principal may remain on either
-      // head. The proof below re-collects through the reader the request
-      // path uses, and both heads' user reads GATE ON MEMBERSHIP - which
-      // this very transaction has just deleted - so on its own it passes
-      // vacuously whether or not the revocations actually landed. This
-      // count does not gate: surviving Grant or RoleBinding rows would
-      // resolve again the moment the user is re-invited, so they fail the
-      // offboarding here, rolling the membership deletes back while the
-      // revocation facts stand (fail-safe: the retry converges).
+      // Direct postcondition: no grant source keyed to this user remains on
+      // either head. User-read gates on membership (just deleted), so count
+      // failing gates the retry (fail-safe).
       const [remainingGrantHeads, remainingCompatRows] = await Promise.all([
         tx.grant.count({
           where: {
@@ -425,17 +361,8 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
         });
       }
 
-      // The proof sees the enforced binding deletes (already committed)
-      // and this transaction's own membership deletes; a throw rolls the
-      // memberships back while the revocations stand — fail-safe.
-      //
-      // It reads through the CUTOVER-AWARE repository, not the legacy one:
-      // "nothing resolves any more" has to be proven against the head this
-      // organization is actually served from, or a cut-over organization's
-      // offboarding would prove the wrong thing about the wrong table. The
-      // direct count above is what keeps it honest about the rows; this
-      // keeps it honest about RESOLUTION - group- and org-floor paths the
-      // row count cannot see.
+      // Proof through cutover-aware repository: direct count catches rows,
+      // proof catches resolution paths (group/org floors) (fail-safe).
       await prove(
         RoutedAuthzReadRepository.create({
           database: tx,

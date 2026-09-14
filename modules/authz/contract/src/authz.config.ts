@@ -2,15 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * Whether a permission read may be served from the epoch cache, and which
- * project (if any) every caller may read.
- *
- * `epochCache` reads `1` or `true` and nothing else, which is the reading the
- * platform application already applied. It is parsed at the leaf so both
- * processes reach one answer from one variable rather than each interpreting a
- * string after its own parse. A blank project id is not a project id: a blank
- * value in a filter widens it rather than narrowing it, so blank resolves to
- * absent here rather than at a call site.
+ * Parse at the leaf for one answer across processes; blank widens filter
+ * predicates so it resolves to absent.
  */
 const blankIsAbsent = z
   .string()
