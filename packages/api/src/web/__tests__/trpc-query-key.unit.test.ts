@@ -3,20 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createModuleApi } from "../module-api.ts";
 import { trpcQueryFilter, trpcQueryKey } from "../trpc-query-key.ts";
 
-/**
- * The one property the whole feature-web data-access pattern rests on: a query
- * a feature package registers and a query the application registers land on the
- * SAME React Query cache entry, so invalidations cross the boundary in both
- * directions during the migration.
- *
- * Two things could break it. A future `@trpc/react-query` could change its key
- * encoding, which would silently split every migrated hook from its
- * un-migrated siblings. Or `trpcQueryKey` — the escape hatch for procedures a
- * feature's map does not declare yet — could drift from that encoding. Both are
- * invisible at runtime: nothing throws, queries just stop refetching. So the
- * expectations here are taken from tRPC's own `getQueryKey`, not written out by
- * hand.
- */
+/** Migrated queries must land on the same cache entry; drift is silent at runtime;
+ * expectations taken from tRPC's `getQueryKey`, not hand-written */
 
 type ProbeApiMap = {
   tracesV2: {

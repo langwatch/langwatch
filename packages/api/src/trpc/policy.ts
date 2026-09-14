@@ -67,46 +67,19 @@ import type { TrpcRoot } from "./runtime.ts";
 const authzLogger = createLogger("langwatch:authz");
 const trpcLogger = createLogger("langwatch:trpc");
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The ports: everything the spine needs from the process it runs in.
-//
-// The spine owns tracing, request logging, handled-error translation, the
-// scope-lineage guard, the declared authorization check, the fail-closed
-// backstop and the audit trail. It owns none of the concrete things those need
-// — who the caller is, which service decides authorization, where an audit row
-// is written, which reporter an unhandled 5xx goes to, or which application
-// error classes become a bad request.
-// ─────────────────────────────────────────────────────────────────────────────
+// The ports: the spine owns tracing, logging, error handling, authorization, and the
+// fail-closed backstop; it delegates concrete implementations
 
-/**
- * The request context as tRPC actually hands it to a middleware.
- *
- * tRPC never gives a middleware the bare context type: it gives that type with
- * its index signatures stripped (`Overwrite<TContext, object>`, flattened by
- * `Simplify`). At runtime the two are the same object, but for a `TContext`
- * that is still a type parameter the compiler cannot prove the mapped form
- * assignable back to it, so a port declared `(ctx: TContext)` cannot be called
- * with what the middleware was given.
- */
+/** Context with index signatures stripped by tRPC; runtime identical but type-incompatible
+ * (see `Overwrite<TContext, object>`) */
 export type TrpcMiddlewareContext<TContext> = Simplify<Overwrite<TContext, object>>;
 
-/**
- * The same context, as a middleware installed AFTER the authenticating one
- * receives it: `TContext` with the authenticated shape written over it.
- *
- * The audit middleware sits behind the authentication middleware and still
- * reads the caller, so `actor` is handed this rather than the plain context.
- */
+/** Context after authenticating middleware; `actor` is handed this for the audit trail */
 export type TrpcAuthenticatedMiddlewareContext<TContext, TAuthenticatedContext> = Simplify<
   Overwrite<TContext, Overwrite<object, TAuthenticatedContext>>
 >;
 
-/**
- * The request as the spine reads it: headers for the caller's trace context,
- * user agent, and the client address the audit trail records. Deliberately
- * not a Node request type — the callers range from an HTTP request to a
- * WebSocket handshake to nothing at all.
- */
+/** Request headers (trace context, user agent, client address); not a Node type */
 export type TrpcRequestHeaders = Record<string, string | string[] | undefined> & {
   /**
    * Named because the request log records it as one string. Left to the index
@@ -257,17 +230,8 @@ export interface TrpcPolicyContext {
   readonly permissionChecked: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Declared authorization: ADR-092 §5, the tRPC adapter behind the typed
-// declaration surface. `protectedProcedure.input(…).permission("…")` compiles
-// down to the middleware built here.
-//
-// Every decision is asked of the authorization port the process resolves per
-// request. What IS deliberately part of this seam is the denial shape: every
-// tier's refusal carries the engine's one handled code. Every middleware built
-// here carries an `AUTHZ_DECLARATION` descriptor, the machine-readable half of
-// the declaration, which the router sweep reads.
-// ─────────────────────────────────────────────────────────────────────────────
+// Declared authorization: tRPC adapter (ADR-092 §5); every decision asks the auth port;
+// denial shape deliberately standardized with machine-readable descriptor
 
 type ScopeInput = Partial<Record<ScopeTierField, unknown>>;
 
@@ -593,15 +557,8 @@ function blankScopeId({ field }: { field: string }): TRPCError {
   });
 }
 
-/**
- * The input names no scope field at all. Nothing the caller did can fix that,
- * so the sentence they read says only that; which procedure is miswired goes
- * to the log. The types make this unreachable — this is the runtime backstop
- * for the day they are bypassed.
- *
- * A field that is present and empty is NOT this: that case answers through
- * `blankScopeId`.
- */
+/** Input carries no scope field; types make unreachable (runtime backstop); see
+ * `blankScopeId` for empty field case */
 function wiringBug({
   permission,
   via,
@@ -684,27 +641,15 @@ function deniedError({
 // on another.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * The middleware's own parameters, annotated rather than inferred.
- *
- * tRPC hands a middleware `Simplify<WithoutIndexSignature<TContext>>`, which is
- * a runtime identity for a plain object type but which the compiler cannot
- * prove assignable back to an unresolved `TContext`. Inferring `ctx` here and
- * passing it to a port that wants `TContext` fails in a way that cascades: the
- * enclosing procedure builder stops resolving and every callback downstream
- * loses its contextual types.
- */
+/** Middleware parameters annotated to avoid type cascade from tRPC's context mapping */
 type ScopeLineageParams<TContext> = {
   ctx: TrpcMiddlewareContext<TContext>;
   input: unknown;
   next: () => any;
 };
 
-/**
- * Deliberately NOT `TRPCMiddlewareFunction`: naming tRPC's own type in the
- * return position re-imposes the mapped context and the assignment fails
- * again. `any` in the result mirrors `DeclaredCheckNext` above.
- */
+/** Not `TRPCMiddlewareFunction` to avoid re-imposing mapped context; `any` result is
+ * intentional */
 type ScopeLineageMiddleware<TContext> = (params: ScopeLineageParams<TContext>) => Promise<any>;
 
 function asScopeLineageInput(input: unknown): AuthzScopeLineageInput {
@@ -758,27 +703,12 @@ export function createScopeLineageGuard<TContext>(
     };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The permission procedure builder: an authorization declaration made
-// mandatory by construction.
-//
-// After `.input()` a pending builder exposes only `input`, `use`, `permission`,
-// `permissionAny`, `noPermission` and `authorizeInService` — and none of
-// `.query` / `.mutation` / `.subscription`. An undeclared procedure is
-// therefore not a lint finding or a sweep failure: it does not compile.
-// ─────────────────────────────────────────────────────────────────────────────
+// The permission procedure builder: declaration made mandatory by construction; .query
+// / .mutation / .subscription unavailable until declared
 
 type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType ? TWith : Simplify<TType & TWith>;
 
-/**
- * The parameter shape a hand-written declared check receives. Supplied by the
- * process as `TCheckContext`, because a custom check reads the process's own
- * request context and this package must not invent one for it.
- *
- * `any` is load-bearing on both `next` and the return: tRPC's `.use()` accepts
- * a middleware whose result is assignable to its own `MiddlewareResult`, which
- * a check written against validated input cannot name.
- */
+/** Parameter shape for hand-written checks; `any` on `next` and return is load-bearing */
 export type TrpcCheckMiddleware<TCheckContext, TInput> = (params: {
   ctx: TCheckContext;
   input: TInput;
@@ -803,9 +733,8 @@ export type TrpcPolicyChainMiddlewares = Readonly<{
 }>;
 
 /**
- * Typescript hackery to make sure all endpoints are forced to set the input, then to explicitly tell
- * a permission check middleware to use, and that this permission check should be compatible with the
- * inputs required
+ * Typescript hackery to force endpoints to set the input, declare a check middleware, and
+ * ensure compatibility with inputs required
  */
 export interface PendingPermissionProcedureBuilder<
   TCheckContext,
@@ -986,19 +915,7 @@ type DeclaredNoPermissionOptions<I> = UnsetMarker extends I
  */
 type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 
-/**
- * What installing a check into the chain actually requires: the declaration
- * brand, and nothing else.
- *
- * The chain builder below reads the descriptor off the check and hands the
- * function to `.use()`; it never calls it, so the context and validated-input
- * types the check is written against are the CALLER's business, checked on the
- * public `.use()` above against that procedure's own generics.
- *
- * The brand is the invariant that matters and it survives: only
- * `declareAuthzMiddleware(...)` produces it, so an undeclared function is
- * still a compile error rather than a sweep finding.
- */
+/** Installing a check requires the declaration brand; only `declareAuthzMiddleware` produces it */
 type InstallableCheck = DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>;
 
 /**
@@ -1138,17 +1055,8 @@ function middlewareList(value: unknown): readonly unknown[] {
   return Array.isArray(middlewares) ? middlewares : [];
 }
 
-/**
- * A built procedure is a **callable** carrying `_def`, not a plain object:
- * tRPC's `createResolver` returns the invoker itself. Reading it as an object
- * answered `[]` for every procedure in the router, which made
- * `isPublicProcedure` below say "public" about all of them.
- *
- * Unreadable is thrown rather than returned as empty. The one thing this
- * function must never do is shrug: an empty list reads as "no auth middleware
- * here", so a shape it does not understand would report the whole surface
- * anonymous, or — with the sense inverted — hide a genuinely public endpoint.
- */
+/** Procedures are callables with `_def`, not plain objects; unreadable throws rather than
+ * returns empty (empty list must mean no auth, not unknown shape) */
 function procedureMiddlewareList(value: unknown): readonly unknown[] {
   if ((typeof value !== "object" && typeof value !== "function") || value === null) {
     throw new Error(`Not a tRPC procedure: ${typeof value}`);
@@ -1191,15 +1099,8 @@ export function createIsPublicProcedure(
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The process middlewares every tRPC procedure is wrapped in, built once from
-// a root and the ports the process fills.
-//
-// ORDER IS BEHAVIOUR. The chain a declared procedure runs is tracer, logger,
-// handled-error, scope-lineage guard, declared check, `enforcePermissionCheck`,
-// audit — and each of the last four reads the VALIDATED input, so the chain is
-// applied after a procedure's own `.input()` parser, never before it.
-// ─────────────────────────────────────────────────────────────────────────────
+// The process middlewares every tRPC procedure is wrapped in; ORDER IS BEHAVIOUR: tracer,
+// logger, handled-error, scope-lineage guard, check, enforceCheck, audit (reads validated input)
 
 /** Everything the process supplies for the policy below to exist. */
 export type TrpcRuntimePolicyMembers<TContext, TAuthenticatedContext extends object> = Readonly<{
@@ -1217,16 +1118,7 @@ function spanAttributes(path: string, type: string) {
   } as const;
 }
 
-/**
- * Put a failed call on its span the way the log line already puts it in Loki.
- *
- * `langwatch.error.code` / `langwatch.error.fault` mirror the fields
- * `handleTrpcCallLogging` writes, so support can filter traces by the same
- * facts they filter logs by. Span status stays UNSET for a customer-fault
- * handled error: a 404 for a row someone deleted is the system working, and
- * marking it ERROR counts routine refusals against every SLO built on span
- * status. Platform and provider faults still set ERROR.
- */
+/** Record failed call on span; span status UNSET for customer faults (404 is not an error) */
 function recordSpanError(span: Span, error: unknown, asError: (failure: unknown) => Error): void {
   const e = asError(error);
   span.recordException(e);
@@ -1295,18 +1187,8 @@ export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,
   TAuthenticatedContext extends object,
 >(root: TrpcRoot<TContext>, ports: TrpcRuntimePolicyMembers<TContext, TAuthenticatedContext>) {
-  /**
-   * The two middlewares the authenticated procedure is built from are written
-   * as plain functions and only then wrapped with `root.middleware(...)`.
-   *
-   * `root.middleware(fn)` answers a builder whose `_middlewares` is `[fn]`, and
-   * `procedure.use(fn)` appends `fn` itself, so a procedure built from either
-   * carries the SAME function instance: the chain, its order, and the identity
-   * `createIsPublicProcedure` compares against are unchanged. What the function
-   * form buys is that `procedure.use(...)` type-checks it against
-   * `MiddlewareFunction`, which names the context as `TContext`, rather than
-   * against `MiddlewareBuilder`, which names it as `Overwrite<TContext, …>`.
-   */
+/** Plain functions preserve identity/order for comparison; type-checking against
+ * `MiddlewareFunction` rather than `MiddlewareBuilder` */
   type AuthenticateParams = {
     ctx: TrpcMiddlewareContext<TContext>;
     next: <$ContextOverride>(opts: {
@@ -1355,7 +1237,7 @@ export function createTrpcRuntimePolicy<
     const actor = ports.identity.actor(ctx);
 
     if (
-      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
+      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated logs for mutations
       !result.ok &&
       result.error instanceof TRPCError &&
       result.error.code !== "INTERNAL_SERVER_ERROR" &&
@@ -1488,22 +1370,8 @@ export function createTrpcRuntimePolicy<
     );
   });
 
-  /**
-   * Converts HandledErrors thrown in procedures to properly-coded TRPCErrors.
-   * Without this, HandledErrors fall through as INTERNAL_SERVER_ERROR.
-   * Placed inner to loggerMiddleware so the logger sees the correct code.
-   *
-   * A cause the process re-raises with a code of its own is answered through
-   * the cause translation port, because those classes are the application's.
-   *
-   * A bare `ZodError` — a `.parse` inside a service, not the procedure's own
-   * `.input()` parser — is promoted the same way the REST door already promotes
-   * it. Without the branch it stays INTERNAL_SERVER_ERROR: the customer still
-   * read the right copy, while the log line, the span status and every alert
-   * built on them booked a customer's typo as one of our 500s. Matched by
-   * shape, not by class: routes and services on this process validate with
-   * whichever zod major their schema was authored against.
-   */
+/** Converts HandledErrors to TRPCErrors (else fall through as INTERNAL_SERVER_ERROR);
+ * promotes bare ZodErrors same as REST door does */
   const handledErrorMiddleware = root.middleware(async ({ next }) => {
     const result = await next();
     if (result.ok) return result;
@@ -1579,15 +1447,7 @@ export function createTrpcRuntimePolicy<
     });
   });
 
-  /**
-   * Protected (authenticated) procedure
-   *
-   * If you want a query or mutation to ONLY be accessible to logged in users,
-   * use this. It verifies the session is valid and guarantees the process's
-   * authenticated context is what the resolver sees.
-   *
-   * @see https://trpc.io/docs/procedures
-   */
+/** Protected (authenticated) procedure; verifies session and guarantees authenticated context */
   const authProtectedProcedure = root.procedure.use(authenticate).use(auditErrors);
 
   return {

@@ -126,7 +126,7 @@ function producerDirectories(projects: ReadonlyMap<string, Project>): Map<string
   return producerByDirectory;
 }
 
-/** References are derived from package.json; a hand edit drifts from what the workspace declares. */
+/** References derived from package.json; hand edits drift from workspace declaration */
 function lintReferenceSync(root: string): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
 

@@ -3,23 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-/**
- * The browser-safe contract must not reach the deployment projection.
- *
- * `public-app-config.projection.ts` declares the deployment's whole runtime
- * configuration at module scope, and that declaration names secret variables:
- * `SENDGRID_API_KEY`, `RESEND_API_KEY`, `SMTP_URL`. The values never reach a
- * browser — there is no `process.env` there — but the names and the config
- * runtime do, because this package does not mark itself side-effect free, so a
- * module-scope `RuntimeConfig.define` cannot be shaken out.
- *
- * `usePublicEnv` reaches `./public-app-config` through the application's
- * reader, so anything that module reaches is in the client bundle. This matches
- * import and export STATEMENTS rather than the bare path, because both modules'
- * docblocks name the projection to explain why they do not import it — a
- * substring check would fail on the explanation and pass once someone deleted
- * it.
- */
+/** Browser-safe contract must not reach deployment projection (secret variable names leak
+ * at module scope); match import/export STATEMENTS, not bare path */
 const MODULE_EDGE =
   /^\s*(?:import|export)\b[^;]*?["'][^"']*public-(?:app-)?config\.projection["']/m;
 const here = dirname(fileURLToPath(import.meta.url));

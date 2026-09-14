@@ -1,12 +1,8 @@
 /**
  * @vitest-environment node
  *
- * The `DATAPLANE_S3__<label>__<organizationId>` routing table every process
- * that addresses a tenant's own bucket resolves through.
- *
- * Driven off an explicit source rather than `process.env`, because the source
- * is an argument: a process reading a validated configuration and one reading
- * raw environment strings must resolve the same routes.
+ * The `DATAPLANE_S3__<label>__<organizationId>` routing table for tenant buckets;
+ * resolves from validated config, not raw environment strings
  */
 import { describe, expect, it } from "vitest";
 

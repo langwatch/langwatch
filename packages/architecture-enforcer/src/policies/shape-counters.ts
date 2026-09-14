@@ -258,7 +258,7 @@ export function collectCompositionRootBudgetFindings(root: string): CompositionR
   return findings;
 }
 
-/** The budget file this measurement would write: the smaller of the stored and the measured count, per path. */
+/** The budget file this measurement would write: smaller of stored vs measured count, per path */
 export function collectCompositionRootBudget(root: string): CompositionRootBudget {
   const stored = readCompositionRootBudget(root);
   const budgets: Record<string, number> = { ...stored.budgets };
@@ -345,7 +345,8 @@ function isExported(modifiers: ts.NodeArray<ts.ModifierLike> | undefined): boole
 
 export type MountFileFinding = { path: string; reason: string };
 
-/** A `*-rest.mount.ts` file that carries anything but imports and one exported `runtime.mount(...)` call. */
+/** A `*-rest.mount.ts` file carrying anything but imports and one exported
+ * `runtime.mount(...)` call */
 export function collectMountFileIsOneCallFindings(root: string): MountFileFinding[] {
   const files = walkFiles(
     join(root, MOUNT_FILE_ROOT),

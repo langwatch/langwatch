@@ -21,39 +21,8 @@ import {
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../../types.ts";
 
-/**
- * Composed exports.
- *
- * A capability that nobody constructs is not a capability. Twelve of them
- * survived the platform migration as exported, tested, reviewed services that
- * no composition root ever builds: online evaluation rejects every command
- * because the worker composition never passes `execution`, the Stripe webhook
- * REST app is mounted by nothing, and the /ops dashboards read a snapshot
- * nothing writes. Each has passing unit tests. The sharpest case shipped with a
- * commit message declaring the seam closed while the call site went unchanged.
- *
- * So the guard is reachability, not existence: a service, adapter, repository,
- * process or transport factory exported from a server package's public index
- * must be named in the body of some file the four application entrypoints
- * actually reach through value imports. Constructed means `new X(`, `X.create(`
- * or passed as a value; a barrel that re-exports it is not evidence, so import
- * and export declarations are stripped before the body is read.
- *
- * Exclusions, each of them a shape that is legitimately unreached:
- *   1. testing exports -- a `/testing` subpath or a `testing.ts` module exists
- *      for suites, and no production process composes one.
- *   2. abstract Port classes -- a port is the seam an adapter implements, and
- *      the adapter is the subject the process composes.
- *   3. error classes -- thrown, never constructed by a composition root.
- *   4. zod schemas and types -- erased or data, not collaborators.
- *   5. web packages -- browser code, composed by the browser, not a process.
- *   6. `*-contract` packages -- types and wire shapes by definition.
- *
- * Existing offenders are baselined with the date they were measured. The
- * baseline is shrink-only against the merge base, the same pattern as
- * `lintOxlintBaseline` and `lintTypedPrismaSeamBaseline`: an entry may leave it
- * once the capability is composed or deleted, and nothing may join it silently.
- */
+/** Guard that exported capabilities are actually composed (reachability, not just existence);
+ * see composed-exports-baseline.json for exclusions and full rules */
 const BASELINE_FILE = "composed-exports-baseline.json";
 
 /**
@@ -328,22 +297,8 @@ function isDeclarationName(node: ts.Identifier): boolean {
   return parent?.name === node && !ts.isPropertyAccessExpression(parent);
 }
 
-/**
- * The wanted names this file uses as VALUES: `new X(`, `X.create(`, `X` handed
- * to a composition. Everything that is not composition is skipped on entry --
- * import and export declarations (re-exporting a class is not composing it, and
- * without this every barrel on the graph would vouch for everything it
- * publishes), type nodes and type declarations (a class named in an annotation
- * is erased), property names, and the module that declares the class -- its own
- * `static create` returning `new X()` is a factory, not a composition, and a
- * package index makes every module in the package reachable, so counting it
- * would let every service vouch for itself.
- *
- * Comments are skipped for free by parsing rather than matching text, which is
- * the reason this is an AST pass at all: a commented-out composition, or a
- * doc block naming the service it was meant to build, read identically to the
- * real thing in a regular expression -- and both were in the tree.
- */
+/** Wanted names used as VALUES only (new X(, X.create(, X composed); skips imports/exports,
+ * types, declaring module; AST parse to skip comments */
 function valueReferences({
   file,
   wanted,

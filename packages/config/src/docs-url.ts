@@ -1,38 +1,7 @@
 /**
- * Where the product's "Setup guide ↗", "Schema reference" and "Read the docs"
- * links point, for the deployment doing the asking.
- *
- * On a contributor's own checkout — the standard `make dev` shape, control
- * plane on http://localhost:5560 — assume Mintlify is running alongside it on
- * :3000 and link there, so worktree-scope doc edits round-trip without a
- * deploy. Every other deployment links to the canonical
- * `https://docs.langwatch.ai`.
- *
- * Hostname alone cannot tell a contributor's dev server apart from a packaged
- * self-hosted server (npx @langwatch/server, Docker, Helm): both are commonly
- * reached on localhost, but only the former has Mintlify running alongside it.
- * So the local shortcut also requires a development runtime, which keeps it
- * scoped to contributors while self-hosted installs always get the real,
- * reachable production docs.
- *
- * WHY THIS LIVES IN `@langwatch/config` AND NOT IN A WEB PACKAGE. Five copies
- * of this existed — one per family that wanted a docs link — because a feature
- * package may not import the application and no family owns another. All five
- * read `import.meta.env.DEV` to decide the branch, which is the read
- * `environment-boundaries` refuses: "Reusable packages receive typed
- * configuration". Three of them hid the read behind a cast, which silenced the
- * rule without answering it. The deployment fact they were all reaching for is
- * already on the contract every browser is handed — `PublicAppConfig.mode` —
- * so the honest shape is one framework-free module that RECEIVES that mode,
- * placed where a web package, a contract and an application can all import it
- * without importing each other.
- *
- * The mode arrives through {@link configureDocsRuntime}, called once by the
- * process that boots the browser application, in the same shape as
- * `configureLogger` and `setTraceUrlProvider`. Until it is called the runtime
- * is production: the local docs origin is the one that must never be assumed,
- * because it is also the one the security allowlist in `read-handled-error`
- * derives from (see below).
+ * Where docs links point, per deployment. On dev (Mintlify on :3000), otherwise canonical
+ * `https://docs.langwatch.ai`. Lives in @langwatch/config not a web package so it receives
+ * typed configuration (`PublicAppConfig.mode`) instead of reads `import.meta.env.DEV`.
  */
 
 import type { PublicAppConfig } from "./public-app-config.ts";
@@ -42,20 +11,8 @@ const LOCAL_DOCS_URL = "http://localhost:3000";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
 
-/**
- * The deployment facts a docs link depends on.
- *
- * `mode` is the contract's own field rather than a boolean of our making, so
- * the browser cannot come to a different conclusion about the deployment than
- * the process that served it. `hostname` is the address bar: a package may read
- * that (it is not the environment), but it is a parameter here so a test can
- * pin the branch without mutating jsdom's non-configurable `location`.
- *
- * `"test"` is deliberately NOT a local-docs mode. It is the runtime a suite
- * runs in, not a deployment anybody opens links from, and treating it as
- * development would put `http://localhost:3000` in the allowlist of every test
- * that never asked for it.
- */
+/** Deployment facts a docs link depends on (mode, hostname); params avoid environment leakage
+ * and test pollution */
 export type DocsRuntime = {
   mode: PublicAppConfig["mode"];
   hostname?: string;

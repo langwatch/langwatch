@@ -9,16 +9,7 @@ import {
   type DeclarationBudget,
 } from "./declaration-budget.ts";
 
-/**
- * Measures each application's declaration count and holds it to the committed
- * budget.
- *
- * `--listFilesOnly` is deliberate: the program is built and its files resolved,
- * nothing is checked. That is the whole of what the budget is about and it
- * costs about four seconds an application rather than the minute a real check
- * takes — still too much to hang off `typecheck`, which is why this is its own
- * command.
- */
+/** Measures declarations and holds to budget; `--listFilesOnly` for speed (4s vs 1min check) */
 
 function measure(root: string, budget: DeclarationBudget): number | undefined {
   const run = spawnSync(

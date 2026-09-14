@@ -357,17 +357,8 @@ function processFormatter() {
     });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The tRPC failure shape, and the one property of it that is easy to lose.
-//
-// A validation failure is recognised STRUCTURALLY — an `issues` array and a
-// `flatten` method — and never with `instanceof z.ZodError`. This workspace
-// resolves two zods, and a zod 3 error travelling into zod 4 code is not an
-// instance of zod 4's class, so a nominal check would turn every identity
-// validation failure into an unknown 500.
-//
-// @see dev/docs/best_practices/zod.md
-// ─────────────────────────────────────────────────────────────────────────────
+// Validation failures recognized structurally, not via instanceof (workspace has two zods;
+// see dev/docs/best_practices/zod.md)
 
 const formatter = createTrpcErrorFormatter({
   causePayload: { payloadFor: () => null },

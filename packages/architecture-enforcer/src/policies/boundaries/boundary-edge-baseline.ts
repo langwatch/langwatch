@@ -138,7 +138,7 @@ export function lintBoundaryEdgeBaseline(
   return { violations, entries: current.entries, bootstrapped: false };
 }
 
-/** The `{kind, from, to}` edges a violations list carries for the two baselined policies. `file`/`specifier` must already be the desired `from`/`to` strings (workspace-relative, as `lintWorkspace` emits). */
+/** Extract `{kind, from, to}` edges from violations for the two baselined policies. */
 export function boundaryEdgesFromViolations(
   violations: readonly ArchitectureViolation[],
 ): BoundaryEdge[] {
@@ -155,7 +155,7 @@ export function boundaryEdgesFromViolations(
     }));
 }
 
-/** Drops a cross-feature/private-runtime-export violation whose edge is listed and not expired. Every other violation passes through untouched. */
+/** Drop a baselined and not-expired cross-feature/private-runtime-export violation */
 export function filterBaselinedBoundaryEdges(
   violations: readonly ArchitectureViolation[],
   entries: readonly BaselineEntry[],

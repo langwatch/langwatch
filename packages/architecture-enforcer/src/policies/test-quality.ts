@@ -10,27 +10,9 @@ const TEST_CALLBACKS = new Set(["it", "test"]);
 const SUITE_CALLBACKS = new Set(["describe", "suite"]);
 const EXPECTATION_CALLEES = new Set(["expect", "expectTypeOf"]);
 const ASSERTION_NAMESPACES = new Set(["assert", "chai"]);
-/**
- * `expect.<name>()` forms that ARE an assertion on their own.
- *
- * Deliberately not every static on `expect`: `expect.any`,
- * `expect.objectContaining` and friends are matcher ARGUMENTS, and counting
- * them would let a test satisfy this rule by constructing a matcher it never
- * asserts against. These four either fail the test outright or state how many
- * assertions must have run.
- */
+/** `expect.<name>()` that are assertions on their own (not matcher args) */
 const EXPECT_STATIC_ASSERTIONS = new Set(["assertions", "fail", "hasAssertions", "unreachable"]);
-/**
- * An IMPORTED binding named this way is taken to assert.
- *
- * Only imported ones. A helper declared in the file is judged by its body,
- * which is stricter and costs nothing; a helper from another module has no body
- * to read without cross-file analysis, so the name is the whole signal —
- * `~/test-utils/expectCanonicalError` is the case, and eight REST tests calling
- * it read as empty. The repo already treats `expectX`/`assertX` as the name an
- * assertion helper carries, so this reads a convention rather than inventing
- * one.
- */
+/** Imported bindings named this way are taken to assert (name-based for cross-file analysis) */
 const IMPORTED_ASSERTION_HELPER = /^(?:expect|assert)[A-Z]/;
 const STATIC_MATCHERS = new Set([
   "toBe",
@@ -192,21 +174,8 @@ function assertsType(node: ts.SignatureDeclaration): boolean {
   );
 }
 
-/**
- * Every assertion helper in the file, at any depth.
- *
- * This used to read `source.statements` alone, so it saw only helpers declared
- * at the top level — and the idiomatic place for one is INSIDE its `describe`,
- * where it can close over the store, projection or app the suite built.
- * `assertCorrectFinalState`, `expectCanonicalError` and `assertExceeded` are all
- * written that way, and twelve tests calling them were reported as having no
- * assertion at all.
- *
- * Collecting by name across the whole file is slightly generous — two helpers
- * of the same name in sibling scopes are one entry — but a name collision
- * between two assertion helpers costs nothing here, while missing a scope costs
- * a false report on every test that uses it.
- */
+/** Every assertion helper in the file at any depth; idiomatic place is nested in describe
+ * blocks, so top-level scan would miss them */
 function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
   const helpers = new Set<string>();
 
@@ -482,16 +451,8 @@ function canonicalTestBody(source: ts.SourceFile, callback: TestCallback): strin
     .trim();
 }
 
-/**
- * The case table of an `it.each(...)`, or "" for an ordinary test.
- *
- * Two `it.each` blocks over different tables share one callback by design —
- * that is what parameterising a test IS — so keying duplicates on the callback
- * alone reported five legitimate suites as copies of each other. In
- * `noRawErrorToasts` two blocks both run
- * `expect(leaksIn(source)).toBe(true)` over completely different lists of leak
- * shapes; the tables are the tests.
- */
+/** The case table of `it.each(...)` or "" for ordinary test; key duplicates on callback +
+ * table, not callback alone */
 function canonicalCaseTable(source: ts.SourceFile, call: ts.CallExpression): string {
   if (!ts.isCallExpression(call.expression)) return "";
 

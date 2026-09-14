@@ -1,28 +1,7 @@
 /** @vitest-environment node */
 
-/**
- * The two doors, answering the same throw.
- *
- * A service that calls `.parse` and loses raises a bare `ZodError` on a channel
- * nobody chose — not the procedure's own `.input()` parser, which rejects
- * before any of this runs, but a schema parse inside the service the resolver
- * called. The REST door has always promoted it (`isZodLikeError` →
- * `validationErrorFromZod` in `../../errors.ts`); the tRPC door translated only
- * `HandledError` and the process's cause-translation port, so the same throw
- * left as a 422 through Hono and an INTERNAL_SERVER_ERROR through tRPC.
- *
- * The customer read the right copy either way — the error formatter recognises
- * a Zod failure structurally and serialises it as `validation_error` — which is
- * exactly why this survived. What did not survive was everything that reads the
- * transport code: the span status, the log level, and the exception reporter,
- * which booked a customer's typo as one of our 500s.
- *
- * Both doors here are the real ones. The tRPC side is `fetchRequestHandler`
- * over a root built with the real error formatter, wrapped in the first three
- * middlewares `declaredPolicy` applies (tracer, logger, handled-error) in that
- * order. The REST side is a Hono app with the real `createErrorHandler`.
- * Nothing below reimplements a boundary.
- */
+/** tRPC and REST doors align on error handling through the shared error formatter; testing
+ * real implementations, not mocks */
 
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";

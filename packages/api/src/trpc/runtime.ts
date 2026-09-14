@@ -96,18 +96,7 @@ export type TrpcRoot<
   "procedure" | "router" | "middleware"
 >;
 
-/**
- * The one place `initTRPC` is called. Feature packages ask for a root here
- * rather than initializing tRPC themselves, so every root in the process
- * carries the same context discipline.
- *
- * The builder is answered as tRPC hands it over, un-narrowed, and `create` is
- * called on it directly. A wrapper `create` of our own cannot forward the
- * options object without erasing it: `TRPCBuilder.create` derives the root's
- * `errorShape` and `transformer` from the literal type of the options it is
- * given, and a forwarding method can only pass a type parameter, which the
- * inference reads as `never`.
- */
+/** The one place `initTRPC` is called; feature packages ask for a root here for discipline */
 export class TrpcRootDefinition {
   private constructor() {}
 
@@ -261,17 +250,8 @@ export const browserSessionFact = defineTrpcFact("browserSession", z.string().nu
 /** Where the request came from, as the process's own mount reads the address. */
 export const callerAddressFact = defineTrpcFact("callerAddress", z.string().nullable());
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The server half of a tRPC contract: a permission and a handler bound to a
-// procedure the contract already named.
-// Design: packages/api/adrs/20260908-transport-declaration-split.md.
-// Spec: packages/api/specs/transport-declaration-split.feature.
-//
-// Nothing the contract said is repeated here. `.procedure(name)` selects a
-// declared member and inherits its kind, its parser and its answer. The
-// declaration carries no process generic and no runtime import: `router(runtime,
-// app)` is where the host's root, ports and application slice arrive.
-// ─────────────────────────────────────────────────────────────────────────────
+// The server half of a tRPC contract: `.procedure(name)` selects a declared member and
+// inherits its kind, parser, and answer (see transport-declaration-split.feature)
 
 /** A feature API token is the runtime identity a router binds to. */
 export type TrpcFeatureApiWitness<Api> = ModuleApiToken<Api>;
@@ -799,16 +779,8 @@ export function defineTrpcRouter<Api, Contract extends TrpcContract>(
   return routerBuilder(api, contract, new Map());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The one tRPC execution path: authenticate, parse, trace, log, decide, handle,
-// check the answer, audit, respond.
-//
-// ORDER IS BEHAVIOUR. Everything that reads the request reads the VALIDATED
-// input, so it is installed after the contract's own parser: tRPC appends its
-// input middleware where `.input()` is called. A check installed ahead of the
-// parser is handed `input === undefined`, reads no scope id, and audits with no
-// arguments, no project and no organization. Nothing reports an error.
-// ─────────────────────────────────────────────────────────────────────────────
+// The one tRPC execution path; ORDER IS BEHAVIOUR: everything reads the VALIDATED input
+// (installed after parser, never before)
 
 /**
  * The transport, as the path reads it: headers for the caller's trace context
@@ -1643,15 +1615,8 @@ function impersonatorOf(actor: Actor & { id: string }): string | undefined {
   return actor.type === "user" ? actor.impersonatorId : undefined;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The wire shape a failed tRPC call arrives in.
-//
-// The framework half is here: a handled error is serialised under `data.error`,
-// its code replaces the message so no unreviewed prose reaches a customer, the
-// stack is stripped, and the trace id captured while the span was live is
-// attached. The application half arrives through a port, because those payloads
-// are browser contracts rather than API framework policy.
-// ─────────────────────────────────────────────────────────────────────────────
+// The wire shape for failed tRPC calls: code replaces message, stack stripped,
+// trace id attached; application half comes through a port
 
 const MAX_CAUSE_DEPTH = 3;
 

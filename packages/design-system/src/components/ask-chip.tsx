@@ -1,18 +1,8 @@
 import { chakra } from "@chakra-ui/react";
 import type React from "react";
 
-/**
- * One borrowable ask, or one short way somewhere.
- *
- * Its surface is deliberately near-opaque. These sit over a moving gradient,
- * and a translucent chip on a moving ground is legible only for as long as the
- * ground happens to be dark behind it.
- *
- * Two kinds, one look: an `onClick` chip fires a prompt (the home's asks), an
- * `href` chip is a link the router follows (the governance hero's shortcuts).
- * The reader should not have to tell them apart before touching one, so the
- * chip is the same chip either way and only the element underneath changes.
- */
+/** Borrowable ask or shortcut link; deliberately near-opaque surface (legible on dark ground);
+ * same look for onClick prompts and href router links */
 export function AskChip({
   icon,
   label,

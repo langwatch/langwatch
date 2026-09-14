@@ -1,33 +1,12 @@
 /**
- * The refusal that keeps a LangWatch process out of its own trace ingest.
- *
- * With `LANGWATCH_API_KEY` set, a process wires the LangWatch SDK's exporter
- * and ships its OWN operational telemetry to whatever `LANGWATCH_ENDPOINT`
- * names. When that endpoint is this same deployment, the result is a feedback
- * loop rather than observability: every ingested span does real work — Redis,
- * Postgres, ClickHouse — and that work emits more spans, which are ingested,
- * which… The observed symptom was a runaway `recordSpan` backlog.
- *
- * The platform process used to refuse the variable outright. The api and
- * worker processes accept it deliberately, because a deployment that exports
- * its telemetry to a DIFFERENT LangWatch instance is a supported and useful
- * shape. So the refusal narrowed from "the key is set" to "the key is set and
- * the endpoint is us", which is the only case the blanket rule was ever
- * protecting.
- *
- * Every refusal names the variables an operator has to change and prints the
- * endpoint's HOST. It never prints the key: nothing here needs its value, only
- * whether one was given.
+ * Refusal that keeps a LangWatch process out of its own trace ingest. When `LANGWATCH_API_KEY`
+ * and `LANGWATCH_ENDPOINT` point to this deployment, a feedback loop results (ingested spans
+ * emit more spans). The refusal is scoped: "the key is set and the endpoint is us".
  */
 
 /**
- * Where the LangWatch SDK exports to when a deployment names no endpoint —
- * `DEFAULT_ENDPOINT` in `sdks/typescript/src/internal/constants.ts`.
- *
- * Stated here because an UNSET endpoint is the loop case on the deployment
- * that serves this host: the SDK's default is that deployment's own front
- * door, so a key set with no endpoint at all points the exporter straight back
- * at the process that set it.
+ * The SDK's default export endpoint. Stated here because an unset endpoint on this deployment
+ * points the exporter back at this process (feedback loop).
  */
 export const DEFAULT_LANGWATCH_ENDPOINT = "https://app.langwatch.ai";
 
@@ -122,15 +101,9 @@ export class SelfIngestingObservabilityError extends Error {
 }
 
 /**
- * Refuses a configuration whose telemetry exporter points back at this
- * deployment, and says nothing otherwise.
- *
- * Three ways a boot is accepted, and each is a real deployment shape:
- *
- *   - no key: the exporter is never wired, so there is nothing to loop
- *   - an endpoint on a different host: exporting to another LangWatch install
- *   - an endpoint on this host but a different stated port: two instances on
- *     one development machine
+ * Refuses a configuration whose telemetry exporter points back at this deployment. Three
+ * acceptance shapes: no key, endpoint on different host, or endpoint on this host with
+ * different port (two instances on one dev machine).
  */
 export function assertObservabilityDoesNotSelfIngest(input: SelfIngestGuardInput): void {
   if (!input.apiKey?.trim()) return;
@@ -160,11 +133,8 @@ export function assertObservabilityDoesNotSelfIngest(input: SelfIngestGuardInput
 type NetworkAddress = Readonly<{ host: string; port: number | undefined }>;
 
 /**
- * Two addresses that are the same deployment.
- *
- * A port only distinguishes when BOTH sides state one: an origin written
- * without a port is the whole host, and `https://app.example.test` and
- * `http://app.example.test` behind a proxy are one deployment rather than two.
+ * Two addresses that are the same deployment. A port only distinguishes when BOTH sides
+ * state one; origins written without a port refer to the whole host.
  */
 function addressesOneDeployment(endpoint: NetworkAddress, own: NetworkAddress): boolean {
   if (sameWorktreeStack(endpoint.host, own.host)) return true;
@@ -192,16 +162,8 @@ function worktreeStack(host: string): string | undefined {
   return slug ? `${slug}${WORKTREE_SUFFIX}` : undefined;
 }
 
-/**
- * An address from a value that may be a full URL, a bare host, or a bare
- * host and port.
- *
- * `BASE_HOST` and `NEXTAUTH_URL` are read as plain strings by both processes,
- * so neither is guaranteed to carry a scheme, and a bind address never does.
- * A port the URL leaves implicit stays `undefined` rather than becoming the
- * scheme's default, because "not stated" and "port 443" are different claims
- * and only the first should match anything.
- */
+/** Parse address from URL, bare host, or host+port; scheme optional (bind never has it),
+ * implicit port stays undefined */
 function parseNetworkAddress(
   raw: string | undefined,
   statedPort?: number,

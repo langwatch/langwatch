@@ -3,20 +3,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// `max-depth`, `complexity` and `no-nested-ternary` are native oxlint rules:
-// they cannot read `oxlint-baseline.json` the way a `defineRule` plugin rule
-// does, so they still need a config override. This generates one override per
-// rule -- a file list, all fully "off" -- from the baseline file, so the file
-// list is produced, not hand-maintained. `no-nested-ternary` joined this list
-// under ADR-135/ADR-140's class-A migration, which deleted the plugin rule
-// `langwatch/nested-ternary` that used to read the baseline directly and
-// re-keyed its 342 `nested-ternary|` entries to `no-nested-ternary|`. Run
-// after editing the baseline:
+// Generate config overrides for native oxlint rules (`max-depth`, `complexity`,
+// `no-nested-ternary`) that cannot read `oxlint-baseline.json`. Run after editing
+// baseline and paste output into `dev/lint/oxlint.baseline.jsonc`'s `overrides` array.
 //
-//   node packages/architecture-enforcer/src/generate-native-baseline-overrides.mjs
-//
-// and paste the objects it prints into `dev/lint/oxlint.baseline.jsonc`'s
-// `overrides` array, replacing the previous generated set.
+// node packages/architecture-enforcer/src/generate-native-baseline-overrides.mjs
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");

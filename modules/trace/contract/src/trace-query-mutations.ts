@@ -1,12 +1,6 @@
 /**
- * Query-string mutations. Every helper here takes a query string, parses it,
- * mutates the AST, and re-serialises — keeping liqe as the single source of
- * truth for AST structure. On parse failure, returns the original string so
- * mid-edit mutations don't blow up.
- *
- * All helpers take a single destructured params object — the location-based
- * mutators in particular have several positional primitives (start/end +
- * field/value) that were easy to mis-order with positional args.
+ * Query-string mutations: parse, mutate AST, re-serialize. Returns original on
+ * parse failure. Helpers take destructured params to avoid positional errors.
  */
 
 import type { LiqeQuery } from "liqe";
@@ -15,13 +9,8 @@ import type { FacetState } from "./trace-query-metadata.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
 /**
- * Toggle a facet value through three states: neutral → include → exclude → neutral.
- * Instead of mutating the AST directly, we serialize → modify string → re-parse.
- *
- * `combinator` controls how a newly-added clause is glued to the existing
- * query. Defaults to AND (the historical behaviour); pass "OR" when the
- * user is shift/ctrl-clicking to add an alternative rather than narrowing
- * the result set further.
+ * Toggle facet value through neutral/include/exclude states. `combinator`
+ * controls gluing (AND default, OR for shift/ctrl-click alternatives).
  */
 export function toggleFacetInQuery({
   currentQuery,
@@ -53,28 +42,8 @@ export function toggleFacetInQuery({
 }
 
 /**
- * Add a new value to a facet, OR-combining it with an existing bare value
- * of the SAME field. Faceted-search semantics: picking two values of one
- * field means "either/or" — a trace's `origin` can't be both `sample` and
- * `application`, so AND-ing them matches nothing. This is the plain-click
- * (no modifier) default for adding a second value.
- *
- * Behaviour, driven by what the field already looks like in the AST:
- *   - Exactly one bare top-level include for the field (the common case
- *     after the user's first pick) → rewrite that tag in place into a
- *     parenthesised same-field OR group:
- *       `model:gpt-4o AND origin:sample`
- *         → `model:gpt-4o AND (origin:sample OR origin:application)`
- *     The parens are mandatory: liqe binds `A AND b OR c` as
- *     `(A AND b) OR c`, so an unparenthesised same-field OR would escape
- *     its scope and silently widen the whole query.
- *   - Anything else (field absent, already multi-valued via AND, or the
- *     lone value is negated) → fall back to a plain AND append. The
- *     splice into an *existing* OR group is a different path
- *     (`addToOrGroupAtLocation`), reached once the group exists.
- *
- * Returns the original string on parse failure, matching the rest of the
- * mutation helpers.
+ * Add new facet value OR-combined with existing same-field value (faceted search).
+ * Rewrites to same-field OR group if lone bare include; else AND-appends.
  */
 export function addSameFieldOrValue({
   currentQuery,
@@ -214,17 +183,8 @@ function containsTagUnderOr({
 }
 
 /**
- * Append a new `field:value` Tag into the OR group at the given liqe
- * location. The group's coordinates come from
- * `analyzeOrGroups(...).groups[].{start,end}` — that's the inner
- * LogicalExpression's range (not including surrounding parens), so
- * splicing ` OR field:value` after the group's end keeps any
- * wrapping parens intact and OR's left-associativity does the rest:
- * `(a OR b) AND c` → `(a OR b OR x) AND c`.
- *
- * Used by the sidebar's smart-toggle: clicking a new value in a
- * facet that's part of an OR group adds it to the same group rather
- * than AND-combining at the top level.
+ * Append new value into OR group at liqe location. Sidebar smart-toggle:
+ * adds to same group rather than AND-combining at top level.
  */
 export function addToOrGroupAtLocation({
   currentQuery,
@@ -253,14 +213,8 @@ export function addToOrGroupAtLocation({
 }
 
 /**
- * Replace the value of the Tag at the given liqe location with
- * `newValue`, preserving the field name and any leading NOT. Drives the
- * click-a-token-to-edit-value popover in the search bar — given the
- * Tag's [start, end] coordinates and a candidate replacement, swap the
- * value in place without touching the rest of the query.
- *
- * Returns the original query if the location doesn't resolve to a Tag
- * with a literal expression (e.g. range tokens, structural mismatch).
+ * Replace Tag value at liqe location, preserving field and NOT.
+ * Drives search bar edit-value popover.
  */
 export function setFacetValueAtLocation({
   currentQuery,
@@ -429,18 +383,8 @@ export function removeFacetValueFromQuery({
 }
 
 /**
- * Remove a free-text (ImplicitField) literal from the query. Used by
- * the empty-state query breakdown chips when the user wants to drop a
- * single bare token (e.g. "Ω" they typed by accident) without
- * clearing the whole query. `filterAST` collapses any orphaned logical
- * parents so we don't leave stray ANDs/ORs behind.
- *
- * Removes only the FIRST matching bare term — a query like
- * `foo AND foo AND bar` collapses to `foo AND bar` after one removal
- * (the chip the user clicked), not just `bar`. Without the
- * single-shot semantics the breakdown UI would silently nuke every
- * duplicate token in one click, which doesn't match what the user sees
- * (one chip per occurrence in the breakdown panel).
+ * Remove free-text literal from query (breakdown chips). Removes only
+ * FIRST match; single-shot semantics for UI chip-per-occurrence.
  */
 export function removeImplicitTermFromQuery({
   currentQuery,
@@ -527,13 +471,8 @@ function appendClause(query: string, clause: string, combinator: "AND" | "OR" = 
 }
 
 /**
- * Wrap a value in liqe-compatible quotes unless it's a "bare" token of
- * safe characters. Liqe's unquoted literal only accepts a limited set,
- * so anything beyond `[A-Za-z0-9_.-]` — a slash in a model id like
- * `anthropic/claude-sonnet-4-6`, a colon, whitespace, quotes, parens —
- * must be quoted or it produces a syntax error. Embedded `"` and `\` are
- * escaped so values like `He said "no"` round-trip cleanly. The empty
- * string quotes to `""` rather than emitting a bare `field:`.
+ * Wrap value in liqe-compatible quotes unless bare safe-character token.
+ * Escapes embedded quotes and backslashes for clean round-trip.
  */
 export function escapeValue(value: string): string {
   if (value === "" || !/^[A-Za-z0-9_.-]+$/.test(value)) {

@@ -4,35 +4,8 @@ import ts from "typescript";
 import { walkFiles } from "../workspace/layout.ts";
 import { discoverClassifiedPackages } from "../workspace/snapshot.ts";
 
-/**
- * Moving a feature package's `tests/` tree into `__tests__` directories beside
- * the code each test covers.
- *
- * WHY THIS EXISTS
- *
- * A package-root `tests/` tree is a MIRROR of `src/`, and a mirror is only
- * accurate while someone maintains it by hand. Rename a directory in `src` and
- * the mirror silently stops matching; move a service and its test stays where
- * it was, still passing, now describing a file two directories away. Nothing
- * fails. The connection between a test and its subject lives in a convention
- * rather than in the filesystem, so it decays quietly.
- *
- * `__tests__` beside the subject puts the connection where a rename cannot
- * miss it: move the directory and the tests move with it.
- *
- * HOW A TEST'S SUBJECT IS FOUND
- *
- * Not from the path — that is the mirror this exists to stop trusting — but
- * from the test's own imports. A test imports what it tests, so the subject is
- * whichever `src` module it reaches for, and the destination is that module's
- * directory. Where a test names several, {@link chooseSubject} picks by name
- * agreement, then by directory agreement with the old mirror path, and a test
- * that names none at all is reported UNRESOLVED rather than guessed at.
- *
- * The plan is a plan: it computes every move, every rewritten specifier and
- * every collision without touching a file, so the whole thing can be read
- * before any of it is applied.
- */
+/** Move feature package `tests/` into `__tests__` beside code; mirrors decay when moved, but
+ * imports stay accurate; subject found from test's own imports, not path */
 
 export type TestMove = {
   /** Absolute path the test lives at now. */
@@ -149,21 +122,8 @@ function declaredExportsTarget(declared: unknown): string | undefined {
   return typeof target === "string" ? target : void 0;
 }
 
-/**
- * The `src` module a SELF-REFERENCING import names.
- *
- * A test often reaches its subject through the package's own name rather than
- * a relative path — `@langwatch/langy-server/eventing/langy-conversation-processing`
- * rather than `../src/eventing/...`. Node resolves that through the package's
- * `exports` map, which for these packages points straight back into `src`, so
- * the subpath after the package name is a path under `src` and the subject is
- * exactly as knowable as it is for a relative import.
- *
- * Reading it matters more than it looks: 188 of the 1292 test files in the
- * workspace name their subject ONLY this way, and treating those as
- * unresolvable would leave a sixth of the suite in the mirror tree for no
- * reason other than the spelling of an import.
- */
+/** The `src` module a self-referencing import names (via package's exports map);
+ * 188 of 1292 test files use this pattern, so must be resolved */
 function selfReferenceTarget(input: {
   specifier: string;
   packageName: string;
@@ -202,25 +162,8 @@ function subjectStem(path: string): string {
   return basename(path).replace(SOURCE_FILE, "").split(".")[0] ?? "";
 }
 
-/**
- * Which `src` module a test is about, given every one it imports.
- *
- * A test that imports one module is unambiguous. Where it imports several, the
- * tie-breaks are, in order:
- *
- *   1. **Name agreement.** `prompt.service.unit.test.ts` beside an import of
- *      `services/prompt.service.ts` is the subject, whatever else it imports —
- *      a test's name is the strongest statement anyone makes about what it
- *      covers.
- *   2. **Directory agreement with the mirror.** The old tree encoded a real
- *      intention, and where the two agree there is no reason to overrule it:
- *      `tests/services/x.test.ts` importing from `src/services/` keeps that.
- *   3. **The most-imported directory**, which is the one the test spends its
- *      assertions on.
- *
- * Ties inside a step fall through to the next; a tie at the end is resolved by
- * path order, so the plan is deterministic.
- */
+/** Which `src` module a test is about; tie-breaks: name agreement, mirror path agreement,
+ * most-imported directory; deterministic by path order */
 export function chooseSubject(
   testFile: string,
   mirrorPath: string,
@@ -262,20 +205,8 @@ export function chooseSubject(
   return best;
 }
 
-/**
- * Rewrites every relative specifier in `source` for a file that is moving from
- * `from` to `to`.
- *
- * A specifier is resolved against the OLD directory and re-expressed against
- * the new one, so it keeps naming the same file. `moved` carries the other
- * files moving in the same plan — a test importing a helper that is itself
- * moving has to follow the helper to its destination, not to where it used to
- * be.
- *
- * The extension the author wrote is preserved: an extensionless specifier stays
- * extensionless, and a `.js` specifier stays `.js`, because in an ESM package
- * that spelling is what resolves at runtime.
- */
+/** Rewrite relative specifiers for file moving from `from` to `to`; resolve against old
+ * directory, re-express against new; follow moved helpers */
 export function rewriteRelativeSpecifiers(input: {
   from: string;
   to: string;
@@ -321,17 +252,8 @@ export function rewriteRelativeSpecifiers(input: {
   return output;
 }
 
-/**
- * The `src` modules a test reaches, THROUGH its helpers as well as directly.
- *
- * A whole directory of tests commonly imports nothing but a shared
- * `./test-helpers`, which is the file that imports the subject. Stopping at the
- * first hop reports every one of them as naming no subject, which is both
- * wrong and the opposite of useful — those are exactly the tests whose home is
- * least obvious from the mirror. So a relative import that lands inside
- * `tests/` is followed, once per file, with a `seen` set because helpers
- * import each other.
- */
+/** The `src` modules a test reaches through helpers as well as directly; follow helpers to
+ * find actual source (seen set prevents cycles) */
 function sourceImports(input: {
   file: string;
   sourceRoot: string;
@@ -372,15 +294,8 @@ function sourceImports(input: {
   return found;
 }
 
-/**
- * Where one file under a package's `tests/` tree belongs.
- *
- * Every file moves, not only the `*.test.ts` ones: a helper left behind in
- * `tests/support/` would be imported from a directory that no longer holds any
- * tests. A test goes beside its subject; a helper goes beside the tests that
- * use it, which is decided by the same rule applied to its own imports, and
- * failing that by the tests importing IT.
- */
+/** Where files under `tests/` tree belong; tests beside subject, helpers beside tests that
+ * use them (decided by helper's own imports or by tests importing it) */
 function planPackage(
   packageRoot: string,
   packageName: string,

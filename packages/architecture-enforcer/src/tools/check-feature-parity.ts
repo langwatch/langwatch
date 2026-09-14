@@ -689,29 +689,7 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/studio-usage-limits.feature",
 ];
 
-/**
- * Feature files that enforce SOME scenarios while others carry no tag at all.
- *
- * This was the gate's last blind spot after `LEGACY_INERT` closed the
- * fully-untagged case: a file with 15 tagged scenarios and 12 untagged ones
- * reported `15/15 scenarios bound · ✓ all bound`, which reads exactly like a
- * fully-covered file. The untagged dozen were declared, unmeasured, and
- * invisible — the comment above `LEGACY_UNBOUND` has named this hole since
- * the sdks tree was added (see #3338); this list finally guards it.
- *
- * Same ratchet as `LEGACY_INERT`: the files below are the ones already in
- * that state when the floor was introduced, and they are tolerated. Any OTHER
- * file that mixes enforced and untagged scenarios fails the check, and an
- * entry that becomes fully tagged must leave the list.
- *
- * Direction: drive this list to empty by tagging the scenarios that describe
- * behaviour we actually test, marking @unimplemented the ones we do not, and
- * deleting the ones that no longer describe anything.
- *
- * Invariants (enforced below):
- *   - Every path must resolve to a discovered `.feature` file.
- *   - Every entry must still be partially tagged.
- */
+/** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
   "sdks/typescript/specs/cli/daemon.feature",
   // Reason: arrived from main already partially tagged (#7778 self-mapped
@@ -1046,13 +1024,8 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
 //
 // The token has to open its comment, or, when it opens no comment of its own,
 // be inside one already: `markerlessBindingSpans` below decides that case. The
-// unquoted alternative here accepts a bare title, so without the anchor any
-// sentence containing the word binds to whatever follows it: a comment reading "carries no @scenario annotation:
-// this guards a temporary exclusion" bound a scenario named "annotation: this
-// guards a temporary", and the failure then named a scenario nobody wrote at a
-// line whose comment says the opposite. The prefix allows the comment markers
-// actually used in this repo, including a `*` continuation that opens a nested
-// `/**`, and a `#` for the Python and Bats forms.
+// unquoted alternative accepts a bare title; without anchor, any sentence containing the
+// word binds to whatever follows it. The prefix allows markers actually used in repo.
 //
 // Each marker there is a fixed two characters or one, never `/*+`. A variable
 // repeat inside the alternation makes `/**` splittable both as one `/*+` and
@@ -1733,15 +1706,8 @@ export function isInert(r: Pick<Report, "scenarios" | "totalScenarios">): boolea
   return r.totalScenarios > 0 && r.scenarios.length === 0;
 }
 
-/**
- * The floor under the other half of the same trap: a file that enforces SOME
- * scenarios and declares others with no tag at all. The enforced ones make it
- * read `N/N bound` while the untagged ones are invisible to the count — a
- * file holding 27 scenarios reported `15/15 · ✓ all bound`. Disjoint from
- * `isInert` by construction (that floor requires zero enforced scenarios), so
- * one file lands on exactly one list. Callers decide whether a given file is
- * tolerated (`LEGACY_PARTIAL`) or fatal.
- */
+/** File with some enforced scenarios and untagged ones (reads as N/N bound while untagged
+ * invisible); disjoint from `isInert` */
 export function isPartiallyTagged(r: Pick<Report, "scenarios" | "untaggedScenarios">): boolean {
   return r.scenarios.length > 0 && r.untaggedScenarios > 0;
 }

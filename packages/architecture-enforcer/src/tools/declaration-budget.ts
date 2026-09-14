@@ -2,19 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-/**
- * How many declaration files each application loads to type-check itself.
- *
- * `Files:` from `--extendedDiagnostics` is the number that tracks the cost:
- * loading them is the single largest bucket in a run, larger than checking
- * expressions. It is also the number that catches an import nobody meant to
- * make — one `better-auth/react` in a browser module put 251 kysely
- * declarations into `apps/ui`, and nothing said so for months, because the
- * only symptom was a slower check.
- *
- * The budget is not a target to grow into. It is today's count with a little
- * headroom, and raising it is a decision somebody writes a reason for.
- */
+/** Declaration file count budget per application (from `--extendedDiagnostics`); not a
+ * target to grow into, but today's count with headroom */
 
 const budgetSchema = z
   .object({

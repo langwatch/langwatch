@@ -39,13 +39,9 @@ export function auditScopeIds(input: unknown): {
 }
 
 /**
- * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
- * recording in the audit log. `presence.*` runs every ~15s per open tab
- * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
- * buries every genuine action - project edits, deletions, role changes —
- * under a wall of `presence.update` rows. They're already silenced from
- * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
- * equivalent.
+ * Mutations that fire on heartbeat/per-tab cadence not worth auditing. `presence.*` runs every
+ * ~15s per tab; auditing them buries genuine actions under `presence.update` rows. Already silenced
+ * from request log via SILENCED_LOG_PATH_PREFIXES.
  */
 const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
 const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
@@ -57,13 +53,8 @@ export function isAuditLogExempt(path: string): boolean {
 }
 
 /**
- * Pull the resource ID + kind from a tRPC mutation result so the audit
- * row's `targetId` / `targetKind` columns are populated. Without this,
- * the audit log shows an empty Target column for Platform-side rows.
- *
- * Best-effort: tries common shapes (id at root, .source.id, .{tail}.id
- * where tail is the resource name from the path), and derives kind
- * from the path's leading segment via a small map.
+ * Pull resource ID + kind from a tRPC mutation result for the audit row's `targetId` /
+ * `targetKind` columns. Best-effort: tries common shapes (id at root, .source.id, .{tail}.id).
  */
 export function deriveAuditTarget(
   path: string,
@@ -187,9 +178,10 @@ function findFirstId(value: unknown): string | undefined {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fields on a model-provider write whose values are secrets. All three ride the same `modelProvider.update`
- * mutation: `customKeys` holds the API key as typed, `providerConfig` is a passthrough object we do not get to
- * police, and `extraHeaders` is precisely where an `Authorization: Bearer …` is entered.
+ * Fields on a model-provider write whose values are secrets. All three ride the same
+ * `modelProvider.update` mutation: `customKeys` holds the API key as typed, `providerConfig`
+ * is a passthrough object we do not police, and `extraHeaders` is where `Authorization: Bearer`
+ * is entered.
  */
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
@@ -204,9 +196,9 @@ const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
 };
 
 /**
- * Action paths whose input holds a credential directly in a field, rather than inside an object.
- * `redactObjectField` deliberately ignores a plain string, so these would otherwise be stored as typed. `value` is
- * an ordinary word other mutations use for harmless things, so the rule is bound to the action.
+ * Action paths whose input holds a credential directly in a field, not inside an object.
+ * `redactObjectField` ignores a plain string, so these would otherwise be stored as typed.
+ * `value` is an ordinary word other mutations use, so the rule is bound to the action.
  */
 const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "secrets.create": ["value"],
@@ -370,15 +362,7 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
 // level, and with which status - can be asked directly.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * How long a call may take before its record is raised from info to warning.
- *
- * A call that succeeds slowly used to log exactly like one that succeeded
- * instantly, so the only way to find one was for a customer to say a screen
- * felt broken. One second, because the regression that motivated it ran at 1.5
- * to 2.3 seconds per call and a higher budget would have kept it invisible.
- * The per-path throttle is what keeps the volume down.
- */
+/** Threshold to surface slow calls; one second catches regressions at 1.5-2.3s per call */
 const DEFAULT_SLOW_CALL_MS = 1000;
 
 const SLOW_CALL_THROTTLE_MS = 60_000;
@@ -574,18 +558,8 @@ export function recordTrpcCall(args: Parameters<typeof handleTrpcCallLogging>[0]
 // id a failure is quoted with after the middleware chain unwinds.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * The trace context the caller sent with this call, so a tRPC span continues
- * the trace the browser started rather than rooting a fresh one.
- *
- * A local span already on the context wins: when tRPC is served through the
- * HTTP router its tracer middleware has already extracted the same
- * `traceparent` and opened the server span executing this call, and
- * re-extracting would parent the procedure to the remote browser span instead.
- * Only the request-per-call transports are consulted - the WebSocket and SSE
- * links hold one long-lived connection, so their `req` is the handshake.
- * See ADR-058.
- */
+/** Extracts caller's trace context; local spans on context win to avoid re-extraction
+ * (see ADR-058) */
 export function callerTraceContext({
   req,
   type,

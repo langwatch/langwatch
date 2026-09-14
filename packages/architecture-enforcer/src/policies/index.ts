@@ -54,7 +54,7 @@ import { lintTestQuality } from "./test-quality.ts";
  * `lintWorkspace()` and `pnpm lint` see the same set of policies run.
  */
 export type PolicyDefinition = {
-  /** The registry's own name for the policy; usually its findings' `policy` field, kebab-cased from the `lint*` function. */
+  /** The registry's own name for the policy; usually kebab-cased from the `lint*` function. */
   id: string;
   /** The feature file its scenarios live in, repository-relative. */
   spec: string;
@@ -72,7 +72,8 @@ const STRICT_FEATURE_LAYOUT = "specs/strict-feature-layout.feature";
 const LINT_BASELINES = "specs/lint-baselines.feature";
 const DEAD_CODE_GUARDS = "specs/dead-code-guards.feature";
 
-/** Prisma migration access needs the same schema read as table ownership; share it rather than re-parse. */
+/** Prisma migration access shares schema read with table ownership; reuse rather than
+ * re-parse */
 function lintPrismaMigrationAccessPolicy(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, catalogue } = snapshot;
   if (!hasPrismaSchema(root)) return [];

@@ -2,36 +2,11 @@ import { type AvatarFallbackProps, Avatar as ChakraAvatar } from "@chakra-ui/rea
 import * as React from "react";
 import { firstGrapheme } from "../first-grapheme.ts";
 
-/**
- * Chakra v3 Avatar wrapper. **Import the avatar from here, never from
- * `@chakra-ui/react`** — a guard test enforces it.
- *
- * The only part that differs is `Fallback`. Chakra derives initials with
- * `name.charAt(0)` on the first and last word, which in UTF-16 returns half
- * of any character outside the basic plane. Half a surrogate pair is not a
- * character, so a project named "🚩 Langy" or a person whose SSO display name
- * starts with an emoji painted a replacement box. Deriving the initials here
- * and passing them as children means Chakra's helper is never reached.
- *
- * Everything else is Chakra's, re-exported unchanged, so `<Avatar.Root>`,
- * `<Avatar.Image>` and `<Avatar.Icon>` behave exactly as before and the
- * import swap is the whole migration.
- *
- * @see specs/components/avatar-initials.feature
- */
+/** Chakra v3 Avatar wrapper (import from here, not @chakra-ui/react); custom Fallback for
+ * grapheme-aware initials (emoji-safe); see avatar-initials.feature */
 
-/**
- * The one or two characters an avatar shows for `name`.
- *
- * Follows Chakra's own rule — first character of the first word, plus the
- * first character of the last word when there is more than one — but counts
- * in grapheme clusters rather than UTF-16 code units. Words are separated by
- * whitespace rather than by the literal space Chakra splits on, so a name
- * holding a tab or a newline yields two initials instead of treating the
- * whole thing as one word. Empty for a blank name, which is what makes the
- * avatar fall through to its generic icon rather than render an empty
- * bubble.
- */
+/** Initials from name (first and last word's first grapheme); empty for blank name (falls
+ * through to icon rather than empty bubble) */
 export function initialsFromName(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const first = words[0];

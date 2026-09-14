@@ -1,21 +1,7 @@
 /**
- * Several built routers, one namespace claim.
- *
- * A namespace whose surface outgrows one declaration chain is declared in
- * fragments — the fluent builder's generics are recursive, and a chain of
- * roughly fifty procedures is where TypeScript gives up on it — but a process
- * mounts ONE declaration per namespace, and two claims on the same name are
- * refused by the mount. Composition is what closes that gap: it takes the
- * fragments as they were BUILT and answers one declaration, so no fragment
- * re-enters the builder's recursive chain and the namespace is claimed once.
- *
- * The merge happens where the fragments already meet: each one is built on the
- * SAME runtime and the same application slice this mount was handed, and its
- * procedures are collected into one record which that runtime's own `router`
- * closes over. So the composed router is a router of the process's own root,
- * indistinguishable from the one a single contract of every procedure would
- * have produced — the fragments are a declaration-time convenience and reach
- * the wire as one flat namespace.
+ * Several built routers, one namespace claim. A namespace outgrowing one declaration chain
+ * is declared in fragments (builder's recursive generics give up at ~50 procedures).
+ * Composition answers one declaration so the namespace is claimed once.
  */
 import type {
   AnyTRPCRootTypes,
@@ -37,13 +23,9 @@ import type {
 } from "./runtime.ts";
 
 /**
- * One fragment, as composition reads it: what it declares, and how it mounts.
- * Named structurally, so a declaration built for its own contract composes
- * without composition naming that contract. Neither the application nor the
- * contract appears as a parameter here: an api token is invariant in the
- * application it names, and the mount is contravariant in it, so a type that
- * asked for both would only ever match a declaration it already knew. Both are
- * read back off the fragments instead, by inference.
+ * One fragment as composition reads it: what it declares and how it mounts. Named structurally
+ * so a declaration built for its contract composes without naming the contract. Both are read back
+ * off the fragments by inference.
  */
 export type ComposableTrpcRouter<Namespace extends string = string> = Readonly<{
   readonly protocol: "trpc";

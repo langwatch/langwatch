@@ -1,28 +1,5 @@
-/**
- * tRPC's React Query cache key, rebuilt from a procedure path string.
- *
- * A feature's `createModuleApi` binding can only name the procedures that
- * feature's map declares, and during the migration that is a fraction of the
- * real router — and never another feature's. A package hook regularly
- * needs to invalidate a procedure that has NOT been declared yet — a moved
- * rename invalidating `tracesV2.list`, say, while `list` is still read only by
- * application hooks. This is how it does that without hand-writing tRPC's key
- * encoding at the call site and getting it subtly wrong.
- *
- * The encoding is `@trpc/react-query`'s `getQueryKeyInternal`:
- *
- *     path only            ->  [["tracesV2", "list"]]
- *     path + input         ->  [["tracesV2", "header"], { input }]
- *     path + input + type  ->  [["tracesV2", "header"], { input, type: "query" }]
- *
- * The nested array is what makes a path-only key a PREFIX of every keyed query
- * under it, which is what lets `invalidateQueries` match a whole procedure.
- *
- * Reach for this only for a procedure the feature's map does not declare. Once
- * it does, `moduleApi.useUtils().tracesV2.list.invalidate()` says the same
- * thing with the types checked, and a typo in a path string here is a silent
- * no-op rather than a compile error.
- */
+/** tRPC's React Query cache key rebuilt from a procedure path string; for procedures
+ * not yet declared in the feature's map; use typed API once declared */
 
 export type TrpcQueryKey =
   | readonly [readonly string[]]
