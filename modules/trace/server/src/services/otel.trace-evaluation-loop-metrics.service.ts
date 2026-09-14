@@ -5,15 +5,9 @@ import {
 } from "../app/trace.members.ts";
 
 /**
- * The series name, its help text and its one label, pinned because two
- * processes write them.
- *
- * A renamed series produces an empty panel rather than an error, and an empty
- * loop-guard panel reads exactly like "the guards never fire" — which is the
- * answer an operator most wants to be able to trust, because the alternative is
- * an evaluation loop billing a customer for its own recursion. A dropped label
- * is just as silent: the two reasons collapse into one number and the guard
- * that fired becomes unknowable.
+ * The series name, help text and one label, pinned because two processes
+ * write them: a rename silently empties the panel (reads as "guards never
+ * fire"), and a dropped label collapses both block reasons into one number.
  */
 export const EVALUATOR_LOOP_BLOCKED_METRIC_NAME = "langwatch_evaluator_loop_blocked_total";
 export const EVALUATOR_LOOP_BLOCKED_METRIC_DESCRIPTION =

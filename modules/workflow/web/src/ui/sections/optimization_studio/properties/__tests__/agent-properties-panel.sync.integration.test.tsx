@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The agent node's three-way sync (drawer editor, DSL node, library record). Pins regressions: Save reverting the code, template overwriting loaded code, saves not reaching executed params. See specs/workflows/agent-node-sync.feature.
+ * The agent node's three-way sync (drawer editor, DSL node, library record).
+ * Pins regressions: Save reverting code, template overwriting code, lost params.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

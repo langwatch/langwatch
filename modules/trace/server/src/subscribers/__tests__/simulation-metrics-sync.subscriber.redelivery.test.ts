@@ -1,25 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `simulationMetricsSync` subscriber, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * The subscriber publishes a pull-mode request: it carries no metrics of its
- * own, only the identity of the trace whose spans the scenario side should
- * re-derive from. Every key downstream is `tenantId : scenarioRunId : traceId`
- * — the emitted event's idempotency key, the `simulation_run_metrics` ORDER BY,
- * and the run fold's `TraceMetrics` map, which is a keyed replacement rather
- * than an accumulator. So a second delivery re-states one trace's metrics
- * instead of adding a second contribution.
- *
- * `occurredAt` is the exception, and it is the same defect the scenario-side
- * `traceMetricsSync` subscriber carries: it is `Date.now()`, not the event's.
- * The fact table is a `ReplacingMergeTree` partitioned by month, and a
- * replacement never collapses across partitions, so a redelivery whose fresh
- * clock reading lands in the next month leaves two permanent rows for one
- * trace. The read path still collapses them; the stored fact does not. Pinned
- * below rather than asserted away.
+ * Redelivery contract: keyed replace, not add; occurredAt month-crossing defect pinned below.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
@@ -50,10 +32,8 @@ function makeSimulationSink() {
       );
     },
     /**
-     * Rows `simulation_run_metrics` physically retains. It is
-     * `ReplacingMergeTree(OccurredAt) PARTITION BY toYYYYMM(OccurredAt)`, and a
-     * replacement only collapses inside one partition, so the month is part of
-     * the retained-row key.
+     * Rows retained: `ReplacingMergeTree` collapses only inside one month
+     * partition, so the month is part of the retained-row key.
      */
     retainedFactRows(): Set<string> {
       return new Set(
@@ -123,12 +103,9 @@ describe("given a simulation trace that has stabilised", () => {
 
   describe("when a redelivery crosses the fact table's month partition", () => {
     /**
-     * The case the invariant exists for, and the one this subscriber fails.
-     * `occurredAt: Date.now()` puts the retry in the next month's partition,
-     * where a ReplacingMergeTree can never collapse it onto the first row. The
-     * customer-visible figure stays right because the read path groups by
-     * `TraceId`; the stored fact does not. `occurredAt: event.occurredAt` is
-     * the fix, and it belongs with the identical one on the scenario side.
+     * The known defect: `occurredAt: Date.now()` puts a retry in the next
+     * month's partition, where ReplacingMergeTree can't collapse it onto the
+     * first row. Fix is `occurredAt: event.occurredAt`, shared with the scenario side.
      */
     it("retains two rows for one trace, which is the defect this pins", async () => {
       vi.useFakeTimers();

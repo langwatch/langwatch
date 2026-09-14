@@ -1,16 +1,7 @@
 /**
- * Regression: a clustering call that returned NOTHING used to wipe the
- * project's entire topic model.
- *
- * `fetchTopics*Clustering` returns undefined whenever the langevals endpoint
- * is unset. `storeResults` defaulted that to empty arrays and fell through
- * into the batch-mode delete-then-recreate, so every batch run on a
- * deployment without a clustering endpoint deleted every Topic row and wrote
- * none back — and still returned a summary, which made the caller's
- * `not_configured` skip unreachable and recorded the run as completed.
- *
- * These tests drive the real code path and observe the outcome (rows
- * deleted / skip reason reported), not the shape of any message.
+ * Regression: a clustering call returning NOTHING used to wipe the project's
+ * topic model (defaulted to empty arrays, then batch-mode delete-then-recreate
+ * deleted every Topic row while still reporting the run completed).
  */
 import { describe, expect, it, vi } from "vitest";
 import { clusterTopicsForProject, storeResults } from "../topic-clustering-runner.intent.ts";
@@ -149,7 +140,7 @@ describe("storeResults", () => {
         // table down to just its own delta.
         const deps = fakeRunnerDeps();
         const order: string[] = [];
-        deps.migration.trySeedProjectTopicModel.mockImplementation(async () => {
+        deps.migration.seedProjectTopicModel.mockImplementation(async () => {
           order.push("seeded");
           return "skipped";
         });
@@ -176,7 +167,7 @@ describe("storeResults", () => {
           false,
         );
 
-        expect(deps.migration.trySeedProjectTopicModel).toHaveBeenCalledWith("proj-1");
+        expect(deps.migration.seedProjectTopicModel).toHaveBeenCalledWith("proj-1");
         expect(order).toEqual(["seeded", "recorded"]);
       });
     });

@@ -1,12 +1,7 @@
 /**
- * The AWS flow that finds, creates or brings up to date the function one
- * project's studio engine runs on, and answers with its ARN.
- *
- * Every per-project function is created from the same image with the same
- * environment, so an existing one is reconciled rather than left as it was
- * born: `CreateFunction` runs once in a function's life and `UpdateFunctionCode`
- * touches the image alone, so without this a function keeps its first
- * configuration forever.
+ * Finds, creates, or reconciles the Lambda function one project's studio
+ * engine runs on, and answers with its ARN — reconciling because
+ * `UpdateFunctionCode` touches only the image, not the rest of the config.
  */
 import {
   CloudWatchLogsClient,

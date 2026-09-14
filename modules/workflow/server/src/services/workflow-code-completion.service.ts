@@ -1,18 +1,7 @@
 /**
- * Monaco's inline completions for the Studio's code node, over whichever model
- * the deployment's cascade resolves for `studio.autocomplete`.
- *
- * `CompletionCopilot` is monacopilot's SERVER half: it builds the three-part
- * prompt (context, instruction, file content) the editor's client half expects
- * back, and hands it to a model callback. Only that callback is ours, which is
- * why the whole adapter is one model call with a fixed parameter strip — 64
- * output tokens, temperature 0, low reasoning effort. An editor completion is
- * discarded the moment the caret moves, so a long or expensive one is worse
- * than none.
- *
- * The model arrives through a resolver rather than being resolved here: WHICH
- * model answers a feature key is the deployment's cascade, held by the model
- * gateway, and a feature server package may not reach into another's.
+ * Monaco's inline completions for the code node, via a model-resolver
+ * callback (only the model gateway may resolve a feature key). Fixed to 64
+ * tokens/temp 0/low effort: a caret-move-discarded completion stays cheap.
  */
 import { generateText, type LanguageModel } from "ai";
 import { CompletionCopilot } from "monacopilot";

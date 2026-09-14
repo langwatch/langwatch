@@ -36,20 +36,8 @@ export interface TopicClusteringBackfillSummary {
 
 /**
  * The one-time legacy import for topic clustering (ADR-051): puts
- * pre-cutover state onto the event stream so the stream owns it.
- *
- * - the topic MODEL seed records every project's pre-ownership Topic rows as
- *   a `topics_recorded` seed event (spec: specs/topics-source-of-truth.feature);
- * - the SCHEDULE seed gives every eligible pre-cutover project (firstMessage:
- *   true) a clustering process row and a scheduled daily wake (spec:
- *   specs/event-sourced-scheduling.feature "Existing projects are backfilled
- *   once").
- *
- * Both run on worker start — no deploy-time job or chart hook, and unlike a
- * Helm hook they never race the app's own migrations (workers only start
- * after boot). Redis (when available) elects one replica per window;
- * correctness comes from the commands' deterministic idempotency keys and
- * the ownership/scheduled skips, which hold with or without coordination.
+ * pre-cutover state onto the event stream. Topic MODEL and clustering
+ * SCHEDULE seeds run on worker start, safe to re-run on their own idempotency.
  */
 export class LegacyImportTopicClusteringMigration {
   private constructor(
@@ -97,14 +85,11 @@ export class LegacyImportTopicClusteringMigration {
   }
 
   /**
-   * Seeds one project's pre-ownership Topic rows onto its clustering stream,
-   * unless the projection already owns the model. Awaited by the clustering
-   * write path BEFORE its own topics_recorded append: per-aggregate log order
-   * then guarantees the seed folds first, so a cutover-time incremental merge
-   * can never reconcile the table down to just its own delta. Duplicate seeds
-   * (boot pass racing the write path) collapse on the `seed:v1` key.
+   * Seeds one project's pre-ownership Topic rows, unless the projection
+   * already owns the model. Awaited before the write path's own append, so
+   * log order guarantees the seed folds first; duplicates dedupe on `seed:v1`.
    */
-  async trySeedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped"> {
+  async seedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped"> {
     const owned = await this.repository.findTopicModelCursor(projectId);
     if (owned) return "skipped";
 
@@ -136,9 +121,8 @@ export class LegacyImportTopicClusteringMigration {
 
   /**
    * The topic-model seed pass: records every project's pre-ownership Topic
-   * rows onto its stream, so the event stream owns the model and replay
-   * reproduces it. Safe to re-run: projects whose projection cursor exists
-   * are skipped, and the seed command dedupes on `seed:v1`.
+   * rows so the event stream owns the model. Safe to re-run: projects with a
+   * projection cursor are skipped, and the seed command dedupes on `seed:v1`.
    */
   async seedTopicModelHistory(): Promise<{ seeded: number; skipped: number }> {
     if (await this.isSeedDone(TOPICS_SEED_DONE_KEY)) return { seeded: 0, skipped: 0 };
@@ -161,17 +145,21 @@ export class LegacyImportTopicClusteringMigration {
     let skipped = 0;
     let failed = 0;
     let cursor: string | null = null;
+    let hasMorePages = true;
 
-    for (;;) {
+    while (hasMorePages) {
       // Fleet-wide walk over the projects that still hold pre-ownership Topic
       // rows. Each project's rows are still READ back through the guarded
-      // repository in trySeedProjectTopicModel, which carries its projectId —
+      // repository in seedProjectTopicModel, which carries its projectId —
       // only this fleet-wide enumeration is cross-tenant.
       const page = await this.repository.findProjectsWithTopicsPage({
         afterId: cursor,
         take: TOPICS_SEED_PAGE_SIZE,
       });
-      if (page.length === 0) break;
+      if (page.length === 0) {
+        hasMorePages = false;
+        continue;
+      }
       cursor = page[page.length - 1]!.id;
 
       // One ownership query per page instead of one per project: projects that
@@ -187,7 +175,7 @@ export class LegacyImportTopicClusteringMigration {
           continue;
         }
         try {
-          const result = await this.trySeedProjectTopicModel(projectId);
+          const result = await this.seedProjectTopicModel(projectId);
           if (result === "seeded") seeded++;
           else skipped++;
         } catch (error) {
@@ -219,16 +207,8 @@ export class LegacyImportTopicClusteringMigration {
 
   /**
    * The schedule seed: every eligible pre-cutover project gets a clustering
-   * process row and a scheduled daily wake. Safe to re-run: projects that
-   * already carry a `nextWakeAt` are skipped outright, and a request that
-   * does go out evolves an already-bootstrapped process as a pure no-op. Note
-   * each such request still appends a fresh `requested` event — the skip
-   * check, not the event log, is what keeps re-runs from growing the log, and
-   * it only holds once the workers have processed the previous request into a
-   * `nextWakeAt`.
-   *
-   * A single project's failure must never truncate the fleet: one bad project
-   * is logged and skipped so the rest still gets scheduled.
+   * process row and a scheduled daily wake. Projects with a `nextWakeAt` are
+   * skipped — that check, not the event log, is what keeps re-runs idempotent.
    */
   async seedClusteringSchedules(): Promise<TopicClusteringBackfillSummary> {
     if (await this.isSeedDone(SCHEDULE_SEED_DONE_KEY)) {
@@ -269,10 +249,14 @@ export class LegacyImportTopicClusteringMigration {
     };
 
     let afterId: string | null = null;
+    let hasMorePages = true;
 
-    for (;;) {
+    while (hasMorePages) {
       const page = await this.repository.findEligibleProjectsPage({ afterId, take });
-      if (page.length === 0) break;
+      if (page.length === 0) {
+        hasMorePages = false;
+        continue;
+      }
 
       const alreadyScheduled = new Set(
         await this.repository.findAlreadyScheduledProjectIds(page.map((project) => project.id)),

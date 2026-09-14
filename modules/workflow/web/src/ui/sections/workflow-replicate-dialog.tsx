@@ -1,5 +1,7 @@
 /**
- * Replicating a workflow into another project. A closed target is listed and greyed, not hidden. The dataset checkbox is this family's own: replicating a workflow without its dataset lands a graph that cannot run.
+ * Replicating a workflow into another project. A closed target is listed and
+ * greyed, not hidden. The dataset checkbox is this family's own: replicating
+ * without its dataset lands a graph that cannot run.
  */
 
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";

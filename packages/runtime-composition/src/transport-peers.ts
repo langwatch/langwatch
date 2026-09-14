@@ -1,13 +1,7 @@
 /**
- * What a process's doors are built from, once every module is installed.
- *
- * The doors cannot be built before boot: the credential a REST route answers
- * behind is resolved by the api-key and identity MODULES, which are installed
- * by the same boot that mounts the routes. They cannot be built after it
- * either, because a listener that binds before the routes are mounted serves
- * 404 for everything it is there to serve. So the process states its doors as
- * a FACTORY, and boot runs it in the one moment both are true: every App
- * exists, and nothing is serving yet.
+ * What a process's doors are built from, once every module is installed:
+ * a FACTORY, since a door can't be built before boot (route credentials
+ * resolve through modules boot installs) or after (bind-first 404s everything).
  */
 import type { DependencyToken, TokenIdentity } from "./dependency-token.ts";
 import { tokenName } from "./dependency-token.ts";

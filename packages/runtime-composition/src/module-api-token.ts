@@ -7,12 +7,8 @@ export abstract class FeatureApiIdentity {
 
 /**
  * The shape a feature API is allowed to have: every member callable. The
- * proxy a consumer reaches an API through serves operations only — a plain
- * property read throws `"exposes operations only"` at request time — so an
- * interface that declares one is a runtime failure waiting for its first
- * caller (it reached production four times before this constraint existed;
- * the fourth broke sign-in). A member here that is not a function maps to
- * `never`, and the resulting assignability error names it.
+ * consumer-facing proxy serves operations only and throws on a plain
+ * property (reached prod four times before this; the fourth broke sign-in).
  */
 export type OperationsOnly<Api> = {
   [Member in keyof Api]: NonNullable<Api[Member]> extends (...args: never[]) => unknown

@@ -13,24 +13,9 @@ import { type TraceEvaluationMonitor } from "../../app/trace.members.ts";
 import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
 
 /**
- * Spec: modules/trace/specs/evaluation-trigger.feature
- *
- * REDELIVERY CONTRACT. The same span event reaches this subscriber more than
- * once by design — a late span and the deferred `origin_resolved` event both
- * wake it for the same trace, and the queue redelivers on any handler failure.
- *
- * The externally visible result that must stay singular is ONE EVALUATION RUN
- * per monitor per trace: an evaluation is a charged model call and a result row
- * a customer reads. This subscriber does not remember what it has dispatched;
- * it makes redelivery safe by giving every delivery the SAME command identity,
- * so the queue collapses them.
- *
- * That is only true while the identity ignores the freshly minted
- * `evaluationId`. Each delivery mints a new KSUID, and an identity that
- * included it would be unique per delivery: the dedup would never match, both
- * deliveries would run, and the customer would be billed twice for one trace
- * with two results and no way to tell which is which. That is the property
- * pinned below — and it is a property of the KEY, not of the queue.
+ * Spec: modules/trace/specs/evaluation-trigger.feature. REDELIVERY CONTRACT:
+ * fires more than once by design, so identity must ignore the freshly minted
+ * `evaluationId`, or dedup never matches and the customer gets double-billed.
  */
 
 function foldState(): TraceSummaryData {

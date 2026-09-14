@@ -1,21 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `experimentMetricsSync` subscriber, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * The contract holds, but not through the command this subscriber builds.
- * `ComputeExperimentRunMetricsCommand`'s idempotency key and job id are both
- * `${tenantId}:${runId}:trace-metrics:${traceId}` — no timestamp — so however
- * many times this subscriber dispatches for one trace, the experiment run
- * records one trace-metrics fact.
- *
- * What does NOT ride on the event is `occurredAt`: this subscriber stamps
- * `Date.now()`, so a redelivery produces a command that differs from the first
- * in that one field. It reaches the event's `occurredAt`, which is what the
- * fold and any partitioned store order on. That is pinned below as the fact it
- * is, next to the identity that saves it.
+ * Redelivery contract: timestamp-free identity records one fact; `occurredAt` stamps `Date.now()`.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
@@ -81,11 +67,8 @@ describe("given an experiment trace that has stabilised", () => {
     });
 
     /**
-     * The one field that is not derived from the event. Everything the store
-     * keys on is timestamp-free, so this does not break the identity — but it
-     * does mean the recorded `occurredAt` is the retry's wall clock rather than
-     * the trace's, and a partitioned store that ordered on it would keep both
-     * rows. `event.occurredAt` is the value that would make this stable.
+     * The one field not derived from the event: the identity survives, but a
+     * partitioned store ordering on `occurredAt` would keep both rows.
      */
     it("stamps the dispatch clock rather than the event's own occurredAt", async () => {
       vi.useFakeTimers();

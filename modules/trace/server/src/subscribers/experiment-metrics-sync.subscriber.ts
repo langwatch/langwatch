@@ -16,10 +16,9 @@ export interface ExperimentMetricsSyncSubscriberDeps {
 }
 
 /**
- * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
- * fold state) and the handler (fail-open path): only experiment traces
- * (evaluation.run_id present) with actual cost data need this subscriber.
- * The experiment-ID lookup is stateful and stays in the handler.
+ * Pure relevance guard, shared by `when` and the handler: only experiment
+ * traces (evaluation.run_id present) with actual cost data need this
+ * subscriber. The experiment-ID lookup is stateful and stays in the handler.
  */
 export function hasExperimentCostMetrics(foldState: TraceSummaryData): boolean {
   if (!foldState.attributes["evaluation.run_id"]) return false;
@@ -27,16 +26,9 @@ export function hasExperimentCostMetrics(foldState: TraceSummaryData): boolean {
 }
 
 /**
- * Trace-side ECST publisher: when an experiment trace stabilises, publishes
- * its cost metrics to the experiment-run-processing pipeline.
- *
- * Uses delay+dedup (60s) for terminal detection — fires once per trace
- * after 60s of quiet (no new spans). Carries the metrics data in the
- * command payload (Event-Carried State Transfer) so the experiment
- * pipeline doesn't need to query back.
- *
- * Filtering: only fires for traces with evaluation.run_id
- * in their hoisted span attributes.
+ * Trace-side ECST publisher: when an experiment trace stabilises (60s quiet,
+ * via delay+dedup), publishes its cost metrics in the command payload so the
+ * experiment-run-processing pipeline doesn't need to query back.
  */
 export function createExperimentMetricsSyncHandler(
   deps: ExperimentMetricsSyncSubscriberDeps,

@@ -41,13 +41,9 @@ export type SpanDedupRef = {
 };
 
 /**
- * Redis-backed deduplication is app members, not Trace domain state.
- *
- * Only the claim can answer "I don't know": it returns null when the store is
- * unreachable, and the caller ingests the span anyway rather than dropping a
- * customer's data because a cache was down. The other two report nothing and
- * throw nothing — dedup is an optimisation, so a failure to tidy up after
- * one span must not fail the span.
+ * Redis-backed deduplication is app members, not Trace domain state. Only
+ * `tryAcquireProcessingLock` answers "unknown" (null) when unreachable, so
+ * the caller ingests rather than drop data; the other two are best-effort.
  */
 export abstract class TraceSpanDedup {
   abstract tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
@@ -68,11 +64,9 @@ export abstract class TraceIngressPayload {
 }
 
 /**
- * The outcome of every span in one export request.
- *
- * Only `dropped` and `failed` are a rejection: `filtered` and `deduped` are
- * spans we declined to store on purpose, and the transport turns
- * `rejectedSpans` into the sender's HTTP answer.
+ * The outcome of every span in one export request. Only `dropped` and
+ * `failed` are a rejection — `filtered`/`deduped` are declined on purpose —
+ * and the transport turns `rejectedSpans` into the sender's HTTP answer.
  */
 class SpanIngestionTally {
   private readonly counts: Record<SpanIngestionStatus, number> = {
@@ -107,7 +101,10 @@ class SpanIngestionTally {
   }
 }
 
-/** The coding-agent contract, holding only what the ingest path reads: no store, no session lookup. */
+/**
+ * The coding-agent contract, holding only what the ingest path reads: no
+ * store, no session lookup.
+ */
 export type CodingAgentIngestFilter = Pick<CodingAgentApi, "shouldFilterSpan">;
 
 /**
@@ -212,12 +209,9 @@ export class TraceIngestionService {
   }
 
   /**
-   * One already-normalized span, collected.
-   *
-   * Kept on this class because the OTLP request path calls it and because the
-   * REST tracked-event path reaches it by name; the work itself belongs to
-   * {@link TraceSpanCollectionService}, which is what a process holding only a
-   * queue and a Redis can compose.
+   * One already-normalized span, collected. Kept on this class because the
+   * OTLP request path and the REST tracked-event path both reach it by name;
+   * the work itself belongs to {@link TraceSpanCollectionService}.
    */
   ingestNormalizedSpan(input: {
     tenantId: string;
@@ -285,7 +279,10 @@ export class TraceIngestionService {
     });
   }
 
-  /** Ids arrive as raw bytes over protobuf and as hex over JSON; dedup and the pipeline want one of them. */
+  /**
+   * Ids arrive as raw bytes over protobuf and as hex over JSON; dedup and
+   * the pipeline want one of them.
+   */
   private withHexIds(span: OtlpSpan): OtlpSpan {
     const hex = OtlpTraceRequestService.normalizeOtlpId;
 
@@ -304,21 +301,9 @@ export class TraceIngestionService {
 }
 
 /**
- * The span-collection half of ingestion: dedup, optional payload preparation,
- * and the one command handoff.
- *
- * SPLIT OUT OF {@link TraceIngestionService} AT THE WORKER CONVERSION, and the
- * split is what the reach shows rather than a tidy-up. `ingestNormalizedSpan`
- * touches three collaborators; the class around it additionally holds the
- * coding-agent span filter and the flag that arms it, and BOTH are reachable
- * only from the OTLP-request path — the tracked-event reactor, which is the
- * caller a background process needs, can never reach either. Composing the
- * whole class for it would have meant a process building the full coding-agent
- * application (and through it a `ProjectApi`) to satisfy two arguments that are
- * provably never read on the path it uses.
- *
- * `TraceIngestionService.create` still takes the same five options and builds
- * this itself, so nothing outside this file changed shape.
+ * The span-collection half of ingestion: dedup, payload prep, command
+ * handoff. Split from {@link TraceIngestionService} at the worker conversion,
+ * since its coding-agent span filter is unreachable from a worker's path.
  */
 export class TraceSpanCollectionService {
   private readonly logger = createLogger("langwatch:trace-processing:span-collection");

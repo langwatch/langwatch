@@ -5,19 +5,17 @@ import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-broadcast");
 
-export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000; // Debounce — notification only, frontend refetches
+// Debounce — notification only, frontend refetches.
+export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000;
 
 export interface SpanStorageBroadcastSubscriberDeps {
   broadcast: TraceTenantBroadcast;
 }
 
 /**
- * Subscriber handler that broadcasts span storage events to connected SSE
- * clients.
- *
- * Registered on the spanStorage map projection; the subscriber-scoped dedup
- * key keeps it independent of the fold-based traceUpdateBroadcast subscriber
- * so both event types can fire within the same TTL window.
+ * Broadcasts span storage events to connected SSE clients. The
+ * subscriber-scoped dedup key keeps it independent of the fold-based
+ * traceUpdateBroadcast subscriber, so both can fire within the same TTL.
  */
 export function createSpanStorageBroadcastHandler(
   deps: SpanStorageBroadcastSubscriberDeps,
