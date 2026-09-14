@@ -20,15 +20,8 @@ export const EVALUATION_COMPLETED_EVENT_TYPE = EVALUATION_EVENT_TYPES.COMPLETED;
 export const EVALUATION_REPORTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.REPORTED;
 
 /**
- * Event schema versions using calendar versioning (YYYY-MM-DD).
- *
- * These versions indicate the schema version of the event data structure.
- * When the event schema changes (fields added/removed/modified), a new version
- * is created. Consumers use these versions to handle backwards compatibility
- * when reading historical events.
- *
- * The date represents when the schema version was introduced, not when the
- * event occurred.
+ * Event schema versions using calendar versioning (YYYY-MM-DD). When the schema
+ * changes, consumers use versions to handle backwards compatibility.
  */
 export const EVALUATION_EVENT_VERSIONS = {
   /** Initial schema version introduced with event sourcing feature */

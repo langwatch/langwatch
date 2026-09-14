@@ -195,16 +195,8 @@ export function SectionHeader({
   );
 }
 
-/**
- * A report's next and last run, straight from the scheduler.
- *
- * The cron stored on the trigger only DESCRIBES the schedule — the scheduler
- * owns the instants — so these two cells are the only honest answer to "when
- * does this actually go out?". A report with no scheduler row has never been
- * scheduled (it was created before the schedule synced, or the scheduler is
- * not wired in this environment), which is different from one that is simply
- * paused, so the two say different things.
- */
+// A report's next and last run from the scheduler; these are the only honest answer to "when
+// does this actually go out?" since cron only describes the schedule, scheduler owns instants.
 export function ReportRunCells({
   schedule,
   loading,

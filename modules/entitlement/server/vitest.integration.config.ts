@@ -1,14 +1,8 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Integration lane: `*.integration.test.ts` and the repository contract suites
- * under `src/`.
- *
- * Unlike the other feature packages, nothing here reaches Postgres: both
- * entitlement repositories read rows other features own (memberships, invites,
- * custom roles, role bindings, projects and costs), so the contract suite
- * registers the memory twin alone. See the note at the head of
- * `src/repositories/__tests__/entitlement.repositories.contract.test.ts`.
+ * Integration lane for contract suites and `*.integration.test.ts`. Repositories
+ * read rows other features own; contract suite registers memory twin only.
  */
 export default defineConfig({
   test: {

@@ -1,22 +1,8 @@
 /**
  * @vitest-environment node
- *
- * AC0g for langwatch#6397.
- *
- * The D6 fix recovers an evaluator's settings when they were stored at the top
- * level of `config` instead of under `config.settings`. That recovery has a
- * consequence nobody had named: a recovered `model` key now reaches
- * `modelEnvResolver.resolveForEvaluator`, which calls `setupModelEnv`, which
- * THROWS `EvaluatorConfigError` when the named provider is not configured or not
- * enabled. Before the fix those rows resolved to `{}`, `"model" in {}` was false,
- * and `setupModelEnv` never ran — so precisely the rows D6 repairs are the rows
- * that could start failing.
- *
- * This pins the outcome: they degrade to a named `skipped` evaluation, they do
- * not error and they do not throw out of the command on every trace. The
- * mechanism is `EvaluatorConfigError`'s `fault: "customer"` plus the command's
- * `isCustomerFixable` branch — an existing contract, previously unasserted for
- * this path.
+ * AC0g for langwatch#6397: recovered evaluator settings with unconfigured providers
+ * degrade to skipped evaluations via EvaluatorConfigError (fault: "customer").
+ * @see langwatch#6397
  */
 
 import { describe, expect, it } from "vitest";

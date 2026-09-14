@@ -1,16 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * A browser's record of the newest experiment it has already been shown.
- *
- * Purely a presentation receipt: it decides whether the Experiments entry
- * wears an unread dot, and nothing else. It is never an input to evaluation,
- * enrolment or authorization — the backend does not read it and would not
- * trust it if it did.
- *
- * Storage failure is not an error worth surfacing. The dialog stays usable
- * and the dot may keep reappearing, which is a far better outcome than a
- * broken menu.
+ * Browser's record of newest experiment shown (presentation only; unread
+ * dot indicator).
  */
 const STORAGE_KEY = "langwatch:experiments-seen-version";
 

@@ -1,15 +1,7 @@
 /**
  * @vitest-environment node
- *
- * langwatch#6397 AC0d asks for the PREVALENCE of evaluator configs stored in
- * the shape that drops the user's prompt. A production database read was never
- * available to the investigation, so the running system reports it instead:
- * one line per affected evaluation, countable without credentials.
- *
- * This file owns the EMISSION — that it fires exactly on the affected shape,
- * and that it carries no prompt text. The classification it keys off
- * (`resolveEvaluatorSettingsWithSource`) is a pure function, covered without
- * mocks in executeEvaluation.settings-resolution.unit.test.ts.
+ * Tests emission of prevalence reports for evaluator configs that drop the user's
+ * prompt. @see langwatch#6397 @see executeEvaluation.settings-resolution.unit.test.ts
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

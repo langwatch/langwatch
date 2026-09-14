@@ -1,18 +1,6 @@
 /**
- * OpenAPI schemas for the evaluate family.
- *
- * `POST /api/evaluations/{evaluator}/evaluate`, its two-segment form, and
- * `POST /api/guardrails/{evaluator}/evaluate` all run one handler over one
- * request envelope, so one set of schemas serves all three; only what the
- * handler does with `as_guardrail` differs.
- *
- * The per-evaluator detail — which `data` fields an evaluator needs, and what
- * its `settings` accept — is generated separately into `openapi-evals.json`
- * and rendered under Built-in Evaluators. That is why `data` and `settings`
- * are open objects here: this document describes the call, and that one
- * describes the evaluators you can address with it.
- *
- * These do not validate anything at runtime; the handler keeps its parsing.
+ * OpenAPI schemas for evaluate endpoints; per-evaluator details are in
+ * openapi-evals.json.
  */
 
 import type {
@@ -60,15 +48,7 @@ export const evaluateRequestSchema = z.object({
     ),
 });
 
-/**
- * What one evaluation answers with.
- *
- * Three shapes, discriminated by `status`. `traceback` is stripped from the
- * error variant before it leaves the boundary and `error_type` is rewritten to
- * a constant, so a caller sees that an evaluator failed without seeing our
- * stack. As a guardrail, all three carry `passed`, which is the whole point of
- * the mode: gate on one boolean regardless of whether the evaluator ran.
- */
+/** Three shapes discriminated by status; error details are stripped at the boundary. */
 export const evaluateResponseSchema = z.union([
   z.object({
     status: z.literal("processed"),
@@ -180,15 +160,7 @@ export const datasetEvaluateRequestSchema = z.object({
     .describe("Per-call overrides of the evaluator's settings"),
 });
 
-/**
- * The body every evaluate door parses.
- *
- * Declared here rather than imported: the schema's other holder is the
- * evaluator wizard's own form model in `@langwatch/evaluator-web`, and a
- * server package may not value-import a browser one. This is the copy the
- * PUBLIC door publishes, so it lives beside the door; collapsing the two
- * belongs with whoever drains that browser package.
- */
+/** Schema declared here, not imported from @langwatch/evaluator-web, per value-import boundary. */
 export const evaluationInputSchema = z.object({
   trace_id: z.string().optional().nullable(),
   evaluation_id: z.string().optional().nullable(),
@@ -235,15 +207,7 @@ export const requestBodySchema = (schema: z.ZodType): RequestBodySchema =>
     reused: "inline",
   }) as RequestBodySchema;
 
-/**
- * A hand-rolled refusal from one of these handlers.
- *
- * They predate ADR-045 and answer a sentence rather than a stable code, in one
- * of two fields depending on where the request failed: `message` when the body
- * was not JSON at all or the route rejected it wholesale, `error` when it
- * parsed and then failed validation. Documented as sent — there is no code to
- * branch on here, so a caller has the status and the sentence.
- */
+/** Legacy error response predating ADR-045: sentences not codes, split between message/error. */
 export const legacySentenceErrorSchema = z.object({
   message: z.string().optional().describe("Set when the request was rejected before validation"),
   error: z.string().optional().describe("Set when the body parsed and then failed validation"),

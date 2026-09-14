@@ -1,22 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * WHAT THIS FILE LOST IN THE MOVE. It was three scenarios about the trace-query
- * autocomplete: a partial field name surfacing its label and accepting with a
- * colon, a typed field offering its values and accepting with a space, and
- * Escape closing the list without touching the query. All three drove the
- * traces view's suggestion dropdown, which lives in
- * `platform/app/src/features/traces-v2` — another feature's presentation, which
- * this package may not import and would not copy. `@langwatch/trace-web`
- * publishes the suggestion ENGINE and no surface that renders it, so the editor
- * here is a plain controlled textarea and those three scenarios are unbound
- * until that surface exists. Recorded in
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * What is left to pin is what the fallback still guarantees, and it is not
- * nothing: the field is controlled, so every keystroke reaches the draft rather
- * than being held in the DOM, which is what makes the Subject facet's live
- * matched-traces count follow what the author typed.
+ * Tests controlled textarea: keystrokes reach draft state, updating matched-traces count.
+ * Autocomplete pending suggestion surface (see dev/docs/plans/ui-family-move-manifests.md).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

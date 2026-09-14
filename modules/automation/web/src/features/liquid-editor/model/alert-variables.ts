@@ -1,14 +1,7 @@
 import type { VariableInfo } from "@langwatch/automation-contract";
 
-/**
- * Variable surface for graph-alert templates (`draft.source ===
- * "customGraph"`). Mirrors `TEMPLATE_VARIABLES` (the trace list) but
- * describes `GraphAlertTemplateContext` — "metric X crossed threshold Y",
- * not "these traces matched". The drawer hands this list to the same
- * editor plumbing (Monaco autocomplete, unknown-variable detection,
- * variable reference panel) via `ConfigFormCtx.variables`; only the data
- * differs per source.
- */
+// Variable surface for graph-alert templates: describes GraphAlertTemplateContext with same
+// editor plumbing (Monaco autocomplete, validation) but different data per source.
 export const ALERT_TEMPLATE_VARIABLES: VariableInfo[] = [
   {
     path: "trigger.name",

@@ -195,18 +195,8 @@ const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
   { value: "bot", label: "Slack app (bot)" },
 ];
 
-/**
- * Slack app manifest an author pastes into "Create app → From a manifest" to
- * skip manual scope setup. One app serves the whole workspace (not per
- * automation), so the name is generic. It grants:
- *   - `chat:write` — post messages to channels the bot is a member of
- *   - `chat:write.public` — post to ANY public channel without being invited
- *     first; without it Slack rejects the post with `not_in_channel` until the
- *     bot is manually `/invite`d, which is the #1 setup snag
- *   - `channels:read` / `groups:read` — populate the channel picker
- * `features.bot_user` is required alongside `oauth_config.scopes.bot` —
- * Slack rejects the manifest with "OAuth requires bot_user" without it.
- */
+// Slack app manifest with required OAuth scopes and bot_user feature for workspace-wide
+// message posting without setup snags.
 export const SLACK_APP_MANIFEST = `display_information:
   name: LangWatch
 features:
@@ -262,15 +252,8 @@ function endWithStop(sentence: string): string {
   return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }
 
-/**
- * Channel field: a typeable combobox. Manual entry always works (type a name or
- * paste an ID); once a token is present the channel list is fetched
- * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
- * stores the channel ID (what `chat.postMessage` wants), while free typing is
- * kept verbatim so a custom / not-yet-listed channel still works — committed
- * on blur or Enter, not on every keystroke. A missing scope degrades to a
- * hint, never a hard error.
- */
+// Flexible channel selector: typeable combobox supporting manual entry and fetched suggestions;
+// gracefully degrades when Slack token lacks required scopes.
 function SlackChannelField({
   projectId,
   automationId,
@@ -571,19 +554,8 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice, S
     isCustomBlockKit ? "code" : "template",
   );
 
-  // If the cadence or trigger kind switches away from what the picked
-  // preset was built for (immediate template on a digest dispatch, trace
-  // template on a graph alert, or vice versa), the source would render
-  // empty/first-match-only bodies. Reset to the framework default so the
-  // editor shows a template that fits the new draft.
-  //
-  // A report's CONTENT source counts the same way: a chart layout has no series
-  // to plot once the report switches to matching traces, and a table of traces
-  // has no rows once it switches to a graph.
-  //
-  // Only a BUNDLED layout is reset this way — whether the author picked it or a
-  // report seeded it. A template the author wrote themselves is never one of
-  // ours, so it is never thrown away from under them.
+  // Reset preset template to framework default when cadence, trigger kind, or report source
+  // doesn't match; never reset author-written templates.
   useEffect(() => {
     const preset = findTemplateOptionBySource(slice.template.value);
     if (!preset) return;
@@ -598,16 +570,8 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice, S
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.cadenceMode, ctx.sourceKind, ctx.reportSourceKind]);
 
-  // A report's layout FOLLOWS its content source — a dashboard has no layout
-  // decision to make at all. So rather than leaving the template column null
-  // and relying on a framework default that can't know the source, seed the
-  // matching layout concretely. What the author sees here is then exactly what
-  // is stored and sent.
-  //
-  // The draft stays on `usingDefault: true` while it holds the seeded layout:
-  // the author has customised nothing yet, so the field must still read as the
-  // default and Reset must bring the bundled layout back rather than being a
-  // no-op on a draft that only LOOKS hand-written.
+  // Seed matching layout for reports using bundled templates; Reset restores seeded layout on
+  // unsaved drafts.
   useEffect(() => {
     if (!isReport || !isBlockKit || !slice.template.usingDefault) return;
     const id = pickDefaultSlackBlockKitTemplateId({

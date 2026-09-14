@@ -83,7 +83,7 @@ export interface EvaluatorApi {
   findByIdWithFields(input: EvaluatorScope): Promise<EvaluatorWithFields | undefined>;
   /** One evaluator by its project-unique slug, or `undefined`. */
   findBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | undefined>;
-  /** One evaluator by its project-unique slug. Throws `EvaluatorNotFoundError` when none matches. */
+  /** Evaluator by project-unique slug; throws `EvaluatorNotFoundError` if none match. */
   getBySlug(input: { slug: string; projectId: string }): Promise<Evaluator>;
   /** One evaluator the way the public API addresses it: by id, failing that by slug. */
   findByIdOrSlugWithFields(input: {

@@ -33,17 +33,8 @@ const evaluationRunEvents = [
 ] as const;
 
 /**
- * Type-safe fold projection for evaluation run state.
- *
- * - `implements FoldEventHandlers` enforces a handler exists for every event schema
- * - Handler names derived from event type strings (e.g. `"lw.evaluation.scheduled"` -> `handleEvaluationScheduled`)
- * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
- *
- * Events are applied in order:
- * - EvaluationScheduledEvent -> status: "scheduled"
- * - EvaluationStartedEvent -> status: "in_progress"
- * - EvaluationCompletedEvent -> status: "processed" | "error" | "skipped"
- * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
+ * Type-safe fold projection for evaluation run state. Implements FoldEventHandlers;
+ * events applied in order: scheduled → in_progress → terminal (processed/error/skipped).
  */
 export class EvaluationRunFoldProjection
   extends AbstractFoldProjection<

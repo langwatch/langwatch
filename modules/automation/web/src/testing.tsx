@@ -1,36 +1,5 @@
-/**
- * The application an automations surface is mounted in, faked.
- *
- * Every screen, drawer and delivery provider in this package reads the world
- * through `AutomationHost`: which project the page is about, what the
- * reader may do, which flags are on, what the address says, and where a success
- * or a failure is announced. A test that mounts one therefore has to answer
- * that port, and answering it ad hoc per file is how a dozen suites come to
- * disagree about what a viewer is.
- *
- * Two things live here. `fakeAutomationHost` builds the port from a small
- * configuration and records everything written through it, so an assertion
- * about a navigation or a toast reads off `host.recording` rather than off a
- * spy on a module. `renderWithAutomationHost` mounts a tree underneath it and
- * owns the one piece of state a static double cannot have: the query string.
- * The surfaces read their own address back — a filtered table, a selected tab —
- * so a write has to come back as a re-render or the test proves nothing.
- *
- * The two automation editors are NOT among them any more. They open through the
- * drawer registry, which the composing application mounts above every page, so
- * what this double answers for them is `openDrawer`: it records which overlay
- * was asked for, and the address that carries the request is the application's
- * to spell.
- *
- * Permissions resolve through `permissionSatisfiedBy`, the authz contract's own
- * hierarchy rule (`<resource>:manage` satisfies `<resource>:view` on the same
- * resource), rather than through a set-membership check written here. A test
- * that passes against this double therefore cannot pass by disagreeing with the
- * rule the server applies.
- *
- * The same shape as `@langwatch/gateway-web`'s harness, because the two host
- * ports are the same shape. They converge when the ports are promoted.
- */
+// Fake automation application for testing: fakeAutomationHost provides port mock with recording,
+// renderWithAutomationHost mounts tree with query string state management.
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";

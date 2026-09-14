@@ -1,20 +1,4 @@
-/**
- * The monitors page's seven-day trend, and nothing else.
- *
- * Split out of {@link EvaluationService} for the reason
- * `ClickHouseEvaluationRepository`'s own export comment gives about the runs
- * read: a caller that wants ONE read must not have to synthesise an evaluator
- * executor, an input resolver and a whole workflow capability it never
- * touches. The API process is exactly that caller — the monitors surface asks
- * for a trend and never executes an evaluation — so what it composes is this,
- * not the service around it.
- *
- * The SUMMARY lives here rather than at the caller. Which bucket counts
- * towards a guardrail's pass rate and which towards an evaluator's mean score,
- * and what an empty window answers, are facts about what the trend MEANS; a
- * process that folded the buckets itself would be a second definition of the
- * number a customer reads.
- */
+/** Monitors page trend only; split from EvaluationService to avoid unnecessary dependencies. */
 import {
   monitorPerformanceQuerySchema,
   onlineEvaluationPerformanceSchema,

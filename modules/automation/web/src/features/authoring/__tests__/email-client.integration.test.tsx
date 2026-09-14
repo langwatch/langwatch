@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The email notification config keeps the default surface a preview only —
- * the ready-made subject and body sit behind a "Customize wording" opt-in so
- * an author who is happy with the default never faces an editor. These tests
- * pin that the editors stay hidden until the tier is opened. Monaco cannot
- * mount in jsdom, so it is stubbed; the editors are asserted through their
- * wrapper test ids.
+ * Tests email notification defaults: preview-only until author opens 'Customize wording'.
+ * Monaco stubbed in jsdom; editors tested via wrapper test ids.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {

@@ -1,17 +1,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * The anonymous browser id used to bucket a visitor who is not signed in.
- *
- * It is a random v4 UUID and nothing else. Nothing about the machine is
- * measured or derived: no canvas, no font or hardware enumeration, no
- * network or locale probing, and no personal data. It identifies one
- * browser's storage, not a person, so clearing site data rotates it and the
- * visitor lands in fresh buckets.
- *
- * It exists so a percentage rollout can be stable for a signed-out visitor
- * across page loads. Once they sign in, the authenticated target buckets by
- * user id instead, so their answer is the same in every browser.
+ * Random v4 UUID for non-signed-in visitor (stable across page loads for
+ * percentage rollouts; clears with site data).
  */
 const STORAGE_KEY = "langwatch:anonymous-id";
 

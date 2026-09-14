@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The View drawer's Conditions section: a query-subject automation shows its
- * search query (ADR-043), legacy structured filters render via FilterDisplay,
- * and an automation with neither shows the "No conditions" empty state (the
- * stored `filters` string is "{}" for query automations, which is truthy, so
- * emptiness must be judged on the parsed object).
+ * Tests Conditions: query automations display searches, legacy filters show, empty state otherwise.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

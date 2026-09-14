@@ -11,28 +11,8 @@ import {
 import type { EvaluationAnalyticsAttributePolicy } from "../../app/evaluation.members.ts";
 
 /**
- * `FoldProjectionStore` adapter for the slim `evaluation_analytics` fold
- * (ADR-034 Phase 6 — eval mirror of `TraceAnalyticsStore`, read-back per
- * ADR-066).
- *
- * Skips empty rows (no identity stamped yet), falls back to the aggregateId
- * when the state has no evaluationId, stamps the per-tenant retention onto the
- * record, and projects the in-memory `EvaluationAnalyticsData` accumulator into
- * the slim row at write time.
- *
- * The slim row is derived deterministically from a fold state whose handlers
- * mirror the `EvaluationRunFoldProjection` for the shared fields, so the
- * persisted hoisted-dim columns (Status / Score / Passed / Label /
- * EvaluatorType / TraceId / IsGuardrail) match `evaluation_runs` to the cent for
- * the SAME evaluation. The slim Attributes map is trimmed by
- * `trimAttributesForAnalytics` inside the projection function so payload-shaped
- * keys never reach the wire.
- *
- * Read-back (ADR-066): `tryGet`/`getWithApplied` decode the last committed row
- * (typed read-back columns, migration 00056) so the delivery path does not
- * refold from `event_log`; the applied-event-id watermark rides next to the row
- * so a cold-cache retry still dedups a redelivered batch. Decoding is gated on
- * the row's projection version — see `getWithApplied`.
+ * FoldProjectionStore adapter for slim evaluation_analytics fold (ADR-066);
+ * read-back via typed columns.
  */
 export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationAnalyticsData> {
   static create(input: {
@@ -94,15 +74,7 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
     retentionDays: number;
     appliedEventIds: string[];
   } | null {
-    // ALWAYS writes. The old gate here refused a state with neither
-    // evaluationId nor evaluatorId — but the very next line stamps
-    // evaluationId from the aggregate id (which the executor asserts
-    // non-empty), so an unaddressable row was never actually reachable; the
-    // gate's real effect was to make row ABSENCE ambiguous, which forced the
-    // executor to treat every store miss as potentially-unpersisted state and
-    // pay an unwindowed fallback scan (79,861 in 30 days, none of which found
-    // anything) plus an `event_log` re-fold. A committed state now always has
-    // a row, so absence is authoritative (`trustAbsentMiss`).
+    // ALWAYS writes; gate removed because evaluationId stamped from aggregateId always.
     const stateWithId: EvaluationAnalyticsData = state.evaluationId
       ? state
       : { ...state, evaluationId: String(context.aggregateId) };
@@ -118,31 +90,7 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
     };
   }
 
-  /**
-   * Read the evaluation's last committed slim state back together with the
-   * applied-event-id watermark (ADR-066) — the CH-fallthrough behind the Redis
-   * cache miss. The typed read-back columns (migration 00056) let the trimmed
-   * row round-trip the lifecycle operands DurationMs is derived from, without
-   * replaying `event_log`.
-   *
-   * Those columns are only trustworthy on a row this build wrote, so the row's
-   * projection version is the discriminator: an older stamp means the row
-   * predates the read-back columns, and its null StartedAt/CompletedAt are
-   * indistinguishable from a genuinely unstarted evaluation — a `completed`
-   * event folded onto them would compute a zero duration over a real one. So a
-   * stale-version row is reported as a MISS (null state, empty watermark — the
-   * same answer as "no row"), which the fold's `refoldOnStoreMiss` rebuilds from
-   * `event_log` once; the rewrite carries the current version and every later
-   * read hits. Transitional by construction: it stops firing as soon as the
-   * aggregate is rewritten, and for the population as a whole once retention has
-   * aged the pre-00056 rows out.
-   *
-   * `context.readWindow` is passed through verbatim; on an ABSENT windowed miss
-   * the EXECUTOR retries without the window, so a row outside it is still
-   * found. A row FOUND and refused by the version gate is reported as
-   * `miss: "undecodable"` and deliberately not retried — a wider scope finds
-   * the same row and refuses it again.
-   */
+  /** Read committed state with watermark (ADR-066); decode via projection version. */
   async getWithApplied(
     aggregateId: string,
     context: ProjectionStoreContext,

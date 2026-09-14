@@ -1,12 +1,5 @@
-/**
- * An in-application link, as this family renders one.
- *
- * `platform/app`'s `~/components/ui/link` wraps Chakra's anchor around the
- * router's own `Link`, which is a router import a feature-web package may not
- * make. A plain anchor navigates to the same address; what it gives up is the
- * client-side transition, and that is the same trade the gateway family's
- * `gateway-link` made.
- */
+// In-application link: plain anchor instead of router Link (feature-web can't import router);
+// trades client-side transition for portability.
 
 // eslint-disable-next-line no-restricted-imports
 import { Link as ChakraLink } from "@chakra-ui/react";

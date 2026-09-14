@@ -2,17 +2,8 @@ import { useMemo } from "react";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import { api } from "../../../../behavior/automation-api.ts";
 
-/**
- * Resolves the human-facing names a graph alert renders with — the graph's
- * name and the monitored series' display label — from the selected graph's
- * saved JSON. Used by the drawer's preview / test-fire (honest example
- * copy) and the main-drawer conditions summary (no raw
- * `{index}/{key}/{aggregation}` keys in front of the user).
- *
- * Both return null while the graph is loading, when no graph is selected,
- * or when the stored series key no longer matches the graph — callers fall
- * back to placeholder copy or the raw key.
- */
+// Resolve human-facing graph name and series display label from saved JSON; returns null when
+// graph is loading, unselected, or stored series key no longer matches.
 export function useGraphAlertLabels({
   projectId,
   enabled,

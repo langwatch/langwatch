@@ -1,17 +1,7 @@
 import type { VariableInfo } from "@langwatch/automation-contract";
 
-/**
- * Variable surface for scheduled-report templates (`draft.source ===
- * "report"`). Mirrors `TEMPLATE_VARIABLES` (the trace list) and
- * `ALERT_TEMPLATE_VARIABLES`, but describes `ReportTemplateContext` — "here is
- * your {source} for {period}". The drawer hands this list to the same editor
- * plumbing (Monaco autocomplete, unknown-variable detection, the variable
- * reference panel) via `ConfigFormCtx.variables`; only the data differs.
- *
- * A report carries its data STRUCTURED (`traces`, `charts`) rather than
- * pre-rendered, which is what lets a layout build a real table or chart. `rows`
- * remains for templates written against the older pre-formatted lines.
- */
+// Variable surface for scheduled-report templates: describes ReportTemplateContext with same
+// editor plumbing; reports carry structured data (traces, charts) not pre-rendered.
 export const REPORT_TEMPLATE_VARIABLES: VariableInfo[] = [
   {
     path: "trigger.name",

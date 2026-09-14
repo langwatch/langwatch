@@ -314,24 +314,8 @@ function ReportSubject() {
   );
 }
 
-/**
- * Automation subject: the trace-filter query.
- *
- * A saved legacy automation (structured `filters`, no query) shows its stored
- * conditions and the one action that moves it forward, rather than the
- * field-by-field editor `platform/app` offered. That editor is
- * `components/filters/FieldsFilters`, and it cannot travel: it reads the filter
- * REGISTRY and the analytics helpers out of `~/server`, which is server source
- * a browser package may not name — an import the application itself only gets
- * away with because its bundler erases the types.
- *
- * What the reader keeps is the whole decision: the conditions are shown as
- * saved, they keep working untouched, and clearing them switches the automation
- * to a search query, which is what the copy already told them to do. What they
- * lose is editing a legacy filter in place; the same automation can be
- * expressed as a query, which is the shape everything created since ADR-043
- * uses. Recorded in `dev/docs/plans/ui-family-move-manifests.md`.
- */
+// Legacy automation subject: display saved filter conditions read-only; clearing them switches to
+// search query (modern shape created since ADR-043).
 function TraceSubject() {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
@@ -598,16 +582,8 @@ function SubjectModeToggle({
   );
 }
 
-/**
- * The live matched-traces preview under the query editor. Deliberately light:
- * a one-line count ("35 traces matched") plus a short list of trace names, so
- * it reads as a glanceable confirmation rather than a second traces table.
- *
- * It refreshes in place — `keepPreviousData` on the query means the last
- * result stays put while a new one loads, and the only motion is a small
- * spinner in the corner. The full spinner shows only on the very first load
- * (no data yet), so gaining/losing focus never blanks the panel.
- */
+// Live matched-traces preview: one-line count plus trace names; refreshes in place with
+// keepPreviousData to prevent blank state on focus change.
 function TracePreview({
   trimmed,
   fetching,

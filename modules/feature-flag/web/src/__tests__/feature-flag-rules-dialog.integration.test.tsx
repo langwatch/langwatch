@@ -1,13 +1,6 @@
 /**
- * The targeting-rules dialog as an operator meets it: what the field beside a
- * scope asks for, where an added rule lands, and whether a rule can be grabbed
- * at all.
- *
- * Placement and reordering have their own unit coverage in `rule-editing`;
- * what these add is that the dialog is actually wired to it — a correct helper
- * the "Add rule" button never calls fixes nothing.
- *
- * @see specs/ops/internal-feature-flags.feature
+ * Targeting-rules dialog as operator meets it: placement, reordering, adding
+ * rules (with dialog wiring to rule-editing).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";

@@ -8,16 +8,8 @@ import { Drawer } from "@langwatch/design-system/drawer";
 // what the editor-mode wants anyway, and avoids the unsupported size.
 type DrawerSize = "md" | "lg" | "xl" | "full";
 
-/**
- * Common shell for the secondary drawers — back-arrow header, body, and
- * footer with a "Done" action. Caller supplies the title, body, and an
- * optional header-right (e.g. the Conditions Code-mode switch).
- *
- * The header carries a width-toggle: clicking the maximise icon expands
- * the drawer to `full` (full-bleed for editor work); clicking the
- * minimise icon returns to the default size. The toggle resets when the
- * drawer reopens — width is a transient preference, not a saved one.
- */
+// Reusable shell for secondary drawers with optional width-toggle between default and
+// full-bleed modes; width preference resets on drawer reopen.
 export function SecondaryDrawerShell({
   open,
   title,

@@ -9,13 +9,8 @@ export class NoUsageCache implements UsageCache {
 }
 
 /**
- * The cache a process composes when it has nowhere shared to keep one: a map
- * in this process, expiring each key after `ttlMs`.
- *
- * Enforcement asks the same two questions on every ingested batch, so without
- * a cache a busy project re-runs the month's count per batch. Per-process is
- * enough for that: the questions repeat within seconds, and the worst a cold
- * pod costs is one extra read.
+ * In-process cache with `ttlMs` expiration. Enforcement asks the same questions
+ * repeatedly; per-process suffices since they recur within seconds.
  */
 export class InProcessUsageCache implements UsageCache {
   private readonly entries = new Map<string, { value: unknown; expiresAt: number }>();

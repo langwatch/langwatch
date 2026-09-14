@@ -1,17 +1,6 @@
 /**
- * Central registry of every feature flag the platform recognises.
- *
- * Resolution looks up exact keys first, then matches family prefix+suffix
- * shapes. An unregistered key has no definition to consult and resolves to
- * the caller's own default, so an unknown flag never silently changes
- * behaviour.
- *
- * Adding a flag: append an entry below, then call
- * `FeatureFlagApi.isEnabled(<key>, ...)`. The key is checked against
- * `FeatureFlagKey`, so typos and unregistered references fail to compile.
- * Operators toggle it from /ops/feature-flags without a redeploy.
- *
- * @see ../../adrs/001-feature-flag-service-boundary.md
+ * Central registry of feature flags; unknown keys resolve to caller default.
+ * Add a flag and call isEnabled(<key>, ...).
  */
 
 import type { FeatureFlagExperiment } from "./feature-flag-experiment.ts";
@@ -205,19 +194,8 @@ export const FEATURE_FLAGS = [
     description:
       "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
   },
-  // Per-project gate for the transient S3 spool at the ingestion edge
-  // (#4215 / ADR-022). ON by default, so a deployment with object storage
-  // configured keeps oversized span content intact with no flag setup: a span
-  // whose serialized command exceeds 256 KB is written to the spool and the
-  // queued command carries only a spool ref. Resolved per span against the
-  // postgres-cached store, so the hot-path cost is one cached lookup.
-  //
-  // The flag stays the kill switch and the per-project opt-out: an operator
-  // row in /ops/feature-flags turns the spool off fleet-wide or for a single
-  // project. When the spool cannot run at all (no reachable object storage,
-  // or an Azure-only install where the S3 client refuses to build) the edge
-  // fails open: ingestion proceeds inline and capOversizedAttributes truncates
-  // each attribute value at 256 KB.
+  // Per-project gate for transient S3 spool at ingestion edge; ON by default
+  // (ADR-022).
   {
     key: "release_trace_blob_offload",
     scope: "PRODUCT",
@@ -225,17 +203,8 @@ export const FEATURE_FLAGS = [
     description:
       "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline, where the 256 KB per-value cap applies. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline and the same 256 KB cap applies.",
   },
-  // Externalizes inline media (base64 audio turns, data-URI images, file
-  // attachments) from span attributes into the content-addressed
-  // stored-objects store at the ingestion edge, before the command is staged.
-  // Fail-open by construction (any error keeps the original inline payload)
-  // and skipped for projects with data-privacy content-drop rules.
-  //
-  // Default OFF: the stored-objects store is not yet covered by the
-  // data-retention deletion path or the storage meter, so extracted media
-  // would outlive the trace's retention policy uncounted. The default flips
-  // on once stored-objects retention lands (#5951); until then the flag is a
-  // per-project / per-deployment opt-in.
+  // Externalizes inline media to stored-objects store at ingestion edge;
+  // currently opt-in (ADR pending).
   {
     key: "release_trace_media_extraction",
     scope: "PRODUCT",
@@ -243,18 +212,8 @@ export const FEATURE_FLAGS = [
     description:
       "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
   },
-  // ADR-116 §3. The allowlist for the born-finalized entrance: a sign-up on
-  // a flag-listed organization is created ON the identity branch — its
-  // identifier history goes into the event log and its migration state is
-  // finalized before sign-up returns — instead of being created on the
-  // legacy branch and migrated off it later.
-  //
-  // Default OFF, and it must stay off until the entrance is hardened: a
-  // flagged sign-up is deliberately COUPLED to engine availability and fails
-  // loudly (`identity_engine_unavailable`) when the event stack is down,
-  // rather than falling back. That coupling is acceptable only while the
-  // population is an operator-chosen allowlist. Target it with a store
-  // targeting rule per organization; the env override is the dev-loop lever.
+  // Allowlist for born-finalized entrance (ADR-116 §3); couples sign-up to
+  // engine availability, so enable per organization knowingly.
   {
     key: "release_identity_born_finalized_signup",
     scope: "PRODUCT",
@@ -265,16 +224,8 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
-    // On by default (ADR-038 Decision 7): self-hosted installations get
-    // governance (AI-tools device login, /me, admin surfaces, the
-    // onboarding intent fork, the org "Primary use" setting) with zero
-    // configuration. Two off-switches with different blast radii: an
-    // operator store row targets per organization, while
-    // RELEASE_UI_AI_GOVERNANCE_ENABLED=0 is deployment-wide — it is
-    // evaluated before store targeting and disables the flag for every
-    // context in the process, so it cannot re-arm the gate for just one
-    // org. This default and the auth-cli device-login fallback are a
-    // pinned pair, move them together (governanceGaDefaults.unit.test.ts
+    // On by default (ADR-038 Decision 7); pinned with auth-cli device-login
+    // fallback (governanceGaDefaults.unit.test.ts
     // enforces it).
     defaultValue: true,
     description:

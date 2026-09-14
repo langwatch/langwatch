@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The precondition rules as the EXECUTION path applies them.
- *
- * This service had no test of its own. The 93 cases under
- * `platform/app/src/server/evaluations/__tests__/preconditions.unit.test.ts`
- * cover a different implementation of the same rules — the one the monitor
- * sample preview uses — and the two do not know the same fields.
+ * Precondition rules as the EXECUTION path applies them.
  */
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluationTraceSpan } from "@langwatch/trace-contract";

@@ -17,42 +17,10 @@ const clickHouseMomentOf = (epochMilliseconds: number): ClickHouseMoment =>
   toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds));
 
 /**
- * One row emitted to `evaluation_analytics_rollup` per terminal evaluation
- * event (ADR-034 Phase 6 — eval mirror of `traceAnalyticsRollup.mapProjection`).
- *
- * Field names match the ClickHouse columns exactly (PascalCase) on the
- * camelCase record so the repository hands the record to `JSONEachRow`
- * without a second mapping layer. `BucketStart` is a JS `Date` floored to
- * the minute — the CH client serializes it as a `DateTime64(3)` literal.
- *
- * The map projection subscribes to BOTH terminal eval event types because
- * either may be the per-evaluation-row source:
- *
- *   - `EvaluationCompletedEvent` (`lw.evaluation.completed`) — the regular
- *     two-event path (scheduled → started → completed). Identity fields
- *     (evaluatorId / evaluatorType / evaluatorName / traceId / isGuardrail)
- *     are NOT on the completed event itself; they were set on the prior
- *     scheduled/started events and we read them off the fold state. Since
- *     the map projection has no fold-state access, the rollup row that
- *     comes from a `completed` event falls back to `EvaluatorType = ""` if
- *     the identity was not on a `reported`-style atomic emission. Operators
- *     reading the rollup get correct counts/sums (the additive metrics);
- *     they just lose the `EvaluatorType` group-by axis for the two-event
- *     evaluations — the slim table still has the correct value because the
- *     fold projection has identity context via its prior-event state.
- *
- *   - `EvaluationReportedEvent` (`lw.evaluation.reported`) — atomic single-
- *     event variant used by the custom SDK report path. Identity + result
- *     ride the same event so the rollup row carries the real EvaluatorType
- *     immediately.
- *
- * The rationale for accepting the EvaluatorType blank-out on completed-only
- * events: the rollup's purpose is additive sums per bucket / evaluator /
- * status, and `EvaluatorType` is a LowCardinality(String) so `''` is a
- * cheap, well-defined fallback. Refusing to emit a row for completed-only
- * events would silently under-count, which is worse. Phase 7 (or whichever
- * iteration adds per-aggregate event-stream context to map projections)
- * can promote this rollup row in retrospect.
+ * One row per terminal evaluation event (ADR-034 Phase 6). Field names match
+ * ClickHouse columns for direct JSONEachRow serialization. Handles both completed
+ * and reported event types; blank EvaluatorType for completed-only events.
+ * @see ADR-034
  */
 export interface EvaluationAnalyticsRollupRow {
   /** Project id; multitenancy boundary. Always required. */
@@ -76,9 +44,9 @@ export interface EvaluationAnalyticsRollupRow {
   errorCount: number;
   /** 1 when `status === 'skipped'`, 0 otherwise. */
   skippedCount: number;
-  /** The event's `score` when `status === 'processed'`, 0 otherwise. Pairs with `scoreCount` for true avg. */
+  /** Score sum when processed; 0 otherwise. Pairs with scoreCount for average. */
   scoreSum: number;
-  /** 1 when `status === 'processed'` and `score` is a finite number, 0 otherwise. Divisor for true avg. */
+  /** Count of finite scores for processed evaluations; divisor for average. */
   scoreCount: number;
   /**
    * Evaluation wall-clock duration in ms. Always 0 from this projection —
@@ -131,20 +99,9 @@ function passFailOf({ status, passed }: { status: string; passed: boolean | null
 }
 
 /**
- * Map projection that transforms terminal evaluation events into per-event
- * rollup rows for `evaluation_analytics_rollup` (ADR-034 Phase 6).
- *
- * Idempotency / re-delivery: UNLIKE spans, eval terminal events are
- * at-least-once BY DESIGN — deterministic evaluation ids, collector retry
- * guidance, and the `tenantId:evaluationId:reported` idempotency key on the
- * report command all invite duplicate appends. Read-time dedup protects the
- * fold, but each appended duplicate would land another increment here —
- * systematic over-counting, not ADR-034's accepted rare crash-retry noise.
- * `dedupeByIdempotencyKey` therefore guards this projection: the executor
- * skips any delivery whose idempotency key is already held by an earlier
- * event in the aggregate's log (fail-open on read lag, so the worst case
- * remains the accepted transient over-count). Replay still rebuilds the
- * rollup truncate-first rather than incrementing it.
+ * Map projection for terminal eval events to rollup rows (ADR-034 Phase 6). At-least-once
+ * by design; `dedupeByIdempotencyKey` guards against duplicate over-counting.
+ * @see ADR-034
  */
 export class EvaluationAnalyticsRollupMapProjection
   extends AbstractMapProjection<EvaluationAnalyticsRollupRow, typeof evaluationRollupEvents>

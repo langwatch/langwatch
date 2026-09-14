@@ -1,13 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * What the dataset provider does with the dataset it is given, and it is the
- * part that decides whether an automation writes usable rows: picking a dataset
- * derives a full column mapping from that dataset's columns, and a saved row
- * that has a dataset but no mapping gets one backfilled once the list arrives.
- *
- * The hand-over to the dataset drawer is next door, in
- * `dataset-sub-flow.integration.test.tsx`.
+ * Tests dataset provider behavior: column mapping derivation and backfilling.
+ * See `dataset-sub-flow.integration.test.tsx` for the dataset drawer hand-over.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

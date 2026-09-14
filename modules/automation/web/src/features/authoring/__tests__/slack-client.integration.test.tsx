@@ -1,13 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The Slack notification config is a layered authoring flow: the guided
- * preset gallery is the default surface, with plain text and raw Block Kit
- * as opt-in escape hatches. These tests pin the disclosure structure — a
- * fresh draft lands on the gallery with no code in sight, and each deeper
- * tier is revealed only on request — plus the slice write when a preset is
- * picked. Monaco cannot mount in jsdom, so it is stubbed; the editors are
- * asserted through their wrapper test ids.
+ * Tests Slack config layering: preset gallery default, plain text and Block Kit as opt-ins.
+ * Disclosure structure and slice writes tested; Monaco stubbed, editors via test ids.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -348,20 +343,7 @@ describe("SlackConfigForm channel picker", () => {
     const typist = () => userEvent.setup({ delay: 10 });
 
     /**
-     * Put a channel in the box in ONE input event, for the tests that are not
-     * about typing.
-     *
-     * The race costs a character only because each keystroke is appended to
-     * whatever the box is holding at that moment: if a resync rewrites the box
-     * from stale text between two keystrokes, the next character lands on the
-     * stale text and the one before it is gone from the combobox's own state
-     * for good. A single event has no "between", so there is nothing to lose —
-     * and this holds whatever it is that makes the resync late, which is worth
-     * something, because that has not been pinned down.
-     *
-     * This is a real thing authors do (paste a channel name or an ID), and for
-     * a test that goes on to blur, press Enter or pick from the list it says
-     * exactly as much as typing did: the box holds the channel.
+     * Paste avoids keystroke race (combobox resyncs between strokes). Mirrors real author behavior.
      */
     const enterChannel = async ({
       user,
@@ -378,22 +360,8 @@ describe("SlackConfigForm channel picker", () => {
     };
 
     /**
-     * Type one character at a time, waiting for the box to hold each prefix
-     * before sending the next.
-     *
-     * Only for the test whose subject IS the per-keystroke path — that the
-     * search filters on the whole term rather than the last letter, which is
-     * the defect that made a long channel name unreachable. Pasting would walk
-     * straight past it, so that test keeps typing and this keeps it honest:
-     * nothing is typed onto a box that is not already holding what came
-     * before, so a stale value is caught while it is still recoverable rather
-     * than being carried into the assertion.
-     *
-     * The tests that type and immediately assert the value use neither helper.
-     * There the dropped character IS the assertion, and it should fail.
-     *
-     * `text` is literal text — key descriptors like `{Enter}` do not survive
-     * being split per character.
+     * Per-keystroke filtering: type one character, await box commitment before next.
+     * Ensures search filters whole term, not just last letter (the defect).
      */
     const typeAndSettle = async ({
       user,

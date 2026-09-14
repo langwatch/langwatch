@@ -1,16 +1,6 @@
 /**
- * The service resolves an organization's creation date on behalf of a "new
- * organizations" rule, so no call site has to carry a date almost no flag
- * needs.
- *
- * Two things matter here and neither is visible from the rule matcher alone:
- * a flag WITHOUT an age rule must not read the organization table at all (the
- * kill-switch path runs per event), and a flag WITH one must not read it per
- * check. Both are asserted against the repository's read count rather than
- * against the resolved boolean, because a resolver that fetched on every call
- * would return exactly the same answers.
- *
- * Spec: specs/ops/internal-feature-flags.feature
+ * Service resolves organization creation date for "new orgs" rules only
+ * (avoids org table reads on flags without age rules).
  */
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it } from "vitest";

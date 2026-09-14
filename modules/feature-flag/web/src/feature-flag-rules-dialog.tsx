@@ -1,12 +1,6 @@
 /**
- * The targeting-rules dialog: one row per rule, a scope picker and the one
- * field that scope needs, in the order the resolver reads them.
- *
- * Order is the whole point — rules are first-match-wins — so a rule can be
- * moved by pointer or by keyboard, and an added rule lands where it can still
- * fire rather than under a catch-all that answers first.
- *
- * @see specs/ops/internal-feature-flags.feature
+ * Targeting-rules dialog with one row per rule (ordered for first-match-wins
+ * evaluation).
  */
 
 import {

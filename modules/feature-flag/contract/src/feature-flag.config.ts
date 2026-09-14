@@ -6,13 +6,8 @@ import { resolveFeatureFlagEnvOverride } from "./feature-flag-environment.ts";
 const optionalEnvironmentValueSchema = z.string().optional();
 
 /**
- * The forced-on list, as a deployment writes it: one comma-separated string
- * of flag keys.
- *
- * A name that is not a registered flag is dropped rather than refused. The
- * list travels with a release and outlives it: a deployment that forced a
- * flag on stays booting after that flag is retired, which is the behaviour a
- * rollout switch has to have.
+ * Forced-on list as comma-separated string; unregistered flags are dropped
+ * (list outlives releases).
  */
 export const featureFlagServerConfigSchema = z
   .string()

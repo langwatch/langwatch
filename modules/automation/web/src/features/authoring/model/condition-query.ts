@@ -1,17 +1,5 @@
 /**
- * The bridge between the structured condition builder and the trace query
- * language. The builder is a friendly front-end over the SAME liqe query string
- * the "Code" editor shows and the dispatcher runs — never a second persistence
- * model. So this module is two pure functions:
- *
- *   - `serializeConditions` — builder rows → query string
- *   - `queryToConditions`   — query string → builder rows, or `null` when the
- *      query is richer than the builder can represent (OR, grouping, free-text,
- *      exclusive ranges). `null` is the signal to keep the user in Code mode
- *      rather than silently dropping structure.
- *
- * The two are inverse for everything the builder can produce, so a query
- * round-trips builder → string → builder unchanged.
+ * Bridges condition builder and liqe queries; null when query exceeds builder representation.
  */
 import type { LiqeQuery, ParserAst, TagToken } from "liqe";
 import {

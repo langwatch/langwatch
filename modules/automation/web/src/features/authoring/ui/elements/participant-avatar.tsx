@@ -1,11 +1,5 @@
 /**
- * One annotator, as a coloured initial.
- *
- * The application's `RandomColorAvatar` renders the member's uploaded photo
- * when there is one and this letter otherwise; the organization read this
- * family makes does not carry the photo, so the letter is the whole answer here
- * and the colour is derived the same way — from the name, so the same person is
- * the same colour on every render.
+ * Participant avatar: coloured initial from name (mirroring RandomColorAvatar, but no photo).
  */
 
 import { Box } from "@chakra-ui/react";

@@ -1,22 +1,5 @@
 /**
- * Which dataset an ADD_TO_DATASET automation writes to.
- *
- * A family-local copy of `platform/app`'s `components/datasets/DatasetSelector`,
- * with two changes.
- *
- * It is controlled by a value and a change handler rather than by
- * `react-hook-form`'s `setValue`: the application's version is generic over a
- * form shape because it serves form-backed callers, and this family's one
- * caller passed a hand-written shim to bridge the two.
- *
- * Creating a dataset is offered as a hand-over rather than a second form: the
- * caller passes `onCreateNew` and the host takes the reader to the dataset
- * drawer and back. A project with no dataset has nothing to pick, so without
- * it that section has no way out.
- *
- * The three-way state is kept: an empty dropdown renders identically whether
- * the list is still coming, genuinely empty, or failed to arrive, and only one
- * of the three is "you have no datasets".
+ * Dataset selector for ADD_TO_DATASET: value-controlled, creation via drawer hand-over.
  */
 
 import {

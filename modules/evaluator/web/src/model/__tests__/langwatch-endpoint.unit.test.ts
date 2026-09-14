@@ -1,13 +1,4 @@
-/**
- * What the API snippets tell a customer to post to.
- *
- * `platform/app` read `window.location` inline, which is why nothing ever
- * asserted this: the two branches differ only on the hostname, and getting them
- * the wrong way round hands a self-hosted customer a snippet that talks to
- * app.langwatch.ai — their traffic, their keys, somebody else's installation.
- *
- * Spec: specs/evaluations/evaluation-pages.feature
- */
+/** API snippet endpoints; must not direct self-hosted customers to app.langwatch.ai. */
 
 import { describe, expect, it } from "vitest";
 

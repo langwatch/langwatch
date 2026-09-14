@@ -1,18 +1,5 @@
-/**
- * The stored structured filters of a legacy automation, read back.
- *
- * A PACKAGE COPY rather than a move. `platform/app`'s
- * `components/automations/FilterDisplay` is also rendered by the analytics
- * section's `GraphFilterIndicator`, which is not this family's, and
- * deletes-only forbids repointing that consumer at a package — so the platform
- * copy stays with it and this family takes its own, exactly as the gateway
- * family did with `ConfirmDialog`.
- *
- * The one substitution is the clamped cell: the application's version reached
- * for `HoverableBigText`, which was refused promotion, so this renders the
- * package's `ClampedText` instead. The behaviour a reader sees is the same —
- * one line, the whole value on hover.
- */
+// Legacy automation's structured filters rendered read-only; copy not move due to analytics
+// section's GraphFilterIndicator; uses ClampedText instead of HoverableBigText.
 
 import { Box, HStack } from "@chakra-ui/react";
 import { Filter } from "react-feather";

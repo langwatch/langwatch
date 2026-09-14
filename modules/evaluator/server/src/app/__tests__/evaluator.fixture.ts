@@ -1,12 +1,6 @@
 /**
- * The evaluator application over memory persistence and stub collaborators,
- * for cases about the application's own rules.
- *
- * The repository is real (in-memory): a case seeds the rows its precondition
- * needs and spies on the repository's own methods to watch what the app
- * wrote, rather than replacing methods on a runtime the app builds itself and
- * keeps private. Everything the case does not name refuses by name rather
- * than answering undefined.
+ * Evaluator application with memory persistence and stub collaborators;
+ * repository is real but in-memory.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";

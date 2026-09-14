@@ -37,7 +37,7 @@ describe("isViewOnlyPermission", () => {
   it("handles edge cases with malformed permissions", () => {
     expect(MemberClassificationService.isViewOnlyPermission("view")).toBe(false); // No colon
     expect(MemberClassificationService.isViewOnlyPermission("")).toBe(false); // Empty string
-    expect(MemberClassificationService.isViewOnlyPermission("project:")).toBe(false); // Missing action
+    expect(MemberClassificationService.isViewOnlyPermission("project:")).toBe(false); // no action
   });
 });
 

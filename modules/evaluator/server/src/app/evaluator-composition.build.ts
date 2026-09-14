@@ -1,17 +1,6 @@
 /**
- * Builds the collaborators `EvaluatorApp` used to receive hand-composed
- * (`apps/api/src/features/evaluator/evaluator.composition.ts`, deleted by
- * b383462d96). `EvaluatorApp.create` now builds the workflow/monitor graph
- * itself from the one member it reads — `prisma` — and its `workflows`
- * dependency, on the exact prisma calls and the exact `workflows` calls the
- * deleted `ProcessEvaluatorGraph` made.
- *
- * The NLP dispatcher has no member and no contract to depend on —
- * `EvaluatorNlpDispatcher` is a one-method structural type precisely so this
- * module never depends on another module's server package — so a deployment
- * that supplies none gets a proxy that refuses by name on first use, rather
- * than the silent `undefined` crash the deleted composition's absence left
- * behind.
+ * Builds EvaluatorApp collaborators; NLP dispatcher is a structural type to
+ * avoid module dependencies.
  */
 import { EvaluatorWorkflowVersionRequiredError } from "@langwatch/evaluator-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

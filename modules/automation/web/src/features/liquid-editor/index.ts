@@ -1,12 +1,5 @@
-/**
- * The Liquid template editor, as the rest of this package composes it.
- *
- * A private feature's public entry: everything another feature in this package
- * may name, and nothing else. The authoring flow is the one caller — its
- * delivery providers each embed an editor for their own template — and it
- * reaches this list rather than the modules behind it, so the editor's internals
- * can move without a search across the package.
- */
+// Public entry point for the Liquid template editor; hides internals so they can move without
+// affecting callers (authoring flow and delivery providers).
 
 export {
   clearLiquidMarkers,

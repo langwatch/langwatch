@@ -1,14 +1,6 @@
 /**
- * The built-in evaluator catalogue `GET /api/evaluations/list` answers with.
- *
- * Each entry carries `settings_json_schema`: the JSON Schema of that
- * evaluator's settings object, which is what a caller renders the settings
- * form from. It must describe every setting — its type, its default, its
- * prose and its permitted values — or the form has nothing to draw.
- *
- * The schema is derived with zod's own `toJSONSchema`. `zod-to-json-schema`
- * reads zod 3 internals and answers `{ "$schema": … }` and nothing else for a
- * zod 4 schema, which is a silently empty catalogue rather than a failure.
+ * Built-in evaluator catalogue with settings_json_schema for each evaluator,
+ * derived via zod's toJSONSchema.
  */
 import {
   AVAILABLE_EVALUATORS,

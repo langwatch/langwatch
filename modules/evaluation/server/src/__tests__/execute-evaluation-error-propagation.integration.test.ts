@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- *
  * Integration tests for ExecuteEvaluationCommand — error propagation.
- *
- * Covers @integration scenarios from
- * specs/evaluators/evaluator-error-propagation.feature:
- * - "langevals returns status=error with a detail message"
- * - "evaluator throws an exception mid-execution"
+ * @see specs/evaluators/evaluator-error-propagation.feature
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

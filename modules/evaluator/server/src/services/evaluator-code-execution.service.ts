@@ -1,16 +1,4 @@
-/**
- * Running a customer's code evaluator on the NLP engine.
- *
- * The dispatch is the Studio one - the same engine, the same `execution`
- * origin, the same causality depth and parent trace - because a code evaluator
- * IS a one-node Studio graph, and giving it a second path would let the two
- * disagree about which trace an evaluation's spans belong to.
- *
- * The engine answers `unknown` and the caller reads three fields off the body.
- * It is PARSED here rather than asserted: a malformed body is a failed
- * evaluation, and the code service already turns a throw from this call into
- * the `CODE_EVALUATOR_ERROR` the customer sees.
- */
+/** Customer code evaluator on NLP engine; dispatch uses Studio path for trace consistency. */
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { z } from "zod";
 

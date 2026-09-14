@@ -35,18 +35,7 @@ export interface EvaluationProcessingPipelineDeps {
   automations: AutomationEvaluationSubscriberService;
 }
 
-/**
- * Creates the evaluation processing pipeline definition.
- *
- * This pipeline uses evaluation-level aggregates (aggregateId = evaluationId).
- * It tracks the lifecycle of individual evaluations (scheduled -> completed)
- * and enables detection of stuck evaluations.
- *
- * Commands:
- * - executeEvaluation: Preconditions + sampling + run eval + emit events (subscriber path)
- * - startEvaluation: Records eval start to CH (API handler path)
- * - completeEvaluation: Records eval result to CH (API handler path)
- */
+/** Tracks evaluation lifecycle (scheduled → completed) via evaluation-level aggregates. */
 export class EvaluationProcessingAdapter {
   static create(deps: EvaluationProcessingPipelineDeps): EvaluationProcessingAdapter {
     return new EvaluationProcessingAdapter(deps);

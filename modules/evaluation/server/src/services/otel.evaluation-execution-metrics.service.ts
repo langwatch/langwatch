@@ -8,34 +8,13 @@ import {
 import type { EvaluationExecutionTelemetry } from "../app/evaluation.members.ts";
 
 /**
- * The two series an evaluation run reports, and the label that tells one
- * evaluator's runs from another's.
- *
- * Pinned as literals because they are read by name from outside this
- * repository — `docs/langwatch-dashboard.json` charts
- * `evaluation_duration_milliseconds_bucket` by `evaluator_type` and counts
- * `evaluation_status_counter` by `status` — and because every way they can go
- * wrong is silent: a panel naming a series nobody writes renders empty, which
- * reads as "no evaluations ran" rather than "the metric moved".
- *
- * They are the SAME two series `OtelPiiAnalysisMetricsAdapter` writes for the
- * PII analysis path, distinguished only by the `evaluator_type` label value.
- * That is deliberate and predates the split: one dashboard row covers every
- * evaluator, and PII detection is one of them.
+ * Two metric series pinned as literals (read by dashboards) with
+ * evaluator_type label.
  */
 export const EVALUATION_DURATION_METRIC_NAME = "evaluation_duration_milliseconds";
 export const EVALUATION_STATUS_METRIC_NAME = "evaluation_status_counter";
 
-/**
- * An evaluation run's duration and outcome, pushed over OTLP.
- *
- * No registry is held or handed in: `histogram()` and `counter()` resolve the
- * process's own meter at declaration, the same way every other `otel.*-metrics`
- * adapter in the tree does, and the bucket boundaries come from
- * `HISTOGRAM_BOUNDARIES` rather than from this file. That is why the port takes
- * a `record(...)` and nothing else — a process composes this adapter or it
- * composes none, and the difference is a missing series rather than a wrong one.
- */
+/** Evaluation run duration and outcome over OTLP; meter resolved at declaration. */
 export class OtelEvaluationExecutionMetricsAdapter implements EvaluationExecutionTelemetry {
   static create(): OtelEvaluationExecutionMetricsAdapter {
     return new OtelEvaluationExecutionMetricsAdapter(

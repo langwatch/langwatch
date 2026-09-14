@@ -13,12 +13,7 @@
 export const FEATURE_FLAG_CACHE_TTL_MS = 5_000;
 
 /**
- * Cache TTL for backend kill switches in milliseconds.
- *
- * Kill switches are checked on hot paths (per span, per event, per command).
- * They do not need second-level freshness — an operator flip taking up to
- * 60s to propagate is fine, and the longer TTL prevents per-tenant cache
- * fragmentation from stampeding the store with per-context reads under high
- * traffic.
+ * Cache TTL for backend kill switches (checked on hot paths; longer TTL
+ * reduces per-tenant cache fragmentation).
  */
 export const KILL_SWITCH_CACHE_TTL_MS = 60_000;

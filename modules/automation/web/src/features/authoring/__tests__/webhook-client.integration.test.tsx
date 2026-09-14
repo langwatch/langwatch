@@ -1,14 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The webhook provider client had zero test coverage in the shared automation
- * provider implementation before this test was added.
- * webhook.ts unit suite covers the shared schema/sanitizer, but nothing
- * exercised this provider's client.tsx: URL validation surfaced in the
- * ConfigForm, the kept-header sentinel round-trip through fromTriggerRow /
- * toActionParams, and JSON-body default resolution). Mirrors the slack/email
- * provider test harness (see ../../slack/__tests__/client.integration.test.tsx
- * and ../../email/__tests__/client.integration.test.tsx).
+ * Tests webhook client: URL validation, kept-header round-trip, JSON defaults (like slack/email).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { SavedTriggerRow } from "@langwatch/automation-contract";

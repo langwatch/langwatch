@@ -24,15 +24,7 @@ const FREQUENCIES: Frequency[] = ["daily", "weekly", "monthly"];
 const DAYS_OF_MONTH = Array.from({ length: 31 }, (_, i) => i + 1);
 
 /**
- * The friendly recurring-schedule picker for a Report's cadence. Renders a
- * frequency + time-of-day picker by default (with a day chooser for weekly /
- * monthly) and keeps raw cron editing behind an opt-in "Edit as a cron
- * expression" switch that stays OFF by default. Controlled: the caller owns
- * `{ cron, timezone }` and receives every edit through `onChange`.
- *
- * Round-trips through `partsFromCron` / `cronFromParts` — an unrecognised cron
- * (e.g. a hand-authored legacy schedule) auto-opens the raw editor so nothing
- * is silently lost. New reports default the timezone to the viewer's locale.
+ * Schedule picker: frequency + time-of-day (day for weekly/monthly). Unknown cron opens editor.
  */
 export function ReportScheduleField({
   cron,

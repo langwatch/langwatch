@@ -1,22 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for ExecuteEvaluationCommand's evaluator settings + workflowId
- * resolution. Re-homes the coverage that lived in the deleted
- * background/workers/evaluationsWorker.integration.test.ts (see
- * specs/monitors/monitor-execution-backend.feature):
- *
- *   1. evaluator.config.settings takes precedence over monitor.parameters
- *   2. monitor.parameters is the fallback when the monitor has NO evaluator
- *   3. a top-level prompt is recovered rather than dropped (langwatch#6397)
- *   4. an EMPTY settings key does not shadow a recoverable prompt
- *   5. the operator rollback flag, including when it cannot be read
- *   6. workflowId resolves from the evaluator record for workflow evaluators
- *
- * All deps injected via constructor — zero vi.mock calls, no DBs. That property
- * is why AC0d's prevalence-LOG coverage lives in the sibling
- * executeEvaluation.prevalence-report.unit.test.ts instead of here: observing
- * the log needs a module mock, and this file is the one that stays mock-free.
+ * Settings + workflowId resolution tests for ExecuteEvaluationCommand. All deps injected,
+ * no vi.mock calls, no DBs. Moved from deleted evaluationsWorker integration test.
+ * @see specs/monitors/monitor-execution-backend.feature
  */
 
 import { describe, expect, it } from "vitest";

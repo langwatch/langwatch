@@ -14,17 +14,7 @@ import { SubjectSection } from "./subject-section.tsx";
 type FacetKey = "type" | "subject" | "cadence" | "severity" | "delivery";
 
 /**
- * The main pane, rendered top-to-bottom in ADR-043 facet order:
- * Name → Type → Subject → Cadence → Severity (alerts) → Delivery.
- *
- * Each facet below the name is independently collapsible: everything starts
- * open (so nothing is hidden), and the author can fold a section they're done
- * with down to a one-line summary. Collapses are independent — folding one
- * never moves another, so the page doesn't jump around. Picking the Type first
- * fixes which later facets show and drives every label. Delivery's guided
- * template authoring is the one piece kept behind a secondary drawer so its
- * live preview effect can gate on `section === "configuration"`; picking a
- * channel opens it straight away.
+ * Main pane: collapsible facets in ADR-043 order. Type drives visibility of later facets.
  */
 export function MainSectionList({
   isEdit,

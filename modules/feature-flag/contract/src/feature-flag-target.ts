@@ -1,18 +1,8 @@
 import { z } from "zod";
 
 /**
- * What a flag is being resolved for.
- *
- * The union is explicit so a caller cannot resolve a project-targeted flag
- * by inventing an organization id, or reach a backend kill switch by
- * passing a placeholder identity. Every variant carries exactly the
- * identifiers its targeting rules can match on, and no more. Authenticated
- * transport targets require the project's organization. A few backend
- * callers only know a project id; they still get project rules, but cannot
- * match organization rules until their composition supplies that id.
- *
- * `userId` is not part of the transport input: an authenticated transport
- * derives it from the caller, never from the request body.
+ * What a flag is being resolved for; union ensures callers pass only the
+ * identifiers their targeting rules can match.
  */
 export const authenticatedFeatureFlagTargetInputSchema = z.discriminatedUnion("kind", [
   z.object({

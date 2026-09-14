@@ -1,14 +1,6 @@
 /**
- * A verdict (passed/score) is only real when the evaluator actually ran to
- * completion. Producers may attach `passed: false` alongside `status:
- * "error"` (the SDKs expose them as independent params), and an errored
- * run's verdict must not reach analytics, triggers, or stored rows as a
- * real fail (#6833).
- *
- * Shared by BOTH evaluation folds (`evaluationRun` and the slim
- * `evaluationAnalytics`) and the executeEvaluation command's emit path, so
- * the documented parity invariant — the slim row matches `evaluation_runs`
- * to the cent for the shared fields — holds by construction.
+ * A verdict (passed/score) is only real when the evaluator completed. Errored
+ * runs' verdicts never reach analytics/triggers/stored rows. @see #6833
  */
 
 export type TerminalEvaluationStatus = "processed" | "error" | "skipped";

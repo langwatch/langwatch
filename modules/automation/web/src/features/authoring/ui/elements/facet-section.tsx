@@ -13,16 +13,7 @@ export interface FacetAccordionProps {
 }
 
 /**
- * The bordered panel one facet is authored in (ADR-043). Each facet reads
- * as the same shape — a semibold title, an optional `(?)` tooltip carrying
- * the long explanation (copywriting.md keeps the header short), an optional
- * trailing control, and the facet's fields below.
- *
- * Given an `accordion`, the panel becomes a single-open accordion item: the
- * header is the whole click target, a completed facet shows a green check, and
- * a collapsed one previews its `summary`. Opening one collapses the rest (the
- * main list holds the single-open state). Without it, the panel stays open —
- * the shape the facet component tests render against.
+ * Facet panel: title, optional help and control, fields. Accordion mode with completion indicator.
  */
 export function FacetSection({
   title,

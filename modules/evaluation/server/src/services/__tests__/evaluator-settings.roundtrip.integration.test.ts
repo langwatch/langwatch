@@ -1,22 +1,7 @@
 /**
  * @vitest-environment node
  *
- * langwatch#6397 — the config round-trip against a REAL Postgres.
- *
- * Every other test for this fix fakes `monitors.getMonitorById`, so the stored
- * `config` never actually goes through Prisma and jsonb. That is precisely where
- * a shape bug hides: the defect being fixed IS a shape mismatch between what the
- * write path stores and what the read path expects, and an in-memory object
- * round-trips perfectly whether or not the real column does.
- *
- * The load-bearing case is the FIRST one: a row inserted with raw SQL, in the
- * shape the reporting customer's evaluator is already in. Write-side
- * normalisation was tried and reverted (it broke code evaluators), so NOTHING
- * converts that row — if read-time recovery does not work against it, the fix
- * does not help the person who filed the issue.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the suite
- * stays runnable on a box with no database.
+ * Real Postgres round-trip for config shape recovery (langwatch#6397).
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

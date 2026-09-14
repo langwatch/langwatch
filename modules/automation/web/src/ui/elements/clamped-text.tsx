@@ -1,20 +1,5 @@
-/**
- * Text that is clamped to its cell and readable in full on hover.
- *
- * `platform/app`'s `HoverableBigText` is what the automations list used, and it
- * was REFUSED promotion to the Design System during the shared-component pass:
- * it carries an expand-to-dialog path with a JSON/markdown renderer, and
- * promoting that needs a render-prop seam nobody has designed yet
- * (`dev/docs/plans/ui-family-move-manifests.md`). Every use in this family
- * passed `expandable={false}`, so what this family actually needs is the other
- * half — clamp, measure, and offer the whole string in a tooltip when it does
- * not fit — and that is what this is.
- *
- * The measurement is a post-layout probe rather than a CSS query because there
- * is no CSS query for "was this clamped": the element's scroll size against its
- * offset size is the only thing that knows, and it only knows after the browser
- * has laid the box out.
- */
+// Text clamped to cell with tooltip on hover; unlike HoverableBigText (expand-to-dialog), this
+// just clamps and offers the full string in a tooltip when it doesn't fit.
 
 import { Box, type BoxProps } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";

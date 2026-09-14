@@ -23,25 +23,10 @@ import {
 
 export type VariableInfo = MonacoVariableInfo;
 
-/**
- * Building blocks shared by every notification config stage (email subject,
- * email body, Slack template): a Monaco Liquid editor with autocomplete +
- * unknown-variable validation, a "using default" header with Reset, plus
- * compact preview pieces (`CompactEmailPreview`, `CompactSlackPreview`) —
- * just the rendered output, no surrounding chrome / variable reference /
- * example-data panels. The heavier "variable surface" lives next to each
- * field header as a hover tooltip on `VariableInfoIcon`.
- */
+// Shared building blocks for notification config stages: Monaco Liquid editor with autocomplete
+// + validation, compact preview pieces, variable surface in hover tooltip.
 
-/**
- * Monaco, loaded when a template editor is first opened.
- *
- * `platform/app` reached for its `next/dynamic` compatibility shim, which is
- * `React.lazy` plus a `Suspense` boundary and an `ssr` flag this application
- * has no use for. Those two pieces are written out here rather than importing
- * an application module, and the boundary stays local so a slow editor chunk
- * never blanks the drawer around it.
- */
+// Lazy-load Monaco editor locally (not via platform/app) so slow chunk doesn't blank the drawer.
 const LazyMonacoEditor = lazy(async () => {
   const module = await import("@monaco-editor/react");
   return { default: module.default };
@@ -329,25 +314,8 @@ type SlackBlock = Record<string, unknown>;
  *  re-points the existing popup instead of opening a new one. */
 const SYNCED_BUILDER_WINDOW_NAME = "lwBlockKitBuilder";
 
-/** Compact Slack preview.
- *
- *  - Plain-text mode renders the mrkdwn inline — Slack's mrkdwn rendering
- *    is well-understood and the in-editor preview reads close enough that
- *    it's a useful proof the template parsed correctly.
- *  - Block Kit mode does NOT render the blocks inline. Slack's Block Kit
- *    UI is too distinct to approximate honestly, and a wrong-looking
- *    "preview" is worse than no preview — it gives the author false
- *    confidence in something that won't match Slack. Instead, the surface
- *    confirms how many blocks the JSON produced and offers two ways into
- *    Slack's actual Block Kit Builder:
- *
- *    • Open in Block Kit Builder — one-shot, new tab.
- *    • Open synced Block Kit Builder — named popup we keep a handle to
- *      and re-navigate on every edit so the rendered blocks follow along.
- *      An iframe would be ideal but Slack ships `X-Frame-Options:
- *      SAMEORIGIN`, so popup-sync is the closest live preview we can
- *      offer.
- */
+// Compact Slack preview: plain-text renders mrkdwn inline; Block Kit shows block count + links to
+// Block Kit Builder (one-shot or synced popup that follows edits).
 export function CompactSlackPreview({
   payload,
 }: {
@@ -503,16 +471,8 @@ function SlackTextPreviewCard({ text }: { text: string }) {
   );
 }
 
-/**
- * Translate Slack mrkdwn to CommonMark so we can render it through our
- * standard `<Markdown>` pipeline. Slack's flavour is close to Markdown but
- * not identical — single-asterisk bold, angle-bracket links, mixed-case
- * mentions — so we touch only the syntax that actually differs and let the
- * rest fall through to the Markdown renderer.
- *
- * Intentional non-goals: Slack user/channel mentions (`<@U123>`, `<#C123>`),
- * since the templates we render against don't produce them.
- */
+// Translate Slack mrkdwn to CommonMark for rendering through standard pipeline: handles syntax
+// differences only (bold, links); intentionally skips Slack user/channel mentions.
 function slackMrkdwnToCommonMark(input: string): string {
   return (
     input

@@ -22,15 +22,7 @@ import { describeCron, isValidCron } from "./report-schedule.ts";
 export type { AutomationFilterValue, AutomationFilters };
 
 /**
- * Pure state machine for the staged automation drawer (ADR-036). Lives
- * outside any React component so it can be unit-tested as a normal
- * function. The drawer is just a view onto this state plus a few async
- * effects (preview, test-fire, save) — every other interaction goes
- * through `reducer`.
- *
- * Provider-specific state lives in `draft.slices[action]`; everything in
- * here is provider-agnostic. To add a new action type, register a
- * provider; the reducer doesn't change.
+ * State machine for automation drawer: provider-agnostic logic extracted for unit testing.
  */
 
 export type ConditionSource = "trace" | "customGraph" | "report";
@@ -362,13 +354,7 @@ function templatesFromDraft<C extends ProviderClients>(
 }
 
 /**
- * Build the `automation.testFireTemplate` mutation input from a draft.
- * Extracted from the drawer so the source discriminators are unit-testable:
- * a `customGraph` draft MUST carry a non-null `graphAlert`, and a `report`
- * draft a non-null `report`, or the server renders that template against the
- * TRACE context — producing the blank "Metric / Condition / <|Open dashboard>"
- * message (the field-5015 bug) or a report with every variable empty.
- * Exactly one of the two discriminators is ever non-null.
+ * Builds testFireTemplate input: customGraph needs graphAlert, report needs report (exactly one).
  */
 export interface BuildTestFirePayloadInput<C extends ProviderClients> {
   draft: AutomationDraft<C>;
@@ -496,14 +482,7 @@ export function filterQueryIsSet(filterQuery: string | null): boolean {
 }
 
 /**
- * The "when" facet (ADR-043 Cadence): is the run-trigger timing set?
- * - Automation: always — the digest cadence and settle window carry valid
- *   defaults, so there is nothing to block on.
- * - Alert: a finite threshold to compare the metric against.
- * - Report: a cron the scheduler can actually run, no more often than the
- *   frequency floor. Non-empty is not enough — "every monday" saved an active
- *   report whose scheduler sync then threw, and `* * * * *` scheduled 1440
- *   sends a day to free-form recipients.
+ * Tests run-trigger timing: automation always, alert needs threshold, report needs valid cron.
  */
 export function cadenceIsSet<C extends ProviderClients>(draft: AutomationDraft<C>): boolean {
   if (draft.source === "customGraph") {
@@ -632,19 +611,7 @@ export function extractGraphAlertFromTriggerRow(actionParams: unknown): GraphAle
 }
 
 /**
- * Pull the report content + schedule out of a saved Trigger row's
- * `actionParams` JSON — the inverse of `reportInputFromDraft`, flattened back
- * onto the form-shaped `ReportDraft`. Without it, editing a saved report
- * hydrated an empty draft and Save rewrote the row as a plain automation:
- * schedule and content source gone, the report silently stopped sending.
- *
- * The content source goes through the SSOT `reportSourceSchema` so this can't
- * drift from what the router writes. The schedule is read VERBATIM rather than
- * through `reportScheduleSchema`: a row written before the send-frequency floor
- * existed would fail that schema, and swapping the author's schedule for a
- * default is the same silent-destruction bug in a smaller costume. An invalid
- * cron rehydrates into the field, shows its error, and blocks Save until the
- * author fixes it. Seeded defaults fill only what the row doesn't carry.
+ * Extracts report from Trigger row's actionParams, preserving invalid crons for user correction.
  */
 export function extractReportFromTriggerRow(actionParams: unknown): ReportDraft {
   if (typeof actionParams !== "object" || actionParams === null) {

@@ -3,18 +3,8 @@ import { toEpochMs, type Instant } from "@langwatch/time";
 import { isWithinRolloutPercentage } from "./feature-flag-bucketing.ts";
 
 /**
- * Targeting-rule contract for postgres-backed feature flags.
- *
- * Rules sit on `FeatureFlag.rules` as a JSON array. The store walks
- * them in order at evaluation time; the first rule whose `match`
- * conditions all hold against the calling context wins. When no rule
- * matches, the row's `enabled` boolean is used as the row-level
- * default. When the row itself is missing, the resolver falls
- * through to the registry default.
- *
- * The shape is intentionally open-ended — today it carries `projectId`,
- * `organizationId`, `organizationCreatedAfter` and a whole-percent
- * `percentage`, and can grow further conditions without a schema migration.
+ * Targeting-rule contract for postgres-backed feature flags. Rules are
+ * evaluated in order; first match wins, else fall back to row's enabled.
  */
 
 const KNOWN_MATCH_KEYS = [
@@ -30,13 +20,8 @@ const featureFlagRuleMatchSchema = z
     projectId: z.string().optional(),
     organizationId: z.string().optional(),
     /**
-     * "New users": matches every organization created on or after this
-     * instant, and nobody else. An operator rolling a feature out to new
-     * signups cannot write the ids of organizations that do not exist yet,
-     * so this names one date instead and every later signup matches it
-     * without another edit. Held as a string (an ISO date, `YYYY-MM-DD` from
-     * the Ops UI's date field) because rules live in a JSONB column, where a
-     * Date would round-trip as a string anyway.
+     * "New users": matches organizations created on or after this instant
+     * (ISO date string, YYYY-MM-DD).
      */
     organizationCreatedAfter: z.string().optional(),
     /**
@@ -62,16 +47,8 @@ export const featureFlagRuleSchema = z.object({
 export const featureFlagRulesSchema = z.array(featureFlagRuleSchema);
 
 /**
- * The rules an operator is allowed to WRITE, which is a narrower set than the
- * rules we are willing to READ.
- *
- * `parseRules` must keep accepting whatever is already stored — a row written
- * by a newer version, a row written by hand — so these refinements deliberately
- * do not live on the shared schema. What they catch is a rule that cannot
- * match anything and therefore silently does nothing: matching is exact string
- * equality, so a blank or padded id is a dead rule; comparison is by instant,
- * so is a date that cannot be parsed. Either one leaves an operator watching a
- * rollout that never starts.
+ * Rules operators can write; narrower set than what we read to prevent dead
+ * rules (blank/padded ids or unparseable dates).
  */
 export const featureFlagRulesWriteSchema = featureFlagRulesSchema
   .max(50)
@@ -123,19 +100,8 @@ export interface RuleEvaluationContext {
 }
 
 /**
- * True when this read cannot be answered without knowing how old the
- * organization is, which is the store's signal to resolve
- * `organizationCreatedAt` before evaluating. Asked per read so a flag with no
- * age rule — every kill switch on the per-event hot path — never pays for an
- * organization lookup.
- *
- * The question is about this context, not about the rule list: rules are
- * first-match-wins, so the first rule that can match here also settles the
- * flag here. A rule naming another organization is skipped, and one that
- * matches on conditions the store already holds answers without a date — an
- * age rule below either of those never gets a say, and reading a date for it
- * would put a query on the path of every previously unseen organization to
- * no end.
+ * True when evaluating rules requires knowing organization age; avoids
+ * lookup for flags with no age rules.
  */
 export function readNeedsOrganizationAge({
   rules,
@@ -185,15 +151,8 @@ export function evaluateRules(
 }
 
 /**
- * Compute the "default context" effective value for the Ops listing
- * UI — what a feature-flag check would resolve to for a caller with no
- * project/organization context. This mirrors the resolver chain so the
- * table can't contradict runtime behavior: env override beats any
- * empty-match rule, which beats the row-level toggle, which beats the
- * registry default. Per-target rules (organization, project, percentage)
- * don't fire here because the listing has no tenant and no bucketing
- * subject, which is also why `flagKey` is optional: with no subject a
- * percentage rule cannot match whatever the key is.
+ * Default context effective value for Ops listing UI (no per-target rules
+ * since listing has no tenant).
  */
 export function resolveEffectiveForListing({
   envOverride,
@@ -255,15 +214,8 @@ function matchesContext(
 }
 
 /**
- * Inclusive lower bound on the organization's creation instant: an
- * organization created at any point on the named day matches, because an
- * operator picking a date reads it as "from this day on".
- *
- * Fails closed on every input it cannot compare — an unknown creation date
- * (a read that opted the organization scope out, or a lookup that failed)
- * and an unparseable boundary both return false. The alternative, treating
- * an unreadable condition as no condition, turns one bad rule into a
- * fleet-wide switch.
+ * Inclusive lower bound on organization creation instant; fails closed on
+ * unknown or unparseable dates.
  */
 function isOrganizationNewerThan(
   createdAfter: string,

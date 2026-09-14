@@ -1,17 +1,6 @@
 /**
- * The flags a signed-in browser may resolve.
- *
- * The app's evaluation transport validates its input against this list, so a
- * flag absent here cannot be queried from the browser at all. Every key here
- * is also a registered flag, so the browser can only ask about flags the
- * registry actually defines.
- *
- * Naming: `{type}_{area}_{feature}_{descriptor}`, where type is one of
- * release, experiment, permission or ops, and area is one of ui, api, es or
- * worker. Targeting is per project or organization and is configured as
- * operator-store rules, never in the key.
- *
- * @see ../../adrs/001-feature-flag-service-boundary.md
+ * Flags a signed-in browser may resolve; validated against FEATURE_FLAGS
+ * registry.
  */
 
 import { z } from "zod";

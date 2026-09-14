@@ -15,13 +15,8 @@ export function deriveFeatureFlagEnvVarName(flagKey: string): string {
 }
 
 /**
- * Resolve the environment override for a flag, or `undefined` to fall
- * through to the next resolution step.
- *
- * The derived name accepts only `1` and `0`. A `legacyEnvVar` alias keeps
- * the looser truthy semantics of the pre-registry `if (process.env.X)`
- * checks it replaced, so installations carrying an older variable name keep
- * working: `1`/`true`/anything non-empty is on, and empty/`0`/`false` is off.
+ * Resolve the environment override for a flag; legacy env var keeps
+ * backward compatibility with older truthy semantics.
  */
 export function resolveFeatureFlagEnvOverride({
   read,

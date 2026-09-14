@@ -102,16 +102,7 @@ export interface EvalChipInput {
   label?: string | null;
   /** Explicit pass flag from a numeric/categorical evaluator. */
   passed?: boolean | null;
-  /**
-   * What kind of verdict the evaluator produced, where the caller knows.
-   * `"categorical"` means it answered with a label and neither a number
-   * nor a pass/fail — see {@link EvalChipDisplay.categoryLabel}.
-   *
-   * Worth passing wherever it is known, because `score` alone cannot carry
-   * the distinction: some callers substitute `0` for a score the evaluator
-   * never produced, and a chip reading that as a real zero reports a
-   * failing-looking verdict nobody returned.
-   */
+  /** Verdict type: "numeric", "boolean", or "categorical"; needed for proper display. */
   scoreType?: "numeric" | "boolean" | "categorical" | null;
 }
 
@@ -119,7 +110,7 @@ export interface EvalChipInput {
  *  the trace-list `EvalChip` and the v2 drawer header eval chips so
  *  visuals never drift between surfaces. */
 export interface EvalChipDisplay {
-  /** Mapped onto the v3 status enum so consumers can reuse `EVALUATION_STATUS_COLORS` / `getStatusLabel`. */
+  /** Mapped to v3 status enum; reuses `EVALUATION_STATUS_COLORS` and `getStatusLabel`. */
   status: ParsedEvaluationResult["status"];
   /** Chakra color token for the status dot / accent. */
   color: string;
@@ -216,18 +207,7 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   };
 }
 
-/**
- * A categorising evaluator's verdict IS its label. Return it so callers can
- * show it where the score and the pass/fail would go: both are stand-ins
- * invented for fields it never filled, and printing them claims a run that
- * scored zero and passed.
- *
- * A caller that knows its `scoreType` is believed over `score`, because its
- * `score` may be one of those stand-ins. A caller that doesn't know is read
- * off the raw fields: a label with neither a score nor a verdict beside it
- * came from an evaluator that only categorised. A boolean score is a verdict,
- * so it never reads as a category no matter what it is labelled.
- */
+/** Categorical evaluator label only; score is a stand-in for missing fields. */
 function resolveCategoryLabel({
   input,
   noVerdict,

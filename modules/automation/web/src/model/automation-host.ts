@@ -1,30 +1,5 @@
-/**
- * What the automations screen asks of the application it is mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make this screen
- * untestable outside a running application. It asks this port instead, and the
- * frontend feature that owns it — `apps/ui/src/features/automations` — answers
- * it by adapting the browser capabilities the application already resolves.
- *
- * It lives in `model` because it is a package-wide portable value: types plus
- * the React context they travel in, depending on nothing but React.
- *
- * THE FOURTH FAMILY TO DECLARE THIS SHAPE, after `GovernanceHostPort`,
- * `GatewayHostPort` and `PersonalWorkspaceHostPort`. The comment on the second
- * said a third repeat is the signal to promote them; the third said the same
- * and left it, and so does this one, for the same reason: promotion is a change
- * to four packages this move does not own, and doing it inside a page-family
- * move would hide it. Recorded in `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * What this family asks that the other three did not: `isFeatureEnabled` alone
- * is not enough for the webhook channel. A prefill that names `SEND_WEBHOOK`
- * must not be dropped merely because the flag has not answered yet, so the port
- * hands over the tri-state — `undefined` while the answer is still arriving —
- * and the screen decides. `isFeatureEnabled` stays as the fail-closed reading
- * every other surface wants.
- */
+// Host port for the automations screen; defines browser capabilities the screen needs (React
+// context only, no UI/router/toast imports); supports tri-state feature flag for webhook channel.
 
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { createContext, useContext } from "react";
@@ -85,21 +60,8 @@ export type AutomationFailureNotice = {
   id?: string;
 };
 
-/**
- * The one thing a screen is handed.
- *
- * Methods rather than an object of loose functions, so the adapter is a class
- * the frontend feature constructs once and a test double is an obvious object
- * literal.
- */
-/**
- * The drawers this family serves, by the name the address uses.
- *
- * Named rather than left as a string so a screen cannot address an overlay the
- * composing application does not register — which is the failure this family
- * spent a release inside: `CurrentDrawer` misses, renders null, and there is no
- * error, no toast and no log line.
- */
+// Methods for the automations screen; drawers named by the application to prevent addressing
+// unregistered overlays.
 export type AutomationDrawer = "automation" | "viewAutomation";
 
 /** A dataset the reader created without leaving the automation they were
@@ -146,40 +108,15 @@ export abstract class AutomationHost {
 
   abstract navigate(to: string): void;
 
-  /**
-   * Puts a REGISTERED DRAWER's address in the URL.
-   *
-   * The two editors used to be an overlay of this screen's own, keyed on
-   * `?automation=` and `?viewAutomation=`, because the drawer registry is
-   * application composition a feature-web package may not reach. It still may
-   * not reach it — but it does not have to: the registry is addressed by a
-   * QUERY STRING, and a query string is something the host already writes. So
-   * the screen names the drawer and the host spells the address, which is what
-   * makes `?drawer.open=` the single way any overlay in the product opens
-   * (`dev/docs/best_practices/drawers.md`).
-   *
-   * `params` are the DRAWER'S OWN parameter names, unprefixed — the `drawer.`
-   * vocabulary belongs to the host, which writes `?drawer.open=<drawer>` plus
-   * one `drawer.<name>` per parameter and clears every stale `drawer.*` key,
-   * exactly as `openDrawer` does. The shape the agents, api-key and
-   * model-provider families already state; they call it `openPlatformDrawer`,
-   * a name from when the registry was `platform/app`'s.
-   */
+  /** Put a registered drawer's address in the URL; screen names drawer, host writes
+   *  ?drawer.open and per-drawer parameters. */
   abstract openDrawer(request: {
     drawer: AutomationDrawer;
     params?: Readonly<Record<string, string | undefined>>;
   }): void;
 
-  /**
-   * Hands over to the dataset drawer and comes back, for the one section that
-   * needs a dataset the project does not have yet.
-   */
-  /* `openDrawer` above writes an address and forgets it, which is all a one-way
-     open needs. A sub-flow needs the return trip: the application pushes the
-     dataset drawer onto its navigation stack, reports what was created, and goes
-     back rather than closing the stack out from under this drawer. Naming the
-     capability rather than the drawer keeps another family's overlay out of this
-     package's vocabulary; `returned` runs on BOTH endings. */
+  /** Hands over to dataset drawer and returns with created dataset; reports dataset via
+   *  handover callback and navigates back rather than closing the stack. */
   abstract createDataset(handover: {
     created: (dataset: AutomationDatasetCreation) => void;
     returned: () => void;

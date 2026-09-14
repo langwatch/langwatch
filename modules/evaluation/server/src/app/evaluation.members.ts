@@ -38,13 +38,8 @@ export interface EvaluationInfrastructure {  evaluationCustomEvaluators: Evaluat
 }
 
 /**
- * What a viewer of the trace is allowed to see.
- *
- * Declared here in Evaluation's own vocabulary rather than imported from
- * `@langwatch/trace-server`, which a feature server package may not reach. The
- * one caller that matters passes `INTERNAL_PROTECTIONS` — an evaluation reads
- * the FULL content or it scores a redacted placeholder — so the type states the
- * three flags the read path branches on and nothing else.
+ * Trace view protections for an evaluation read. Declared in Evaluation vocab
+ * rather than imported from trace-server (feature packages may not import).
  */
 export type EvaluationTraceProtections = Readonly<{
   canSeeCosts?: boolean | undefined | null;
@@ -108,14 +103,8 @@ export interface EvaluationLangevals {
 }
 
 /**
- * Resolves the environment an evaluator executes with: the model provider's
- * credentials for the model the settings name, plus whatever the evaluator's
- * own `envVars` declare.
- *
- * A port because the resolution is the MODEL PROVIDER cascade — another
- * feature's server package, and on a managed deployment an Enterprise one.
- * Guessing it would bill a customer's key against a provider they did not
- * choose.
+ * Resolves the environment an evaluator executes with: model provider credentials and
+ * env vars. A port to avoid billing a customer's key against a provider they didn't choose.
  */
 export interface EvaluationModelEnv {
   resolveForEvaluator(params: {
@@ -139,13 +128,8 @@ export interface EvaluationWorkflowExecutor {
 }
 
 /**
- * The two process series an evaluation run reports: how long it took and how it
- * ended.
- *
- * `evaluation_duration_milliseconds` and `evaluation_status_counter` are the
- * names a dashboard already reads, so an implementation must keep them. A
- * process that composes no registry passes nothing and reports nothing, which
- * is a missing series rather than a wrong one.
+ * Reporting interface for evaluation run telemetry: duration and status. Names are
+ * already read by dashboard; implementation must keep them stable.
  */
 export interface EvaluationExecutionTelemetry {
   record(input: {

@@ -1,25 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Worker-pool and memory sizing checks for the evaluations service across every
- * shipped install profile.
- *
- * These are file-content assertions against the real chart values on disk, in
- * the same spirit as stored-objects/__tests__/helm-and-docs-shape.unit.test.ts.
- * The values files ARE the artifact here — what a profile asks for is a fact
- * about its text, not about a render — so reading them is the direct check,
- * not a proxy for one.
- *
- * What this file deliberately does NOT cover is the worker count the chart
- * computes. That is arithmetic over a Kubernetes CPU quantity, and asserting
- * that the template mentions `ceil` would pass just as happily if it said
- * `floor`. It is verified by rendering instead, in
- * charts/langwatch/tests/langevals-sizing.sh, which the chart CI runs on every
- * change under charts/.
- *
- * The figures come from the published images running on a real cluster. See
- * specs/setup/helm-langevals-memory.feature for the measurement table and for
- * why the pool size is the thing that actually governs the footprint.
+ * Worker-pool and memory sizing checks for evaluations service. File-content assertions
+ * against chart values; worker count computation verified separately in langevals-sizing.sh.
+ * @see specs/setup/helm-langevals-memory.feature
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";

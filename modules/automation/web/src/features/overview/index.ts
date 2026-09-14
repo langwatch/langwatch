@@ -1,12 +1,5 @@
-/**
- * The automations overview, as the rest of this package composes it.
- *
- * A private feature's public entry. The list's cells, the activity feed and the
- * use-case strip belong to the screen; what the authoring flow reaches for is
- * the ONE type both halves read — the shape of a saved automation's
- * `actionParams` — which is here rather than in package-global `model` because
- * it is the overview's reading of that column and the two travel together.
- */
+// Public entry point for the automations overview; exports the actionParams shape and activity
+// components shared between overview screen and authoring flow.
 
 export {
   AutomationHistory,

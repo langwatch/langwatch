@@ -10,18 +10,8 @@ import { EvaluationRunProjectionRepository } from "../repositories/evaluation-ru
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
 /**
- * Evaluation's run store, without the execution capability around it.
- *
- * The three methods are byte-for-byte the ones {@link EvaluationService}
- * implements — the same two schema parses before the same two repository
- * calls — because both write the SAME ClickHouse rows. A process that skipped
- * a parse here would store a run the other process could not read back, and a
- * process that chose a different retention default would expire it early.
- *
- * It exists because composing the full service to reach these three would
- * mean handing it an evaluator executor and a Workflow service this path
- * provably never calls, and a graph that names a collaborator it cannot use
- * is how a boot refusal turns into a runtime one.
+ * Run store without execution capability; mirrors {@link EvaluationService}
+ * for ClickHouse consistency.
  */
 export class EvaluationRunProjectionService extends EvaluationRunProjectionRepository {
   static create(options: { repository: EvaluationRunRepository }): EvaluationRunProjectionService {

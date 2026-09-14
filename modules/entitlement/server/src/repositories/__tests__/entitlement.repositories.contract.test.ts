@@ -1,18 +1,7 @@
 /**
  * @vitest-environment node
- * The two entitlement readers' contract. Both interfaces are small, so one
- * file holds both.
- *
- * The memory twin is the only backend registered here, and deliberately so.
- * Neither Prisma repository owns a row: `PrismaUsageMembershipRepository`
- * counts memberships, invites, custom roles and role bindings, and aggregates
- * costs; `PrismaOrganizationSpendRepository` groups those same cost rows over
- * projects. Seeding them would mean this suite writing the identity, role and
- * billing features' tables to assert on a reading it only takes — a fixture
- * that goes stale the moment any of those three change shape. Those readings
- * belong to a suite that owns the rows. Everything the entitlement feature
- * itself decides on top of them is covered by the service and app tests.
- * @see specs/usage-stats-reporting.feature
+ * Contract test: only the memory backend is registered to avoid stale fixtures from
+ * identity/role/billing table changes. @see specs/usage-stats-reporting.feature
  */
 import type { ProjectSpendRollup } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";

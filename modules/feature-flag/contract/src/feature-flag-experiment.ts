@@ -19,17 +19,8 @@ export type ExperimentEvaluationTarget =
   | { kind: "anonymous"; anonymousId: string };
 
 /**
- * Experiment metadata on a flag definition.
- *
- * A flag becomes an experiment by carrying this. `catalogueVersion` is
- * monotonic across the whole registry, so a browser can hold one watermark
- * and still tell whether anything new has appeared.
- *
- * `publicAnonymous` marks the narrow case of an experiment that runs before
- * anyone signs in. Such a flag has no user preference and no tenant scope to
- * consult, so it is decided by base availability and the anonymous bucket
- * alone. It must never guard authentication, entitlements or anything a
- * signed-out visitor should not reach.
+ * Experiment metadata on a flag definition; `publicAnonymous` guards
+ * pre-sign-in experiments only.
  */
 export interface FeatureFlagExperiment {
   /** Shown in the Experiments dialog. Customer-facing copy, not the key. */
@@ -82,13 +73,8 @@ export const experimentDecisionSchema = z.enum([
 ]);
 
 /**
- * One experiment as a viewer sees it.
- *
- * Only experiments whose base availability is true for that viewer appear at
- * all, so registry metadata alone never announces something unreleased. An
- * experiment an owner has switched off stays visible — its base is still
- * available — so the owner can switch it back on and an ordinary member can
- * see why it is off.
+ * One experiment as a viewer sees it (only those with true base availability
+ * for that viewer).
  */
 export interface ExperimentCatalogueEntry {
   key: FrontendFeatureFlag;
@@ -138,19 +124,8 @@ export function isExperimentVisibleToTarget({
 }
 
 /**
- * Effective value of an experiment.
- *
- * Precedence, strongest first:
- *   1. base availability — operator row, targeting rules and rollout. An
- *      unavailable experiment is off for everyone and no lower choice can
- *      revive it.
- *   2. project policy, then organization policy. An explicit `enabled` or
- *      `disabled` at either scope decides, and the project wins over the
- *      organization.
- *   3. the individual's own opt-in.
- *
- * An anonymous target has neither a preference nor a tenant, so availability
- * alone decides it, and only for an experiment marked `publicAnonymous`.
+ * Effective value of an experiment: base availability (operator, targeting,
+ * rollout), then project/org policy, then individual opt-in.
  */
 export function resolveExperimentDecision({
   experiment,
@@ -192,15 +167,8 @@ export function resolveExperimentDecision({
 }
 
 /**
- * Structural rules an experiment definition must satisfy, checked against
- * the registry at import so a bad definition fails the build rather than
- * shipping a half-usable experiment.
- *
- * An experiment is a thing a person turns on for themselves in the browser,
- * so it has to be reachable from the browser (`FRONTEND_FEATURE_FLAGS`) and
- * has to be a PRODUCT flag. A SYSTEM flag is a backend kill switch: it can
- * carry `envOverridable: false` and is resolved on paths that have no person
- * at all, so offering one as a personal choice would be a lie.
+ * Structural rules an experiment definition must satisfy; experiments must be
+ * PRODUCT flags (not SYSTEM) reachable from the browser.
  */
 export function findExperimentDefinitionViolations({
   definitions,

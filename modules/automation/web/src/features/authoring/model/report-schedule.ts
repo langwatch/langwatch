@@ -1,31 +1,13 @@
 import { reportScheduleSchema } from "@langwatch/automation-contract";
 
 /**
- * Pure schedule <-> cron helpers for the Report cadence facet. Kept out of
- * the React component so the round-trip (friendly picker -> cron -> friendly
- * picker) is unit-testable as plain functions.
- *
- * We only speak the three cron shapes the friendly picker emits:
- *   daily    `m h * * *`
- *   weekly   `m h * * D`   (D = 0-6, 0 = Sunday)
- *   monthly  `m h D * *`   (D = 1-31)
- * Any other expression is "custom" — `partsFromCron` returns null so the
- * drawer can drop into the raw-cron editor without losing the value.
+ * Schedule <-> cron helpers: daily/weekly/monthly only; null for custom cron (raw-cron fallback).
  */
 
 export type Frequency = "daily" | "weekly" | "monthly";
 
 /**
- * Why this schedule can't be saved, or null when it's fine. Delegates to the
- * SSOT `reportScheduleSchema` the router validates the upsert with — the same
- * schema proves the cron parses, repeats, and stays above the send-frequency
- * floor, so a schedule the drawer lets you save is a schedule the server
- * accepts and the scheduler can register. Before this, "every monday" saved an
- * active report whose scheduler sync then threw (an orphan report that never
- * sent), and `* * * * *` scheduled 1440 sends a day to free-form recipients.
- *
- * Only the empty case is worded here — an empty field is a not-yet, not a
- * mistake, and the schema's "at least 1 character" is the wrong thing to say.
+ * Returns validation error or null. Server accepts what this schema lets the drawer save.
  */
 export function cronScheduleError({
   cron,

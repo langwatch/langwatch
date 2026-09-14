@@ -30,15 +30,7 @@ function bundlesMatches({ cadence, canBatch }: FiringRateInput): boolean {
 }
 
 /**
- * How many times a day the automation acts, as a raw number.
- *
- * A trace automation matches once per incoming trace, but how often it actually
- * *notifies* depends on the cadence: an immediate (or persist-class) automation
- * fires once per match, whereas a digest cadence bundles every match inside its
- * window into a single notification — so the notification rate is capped at one
- * per window. `canBatch` is false for persist-class actions (dataset / annotation
- * writes), which always fire per match regardless of cadence, which is why for
- * those this is also the matches-per-day estimate the daily ceiling counts.
+ * Automation firing rate per day: immediate fires per match, digest bundles matches per window.
  */
 export function estimateRatePerDay(input: FiringRateInput): number {
   const matchesPerDay = input.matchesLast7Days / 7;

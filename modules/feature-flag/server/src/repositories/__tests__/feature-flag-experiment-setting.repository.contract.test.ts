@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- * The experiment-setting contract, stated once and run against both backends:
- * the memory twin always, and the Postgres one when a test database is named
- * at `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
- *
- * Every read names its flags and its subjects, so a run's own prefix is all
- * the isolation the cases need in a shared database.
- * @see specs/feature-flag.feature
+ * Experiment-setting contract run against both memory and Postgres backends
+ * (when test database configured).
  */
 import {
   PrismaConfigService,

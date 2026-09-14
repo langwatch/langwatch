@@ -34,16 +34,7 @@ const OPERATOR_LABEL: Record<ConditionOperator, string> = {
 };
 
 /**
- * The non-prefix fields, in the same order and labelling the traces
- * autocomplete uses, so the builder's field list reads identically.
- *
- * Read straight off `@langwatch/trace-contract` rather than through the traces
- * view's `getFieldSuggestions`, which is `platform/app` source this package may
- * not reach. That helper ranks candidates against a typed query and the builder
- * always passed an empty one, so what it contributed here was the contract's
- * own order and labels — which is exactly what this is. The dynamic prefixes it
- * also returns are filtered out there and absent here for the same reason: a
- * prefix is not a field a row can be built on.
+ * Field options from trace-contract in autocomplete order; prefixes excluded (unusable as fields).
  */
 const FIELD_OPTIONS = FIELD_NAMES.map((name) => ({
   value: name,
@@ -56,15 +47,7 @@ const MAX_VALUE_SUGGESTIONS = 10;
 const FIELD_COLLECTION = createListCollection({ items: FIELD_OPTIONS });
 
 /**
- * The structured, no-code front-end over the trace query language. Rows are
- * `field · operator · value`, joined by AND — the common case people reach for.
- * It reads and writes the SAME query string the Code editor shows (via
- * `conditionQuery`), so the two are always in sync and switching between them
- * never loses anything the builder can represent.
- *
- * Anything the builder can't represent (OR, grouping, free-text) keeps the
- * user in Code mode upstream; this component is only mounted for a structurable
- * query, and defends the invariant by ignoring an unparseable incoming value.
+ * Condition builder: field · operator · value rows, AND-joined. Synced with Code editor query.
  */
 export function ConditionBuilder({
   query,

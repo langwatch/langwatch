@@ -27,14 +27,7 @@ export interface DailyCapAdvice {
 }
 
 /**
- * Whether the drafted automation should be told it would outrun the plan's
- * daily action ceiling, and the two numbers the warning quotes.
- *
- * This is advice, never a gate: every missing or unusable input returns null,
- * so a failed preview, a failed cap read, or an action the ceiling does not
- * govern all mean the author sees nothing extra and saves exactly as before.
- * The comparison uses the rounded estimate so the warning never claims that
- * "about 100 a day" is over a limit of 100.
+ * Advice on daily ceiling overflow; null if inputs missing or unusable. Uses rounded estimates.
  */
 export function dailyCapAdvice({
   action,

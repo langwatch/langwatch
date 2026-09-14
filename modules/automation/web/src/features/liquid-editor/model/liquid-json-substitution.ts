@@ -1,28 +1,5 @@
-/**
- * Strips Liquid expressions out of a `liquid-json` source string by replacing
- * each `{{ ... }}` / `{% ... %}` span with a same-length placeholder that
- * parses as valid JSON in its context. Because every replacement preserves
- * length and newline placement, any (line, column) the JSON language service
- * computes on the substituted text matches the same position in the original
- * text — the editor's schema markers map back 1:1 without an offset table.
- *
- * Heuristics for what to substitute with:
- *
- * • `{{ expr }}` *inside* a JSON string → fill non-newline chars with `_`.
- *   The surrounding string stays well-formed; the schema sees a longer string.
- *
- * • `{{ expr }}` *outside* a string (a JSON value slot) → wrap in quotes so
- *   the slot becomes a string literal: `"_____"`. Block Kit values that admit
- *   Liquid expressions are always strings, so the schema accepts it. (If the
- *   user puts Liquid where a non-string was required, the schema will flag
- *   "expected X got string" — accurate enough.)
- *
- * • `{% tag %}` → fill non-newline chars with ` `. Tags read as whitespace,
- *   which JSON ignores. A `{% for %}…{% endfor %}` wrapping structural JSON
- *   may still produce invalid JSON (e.g. trailing commas); that's the
- *   inherent limit of static validation over a dynamic template and the
- *   resulting marker is on real syntax the user can act on.
- */
+// Strip Liquid expressions by replacing {{ ... }} / {% ... %} with same-length placeholders
+// that parse as valid JSON; preserves (line, column) positions for 1:1 mapping to original text.
 
 export interface LiquidSubstitutionResult {
   /** Same-length copy of the source with Liquid spans neutralised. */

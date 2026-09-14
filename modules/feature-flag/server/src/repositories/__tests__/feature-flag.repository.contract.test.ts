@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
- * The operator-row contract, stated once and run against both backends: the
- * memory twin always, and the Postgres one when a test database is named at
- * `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
- *
- * The FeatureFlag table is cluster-wide and `findAll` reads all of it, so the
- * cases narrow the listing to this run's own keys: in a shared database the
- * rows an installation already carries are not this suite's to reason about.
- * @see specs/feature-flag.feature
+ * Operator-row contract run against both memory and Postgres backends
+ * (when test database configured).
  */
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import {

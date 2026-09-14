@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
  * Integration tests for ExecuteEvaluationCommand — Azure Safety BYOK gate.
- *
- * Covers @integration scenarios from specs/evaluators/azure-safety-byok-gating.feature:
- * - "ON_MESSAGE monitor using azure/content_safety without provider emits skipped"
- * - "ON_MESSAGE monitor using azure/prompt_injection without provider emits skipped"
- * - "ON_MESSAGE monitor using azure/jailbreak without provider emits skipped"
- * - "Configured Azure provider passes keys to langevals at runtime"
+ * @see specs/evaluators/azure-safety-byok-gating.feature
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

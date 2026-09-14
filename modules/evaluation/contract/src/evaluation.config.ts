@@ -2,13 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * Where the evaluator service answers.
- *
- * Absent composes no evaluator runtime at all, which is a supported
- * read-only shape, so absence is not a boot failure. Which environment
- * variables a given evaluator needs is registry data, not configuration: the
- * process answers "is this one set" over its own environment rather than
- * enumerating names no schema could know in advance.
+ * Evaluator service endpoint. Absence composes no runtime and is not a boot
+ * failure; it's a supported read-only shape. Env vars are registry data, not config.
  */
 export const evaluationServerConfigDefinition = RuntimeConfig.define({
   langevalsEndpoint: Config.value(z.string().optional(), { env: "LANGEVALS_ENDPOINT" }),
