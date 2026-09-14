@@ -1,15 +1,5 @@
-/**
- * Reading a graph trigger's series, and what happens when the read is refused.
- *
- * A graph grouped by something high-cardinality can ask analytics for more
- * rows than the ceiling allows. That is a configuration the customer can fix,
- * not a fault, so it becomes a SKIPPED evaluation with a reason — the trigger
- * stays alive and the evaluation loop keeps running.
- *
- * The other half matters more: every other failure has to keep propagating. A
- * classification that widened to catch them would turn a real outage into a
- * quiet "skipped" and the trigger would simply stop alerting.
- */
+// Reading graph trigger series; distinguish cardinality overflow (SKIPPED) from
+// real failures (propagate) to avoid hiding outages.
 
 import { describe, expect, it } from "vitest";
 import { GraphTriggerSeriesEvaluationService } from "../graph-trigger-series-evaluation.service.ts";

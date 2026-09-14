@@ -1,18 +1,5 @@
-/**
- * A webhook action's secrets, on the way in and on the way back out.
- *
- * Header values and the signing secret are customer secrets. They are stored
- * encrypted, and what comes back to the settings screen is the marker
- * `__kept__` rather than the value — so the screen can show that a header
- * exists without ever handing it back. If that redaction stopped happening,
- * every read of an automation would return the secrets in plaintext.
- *
- * The marker doubles as the write protocol: a form that submits `__kept__`
- * back is saying "leave this one alone". That makes the redact/persist pair a
- * round trip, and the one case it must refuse is a `__kept__` arriving
- * alongside a CHANGED url — because "leave it alone" would then silently send
- * the old destination's credentials to a new one.
- */
+// Webhook secrets are encrypted and redacted with __kept__ marker; this also
+// serves as the write protocol (leave alone). Must refuse __kept__ with changed URL.
 
 import { describe, expect, it } from "vitest";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";

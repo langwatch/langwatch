@@ -6,22 +6,8 @@ import type {
 } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 
-/**
- * Everything trigger settlement asks Automation for, and nothing else.
- *
- * The dispatch service used to name the whole `AutomationService` — forty-four
- * methods over report schedules, template test fires, unsubscribe views and the
- * automation CRUD — to reach these ten. A process that wanted to settle a match
- * therefore had to compose all of it or none, which is the same cycle
- * `AutomationGraphActivity` broke for the real-time graph path and it is
- * broken here the same way: the published `AutomationService` satisfies this
- * port structurally, so the application passes exactly what it passed before,
- * while a background process composes the ten over its own repositories.
- *
- * The ten are three separate concerns and they are listed in that order: the
- * trigger catalogue and the per-recipient send claims, the daily persist
- * ceiling, and the webhook delivery log.
- */
+// Port for trigger settlement; extracts the ten methods it needs from the full
+// AutomationService into three concerns: triggers + send claims, persist ceiling, webhook log.
 export abstract class AutomationSettlementLedger {
   /** The project's active trace automations, as the settled digest re-reads them. */
   abstract getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
@@ -78,15 +64,8 @@ export abstract class AutomationSettlementLedger {
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision>;
 
-  /**
-   * Contains an automation that ran past its ceiling.
-   *
-   * Reached at most once per page and behind the caller's own try/catch, which
-   * is why a process that composes no runaway notifier may refuse it by name:
-   * the matches are still skipped and the skip is still logged with the project,
-   * the trigger and the count — what is lost is the mail to the organization's
-   * admins and the auto-pause, not the containment.
-   */
+  // Contains an automation that ran past its cap; containment is mandatory but
+  // the notifier (mail + auto-pause) is optional.
   abstract handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void>;
 }
 

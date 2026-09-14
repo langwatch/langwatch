@@ -12,17 +12,8 @@ const logger = createLogger("langwatch:triggers:slackWebApi");
 const CHAT_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
 const CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list";
 
-/**
- * The Slack Web API calls are the last outbound sends that ran without a
- * pinned validator, which left them on the default env-gated policy and
- * following up to ten redirects — the weakest of the three callers of the
- * shared transport, and the one carrying a customer's bot token.
- *
- * Both destinations are constants under `slack.com`, and both answer a POST
- * with 200 directly, so refusing redirects costs nothing: a 3xx here would
- * mean the host is not the Slack we compiled in, which is precisely the case
- * where the token must not be re-sent.
- */
+// Slack Web API calls carry bot tokens, so they must refuse redirects to
+// prevent re-sending a token if the URL has changed.
 export interface SlackApiTransport {
   request(input: {
     url: string;
@@ -57,19 +48,8 @@ interface SlackApiResponse {
   response_metadata?: { messages?: string[] };
 }
 
-/**
- * Turn a raw Slack `chat.postMessage` error code into a message that tells the
- * author what to actually do. The bare codes (`not_in_channel`,
- * `channel_not_found`) are the top setup snags and read as opaque in a toast —
- * a bot posting to a public channel it hasn't joined needs either an invite or
- * the `chat:write.public` scope, and a bad channel value needs the picker.
- *
- * `null` for a code with no remediation we can vouch for. The caller ships this
- * to the customer verbatim, so anything returned here has to be a sentence
- * written FOR one — and `ratelimited` or `fatal_error` is a provider slug, not
- * copy. Those get the registry's own "Check the destination and try again."
- * instead; the code still travels in the log line.
- */
+// Translate Slack error codes to customer-safe remediation copy; null for
+// codes without actionable guidance.
 function findSlackPostErrorRemediation(code: string): string | null {
   switch (code) {
     case "not_in_channel":
@@ -90,20 +70,8 @@ function findSlackPostErrorRemediation(code: string): string | null {
   }
 }
 
-/**
- * Post a message through the Slack Web API (`chat.postMessage`) with a bot
- * token — the delivery surface that renders the newer Block Kit blocks (charts,
- * tables, alerts) that incoming webhooks reject.
- *
- * A thin Slack-specific layer over the shared {@link sendHttpDestination}
- * primitive (ADR-040): the primitive owns the SSRF-fenced transport, timeout,
- * and retryable/terminal classification of transport failures; this layer adds
- * the bearer auth + JSON body and interprets Slack's response. `chat.postMessage`
- * returns HTTP 200 even on logical failure, carrying the real outcome in the
- * JSON `ok` flag, so success is decided off the body — and the Slack error code
- * (plus any `response_metadata.messages`, e.g. the exact invalid block) is
- * surfaced and re-classified for the outbox drainer.
- */
+// Post a message via Slack Web API with a bot token; thin layer over
+// {@link sendHttpDestination} (ADR-040) that interprets Slack's response.
 async function postSlackChatMessage(
   {
     token,
@@ -158,17 +126,8 @@ async function postSlackChatMessage(
   throw new DispatchError({
     message: `${label}: ${explanation ?? `Slack rejected the message: ${code}`}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
-    // Slack told us what the admin has to do; that sentence is the whole value
-    // of this failure, so it travels to them. Capitalised because
-    // `findSlackPostErrorRemediation` writes a clause to follow the label, and this is
-    // read on its own. `label` and `detail` stay behind: one names an internal
-    // dispatcher, the other is raw provider metadata.
-    //
-    // Only when there IS one. Omitting the property is what makes the registry
-    // fall back to its own copy for `notification_delivery_error` — see
-    // NotificationDeliveryError. Sending `Slack rejected the message:
-    // ratelimited` instead would put a provider slug in front of a customer,
-    // which is neither remediation nor English.
+    // Include Slack's remediation when available; omit to let the registry
+    // fall back to its own copy, avoiding provider slugs in customer-facing copy.
     ...(explanation
       ? {
           customerMessage: `${explanation.charAt(0).toUpperCase()}${explanation.slice(1)}`,
@@ -277,17 +236,8 @@ async function listChannelsForTypes(
   return done(null, ["page_cap"]);
 }
 
-/**
- * List the channels a bot token can see (`conversations.list`) so the config
- * form can offer a channel picker.
- *
- * Slack rejects the WHOLE request with `missing_scope` if ANY requested type
- * lacks its scope — so asking for `private_channel` (needs `groups:read`) fails
- * outright for an app that only has `channels:read`, taking the public channels
- * down with it. We degrade instead: try public+private, and on `missing_scope`
- * retry public-only. An app with just `channels:read` then still gets its public
- * channels; only an app missing `channels:read` too ends up with `missing_scope`.
- */
+// List channels for the config form's channel picker; degrade to public-only
+// on missing_scope to avoid losing all channels when private_channel scope is denied.
 async function listSlackChannels(
   token: string,
   transport: SlackApiTransport,

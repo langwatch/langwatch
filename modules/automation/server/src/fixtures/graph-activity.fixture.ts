@@ -7,16 +7,8 @@ import {
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
-/**
- * The rows and collaborators the graph-alert vertical touches, and nothing
- * else.
- *
- * This is a stand-in for a Prisma client rather than an in-memory Prisma: it
- * answers exactly the queries the composed path makes, in the shapes those
- * repositories ask for. Anything the path does not reach is absent, so a
- * future change that reaches for a table this vertical was not supposed to
- * need fails here rather than passing against a permissive double.
- */
+// Strict Prisma double for graph-alert vertical; fails on queries it should not
+// need.
 
 export type TriggerRow = Record<string, unknown>;
 

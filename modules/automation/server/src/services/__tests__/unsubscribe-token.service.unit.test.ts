@@ -2,16 +2,8 @@ import { describe, expect, it } from "vitest";
 import { TriggerNoReplyService, TriggerNoReplyWarning } from "../trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "../unsubscribe-token.service.ts";
 
-/**
- * Spec: modules/automation/specs/unsubscribe-token-twin.feature
- *
- * The tokens and addresses below were RECORDED from
- * `platform/app/src/server/mailer/unsubscribeToken.ts` and
- * `platform/app/src/server/mailer/triggerNoReply.ts` under the key spelled
- * here. They are literals on purpose: a token minted by one process is read by
- * the other, out of somebody's inbox, and re-deriving the expectation from the
- * module under test would assert only that it agrees with itself.
- */
+// Spec: modules/automation/specs/unsubscribe-token-twin.feature
+// Tokens recorded from platform mailer; hardcoded to verify cross-module compatibility.
 const SHARED_KEY = "0f".repeat(32);
 
 const APPLICATION_TRIGGER_TOKEN =

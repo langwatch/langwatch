@@ -60,15 +60,8 @@ export interface PersistPage {
   pageKey: string;
 }
 
-/**
- * When a trigger's matches settle, and what is carried until they do.
- *
- * Matches arrive continuously and are notified in batches, so this holds the
- * pending set and the boundary it drains at. The two bounds are the point:
- * pending matches are capped, and a drain is paged, because a trigger that
- * matched a whole backfill must not turn one notification into an unbounded
- * read.
- */
+// When trigger matches settle; holds pending set and drain boundary to cap
+// reads and notifications.
 export class TriggerSettlement {
   private static computeScheduledFor({
     action,

@@ -1,14 +1,5 @@
-/**
- * Per-project error isolation for the graph-trigger heartbeat.
- *
- * The heartbeat is the ONLY path that fires no-data alerts and resolves
- * firing alerts when traffic stops. A tick that aborts on the first project's
- * transient error therefore silences absence alerts for EVERY project for as
- * long as that error persists — a silent, cross-tenant outage.
- *
- * The per-project candidate load is isolated: a failure logs and the tick
- * continues with the next project.
- */
+// Per-project error isolation for the heartbeat; a failure must not silence
+// no-data alerts for all projects.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {

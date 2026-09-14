@@ -17,15 +17,8 @@ import { PrismaAutomationGraphDeliveryRepository } from "./prisma.automation-gra
 import { AutomationSlackSecretsService, AutomationSlackBotTokenDecryptorService, type AutomationSecretCrypto } from "../../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 
-/**
- * The tables this vertical reads and writes, and no others.
- *
- * Derived from the client rather than restated, so it cannot drift from the
- * schema; narrowed rather than passed whole, so a composition root can hand
- * its one typed client down WITHOUT naming generated Prisma itself. That is
- * the containment rule working: `PrismaClient` is named here, in the Postgres
- * adapter, and nowhere above it.
- */
+// Restricted Pick of PrismaClient; containment rule — PrismaClient named only
+// here and in the adapter.
 export type AutomationGraphActivityDatabase = Pick<
   PrismaClient,
   | "trigger"

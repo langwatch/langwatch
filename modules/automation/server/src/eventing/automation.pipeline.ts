@@ -143,24 +143,8 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
                           },
                         ),
                       ),
-                      // The message key is what the outbox dedups on, so it
-                      // decides how many DURABLE ROWS a log line costs. Keyed on
-                      // the cumulative counter it was unique every single time,
-                      // which meant one row per overflowed match: 119,665 rows in
-                      // one project-day, whose entire content was "we flushed
-                      // early again". Keyed on the trigger and the minute of
-                      // EVENT time, a storm coalesces to at most one row per
-                      // trigger per minute, and a redelivery of the same event
-                      // produces a byte-identical key so it dedups rather than
-                      // adding a row. The payload still carries the running
-                      // total, so the storm rate is recoverable from any single
-                      // surviving row.
-                      //
-                      // A key written here only has to be unique inside ONE
-                      // trigger: the outbox unique index is (processName,
-                      // projectId, messageKey), and the runtime prefixes every
-                      // builder-authored key with `process:<processKey>:`, so
-                      // two triggers never collide on identical bodies.
+                      // Message key for outbox deduplication; keyed on trigger +
+                      // minute to coalesce storms to one row per trigger per minute.
                       ctx.intents.logOverflow(
                         `overflow:${ctx.key}:${Math.floor(ctx.at / 60_000)}`,
                         {

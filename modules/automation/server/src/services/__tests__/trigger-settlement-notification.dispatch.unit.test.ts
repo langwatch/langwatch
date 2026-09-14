@@ -1,16 +1,5 @@
-/**
- * What `dispatch` refuses to send, and what it never sends twice.
- *
- * A settlement notification is a customer-visible email, Slack message or
- * webhook, dispatched from a queue that can redeliver. Everything asserted here
- * is a reason a trace should NOT produce one — a trigger switched off since the
- * match, a fold that has since gone, a confirmation that no longer holds, and a
- * trace already claimed by an earlier send. Each is a silent skip in the middle
- * of a loop, which is exactly the kind of thing a rewrite drops.
- *
- * The one loud path is a missing project: that raises a DispatchError marked
- * non-retryable, so the queue stops rather than redelivering forever.
- */
+// What dispatch refuses to send (idempotent skips) and what it never sends
+// twice; only missing project raises non-retryable DispatchError.
 
 import { describe, expect, it } from "vitest";
 import { TriggerSettlementNotificationService } from "../trigger-settlement-notification.service.ts";

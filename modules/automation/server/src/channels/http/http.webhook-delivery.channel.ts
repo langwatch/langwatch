@@ -66,19 +66,8 @@ function findFailureResponse({
   };
 }
 
-/**
- * Send one webhook dispatch AND record its outcome to the delivery log
- * (ADR-040 §5 + §6) as a single unit: on 2xx a `success` row, on a classified
- * non-2xx a `retryable`/`terminal` row, on a transport/SSRF throw a row with
- * the error and no status. A failed attempt keeps the receiver's truncated
- * response (body + headers) VERBATIM for debugging — industry-baseline
- * plaintext, deliberately unredacted (ADR-040 §6: what the receiver echoes
- * is the receiver's own output; our request content is never stored at all),
- * deleted with the row by the prune. The classified DispatchError is always
- * re-thrown so the outbox retry contract is unchanged — logging is a side
- * effect that never swallows a dispatch failure, and a logging failure never
- * breaks dispatch.
- */
+// Send one webhook dispatch and record the outcome (ADR-040 §5+§6) as a
+// single unit; logging is a side effect and never breaks dispatch.
 async function deliverWebhook({
   transport,
   recorder,

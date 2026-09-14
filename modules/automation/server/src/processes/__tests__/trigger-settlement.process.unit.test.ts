@@ -330,15 +330,8 @@ describe("trigger settlement process", () => {
         ]);
       });
 
-      // The overflow entry is a log line, so it must cost about as much as a
-      // log line. Keyed on the cumulative flush counter it was unique on every
-      // single flush, so the outbox's own dedup could never collapse it and a
-      // storm wrote one durable row per overflowed match (119,665 rows in one
-      // project-day in production). Keyed on the trigger and the minute of
-      // event time, the same storm writes at most one row per trigger per
-      // minute — and because the key reads EVENT time rather than wall time,
-      // a redelivery of the same event produces a byte-identical key and
-      // dedups instead of adding a row.
+      // Keyed on trigger + event minute to coalesce storms to one row per
+      // minute, deduplicated on redelivery.
       it("keys the overflow entry per trigger per minute so a storm coalesces", () => {
         const definition = automationProcessDefinition({
           name: "triggerSettlement",

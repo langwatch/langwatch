@@ -1,18 +1,5 @@
-/**
- * Sending one graph alert, once.
- *
- * The behaviour worth guarding is what happens on a retry. A fire is claimed
- * PER RECIPIENT, so a delivery that emailed two of three addresses and then
- * failed does not email those two again when the intent is retried — and the
- * third still gets theirs. Both halves matter: a claim that is too coarse
- * loses recipients, one that is too fine sends duplicates.
- *
- * The other is the cap. When an alert is dropped for exceeding its hourly or
- * daily allowance the result says `didSend: true` — not because anything was
- * sent, but because the send is SETTLED and must not be retried. Returning
- * false there would put the alert back on the queue to be dropped again,
- * forever.
- */
+// Sending one graph alert once; guard per-recipient claims for idempotent
+// retries and return didSend: true on cap to prevent infinite retries.
 
 import { describe, expect, it } from "vitest";
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
