@@ -182,16 +182,17 @@ const DISPATCH_LAG_RETRY_MS = 400;
  * How many attempts may pass with NO evidence that waiting can help before we
  * conclude the id is simply unknown.
  *
- * It cannot be zero: the evidence — the aggregate's events, or the legacy
- * pending-handoff row — is written by the very dispatch we are waiting on
- * (commands are queued, so even the event append trails the accept). A read
- * that arrives before it lands finds nothing, and a couple of beats of grace
- * is the difference between "no create is in flight" and "the create is a
- * few milliseconds younger than this read". It is also the SAME exit for
- * absent, foreign and archived ids alike, so an id nobody may see never
- * answers on a different clock than an id that does not exist.
+ * It cannot be zero: the evidence — the aggregate's events — is written by
+ * the very dispatch we are waiting on (commands are queued, so the event
+ * append trails the accept). A read that arrives before it lands finds
+ * nothing, and a couple of beats of grace is the difference between "no
+ * create is in flight" and "the create is a few milliseconds younger than
+ * this read". It is also the SAME exit for absent, foreign and archived ids
+ * alike — and for a reader outage, which can establish nothing — so an id
+ * nobody may see never answers on a different clock than an id that does
+ * not exist.
  */
-const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
+const DISPATCH_EVIDENCE_GRACE_ATTEMPTS = 3;
 
 const conversationServiceLogger = createLogger(
   "langwatch:langy:conversation-service",
@@ -473,7 +474,7 @@ export class LangyConversationService {
       waitOutFullBudget =
         waitOutFullBudget ||
         (await this.dispatchInFlightEvidence({ id, projectId, userId }));
-      if (!waitOutFullBudget && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
+      if (!waitOutFullBudget && attempt >= DISPATCH_EVIDENCE_GRACE_ATTEMPTS) {
         return null;
       }
 
@@ -489,18 +490,22 @@ export class LangyConversationService {
    * Whether a projection miss is worth waiting out — the answer to "will
    * this caller's `findVisibleById` succeed once the fold catches up?".
    *
-   * The preferred source is the canonical event log, the very record the
+   * The ONLY source is the canonical event log, the very record the
    * projection is folded FROM: owned-or-shared and not archived means the
    * visible row WILL land (`eventLogSaysVisible`), anything else means
    * waiting cannot help. An EMPTY log is "no evidence", not "no
    * conversation" — the caller re-asks each beat of its grace window because
    * the append itself may be a few milliseconds younger than this read.
    *
-   * Without a reader (event sourcing disabled), or when the log read fails,
-   * the legacy heuristic stands in: a pending handoff on the projection row
-   * proves a dispatch is in flight. It says nothing about visibility — but
-   * evidence here only extends the wait, and the retried projection read is
-   * what enforces visibility, so the fallback never widens access.
+   * No reader (event sourcing disabled) and a failed log read both answer
+   * "no evidence", never a guess: only evidence that ESTABLISHES the
+   * caller's visibility may extend the wait, or the window itself becomes a
+   * timing signal — a pending handoff, say, proves a dispatch is in flight
+   * for SOMEONE, and stretching a foreign caller's miss on it would tell
+   * them the id exists. Failing toward the short grace costs one thing: a
+   * fresh read during a reader outage can 404 early — which the client
+   * absorbs, because an unconfirmed conversation's poll keeps re-asking
+   * until the projection answers (`useLangyMessages`).
    */
   private async dispatchInFlightEvidence({
     id,
@@ -511,30 +516,26 @@ export class LangyConversationService {
     projectId: string;
     userId: string;
   }): Promise<boolean> {
-    if (this.events) {
-      try {
-        const events = await this.events.getEventsOccurredSince(
-          id,
-          { tenantId: createTenantId(projectId) },
-          "langy_conversation",
-          0,
-        );
-        return events.length > 0 && eventLogSaysVisible(events, userId);
-      } catch (error) {
-        conversationServiceLogger.warn(
-          {
-            projectId,
-            conversationId: id,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Event-log evidence read failed during the dispatch window — falling back to the pending-handoff heuristic",
-        );
-      }
+    if (!this.events) return false;
+    try {
+      const events = await this.events.getEventsOccurredSince(
+        id,
+        { tenantId: createTenantId(projectId) },
+        "langy_conversation",
+        0,
+      );
+      return events.length > 0 && eventLogSaysVisible(events, userId);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        {
+          projectId,
+          conversationId: id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Event-log evidence read failed during the dispatch window — treating as no evidence (short grace)",
+      );
+      return false;
     }
-    const handoff = await this.repository
-      .findPendingHandoff({ projectId, conversationId: id })
-      .catch(() => null);
-    return handoff !== null;
   }
 
   /**
