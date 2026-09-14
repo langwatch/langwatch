@@ -379,10 +379,6 @@ const LEGACY_INERT: string[] = [
   "specs/claude/drive-pr.feature",
   "specs/claude/telemetry-turn-bounding.feature",
   "specs/coding-agent/personal-usage.feature",
-  // Written spec-first under ADR-132, ahead of any pi code. Every scenario is
-  // @unimplemented on purpose. Retire this entry in the same pull request, on
-  // the commit that binds the first pi scenario.
-  "specs/coding-agent/pi-session-capture.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
   "specs/data-retention/monitoring.feature",

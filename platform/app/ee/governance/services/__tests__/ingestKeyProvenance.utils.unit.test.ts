@@ -32,6 +32,7 @@ describe("originForIngestSourceType", () => {
       "gemini",
       "opencode",
       "cursor",
+      "pi",
     ])("maps %s to coding_agent", (sourceType) => {
       expect(originForIngestSourceType(sourceType)).toBe(
         CODING_AGENT_ORIGIN_VALUE,

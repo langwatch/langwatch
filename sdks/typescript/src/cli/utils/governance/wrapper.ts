@@ -30,6 +30,8 @@ import {
 	copilotPrespawnWarnings,
 } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
+import { createPiCapture, type PiCapture } from "./pi-capture";
+import { resolvePiSessionDir } from "./pi-session-dir";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
 	maybeOfferIngestionShellRcPersist,
@@ -52,6 +54,16 @@ import {
  * runs, streaming each completed turn's I/O instead of one burst on exit.
  */
 const CODEX_IO_POLL_MS = 2_500;
+
+/**
+ * How often the wrapper re-reads pi's session file while the session runs.
+ *
+ * The same cadence as codex, and for the same reason: often enough that a turn
+ * appears in the product while the developer is still looking at it, rarely
+ * enough that a poll of a few appended lines is nothing next to the work pi is
+ * doing between them.
+ */
+const PI_SESSION_POLL_MS = 2_500;
 
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
 const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
@@ -770,6 +782,69 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		codexPoll.unref?.();
 	}
 
+	// pi ships no exporter at all, and its child is deliberately handed no
+	// endpoint and no token (ADR-132 revision v9), so its session file is not
+	// one capture path among several — it is the only one there is. Poll it
+	// while pi runs, on the same shape codex uses above.
+	//
+	// Started with NO test on `modeResult.mode`, unlike codex. pi ignores
+	// base-URL environment variables entirely (revision v10), so there is no
+	// gateway run of pi that a mode gate would be protecting from
+	// double-tracing: the condition would be true on every run today, and the
+	// day the policy changed it would turn all capture off in silence, for
+	// exactly the users holding keys. What capture actually needs is somewhere
+	// to post to, so that is what is checked — and it says so rather than going
+	// quiet, because pi has no second path to fall back on.
+	let piCapture: PiCapture | null = null;
+	let piPoll: ReturnType<typeof setInterval> | null = null;
+	if (tool === "pi") {
+		if (modeResult.endpoint && modeResult.ingestionToken) {
+			const capture = createPiCapture({
+				// Stamped before the spawn: a session file untouched since then is
+				// one this run never wrote to, and belongs to nobody's launch of ours.
+				sinceMs: sessionStartMs,
+				sessionsDir: await resolvePiSessionDir({
+					toolArgs,
+					env: process.env,
+				}),
+				// Events, never spans: a pi turn on both lanes would be counted twice.
+				logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
+				token: modeResult.ingestionToken,
+			});
+			piCapture = capture;
+			let inFlight = false;
+			piPoll = setInterval(() => {
+				// Skip a tick while the previous pass is still running - and NOT for
+				// the reason the codex block gives. A codex harvest is stateless and
+				// its span ids are trace-id-derived, so overlap there merely wastes a
+				// request. Two pi passes that interleave both read the same byte range
+				// and both run `cursor.offset += complete.length`
+				// (`pi-session-stream.ts:210`), leaving the offset a whole chunk past
+				// the end of the file. Nothing is sent twice - the seen-set stops that
+				// - but every append after it is skipped until the file happens to
+				// shrink and the cursor resets to zero. It heals itself, silently,
+				// having lost the turns in between.
+				if (inFlight) return;
+				inFlight = true;
+				void capture
+					.harvest()
+					.catch(() => 0)
+					.finally(() => {
+						inFlight = false;
+					});
+			}, PI_SESSION_POLL_MS);
+			// Same as codex: the child drives the lifecycle, so the timer must never
+			// be the thing keeping the process alive.
+			piPoll.unref?.();
+		} else {
+			process.stderr.write(
+				`${lwTag()} pi session capture is off for this run: no ingestion ` +
+					`endpoint or key was resolved, and pi has no other way to reach ` +
+					`LangWatch. Nothing from this session will be recorded.\n`,
+			);
+		}
+	}
+
 	let child;
 	if (aliasShell) {
 		const reapply = buildShellReapply({
@@ -817,6 +892,32 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			await codexStreamer.harvest(Date.now());
 		} catch {
 			/* content recovery is non-essential; never block exit on it */
+		}
+	}
+
+	// Same for pi: the turns written between the last tick and exit are the ones
+	// the user just produced, so the final sweep is where a short session lands
+	// in full. `harvest` resolves on a failed post rather than throwing, and the
+	// try is here anyway - a coding session must never fail on capture.
+	if (piPoll) clearInterval(piPoll);
+	if (piCapture) {
+		try {
+			await piCapture.harvest();
+		} catch {
+			/* capture is non-essential; never block exit on it */
+		}
+		// Say what was lost. Turns held back after the final sweep are turns the
+		// reader will not offer again, so silence here would be an undercount the
+		// user could never account for.
+		// Turns discarded on overflow count too, and separately: those were lost
+		// mid-session rather than at exit, so a user reading only the pending
+		// figure would think a long outage cost them one pass.
+		const undelivered = piCapture.pendingCount() + piCapture.droppedCount();
+		if (undelivered > 0) {
+			process.stderr.write(
+				`${lwTag()} ${undelivered} pi turn${undelivered === 1 ? "" : "s"} ` +
+					`could not be sent to LangWatch and were not recorded.\n`,
+			);
 		}
 	}
 

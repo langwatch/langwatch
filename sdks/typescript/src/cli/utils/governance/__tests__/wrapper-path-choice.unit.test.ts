@@ -671,3 +671,83 @@ describe("parseProjectScopeFlags", () => {
     });
   });
 });
+
+/**
+ * The seam where pi's forced ingestion is actually decided on a real launch.
+ * resolveWrapperPath's result is passed to resolveWrapperMode as a FORCED
+ * mode, so that function's downgrade branch — and the notice attached to it —
+ * cannot run: the mode is already "ingestion" when it is evaluated. Before
+ * this write existed, every key-holding pi user was moved to a different
+ * capture path and told nothing. The copilot notice a few lines above this
+ * branch handles the mirror case (ADR-039 D3).
+ */
+describe("an ingestion-only tool says so at the path-choice seam", () => {
+  it("tells the pi user which path was taken, while a control tool on the same config goes to the gateway silently", async () => {
+    const write = vi.fn();
+    const cfg = baseCfg({
+      default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+    });
+
+    const pi = await resolveWrapperPath({
+      cfg,
+      tool: "pi",
+      args: [],
+      isTTY: true,
+      promptImpl: neverPrompt,
+      writeImpl: write,
+      env: {},
+    });
+
+    expect(pi.mode).toBe("ingestion");
+    expect(pi.prompted).toBe(false);
+    expect(write).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "pi is captured from its session file rather than through the gateway",
+      ),
+    );
+    // Forced by us, not by an admin — see ingestionOnlyNotice.
+    expect(write).not.toHaveBeenCalledWith(
+      expect.stringContaining("org admin"),
+    );
+
+    // The control: same config, a tool whose gateway path is real. It is not
+    // routed to ingestion, so this cannot be passing because the branch fires
+    // for everything.
+    const controlWrite = vi.fn();
+    const control = await resolveWrapperPath({
+      cfg: baseCfg({
+        default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+      }),
+      tool: "cursor",
+      args: [],
+      isTTY: true,
+      promptImpl: neverPrompt,
+      writeImpl: controlWrite,
+      env: {},
+    });
+    expect(control.mode).toBe("gateway");
+    expect(controlWrite).not.toHaveBeenCalled();
+  });
+
+  it("still names the path when a stale cached row claims pi may use the gateway", async () => {
+    // The clamp in resolvePlatformToolPolicy decides the mode; this checks the
+    // user is told about it rather than silently overridden.
+    const write = vi.fn();
+    const out = await resolveWrapperPath({
+      cfg: baseCfg({
+        default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+        tool_policies: { pi: { allowVk: true, allowOtelDirect: true } },
+      }),
+      tool: "pi",
+      args: [],
+      isTTY: true,
+      promptImpl: neverPrompt,
+      writeImpl: write,
+      env: {},
+    });
+    expect(out.mode).toBe("ingestion");
+    expect(write).toHaveBeenCalledWith(
+      expect.stringContaining("rather than through the gateway"),
+    );
+  });
+});

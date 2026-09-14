@@ -6,7 +6,7 @@
  * source codex offers.
  */
 import { createHash } from "node:crypto";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -15,7 +15,13 @@ import {
   runGitCommand,
 } from "@/cli/commands/ingestion/git-context";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { GovernanceCliError } from "./cli-api";
+import {
+  drainSpooledSessionContext,
+  findFilesModifiedSince,
+  postOtlpBody,
+  runBoundedBatch,
+  walkSessionFiles,
+} from "./agent-rollout-transport";
 import {
   type CodexRolloutMeta,
   type CodexTurnIO,
@@ -27,7 +33,6 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "./hook-state";
-import { drainSessionContextSpool } from "./session-context-spool";
 import {
   codexSessionIndexPath,
   readCodexThreadNames,
@@ -124,42 +129,12 @@ export function buildCodexIOExportRequest(
 const RECENT_TURN_WINDOW = 3;
 
 /**
- * Walk codex's `YYYY/MM/DD` session tree, handing every rollout file to
- * `onFile`. The depth bound encodes that layout, so it lives here once rather
- * than in each caller, where a layout change would be fixed in one and missed
- * in the other.
- *
- * Newest first: the per-turn hook is looking for the session that just ended,
- * which is under today's date, and `readdir` order is whatever the filesystem
- * says. The path segments are zero-padded, so a descending name sort is a
- * descending date sort. A caller that stops on a match (`onFile` returning
- * true) therefore finds a recent session in the first directory it opens,
- * rather than after walking a long-lived account's older ones.
+ * Codex lays its transcripts out as `sessions/YYYY/MM/DD/rollout-*.jsonl`, so
+ * the walk descends three directory levels. Stated once here rather than at
+ * each call site, where a layout change would be fixed in one and missed in
+ * the other.
  */
-async function walkRolloutFiles(
-  root: string,
-  onFile: (path: string, name: string) => Promise<boolean | void> | boolean,
-): Promise<void> {
-  async function walk(dir: string, depth: number): Promise<boolean> {
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-    entries.sort((a, b) => b.name.localeCompare(a.name));
-    for (const e of entries) {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) {
-        if (depth < 3 && (await walk(full, depth + 1))) return true;
-      } else if (e.isFile() && (await onFile(full, e.name))) {
-        return true;
-      }
-    }
-    return false;
-  }
-  await walk(root, 0);
-}
+const ROLLOUT_TREE_DEPTH = 3;
 
 /**
  * Where codex keeps its session transcripts. Honours `CODEX_HOME` the same way
@@ -187,10 +162,14 @@ export async function findRolloutForThread(
   if (!/^[A-Za-z0-9_-]+$/.test(threadId)) return null;
   const suffix = `-${threadId}.jsonl`;
   let found: string | null = null;
-  await walkRolloutFiles(sessionsRoot, (full, name) => {
-    if (!name.endsWith(suffix)) return false;
-    found = full;
-    return true;
+  await walkSessionFiles({
+    root: sessionsRoot,
+    maxDepth: ROLLOUT_TREE_DEPTH,
+    onFile: (full, name) => {
+      if (!name.endsWith(suffix)) return false;
+      found = full;
+      return true;
+    },
   });
   return found;
 }
@@ -213,51 +192,6 @@ export async function findRolloutForThread(
  * already final. Worth knowing before making the emitted content depend on
  * anything that keeps changing after the turn ends.
  */
-/**
- * Send the declarations a sandboxed `langwatch ingest context` could not.
- *
- * The notify program codex runs is spawned from codex's own process, outside
- * the sandbox it puts its shell in, so this is the seam that can reach the
- * collector when the agent's own shell cannot. It runs after the session
- * context posts above, so a declared checkout is the last one written and
- * becomes the session's current branch.
- */
-async function drainCodexSpool(args: {
-  nowMs: number;
-  logsEndpoint: string | null;
-  token: string;
-  stateDir?: string;
-  fetchImpl?: typeof fetch;
-}): Promise<void> {
-  const { logsEndpoint, token } = args;
-  if (!logsEndpoint) return;
-  const doFetch = args.fetchImpl ?? fetch;
-  await drainSessionContextSpool({
-    stateDir: args.stateDir ?? defaultStateDir(),
-    now: () => args.nowMs,
-    post: async (payload) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5_000);
-      try {
-        const response = await doFetch(logsEndpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        return response.ok;
-      } catch {
-        return false;
-      } finally {
-        clearTimeout(timer);
-      }
-    },
-  });
-}
-
 export async function harvestCodexThread(args: {
   threadId: string;
   nowMs: number;
@@ -290,7 +224,7 @@ export async function harvestCodexThread(args: {
     fetchImpl: args.fetchImpl,
     runGit: args.runGit,
   });
-  await drainCodexSpool(args);
+  await drainSpooledSessionContext(args);
   const recent = turns.slice(-RECENT_TURN_WINDOW);
   if (recent.length === 0) return 0;
   await postCodexTurns({
@@ -312,18 +246,13 @@ export async function findRecentRollouts(
   sinceMs: number,
   sessionsRoot = defaultCodexSessionsRoot(),
 ): Promise<string[]> {
-  const out: string[] = [];
-  await walkRolloutFiles(sessionsRoot, async (full, name) => {
-    if (!name.startsWith("rollout-") || !name.endsWith(".jsonl")) return false;
-    try {
-      const s = await stat(full);
-      if (s.mtimeMs >= sinceMs) out.push(full);
-    } catch {
-      /* skip unreadable */
-    }
-    return false;
+  return findFilesModifiedSince({
+    root: sessionsRoot,
+    maxDepth: ROLLOUT_TREE_DEPTH,
+    sinceMs,
+    matchesName: (name) =>
+      name.startsWith("rollout-") && name.endsWith(".jsonl"),
   });
-  return out;
 }
 
 /** Read + parse every in-window rollout: one flat turn list, one meta per session. */
@@ -349,37 +278,12 @@ async function readRollouts({
   return { turns, metas };
 }
 
-/**
- * A refusal from the ingest endpoint, named so the caller can act on it.
- *
- * The key codex posts with lives in its config file and is the normal thing to
- * go stale, so a refusal of the key reads as a key problem rather than as a
- * status code the reader has to look up.
- */
-function ingestRefusal(status: number): GovernanceCliError {
-  if (status === 401 || status === 403) {
-    return new GovernanceCliError(
-      status,
-      "ingest_key_rejected",
-      "LangWatch refused the ingest key codex is configured with. Run `langwatch ingest install codex` to issue a new one.",
-    );
-  }
-  return new GovernanceCliError(
-    status,
-    "ingest_rejected",
-    `LangWatch did not accept the conversation (HTTP ${status}).`,
-  );
-}
+/** The agent named in a refusal, and in the command that reissues its key. */
+const CODEX_TOOL = "codex";
 
 /**
- * POST a batch of turns as OTLP IO spans. Capped at 5s so a slow or unreachable
- * endpoint can't wedge the user's shell.
- *
- * A refused upload throws, the same as an unreachable one: a response that
- * arrived is not the same as content that landed, and the turn-completion path
- * runs after every turn of every session, so "the key expired" would otherwise
- * read as success forever. Each caller decides what to do with the throw: the
- * turn-completion path swallows it, the backfill reports it.
+ * POST a batch of turns as OTLP IO spans, through the shared transport: the
+ * codex-specific part is the body, the timeout and refusal handling are not.
  */
 async function postCodexTurns(args: {
   turns: CodexTurnIO[];
@@ -389,25 +293,13 @@ async function postCodexTurns(args: {
   fetchImpl?: typeof fetch;
 }): Promise<void> {
   const { turns, nowMs, endpoint, token, fetchImpl } = args;
-  const body = buildCodexIOExportRequest(turns, nowMs);
-  const doFetch = fetchImpl ?? fetch;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5_000);
-  let response: Response;
-  try {
-    response = await doFetch(endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-  if (!response.ok) throw ingestRefusal(response.status);
+  await postOtlpBody({
+    body: buildCodexIOExportRequest(turns, nowMs),
+    endpoint,
+    token,
+    tool: CODEX_TOOL,
+    fetchImpl,
+  });
 }
 
 /**
@@ -585,40 +477,21 @@ async function postCodexSessionContexts(args: {
   runGit?: GitRunner;
 }): Promise<void> {
   const { metas, threadNames, ...post } = args;
-  if (metas.length === 0) return;
-  let next = 0;
-  let outOfBudget = false;
-  const budget = setTimeout(() => {
-    outOfBudget = true;
-  }, CONTEXT_POST_BUDGET_MS);
-  // A CLI must not stay alive for the budget alone: every post can finish
-  // early, and then there is nothing left to wait for.
-  budget.unref?.();
-  try {
-    await Promise.all(
-      Array.from(
-        { length: Math.min(CONTEXT_POST_CONCURRENCY, metas.length) },
-        async () => {
-          while (!outOfBudget && next < metas.length) {
-            // Read and advance in one synchronous step, so two workers never
-            // take the same session.
-            const meta = metas[next++] ?? null;
-            // `postCodexSessionContext` reports failure rather than throwing,
-            // and this guard keeps that true for the caller if it ever stops.
-            await postCodexSessionContext({
-              meta,
-              threadName: meta?.sessionId
-                ? threadNames?.get(meta.sessionId)
-                : null,
-              ...post,
-            }).catch(() => false);
-          }
-        },
-      ),
-    );
-  } finally {
-    clearTimeout(budget);
-  }
+  await runBoundedBatch({
+    items: metas,
+    concurrency: CONTEXT_POST_CONCURRENCY,
+    budgetMs: CONTEXT_POST_BUDGET_MS,
+    handle: (entry) => {
+      const meta = entry ?? null;
+      // `postCodexSessionContext` reports failure rather than throwing, and
+      // this guard keeps that true for the caller if it ever stops.
+      return postCodexSessionContext({
+        meta,
+        threadName: meta?.sessionId ? threadNames?.get(meta.sessionId) : null,
+        ...post,
+      }).catch(() => false);
+    },
+  });
 }
 
 /**
@@ -664,7 +537,7 @@ export async function harvestAndEmitCodexIO(args: {
     fetchImpl,
     runGit,
   });
-  await drainCodexSpool(args);
+  await drainSpooledSessionContext(args);
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;

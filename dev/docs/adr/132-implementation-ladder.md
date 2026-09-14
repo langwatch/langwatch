@@ -21,12 +21,19 @@ A scenario is bound by a JSDoc annotation above the test:
 /** @scenario "A session started fresh has no parent" */
 ```
 
-Three ways this silently fails to bind, all of which report green:
+A `// @scenario "…"` line comment binds equally well, and several bound tests
+here use that form. **This document claimed the JSDoc form was required until
+rung 21 disproved it** by breaking a line-comment tag and watching parity drop
+from 25/25 to 24/25 naming the scenario, then restoring it. The rule is recorded
+with its correction attached rather than quietly rewritten: a false binding rule
+is worse than no rule, because the next reader "fixes" working bindings to obey
+it and the suite stays green while enforcing less.
 
-1. The tag must sit on the **same line as the opening `/**`**.
-2. The title must be in **double** quotes. Five titles here contain an
+Two ways this silently fails to bind, both of which report green:
+
+1. The title must be in **double** quotes. Five titles here contain an
    apostrophe, so single quotes are a tempting and wrong reflex.
-3. The scenario must have had `@unimplemented` **removed**. Left on, the checker
+2. The scenario must have had `@unimplemented` **removed**. Left on, the checker
    skips the scenario, the test binds to nothing, and the suite passes while
    enforcing nothing.
 
@@ -188,16 +195,30 @@ has simply never seen an agent that fills them.
 - **Proves it** — `pnpm --filter langwatch test:unit src/cli/utils/governance/__tests__/pi-session-lineage.unit.test.ts`
 - **Depends on** — 13
 
-### 15. Wire the reader into the wrapper, gated on the no-virtual-key mode
+### 15. Wire the reader into the wrapper, gated on whether an endpoint exists
 
 - **Files** — `sdks/typescript/src/cli/utils/governance/wrapper.ts` (a pi streamer block mirroring `:741-770`: start-time stamp, unreferenced poll timer, skip while a pass is in flight, final sweep guarded), `.../__tests__/wrapper.unit.test.ts`
 - **Scenarios** — "A session already captured on the server is not also captured from the file", "A session with no virtual key is captured from the file", "A pi session LangWatch did not launch is left alone"
 - **Proves it** — `pnpm --filter langwatch test:unit src/cli/utils/governance/__tests__/wrapper.unit.test.ts`
 - **Depends on** — 14, 6
 
-The first two scenarios are the Gates-table gate against posting transcripts
-twice: the streamer must be absent when the run is not in the no-virtual-key
-mode. The third is the start-time stamp.
+**Revised at v10 — this paragraph said the reverse.** It read: "the streamer
+must be absent when the run is not in the no-virtual-key mode", and the heading
+above said the rung was gated on that mode. Both were written when we believed
+pi honours a base-URL swap, so that a key-holder would be captured server-side
+instead. pi does not honour it, so there is no server-side capture to fall back
+to: gating on the mode would have switched capture off for exactly the customers
+who pay, silently. The no-double-trace rule still holds — it is just no longer
+reachable through pi, because pi can only ever be captured one way.
+
+What replaces it is physical rather than policy: the streamer runs when an
+endpoint and an ingestion token exist to post with, and does not when they do
+not (gateway returns omit both, `wrapper-mode.ts:340-347`). Do **not** branch on
+`modeResult.mode` here. When capture cannot run, say so on stderr rather than
+skipping in silence — a capture that is off and quiet is indistinguishable from
+one that is on and working.
+
+The start-time stamp is unchanged and is the third scenario.
 
 That stamp needs stating precisely, because a loose reading of it loses data.
 The existing filter compares the file's **modification** time, not its creation

@@ -80,6 +80,7 @@ export const SUPPORTED_ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "pi",
   "custom",
 ] as const;
 export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];
@@ -102,6 +103,10 @@ export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
   cursor: "cursor",
   // GitHub Copilot CLI wrapper (`langwatch copilot`), ADR-039.
   github_copilot: "copilot",
+  // pi wrapper (`langwatch pi`), ADR-132. An unmapped kind contributes no
+  // toolPolicies entry and silently resolves to the permissive default, so
+  // this line is what makes a pi tile's policy reach the launcher at all.
+  pi: "pi",
 };
 
 const codingAssistantConfig = z.object({
@@ -518,11 +523,19 @@ export class AiToolEntryService {
       if (overrides[slug]) continue;
 
       // Structural forces, immune to tile config: cursor has no terminal
-      // env path (no direct OTLP), and `code` (VS Code Copilot Chat) has no
-      // BYOK gateway env (no VK path) — a tile default of `true` would
-      // enable a path that cannot exist. ADR-039 §Extension #2.
+      // env path (no direct OTLP); `code` (VS Code Copilot Chat) has no BYOK
+      // gateway env; and pi ignores OPENAI_BASE_URL / ANTHROPIC_BASE_URL
+      // outright, hardcoding each catalog model's base URL, so the gateway
+      // swap the wrapper performs is accepted and dialled past. A tile
+      // default of `true` would enable a path that cannot exist — and for pi
+      // that is not merely useless: gateway and direct capture are mutually
+      // exclusive in the launcher, so choosing the dead path also skips the
+      // live one, capturing nothing at all. Overriding the shipped default
+      // here as well as in PLATFORM_TOOL_POLICY_DEFAULTS is what keeps an org
+      // that publishes a pi tile from re-enabling it.
+      // ADR-039 §Extension #2, ADR-132 §7.
       const allowVk =
-        slug === "code"
+        slug === "code" || slug === "pi"
           ? false
           : config.allowVk === undefined
             ? true

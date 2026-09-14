@@ -624,6 +624,34 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
+  // Registered hidden AND deliberately left out of the "Coding assistants:"
+  // footer below: pi capture is only half-built (ADR-132), so the command has
+  // to exist for the rest of the ladder to be exercised without being
+  // advertised as something a user should reach for yet. Add the footer line
+  // in the same change that finishes capture.
+  program
+    .command("pi", { hidden: true })
+    .description(
+      // Not "routed through the gateway" — that is the one thing this command
+      // never does. pi ignores base-URL environment variables, so the gateway
+      // swap cannot reach it; capture is read from pi's own session file
+      // instead. ADR-132 revision v10.
+      "Run `pi` and capture the session from its own transcript file.",
+    )
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapPi } = await import("./commands/wrap.js");
+        await wrapPi(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
   // 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
   // not on every `langwatch <subcommand> --help` invocation.
   program.addHelpText(
@@ -950,7 +978,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       )
       .option(
         "--agent <tool>",
-        "the agent the session belongs to: claude-code, codex or opencode",
+        "the agent the session belongs to: claude-code, codex, opencode or pi",
       ),
   ).action(async (options: { sessionId?: string; agent?: string }) => {
     try {

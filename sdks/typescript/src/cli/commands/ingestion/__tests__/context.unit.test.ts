@@ -191,6 +191,27 @@ describe("the declare command's session resolution", () => {
     });
   });
 
+  // pi installs no hooks and exports no telemetry, so the explicit flags are
+  // the only way a pi session declares anything. An agent the set does not
+  // know is refused with the both-flags line and posts nothing, which is
+  // indistinguishable from a typo — hence the assertion on what was posted.
+  it("declares for a pi session the flags name", async () => {
+    await runContext({ agent: "pi", sessionId: "pi-session-1" });
+
+    expect(posted).toHaveLength(1);
+    expect(attributesOf(posted[0]!)).toMatchObject({
+      "coding_agent.name": "pi",
+      "session.id": "pi-session-1",
+    });
+  });
+
+  it("refuses an agent the declaration does not know", async () => {
+    await runContext({ agent: "not-an-agent", sessionId: "some-session" });
+
+    expect(posted).toHaveLength(0);
+    expect(lines[0]).toContain("pi");
+  });
+
   it("asks for both flags when only one is passed", async () => {
     await runContext({ sessionId: "half-a-session" });
 

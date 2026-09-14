@@ -56,6 +56,11 @@ export const PERSONAL_INGEST_SOURCE_TYPES = [
   "copilot_cli",
   "copilot_vscode",
   "copilot_app",
+  // pi (ADR-132). Captured from its own session file rather than from an
+  // OTLP exporter it does not have, but the capture still needs an ingest
+  // key, and it is minted by the CLI session that launched pi, so it
+  // belongs here with the other wrapped tools.
+  "pi",
 ] as const;
 
 /** The plaintext token, returned exactly once, plus its identifiers. */
