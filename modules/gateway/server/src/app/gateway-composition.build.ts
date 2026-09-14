@@ -1,0 +1,518 @@
+/**
+ * The gateway control plane, composed from what the process hands the module.
+ *
+ * This is the filling `apps/api/src/app/api-gateway.composition.ts` used to
+ * carry (deleted in b383462d96), moved whole into the module that owns every
+ * service it names. Nothing here is a process decision any more: the four
+ * capabilities that genuinely belong to other features arrive as declared
+ * peers, the two datastores arrive as declared members, and everything else —
+ * the repositories, the adapters, the DTO projections — is this package's own.
+ *
+ * Two members of the deleted composition are deliberately not here:
+ *
+ *  - `idempotency`. The receipt ledger is no longer an application member: a
+ *    keyed create declares `.withIdempotency(...)` on its route and the REST
+ *    host threads the process's one ledger to every mount (febccfe138), so an
+ *    application-level runner would be a second, unread one.
+ *  - `agentCache` / `elevenLabsWebhook`. Those are the two REST-only families,
+ *    kept on {@link GatewayRestInfrastructure} and composed separately.
+ */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
+import { TRPCError } from "@trpc/server";
+
+import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { PrismaGatewayTransactionAdapter } from "../adapters/postgres.gateway-transaction.adapter.ts";
+import { VirtualKeyCryptoAdapter } from "../adapters/virtual-key-crypto.adapter.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
+import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
+import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
+import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
+import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
+import { PrismaVirtualKeyAuthorizationRepository } from "../repositories/prisma/prisma.virtual-key-authorization.repository.ts";
+import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
+import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import { GatewayUsageService } from "../services/gateway-usage.service.ts";
+import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";
+import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
+import { VirtualKeyService } from "../services/virtual-key.service.ts";
+
+import type { GatewayAppDependencies } from "./gateway.app.ts";
+import type {
+  GatewayClickHouseClient,
+  GatewayClickHouseResolver,
+  GatewayGovernanceSignals,
+  GatewayPermissionScope,
+  GatewayScopePermissions,
+} from "./gateway.members.ts";
+import type { MembershipSet, VirtualKeyActor } from "../services/virtual-key-authorization.service.ts";
+
+const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
+
+/**
+ * Adapts the process's ONE routing `clickhouse` member to the per-tenant
+ * client shape the gateway ledger repositories were written against — the
+ * same calling convention `@clickhouse/client` exposes, which is why they
+ * were written that way. The member already routes, guards, traces, limits
+ * and retries every statement internally, so this session is a thin
+ * translation bound to one tenant and NOT a second client: no second pool, no
+ * second retry, no second limiter. The same seam analytics uses for the same
+ * reason (`ClickHouseMemberSession` in `modules/analytics`).
+ */
+class GatewayClickHouseSession implements GatewayClickHouseClient {
+  constructor(
+    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly tenantId: string,
+  ) {}
+
+  async query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
+    unscoped?: { reason: string };
+  }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: this.tenantId,
+      sql: input.query,
+      params: input.query_params,
+      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
+      ...(input.unscoped ? { unscoped: input.unscoped } : {}),
+    });
+
+    return { json: <T = unknown>() => Promise.resolve(rows as T[]) };
+  }
+
+  async insert(input: {
+    table: string;
+    values: Record<string, unknown>[];
+    format?: "JSONEachRow";
+    clickhouse_settings?: Record<string, string | number | boolean | undefined>;
+  }): Promise<unknown> {
+    await this.clickhouse.insert({
+      tenantId: this.tenantId,
+      table: input.table,
+      rows: input.values,
+      settings: input.clickhouse_settings as Record<string, string | number> | undefined,
+    });
+
+    return undefined;
+  }
+}
+
+/**
+ * The two questions a virtual-key write is authorized by, answered from the
+ * process's own AuthZ application rather than from role rows this package can
+ * see: the gateway holds no membership or grant table of its own.
+ */
+class GatewayAuthzScopePermissions implements GatewayScopePermissions {
+  static create(authz: AuthzApi): GatewayAuthzScopePermissions {
+    return new GatewayAuthzScopePermissions(authz);
+  }
+
+  private constructor(private readonly authz: AuthzApi) {}
+
+  sessionHolds(input: {
+    userId: string;
+    permission: Parameters<AuthzApi["hasPermission"]>[0]["permission"];
+    scope: GatewayPermissionScope;
+  }): Promise<boolean> {
+    const scope =
+      input.scope.type === "org"
+        ? { organizationId: input.scope.id }
+        : input.scope.type === "team"
+          ? { teamId: input.scope.id }
+          : { projectId: input.scope.id };
+
+    return this.authz.hasPermission({
+      userId: input.userId,
+      permission: input.permission,
+      ...scope,
+    } as Parameters<AuthzApi["hasPermission"]>[0]);
+  }
+
+  apiKeyHolds(input: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    permission: Parameters<AuthzApi["hasPermission"]>[0]["permission"];
+    scope: GatewayPermissionScope;
+  }): Promise<boolean> {
+    return this.authz.hasApiKeyPermission({
+      apiKeyId: input.apiKeyId,
+      userId: input.userId,
+      organizationId: input.organizationId,
+      permission: input.permission,
+      // Structurally the same union, restated by the AuthZ contract under its
+      // own name. Named rather than cast so a divergence is a compile error.
+      scope: input.scope satisfies ApiKeyPermissionScope,
+    });
+  }
+}
+
+/** The four other features the gateway control plane reaches, one by one. */
+export type GatewayControlPlanePeers = Readonly<{
+  /** The permission service every other surface on this process authorizes with. */
+  authz: AuthzApi;
+  /** The project directory the tenancy graph composed. */
+  projects: ProjectApi;
+  /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
+  evaluators: EvaluatorApi;
+  /** The monitors a guardrail attachment names. */
+  monitors: MonitorApi;
+}>;
+
+export type GatewayControlPlaneOptions = Readonly<{
+  /** The one guarded connection every gateway row read below runs on. */
+  prisma: PrismaClient;
+  /**
+   * The process's ONE routing ClickHouse client. The gateway ledger is a
+   * projection in that instance, and a second connection would be a second
+   * pool over the same server.
+   */
+  clickhouse: ClickHouseQueryClient;
+  peers: GatewayControlPlanePeers;
+  /** The HMAC key a virtual key's stored secret is hashed under. */
+  virtualKeyPepper: string | undefined;
+  /**
+   * Where a virtual key's lifecycle is announced, where the deployment
+   * composed a ledger for it.
+   */
+  governanceSignals?: GatewayGovernanceSignals | undefined;
+}>;
+
+/**
+ * Composes the gateway control plane: the whole of what {@link GatewayApp}'s
+ * core surface answers from.
+ */
+export function buildGatewayControlPlane(
+  options: GatewayControlPlaneOptions,
+): GatewayAppDependencies {
+  const { prisma, peers } = options;
+  const { projects } = peers;
+  const permissions = GatewayAuthzScopePermissions.create(peers.authz);
+  const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
+    directory: PrismaVirtualKeyAuthorizationRepository.create({ database: prisma }),
+  });
+  // One resolution over the one member, per tenant. `Promise.resolve` because
+  // there is nothing to open: the client already exists.
+  const resolveClickHouse: GatewayClickHouseResolver = (tenantId) =>
+    Promise.resolve(new GatewayClickHouseSession(options.clickhouse, tenantId));
+
+  const virtualKeys = VirtualKeyService.create({
+    transactions: PrismaGatewayTransactionAdapter.create({ database: prisma }),
+    keyBudgets: PrismaGatewayKeyBudgetRepository.create({ database: prisma }),
+    scopeResolution: GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+    }),
+    projects,
+    repository: PrismaGatewayVirtualKeyRepository.create(prisma),
+    changeEvents: PrismaGatewayChangeEventsRepository.create(prisma),
+    auditLog: PrismaGatewayAuditRepository.create(prisma),
+    crypto: VirtualKeyCryptoAdapter.create({ pepper: options.virtualKeyPepper }),
+    ...(options.governanceSignals ? { governanceSignals: options.governanceSignals } : {}),
+  });
+
+  const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
+  const virtualKeySpend = GatewayVirtualKeySpendRepository.create(resolveClickHouse);
+  const spendEvents = GatewaySpendEventsService.create(
+    GatewaySpendEventsRepository.create(resolveClickHouse),
+  );
+
+  const budgetDecisions = PrismaGatewayAdapter.create({
+    database: prisma,
+    projects,
+    evaluators: peers.evaluators,
+    monitors: peers.monitors,
+    // The change feed the Go data plane long-polls and the audit trail every
+    // cache-rule and guardrail command is written to. Both are Prisma
+    // repositories this package owns; the process only named the connection
+    // they run on.
+    changes: PrismaGatewayChangeEventsRepository.create(prisma),
+    audit: PrismaGatewayAuditRepository.create(prisma),
+    budgetSpend,
+  }).build();
+
+  const usage = GatewayUsageService.create({
+    projects,
+    // The usage rollup needs a label per key the ledger reported spend
+    // against, which is a repository read; `virtualKeys` above is the
+    // operations service the gateway application itself is built on.
+    virtualKeys: PrismaGatewayVirtualKeyRepository.create(prisma),
+    chRepo: budgetSpend,
+    spendRepo: virtualKeySpend,
+  });
+
+  // No type arguments: the two budget row shapes the wire contract carries are
+  // named by `@langwatch/gateway-contract` (`GatewayApplicableBudget`,
+  // `GatewayVirtualKeyDirectBudget`), so the application declares them itself
+  // instead of taking them as parameters a router could not propagate.
+  return {
+    virtualKeys,
+    budgetDecisions,
+    budgetSpend,
+    virtualKeySpend,
+    spendEvents,
+    projects,
+    usage,
+    // `reads("clickhouse")` is a boot claim: a process that opened no
+    // ClickHouse never reaches this function, so the spend source is present
+    // whenever the control plane is.
+    spendSourceAvailable: true,
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+
+    organizationIdForProject: async (projectId) => {
+      const organizationId = await projects.tryGetOrganizationId(projectId);
+      if (!organizationId) throw new Error(`project ${projectId} missing team`);
+
+      return organizationId;
+    },
+    assertOrganizationExists: async (organizationId) => {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+      });
+      // The refusal the deleted composition raised, unchanged: the anchor is
+      // read from both doors and a second taxonomy here would change what a
+      // tRPC caller already sees.
+      if (!organization) throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
+    },
+    resolveProviderLabels: (budgets) =>
+      PrismaGatewayProviderLabelRepository.create(prisma).resolveProviderLabels([...budgets]),
+    listGroupTargets: async (organizationId) => {
+      const groups = await prisma.group.findMany({
+        where: { organizationId },
+        select: { id: true, name: true, _count: { select: { members: true } } },
+        orderBy: { name: "asc" },
+      });
+
+      return groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        memberCount: group._count.members,
+      }));
+    },
+    groupMemberCounts: async (budgets) => {
+      const groupIds = Array.from(
+        new Set(budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId)),
+      );
+      if (groupIds.length === 0) return new Map();
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        select: { id: true, _count: { select: { members: true } } },
+      });
+
+      return new Map(groups.map((group) => [group.id, group._count.members]));
+    },
+    // The label per key a page of spend rows carries, read through this
+    // feature's OWN persistence rather than by a key-table `findMany`.
+    resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
+    isOrganizationMember: async ({ organizationId, userId }) =>
+      (await prisma.organizationUser.findFirst({
+        where: { organizationId, userId },
+        select: { userId: true },
+      })) !== null,
+    // A scoped API key acts as its owning user; a legacy project key carries
+    // none, so it acts as a stable machine principal for its project, which
+    // keeps an audit row traceable back to the credential that wrote it.
+    actorForCredential: ({ projectId, credential }) =>
+      credential.kind === "apiKey"
+        ? {
+            actor: {
+              kind: "apiKey",
+              apiKeyId: credential.apiKeyId,
+              userId: credential.userId,
+              organizationId: credential.organizationId,
+            } satisfies VirtualKeyActor,
+            actorUserId: credential.userId ?? `svc_${projectId}`,
+          }
+        : {
+            actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
+            actorUserId: `svc_${projectId}`,
+          },
+
+    listVisibleVirtualKeys: async ({ organizationId, userId }) => {
+      const membership = await virtualKeyAuthorization.loadMembershipSet({
+        organizationId,
+        userId,
+      });
+
+      return (await virtualKeys.getAll(organizationId)).filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
+      virtualKeyAuthorization.isVisibleToMembership(
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        virtualKey.scopes,
+      ),
+    requireVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
+      virtualKeyAuthorization.getVisibleVk(
+        virtualKeys,
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        { id, organizationId },
+      ),
+    visibleToProjectCredential: ({ project, virtualKeys: page }) => {
+      const membership = membershipForProjectCredential(project);
+
+      return page.filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    requireVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
+      virtualKeyAuthorization.getVisibleVk(virtualKeys, membershipForProjectCredential(project), {
+        id,
+        organizationId,
+      }),
+    requireExistingVirtualKey: ({ organizationId, id }) =>
+      virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
+
+    assertCanManageAllScopes: ({ actor, scopes }) =>
+      virtualKeyAuthorization.assertActorCanManageAllScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+      ),
+    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateOnAnyScope(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+        permission,
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      virtualKeyAuthorization.assertScopesBelongToOrg({ organizationId, scopes: [...scopes] }),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      virtualKeyAuthorization.assertTraceProjectBelongsToOrg({ organizationId, traceProjectId }),
+    assertGuardrailAttachmentsAllowed: ({ actor, projectId, attachments }) =>
+      virtualKeyAuthorization.assertGuardrailAttachmentsAllowed(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        projectId,
+        attachments ? [...attachments] : undefined,
+      ),
+    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
+      virtualKeyAuthorization.tryResolveVkProjectId({
+        organizationId,
+        vkId: virtualKeyId,
+        inputScopes: scopes ? [...scopes] : undefined,
+        traceProjectId,
+      }),
+
+    // One read of the destinations for a whole page, in both casings: a
+    // listing must not cost a query per key to say where its traffic goes.
+    toVirtualKeyCamelDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeyCamelDto({ virtualKey, facts }));
+    },
+    toVirtualKeySnakeDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeySnakeDto({ virtualKey, facts }));
+    },
+    listApplicableBudgets: ({ target }) =>
+      GatewayApplicableBudgetsService.create({
+        budgetDecisions,
+        providerLabels: PrismaGatewayProviderLabelRepository.create(prisma),
+      }).resolveApplicableBudgetsForDraftKey(
+        projects,
+        { ...target, scopes: [...target.scopes] },
+        budgetSpend,
+      ),
+    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
+      VirtualKeyDirectBudgetService.create({
+        repository: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
+      }).loadDirectBudgetsForKeys({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        chRepo: budgetSpend,
+        now,
+      }),
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
+      usage.spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+  };
+}
+
+/**
+ * The caller as the virtual-key authorization vocabulary names them,
+ * whichever door they arrived through.
+ */
+function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
+  if (typeof actor !== "object" || actor === null) {
+    return { kind: "session", session: null };
+  }
+  if (!("kind" in actor)) {
+    return { kind: "session", session: sessionActor(actor) };
+  }
+  if (
+    actor.kind === "apiKey" &&
+    "apiKeyId" in actor &&
+    typeof actor.apiKeyId === "string" &&
+    "organizationId" in actor &&
+    typeof actor.organizationId === "string" &&
+    "userId" in actor &&
+    (typeof actor.userId === "string" || actor.userId === null)
+  ) {
+    return {
+      kind: "apiKey",
+      apiKeyId: actor.apiKeyId,
+      userId: actor.userId,
+      organizationId: actor.organizationId,
+    };
+  }
+  if (
+    actor.kind === "legacyProjectKey" &&
+    "projectId" in actor &&
+    typeof actor.projectId === "string"
+  ) {
+    return { kind: "legacyProjectKey", projectId: actor.projectId };
+  }
+
+  return { kind: "session", session: null };
+}
+
+/**
+ * The one member the authorization vocabulary reads off a browser session: the
+ * signed-in person's id.
+ */
+function sessionActor(value: object): { user: { id: string } } | null {
+  if (!("user" in value)) return null;
+  const user = value.user;
+  if (typeof user !== "object" || user === null) return null;
+  if (!("id" in user) || typeof user.id !== "string") return null;
+
+  return { user: { id: user.id } };
+}
+
+/**
+ * A project credential stands in for someone working in its project, so it
+ * sees organization-scoped keys, its own team's keys and its own project's —
+ * and not a sibling team's. The same rule the tRPC list applies to a member.
+ */
+function membershipForProjectCredential(project: ProjectIdentity): MembershipSet {
+  return {
+    isOrgMember: true,
+    isOrgAdmin: false,
+    teamIds: new Set([project.teamId]),
+    projectIds: new Set([project.id]),
+  };
+}

@@ -7,7 +7,6 @@ import type {
   GatewayVirtualKeyScope,
   VirtualKeyWithScopes,
 } from "@langwatch/gateway-contract";
-import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   GatewayApi as GatewayApiToken,
@@ -32,7 +31,7 @@ import {
 } from "@langwatch/gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GatewayService } from "../services/gateway.service.ts";
-import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { z } from "zod";
 
@@ -57,6 +56,15 @@ import {
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import {
+  gatewayServerConfigSchema,
+  type GatewayServerConfig,
+} from "@langwatch/gateway-contract";
+import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
 // delivers, so both ARRIVE from that module rather than being restated here.
@@ -246,12 +254,6 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   projects: ProjectApi;
   /** The usage reader, already bound to the spend sources above. */
   usage: GatewayUsageService;
-  /**
-   * The receipt ledger the public creates dispatch through, already bound to
-   * the process's store. A feature cannot hold one of its own: a receipt is an
-   * encrypted row in the application's database.
-   */
-  idempotency: IdempotentRunner;
   /**
    * Whether this deployment has the ClickHouse spend source key spend is read
    * from. False answers `spend_source_unavailable` rather than a $0.00 that
@@ -444,7 +446,7 @@ export type GatewaySpendCollaborators = Readonly<{
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
   MembersRead<typeof GatewayApp.reads>,
-  undefined
+  GatewayServerConfig
 >;
 
 export class GatewayApp implements GatewayApi {
@@ -465,30 +467,49 @@ export class GatewayApp implements GatewayApi {
   static readonly dependencies = {
     webhooks: WebhookApi,
     entitlement: EntitlementApi,
+    /**
+     * The four capabilities the control plane reaches that belong to other
+     * features, resolved as peers rather than rebuilt: the permission service
+     * every other surface authorizes with, the project directory a key's
+     * scope is anchored to, the evaluators a guardrail rule runs and the
+     * monitors an attachment names. A guardrail attachment and the monitor
+     * page it points at must agree about what one runs, so they are the SAME
+     * applications the rest of the process reads.
+     */
+    authz: AuthzApi,
+    projects: ProjectApi,
+    evaluators: EvaluatorApi,
+    monitors: MonitorApi,
   };
+  static readonly configSchema = gatewayServerConfigSchema;
   /**
-   * The billing family's scope resolution and its per-end-user caps are
-   * Postgres reads, so the module takes the process's one guarded connection
-   * rather than a bag a composition root fills.
+   * `prisma` is the one guarded connection every gateway row read runs on.
+   * `clickhouse` is the process's ONE routing client, which the control plane
+   * resolves per tenant rather than opening a second pool over the same
+   * server — the spend ledger is a projection in that instance.
    */
-  static readonly reads = reads("prisma");
+  static readonly reads = reads("prisma", "clickhouse");
 
   static create(setup: GatewaySetup): GatewayApp {
     return new GatewayApp(
-      // Not a placeholder for a bag that arrives later: this module declares
-      // `reads("prisma")` and nothing else, so the installer hands it exactly
-      // that, and the control-plane infrastructure below is absent on every
-      // process until the gateway's own composition of it lands. Every core
-      // path refuses by name in the meantime (`#dependencies`).
-      {},
+      buildGatewayControlPlane({
+        prisma: setup.members.prisma,
+        clickhouse: setup.members.clickhouse,
+        peers: {
+          authz: setup.dependencies.authz,
+          projects: setup.dependencies.projects,
+          evaluators: setup.dependencies.evaluators,
+          monitors: setup.dependencies.monitors,
+        },
+        virtualKeyPepper: setup.config.virtualKeyPepper,
+      }),
       {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
         // `settlementGraceMs` owns the parse, the bound and the warning on the
-        // raw `LW_SPEND_SETTLEMENT_GRACE_MS` string; with no gateway config
-        // slice on this process it answers the module's own default, which is
-        // the same number the settlement sweeper falls back to.
-        settlementGraceMs: settlementGraceMs(undefined),
+        // raw `LW_SPEND_SETTLEMENT_GRACE_MS` string, so this carries it as
+        // written and never reads a second answer out of it.
+        settlementGraceMs: settlementGraceMs(setup.config.spendSettlementGraceMs),
       },
     );
   }
@@ -503,6 +524,9 @@ export class GatewayApp implements GatewayApi {
 
   private constructor(members: GatewayInfrastructure, spend?: GatewaySpendCollaborators) {
     this.#spend = spend;
+    // The union's second arm exists for the REST-only composition (agent cache
+    // and the ElevenLabs callback), which carries no control plane. Every
+    // installed process now takes the first.
     this.#coreDependencies = "virtualKeys" in members ? members : void 0;
     this.#agentCache = members.agentCache
       ? GatewayAgentCacheService.create(members.agentCache)

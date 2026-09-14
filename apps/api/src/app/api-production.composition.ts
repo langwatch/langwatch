@@ -29,7 +29,12 @@ import {
   type TransportPeers,
 } from "@langwatch/runtime-composition";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
+import type { ApiPreRoutingSurface } from "../api-http.listener.ts";
 import { ApiRestHost, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
+import {
+  mountedPathsOfRestFamilies,
+  tryCreateApiStaticSurface,
+} from "../app-static/app-static.surface.ts";
 import type { ApiBrowserSessionTransport } from "./api-auth.composition.ts";
 import {
   ApiTrpcHost,
@@ -132,6 +137,13 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     /** Already resolved by the api's own parse — the module takes the RESOLVED record (re-parsing emptied the force-enable list, a defect the worker's tests caught). */
     "feature-flag": config.featureFlags,
+    /** Carried raw: `settlementGraceMs` in the gateway package owns the parse and the bound. */
+    gateway: {
+      internalSecret: config.gatewayInternalSecret,
+      jwtSecret: config.gatewayJwtSecret,
+      virtualKeyPepper: config.virtualKeyPepper,
+      spendSettlementGraceMs: config.spendSettlementGraceMs,
+    },
     /** Wholly defaulted; the entry exists because a schema refuses undefined. */
     evaluator: {},
     github: stated(config.infrastructure.github),
@@ -468,7 +480,21 @@ export async function bootApiProcess(options: {
   }
   reportAbsentTrpcNamespaces(runtime.transports.trpc);
 
-  return { runtime, trpc };
+  // The built browser bundle, served by this process off the same listener.
+  // `apps/ui` is a build, not a deployable: the image ships its `dist/client`
+  // beside this app (infra/docker/Dockerfile:217,240) and the chart runs one
+  // interactive Deployment (charts/langwatch/templates/app/deployment.yaml), so
+  // the pod that answers `/api/*` is the pod a browser asks for `/`. Asked LAST,
+  // after every address the mounted families declare, because it is the
+  // fallback — and the families' own route table is what it defers to, so a
+  // root-level address like the hosted MCP endpoint's `/mcp` stays theirs.
+  const staticSurface = tryCreateApiStaticSurface({
+    environment: globalThis.process.env,
+    report: (message, context) => createLogger(config.serviceName).info(context, message),
+    mountedPaths: mountedPathsOfRestFamilies(runtime.transports.rest),
+  });
+
+  return { runtime, trpc, ...(staticSurface ? { staticSurface } : {}) };
 }
 
 /**
@@ -478,6 +504,13 @@ export async function bootApiProcess(options: {
 export type ApiBootedProcess = Readonly<{
   runtime: BootedRuntime<ProcessMembers, MountableRestApp, ApiTrpcNamespace>;
   trpc: ApiTrpcHost;
+  /**
+   * The built browser bundle, served straight off the Node server ahead of the
+   * Hono application. Absent when this build carries no `apps/ui/dist/client` —
+   * a source checkout that never ran the browser build, which then answers `/`
+   * from the Hono application alone exactly as it did before.
+   */
+  staticSurface?: ApiPreRoutingSurface;
 }>;
 
 /**
