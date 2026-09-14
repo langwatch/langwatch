@@ -64,16 +64,8 @@ import { AudiencePicker } from "../elements/audience-picker.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
 
 /**
- * Writing one privacy rule, at one or more scopes.
- *
- * `platform/app/src/pages/settings/data-privacy.tsx`'s `PrivacyRuleDrawer`,
- * moved whole. Two substitutions, both the ones a feature-web package always
- * makes: the Design System's `Drawer` in place of `~/components/ui/drawer`
- * (which adds the Langy dodge and an inline error boundary, neither of which a
- * package may reach for), and a `scopePicker` RENDER PROP in place of a direct
- * `ScopeChipPicker` import — the same seam the sibling retention drawer already
- * used, and for the same reason its docblock gives: scope selection reads
- * organization data this feature does not own.
+ * Writes privacy rules; uses scopePicker render prop because scope selection
+ * reads organization data this feature doesn't own.
  */
 
 /** One scope the rule is written at. Structural, so the picker stays the caller's. */

@@ -1,20 +1,6 @@
 /**
- * What the Data Privacy screen asks of the application it is mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make this screen
- * untestable outside a running application. It asks this port instead, and the
- * frontend feature that owns it — `apps/ui/src/features/data-privacy` — answers
- * it by adapting the browser capabilities the application already resolves.
- *
- * THE EIGHTH DECLARATION OF THIS SHAPE, and the second in this move. See
- * `DataRetentionHostApi` for why it is still written out rather than promoted.
- *
- * NARROWER THAN ITS SIBLING. Data privacy has no plan gate and no
- * platform-admin capability: every scope the server hands back is writable, so
- * the screen asks only for the scope, the address and the two notices. Nothing
- * is declared here that the screen does not read.
+ * The port interface for the Data Privacy screen; every scope is writable with
+ * no plan gate or platform-admin capability.
  */
 
 import { createContext, useContext } from "react";

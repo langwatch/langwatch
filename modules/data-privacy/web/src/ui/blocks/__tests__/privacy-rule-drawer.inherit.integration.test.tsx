@@ -1,17 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The privacy rule drawer exposes "Inherit" on every control.
- *
- * `platform/app/src/pages/settings/__tests__/dataPrivacyInheritDrawer.integration.test.tsx`,
- * moved with the drawer. Two edits, both forced by the move: the DTOs come from
- * `@langwatch/data-privacy-contract` rather than from the application's server
- * read model, and the scope picker arrives as the render prop the drawer now
- * takes rather than being reached for directly. A new rule starts
- * every field on Inherit (so a saved-as-is rule changes nothing), an inherited
- * field shows the value it resolves to, and editing a rule shows the fields the
- * rule does not set as Inherit rather than a concrete default. Renders the real
- * drawer (no shallow, no mocked controls) and asserts via each control's value.
+ * Tests that the privacy rule drawer handles "Inherit" correctly: new rules
+ * start with all fields inherited and show resolved values for inherited fields.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

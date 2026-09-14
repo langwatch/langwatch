@@ -1,15 +1,6 @@
 /**
- * What an organization's plan permits of its retention, in the two facts the
- * retention tiering actually turns on.
- *
- * Deliberately NOT a `PlanProvider` and deliberately not `PlanInfo`. Retention
- * packaging owns its own tiering — which values a tier may persist, the
- * enterprise custom floor, the paid presets that are the sole exceptions below
- * it — and that rule stays in this package. What leaves is only the billing and
- * licensing plumbing behind these two booleans: which plan types count as
- * enterprise, and whether this install is SaaS at all. Neither is retention's
- * to know, and dragging them in is what would couple this feature to the
- * licence reader.
+ * Organization's retention plan permissions; only the two booleans affecting
+ * billing/licensing leave this package to avoid coupling to plan readers.
  */
 export type DataRetentionPlan = Readonly<{
   /**

@@ -12,15 +12,8 @@ import {
 } from "@langwatch/data-privacy-contract";
 
 /**
- * Pure form-state to DataPrivacyConfig translation for the privacy-rule drawer.
- *
- * Every control carries an explicit "inherit" choice on top of its real values.
- * A field only lands in the config when its control names a concrete value; an
- * "inherit" control is omitted, so that field falls through to the next scope up
- * the cascade (and finally the platform default). The cascade resolves per
- * field, so a less-restrictive override (e.g. project `capture` over an org
- * `drop`) is representable by choosing that value explicitly, while "inherit"
- * hands the field back to the wider scope.
+ * Pure form-state to config translation; only explicit values land in the
+ * config, "inherit" choices omit fields to cascade through scopes.
  */
 
 export type CategoryChoice = "inherit" | Disposition;

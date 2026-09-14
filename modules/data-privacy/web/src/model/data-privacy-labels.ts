@@ -8,13 +8,8 @@ import { Building2, Folder, Users } from "lucide-react";
 import type { AudienceFormState } from "./data-privacy-rule-config.ts";
 
 /**
- * The words this family puts on the four categories, the three dispositions and
- * the four PII levels — and the glyph each scope tier gets.
- *
- * Lifted out of `platform/app/src/pages/settings/data-privacy.tsx` unchanged.
- * Two label maps for PII rather than one is deliberate and was already so: the
- * effective-policy summary says "Disabled" for the off level and the drawer's
- * inherited hint says "Off", matching the word on its own radio button.
+ * Labels for categories, dispositions, and PII levels; two PII maps because
+ * summary and drawer use different words for the off level.
  */
 
 export const CATEGORY_LABELS: Record<ContentCategory, string> = {

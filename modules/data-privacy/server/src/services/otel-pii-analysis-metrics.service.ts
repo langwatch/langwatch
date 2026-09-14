@@ -10,16 +10,8 @@ import {
 } from "../app/data-privacy.members.ts";
 
 /**
- * The three series names, and the evaluator label the two duration/status
- * series carry, pinned because two processes write them.
- *
- * Every one of these is read by name somewhere outside this repository, and
- * every one of them fails silently: a renamed series produces an empty panel,
- * not an error, and an empty PII-analysis panel reads exactly like "no traffic"
- * rather than "the metric moved". `evaluation_duration_milliseconds` and
- * `evaluation_status_counter` are shared with the evaluator pipeline and are
- * distinguished only by `evaluator_type`, so the label value is as
- * load-bearing as the name.
+ * Series names and evaluator labels are pinned and read externally; renamed
+ * series produce empty panels without error.
  */
 export const PII_CHECKS_METRIC_NAME = "pii_checks";
 export const PII_ANALYSIS_DURATION_METRIC_NAME = "evaluation_duration_milliseconds";

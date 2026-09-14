@@ -11,13 +11,8 @@ import {
 } from "@langwatch/data-privacy-contract";
 
 /**
- * System instructions and tool calls do not only live in their own attributes
- * (`gen_ai.system_instructions`, `gen_ai.tool.call.*`); they also ride inside the
- * captured input/output conversation as chat messages with `role: "system"` or
- * `role: "tool"`, and as `tool_calls` on assistant messages. Canonicalization
- * (which runs AFTER the drop) re-derives `gen_ai.system_instructions` from that
- * conversation, so dropping the key alone is not enough: the role has to be
- * stripped from the conversation arrays too, or the content survives.
+ * Roles in chat messages must be stripped because canonicalization re-derives
+ * system_instructions from the conversation after the drop.
  */
 const ROLE_BASED_CATEGORY_ROLES: Partial<Record<ContentCategory, readonly string[]>> = {
   system: ["system"],
@@ -25,14 +20,8 @@ const ROLE_BASED_CATEGORY_ROLES: Partial<Record<ContentCategory, readonly string
 };
 
 /**
- * What a resolved privacy policy means for a payload, independent of the shape
- * that payload arrives in.
- *
- * Split from the OTLP-span walker deliberately, the same way the PII redaction
- * slice split: these decisions — which keys a `drop` category covers, which
- * message roles have to come out of a conversation, which custom patterns
- * compile — are the same for a span, a log record and a metric, and only the
- * walk over the payload differs. Every method is pure and free of I/O.
+ * Policy decisions independent of payload shape; decisions apply uniformly and
+ * all methods are pure and free of I/O.
  */
 export class ContentDropPolicyService {
   static create(): ContentDropPolicyService {

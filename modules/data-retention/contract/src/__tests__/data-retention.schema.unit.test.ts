@@ -154,15 +154,8 @@ describe("PLATFORM_DEFAULT_RETENTION_DAYS", () => {
 });
 
 /**
- * What is left of the platform default's own guard.
- *
- * The retired application read `LANGWATCH_DEFAULT_RETENTION_DAYS` inside this
- * module and refused it outright outside development and test — lowering the
- * platform default on a production deployment would silently expire customer
- * data. The portable contract reads no environment, so what survives here is
- * the SHAPE rule the boot-time reader is meant to validate against before it
- * injects a value. The environment refusal itself has no owner: see the ledger
- * record for this lane.
+ * Validates the platform default retention days shape; the environment guard
+ * moved to the boot-time reader.
  */
 describe("platformDefaultRetentionDaysSchema", () => {
   describe("given a whole-week value within the column's bounds", () => {

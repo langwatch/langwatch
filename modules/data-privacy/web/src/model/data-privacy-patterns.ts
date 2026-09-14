@@ -2,19 +2,8 @@ import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import safe from "safe-regex2";
 
 /**
- * Whether a pattern a customer typed is safe to run, and safe to run on TRACES.
- *
- * `isSafeRegex` is a family-local copy of `platform/app/src/utils/safeRegex.ts`.
- * That module has six non-family callers — the cost drawer, the matching-spans
- * view, the model-provider router and two ingestion paths — and the migration
- * ruling forbids repointing them, so the copy is what travels. It is the same
- * `safe-regex2` verdict the server applies at the write boundary, which is what
- * keeps the form and the runtime from disagreeing.
- *
- * The over-broad probe is a SECOND check and only the custom-secret input runs
- * it: a secret pattern that also matches ordinary prose rewrites trace content
- * at ingestion, and that is not recoverable. The probe is the pipeline's own, so
- * this page cannot promise something different from what actually happens.
+ * Whether a pattern is safe to run on traces; uses the same safe-regex2 verdict
+ * as the server and runs an additional over-broad probe on custom secrets.
  */
 
 /** Compiles a pattern, and hands it back only if it cannot backtrack catastrophically. */

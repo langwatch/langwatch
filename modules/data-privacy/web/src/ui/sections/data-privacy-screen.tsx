@@ -1,27 +1,6 @@
 /**
- * Data privacy rules, as a reader configures them.
- *
- * `platform/app/src/pages/settings/data-privacy.tsx`, moved whole, together
- * with `components/settings/DataPrivacyRuleDrawer.tsx` — the URL shell that
- * rebuilt the drawer from the address. What changed is only what a feature-web
- * package may not own:
- *
- * - `SettingsLayout` does not travel. Chrome belongs to the route tree, and
- *   `apps/ui` mounts the harvested settings layout around this screen.
- * - `withPermissionGuard("project:view")` does not travel either; the frontend
- *   feature states the same policy in front of the same loader.
- * - The organization, the team, the project, the address and both toasts are
- *   the host's.
- * - THE DRAWER IS THIS SCREEN'S OWN OVERLAY, not a registry entry. It had
- *   exactly one opener — this page — so the `dataPrivacyRule` registration and
- *   its lazy shell die with the move, and the address becomes `?rule=`. The
- *   spec asks that the URL carry the drawer and the rule it targets, and it
- *   still does: `?rule=new` for the add flow, `?rule=<tier>:<id>:<personal>`
- *   for one rule, cleared on close. That is the gateway family's answer to the
- *   same question, third use.
- *
- * Spec: specs/data-privacy/privacy-rule-drawer-url.feature
- * Spec: specs/data-privacy/policy-configuration.feature
+ * Data privacy rules configuration; the drawer is a screen-specific overlay
+ * with URL state managed via ?rule=new or ?rule=<tier>:<id>:<personal>.
  */
 
 import {

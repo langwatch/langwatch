@@ -92,17 +92,8 @@ export const INDEFINITE_RETENTION_DAYS = 0;
 export const MIGRATION_DEFAULT_RETENTION_DAYS = 308;
 
 /**
- * The retention a tenant's data is stamped with when no override exists
- * anywhere in its scope cascade: 7 weeks. Retention is default-on — the absence
- * of an override does not mean indefinite, it means "use the platform default".
- *
- * A SERVER process may lower this for a local stack through
- * `LANGWATCH_DEFAULT_RETENTION_DAYS`, which is validated at boot and injected;
- * that override is dev-only and fails loud outside development and test. The
- * BROWSER has no such override to honour and no `process` to read it from, so
- * the constant is the value every browser surface has always rendered. It is
- * here because the settings page names the default in its empty state, and a
- * browser package may not import the server module that resolves it.
+ * Platform default retention (7 weeks) when no override exists; defined here
+ * for browser surfaces that name the default.
  */
 export const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
 

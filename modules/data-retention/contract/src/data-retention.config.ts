@@ -7,14 +7,8 @@ import {
 } from "./data-retention.ts";
 
 /**
- * The retention a tenant's data is stamped with when nothing in its scope
- * cascade says otherwise.
- *
- * Carried as written rather than coerced at the leaf, because the rule is
- * cross-field: the override is admissible only under a recognised
- * non-production environment, and `NODE_ENV` is bound once by the process's
- * own identity block. {@link resolvePlatformDefaultRetentionDays} applies the
- * rule at the root, immediately after the one parse.
+ * Platform default retention; carried as written and validated at root because
+ * the override rule depends on NODE_ENV.
  */
 export const dataRetentionServerConfigDefinition = RuntimeConfig.define({
   platformDefaultDays: Config.value(z.string().optional(), {

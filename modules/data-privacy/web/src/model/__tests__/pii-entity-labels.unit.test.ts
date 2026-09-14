@@ -1,28 +1,6 @@
 /**
- * The custom PII picker offers every identifier redaction can produce, once —
- * and offers it on the SIDE the engines actually detect it on.
- *
- * The original pin lived in
- * `platform/app/src/components/settings/__tests__/piiEntityLabels.unit.test.ts`
- * and read the two ENGINE lists, `ESSENTIAL_PII_ENTITIES` and
- * `PRESIDIO_STRICT_ENTITIES`. Both lived under `platform/app/src/server`, where
- * a browser package may not reach and which the migration ruling forbids
- * editing to publish them, so this file was rebuilt on
- * `REDACTION_MARKER_ENTITIES` alone and RECORDED the three assertions it lost:
- * that essential is exactly the native engine's list, that strict-added is
- * exactly the analyzer entities the native engine cannot detect, and that the
- * Brazilian CPF is the one native-only identifier.
- *
- * Those three are back. The two lists moved into `@langwatch/redaction` with
- * the trace-privacy harvest, into a dependency-free module the browser may
- * import — the engines that use them stay behind `@langwatch/redaction/pii`,
- * so this bundle still pulls in no recognizer table and no phone-number
- * library.
- *
- * What the picker depends on, in one line: an identifier with no checkbox can
- * never be turned off, an identifier with two is a duplicate row, and an
- * identifier under the wrong heading tells a customer the essential level
- * covers something only the strict level does.
+ * Verifies the PII picker offers every identifier exactly once on the correct
+ * engine side and that detection levels map correctly.
  */
 
 import {

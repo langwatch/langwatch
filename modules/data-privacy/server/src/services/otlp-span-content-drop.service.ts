@@ -51,14 +51,8 @@ export interface OtlpSpanContentDropServiceOptions {
 }
 
 /**
- * Removes the content a project's privacy policy says must never be stored.
- *
- * The pass runs at ingestion, before the event is made immutable, and it is the
- * only one: nothing downstream can take back a value that was written. It is
- * therefore deliberately fail-OPEN — a policy that cannot be resolved leaves
- * the span intact and subject to read-time visibility rather than dropping
- * content on a guess — and just as deliberately in-place, so a caller cannot
- * store the pre-drop copy by holding the wrong reference.
+ * Removes content at ingestion before the event is immutable; deliberately
+ * fail-open: unresolved policies leave the span intact.
  */
 export class OtlpSpanContentDropService {
   static create(options: OtlpSpanContentDropServiceOptions): OtlpSpanContentDropService {
@@ -100,17 +94,8 @@ export class OtlpSpanContentDropService {
   }
 
   /**
-   * Strip every dropped content key from an OTLP span IN PLACE for a resolved
-   * policy: each `drop` category's key-set plus the policy's custom attribute
-   * rules (exact keys or `*` wildcards), on the span attributes and every event's
-   * attributes. Metadata keys (tokens, cost, model, latency, ids, names, status)
-   * are never in a droppable key-set, so they always survive. When a category is
-   * dropped a marker attribute is stamped listing the categories; when custom
-   * attribute rules drop keys a second marker lists the dropped key NAMES (never
-   * the values) so the trace view can explain the absence.
-   *
-   * Deterministic and free of I/O: it mutates the passed `span` in place rather
-   * than returning a copy, so it can be unit-tested directly without a database.
+   * Strips every dropped content key from the span in place; marks dropped
+   * categories and custom attribute rules with separate markers.
    */
   stripSpanContent({
     span,

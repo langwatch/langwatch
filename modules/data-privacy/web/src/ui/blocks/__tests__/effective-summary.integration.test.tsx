@@ -1,15 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The Data Privacy "Effective" summary follows the scope filter: "All you can
- * see" shows the organization baseline, "This team" the team baseline, and a
- * project the full cascade. Renders the real component (no shallow) and asserts
- * the heading and the resolved values switch together with the filter.
- *
- * `platform/app/src/pages/settings/__tests__/dataPrivacyEffectiveSummary.integration.test.tsx`,
- * moved with the block. The only edit the move forced is where the DTOs come
- * from: `@langwatch/data-privacy-contract` rather than the application's server
- * read model.
+ * Tests that the Effective summary displays the correct scope baseline
+ * (organization, team, or full cascade) based on the scope filter.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
