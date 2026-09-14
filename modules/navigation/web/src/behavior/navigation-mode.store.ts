@@ -9,25 +9,7 @@ export const DEFAULT_NAVIGATION_MODE: NavigationMode = "product-switcher";
 
 export const NAVIGATION_MODE_STORAGE_KEY = "langwatch:navigation-mode:v1";
 
-/**
- * Which navigation shell this device renders: the product-switcher top
- * bar, or the icon rail. Purely a per-device preference (localStorage
- * only, never synced to the account), so it lives in its own zustand
- * store the same way the graphics-quality override does.
- *
- * `storedMode` is the reader's own pick and is null until they make one.
- * A stored "legacy" from the flag era fails the mode check and reads as
- * null, so those devices run the default mode.
- *
- * The store initializes to null so server render and the first client
- * frame agree (the server has no localStorage to read). The device's
- * saved pick is applied after mount by `useNavigationMode`, which calls
- * `hydrateStoredMode`. Reading localStorage at module init would render
- * a different shell on the first client frame than the server sent,
- * which is a hydration mismatch on the top-level DOM.
- *
- * Spec: specs/navigation/navigation-modes.feature
- */
+/** Per-device shell preference (null until set); server/client render must match for hydration */
 function isNavigationMode(value: unknown): value is NavigationMode {
   return NAVIGATION_MODES.includes(value as NavigationMode);
 }

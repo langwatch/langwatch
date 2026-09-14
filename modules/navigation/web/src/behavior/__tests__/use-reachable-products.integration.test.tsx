@@ -1,15 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The reachable-products hook keeps a stable array identity across
- * renders while the answer is unchanged. Consumers put the list in
- * effect dependencies (the "/" landing redirect), so a fresh array on
- * every render re-fires those effects into a render loop.
- *
- * MOVED from `platform/app`. The two mocks that named that application's hooks
- * are the stub host now; what the second scenario asserts is unchanged in
- * substance — a legacy-mode caller must not pay for the product flags — and is
- * asserted where the cost now lives, which is the ask on the host.
+ * Stable array identity for reachable products; moved from platform/app to use stub host
  */
 
 import { renderHook } from "@testing-library/react";

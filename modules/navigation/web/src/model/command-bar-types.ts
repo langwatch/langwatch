@@ -2,15 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { z } from "zod";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
-/**
- * A drawer named as an ADDRESS, not as a component.
- *
- * The catalogue names drawers other families own — the agent picker, the
- * prompt editor, the trace detail. A shell package may not reach for any of
- * them, and it does not have to: `?drawer.open=<name>` IS the address, and the
- * host resolves the name against whatever registry the application composed.
- * So the type is the name, and the resolution is the host's.
- */
+/** Drawer name (address, not component); host resolves against its own registry */
 export type CommandDrawerName = string;
 
 export type CommandCategory = "navigation" | "actions" | "search" | "projects";

@@ -1,20 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The post-approval first-trace watch, driven end to end.
- *
- * The policy it applies is pure and has its own unit suite; what this file is
- * about is the two things only a render can say: that a project which already
- * has traces keeps the plain close-this-tab card, and that a first trace landing
- * takes the reader to their own session — through the HOST, never through a
- * router the screen reached for.
- *
- * Restated from `platform/app/src/pages/cli/__tests__/cliAuthFirstTraceRedirect.integration.test.tsx`,
- * which drove the whole `/cli/auth` page to reach this component. Here the
- * component is driven directly, which is what makes the timers legible: the
- * platform suite had to approve a device code first, and every timing question
- * was tangled with the approval's.
- *
+ * Post-approval first-trace watch: render-only behavior (nav through HOST, not router).
  * Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
  */
 

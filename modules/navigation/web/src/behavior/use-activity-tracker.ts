@@ -13,15 +13,7 @@ interface EntityMatch {
   typeLabel: string;
 }
 
-/**
- * Parse a URL path to extract entity information.
- * Returns null if the path doesn't match a known entity pattern.
- *
- * Exported so its suite reads THIS table rather than a second copy of it. The
- * test that travelled with the hook re-declared the patterns inline and
- * asserted against its own declaration, which is a test that cannot fail on a
- * change to the product.
- */
+/** Parses URL to extract entity; exported so suite reads this table, not a test-local copy */
 export function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
   // Remove query params and hash
   const cleanPath = path.split("?")[0]?.split("#")[0] ?? "";
@@ -174,15 +166,7 @@ function parseDrawerEntity(fullUrl: string, projectSlug: string): EntityMatch | 
   }
 }
 
-/**
- * Tracks the entity pages a reader visits, so Quick Search can offer them back.
- *
- * IT WATCHES THE ADDRESS, not a router's event stream. The platform hook it
- * came from subscribed to `routeChangeComplete`, which is one router's own
- * vocabulary; the port answers with the address on screen, and an address that
- * changed IS the navigation that happened. Same recordings, one less thing the
- * package has to know about the application it is mounted in.
- */
+/** Tracks entity pages for Quick Search; watches address instead of router events */
 export function useActivityTracker() {
   const host = useNavigationHost();
   const project = host.project();

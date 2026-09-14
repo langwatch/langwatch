@@ -14,26 +14,7 @@ import type { AgentType } from "@langwatch/agent-contract";
 
 import type { SearchResult } from "./command-bar-types.ts";
 
-/**
- * The address the whole product uses for ONE agent.
- *
- * Three editors, one per kind, and the kind is what picks between them — the
- * same rule `apps/api`'s `createAgentPlatformUrlBuilder` applies when it mints
- * an agent's link for the REST API and for Langy's deep links, and the same one
- * `@langwatch/agent-web`'s `getAgentEditorDrawer` applies on the agents page.
- *
- * WHAT THIS ONE ANSWERS THAT NEITHER OF THOSE DOES is "and what if there is no
- * editor". A signature agent has none, and the command bar lists every agent
- * the project has, so `null` is a real answer here where agent-web's version
- * throws: a palette that threw on a search result would take the whole overlay
- * down for a kind of agent that is perfectly valid.
- *
- * `agentViewer` USED TO BE THE ANSWER and never worked. It was in no drawer
- * registry, had no component, and every agent hit in the palette wrote it — so
- * the reader clicked and the page did not move. Recorded in
- * `dev/docs/plans/ownerless-ui-surfaces-census.md` as the one ownerless drawer
- * that never existed in the first place.
- */
+/** Agent editor drawer name; returns null for signature agents with no editor */
 export type AgentEditorDrawerName =
   | "agentCodeEditor"
   | "agentHttpEditor"
@@ -48,13 +29,7 @@ export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName
       return "agentHttpEditor";
     case "workflow":
       return "agentWorkflowEditor";
-    /**
-     * A connected agent has no editor — the SDK registered it from a decorated
-     * function, so there is nothing here to edit — but it does have a place to
-     * be looked at, which is the drawer the agents page itself opens for one.
-     * Sending the palette there is the same promise the three editors make:
-     * the hit you clicked is what fills the screen.
-     */
+    /** Connected agents have no editor, send to detail view like the agents page does */
     case "connected":
       return "agentConnectedDetail";
     case "signature":

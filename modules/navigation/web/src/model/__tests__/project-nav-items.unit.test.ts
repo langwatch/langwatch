@@ -1,13 +1,4 @@
-/**
- * The address on screen, written back as the route pattern the menu matches on.
- *
- * Every active-state test in the moved project menu was written against
- * `router.pathname` — the PATTERN, `/[project]/sessions`, not the address
- * `/acme-app/sessions`. The host answers with the address, because that is the
- * only thing a settings entry can be matched against. This is the seam that
- * lets both kinds of test keep the exact comparison they were written with, so
- * it is where a wrong answer lights the wrong menu entry.
- */
+/** Address to route pattern converter; host provides address, tests compare to pattern */
 
 import { describe, expect, it } from "vitest";
 import { projectNavItemAt, projectNavItems, toProjectRoutePattern } from "../project-nav-items.ts";

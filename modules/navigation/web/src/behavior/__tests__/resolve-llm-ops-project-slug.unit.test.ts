@@ -1,16 +1,4 @@
-/**
- * Which project LLM Ops opens when the ambient one cannot be it: the Me
- * pages resolve the personal workspace, and a reader who has just switched
- * organization has nothing remembered at all.
- *
- * MOVED from `platform/app`, where the function decided for itself which teams
- * the reader could open by calling that application's `userCanOpenTeam`. The
- * host answers that now, so the cases that used to turn on an organization ROLE
- * turn on which teams the host offered — which is the same question asked at the
- * seam that owns it.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
- */
+/** Tests resolveLlmOpsProjectSlug; moved from platform/app, now uses host for team access */
 import { describe, expect, it } from "vitest";
 import type { NavigationTeam } from "../../model/navigation-host.ts";
 import { resolveLlmOpsProjectSlug } from "../use-llm-ops-project-slug.ts";

@@ -1,16 +1,4 @@
-/**
- * Which product an address belongs to, and which scope its chrome carries.
- *
- * Written HERE rather than moved: the platform suite for this function was
- * swept with the rest of `platform/app`'s unreachable navigation before the
- * module travelled, and a resolver the chrome asks on every render may not
- * arrive without one. The cases are the ones its own docblock names — the
- * settings detour, the personal scope, and the segment-boundary trap a plain
- * prefix test falls into.
- *
- * Specs: specs/navigation/product-switcher-navigation.feature,
- *        specs/navigation/ops-navigation-v2.feature
- */
+/** Product and scope resolver; written after platform sweep; cases: settings/personal/boundary */
 
 import { describe, expect, it } from "vitest";
 import { resolveShellRoute } from "../resolve-shell-route.ts";

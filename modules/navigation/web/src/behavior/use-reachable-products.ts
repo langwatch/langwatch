@@ -3,15 +3,7 @@ import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { PRODUCTS, type ProductId } from "../model/products.ts";
 
-/**
- * Which products the current user can open right now: every access gate
- * in the registry evaluated against the live flags and permissions.
- * `isLoading` covers the flag round-trips so landing decisions can wait
- * instead of resolving against a half-evaluated list.
- *
- * A caller that does not need the list passes `enabled: false`; the flag
- * queries then never run and its request count is unchanged.
- */
+/** Products user can open; evaluated against flags/permissions; isLoading covers queries */
 export function useReachableProducts({
   enabled = true,
 }: {

@@ -1,14 +1,6 @@
-/**
- * Which projects the CLI project picker offers, and which one it starts on.
- *
- * Moved verbatim from `platform/app/src/pages/cli/__tests__/cliAuthProjects.unit.test.ts`;
- * the only edit is the module path. The case that matters most is the org
- * admin's: `organization.getAll` retains OTHER members' personal workspaces for
- * an admin, and offering one of those would fail server-side with
- * `personal_project_not_allowed` after the reader had already picked it.
- *
- * Spec: specs/ai-governance/cli-onboarding/authorize-project-picker.feature
- */
+// CLI project picker options and startup. Moved from platform/app. Guards that org admin personal
+// workspaces aren't offered (would fail server-side).
+// Spec: specs/ai-governance/cli-onboarding/authorize-project-picker.feature
 import { describe, expect, it } from "vitest";
 import { PERSONAL_GROUP_NAME, resolveCliAuthProjects } from "../cli-auth-projects.ts";
 

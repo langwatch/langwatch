@@ -1,22 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * `/cli/auth`: the code check, what the approval carries, and who it is offered.
- *
- * Consolidates three platform suites - `cliAuthKeySelection`,
- * `cliAuthProjectPicker` and `cliAuthFirstTraceRedirect` - onto this package's
- * host harness. THE ONE STRUCTURAL CHANGE is where the wire lives: the platform
- * files replaced `globalThis.fetch` and asserted on the request bodies it saw.
- * A screen may not call `fetch`, so the three calls are host methods, and the
- * fake host records the SELECTION each one carried. What the adapter turns that
- * selection into - the paths, the method, the snake-cased body - is pinned in
- * `apps/ui/tests/cli-auth-exchange.integration.test.tsx`, which is where the
- * wire actually lives. Between them the coverage is the same and each half is
- * asserted where it is decided.
- *
- * Specs: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature,
- *        specs/ai-governance/cli-onboarding/authorize-project-picker.feature,
- *        specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
+ * Consolidates three platform suites onto the host harness. Key structural
+ * change: host methods instead of fetch mocking. Specs: login-user-scoped-key,
+ * authorize-project-picker, post-login-first-trace-redirect.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

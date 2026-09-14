@@ -1,20 +1,5 @@
-/**
- * The API Keys table's scope filter, and the parallel implementation it is not.
- *
- * Restated from `platform/app/src/pages/settings/api-keys/__tests__/api-keys-scope-filter.unit.test.ts`,
- * which proved "one filter, shared with the model-providers page" by reading
- * both pages' source off disk and matching import strings. One of those files no
- * longer exists (the model-config family deleted it, which cost that guard three
- * cases already) and the other is now a screen in this package, so the guard is
- * restated as what it was actually protecting: the cascade this family applies is
- * the SHARED predicate, not a second opinion about scopes.
- *
- * The proof is behavioural rather than textual — `filterRowsByScope` is driven
- * through the inclusive cascade in both directions — plus one structural case
- * that the package publishes no filter component of its own.
- *
- * Spec: specs/api-keys/scope-filter.feature
- */
+// Scope filter: proves the cascade is shared, not reimplemented. Restated from platform/app guard.
+// Spec: specs/api-keys/scope-filter.feature
 
 import fs from "node:fs";
 import path from "node:path";

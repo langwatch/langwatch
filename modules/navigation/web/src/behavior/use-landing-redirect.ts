@@ -90,33 +90,14 @@ function productLandingDestination({
   });
 }
 
-/**
- * The safety nets. A failed resolver keeps the
- * LLMOps majority on their project home, so a transient backend error
- * never strands them.
- *
- * A user with no organization goes to the bootstrap page. Routing them to
- * /me instead is a dead end for a fresh-signup admin: no projects, no
- * discoverable path onward, and /governance renders Access Restricted
- * behind the governance:view gate. /onboarding/welcome creates the
- * organization and the first project (api.onboarding.initializeOrganization),
- * after which the resolver picks the right destination on the next visit.
- */
+/** Fallback destinations: project home on error, /onboarding/welcome for orgless users */
 function fallbackDestination({ resolved, projectSlug, isOrgless }: LandingInput): string | null {
   if (resolved.hasError && projectSlug) return `/${projectSlug}`;
   if (isOrgless) return "/onboarding/welcome";
   return null;
 }
 
-/**
- * Navigate to a destination at most once.
- *
- * Several of the redirect effect's dependencies get a fresh identity per
- * render while the target route lazy-loads, so the effect re-runs during
- * the navigation. Repeating router.replace with the same target
- * interrupts and restarts that navigation, which React reports as an
- * update-depth loop. A changed destination still goes through.
- */
+/** Navigates to destination at most once; prevents update-depth loops from lazy-loading routes */
 function useReplaceOnce(): (destination: string | null) => void {
   const host = useNavigationHost();
   const lastReplacedRef = useRef<string | null>(null);
@@ -132,16 +113,7 @@ function useReplaceOnce(): (destination: string | null) => void {
   );
 }
 
-/**
- * The `/` redirect: picks the right home for the user's persona via the
- * `api.governance.resolveHome` tRPC procedure. Falls back to the existing
- * project-default redirect if the resolver query is still loading or
- * fails, so the LLMOps majority experience never regresses on transient
- * backend errors.
- *
- * Specs: specs/ai-gateway/governance/persona-home-resolver.feature
- *        specs/navigation/navigation-v2-landing.feature
- */
+/** The / redirect: picks home per user persona; falls back to project home on error */
 export function useLandingRedirect(): void {
   const host = useNavigationHost();
   const project = host.project();

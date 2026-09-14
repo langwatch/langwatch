@@ -1,14 +1,6 @@
 import { PRODUCTS, type ProductId } from "./products.ts";
 
-/**
- * The last product visited, one value per organization, on this device
- * only. A raw localStorage key with no subscribers: the value is read at
- * decision points (landing, settings back target, org switch), never
- * watched, so writing it can never re-render the app mid-navigation
- * (React error #185 class of bugs).
- *
- * Spec: specs/navigation/navigation-v2-product-memory.feature
- */
+/** Last product visited per organization (localStorage only); not watched, so no re-renders */
 function storageKey(organizationId: string): string {
   return `langwatch:nav:last-product:${organizationId}:v1`;
 }

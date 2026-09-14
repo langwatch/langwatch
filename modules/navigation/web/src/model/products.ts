@@ -2,16 +2,7 @@ import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
-/**
- * The product registry: the platform is four products plus Settings, and
- * every navigation-v2 surface (product switcher, icon rail, sidebars,
- * command bar entries, landing memory) reads this one declaration.
- * Pure data: icons are component references, never JSX, so server-safe
- * logic can import it too.
- *
- * Settings is deliberately NOT a product here: it has no switcher entry,
- * never becomes the remembered product, and gets its own shell.
- */
+/** Product registry; Settings excluded (no switcher, no memory, own shell) */
 export type ProductId = "me" | "llm-ops" | "gateway" | "governance";
 
 export type ProductScopeKind = "personal" | "project" | "organization";
@@ -83,20 +74,7 @@ export function productById(id: ProductId): ProductDefinition {
   return product;
 }
 
-/**
- * Whether a product is an organization-wide surface, read off the registry
- * rather than from a list of product names. The scope of a product is a
- * fact the registry owns; the shell route resolver used to type out
- * "gateway" and "governance" by hand in two separate places, so a fifth
- * org-wide product meant remembering to edit both. Now it is one entry
- * here.
- *
- * Takes a nullable id because the callers work from the address: there is
- * no active product on the settings detour, and `productFromPathname`
- * returns null for every non-product page. A missing product is not
- * organization-wide, so this looks the id up without `productById`, which
- * throws on anything unknown.
- */
+/** Checks if product is org-scoped; registry owns scope so fifth product means one edit */
 export function isOrganizationScopedProduct(id: ProductId | null): boolean {
   if (!id) return false;
   return (
@@ -150,15 +128,7 @@ export function productFromPathname(pathname: string): ProductId | null {
   return "llm-ops";
 }
 
-/**
- * The settings detour: the settings pages and the internal ops pages.
- * Neither is a product. Both render the settings sidebar surface, which
- * is where the ops pages are offered in the new navigation modes, both
- * carry the static Settings title, and both belong to the organization
- * rather than to a project, so the chrome never waits for a project.
- *
- * Spec: specs/navigation/ops-navigation-v2.feature
- */
+/** Settings detour: settings and ops pages; both org-scoped, render settings sidebar */
 export function isSettingsShellRoute(pathname: string): boolean {
   return isPathUnder({ pathname, base: "/settings" }) || isPathUnder({ pathname, base: "/ops" });
 }

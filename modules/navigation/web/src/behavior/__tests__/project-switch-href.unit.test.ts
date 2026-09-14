@@ -1,14 +1,4 @@
-/**
- * Where a project pick lands, per `projectSwitchHref`.
- *
- * Written HERE rather than moved: main's `buildProjectSwitchHref`
- * (platform/app's WorkspaceSwitcher route table) has a successor in this
- * package that reads the boundary off the router's own matched pattern
- * instead of a route table, but nothing bound its three project-switching
- * scenarios on this branch.
- *
- * Spec: specs/navigation/workspace-switcher.feature
- */
+/** Tests projectSwitchHref, which reads route boundaries from matched pattern instead of a table */
 
 import { describe, expect, it } from "vitest";
 import { projectSwitchHref } from "../use-project-pick-groups.ts";

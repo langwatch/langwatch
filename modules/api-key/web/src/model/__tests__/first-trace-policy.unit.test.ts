@@ -1,12 +1,5 @@
-/**
- * When the first-trace watch polls, and what a landing read means.
- *
- * Moved verbatim from `platform/app/src/pages/cli/__tests__/firstTracePolling.unit.test.ts`;
- * the only edit is the module path, which is now the pure policy rather than the
- * component that used to carry it.
- *
- * Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
- */
+// First-trace watch polling: when to poll and what landing means. Moved from platform/app; now
+// pure policy. Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 import { describe, expect, it } from "vitest";
 import {
   FIRST_TRACE_POLL_INTERVAL_MS,

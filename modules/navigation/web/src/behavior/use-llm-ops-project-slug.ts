@@ -1,27 +1,6 @@
 import { useNavigationHost, type NavigationTeam } from "../model/navigation-host.ts";
 
-/**
- * Which project the LLM Ops product opens, from anywhere in the app.
- *
- * On an LLM Ops page that is the project being shown. Everywhere else the
- * ambient project can be private (the Me pages resolve the personal
- * workspace) or absent, and LLM Ops still has somewhere to go: the project
- * the reader last had open, else the first one of a team they are allowed to
- * open. Null only when no team they can open holds a project, which is the
- * one case where the product has no home and the switcher greys it out.
- *
- * MOVED from `platform/app/src/features/navigation/useLlmOpsProjectSlug.ts`.
- * One thing changed and it is a seam, not a rule: "a team they are allowed to
- * open" used to be decided here, by calling that application's
- * `userCanOpenTeam` and `selectAmbientTeam` on the raw organization graph. Who
- * may open a team is the HOST's policy — it is the same test its chrome uses
- * to decide whether to render a page at all — so the port answers it, in the
- * ambient preference order the host already resolves scope with, and this
- * module reads the answer. The preference the function itself applies (a
- * shared team holding a project) is unchanged.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
- */
+/** Which project LLM Ops opens; moved from platform/app, team access now delegated to host */
 export function resolveLlmOpsProjectSlug({
   ambientProject,
   rememberedProjectSlug,

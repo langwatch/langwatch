@@ -1,17 +1,4 @@
-/**
- * What Quick Search records as you move through the product.
- *
- * THE SUITE READS THE REAL TABLE NOW. It travelled with a second copy of
- * `parseEntityUrl` declared inline and asserted against that copy, which is a
- * test that cannot fail on a change to the product: the patterns could drift
- * and every assertion would still pass. The hook exports the function, so the
- * expectations below are pinned to the thing that runs.
- *
- * The expectations themselves are unchanged, which is what makes the two
- * `messages` cases worth reading: the legacy trace and span addresses are
- * still recognised, because history entries written before the redirect landed
- * still name them.
- */
+/** Tests what Quick Search records; uses real parseEntityUrl, recognizes legacy addresses */
 
 import { describe, expect, it } from "vitest";
 import { parseEntityUrl } from "../use-activity-tracker.ts";

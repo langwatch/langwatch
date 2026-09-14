@@ -1,16 +1,4 @@
-/**
- * What the navigation feature asks of the application it is mounted in.
- *
- * Everything the landing redirect and the project switcher used to read off
- * `platform/app` — the organization graph, the signed-in user, the grants, the
- * feature flags and the address bar — arrives through this one declaration, so
- * the package names none of that application's modules.
- *
- * The port is deliberately SYNCHRONOUS and fail-closed, the same contract
- * `apps/ui`'s session capability already keeps: a grant or a flag that has not
- * answered yet reads as "not yet", never as "yes". `isLoading()` is what tells
- * the redirect to wait rather than to decide against a half-read workspace.
- */
+/** Navigation feature port; synchronous and fail-closed, same contract as apps/ui session */
 
 import { createContext, useContext, type ReactNode } from "react";
 
@@ -20,19 +8,7 @@ export type NavigationProject = {
   name: string;
   slug: string;
   isPersonal?: boolean | null;
-  /**
-   * When this project last sent coding-agent telemetry.
-   *
-   * The project column offers a Sessions and a Pull requests destination only
-   * to projects that actually send one, and only while the signal is recent —
-   * a project that stops sending loses the destination rather than keeping a
-   * link to an empty page forever (`coding-agent-activity`). Absent when the
-   * application's workspace graph did not read the column, which
-   * `withinDays` already treats as outside every window: the entries are not
-   * offered, which is the fail-closed answer.
-   *
-   * Spec: specs/coding-agent/project-menu-links.feature
-   */
+  /** Last coding-agent telemetry timestamp; sessions/PR destinations kept while recent */
   lastCodingAgentSessionAt?: string | null;
   lastCodingAgentPullRequestAt?: string | null;
 };
@@ -124,50 +100,20 @@ export type NavigationOpsAccess = {
   isAdmin: boolean;
 };
 
-/**
- * A change to the scope this device remembers.
- *
- * Written through the host because the keys are the application shell's own
- * (`ui-scope-storage`), and a second writer of the same `localStorage` key in
- * a package is the split brain the landing move already refused. An empty
- * string clears a key: switching organization has to forget the project,
- * which belongs to the organization being left.
- */
+/** Scope change through host; written to app shell's localStorage, not package's */
 export type NavigationScopeWrite = {
   organizationId?: string;
   projectSlug?: string;
 };
 
-/**
- * The search palette, when the application has one.
- *
- * A `ReactNode` plus the two things the sidebar entry needs — the shortcut it
- * prints and the way to open it — the shape `waiting()` and `projectSwitcher()`
- * established. `null` is a real answer: a host with no palette renders no Quick
- * Search entry and no header trigger, rather than an entry that does nothing.
- */
+/** Command bar when app has one; null is real answer, no palette = no Quick Search entry */
 export type NavigationCommandBar = {
   shortcut: string;
   open: () => void;
   trigger: ReactNode;
 };
 
-/**
- * The assistant, when this application composes one and this reader may start
- * a turn with it.
- *
- * THE COMMAND BAR'S ONE DOOR INTO LANGY, and it is a host answer rather than
- * an import for the reason every other cross-family reach in this package is:
- * `@langwatch/langy-web` is a feature-web package and this one may not name it.
- * What the palette actually needs is small — may this reader ask, a way to
- * hand a question over, a way to tell a minimised panel to stand down while
- * the home's field is in use, and the mark to draw in the composer — so the
- * port carries those four and nothing of the assistant itself.
- *
- * `null` is a real answer: a reader holding only `langy:view` is not offered
- * the hand-off at all, because the hand-off queues a prompt that auto-sends
- * and offering it would be an invitation into a 403.
- */
+/** Assistant/Langy when app composes one; host answer avoids importing langy-web package */
 export type NavigationLangy = {
   /** Hand a typed question to the assistant. It opens and sends. */
   ask: (prompt: string) => void;
@@ -180,29 +126,12 @@ export type NavigationLangy = {
   mark: ReactNode;
 };
 
-/**
- * The live-chat bubble, when this deployment carries one.
- *
- * `null` is a real answer and the Support menu reads it as one: a deployment
- * with no bubble offers the community and documentation entries and no "Chat
- * with a human", rather than an entry that opens nothing. The predicate used
- * to be `publicEnv.IS_SAAS`, which was a proxy for "is the bubble script on
- * this page"; the host now answers the question directly.
- */
+/** Live-chat bubble when deployment has one; null is real answer, no bubble = no chat entry */
 export type NavigationSupportChat = {
   open: () => void;
 };
 
-/**
- * What the APPLICATION adds to the account dropdown.
- *
- * The moved menu carried three things a package cannot: an experiments dialog
- * from `@langwatch/feature-flag-web`, an impersonation switch-back entry from
- * `platform/app`'s ops components, and a reduced-graphics store the
- * application owns. All three arrive as nodes and callbacks, the shape
- * `waiting()` established, so this package depends on none of them. `null` is
- * a real answer: the menu then carries its own entries and nothing else.
- */
+/** Account menu additions from app; experiments, impersonation, graphics quality; null is real */
 export type NavigationAccountMenu = {
   /**
    * What the application draws in the header beside the avatar.
@@ -338,15 +267,7 @@ export abstract class NavigationHost {
    */
   abstract pathname(): string;
 
-  /**
-   * The router's matched pattern for the address on screen, params spelled
-   * `:name` — `/:project/traces/:traceId` for `/acme-app/traces/trace_abc`.
-   *
-   * The one reader is the project switcher: a trace id can't exist in another
-   * project, so picking a project on a route with a second dynamic segment
-   * drops to the segment's parent instead of building a 404. Optional because
-   * a host with no router (a test, a static shell) has no pattern to give.
-   */
+  /** Router matched pattern; project switcher reads it to drop trailing dynamic segments */
   routePattern(): string | undefined {
     return void 0;
   }
@@ -392,15 +313,7 @@ export abstract class NavigationHost {
   /** The search palette, or nothing when this application has none. */
   abstract commandBar(): NavigationCommandBar | null;
 
-  /**
-   * Opens a drawer BY NAME, against whatever registry the application composed.
-   *
-   * The command catalogue names drawers eight other families own. None of them
-   * is this package's to import, and none of them has to be: `?drawer.open=`
-   * is an address, so the catalogue carries the name and the host resolves it.
-   * A host whose registry has no such drawer opens nothing, which is the same
-   * answer a mistyped address has always given.
-   */
+  /** Opens drawer by name; host resolves against its registry, missing = no-op */
   abstract openDrawer(drawer: string, params?: Record<string, string>): void;
 
   /** The assistant, or nothing when this reader may not start a turn. */
@@ -453,15 +366,7 @@ export function useNavigationHost(): NavigationHost {
   return host;
 }
 
-/**
- * The host, or nothing.
- *
- * For the one control that is handed ACROSS a seam rather than rendered where
- * it was built: the project switcher travels to a screen as a `ReactNode`, and
- * a screen mounted somewhere the chrome does not reach would otherwise crash on
- * a header decoration. Rendering no switcher is the honest answer there — the
- * same answer the port gave before there was one.
- */
+/** Host or nothing; for controls handed across seams; missing = no-op for switcher */
 export function useOptionalNavigationHost(): NavigationHost | undefined {
   return useContext(NavigationHostContext);
 }

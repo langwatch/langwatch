@@ -1,47 +1,10 @@
-/**
- * Which projects the switcher offers, and where each one goes.
- *
- * ONE ANSWER FOR THE TWO SWITCHERS. The application chrome renders the
- * combobox in its header, and the shell's top bar renders the same control as
- * the LLM Ops scope; both used to build these groups for themselves — the
- * application from the navigation host, the shell from `platform/app`'s
- * `useWorkspaceData` — and a switcher that offers a different list depending on
- * which header drew it is the "two co-existing workspace switchers" bug in a
- * new shape.
- *
- * WHERE A PICK GOES is the rule that needs no route table: swap the `:project`
- * segment of the address the reader is on, and fall back to the project home
- * for an address that carries none. `platform/app`'s `projectRoutes` lookup did
- * not travel and no longer exists; this gives the same answer for every
- * `/:project/...` page, which is every page a switcher is rendered above.
- *
- * THE PER-TEAM "New Project" ENTRY is offered to whoever holds `project:create`
- * (the same ambient permission `@langwatch/organization-web`'s Teams page
- * gates its own "Add project" button on — the host's team shape carries no
- * per-team role to restate main's admin check). An empty team still gets a
- * row when that holds, so a coding-usage signup's first team has one.
- * Spec: specs/navigation/workspace-switcher.feature
- */
+/** Projects switcher offers; one answer for both; "New Project" for project:create access */
 
 import { useMemo } from "react";
 import { useOptionalNavigationHost } from "../model/navigation-host.ts";
 import type { ProjectPickGroup } from "../model/project-pick-items.ts";
 
-/**
- * The address a project pick lands on: the reader's own, with the project
- * segment swapped.
- *
- * The segment boundary is load-bearing. `/acme-app-staging/traces` is not a
- * sub-path of `/acme-app`, and a plain `startsWith` would rewrite it into an
- * address that belongs to neither project.
- *
- * `routePattern` (`:name` params, e.g. `/:project/traces/:traceId`) is what
- * tells a pick to drop a second dynamic segment rather than carry it into the
- * target project — a trace id can't exist there, so the pick lands on the
- * segment's parent instead of building a 404ing per-project URL. Mirrors
- * platform/app's retired `buildProjectSwitchHref`, minus its route table:
- * this reads the boundary off the router's own matched pattern instead.
- */
+/** Project pick destination: swap project segment, drop trailing dynamic segments */
 export function projectSwitchHref({
   pathname,
   routePattern,
@@ -60,12 +23,7 @@ export function projectSwitchHref({
   return `/${nextSlug}${kept.slice(prefix.length)}`;
 }
 
-/**
- * Truncates `pathname` at the first dynamic segment past `:project`, per
- * `routePattern`. Segment counts have to line up (a stale or absent pattern
- * just carries the whole path through) since the truncation index is read
- * off the pattern and applied to the path.
- */
+/** Drops first dynamic segment past :project per routePattern */
 function dropExtraDynamicSegment({
   pathname,
   routePattern,
@@ -86,16 +44,7 @@ function dropExtraDynamicSegment({
   return pathSegments.slice(0, extraDynamicIndex).join("/") || "/";
 }
 
-/**
- * The teams the reader may open, with the projects under each and the address
- * a pick lands on.
- *
- * The host is read as OPTIONAL because the switcher is handed ACROSS a seam: a
- * screen's own host port carries it as a `ReactNode` and the screen decides
- * where in its header to put it, so it can be rendered somewhere the chrome
- * layout route does not reach. No host is no groups, which renders no switcher
- * — the answer those ports gave before there was one.
- */
+/** Teams reader may open with projects; host is optional since switcher handed across seam */
 export function useProjectPickGroups(): ProjectPickGroup[] {
   const host = useOptionalNavigationHost();
   const organization = host?.organization();

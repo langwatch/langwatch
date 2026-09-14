@@ -1,12 +1,4 @@
-/**
- * The quiet chip the sidebar marks an item with: grey type inside a
- * hairline border, no colour of its own. The enterprise pill and the
- * Quick Search key cap both wear it, so a mark never competes with the
- * page name it sits next to.
- *
- * Specs: specs/navigation/product-sidebars.feature,
- *        specs/navigation/settings-shell-v2.feature
- */
+/** Quiet sidebar chip (grey type, hairline border); worn by enterprise pill and key cap */
 export const QUIET_SIDEBAR_CHIP = {
   color: "gray.400",
   borderWidth: "1px",
