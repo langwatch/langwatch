@@ -133,15 +133,29 @@ export function rowToScimSync(row: ScimSyncRow): ScimSyncState {
     state: row.state as ScimSyncLifecycleState,
     lastPushedAtMs: row.lastPushedAt?.getTime() ?? null,
     lastFailure: row.lastFailure
-      ? (row.lastFailure as unknown as ScimSyncFailure)
+      ? readFailure(row.lastFailure as unknown as ScimSyncFailure)
       : null,
     deadLetters: Array.isArray(row.deadLetters)
-      ? (row.deadLetters as unknown as ScimSyncFailure[])
+      ? (row.deadLetters as unknown as ScimSyncFailure[]).map(readFailure)
       : [],
     revokedCause: (row.revokedCause as ScimRevokeCause | null) ?? null,
     createdAtMs: row.createdAt.getTime(),
     updatedAtMs: row.updatedAt.getTime(),
   };
+}
+
+/**
+ * One stored failure, with the fields written after it was.
+ *
+ * `redrivenAtMs` arrived with the operator re-drive (ADR-122), so every
+ * failure recorded before that lands here as `undefined` — and `undefined` is
+ * not `null`: it would compare unequal in the replay proof and read as
+ * "already re-driven" nowhere, but it would also serialise back out as a
+ * missing key and make two rows holding the same failure differ. Normalised
+ * on the way in, at the one seam that knows both shapes.
+ */
+function readFailure(failure: ScimSyncFailure): ScimSyncFailure {
+  return { ...failure, redrivenAtMs: failure.redrivenAtMs ?? null };
 }
 
 /**

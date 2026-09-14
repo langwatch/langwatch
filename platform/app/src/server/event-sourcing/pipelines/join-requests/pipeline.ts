@@ -70,9 +70,10 @@ export interface JoinRequestPipelineDeps {
  * organization is the tenant. Commands append (waited) and the operational
  * projection folds into the Postgres `JoinRequest` head in per-request FIFO.
  *
- * Ships DARK: `JOIN_REQUESTS` defaults off, so nothing dispatches these
- * commands, no interstitial renders and no panel appears — a deploy changes
- * nothing on its own, and rollback is the flag.
+ * The `JOIN_REQUESTS` flag that kept this dark is retired. What gates a
+ * command now is what always did the work: a verified address, a company
+ * domain, and an organization whose administrator opted in. Rollback is that
+ * setting, on the customer's own Access page.
  *
  * Lanes: the commands keep the default per-aggregate group key — one request
  * is one lane, which is already the narrowest useful shard, and a request

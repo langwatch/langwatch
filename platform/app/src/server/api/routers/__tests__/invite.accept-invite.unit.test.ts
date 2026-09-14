@@ -60,6 +60,7 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // tests exercise exactly the legacy branch.
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  clearSignUpConfirmationPending: async () => void 0,
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
   // `betterAuth()` builds its adapter EAGERLY at module load, and this
   // suite's import graph reaches it through the router. It has to be real
@@ -74,6 +75,8 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   PASSWORD_HASH_ROUNDS: 10,
   BACKUP_CODE_COUNT: 10,
   passkeySignUp: () => ({}),
+  ssoAssertion: () => ({}),
+  databaseHooks: () => ({}),
   signUpConfirmationEndpoint: () => ({}),
   lastWayInGuard: () => ({}),
   twoStepAccount: () => ({}),

@@ -206,6 +206,32 @@ export function createEnvConfig() {
           process.env.VERCEL ? z.string().min(1) : z.string().url(),
         ),
       ),
+      /**
+       * Internal identity providers this installation may fetch OIDC
+       * discovery from, comma or whitespace separated. An issuer whose
+       * origin is not our own address and not on this list is refused
+       * before it is fetched, which is what stops a registration form
+       * being a server-side request forgery. Enterprises whose identity
+       * provider lives inside their own network list it here.
+       */
+      SSO_TRUSTED_IDP_ORIGINS: z.string().optional(),
+      /**
+       * Nameservers the single sign-on domain proof asks, in node's
+       * `setServers` shape (`127.0.0.1:15353`, `[::1]:15353`), comma or
+       * whitespace separated. LOCAL ONLY — ignored under
+       * `NODE_ENV=production`, where domain ownership must rest on real DNS.
+       * Set it in development so a reserved name like `acme.test`, which no
+       * public resolver will ever answer for, can be proved against the
+       * identity provider simulator's own nameserver.
+       */
+      SSO_DOMAIN_PROOF_DNS_SERVERS: z.string().optional(),
+      /**
+       * The identity provider simulator haven starts for this worktree.
+       * Trusted for discovery OUTSIDE production only — it signs whatever
+       * it is asked to, so a production installation trusting one would be
+       * trusting an oracle. Written by haven; nobody sets it by hand.
+       */
+      LANGWATCH_IDPSIM_URL: z.string().optional(),
       AUTH0_CLIENT_ID: z.string().optional(),
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
@@ -349,18 +375,6 @@ export function createEnvConfig() {
       // Off is not a deletion. Passkeys already registered are left alone and
       // nobody is signed out, so turning it back on finds them still there.
       PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("on"),
-      // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
-      // and shipped `off` for the same reason the router's own flag is: the
-      // front door is the highest-risk flip in the identity program.
-      // `off` composes today's `Organization.ssoDomain` strings and nothing
-      // else. `shadow` still lets the strings decide, and runs the
-      // `SsoConnection` projection lookup alongside so disagreements are
-      // logged with both answers. `enforce` is the flip, and only at `enforce`
-      // do the string writes stop. Rollback is this value.
-      SSOCONN_ROUTING: z
-        .enum(["off", "shadow", "enforce"])
-        .optional()
-        .default("off"),
       // D08: whether a SCIM push writes membership through the grants
       // service. Two-valued, because there is no useful middle: `off` keeps
       // the previous write path — the hand-written OrganizationUser row with
@@ -683,6 +697,9 @@ export function createEnvConfig() {
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       GOVERNANCE_ERASURE_PSEUDONYM_SECRET:
         process.env.GOVERNANCE_ERASURE_PSEUDONYM_SECRET,
+      SSO_TRUSTED_IDP_ORIGINS: process.env.SSO_TRUSTED_IDP_ORIGINS,
+      SSO_DOMAIN_PROOF_DNS_SERVERS: process.env.SSO_DOMAIN_PROOF_DNS_SERVERS,
+      LANGWATCH_IDPSIM_URL: process.env.LANGWATCH_IDPSIM_URL,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,
@@ -714,8 +731,6 @@ export function createEnvConfig() {
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
-      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
-      SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
@@ -790,6 +805,7 @@ export function createEnvConfig() {
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
       CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
+      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
       AZURE_AD_CLIENT_ID: process.env.AZURE_AD_CLIENT_ID,
       AZURE_AD_CLIENT_SECRET: process.env.AZURE_AD_CLIENT_SECRET,
       AZURE_AD_TENANT_ID: process.env.AZURE_AD_TENANT_ID,

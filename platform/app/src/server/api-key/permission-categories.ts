@@ -213,6 +213,13 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf("organization"),
   },
   {
+    key: "sso",
+    label: "Single sign-on and directory sync",
+    accessLevels: ["read", "write"],
+    readPermissions: viewsOf("sso"),
+    writePermissions: allActionsOf("sso"),
+  },
+  {
     key: "gateway",
     label: "Gateway",
     accessLevels: ["read", "write"],

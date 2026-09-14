@@ -11,6 +11,7 @@ import type { StateProjectionStore } from "../../../projections/stateProjection.
 import {
   type ScimApplyFailedEvent,
   type ScimApplyRecoveredEvent,
+  type ScimApplyRedrivenEvent,
   type ScimApplyRetiredEvent,
   type ScimGroupMappedEvent,
   type ScimSyncEvent,
@@ -19,6 +20,7 @@ import {
   type ScimUserPushedEvent,
   scimApplyFailedEventSchema,
   scimApplyRecoveredEventSchema,
+  scimApplyRedrivenEventSchema,
   scimApplyRetiredEventSchema,
   scimGroupMappedEventSchema,
   scimSyncEventSchema,
@@ -27,7 +29,7 @@ import {
   scimUserPushedEventSchema,
 } from "../schemas/events";
 
-const SCIM_SYNC_PROJECTION_VERSION = "2026-08-24";
+const SCIM_SYNC_PROJECTION_VERSION = "2026-08-25";
 
 export const SCIM_SYNC_PROJECTION_NAME = "scimSyncState" as const;
 
@@ -37,6 +39,7 @@ const scimSyncEvents = [
   scimGroupMappedEventSchema,
   scimApplyFailedEventSchema,
   scimApplyRecoveredEventSchema,
+  scimApplyRedrivenEventSchema,
   scimApplyRetiredEventSchema,
   scimTokenRevokedEventSchema,
 ] as const;
@@ -146,6 +149,13 @@ export class ScimSyncStateFoldProjection
 
   handleIdentityScimApplyRetired(
     event: ScimApplyRetiredEvent,
+    state: ScimSyncFoldState,
+  ): ScimSyncFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityScimApplyRedriven(
+    event: ScimApplyRedrivenEvent,
     state: ScimSyncFoldState,
   ): ScimSyncFoldState {
     return this.fold(event, state);
