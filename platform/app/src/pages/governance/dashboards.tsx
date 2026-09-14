@@ -55,17 +55,9 @@ import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 
 const MS_PER_DAY = 86_400_000;
 
-/** Where each card sits, authored with the widgets and never moved by a reader. */
-const PLACEMENTS: readonly ChartGridPlacement[] = GOVERNANCE_WIDGETS.map(
-  (widget) => widget.placement,
-);
-
-/**
- * The grid is draggable by construction, and this page has nowhere to put a
- * new layout. A drag therefore ends where it started: the placements prop is
- * unchanged, so the next render puts every card back.
- */
-const keepLayout = (_placements: ChartGridPlacement[]) => undefined;
+/** Where each card sits when the page opens, authored beside the widgets. */
+const AUTHORED_PLACEMENTS: readonly ChartGridPlacement[] =
+  GOVERNANCE_WIDGETS.map((widget) => widget.placement);
 
 /**
  * One time chip, and only one.
@@ -113,6 +105,15 @@ function DashboardsPage() {
   } = useSampleMode();
   const [frame, setFrame] = useState<TimeFrame>(DEFAULT_TIME_FRAME);
 
+  // The grid is draggable by construction, so a card the reader drags has to
+  // stay where it was dropped — a card that springs back reads as a bug, not
+  // as a locked layout. It stays for the visit and no longer: there is no row
+  // behind this page to save a layout to, and the page may not grow one (see
+  // the docblock above), so the next visit opens on the authored arrangement.
+  const [placements, setPlacements] = useState<ChartGridPlacement[]>(() =>
+    AUTHORED_PLACEMENTS.map((placement) => ({ ...placement })),
+  );
+
   // Memoized on the frame, and handed to every card: `GovernanceWidgetCard`
   // builds each chart's dashboard context from it, and a fresh object per
   // render would rebuild four contexts — and re-initialise four frames — on
@@ -145,8 +146,8 @@ function DashboardsPage() {
         )}
         <DashboardsFilterBar frame={frame} onFrameChange={setFrame} />
         <ChartGrid
-          placements={PLACEMENTS}
-          onPlacementsCommit={keepLayout}
+          placements={placements}
+          onPlacementsCommit={setPlacements}
           renderCard={(placement) => {
             const widget = GOVERNANCE_WIDGETS.find(
               (candidate) => candidate.placement.graphId === placement.graphId,

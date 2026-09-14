@@ -69,6 +69,17 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     # chart added to make the grid look inhabited.
 
   @integration
+  Scenario: A card stays where the reader drags it
+    When the member drags a card to another row and drops it
+    Then the card stays in its new row
+    And it is still there after the page renders again
+    But the authored arrangement is back on the member's next visit
+    # The grid is draggable by construction, so a card that springs back to
+    # where it started reads as a bug rather than as a locked layout. There is
+    # no row behind this page to save an arrangement to, and the page may not
+    # grow one, so the move lasts the visit and no longer.
+
+  @integration
   Scenario: Sample on fills every widget from invented figures
     Given sample mode is on
     When the page renders

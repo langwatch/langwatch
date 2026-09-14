@@ -121,24 +121,55 @@ vi.mock("~/features/custom-chart-playground/SandboxedChartFrame", () => ({
  * the placements, which is also what makes the layout assertion possible.
  */
 const gridPlacements = vi.hoisted(() => [] as unknown[]);
+/**
+ * The placements of the LAST render only. `gridPlacements` accumulates across
+ * renders, which answers "what was the page authored with"; a drag is only
+ * visible in what the grid is given the next time around.
+ */
+const latestPlacements = vi.hoisted(() => [] as unknown[]);
 vi.mock("~/components/analytics/reports/ChartGrid", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("~/components/analytics/reports/ChartGrid")
   >()),
   ChartGrid: ({
     placements,
+    onPlacementsCommit,
     renderCard,
   }: {
     placements: ChartGridPlacement[];
+    onPlacementsCommit: (placements: ChartGridPlacement[]) => void;
     renderCard: (placement: ChartGridPlacement) => React.ReactNode;
   }) => {
     gridPlacements.push(...placements);
+    latestPlacements.length = 0;
+    latestPlacements.push(...placements);
     return (
-      <div data-testid="chart-grid">
-        {placements.map((placement) => (
-          <div key={placement.graphId}>{renderCard(placement)}</div>
-        ))}
-      </div>
+      <>
+        {/* The real grid commits once, on drop or resize-end, with the whole
+            grid's new layout. This is that call and nothing else: dragging
+            itself is a pointer gesture jsdom has no width to lay out. It sits
+            OUTSIDE the grid element, whose children are counted as cards. */}
+        <button
+          type="button"
+          data-testid="finish-a-drag"
+          onClick={() =>
+            onPlacementsCommit(
+              placements.map((placement, index) =>
+                index === 0
+                  ? { ...placement, gridRow: placement.gridRow + 4 }
+                  : placement,
+              ),
+            )
+          }
+        >
+          finish a drag
+        </button>
+        <div data-testid="chart-grid">
+          {placements.map((placement) => (
+            <div key={placement.graphId}>{renderCard(placement)}</div>
+          ))}
+        </div>
+      </>
     );
   },
 }));
@@ -189,6 +220,7 @@ beforeEach(() => {
   harness.colorMode = "light";
   frameProps.length = 0;
   gridPlacements.length = 0;
+  latestPlacements.length = 0;
   // The choice is section-wide and lives in session storage, which the lane
   // shares between files; clear both halves so each test states its own.
   writeSampleChoice(null);
@@ -285,6 +317,33 @@ describe("given the page is open with sample data off", () => {
     // Between them: under the provider chart, above the model one.
     expect(provider!.gridRow).toBeLessThan(department!.gridRow);
     expect(model!.gridRow).toBeGreaterThan(person!.gridRow);
+  });
+
+  /** @scenario "A card stays where the reader drags it" */
+  it("keeps a moved card where it was dropped, and through a later render", () => {
+    renderPage();
+
+    const authored = [...(latestPlacements as ChartGridPlacement[])];
+    const moved = authored[0]!;
+
+    fireEvent.click(screen.getByTestId("finish-a-drag"));
+
+    // The grid is draggable by construction, so a card the reader drags must
+    // not spring back to where it was authored the moment React renders again.
+    const afterDrag = latestPlacements as ChartGridPlacement[];
+    expect(afterDrag).toHaveLength(4);
+    expect(
+      afterDrag.find((placement) => placement.graphId === moved.graphId)
+        ?.gridRow,
+    ).toBe(moved.gridRow + 4);
+
+    // …and it survives a render the reader causes for another reason.
+    fireEvent.click(screen.getByRole("button", { name: /time frame/i }));
+    const afterRerender = latestPlacements as ChartGridPlacement[];
+    expect(
+      afterRerender.find((placement) => placement.graphId === moved.graphId)
+        ?.gridRow,
+    ).toBe(moved.gridRow + 4);
   });
 
   /** @scenario "Sample off shows an empty widget that says what would fill it" */
