@@ -1,5 +1,7 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { AuthCard } from "~/components/auth/AuthCard";
+import { inboxUrlFor } from "../logic/inboxProviders";
+import { AuthSecondaryButton } from "./AuthSecondaryButton";
 
 /**
  * The one state both doors end at when an address has to be confirmed: the
@@ -38,8 +40,13 @@ export function CheckYourEmail({
   /** Back to the address step, for the address that was typed wrong. */
   onUseDifferentEmail?: () => void;
 }) {
+  const inboxUrl = inboxUrlFor({ email });
+
   return (
-    <AuthCard title="Check your email">
+    // Solid rather than glass: this card is one sentence with nothing to
+    // operate, and the glass treatment left the words washed against the
+    // ground it was asking somebody to leave.
+    <AuthCard title="Check your email" solid>
       <VStack width="full" align="stretch" gap="14px">
         {/* Centred under a centred title, because there is nothing to do on
             this card. Every other screen left-aligns its words against a form
@@ -62,6 +69,14 @@ export function CheckYourEmail({
           )}{" "}
           {what} The link expires in 1 hour.
         </Text>
+        {/* Only for the mailboxes everyone recognizes: a company domain gets
+            no guess, because a wrong guess is a login page for a mailbox the
+            person does not have. */}
+        {inboxUrl ? (
+          <AuthSecondaryButton href={inboxUrl} testId="go-to-inbox">
+            Go to inbox
+          </AuthSecondaryButton>
+        ) : null}
         {onUseDifferentEmail ? (
           <Button
             variant="plain"

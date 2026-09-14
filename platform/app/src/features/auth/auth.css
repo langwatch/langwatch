@@ -464,6 +464,13 @@
 		border-color 420ms ease;
 }
 
+/* The waiting card: one sentence, nothing to operate. It stands on a
+   near-solid floor (see `cardBgSolid` in authTheme.ts) so the words hold
+   against the ground instead of dissolving into it. */
+.lw-auth-card--solid {
+	background: var(--chakra-colors-auth-card-bg-solid) !important;
+}
+
 .lw-auth-card:focus-within {
 	box-shadow:
 		var(--lw-auth-card-shadow),

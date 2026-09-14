@@ -117,6 +117,14 @@ export const authThemeConfig = defineConfig({
            */
           cardBg: mode(white(0.3), "rgba(10, 10, 12, 0.54)"),
           /**
+           * The waiting card's floor: the email-sent state is one sentence
+           * with nothing to operate, and the glass that flatters a column of
+           * fields left it washed against the ground. A near-solid floor
+           * gives the sentence a surface of its own; the ground still reads
+           * at the edges, so it stays the same card, only firmer.
+           */
+          cardBgSolid: mode(white(0.85), "rgba(12, 12, 15, 0.88)"),
+          /**
            * On paper the border is a shadow's job done with a line: a soft
            * dark hairline. The white(0.85) it used to be read as a bright
            * ring around the card on a pale ground — an outline, not an edge.

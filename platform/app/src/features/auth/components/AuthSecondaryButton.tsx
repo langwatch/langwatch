@@ -28,15 +28,32 @@ export function AuthSecondaryButton({
   type = "button",
   isDisabled = false,
   onClick,
+  href,
   testId,
   children,
 }: {
   type?: "button" | "submit";
   isDisabled?: boolean;
   onClick?: () => void;
+  /**
+   * A destination instead of a handler: the button renders as a real anchor
+   * (new tab, no opener), because a door out of the flow — "Go to inbox" —
+   * is a link wearing this card's button shape, and middle-click and
+   * copy-address have to keep working on it.
+   */
+  href?: string;
   testId?: string;
   children: ReactNode;
 }) {
+  if (href) {
+    return (
+      <Button {...AUTH_SECONDARY_STYLE} asChild data-testid={testId}>
+        <a href={href} target="_blank" rel="noreferrer">
+          {children}
+        </a>
+      </Button>
+    );
+  }
   return (
     <Button
       {...AUTH_SECONDARY_STYLE}

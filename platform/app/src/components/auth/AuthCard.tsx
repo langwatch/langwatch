@@ -36,6 +36,7 @@ export function AuthCard({
   title,
   intro,
   finePrint,
+  solid = false,
   children,
 }: {
   title: string;
@@ -44,6 +45,13 @@ export function AuthCard({
   intro?: string;
   /** The small print under everything: terms, privacy, nothing louder. */
   finePrint?: ReactNode;
+  /**
+   * A near-solid floor instead of the glass. For the states that are one
+   * sentence with nothing to operate — "check your email" — where the glass
+   * that flatters a column of fields leaves the words washed against the
+   * ground.
+   */
+  solid?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -55,7 +63,7 @@ export function AuthCard({
       marginY={{ base: 6, md: "8vh" }}
     >
       <Card.Root
-        className="lw-auth-card"
+        className={solid ? "lw-auth-card lw-auth-card--solid" : "lw-auth-card"}
         width="full"
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}

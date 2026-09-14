@@ -183,6 +183,31 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then the ground is the still colour field
     And no graphics engine is started to draw it
 
+  # The waiting card is one sentence with nothing to operate, and the glass
+  # treatment that flatters a column of fields left the sentence washed
+  # against the ground it was asking somebody to leave.
+  @integration
+  Scenario: The email-sent card stands on a solid floor
+    Given I asked for a confirmation link
+    When the check-your-email card is shown
+    Then the card is drawn on the solid surface, not the glass
+
+  # "Check your email" can also open the door — for the mailboxes everyone
+  # recognizes. A company's own domain gets no guess: guessing wrong sends a
+  # person to a login page for a mailbox they do not have.
+  @integration
+  Scenario: A common mailbox gets a door straight to it
+    Given I asked for a confirmation link at a gmail.com address
+    When the check-your-email card is shown
+    Then it offers "Go to inbox"
+    And the offer opens that provider's inbox in a new tab
+
+  @integration
+  Scenario: A company domain gets no inbox guess
+    Given I asked for a confirmation link at an address on my company's own domain
+    When the check-your-email card is shown
+    Then no inbox door is offered
+
   # ── Sign-up ────────────────────────────────────────────────────────────
 
   # The address is confirmed before the screen asks for a credential
