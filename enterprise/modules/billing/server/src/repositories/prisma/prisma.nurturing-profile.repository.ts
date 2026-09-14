@@ -21,7 +21,7 @@ export class PrismaNurturingProfileRepository extends NurturingProfileRepository
     return new PrismaNurturingProfileRepository(database);
   }
 
-  async tryFindProfile(userId: string): Promise<NurturingProfile | null> {
+  async findProfile(userId: string): Promise<NurturingProfile | null> {
     const [user, orgUser] = await Promise.all([
       this.database.user.findUnique({
         where: { id: userId },

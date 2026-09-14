@@ -17,7 +17,7 @@ export class NurturingFeatureAdoptionService {
     teamMemberCount: number;
     role: string;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }
@@ -51,7 +51,7 @@ export class NurturingFeatureAdoptionService {
     workflowId: string;
     projectId: string;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }
@@ -86,7 +86,7 @@ export class NurturingFeatureAdoptionService {
     scenarioId: string;
     projectId: string;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }
@@ -121,7 +121,7 @@ export class NurturingFeatureAdoptionService {
     experimentId?: string;
     projectId: string;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

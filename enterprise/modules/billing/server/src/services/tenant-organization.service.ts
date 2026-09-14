@@ -13,7 +13,7 @@ const logger = createLogger("langwatch:billing:tenantOrganization");
  * in-memory, and this service only ever reads and writes one key per tenant.
  */
 export interface BillingTenantOrganizationCache {
-  get(tenantId: string): Promise<string | undefined>;
+  find(tenantId: string): Promise<string | undefined>;
   set(tenantId: string, organizationId: string): Promise<void>;
 }
 
@@ -40,14 +40,14 @@ export class BillingTenantOrganizationService {
   ) {}
 
   /** Undefined means an orphan tenant, which is skipped rather than billed. */
-  async tryResolveOrganizationId(tenantId: string): Promise<string | undefined> {
-    const cached = await this.cache.get(tenantId);
+  async findOrganizationId(tenantId: string): Promise<string | undefined> {
+    const cached = await this.cache.find(tenantId);
 
     if (cached) {
       return cached;
     }
 
-    const organizationId = await this.organizations.tryFindOrganizationForTenant(tenantId);
+    const organizationId = await this.organizations.findOrganizationForTenant(tenantId);
 
     if (!organizationId) {
       logger.warn(

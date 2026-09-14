@@ -39,10 +39,10 @@ describe("PrismaBillingWebhookOrganizationRepository", () => {
         { id: "organization-1", name: "Acme", stripeCustomerId: "cus_1" },
       ]);
 
-      await expect(adapter.tryFindByStripeCustomerId("cus_1")).resolves.toEqual({
+      await expect(adapter.findByStripeCustomerId("cus_1")).resolves.toEqual({
         id: "organization-1",
       });
-      await expect(adapter.tryFindByStripeCustomerId("cus_missing")).resolves.toBeNull();
+      await expect(adapter.findByStripeCustomerId("cus_missing")).resolves.toBeNull();
     });
   });
 
@@ -78,11 +78,11 @@ describe("PrismaBillingWebhookOrganizationRepository", () => {
     it("answers the name, and nothing for an organization that is gone", async () => {
       const { adapter } = organizationDouble([{ id: "organization-1", name: "Acme" }]);
 
-      await expect(adapter.tryFindNameById("organization-1")).resolves.toEqual({
+      await expect(adapter.findNameById("organization-1")).resolves.toEqual({
         id: "organization-1",
         name: "Acme",
       });
-      await expect(adapter.tryFindNameById("organization-2")).resolves.toBeNull();
+      await expect(adapter.findNameById("organization-2")).resolves.toBeNull();
     });
   });
 });

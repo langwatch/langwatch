@@ -7,12 +7,12 @@ async function syncSubscriptionTrait({
   organizationId: string;
   hasSubscription: boolean;
 }): Promise<void> {
-  const nurturing = NurturingSinkRegistryService.trySink();
+  const nurturing = NurturingSinkRegistryService.findSink();
   if (!nurturing) {
     return;
   }
 
-  const profiles = NurturingSinkRegistryService.tryProfiles();
+  const profiles = NurturingSinkRegistryService.findProfiles();
   if (!profiles) {
     return;
   }
@@ -44,7 +44,7 @@ export class NurturingSubscriptionSyncService {
     organizationId: string;
     hasSubscription: boolean;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

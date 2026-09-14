@@ -67,7 +67,7 @@ export class NurturingSignupIdentificationService {
     /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
     primaryIntent?: OrganizationIntent | null;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

@@ -1,3 +1,3 @@
 export abstract class OrganizationPricing {
-  abstract tryGetPricingModel(organizationId: string): Promise<string | null>;
+  abstract findPricingModel(organizationId: string): Promise<string | null>;
 }

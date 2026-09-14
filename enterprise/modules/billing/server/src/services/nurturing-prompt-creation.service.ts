@@ -23,7 +23,7 @@ export class NurturingPromptCreationService {
     projectId: string;
     orgPromptCount: number;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }
@@ -67,7 +67,7 @@ export class NurturingPromptCreationService {
         let organizationId: string | undefined;
 
         if (!resolvedUserId) {
-          const resolveOrgAdmin = NurturingSinkRegistryService.tryOrganizationAdminResolver();
+          const resolveOrgAdmin = NurturingSinkRegistryService.findOrganizationAdminResolver();
           const resolution = await resolveOrgAdmin?.(projectId);
           resolvedUserId = resolution?.userId;
           organizationId = resolution?.organizationId ?? undefined;
@@ -84,7 +84,7 @@ export class NurturingPromptCreationService {
 
         // Get organizationId if we don't have it yet
         if (!organizationId) {
-          organizationId = await repository.tryFindOrganizationId(projectId);
+          organizationId = await repository.findOrganizationId(projectId);
         }
 
         if (!organizationId) {

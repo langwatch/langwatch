@@ -23,7 +23,7 @@ describe("BillingAlertCooldownService", () => {
       expect(await cooldown.claim("org-1")).toBe(true);
       vi.setSystemTime(START + HOUR_MS - 1);
       expect(await cooldown.claim("org-1")).toBe(false);
-      expect(await cooldown.tryGet("org-1")).toBe(true);
+      expect(await cooldown.find("org-1")).toBe(true);
     });
   });
 
@@ -45,7 +45,7 @@ describe("BillingAlertCooldownService", () => {
 
       vi.setSystemTime(START + HOUR_MS);
 
-      expect(await cooldown.tryGet("org-1")).toBeNull();
+      expect(await cooldown.find("org-1")).toBeNull();
       expect(await cooldown.claim("org-1")).toBe(true);
     });
   });
@@ -74,7 +74,7 @@ describe("BillingAlertCooldownService", () => {
 
       await cooldown.delete("org-1");
 
-      expect(await cooldown.tryGet("org-1")).toBeNull();
+      expect(await cooldown.find("org-1")).toBeNull();
       expect(await cooldown.claim("org-1")).toBe(true);
     });
   });

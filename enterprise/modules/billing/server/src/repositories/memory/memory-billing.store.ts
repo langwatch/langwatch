@@ -49,7 +49,7 @@ export class MemoryBillingStore {
   }
 
   /** The profile facts a lifecycle signal reads, or null where the seat is gone. */
-  profileOf(userId: string): NurturingProfile | null {
+  findProfileOf(userId: string): NurturingProfile | null {
     const user = this.users.get(userId);
     const organization = user ? this.organizations.get(user.organizationId) : void 0;
     if (!user || !organization) return null;

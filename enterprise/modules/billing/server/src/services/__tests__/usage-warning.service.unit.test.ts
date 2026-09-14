@@ -36,7 +36,7 @@ describe("UsageWarningService", () => {
     /** @scenario "The usage warning carries the organization's own next step and meter" */
     it("passes the resolved plan and unit through to the mail", async () => {
       const nextStep = {
-        resolve: vi.fn().mockResolvedValue({
+        find: vi.fn().mockResolvedValue({
           kind: "self_serve" as const,
           name: "Accelerate",
           url: "https://app.langwatch.ai/settings/subscription/checkout/accelerate",
@@ -55,13 +55,13 @@ describe("UsageWarningService", () => {
         usageUnit,
       } as unknown as UsageWarningServiceOptions);
 
-      await service.tryCheckAndSendWarning({
+      await service.findCheckAndSendWarning({
         organizationId: "org-1",
         currentMonthMessagesCount: 800,
         maxMonthlyUsageLimit: 1000,
       });
 
-      expect(nextStep.resolve).toHaveBeenCalledWith({
+      expect(nextStep.find).toHaveBeenCalledWith({
         organizationId: "org-1",
         pricingModel: "TIERED",
         currency: "USD",
@@ -84,14 +84,14 @@ describe("UsageWarningService", () => {
   describe("when the next-step resolver throws", () => {
     /** @scenario "A usage warning omits the next step it cannot resolve" */
     it("still sends the warning, without a next step", async () => {
-      const nextStep = { resolve: vi.fn().mockRejectedValue(new Error("catalogue unavailable")) };
+      const nextStep = { find: vi.fn().mockRejectedValue(new Error("catalogue unavailable")) };
       const options = baseOptions();
       const service = UsageWarningService.create({
         ...options,
         nextStep,
       } as unknown as UsageWarningServiceOptions);
 
-      await service.tryCheckAndSendWarning({
+      await service.findCheckAndSendWarning({
         organizationId: "org-1",
         currentMonthMessagesCount: 800,
         maxMonthlyUsageLimit: 1000,

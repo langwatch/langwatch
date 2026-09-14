@@ -37,8 +37,8 @@ export interface ReportUsageForMonthCommandDeps {
   getUsageReportingService: () => UsageReportingService | undefined;
   /** Nullable by contract: `null` means ClickHouse was unavailable, and the
    *  caller must skip the month rather than report a total it did not read.
-   *  The service spells that with the repo's `try` prefix. */
-  queryBillableEventsTotal: BillableEventsQueryService["tryQueryBillableEventsTotal"];
+   *  The service spells that with the repo's `find` prefix. */
+  queryBillableEventsTotal: BillableEventsQueryService["findQueryBillableEventsTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCache;
@@ -116,7 +116,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     let shouldSelfDispatch: boolean;
     try {
       // 1. Skip conditions
-      let lookup = await this.deps.organizationCache.get(organizationId);
+      let lookup = await this.deps.organizationCache.find(organizationId);
       if (!lookup) {
         lookup = await this.deps.organizations.getOrganizationForBilling(organizationId);
         // The skip verdicts are cached too. Only a hit was cached before, so
@@ -205,7 +205,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     billingMonth: string;
     stripeCustomerId: string;
   }): Promise<boolean> {
-    const checkpoint = await this.deps.billingCheckpoints.tryGetCheckpoint({
+    const checkpoint = await this.deps.billingCheckpoints.findCheckpoint({
       organizationId,
       billingMonth,
     });

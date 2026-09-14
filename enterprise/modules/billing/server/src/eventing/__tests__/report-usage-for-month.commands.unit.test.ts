@@ -44,7 +44,7 @@ const {
   };
 
   const billingCheckpointsPort = {
-    tryGetCheckpoint: vi.fn(),
+    findCheckpoint: vi.fn(),
     writeIntent: vi.fn(),
     confirm: vi.fn(),
     clearPendingAndIncrementFailures: vi.fn(),
@@ -76,7 +76,7 @@ vi.mock("@langwatch/observability", () => ({
  * requires that a miss falls through to the organization read.
  */
 const missingOrganizationCache = {
-  get: async () => undefined,
+  find: async () => undefined,
   set: async () => {},
 };
 
@@ -245,7 +245,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given ClickHouse not available", () => {
     it("returns empty events without reporting", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue(null);
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
       mockQueryBillableEventsTotal.mockResolvedValue(null);
       const handler = await createHandler();
 
@@ -260,7 +260,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given delta is zero", () => {
     it("returns empty events without reporting", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
@@ -283,7 +283,7 @@ describe("ReportUsageForMonthCommand", () => {
     /** @scenario "Report metered usage through an injected provider" */
     it("reports delta, updates checkpoint, and self-dispatches", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
@@ -332,7 +332,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given first run for new org (no checkpoint)", () => {
     it("creates checkpoint at reported total", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue(null);
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
       mockQueryBillableEventsTotal.mockResolvedValue(50);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
@@ -366,7 +366,7 @@ describe("ReportUsageForMonthCommand", () => {
     /** @scenario "Report metered usage through an injected provider" */
     it("uses pending value with same idempotency key", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: 200,
         consecutiveFailures: 0,
@@ -403,7 +403,7 @@ describe("ReportUsageForMonthCommand", () => {
     /** @scenario "Report metered usage through an injected provider" */
     it("clears pending, increments failures, does NOT self-dispatch", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
@@ -437,7 +437,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given transient Stripe error", () => {
     it("catches error, increments failures, and self-dispatches for retry", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 0,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
@@ -486,7 +486,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given 5 consecutive failures (circuit-breaker threshold)", () => {
     it("does NOT self-dispatch and logs alarm", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
         consecutiveFailures: 5,
@@ -506,7 +506,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given circuit-breaker reset after successful report", () => {
     it("resets consecutiveFailures to 0 on success", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
-      mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
         consecutiveFailures: 3,

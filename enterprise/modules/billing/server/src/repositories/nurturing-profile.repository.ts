@@ -12,7 +12,7 @@ export type NurturingProfile = {
 
 /** The row reads the lifecycle signals make on their own. */
 export abstract class NurturingProfileRepository {
-  abstract tryFindProfile(userId: string): Promise<NurturingProfile | null>;
+  abstract findProfile(userId: string): Promise<NurturingProfile | null>;
 
   abstract memberUserIds(organizationId: string): Promise<string[]>;
 }

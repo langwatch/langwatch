@@ -23,7 +23,7 @@ export class NurturingSsoAutoAddService {
     organizationId: string;
     organizationName: string;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

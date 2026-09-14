@@ -25,7 +25,7 @@ export class SeatSyncService {
     organizationId: string;
     newTotalSeats: number;
   }): Promise<boolean> {
-    const pricingModel = await this.organizations.tryGetPricingModel(organizationId);
+    const pricingModel = await this.organizations.findPricingModel(organizationId);
 
     if (pricingModel !== "SEAT_EVENT") {
       return false;

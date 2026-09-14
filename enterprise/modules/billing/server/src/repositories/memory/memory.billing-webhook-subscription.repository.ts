@@ -30,37 +30,37 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return new MemoryBillingWebhookSubscriptionRepository(options.subscriptions, options.store);
   }
 
-  async tryFindLastNonCancelled(
+  async findLastNonCancelled(
     organizationId: string,
   ): Promise<BillingSubscriptionRecord | null> {
-    return this.subscriptions.tryFindLastNonCancelled(organizationId);
+    return this.subscriptions.findLastNonCancelled(organizationId);
   }
 
-  async tryCreatePending(input: {
+  async findCreatePending(input: {
     organizationId: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord | null> {
     return this.subscriptions.createPending(input);
   }
 
-  async tryUpdateStatus(input: {
+  async findUpdateStatus(input: {
     id: string;
     status: string;
   }): Promise<BillingSubscriptionRecord | null> {
     return this.present(input.id) ? this.subscriptions.updateStatus(input) : null;
   }
 
-  async tryUpdatePlan(input: {
+  async findUpdatePlan(input: {
     id: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord | null> {
     return this.present(input.id) ? this.subscriptions.updatePlan(input) : null;
   }
 
-  async tryFindByStripeId(
+  async findByStripeId(
     stripeSubscriptionId: string,
   ): Promise<BillingSubscriptionRecord | null> {
-    return this.subscriptions.tryFindByStripeId(stripeSubscriptionId);
+    return this.subscriptions.findByStripeId(stripeSubscriptionId);
   }
 
   async linkStripeId(input: {
@@ -70,7 +70,7 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.linkStripeId(input);
   }
 
-  async tryActivate(input: {
+  async findActivate(input: {
     id: string;
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null> {
@@ -98,7 +98,7 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
-  async tryUpdateQuantities(input: {
+  async findUpdateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;

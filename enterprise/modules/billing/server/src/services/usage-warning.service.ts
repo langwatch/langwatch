@@ -20,7 +20,7 @@ const logger = createLogger("langwatch:notifications:usageWarning");
 
 import {
   USAGE_WARNING_THRESHOLDS,
-  crossedUsageThreshold,
+  findCrossedUsageThreshold,
   getCurrentMonthStart,
   type BillingNextStepResolver,
   type BillingUsageUnit,
@@ -66,12 +66,12 @@ export class UsageWarningService {
   /**
    * Sends a usage-limit warning email if one is due, and records that it went.
    */
-  async tryCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
+  async findCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
 
     const usagePercentage =
       maxMonthlyUsageLimit > 0 ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100 : 0;
-    const crossedThreshold = crossedUsageThreshold(usagePercentage);
+    const crossedThreshold = findCrossedUsageThreshold(usagePercentage);
 
     if (!crossedThreshold) {
       logger.debug(

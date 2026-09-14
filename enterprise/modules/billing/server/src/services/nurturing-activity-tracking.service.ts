@@ -50,7 +50,7 @@ export class NurturingActivityTrackingService {
     /** When false, the user hasn't completed onboarding yet — skip identify to avoid ghost people in Customer.io. */
     hasOrganization?: boolean;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

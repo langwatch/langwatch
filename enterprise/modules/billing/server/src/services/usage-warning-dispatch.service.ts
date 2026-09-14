@@ -131,7 +131,7 @@ export class UsageWarningDispatchService {
   }): Promise<UsageLimitEmailData["nextStep"] | undefined> {
     if (!this.deps.nextStep) return undefined;
     try {
-      return await this.deps.nextStep.resolve(input);
+      return await this.deps.nextStep.find(input);
     } catch (error) {
       logger.warn(
         { organizationId: input.organizationId, error },
@@ -155,7 +155,11 @@ export class UsageWarningDispatchService {
     organizationName: string;
     deliverableAdmins: Array<{ user: { id: string; email: string | null } }>;
     emailContext: UsageLimitEmailData;
-  }) {
+  }): Promise<{
+    recipientsSuccessCount: number;
+    recipientsFailureCount: number;
+    failedRecipients: Array<{ userId: string; error: string }>;
+  }> {
     const emailResults = await Promise.allSettled(
       deliverableAdmins.map(async (member) => {
         await this.deps.emails.sendUsageLimitEmail({

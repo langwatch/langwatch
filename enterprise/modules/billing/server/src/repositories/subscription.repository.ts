@@ -25,8 +25,8 @@ export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
 };
 
 export abstract class SubscriptionRepository {
-  abstract tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null>;
-  abstract tryFindLastNonCancelled(
+  abstract findActive(organizationId: string): Promise<BillingSubscriptionRecord | null>;
+  abstract findLastNonCancelled(
     organizationId: string,
   ): Promise<BillingSubscriptionRecord | null>;
   abstract createPending(input: {
@@ -35,7 +35,7 @@ export abstract class SubscriptionRepository {
   }): Promise<BillingSubscriptionRecord>;
   abstract updateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord>;
   abstract updatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord>;
-  abstract tryFindByStripeId(
+  abstract findByStripeId(
     stripeSubscriptionId: string,
   ): Promise<BillingSubscriptionRecord | null>;
   abstract linkStripeId(input: {

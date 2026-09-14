@@ -17,7 +17,7 @@ export class PrismaBillingOrganizationRepository extends BillingOrganization {
     return new PrismaBillingOrganizationRepository(prisma);
   }
 
-  async tryGetPricingModel(organizationId: string): Promise<string | null> {
+  async findPricingModel(organizationId: string): Promise<string | null> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { pricingModel: true },
@@ -25,7 +25,7 @@ export class PrismaBillingOrganizationRepository extends BillingOrganization {
     return organization?.pricingModel ?? null;
   }
 
-  async tryGetStripeCustomerId(organizationId: string): Promise<string | null> {
+  async findStripeCustomerId(organizationId: string): Promise<string | null> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { stripeCustomerId: true },
@@ -33,14 +33,14 @@ export class PrismaBillingOrganizationRepository extends BillingOrganization {
     return organization?.stripeCustomerId ?? null;
   }
 
-  async tryFindName(organizationId: string): Promise<{ id: string; name: string } | null> {
+  async findName(organizationId: string): Promise<{ id: string; name: string } | null> {
     return this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true },
     });
   }
 
-  async tryFindFirstTeamId(organizationId: string): Promise<string | null> {
+  async findFirstTeamId(organizationId: string): Promise<string | null> {
     const team = await this.prisma.team.findFirst({
       where: { organizationId },
       orderBy: { createdAt: "asc" },

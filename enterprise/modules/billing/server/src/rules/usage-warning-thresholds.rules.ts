@@ -25,7 +25,7 @@ export type BillingUsageUnit = "traces" | "events";
  * needs out of this package, which only ever sees the result.
  */
 export type BillingNextStepResolver = {
-  resolve(input: {
+  find(input: {
     organizationId: string;
     pricingModel: BillingPricingModel | null;
     currency: "USD" | "EUR";
@@ -44,7 +44,7 @@ export const getCurrentMonthStart = (): Instant => {
 };
 
 /** The highest warning threshold this usage percentage has crossed, or nothing below them all. */
-export function crossedUsageThreshold(
+export function findCrossedUsageThreshold(
   usagePercentage: number,
 ): (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined {
   let crossed: (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined;

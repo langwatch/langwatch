@@ -38,14 +38,14 @@ export class MemorySubscriptionRepository extends SubscriptionRepository {
     return new MemorySubscriptionRepository(store);
   }
 
-  async tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
+  async findActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return this.newestOf(
       (subscription) =>
         subscription.organizationId === organizationId && subscription.status === ACTIVE,
     );
   }
 
-  async tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
+  async findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return this.newestOf(
       (subscription) =>
         subscription.organizationId === organizationId && subscription.status !== CANCELLED,
@@ -82,7 +82,7 @@ export class MemorySubscriptionRepository extends SubscriptionRepository {
     return this.update(input.id, (subscription) => ({ ...subscription, plan: input.plan }));
   }
 
-  async tryFindByStripeId(
+  async findByStripeId(
     stripeSubscriptionId: string,
   ): Promise<BillingSubscriptionRecord | null> {
     return (

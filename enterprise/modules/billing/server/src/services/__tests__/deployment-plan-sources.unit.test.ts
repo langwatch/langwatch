@@ -37,7 +37,7 @@ const subscription = (
 /** The one read the subscription source makes; nothing else is exercised. */
 function subscriptions(active: BillingSubscriptionRecord | null): SubscriptionRepository {
   return {
-    tryFindActive: async () => active,
+    findActive: async () => active,
   } as unknown as SubscriptionRepository;
 }
 

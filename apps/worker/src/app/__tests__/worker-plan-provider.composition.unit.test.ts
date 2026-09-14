@@ -35,7 +35,7 @@ import { Temporal } from "@langwatch/time";
  * disagreeing with the table it stands for.
  */
 type SubscriptionRecord = NonNullable<
-  Awaited<ReturnType<BillingSubscription["tryFindActive"]>>
+  Awaited<ReturnType<BillingSubscription["findActive"]>>
 >;
 
 const subscription = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRecord => ({
@@ -57,7 +57,7 @@ const subscription = (overrides: Partial<SubscriptionRecord> = {}): Subscription
 /** The one read the subscription source makes; nothing else is exercised. */
 function subscriptions(active: SubscriptionRecord | null): BillingSubscription {
   return {
-    tryFindActive: async () => active,
+    findActive: async () => active,
   } as unknown as BillingSubscription;
 }
 

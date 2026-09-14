@@ -50,14 +50,14 @@ describe("RedisBillingOrganizationCacheRepository", () => {
     it("reads back what the other graph stored", async () => {
       const get = vi.fn(async () => JSON.stringify(ORGANIZATION));
 
-      expect(await cacheOver({ get }).get("organization_acme")).toEqual(ORGANIZATION);
+      expect(await cacheOver({ get }).find("organization_acme")).toEqual(ORGANIZATION);
       expect(get).toHaveBeenCalledWith("ttlcache:billing:orgData:organization_acme");
     });
 
     /** @scenario "Both graphs cache the billing organization read in one keyspace" */
     it("reports a miss as a miss rather than as a null organization", async () => {
       expect(
-        await cacheOver({ get: vi.fn(async () => null) }).get("organization_acme"),
+        await cacheOver({ get: vi.fn(async () => null) }).find("organization_acme"),
       ).toBeUndefined();
     });
 
@@ -77,7 +77,7 @@ describe("RedisBillingOrganizationCacheRepository", () => {
         }),
       };
 
-      expect(await cacheOver(failing).get("organization_acme")).toBeUndefined();
+      expect(await cacheOver(failing).find("organization_acme")).toBeUndefined();
       await expect(
         cacheOver(failing).set("organization_acme", ORGANIZATION),
       ).resolves.toBeUndefined();

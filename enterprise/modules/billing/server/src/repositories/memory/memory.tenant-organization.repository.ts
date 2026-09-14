@@ -16,7 +16,7 @@ export class MemoryBillingTenantOrganizationRepository extends BillingTenantOrga
     return new MemoryBillingTenantOrganizationRepository(store);
   }
 
-  async tryFindOrganizationForTenant(tenantId: string): Promise<string | null> {
+  async findOrganizationForTenant(tenantId: string): Promise<string | null> {
     return this.store.organizationOfTenant.get(tenantId) ?? null;
   }
 }

@@ -40,12 +40,12 @@ function recordNotFound(): Error & { code: string } {
 
 function repositoryDouble(overrides: Partial<SubscriptionRepository> = {}) {
   return {
-    tryFindActive: vi.fn(),
-    tryFindLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
+    findActive: vi.fn(),
+    findLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
     createPending: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
     updateStatus: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
     updatePlan: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
-    tryFindByStripeId: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
+    findByStripeId: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
     linkStripeId: vi.fn(() => Promise.resolve({ count: 1 })),
     activate: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
     recordPaymentFailure: vi.fn(() => Promise.resolve()),
@@ -82,7 +82,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
     it("carries the organization's trial licence beside the activated row", async () => {
       const { adapter, subscriptions } = compose({ license: "trial-key" });
 
-      const activated = await adapter.tryActivate({
+      const activated = await adapter.findActivate({
         id: "subscription-1",
         previousStatus: "PENDING",
       });
@@ -105,7 +105,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
     it("writes both quantities and reports no trial licence where there is none", async () => {
       const { adapter, subscriptions } = compose();
 
-      const updated = await adapter.tryUpdateQuantities({
+      const updated = await adapter.findUpdateQuantities({
         id: "subscription-1",
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
@@ -130,7 +130,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       });
 
       await expect(
-        adapter.tryActivate({ id: "subscription-gone", previousStatus: "PENDING" }),
+        adapter.findActivate({ id: "subscription-gone", previousStatus: "PENDING" }),
       ).resolves.toBeNull();
     });
   });
@@ -145,7 +145,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       });
 
       await expect(
-        adapter.tryActivate({ id: "subscription-1", previousStatus: "PENDING" }),
+        adapter.findActivate({ id: "subscription-1", previousStatus: "PENDING" }),
       ).rejects.toThrow("connection refused");
     });
   });

@@ -140,7 +140,7 @@ export class BillableEventsMeterProjection {
         record: BillableEventRecord,
         _context: ProjectionStoreContext,
       ): Promise<void> => {
-        const organizationId = await this.organizations.tryResolveOrganizationId(record.tenantId);
+        const organizationId = await this.organizations.findOrganizationId(record.tenantId);
         if (!organizationId) return;
 
         await this.meter.insert({ record, organizationId });

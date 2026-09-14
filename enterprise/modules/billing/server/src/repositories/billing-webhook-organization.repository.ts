@@ -8,9 +8,9 @@
  * retires.
  */
 export abstract class BillingWebhookOrganization {
-  abstract tryFindByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null>;
+  abstract findByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null>;
 
-  abstract tryFindNameById(organizationId: string): Promise<{ id: string; name: string } | null>;
+  abstract findNameById(organizationId: string): Promise<{ id: string; name: string } | null>;
 
   abstract updateCurrency(input: { organizationId: string; currency: string }): Promise<void>;
 

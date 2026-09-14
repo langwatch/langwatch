@@ -12,17 +12,17 @@ const syncedUserIds = new Set<string>();
  * Only called on first login per process lifetime.
  */
 async function performFullSync({ userId }: { userId: string }): Promise<void> {
-  const nurturing = NurturingSinkRegistryService.trySink();
+  const nurturing = NurturingSinkRegistryService.findSink();
   if (!nurturing) {
     return;
   }
 
-  const profiles = NurturingSinkRegistryService.tryProfiles();
+  const profiles = NurturingSinkRegistryService.findProfiles();
   if (!profiles) {
     return;
   }
 
-  const profile = await profiles.tryFindProfile(userId);
+  const profile = await profiles.findProfile(userId);
   if (!profile) {
     return;
   }
@@ -72,7 +72,7 @@ export class NurturingUserSyncService {
     userId: string;
     hasOrganization: boolean;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

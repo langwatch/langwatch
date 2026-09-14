@@ -16,7 +16,7 @@ export class MemoryOrganizationPricingRepository extends OrganizationPricing {
     return new MemoryOrganizationPricingRepository(store);
   }
 
-  async tryGetPricingModel(organizationId: string): Promise<string | null> {
+  async findPricingModel(organizationId: string): Promise<string | null> {
     return this.store.organizations.get(organizationId)?.pricingModel ?? null;
   }
 }

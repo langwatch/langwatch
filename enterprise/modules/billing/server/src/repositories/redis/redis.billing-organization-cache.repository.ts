@@ -37,7 +37,7 @@ export class RedisBillingOrganizationCacheRepository implements BillingOrganizat
 
   private constructor(private readonly redis: BillingOrganizationCacheRedis) {}
 
-  async get(key: string): Promise<BillingReportOrganizationLookup | undefined> {
+  async find(key: string): Promise<BillingReportOrganizationLookup | undefined> {
     try {
       const stored = await this.redis.get(`${BILLING_ORG_CACHE_PREFIX}${key}`);
       if (stored === null) return undefined;

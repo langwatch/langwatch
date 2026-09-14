@@ -284,7 +284,7 @@ export class EEWebhookService implements WebhookService {
         : paymentIntent.customer?.id;
 
     const organization = customerId
-      ? await this.organizationRepository.tryFindByStripeCustomerId(customerId)
+      ? await this.organizationRepository.findByStripeCustomerId(customerId)
       : null;
 
     if (customerId && !organization) {
@@ -365,7 +365,7 @@ export class EEWebhookService implements WebhookService {
   async handleInvoicePaymentFailed({ subscriptionId }: { subscriptionId: string }): Promise<void> {
     await waitForStripeConsistency();
 
-    const currentSubscription = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
+    const currentSubscription = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     if (!currentSubscription) {
       logger.warn(

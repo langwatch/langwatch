@@ -15,7 +15,7 @@ export interface BillingCheckpoint {
  * Also carries failure tracking (consecutiveFailures) for the circuit breaker.
  */
 export abstract class BillingCheckpointRepository {
-  abstract tryGetCheckpoint(params: {
+  abstract findCheckpoint(params: {
     organizationId: string;
     billingMonth: string;
   }): Promise<BillingCheckpoint | null>;

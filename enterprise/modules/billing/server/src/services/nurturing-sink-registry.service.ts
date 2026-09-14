@@ -31,7 +31,7 @@ export class NurturingSinkRegistryService {
   }
 
   /** The registered sink, or null when this process composed none. */
-  static trySink(): NurturingService | null {
+  static findSink(): NurturingService | null {
     return NurturingSinkRegistryService.#sink;
   }
 
@@ -45,7 +45,7 @@ export class NurturingSinkRegistryService {
   }
 
   /** The registered reader, or null when this process composed none. */
-  static tryProfiles(): NurturingProfileRepository | null {
+  static findProfiles(): NurturingProfileRepository | null {
     return NurturingSinkRegistryService.#profiles;
   }
 
@@ -55,7 +55,7 @@ export class NurturingSinkRegistryService {
   }
 
   /** The registered resolver, or null when this process composed none. */
-  static tryOrganizationAdminResolver(): OrganizationAdminResolver | null {
+  static findOrganizationAdminResolver(): OrganizationAdminResolver | null {
     return NurturingSinkRegistryService.#organizationAdminResolver;
   }
 

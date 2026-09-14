@@ -38,12 +38,12 @@ const createMockStripe = () => ({
 const createMockRepository = (): {
   [K in keyof BillingSubscription]: ReturnType<typeof vi.fn>;
 } => ({
-  tryFindActive: vi.fn(),
-  tryFindLastNonCancelled: vi.fn(),
+  findActive: vi.fn(),
+  findLastNonCancelled: vi.fn(),
   createPending: vi.fn(),
   updateStatus: vi.fn(),
   updatePlan: vi.fn(),
-  tryFindByStripeId: vi.fn(),
+  findByStripeId: vi.fn(),
   linkStripeId: vi.fn(),
   activate: vi.fn(),
   recordPaymentFailure: vi.fn(),
@@ -62,10 +62,10 @@ const createMockItemCalculator = () => ({
 const createMockOrganizationRepository = (): {
   [K in keyof BillingOrganization]: ReturnType<typeof vi.fn>;
 } => ({
-  tryGetPricingModel: vi.fn(),
-  tryGetStripeCustomerId: vi.fn(),
-  tryFindName: vi.fn(),
-  tryFindFirstTeamId: vi.fn(),
+  findPricingModel: vi.fn(),
+  findStripeCustomerId: vi.fn(),
+  findName: vi.fn(),
+  findFirstTeamId: vi.fn(),
 });
 
 const createMockNotifier = (): BillingSubscriptionNotifier => ({
@@ -126,7 +126,7 @@ describe("BillingSubscriptionService", () => {
       expect(typeof localService.updateSubscriptionItems).toBe("function");
       expect(typeof localService.createOrUpdateSubscription).toBe("function");
       expect(typeof localService.createBillingPortalSession).toBe("function");
-      expect(typeof localService.tryGetLastNonCancelledSubscription).toBe("function");
+      expect(typeof localService.findLastNonCancelledSubscription).toBe("function");
       expect(typeof localService.notifyProspective).toBe("function");
     });
   });
@@ -151,7 +151,7 @@ describe("BillingSubscriptionService", () => {
     describe("when active subscription exists", () => {
       /** @scenario EESubscriptionService updates subscription items via Stripe */
       it("updates subscription items via Stripe", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -181,7 +181,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgradeTraces is false", () => {
       it("passes zero traces to the item calculator", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -213,7 +213,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgradeMembers is false", () => {
       it("passes zero members to the item calculator", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -245,7 +245,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when no active subscription exists", () => {
       it("returns success false", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue(null);
+        repository.findLastNonCancelled.mockResolvedValue(null);
 
         const result = await service.updateSubscriptionItems({
           organizationId: "org_123",
@@ -265,7 +265,7 @@ describe("BillingSubscriptionService", () => {
     describe("when cancelling to FREE with existing subscription", () => {
       /** @scenario EESubscriptionService cancels subscription when downgrading to free */
       it("cancels Stripe subscription and updates status via repository", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -291,7 +291,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgrading existing subscription", () => {
       it("updates Stripe subscription items and plan via repository", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -321,7 +321,7 @@ describe("BillingSubscriptionService", () => {
     describe("when creating new subscription", () => {
       /** @scenario EESubscriptionService creates checkout for new subscription */
       it("creates checkout session for new plan", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue(null);
+        repository.findLastNonCancelled.mockResolvedValue(null);
         repository.createPending.mockResolvedValue({ id: "sub_new" });
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
@@ -351,7 +351,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when plan is invalid", () => {
       it("raises billing_plan_price_missing without creating a pending subscription", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue(null);
+        repository.findLastNonCancelled.mockResolvedValue(null);
 
         await expect(
           service.createOrUpdateSubscription({
@@ -368,7 +368,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when selecting FREE with no existing subscription", () => {
       it("returns subscription settings URL", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue(null);
+        repository.findLastNonCancelled.mockResolvedValue(null);
 
         const result = await service.createOrUpdateSubscription({
           organizationId: "org_123",
@@ -383,7 +383,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when createPending succeeds but stripe checkout throws", () => {
       it("propagates the error", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue(null);
+        repository.findLastNonCancelled.mockResolvedValue(null);
         repository.createPending.mockResolvedValue({ id: "sub_new" });
         stripe.checkout.sessions.create.mockRejectedValue(new Error("Stripe checkout failed"));
 
@@ -400,7 +400,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when upgrading and stripe subscriptions.update throws", () => {
       it("does not call repository.updatePlan", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -425,7 +425,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when cancelling and stripe subscriptions.cancel throws", () => {
       it("does not call repository.updateStatus", async () => {
-        repository.tryFindLastNonCancelled.mockResolvedValue({
+        repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
@@ -469,16 +469,16 @@ describe("BillingSubscriptionService", () => {
     });
   });
 
-  describe("tryGetLastNonCancelledSubscription()", () => {
+  describe("findLastNonCancelledSubscription()", () => {
     describe("when querying for an organization", () => {
       it("delegates to repository and returns the result", async () => {
         const mockSub = { id: "sub_1", status: "ACTIVE" };
-        repository.tryFindLastNonCancelled.mockResolvedValue(mockSub);
+        repository.findLastNonCancelled.mockResolvedValue(mockSub);
 
-        const result = await service.tryGetLastNonCancelledSubscription("org_123");
+        const result = await service.findLastNonCancelledSubscription("org_123");
 
         expect(result).toEqual(mockSub);
-        expect(repository.tryFindLastNonCancelled).toHaveBeenCalledWith("org_123");
+        expect(repository.findLastNonCancelled).toHaveBeenCalledWith("org_123");
       });
     });
   });
@@ -487,7 +487,7 @@ describe("BillingSubscriptionService", () => {
     describe("when organization exists", () => {
       /** @scenario EESubscriptionService notifies for prospective subscription */
       it("dispatches prospective notification", async () => {
-        organizationRepository.tryFindName.mockResolvedValue({
+        organizationRepository.findName.mockResolvedValue({
           id: "org_123",
           name: "Acme",
         });
@@ -516,7 +516,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when organization not found", () => {
       it("raises organization_not_found", async () => {
-        organizationRepository.tryFindName.mockResolvedValue(null);
+        organizationRepository.findName.mockResolvedValue(null);
 
         await expect(
           service.notifyProspective({
@@ -555,8 +555,8 @@ describe("BillingSubscriptionService", () => {
           seatEventService,
         });
 
-        organizationRepository.tryFindFirstTeamId.mockResolvedValue("team_1");
-        organizationRepository.tryGetPricingModel.mockResolvedValue("SEAT_EVENT");
+        organizationRepository.findFirstTeamId.mockResolvedValue("team_1");
+        organizationRepository.findPricingModel.mockResolvedValue("SEAT_EVENT");
         (seatEventService.createSeatEventCheckout as ReturnType<typeof vi.fn>).mockResolvedValue({
           url: "https://checkout.stripe.com/seat-session",
         });
@@ -637,7 +637,7 @@ describe("BillingSubscriptionService", () => {
   describe("listInvoices()", () => {
     describe("when organization has no stripeCustomerId", () => {
       it("returns an empty array", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue(null);
+        organizationRepository.findStripeCustomerId.mockResolvedValue(null);
 
         const result = await service.listInvoices({
           organizationId: "org_no_stripe",
@@ -650,7 +650,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when organization is not found", () => {
       it("returns an empty array", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue(null);
+        organizationRepository.findStripeCustomerId.mockResolvedValue(null);
 
         const result = await service.listInvoices({
           organizationId: "org_missing",
@@ -662,7 +662,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when the provider rate-limits the invoice list", () => {
       it("fails with a retryable provider-unavailable error", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(
           new Stripe.errors.StripeRateLimitError({
             message: "slow down",
@@ -678,7 +678,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when the provider is unreachable for the invoice list", () => {
       it("fails with the same retryable provider-unavailable error", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(
           new Stripe.errors.StripeConnectionError({
             message: "network down",
@@ -695,7 +695,7 @@ describe("BillingSubscriptionService", () => {
     describe("when the invoice list fails for a reason we cannot name", () => {
       it("lets the original error through rather than dressing it as handled", async () => {
         const providerError = new Error("No such customer");
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(providerError);
 
         const error = await service
@@ -709,7 +709,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when organization has a stripeCustomerId", () => {
       it("returns mapped invoices excluding drafts", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
 
         stripe.invoices.list.mockResolvedValue({
           data: [

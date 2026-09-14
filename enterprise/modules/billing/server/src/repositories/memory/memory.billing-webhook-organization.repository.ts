@@ -17,14 +17,14 @@ export class MemoryBillingWebhookOrganizationRepository extends BillingWebhookOr
     return new MemoryBillingWebhookOrganizationRepository(store);
   }
 
-  async tryFindByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null> {
+  async findByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null> {
     const found = [...this.store.organizations.values()].find(
       (organization) => organization.stripeCustomerId === stripeCustomerId,
     );
     return found ? { id: found.id } : null;
   }
 
-  async tryFindNameById(organizationId: string): Promise<{ id: string; name: string } | null> {
+  async findNameById(organizationId: string): Promise<{ id: string; name: string } | null> {
     const organization = this.store.organizations.get(organizationId);
     return organization ? { id: organization.id, name: organization.name } : null;
   }

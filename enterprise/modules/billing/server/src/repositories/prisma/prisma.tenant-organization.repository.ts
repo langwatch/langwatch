@@ -21,7 +21,7 @@ export class PrismaBillingTenantOrganizationRepository extends BillingTenantOrga
     return new PrismaBillingTenantOrganizationRepository(prisma);
   }
 
-  async tryFindOrganizationForTenant(tenantId: string): Promise<string | null> {
+  async findOrganizationForTenant(tenantId: string): Promise<string | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: tenantId },
       select: { team: { select: { organizationId: true } } },

@@ -67,7 +67,7 @@ export class PrismaSubscriptionRepository extends SubscriptionRepository {
     return new PrismaSubscriptionRepository(database);
   }
 
-  async tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
+  async findActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     const row = await this.prisma.subscription.findFirst({
       where: { organizationId, status: SubscriptionStatus.ACTIVE },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -76,7 +76,7 @@ export class PrismaSubscriptionRepository extends SubscriptionRepository {
     return row ? subscriptionRecordOf(row) : null;
   }
 
-  async tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
+  async findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     const row = await this.prisma.subscription.findFirst({
       where: {
         organizationId,
@@ -125,7 +125,7 @@ export class PrismaSubscriptionRepository extends SubscriptionRepository {
 
   // --- Webhook handler methods ---
 
-  async tryFindByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
+  async findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
     const row = await this.prisma.subscription.findUnique({
       where: { stripeSubscriptionId },
     });

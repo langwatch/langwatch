@@ -13,8 +13,8 @@ export class MemoryNurturingProfileRepository extends NurturingProfileRepository
     return new MemoryNurturingProfileRepository(store);
   }
 
-  async tryFindProfile(userId: string): Promise<NurturingProfile | null> {
-    return this.store.profileOf(userId);
+  async findProfile(userId: string): Promise<NurturingProfile | null> {
+    return this.store.findProfileOf(userId);
   }
 
   async memberUserIds(organizationId: string): Promise<string[]> {

@@ -262,7 +262,7 @@ export class UsageLimitService {
 
     const cooldownKey = `${organizationId}:${limitType}`;
 
-    if (await this.resourceCooldown.tryGet(cooldownKey)) {
+    if (await this.resourceCooldown.find(cooldownKey)) {
       return;
     }
 
@@ -316,7 +316,7 @@ export class UsageLimitService {
    * allowance. Owned by {@link UsageWarningService}; it stays on this class
    * because this is the entry point every caller already holds.
    */
-  tryCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
-    return this.warnings.tryCheckAndSendWarning(data);
+  findCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
+    return this.warnings.findCheckAndSendWarning(data);
   }
 }

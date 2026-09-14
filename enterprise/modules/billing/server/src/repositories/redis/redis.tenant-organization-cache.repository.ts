@@ -42,7 +42,7 @@ export class RedisTenantOrganizationCacheRepository implements BillingTenantOrga
 
   private constructor(private readonly redis: BillingTenantOrganizationCacheRedis) {}
 
-  async get(tenantId: string): Promise<string | undefined> {
+  async find(tenantId: string): Promise<string | undefined> {
     try {
       const stored = await this.redis.get(`${BILLING_TENANT_ORGANIZATION_CACHE_PREFIX}${tenantId}`);
       if (stored === null) return undefined;

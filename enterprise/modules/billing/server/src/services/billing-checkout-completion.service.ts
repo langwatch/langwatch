@@ -193,7 +193,7 @@ export class BillingCheckoutCompletionService {
       throwOnMissing: true,
     });
 
-    const subscriptionRecord = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
+    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {

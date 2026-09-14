@@ -22,14 +22,14 @@ export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOr
     return new PrismaBillingWebhookOrganizationRepository(options.database);
   }
 
-  async tryFindByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null> {
+  async findByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string } | null> {
     return await this.database.organization.findFirst({
       where: { stripeCustomerId },
       select: { id: true },
     });
   }
 
-  async tryFindNameById(organizationId: string): Promise<{ id: string; name: string } | null> {
+  async findNameById(organizationId: string): Promise<{ id: string; name: string } | null> {
     return await this.database.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true },

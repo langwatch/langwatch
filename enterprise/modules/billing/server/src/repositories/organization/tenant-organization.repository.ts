@@ -13,5 +13,5 @@
  */
 export abstract class BillingTenantOrganization {
   /** Null means the tenant has no organization; never a fallback to another. */
-  abstract tryFindOrganizationForTenant(tenantId: string): Promise<string | null>;
+  abstract findOrganizationForTenant(tenantId: string): Promise<string | null>;
 }

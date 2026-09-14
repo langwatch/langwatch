@@ -26,7 +26,7 @@ export interface BillingStripeWebhookApi {
    */
   dispatchesEvents(): boolean;
   /** The signing secret, read per request so a rotation without a restart works. */
-  signingSecret(): string | undefined;
+  findSigningSecret(): string | undefined;
   /**
    * Verifies the signature over the raw bytes and returns the event. Throwing
    * means the payload or the signature is wrong.
@@ -65,7 +65,7 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
     }
 
     const signature = request.headers.get("stripe-signature");
-    const secret = app.signingSecret();
+    const secret = app.findSigningSecret();
 
     if (!signature || !secret) {
       logger.error(
@@ -76,7 +76,7 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
       return refusal("Webhook Error: Missing signature or secret");
     }
 
-    const event = verifiedEvent({ app, rawBody: raw, signature });
+    const event = findVerifiedEvent({ app, rawBody: raw, signature });
 
     if (!event) return refusal("Webhook Error: Invalid payload or signature");
 
@@ -100,7 +100,7 @@ function refusal(message: string): RestRawAnswer {
  * signature is wrong. The failure is logged here because the answer the sender
  * gets is deliberately the same for both.
  */
-function verifiedEvent({
+function findVerifiedEvent({
   app,
   rawBody,
   signature,

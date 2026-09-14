@@ -12,27 +12,27 @@ export type SubscriptionWithOrg = BillingSubscriptionRecord & {
 export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
 export abstract class BillingWebhookSubscription {
-  abstract tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
+  abstract findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
 
-  abstract tryCreatePending(input: {
+  abstract findCreatePending(input: {
     organizationId: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord | null>;
 
-  abstract tryUpdateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord | null>;
+  abstract findUpdateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord | null>;
 
-  abstract tryUpdatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null>;
+  abstract findUpdatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null>;
 
   // --- Webhook handler methods ---
 
-  abstract tryFindByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null>;
+  abstract findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null>;
 
   abstract linkStripeId(input: {
     id: string;
     stripeSubscriptionId: string;
   }): Promise<{ count: number }>;
 
-  abstract tryActivate(input: {
+  abstract findActivate(input: {
     id: string;
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null>;
@@ -48,7 +48,7 @@ export abstract class BillingWebhookSubscription {
     excludeSubscriptionId: string;
   }): Promise<CancelledSubscription[]>;
 
-  abstract tryUpdateQuantities(input: {
+  abstract findUpdateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
@@ -56,26 +56,26 @@ export abstract class BillingWebhookSubscription {
 }
 
 export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscription {
-  async tryFindLastNonCancelled(_organizationId: string): Promise<BillingSubscriptionRecord | null> {
+  async findLastNonCancelled(_organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async tryCreatePending(_input: {
+  async findCreatePending(_input: {
     organizationId: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async tryUpdateStatus(_input: { id: string; status: string }): Promise<BillingSubscriptionRecord | null> {
+  async findUpdateStatus(_input: { id: string; status: string }): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async tryUpdatePlan(_input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null> {
+  async findUpdatePlan(_input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
-  async tryFindByStripeId(_stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
+  async findByStripeId(_stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
     return null;
   }
 
@@ -86,7 +86,7 @@ export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscri
     return { count: 0 };
   }
 
-  async tryActivate(_input: {
+  async findActivate(_input: {
     id: string;
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null> {
@@ -106,7 +106,7 @@ export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscri
     return [];
   }
 
-  async tryUpdateQuantities(_input: {
+  async findUpdateQuantities(_input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;

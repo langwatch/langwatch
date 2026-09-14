@@ -26,7 +26,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
     return new MemoryBillingCheckpointRepository(store);
   }
 
-  async tryGetCheckpoint(params: {
+  async findCheckpoint(params: {
     organizationId: string;
     billingMonth: string;
   }): Promise<BillingCheckpoint | null> {
@@ -39,7 +39,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
     lastReportedTotal: number;
     pendingReportedTotal: number;
   }): Promise<void> {
-    const current = await this.tryGetCheckpoint(params);
+    const current = await this.findCheckpoint(params);
     this.write(params, {
       lastReportedTotal: current?.lastReportedTotal ?? params.lastReportedTotal,
       pendingReportedTotal: params.pendingReportedTotal,
@@ -64,7 +64,7 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
     billingMonth: string;
     consecutiveFailures: number;
   }): Promise<void> {
-    const current = await this.tryGetCheckpoint(params);
+    const current = await this.findCheckpoint(params);
     this.write(params, {
       lastReportedTotal: current?.lastReportedTotal ?? UNREPORTED.lastReportedTotal,
       pendingReportedTotal: null,

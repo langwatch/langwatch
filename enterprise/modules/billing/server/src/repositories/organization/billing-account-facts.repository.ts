@@ -1,9 +1,9 @@
 /** Narrow organization reads needed by the billing lifecycle services. */
 export abstract class BillingOrganization {
-  abstract tryGetPricingModel(organizationId: string): Promise<string | null>;
-  abstract tryGetStripeCustomerId(organizationId: string): Promise<string | null>;
-  abstract tryFindName(organizationId: string): Promise<{ id: string; name: string } | null>;
-  abstract tryFindFirstTeamId(organizationId: string): Promise<string | null>;
+  abstract findPricingModel(organizationId: string): Promise<string | null>;
+  abstract findStripeCustomerId(organizationId: string): Promise<string | null>;
+  abstract findName(organizationId: string): Promise<{ id: string; name: string } | null>;
+  abstract findFirstTeamId(organizationId: string): Promise<string | null>;
 }
 
 /** Answers every organization read as absent where no directory is composed. */
@@ -16,19 +16,19 @@ export class NullBillingOrganizationAdapter extends BillingOrganization {
     return new NullBillingOrganizationAdapter();
   }
 
-  async tryGetPricingModel(): Promise<string | null> {
+  async findPricingModel(): Promise<string | null> {
     return null;
   }
 
-  async tryGetStripeCustomerId(): Promise<string | null> {
+  async findStripeCustomerId(): Promise<string | null> {
     return null;
   }
 
-  async tryFindName(): Promise<{ id: string; name: string } | null> {
+  async findName(): Promise<{ id: string; name: string } | null> {
     return null;
   }
 
-  async tryFindFirstTeamId(): Promise<string | null> {
+  async findFirstTeamId(): Promise<string | null> {
     return null;
   }
 }

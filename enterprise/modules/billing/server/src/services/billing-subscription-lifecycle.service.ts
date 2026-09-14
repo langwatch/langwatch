@@ -76,7 +76,7 @@ export class BillingSubscriptionLifecycleService {
     await waitForStripeConsistency();
 
     const existingSubscription =
-      await this.subscriptionRepository.tryFindByStripeId(stripeSubscriptionId);
+      await this.subscriptionRepository.findByStripeId(stripeSubscriptionId);
 
     if (!existingSubscription) {
       logger.warn(
@@ -103,7 +103,7 @@ export class BillingSubscriptionLifecycleService {
       label: "cancellation notification",
       context: { stripeSubscriptionId },
       effect: async () => {
-        const org = await this.organizationRepository.tryFindNameById(
+        const org = await this.organizationRepository.findNameById(
           existingSubscription.organizationId,
         );
         await this.host.sendSlackSubscriptionEvent({
@@ -117,7 +117,7 @@ export class BillingSubscriptionLifecycleService {
       },
     });
 
-    const remainingActive = await this.subscriptionRepository.tryFindLastNonCancelled(
+    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existingSubscription.organizationId,
     );
     NurturingSubscriptionSyncService.fireSubscriptionSync({
@@ -136,7 +136,7 @@ export class BillingSubscriptionLifecycleService {
   }): Promise<void> {
     await waitForStripeConsistency();
 
-    const existingSubForUpdate = await this.subscriptionRepository.tryFindByStripeId(
+    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(
       subscription.id,
     );
 
@@ -169,7 +169,7 @@ export class BillingSubscriptionLifecycleService {
   private async cancelSubscriptionRecord(existing: BillingSubscriptionRecord): Promise<void> {
     await this.subscriptionRepository.cancel({ id: existing.id });
 
-    const remainingActive = await this.subscriptionRepository.tryFindLastNonCancelled(
+    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existing.organizationId,
     );
     NurturingSubscriptionSyncService.fireSubscriptionSync({
@@ -188,7 +188,7 @@ export class BillingSubscriptionLifecycleService {
   }): Promise<void> {
     const shouldNotify = existing.status !== SubscriptionStatus.ACTIVE;
     const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
-    const updatedSubscription = await this.subscriptionRepository.tryUpdateQuantities({
+    const updatedSubscription = await this.subscriptionRepository.findUpdateQuantities({
       id: existing.id,
       ...planQuantities({ members: usersQuantity, messagesPerMonth: tracesQuantity }),
     });
@@ -278,7 +278,7 @@ export class BillingSubscriptionLifecycleService {
     await waitForStripeConsistency();
 
     const previousSubscription =
-      await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
+      await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     if (!previousSubscription) {
       if (throwOnMissing) {
@@ -297,7 +297,7 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
 
-    const updatedSubscription = await this.subscriptionRepository.tryActivate({
+    const updatedSubscription = await this.subscriptionRepository.findActivate({
       id: previousSubscription.id,
       previousStatus: previousSubscription.status,
     });

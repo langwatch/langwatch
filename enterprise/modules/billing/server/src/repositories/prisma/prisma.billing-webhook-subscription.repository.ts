@@ -43,37 +43,37 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return new PrismaBillingWebhookSubscriptionRepository(options.subscriptions, options.database);
   }
 
-  tryFindLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
-    return this.subscriptions.tryFindLastNonCancelled(organizationId);
+  findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
+    return this.subscriptions.findLastNonCancelled(organizationId);
   }
 
-  tryCreatePending(input: {
+  findCreatePending(input: {
     organizationId: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord | null> {
     return this.orNull("createPending", () => this.subscriptions.createPending(input));
   }
 
-  tryUpdateStatus(input: {
+  findUpdateStatus(input: {
     id: string;
     status: string;
   }): Promise<BillingSubscriptionRecord | null> {
     return this.orNull("updateStatus", () => this.subscriptions.updateStatus(input));
   }
 
-  tryUpdatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null> {
+  findUpdatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null> {
     return this.orNull("updatePlan", () => this.subscriptions.updatePlan(input));
   }
 
-  tryFindByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
-    return this.subscriptions.tryFindByStripeId(stripeSubscriptionId);
+  findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
+    return this.subscriptions.findByStripeId(stripeSubscriptionId);
   }
 
   linkStripeId(input: { id: string; stripeSubscriptionId: string }): Promise<{ count: number }> {
     return this.subscriptions.linkStripeId(input);
   }
 
-  async tryActivate(input: {
+  async findActivate(input: {
     id: string;
     previousStatus: string;
   }): Promise<SubscriptionWithOrg | null> {
@@ -100,7 +100,7 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
-  async tryUpdateQuantities(input: {
+  async findUpdateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;

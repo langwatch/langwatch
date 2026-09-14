@@ -50,7 +50,7 @@ export type LicenseEmailDelivery = {
  * do it.
  */
 export type LicenseFeaturesResolver = {
-  resolve(input: { planType: string }): Promise<LicenseUnlockedFeatures | undefined>;
+  find(input: { planType: string }): Promise<LicenseUnlockedFeatures | undefined>;
 };
 
 export type LicensePurchaseNotification = {
@@ -155,7 +155,7 @@ export class LicensePurchaseService {
   ): Promise<LicenseUnlockedFeatures | undefined> {
     if (!this.licenseFeatures) return undefined;
     try {
-      return await this.licenseFeatures.resolve({ planType });
+      return await this.licenseFeatures.find({ planType });
     } catch (error) {
       logger.warn(
         { planType, error },

@@ -120,7 +120,7 @@ export class BillingMeterDispatchSubscriber {
       },
 
       handle: async (_event, context) => {
-        const organizationId = await this.organizations.tryResolveOrganizationId(context.tenantId);
+        const organizationId = await this.organizations.findOrganizationId(context.tenantId);
         if (!organizationId) return;
 
         const now = this.now();

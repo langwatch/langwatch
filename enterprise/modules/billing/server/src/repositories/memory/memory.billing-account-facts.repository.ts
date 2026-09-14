@@ -13,20 +13,20 @@ export class MemoryBillingOrganizationRepository extends BillingOrganization {
     return new MemoryBillingOrganizationRepository(store);
   }
 
-  async tryGetPricingModel(organizationId: string): Promise<string | null> {
+  async findPricingModel(organizationId: string): Promise<string | null> {
     return this.store.organizations.get(organizationId)?.pricingModel ?? null;
   }
 
-  async tryGetStripeCustomerId(organizationId: string): Promise<string | null> {
+  async findStripeCustomerId(organizationId: string): Promise<string | null> {
     return this.store.organizations.get(organizationId)?.stripeCustomerId ?? null;
   }
 
-  async tryFindName(organizationId: string): Promise<{ id: string; name: string } | null> {
+  async findName(organizationId: string): Promise<{ id: string; name: string } | null> {
     const organization = this.store.organizations.get(organizationId);
     return organization ? { id: organization.id, name: organization.name } : null;
   }
 
-  async tryFindFirstTeamId(organizationId: string): Promise<string | null> {
+  async findFirstTeamId(organizationId: string): Promise<string | null> {
     return this.store.organizations.get(organizationId)?.teamIds[0] ?? null;
   }
 }

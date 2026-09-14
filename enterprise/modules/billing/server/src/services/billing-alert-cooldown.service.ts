@@ -14,7 +14,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 export interface BillingCooldownCache {
-  tryGet(key: string): Promise<boolean | null>;
+  find(key: string): Promise<boolean | null>;
   set(key: string, value: true): Promise<void>;
   delete(key: string): Promise<void>;
   claim?(key: string, value: true): Promise<boolean>;
@@ -29,7 +29,7 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 
   private constructor(private readonly ttlMs: number) {}
 
-  async tryGet(key: string): Promise<boolean | null> {
+  async find(key: string): Promise<boolean | null> {
     const expiresAt = this.values.get(key);
     if (!expiresAt || expiresAt <= nowInstant().epochMilliseconds) {
       this.values.delete(key);
@@ -50,7 +50,7 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 
   /** Take the key if it is free, in one step, so two callers cannot both win. */
   async claim(key: string): Promise<boolean> {
-    if (await this.tryGet(key)) {
+    if (await this.find(key)) {
       return false;
     }
 

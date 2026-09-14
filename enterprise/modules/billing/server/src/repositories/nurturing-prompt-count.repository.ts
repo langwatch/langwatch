@@ -5,7 +5,7 @@
  */
 export abstract class NurturingPromptCountRepository {
   /** The organization a project belongs to, where the project still exists. */
-  abstract tryFindOrganizationId(projectId: string): Promise<string | undefined>;
+  abstract findOrganizationId(projectId: string): Promise<string | undefined>;
 
   /** Every non-deleted, versioned prompt across the whole organization. */
   abstract countOrganizationPrompts(organizationId: string): Promise<number>;

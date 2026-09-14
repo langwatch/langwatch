@@ -19,7 +19,7 @@ vi.mock("@langwatch/observability", () => ({
 /** The two reads `NurturingPromptCreationService.afterPromptCreated` makes on its own, and nothing else. */
 function repositoryCounting(orgPromptCount: number): NurturingPromptCountRepository {
   return {
-    tryFindOrganizationId: vi.fn(async () => "org-1"),
+    findOrganizationId: vi.fn(async () => "org-1"),
     countOrganizationPrompts: vi.fn(async () => orgPromptCount),
   };
 }

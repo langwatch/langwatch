@@ -44,7 +44,7 @@ export class BillableEventsQueryService {
     ];
   }
 
-  async tryQueryBillableEventsTotal({
+  async findQueryBillableEventsTotal({
     organizationId,
     billingMonth,
   }: {
@@ -67,7 +67,7 @@ export class BillableEventsQueryService {
    * Approximate count of distinct billable events for an org in a billing month.
    * Uses HyperLogLog (~1% error, constant memory).
    */
-  async tryQueryBillableEventsTotalUniq({
+  async findQueryBillableEventsTotalUniq({
     organizationId,
     billingMonth,
   }: {
@@ -94,7 +94,7 @@ export class BillableEventsQueryService {
    * Approximate count of distinct trace events for an org in a current month.
    * Uses HyperLogLog (~1% error, constant memory).
    */
-  async tryQueryTraceSummariesTotalUniq({
+  async findQueryTraceSummariesTotalUniq({
     projectIds,
     billingMonth,
   }: {

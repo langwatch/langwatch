@@ -1,4 +1,10 @@
-import { defineAggregate, defineEvents, definePipeline, type Event } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
   type ReportUsageForMonthCommandData,
@@ -36,7 +42,7 @@ export class BillingReportingPipeline {
     private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
   ) {}
 
-  buildProcessing() {
+  buildProcessing(): StaticPipelineDefinition<Event, any, any> {
     const reportUsageForMonthCommand = ReportUsageForMonthCommandHandler.create({
       ...this.deps,
       selfDispatch: (data) => {

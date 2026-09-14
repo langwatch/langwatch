@@ -63,7 +63,7 @@ describe("LicensePurchaseService", () => {
     /** @scenario "A licence checkout links what the issued tier unlocks" */
     it("passes a self-serve unlocked-features link to the mail", async () => {
       const licenseFeatures = {
-        resolve: vi.fn(async () => ({
+        find: vi.fn(async () => ({
           kind: "self_serve" as const,
           url: "https://app.langwatch.ai/pricing",
         })),
@@ -76,7 +76,7 @@ describe("LicensePurchaseService", () => {
         privateKey: "priv",
       });
 
-      expect(licenseFeatures.resolve).toHaveBeenCalledWith({ planType: "ACCELERATE" });
+      expect(licenseFeatures.find).toHaveBeenCalledWith({ planType: "ACCELERATE" });
       expect(sendLicenseEmail).toHaveBeenCalledWith(
         expect.objectContaining({
           unlockedFeatures: { kind: "self_serve", url: "https://app.langwatch.ai/pricing" },
@@ -89,7 +89,7 @@ describe("LicensePurchaseService", () => {
     /** @scenario "A licence checkout for a negotiated tier names the account team" */
     it("passes an account-team contact to the mail", async () => {
       const licenseFeatures = {
-        resolve: vi.fn(async () => ({
+        find: vi.fn(async () => ({
           kind: "account_team" as const,
           contactUrl: "https://langwatch.ai/contact",
         })),

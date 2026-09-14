@@ -31,6 +31,6 @@ export const BILLING_ORG_CACHE_PREFIX = "ttlcache:billing:orgData:";
  * different dedup keys, so both run.
  */
 export interface BillingOrganizationCache {
-  get(key: string): Promise<BillingReportOrganizationLookup | undefined>;
+  find(key: string): Promise<BillingReportOrganizationLookup | undefined>;
   set(key: string, value: BillingReportOrganizationLookup): Promise<void>;
 }

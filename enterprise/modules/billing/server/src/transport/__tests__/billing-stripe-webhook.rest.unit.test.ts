@@ -18,7 +18,7 @@ const declaration = billingStripeWebhookRest.router();
 const EVENT = { id: "evt_1", type: "checkout.session.completed" } as unknown as Stripe.Event;
 
 const dispatchesEvents = vi.fn<() => boolean>();
-const signingSecret = vi.fn<() => string | undefined>();
+const findSigningSecret = vi.fn<() => string | undefined>();
 const constructEvent = vi.fn<BillingStripeWebhookApi["constructEvent"]>();
 const handleEvent = vi.fn<BillingStripeWebhookApi["handleEvent"]>();
 
@@ -32,7 +32,7 @@ function mounted() {
   });
 
   return runtime.mount(declaration, {
-    app: () => ({ dispatchesEvents, signingSecret, constructEvent, handleEvent }),
+    app: () => ({ dispatchesEvents, findSigningSecret, constructEvent, handleEvent }),
     credential: "public",
     onError: (error, context) => context.json({ error: String(error) }, 500),
   });
@@ -49,7 +49,7 @@ function deliver(headers: Record<string, string> = { "stripe-signature": "t=1,v1
 beforeEach(() => {
   vi.clearAllMocks();
   dispatchesEvents.mockReturnValue(true);
-  signingSecret.mockReturnValue("whsec_test");
+  findSigningSecret.mockReturnValue("whsec_test");
   constructEvent.mockReturnValue(EVENT);
   handleEvent.mockResolvedValue({ status: "ok" } satisfies HandleEventResult);
 });
@@ -110,7 +110,7 @@ describe("given a deployment that bills through the provider", () => {
 
   describe("when this deployment holds no signing secret", () => {
     it("refuses with the same sentence rather than verifying against nothing", async () => {
-      signingSecret.mockReturnValue(undefined);
+      findSigningSecret.mockReturnValue(undefined);
 
       const response = await deliver();
 

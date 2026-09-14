@@ -17,7 +17,7 @@ export class PrismaBillingCheckpointRepository extends BillingCheckpointReposito
     return new PrismaBillingCheckpointRepository(prisma);
   }
 
-  async tryGetCheckpoint(params: {
+  async findCheckpoint(params: {
     organizationId: string;
     billingMonth: string;
   }): Promise<BillingCheckpoint | null> {

@@ -39,7 +39,7 @@ export class NurturingProductInterestService {
     userId: string;
     integrationMethod: IntegrationMethodValue;
   }): void {
-    const nurturing = NurturingSinkRegistryService.trySink();
+    const nurturing = NurturingSinkRegistryService.findSink();
     if (!nurturing) {
       return;
     }

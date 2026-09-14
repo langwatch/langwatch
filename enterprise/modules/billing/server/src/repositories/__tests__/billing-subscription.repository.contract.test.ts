@@ -23,9 +23,9 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       });
 
       expect(pending.status).toBe("PENDING");
-      await expect(repositories.subscriptions.tryFindActive("org-1")).resolves.toBeNull();
+      await expect(repositories.subscriptions.findActive("org-1")).resolves.toBeNull();
       await expect(
-        repositories.subscriptions.tryFindLastNonCancelled("org-1"),
+        repositories.subscriptions.findLastNonCancelled("org-1"),
       ).resolves.toMatchObject({ id: pending.id });
     });
   });
@@ -45,13 +45,13 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
         }),
       ).resolves.toEqual({ count: 1 });
       await expect(
-        repositories.subscriptions.tryFindByStripeId("sub_stripe_1"),
+        repositories.subscriptions.findByStripeId("sub_stripe_1"),
       ).resolves.toMatchObject({ id: pending.id });
 
       await repositories.subscriptions.cancel({ id: pending.id });
 
       await expect(
-        repositories.subscriptions.tryFindLastNonCancelled("org-1"),
+        repositories.subscriptions.findLastNonCancelled("org-1"),
       ).resolves.toBeNull();
     });
   });
@@ -60,7 +60,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
     it("answers null rather than another organization's row", async () => {
       const repositories = create();
 
-      await expect(repositories.subscriptions.tryFindByStripeId("sub_absent")).resolves.toBeNull();
+      await expect(repositories.subscriptions.findByStripeId("sub_absent")).resolves.toBeNull();
     });
   });
 
@@ -69,7 +69,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       const repositories = create();
 
       await expect(
-        repositories.checkpoints.tryGetCheckpoint({
+        repositories.checkpoints.findCheckpoint({
           organizationId: "org-1",
           billingMonth: "2026-09",
         }),
@@ -88,7 +88,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
         pendingReportedTotal: 120,
       });
 
-      await expect(repositories.checkpoints.tryGetCheckpoint(month)).resolves.toEqual({
+      await expect(repositories.checkpoints.findCheckpoint(month)).resolves.toEqual({
         lastReportedTotal: 0,
         pendingReportedTotal: 120,
         consecutiveFailures: 0,
@@ -96,7 +96,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
 
       await repositories.checkpoints.confirm({ ...month, lastReportedTotal: 120 });
 
-      await expect(repositories.checkpoints.tryGetCheckpoint(month)).resolves.toEqual({
+      await expect(repositories.checkpoints.findCheckpoint(month)).resolves.toEqual({
         lastReportedTotal: 120,
         pendingReportedTotal: null,
         consecutiveFailures: 0,
@@ -119,7 +119,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       const repositories = create();
 
       await expect(
-        repositories.tenantOrganizations.tryFindOrganizationForTenant("project-1"),
+        repositories.tenantOrganizations.findOrganizationForTenant("project-1"),
       ).resolves.toBeNull();
     });
   });
@@ -128,13 +128,13 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       const repositories = create();
 
       await expect(
-        repositories.webhookSubscriptions.tryUpdateStatus({ id: "sub-absent", status: "ACTIVE" }),
+        repositories.webhookSubscriptions.findUpdateStatus({ id: "sub-absent", status: "ACTIVE" }),
       ).resolves.toBeNull();
       await expect(
-        repositories.webhookSubscriptions.tryUpdatePlan({ id: "sub-absent", plan: "GROWTH" }),
+        repositories.webhookSubscriptions.findUpdatePlan({ id: "sub-absent", plan: "GROWTH" }),
       ).resolves.toBeNull();
       await expect(
-        repositories.webhookSubscriptions.tryActivate({
+        repositories.webhookSubscriptions.findActivate({
           id: "sub-absent",
           previousStatus: "PENDING",
         }),
@@ -147,9 +147,9 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       const repositories = create();
 
       await expect(
-        repositories.webhookOrganizations.tryFindByStripeCustomerId("cus_absent"),
+        repositories.webhookOrganizations.findByStripeCustomerId("cus_absent"),
       ).resolves.toBeNull();
-      await expect(repositories.webhookOrganizations.tryFindNameById("org-absent")).resolves.toBeNull();
+      await expect(repositories.webhookOrganizations.findNameById("org-absent")).resolves.toBeNull();
     });
   });
 });
