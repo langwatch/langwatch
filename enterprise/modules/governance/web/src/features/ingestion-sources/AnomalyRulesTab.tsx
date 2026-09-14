@@ -13,7 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { DashboardSelect } from "@ee/governance/dashboard/components/DashboardSelect";
+import { DashboardSelect } from "./DashboardSelect.tsx";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
