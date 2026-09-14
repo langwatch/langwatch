@@ -1,22 +1,5 @@
-/**
- * "Choose Dataset": pick an existing dataset for something else to use.
- *
- * Moved from `platform/app/src/components/datasets/SelectDatasetDrawer.tsx`.
- * It is a REGISTERED drawer — `?drawer.open=selectDataset` — opened from
- * flows that are not this family's (an evaluation picking its data, a workflow
- * node), which is exactly why it belongs to the family that owns datasets
- * rather than to any one of its callers.
- *
- * Three substitutions, none of them behavioural:
- *
- *   - `Drawer` comes from the Design System rather than `~/components/ui/drawer`.
- *   - `useDrawer` / `getComplexProps` come from `@langwatch/ui-drawer`, which is
- *     where the address vocabulary lives now.
- *   - The list is FETCHED HERE rather than inside the picker. `DatasetPickerList`
- *     in this package is presentational and takes rows; the platform drawer's
- *     picker did its own query. The query is the same one the datasets list
- *     screen makes, so under tRPC's path-plus-input cache key it is the same
- *     entry rather than a second read.
+/** SelectDataset drawer (cross-family opener, registered). Drawer from Design
+ * System, query cached under tRPC path-plus-input key.
  */
 
 import { Button, HStack, Text } from "@chakra-ui/react";

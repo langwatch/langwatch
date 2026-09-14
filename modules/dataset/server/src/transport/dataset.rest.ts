@@ -1,20 +1,5 @@
-/**
- * `/api/dataset`: the project's datasets and their entries, over the
- * management API.
- *
- * WHAT IS NOT HERE, and why. Eight of this family's doors need a request shape
- * the runtime cannot declare yet, so they are named in
- * `apps/api/src/features/dataset/dataset-rest.mount.ts` and answered nowhere
- * until it grows those doors:
- *
- *  - `POST /upload` and `POST /:slugOrId/upload` read a multipart file body;
- *  - `POST /direct-upload` reads a multipart body AND resolves a browser
- *    session in the handler, as do the three `/direct-upload/:datasetId` doors;
- *  - `PUT /direct-upload/staging/:uploadId` streams the raw request bytes;
- *  - `PATCH /:slugOrId/records/:recordId` answers 201 when it created the entry
- *    and 200 when it replaced one, and a declaration states one status.
- *
- * Spec: modules/dataset/specs/dataset-service.feature.
+/** Datasets REST API. Eight doors unimplemented (multipart/streaming/dual-status
+ * routes need runtime support).
  */
 import {
   BadRequestError,
