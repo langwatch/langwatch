@@ -27,7 +27,7 @@ import {
 import {
   GOVERNANCE_EVENTS_PROCESS_NAME,
   GovernanceEventDeliveryProcess,
-} from "../processes/governance-event-delivery.process.ts";
+} from "../eventing/governance-event-delivery.process.ts";
 import type { GovernanceEventsProcessingEvent } from "../app/governance.members.ts";
 
 type GovernanceVkLifecycleEvent = Extract<

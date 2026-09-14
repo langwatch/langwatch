@@ -40,7 +40,7 @@ import {
   type AgentsListingOutcome,
   type AgentsListingSummary,
   agentsListingOutcome,
-} from "../../../../../modules/governance/server/src/services/agentsListingOutcome.ts";
+} from "../../../../../modules/governance/server/src/services/agents-listing-outcome.service.ts";
 import { PrismaIngestionPullRunProjectionRepository } from "@langwatch/enterprise-governance-server";
 
 const logger = createLogger("langwatch:governance:agent-sync");

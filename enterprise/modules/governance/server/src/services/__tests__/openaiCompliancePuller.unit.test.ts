@@ -42,7 +42,7 @@ vi.mock("@aws-sdk/client-s3", () => {
   return { S3Client, ListObjectsV2Command, GetObjectCommand };
 });
 
-import { mapToOcsfRow } from "../ocsfPullEventMapping";
+import { mapToOcsfRow } from "../ocsf-pull-event-mapping.service";
 import { OpenAiComplianceReferencePuller } from "../../../../../../../docs/ai-governance/ingestion-sources/openai-compliance.mdx";
 
 const PERSON_ID = "u_123";

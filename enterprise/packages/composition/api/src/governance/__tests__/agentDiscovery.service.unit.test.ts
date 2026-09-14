@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { IngestionSourceNotFoundError } from "../ingestion-source.adapter.ts";
 import { AgentDiscoveryService } from "../agentDiscovery.service";
-import { withSourceCredentials } from "../../../../../../modules/governance/server/src/services/sourceCredentialAccess.ts";
+import { withSourceCredentials } from "../../../../../../modules/governance/server/src/services/source-credential-access.service.ts";
 
 vi.mock("~/utils/ssrfProtection", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");

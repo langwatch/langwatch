@@ -50,11 +50,11 @@ import {
   GOVERNANCE_COST_SOURCE,
   GOVERNANCE_SETTLING_WINDOW_DAYS,
 } from "./governanceCostRollup.clickhouse.repository.ts";
-import { azureBillSourceId } from "../../../../../modules/governance/server/src/repositories/prisma/azureBillIdentity.ts";
+import { azureBillSourceId } from "../../../../../modules/governance/server/src/repositories/prisma/prisma.azure-bill-identity.repository.ts";
 import {
   readClaimedSubscription,
   readPrepaidDeclared,
-} from "../../../../../modules/governance/server/src/repositories/prisma/azureBillOwnership.ts";
+} from "../../../../../modules/governance/server/src/repositories/prisma/prisma.azure-bill-ownership.repository.ts";
 import {
   azureBillingNoteFrom,
   type GovernanceAzureBillingNote,

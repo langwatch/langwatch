@@ -1,4 +1,4 @@
-import type { AgentsListingSummary } from "../../services/agentsListingOutcome.ts";
+import type { AgentsListingSummary } from "../../services/agents-listing-outcome.service.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
@@ -6,8 +6,8 @@ import type {
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection.ts";
-import { buildIngestionSourceMirror } from "./ingestionSourceMirror.ts";
+import type { IngestionPullRunStatusData } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
+import { buildIngestionSourceMirror } from "./prisma.ingestion-source-mirror.mapper.ts";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
 const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";

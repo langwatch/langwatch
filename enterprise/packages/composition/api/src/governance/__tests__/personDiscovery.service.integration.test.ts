@@ -27,7 +27,7 @@ import {
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 import { PersonDiscoveryService } from "../personDiscovery.service";
-import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoftGraphDirectory.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
 
 const ns = nanoid(8);
 const organizationId = `org_discovery_${ns}`;

@@ -21,7 +21,7 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
-import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoftGraphDirectory.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
 
 const ns = nanoid(8);
 const organizationId = `org_dirdept_${ns}`;

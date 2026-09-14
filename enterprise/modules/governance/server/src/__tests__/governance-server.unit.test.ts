@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PulledUsagePricingService, PulledUsageRateReader } from "../index.ts";
-import { IngestionPullRunStatusProjection } from "../projections/ingestion-pull-run-status.projection.ts";
+import { IngestionPullRunStatusProjection } from "../eventing/ingestion-pull-run-status.projection.ts";
 
 class FixedRate implements PulledUsageRateReader {
   rate() {

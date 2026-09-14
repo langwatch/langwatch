@@ -639,11 +639,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
+      "key": "cognitive-complexity|enterprise/modules/governance/server/src/transport/governance-cli.rest.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
+      "key": "cognitive-complexity|enterprise/modules/governance/server/src/transport/governance-ingest.rest.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4359,7 +4359,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/server/src/intents/gateway-debit.intent.ts",
+      "key": "condition-shape|enterprise/modules/governance/server/src/eventing/gateway-debit.intent.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4415,7 +4415,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
+      "key": "condition-shape|enterprise/modules/governance/server/src/transport/governance-ingest.rest.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6179,6 +6179,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "dangling-barrel-export|enterprise/modules/governance/server/src/eventing/__tests__/governance-subscriber.fixtures.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "dangling-barrel-export|enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-source.repository.ts",
       "measured": "2026-09-10"
     },
@@ -6204,10 +6208,6 @@
     },
     {
       "key": "dangling-barrel-export|enterprise/modules/governance/server/src/services/__tests__/personal-virtual-key.service.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "dangling-barrel-export|enterprise/modules/governance/server/src/subscribers/__tests__/governance-subscriber.fixtures.ts",
       "measured": "2026-09-10"
     },
     {
@@ -6415,7 +6415,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "empty-catch|enterprise/modules/governance/server/src/intents/gateway-debit.intent.ts",
+      "key": "empty-catch|enterprise/modules/governance/server/src/eventing/gateway-debit.intent.ts",
       "measured": "2026-09-10"
     },
     {
@@ -7175,23 +7175,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "feature-source-layout|enterprise/modules/governance/server/src/testing.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "feature-source-layout|enterprise/modules/governance/server/src/transport/api-mcp/governance-tools.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "feature-source-layout|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "feature-source-layout|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "feature-source-layout|enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts",
       "measured": "2026-09-10"
     },
     {
@@ -8895,15 +8879,15 @@
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/azureBillIdentity.unit.test.ts",
-      "measured": "2026-09-11"
-    },
-    {
       "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/ingestion-pull-run-projection.tenancy.integration.test.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/providerAccountLookup.unit.test.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/prisma.azure-bill-identity.repository.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/__tests__/prisma.provider-account-lookup.repository.unit.test.ts",
       "measured": "2026-09-11"
     },
     {
@@ -8915,19 +8899,19 @@
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/azureBillIdentity.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/prisma.azure-bill-identity.repository.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/providerAccountLookup.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/repositories/prisma/prisma.provider-account-lookup.repository.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/agentListing.unit.test.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/agent-listing-port.service.unit.test.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/agentListingPort.unit.test.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/agent-listing.service.unit.test.ts",
       "measured": "2026-09-11"
     },
     {
@@ -8955,11 +8939,11 @@
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/peopleListing.unit.test.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/people-listing-port.service.unit.test.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/peopleListingPort.unit.test.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/__tests__/people-listing.service.unit.test.ts",
       "measured": "2026-09-11"
     },
     {
@@ -8983,39 +8967,39 @@
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/adminApiUsers.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/admin-api-users.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/agentListingPort.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/agent-listing-port.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/agentsListingOutcome.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/agents-listing-outcome.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/copilotBots.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/copilot-bots.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/genieSpaces.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/genie-spaces.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/microsoftDirectoryRead.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/microsoft-directory-read.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/peopleListingPort.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/people-listing-port.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/sourceCredentialAccess.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/source-credential-access.service.ts",
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/sourcePullStatus.ts",
+      "key": "legacy-monolith-path|enterprise/modules/governance/server/src/services/source-pull-status.service.ts",
       "measured": "2026-09-11"
     },
     {
@@ -14535,27 +14519,59 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/intents/governance-event-delivery.intent.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/__tests__/gateway-debit.process.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/intents/pulled-usage-ledger.intent.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/__tests__/governance-kpis.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/processes/__tests__/gateway-debit.process.unit.test.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/__tests__/governance-ocsf.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/processes/governance-event-delivery.process.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/__tests__/governance-subscriber.fixtures.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/processes/ingestion-pull.process.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/processes/pulled-usage-ledger.process.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/__tests__/trace-alert-trigger-match.subscriber.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/governance-event-delivery.intent.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/governance-event-delivery.process.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/governance-kpis.subscriber.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/governance-ocsf.subscriber.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/ingestion-pull.process.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/pulled-usage-ledger.intent.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/pulled-usage-ledger.process.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/eventing/trace-alert-trigger-match.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -14931,35 +14947,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/__tests__/governance-kpis.subscriber.redelivery.test.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/__tests__/governance-cli-budget-status.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/__tests__/governance-ocsf.subscriber.redelivery.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/__tests__/governance-subscriber.fixtures.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/__tests__/trace-alert-trigger-match.subscriber.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/governance-kpis.subscriber.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/subscribers/trace-alert-trigger-match.subscriber.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/__tests__/governance-cli-ingestion-key-personal.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -14967,19 +14959,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/api-rest/__tests__/governance-cli-budget-status.unit.test.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/governance-cli.rest.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/api-rest/__tests__/governance-cli-ingestion-key-personal.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
+      "key": "no-port-vocabulary|enterprise/modules/governance/server/src/transport/governance-ingest.rest.ts",
       "measured": "2026-09-10"
     },
     {
@@ -19167,11 +19151,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/governance-cli.rest.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts",
+      "key": "schema-outside-contract|enterprise/modules/governance/server/src/transport/governance.rest.ts",
       "measured": "2026-09-10"
     },
     {
@@ -19659,7 +19643,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "stand-in-cast|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
+      "key": "stand-in-cast|enterprise/modules/governance/server/src/transport/governance-ingest.rest.ts",
       "measured": "2026-09-10"
     },
     {
@@ -22591,11 +22575,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "transport-imports-a-repository|enterprise/modules/governance/server/src/transport/api-rest/governance-cli.api.ts",
+      "key": "transport-imports-a-repository|enterprise/modules/governance/server/src/transport/governance-cli.rest.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "transport-imports-a-repository|enterprise/modules/governance/server/src/transport/api-rest/governance-ingest.api.ts",
+      "key": "transport-imports-a-repository|enterprise/modules/governance/server/src/transport/governance-ingest.rest.ts",
       "measured": "2026-09-10"
     },
     {

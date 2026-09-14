@@ -24,7 +24,7 @@ import {
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
 } from "../governance.app.ts";
-import { createGovernanceRestApp } from "../../transport/api-rest/governance.api.ts";
+import { createGovernanceRestApp } from "../../transport/governance.rest.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
 
 /** A dependency this door never reaches; calling one is the test's own bug. */

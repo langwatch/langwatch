@@ -47,23 +47,35 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "enterprise/modules/governance/server/src/intents/governance-event-delivery.intent.ts|DeliverGovernancePayload",
+      "key": "enterprise/modules/governance/server/src/eventing/governance-event-delivery.intent.ts|DeliverGovernancePayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "enterprise/modules/governance/server/src/intents/governance-event-delivery.intent.ts|governanceWebhookEnvelopeSchema",
+      "key": "enterprise/modules/governance/server/src/eventing/governance-event-delivery.intent.ts|governanceWebhookEnvelopeSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "enterprise/modules/governance/server/src/intents/ingestion-pull.intent.ts|IngestionPullRunIntent",
+      "key": "enterprise/modules/governance/server/src/eventing/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_INFO_SEVERITY_ID",
       "measured": "2026-09-10"
     },
     {
-      "key": "enterprise/modules/governance/server/src/processes/ingestion-pull.process.ts|INGESTION_PULL_STALE_RUN_MS",
+      "key": "enterprise/modules/governance/server/src/eventing/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID",
       "measured": "2026-09-10"
     },
     {
-      "key": "enterprise/modules/governance/server/src/projections/ingestion-pull-run-status.projection.ts|IngestionPullRunStatus",
+      "key": "enterprise/modules/governance/server/src/eventing/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_MEDIUM_SEVERITY_ID",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/eventing/ingestion-pull-run-status.projection.ts|IngestionPullRunStatus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/eventing/ingestion-pull.intent.ts|IngestionPullRunIntent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/eventing/ingestion-pull.process.ts|INGESTION_PULL_STALE_RUN_MS",
       "measured": "2026-09-10"
     },
     {
@@ -224,18 +236,6 @@
     },
     {
       "key": "enterprise/modules/governance/server/src/services/spend-spike-anomaly-evaluator.service.ts|SpendSpikeEvaluationSummary",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_INFO_SEVERITY_ID",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_MEDIUM_SEVERITY_ID",
       "measured": "2026-09-10"
     },
     {

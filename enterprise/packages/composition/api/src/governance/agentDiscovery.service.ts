@@ -38,8 +38,8 @@ import {
   type AgentListingRefusal,
   agentsRefused,
   refusalFromThrown,
-} from "../../../../../modules/governance/server/src/services/agentListing.ts";
-import { listCopilotAgents } from "../../../../../modules/governance/server/src/services/copilotBots.ts";
+} from "../../../../../modules/governance/server/src/services/agent-listing.service.ts";
+import { listCopilotAgents } from "../../../../../modules/governance/server/src/services/copilot-bots.service.ts";
 import {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
@@ -52,12 +52,12 @@ import {
   resolveWorkspaceToken,
 } from "../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
-import { listGenieAgents } from "../../../../../modules/governance/server/src/services/genieSpaces.ts";
+import { listGenieAgents } from "../../../../../modules/governance/server/src/services/genie-spaces.service.ts";
 import { ProviderSignInError } from "./pullers/pullerAdapter";
 import {
   type SourceCredentialContext,
   withSourceCredentials,
-} from "../../../../../modules/governance/server/src/services/sourceCredentialAccess.ts";
+} from "../../../../../modules/governance/server/src/services/source-credential-access.service.ts";
 
 const logger = createLogger("langwatch:governance:agent-discovery");
 

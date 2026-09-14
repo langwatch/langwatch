@@ -69,8 +69,8 @@ import {
   type WarehousePricedStatement,
   warehouseCostRowSchema,
 } from "../rules/warehouse-cost.rules.ts";
-import { GENIE_SPACES_PATH, walkGenieSpaces } from "./genieSpaces.ts";
-import type { GenieSpace } from "./genieSpaces.ts";
+import { GENIE_SPACES_PATH, walkGenieSpaces } from "./genie-spaces.service.ts";
+import type { GenieSpace } from "./genie-spaces.service.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 import type {

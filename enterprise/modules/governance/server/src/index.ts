@@ -71,10 +71,10 @@ export {
   AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,
   AUTOMATION_MATCH_RECORDS_METRIC_NAME,
   OtelTraceAlertMetricsAdapter,
-} from "./services/otel.trace-alert-metrics.service.ts";
+} from "./services/otel-trace-alert-metrics.service.ts";
 
 export { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
-export { SEAT_REPORT_ACTION } from "./services/microsoftGraphSeats.ts";
+export { SEAT_REPORT_ACTION } from "./services/microsoft-graph-seats.service.ts";
 export { PrismaSpendSpikeAnomalyRepository } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export { PrismaIngestionPullLifecycleRepository } from "./repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";
@@ -87,10 +87,10 @@ export { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.ser
 export {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
-} from "./processes/gateway-debit.process.ts";
-export { GovernanceEventDeliveryProcess } from "./processes/governance-event-delivery.process.ts";
-export { IngestionPullProcess } from "./processes/ingestion-pull.process.ts";
-export { PulledUsageLedgerProcess } from "./processes/pulled-usage-ledger.process.ts";
+} from "./eventing/gateway-debit.process.ts";
+export { GovernanceEventDeliveryProcess } from "./eventing/governance-event-delivery.process.ts";
+export { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
+export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
 
 export { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
 export { PullerRegistryService } from "./services/puller-registry.service.ts";
@@ -123,13 +123,13 @@ export {
   SessionPolicyOutOfRangeError,
 } from "./services/organization-session-policy.service.ts";
 export { PrismaSessionPolicyRepository as PostgresSessionPolicyAdapter } from "./repositories/prisma/prisma.session-policy.repository.ts";
-export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./subscribers/governance-ocsf.subscriber.ts";
+export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./eventing/governance-ocsf.subscriber.ts";
 export {
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
   GovernanceKpisSubscriber,
-} from "./subscribers/governance-kpis.subscriber.ts";
-export { GovernanceOcsfSubscriber } from "./subscribers/governance-ocsf.subscriber.ts";
-export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trigger-match.subscriber.ts";
+} from "./eventing/governance-kpis.subscriber.ts";
+export { GovernanceOcsfSubscriber } from "./eventing/governance-ocsf.subscriber.ts";
+export { TraceAlertTriggerMatchSubscriber } from "./eventing/trace-alert-trigger-match.subscriber.ts";
 
 // The thirteen tRPC transports this feature owns are not exported: they still
 // name the deleted legacy builder, so nothing may reach them until each is
@@ -140,7 +140,7 @@ export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trig
  * service and resolvers for the governance and project services; the base path, access
  * declarations, schemas and delegation are the feature's.
  */
-export { createGovernanceRestApp } from "./transport/api-rest/governance.api.ts";
+export { createGovernanceRestApp } from "./transport/governance.rest.ts";
 
 // The CLI governance plane: thirteen routes under `/api/auth/cli` that
 // authenticate with a device-session bearer and dispatch into governance. They
@@ -153,7 +153,7 @@ export {
   type GovernanceCliCaller,
   type GovernanceCliPersonalWorkspace,
   type GovernanceCliRestDependencies as GovernanceCliRestMembers,
-} from "./transport/api-rest/governance-cli.api.ts";
+} from "./transport/governance-cli.rest.ts";
 
 // The Activity Monitor's push-mode receivers. A signal whose collection this
 // process did not compose is not mounted at all, so an exporter gets a 404
@@ -165,7 +165,7 @@ export {
   type GovernanceIngestRestMembers,
   type GovernanceIngestSpend,
   type GovernanceIngestTraceCollection,
-} from "./transport/api-rest/governance-ingest.api.ts";
+} from "./transport/governance-ingest.rest.ts";
 export {
   GovernanceIngestRateLimiter,
   INGEST_RATE_LIMIT_MAX_REQUESTS,

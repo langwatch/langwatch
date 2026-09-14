@@ -19,7 +19,7 @@ import {
 import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
   PulledUsageLedgerProcess,
-} from "../processes/pulled-usage-ledger.process.ts";
+} from "../eventing/pulled-usage-ledger.process.ts";
 
 type PulledUsageEvent = PulledUsageObservedEvent & Event;
 

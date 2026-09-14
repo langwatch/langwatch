@@ -29,7 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PulledUsageLedgerIntent,
   type WritePulledUsagePayload,
-} from "../intents/pulled-usage-ledger.intent.ts";
+} from "../eventing/pulled-usage-ledger.intent.ts";
 import type {
   PulledUsageLedgerRepository,
   PulledUsageLedgerRow,

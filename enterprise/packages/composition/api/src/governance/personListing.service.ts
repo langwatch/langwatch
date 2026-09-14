@@ -43,7 +43,7 @@ import {
   partitionSuppressedEvents,
 } from "./erasureSuppression.service.ts";
 import { PersonDiscoveryService } from "./personDiscovery.service.ts";
-import { listAnthropicPeople, listOpenAiPeople } from "../../../../../modules/governance/server/src/services/adminApiUsers.ts";
+import { listAnthropicPeople, listOpenAiPeople } from "../../../../../modules/governance/server/src/services/admin-api-users.service.ts";
 import {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
@@ -55,23 +55,23 @@ import {
   databricksGeniePullConfigSchema,
   resolveWorkspaceToken,
 } from "../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
-import { listDatabricksPeople } from "../../../../../modules/governance/server/src/services/databricksScimUsers.ts";
+import { listDatabricksPeople } from "../../../../../modules/governance/server/src/services/databricks-scim-users.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
-import { listMicrosoftPeople } from "../../../../../modules/governance/server/src/services/microsoftDirectoryRead.ts";
-import { MICROSOFT_GRAPH_SCOPE } from "../../../../../modules/governance/server/src/services/microsoftGraphSeats.ts";
+import { listMicrosoftPeople } from "../../../../../modules/governance/server/src/services/microsoft-directory-read.service.ts";
+import { MICROSOFT_GRAPH_SCOPE } from "../../../../../modules/governance/server/src/services/microsoft-graph-seats.service.ts";
 import {
   listingDay,
   type PeopleListing,
   type PeopleListingRefusal,
   peopleRefused,
   personListingEvents,
-} from "../../../../../modules/governance/server/src/services/peopleListing.ts";
-import { refusalFromThrown } from "../../../../../modules/governance/server/src/services/providerListing.ts";
+} from "../../../../../modules/governance/server/src/services/people-listing.service.ts";
+import { refusalFromThrown } from "../../../../../modules/governance/server/src/services/provider-listing.service.ts";
 import { ProviderSignInError } from "./pullers/pullerAdapter";
 import {
   type SourceCredentialContext,
   withSourceCredentials,
-} from "../../../../../modules/governance/server/src/services/sourceCredentialAccess.ts";
+} from "../../../../../modules/governance/server/src/services/source-credential-access.service.ts";
 
 const logger = createLogger("langwatch:governance:person-listing");
 

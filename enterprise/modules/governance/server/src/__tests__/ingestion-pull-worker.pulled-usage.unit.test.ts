@@ -10,7 +10,7 @@
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createWorkerService } from "./support/puller-test-ports.ts";
-import { azureCostEvents } from "../services/azureCostManagement.ts";
+import { azureCostEvents } from "../services/azure-cost-management.service.ts";
 // NOT YET PORTED. Main's governance cost-rollup fold projection still lives only
 // at platform/app/ee/governance/projections/governanceCostRollup.foldProjection.ts
 // (961 lines, ADR-128 — see E8 in the handoff). Imported from the path it will

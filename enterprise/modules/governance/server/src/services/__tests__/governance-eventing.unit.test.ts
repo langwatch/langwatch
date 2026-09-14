@@ -42,21 +42,21 @@ import type { PulledUsageLedgerRepository, PulledUsageLedgerRow } from "../../ap
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
-} from "../../projections/ingestion-pull-run-status-eventing.projection.ts";
+} from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import {
   type GatewayDebitsState,
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
-} from "../../processes/gateway-debit.process.ts";
-import { GovernanceEventDeliveryProcess } from "../../processes/governance-event-delivery.process.ts";
-import { GovernanceEventDeliveryIntent } from "../../intents/governance-event-delivery.intent.ts";
+} from "../../eventing/gateway-debit.process.ts";
+import { GovernanceEventDeliveryProcess } from "../../eventing/governance-event-delivery.process.ts";
+import { GovernanceEventDeliveryIntent } from "../../eventing/governance-event-delivery.intent.ts";
 import {
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
   IngestionPullProcess,
-} from "../../processes/ingestion-pull.process.ts";
+} from "../../eventing/ingestion-pull.process.ts";
 import { IngestionPullService } from "../ingestion-pull.service.ts";
-import { PulledUsageLedgerIntent } from "../../intents/pulled-usage-ledger.intent.ts";
+import { PulledUsageLedgerIntent } from "../../eventing/pulled-usage-ledger.intent.ts";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
