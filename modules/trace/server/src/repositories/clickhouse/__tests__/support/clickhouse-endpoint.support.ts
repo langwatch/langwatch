@@ -1,27 +1,6 @@
-/**
- * The migrated ClickHouse these repository suites read and write, or nothing.
- *
- * The suites here assert a DDL↔repository column contract: a renamed column or
- * a widened type fails a real INSERT loudly, which no mock catches. So they
- * need the PRODUCTION schema, not a table they create themselves — a second
- * copy of the DDL beside the migrations is exactly the drift they exist to
- * find.
- *
- * Two ways to get it, in this order:
- *
- *   - The connection string the job supplies (`TEST_CLICKHOUSE_URL`, else
- *     `CI_CLICKHOUSE_URL`). In the `package-suites` job that points at a
- *     ClickHouse whose migrations have already run, so the suite reads the real
- *     schema without standing up a second server.
- *   - Otherwise the always-on local server (`LANGWATCH_TEST_CLICKHOUSE_URL`),
- *     where the harness gives this package a database of its own and replays
- *     the shipped migrations into it once per process — the same shape the
- *     private-dataplane suite next door and `@langwatch/gateway-server` use.
- *     Reading a developer's existing `test_langwatch` instead would assert
- *     against whatever migration it happens to have stopped at.
- *
- * With neither configured the suites `describe.skipIf` themselves away.
- */
+/** The migrated ClickHouse these repository suites read and write. Suites need
+ * PRODUCTION schema to assert DDL↔repository contracts. Sources: TEST_CLICKHOUSE_URL
+ * (job-supplied), or LANGWATCH_TEST_CLICKHOUSE_URL (always-on local, harness-managed). */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import {

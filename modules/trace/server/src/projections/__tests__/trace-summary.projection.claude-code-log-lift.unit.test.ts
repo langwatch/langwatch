@@ -1,23 +1,6 @@
-/**
- * Fold-projection log-lift regression tests for the events that REMAIN on
- * the log path: claude_code `user_prompt`, codex (`codex.sse_event` /
- * `codex.conversation_starts`), and the gemini / gen_ai.* defensive lift.
- *
- * The claude_code model-call triplet (api_request / api_request_body /
- * api_response_body) does NOT lift model / cost / tokens / output through the
- * log fold: Claude Code's own SDK spans carry that (computeSpanCost +
- * accumulateTokens on the SPAN fold), and the coding-agent session pipeline
- * owns the session-grain totals (ADR-056). The "does NOT lift an api_request"
- * case below pins that the log fold stays a no-op for these, so cost/tokens
- * can never be double-counted from the log path.
- *
- * The top-level column mirror (langwatch.* lift -> Models /
- * TotalPromptTokenCount / TotalCompletionTokenCount) stays live for the
- * log-path emitters and is exercised here through codex.sse_event. Claude's
- * cost/tokens now mirror onto the top-level columns via the SPAN fold
- * (computeSpanCost + accumulateTokens), covered in the converter + service
- * tests.
- */
+/** Fold-projection log-lift regression tests for events that REMAIN on the
+ * log path: claude_code user_prompt, codex (codex.sse_event, conversation_starts),
+ * and gemini / gen_ai.* defensive lift. Cost/tokens are lifted via SPAN fold. */
 import { createTenantId } from "@langwatch/eventing";
 import {
   LOG_CONTRIBUTED_EVENT_TYPE,

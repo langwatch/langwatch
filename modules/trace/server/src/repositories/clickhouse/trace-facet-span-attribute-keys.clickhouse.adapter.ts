@@ -12,7 +12,7 @@ export class ClickHouseSpanAttributeKeysFacetAdapter {
   }
 
   /**
-   * Discover query for span attribute keys, ordered by frequency — a key list, not a (key,value) cross-product, since values load lazily via facetValues once a key expands (a full value enumeration would be unbounded). SpanAttributes.keys reads only the keys subcolumn, skipping the (often large) values column; the empty-map check probes .keys too, never length(SpanAttributes), which would materialise the whole Map into memory and risk MEMORY_LIMIT_EXCEEDED. Filtering is wired through filter-to-clickhouse/ast.ts; this only feeds discovery.
+   * Discovers span attribute keys ordered by frequency, reading keys only.
    */
   static buildSpanAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");

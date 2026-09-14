@@ -2,9 +2,9 @@ import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhou
 import { describe, expect, it } from "vitest";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
 
-/**
- * Regression contract for "Errored pill filtered the wrong bucket": the sidebar's erroredCount is countIf(Status='error'), so the verdict facet expression must route Status='error' rows to a dedicated 'error' value (precedence over Passed), accepted by the query language. Before this contract, the pill emitted evaluatorVerdict:unknown, the Passed-is-null-but-not-errored bucket.
- */
+/** Regression contract: the verdict facet expression must route Status='error'
+ * rows to a dedicated 'error' value (precedence over Passed), so the sidebar's
+ * erroredCount filter (countIf(Status='error')) works correctly. */
 describe("evaluatorVerdict facet", () => {
   const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
     (d) => d.key === "evaluatorVerdict",

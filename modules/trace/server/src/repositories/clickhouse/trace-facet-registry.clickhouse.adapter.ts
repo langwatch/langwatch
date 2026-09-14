@@ -47,7 +47,7 @@ export interface ExpressionCategoricalDef extends BaseFacetDef {
   kind: "categorical";
   expression: string;
   /**
-   * In-memory accessor mirroring expression, letting the filter compiler evaluate this field against fold state without a ClickHouse round-trip. Present on auto-derived trace_summaries facets (cheap TraceSummaryData reads); cross-table facets attach their per-collection read in filter-to-clickhouse/build-handlers.ts instead.
+   * In-memory accessor mirroring expression for filter compilation.
    */
   read?: CategoricalRead;
 }
@@ -61,7 +61,7 @@ export interface RangeFacetDef extends BaseFacetDef {
   kind: "range";
   expression: string;
   /**
-   * When true, this integer facet can ALSO present as a "Discrete" tick-list (distinct values + counts), not just min/max. Discover computes distinct values; sidebar falls back to the slider past the discrete threshold. Only set on small, naturally-bounded columns (prompt version, span count) — each flag adds one GROUP BY to discovery.
+   * When true, facet presents as discrete tick-list; adds one GROUP BY to discovery.
    */
   isDiscrete?: boolean;
   /** In-memory accessor mirroring `expression`. See {@link ExpressionCategoricalDef.read}. */

@@ -16,7 +16,7 @@ export class ClickHouseEventsFacetAdapter {
   }
 
   /**
-   * Span event names + per-event metric value aggregates: zips stored_spans' parallel Events.Name/Events.Attributes arrays before arrayJoin-exploding, so each metric entry stays scoped to its event, then groups by name. Metric buckets ride the SAME discover query (evaluator-facet precedent) for zero extra queries per click, aggregated verbatim so a click round-trips exactly into event.attribute.event.metrics.<k>:<v>. Facet key is 'event' to match the search-bar field.
+   * Discovers event names and their metric value aggregates in one query.
    */
   static buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");

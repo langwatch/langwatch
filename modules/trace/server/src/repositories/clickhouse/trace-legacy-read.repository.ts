@@ -286,8 +286,7 @@ export type TraceLegacyFilterConditions = (
 };
 
 /**
- * @see ADR-022
- * Builds per-trace and bulk resolver callbacks from the blob-offload dependencies: given a project and a trace's normalized spans, restores the field values leanForProjection offloaded to event_log and recomputes trace IO from the resolved spans. Absent, the store falls back to the preview values on trace_summaries.
+ * Restores offloaded spans from blob store using ADR-022 semantics.
  */
 class OffloadedSpanResolver {
   constructor(private readonly deps: BlobResolutionDeps) {}
@@ -390,7 +389,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     this.retentionFloor = TraceRetentionFloorService.create(retentionResolver);
   }
 
-  /** Builds the repository and its own offloaded-span resolvers from a composition root's options. */
+  /** Builds the repository with offloaded-span resolvers from options. */
   static create(options: ClickHouseTraceLegacyReadOptions): TraceLegacyReadClickHouseRepository {
     const offloadedSpanResolver =
       options.blobResolutionDeps !== undefined

@@ -9,15 +9,7 @@ const TABLE_NAME = "trace_analytics_rollup" as const;
 const logger = createLogger("langwatch:trace:trace-analytics-rollup-repository");
 
 /**
- * ClickHouse columns are `SimpleAggregateFunction(sum, ...)`. Inserts carry
- * plain scalars, but the JSONEachRow contract requires UInt64 / Int64 columns
- * to be serialized as STRINGS — JSON numbers can't safely round-trip a 64-bit
- * integer (precision-loss at >2^53). Float64 columns stay as numbers.
- *
- * Mismatch reproduces as `CANNOT_PARSE_QUOTED_STRING: expected opening quote`
- * at insert time, so every 64-bit-integer column is typed `string` below and
- * stringified in `toClickHouseRecord`. The async_insert path coalesces per-span
- * writes into batches at the server.
+ * 64-bit int columns serialize as strings to prevent JSON precision loss.
  */
 interface ClickHouseRollupWriteRecord {
   TenantId: string;

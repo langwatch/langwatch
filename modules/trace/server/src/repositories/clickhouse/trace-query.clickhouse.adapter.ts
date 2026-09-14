@@ -32,7 +32,7 @@ const MAX_PARAM_COUNT = 50;
 const MAX_CONTENT_TERMS = 8;
 
 /**
- * A trace filter as ClickHouse SQL — the top of the query translator: walks the filter tree, hands each leaf to {@link TraceQueryTranslatorsAdapter} for a predicate, with {@link TraceQueryValuesAdapter} binding values. Free text is pulled out separately since it's a search across several fields, not a predicate on one, and its terms must be known before the SQL is built. Nine of twelve steps here are the tree walk itself, exported for no reason; only three entry points are anybody else's business.
+ * Translates trace filters to ClickHouse SQL with value binding and free text.
  */
 export class TraceQueryClickHouseAdapter {
   static create(): TraceQueryClickHouseAdapter {
@@ -98,7 +98,7 @@ export class TraceQueryClickHouseAdapter {
   }
 
   /**
-   * Bare search word this tag carries, or null if not one. Literals only — content search matches a term as a plain substring, so a regex would be looked up by its source text and match nothing.
+   * Extracts bare search words; null if not a literal term.
    */
   private static freeTextTermOf(tag: TagToken, negated: boolean): string | null {
     if (negated || tag.field.type !== "ImplicitField") return null;
@@ -211,7 +211,7 @@ export class TraceQueryClickHouseAdapter {
   }
 
   /**
-   * event.attribute.<attr_key>:value — matches if any span event has Attributes[<attr_key>]=<value>. Events live on stored_spans, answered by a partition-pruned subquery; Events.Attributes is Array(Map), and arrayExists short-circuits on first match, cheap relative to materialising the nested column per row.
+   * Matches span events with Attributes[<key>]=<value> via partition-pruned subquery.
    */
   private static translateEventAttribute(
     attrKey: string,
@@ -240,7 +240,7 @@ export class TraceQueryClickHouseAdapter {
   }
 
   /**
-   * span.attribute.<attr_key>:value — matches if any span has SpanAttributes[<attr_key>]=<value>. Same partition-pruned subquery shape as the event-attribute form. Filtering only — never SELECTs the heavy attribute payloads, so it stays cheap even with megabyte-class gen_ai.input.messages blobs.
+   * Matches spans with SpanAttributes[<key>]=<value> via partition-pruned subquery.
    */
   private static translateSpanAttribute(
     attrKey: string,
@@ -293,9 +293,7 @@ export class TraceQueryClickHouseAdapter {
   }
 
   /**
-   * `liqe`'s serializer can emit `cost:[0.01 TO 1]AND foo:bar` (no space after
-   * `]`/`)` before a boolean) which its own parser then rejects. Normalise the
-   * incoming query so older saved URLs and external callers don't 422.
+   * Normalizes query spacing for compatibility with liqe parser.
    */
   static normalizeQuery(s: string): string {
     return s
@@ -305,7 +303,7 @@ export class TraceQueryClickHouseAdapter {
   }
 
   /**
-   * Positive free-text terms of a query: every non-negated implicit-field value, skipping structured field:value tags. The Sessions lens matches these against transcript content in log_records, ON TOP of the trace-level translation, so a transcript-only term still finds its session. Returns [] for empty/unparsable input and for any query carrying an OR.
+   * Extracts positive free-text terms, excluding OR queries and structured tags.
    */
   static extractFreeTextTerms(queryText: string): string[] {
     const trimmed = TraceQueryClickHouseAdapter.normalizeQuery(queryText);
@@ -338,7 +336,7 @@ export class TraceQueryClickHouseAdapter {
   }
 
   /**
-   * Translates a liqe query into a parameterized CH WHERE fragment. Null for empty/whitespace. Throws FilterParseError for invalid syntax or over-complex queries, FilterFieldUnknownError for unrecognized fields.
+   * Translates a liqe query into a parameterized WHERE fragment or null.
    */
   static translateFilter(
     queryText: string,

@@ -1,32 +1,7 @@
-/**
- * Integration tests for the single-trace span readers on
- * `SpanStorageClickHouseRepository`, exercised against a real ClickHouse, on
- * the production `stored_spans` schema.
- *
- * These readers carry an explicit `max_memory_usage` cap so a trace with very
- * large per-span attribute values fails its own read instead of pressuring the
- * whole server (see `SINGLE_TRACE_READ_MAX_MEMORY_BYTES`). The cap itself can't
- * be asserted by tripping an OOM here — an errored ClickHouse response stream
- * wedges the vitest worker — so the unit test asserts the setting is passed,
- * and this suite confirms a normal trace read still returns correct results
- * under the cap (ordering, latest-version dedup, full payload preserved).
- *
- * Was
- * `platform/app/src/server/app-layer/traces/repositories/__tests__/span-storage.clickhouse.repository.integration.test.ts`,
- * against its own copy of the repository. The repository now lives in this
- * package as `SpanStorageClickHouseRepository`
- * (`../span-storage.repository`); the fixed testcontainer bootstrap it used
- * (`startTestContainers`) went with the monolith, so this uses the shape
- * every other suite in this package uses instead —
- * `startMigratedTraceClickHouse`/`testClickHouseConfigured`, skipped when no test
- * ClickHouse is configured. Ported only the "single-trace reads" describe
- * (basic reads, OTel events, and the per-trace event-badge rollups it
- * carries every `@scenario`-tagged case in this file) — the sibling describes
- * further down the original file (per-span cost columns, cursor-paged span
- * summaries against a `findSpanSummariesPage` method the repository no
- * longer has, langwatch-signals read, lone-surrogate insert) carried no
- * `@scenario` tags and were left for a follow-up port.
- */
+/** Integration tests for the single-trace span readers on
+ * SpanStorageClickHouseRepository against production schema. Readers carry an
+ * explicit max_memory_usage cap; unit test asserts the setting passes and this
+ * suite confirms normal traces return correct results under the cap. */
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -124,11 +99,11 @@ beforeAll(async () => {
   const rows = Array.from({ length: TOTAL_SPANS }, (_, i) => makeSpanRow(i));
   await insertRows(rows);
 
-  // A stale earlier version of the first span: the dedup must return the latest version (no `stale` marker), never this one. Override StartTime as well as
-  // UpdatedAt: stored_spans is ReplacingMergeTree(StartTime), so a tied StartTime lets the engine collapse the two versions at merge time keeping whichever
-  // was inserted last among the tie (the stale row here, inserted after the live span 0) — leaving the read with only the stale row to dedup. A strictly
-  // older StartTime makes the stale row deterministically lose the merge regardless of merge timing or shard load. (Same fix the events fixture below already
-  // applies for `evt-span-1`.)
+  // A stale earlier version of the first span: the dedup must return the latest
+  // version (no `stale` marker), never this one. Override StartTime as well as
+  // UpdatedAt: stored_spans is ReplacingMergeTree(StartTime), so a tied StartTime
+  // lets the engine collapse the two versions at merge time keeping whichever was
+  // inserted last among the tie — a strictly older StartTime makes it lose.
   await insertRows([
     makeSpanRow(0, {
       SpanAttributes: { idx: "0", stale: "yes" },
@@ -150,8 +125,8 @@ afterAll(async () => {
   }
 });
 
-// Event-bearing fixtures for the events-only readers below. Isolated under a
-// distinct tenant/trace so the heavy single-trace dataset above is untouched.
+// Event-bearing fixtures for the events-only readers. Isolated under a
+// distinct tenant/trace so the heavy single-trace dataset is untouched.
 const eventsTenantId = `test-span-events-${nanoid()}`;
 const eventsTraceId = `trace-${nanoid()}`;
 
@@ -255,10 +230,9 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           { ts: t(20), name: "span.end", attrs: { phase: "done" } },
         ]),
         makeEventRow("evt-span-2", [{ ts: t(5), name: "process.tick", attrs: { iter: "1" } }]),
-        // Stale earlier version of evt-span-1 — dedup must drop it. Override StartTime as well as UpdatedAt:
-        // stored_spans is ReplacingMergeTree(StartTime), so a tied StartTime lets the engine collapse the live
-        // row at insert time (rows in one INSERT land in a single part, and the engine resolves ties
-        // unpredictably). A strictly older StartTime makes the stale row deterministically lose the merge.
+        // Stale earlier version of evt-span-1 — dedup must drop it. Override
+        // StartTime as well as UpdatedAt: stored_spans is ReplacingMergeTree
+        // (StartTime). A strictly older StartTime makes it deterministically lose.
         makeEventRow("evt-span-1", [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }], {
           StartTime: new Date(base - 60_000),
           EndTime: new Date(base - 60_000 + 50),
@@ -275,7 +249,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       });
     });
 
-    it("getTraceEventsByTraceId returns all events incl. exceptions in event_timestamp ASC order, latest span version only", async () => {
+    it("getTraceEventsByTraceId returns all events incl. exceptions in ASC order, latest span version only", async () => {
       const events = await repo.getTraceEventsByTraceId({
         tenantId: eventsTenantId,
         traceId: eventsTraceId,
@@ -555,10 +529,9 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
   });
 
-  // The drawer fires the events read off entry points that drop the `occurredAtMs` URL hint (back-stack,
-  // conversation jumps, deep links), and worker callers never carry one. Without a hint the read used to walk
-  // every weekly `stored_spans` partition (incl. cold S3). The reader now seeds the partition window from the
-  // trace's own `trace_summaries.OccurredAt`, and an empty result is authoritative (no unbounded rescan).
+  // The drawer fires the events read from entry points without occurredAtMs hint.
+  // Without a hint the read used to walk every weekly partition (incl. cold S3).
+  // The reader now seeds the partition window from trace_summaries.OccurredAt.
   describe("given the events are read without an occurredAtMs hint", () => {
     const hintlessTenantId = `test-span-hintless-${nanoid()}`;
     const withEventsTraceId = `trace-${nanoid()}`;
@@ -645,11 +618,10 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
   });
 
-  // The single-trace span readers fire from the same hint-dropping entry points as the events read (back-stack / conversation jumps / deep links) and from
-  // worker callers that never had an `occurredAtMs`. Without a hint they used to walk every weekly `stored_spans` partition (incl. cold S3). They now seed
-  // the partition window from the trace's own `trace_summaries.OccurredAt` and read that window first. Unlike the events read, an empty windowed result is
-  // NOT authoritative for spans (OccurredAt is the trace start and never widens, so a long-running trace can produce spans past OccurredAt + 2 days): the
-  // reader falls back to an unbounded rescan, and only skips the window entirely when the trace isn't in `trace_summaries` at all.
+  // The single-trace span readers fire from hint-dropping entry points and
+  // worker callers. Without a hint they used to walk every weekly partition
+  // (incl. cold S3). They now seed the partition window from trace_summaries
+  // .OccurredAt and read that window first, falling back to an unbounded rescan.
   describe("given a span read without an occurredAtMs hint", () => {
     const hintlessTenantId = `test-span-read-hintless-${nanoid()}`;
     const withSpansTraceId = `trace-${nanoid()}`;

@@ -6,7 +6,7 @@
 import type { FacetQueryContext } from "./trace-facet-registry.clickhouse.adapter.ts";
 
 /**
- * Per-query memory guard for unbounded key-discovery facets (metadata/span/event-attribute-keys): each flattens an attribute map with arrayJoin and groups by key over the whole window, and high-cardinality key names (per-user/UUID) turn GROUP BY into millions of groups, tripping MEMORY_LIMIT_EXCEEDED in prod. max_bytes_before_external_group_by spills to disk so the facet completes; max_memory_usage caps the read so a pathological tenant fails its own query rather than triggering the OvercommitTracker to kill an unrelated one (same rationale as SINGLE_TRACE_READ_SETTINGS). Sits above any normal read and below the global limit.
+ * Per-query memory settings for high-cardinality key-discovery facets.
  */
 export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
   // ClickHouse settings are string-typed over the wire.
@@ -20,8 +20,7 @@ export class ClickHouseFacetQueryAdapter {
   }
 
   /**
-   * See dev/docs/best_practices/clickhouse-queries.md (multitenancy review)
-   * WHERE predicate pinning every facet query to the right tenant + time window. Time column varies per table (OccurredAt/StartTime/ScheduledAt — see TABLE_TIME_COLUMNS in facet-registry.ts); TenantId comes first in the predicate list because of how the cross-tenant index is laid out.
+   * WHERE predicate with tenant filtering and time window, per clickhouse-queries.md.
    */
   static buildTimeWhere(timeColumn: string): string {
     return [

@@ -40,22 +40,9 @@ export interface TraceInfrastructure {  traceEdgeMediaTelemetry: TraceEdgeMediaT
 }
 
 /**
- * Sending one online-evaluator run for an ingested trace.
- *
- * Two methods, because the dispatch is two decisions that belong to different
- * features. The PAYLOAD is Trace's: the fold state, the monitor, the delay and
- * the TTL are all read off a trace. The DEDUPLICATION KEY is Evaluation's:
- * `ExecuteEvaluationCommand.makeJobId` is the identity of an evaluation run,
- * and the queue squashes against it. Trace asks for that key rather than
- * spelling it, because a second spelling would not collide with the first and
- * the same evaluation would run twice.
- *
- * This is a port and not an import for a reason the linter enforces: a feature
- * server cannot depend on another feature's server package (`cross-feature` in
- * `architecture-enforcer`), and `ExecuteEvaluationCommand` lives in
- * `@langwatch/evaluation-server`. The composition root holds both and wires
- * them together, which is also what lets a process dispatch evaluations
- * without building the evaluator engine behind them.
+ * Dispatch online-evaluator runs for ingested traces. Payload is Trace's
+ * (fold state, monitor, delay, TTL); dedup key is Evaluation's (from makeJobId).
+ * Ported (not imported) to avoid cross-feature server dependency.
  */
 export interface TraceEvaluationDispatch {
   /**
@@ -80,39 +67,15 @@ export interface TraceEvaluationDispatch {
  */
 export type TraceEvaluationLoopBlockReason = "depth_direct" | "parent_in_subtree";
 
-/**
- * What an operator can see about evaluations the loop guards refused.
- *
- * It is a port because the two processes that dispatch evaluations export
- * differently: the application increments its own `prom-client` registry
- * (`platform/app/src/server/metrics.ts`), and a process composed from packages
- * pushes over OTLP. Both must write the same series under the same name with
- * the same label, because the dashboard that answers "is the loop guard firing"
- * cannot be asked which process made the dispatch.
- *
- * Tenant attribution deliberately stays out of the labels and lives in the
- * structured log line instead — one label per project is unbounded cardinality
- * on a metric that fires per dispatch.
- */
+/** What an operator can see about evaluations the loop guards refused. A port
+ * because different processes export differently: app uses prom-client, packages
+ * push over OTLP. Both write the same series to keep the dashboard consistent. */
 export interface TraceEvaluationLoopMetrics {
   loopBlocked(reason: TraceEvaluationLoopBlockReason): void;
 }
 
-/**
- * The monitors an ingested trace should be evaluated against.
- *
- * One method, because `evaluationTrigger` calls exactly one: it lists the
- * project's on-message monitors and dispatches an evaluation command per
- * monitor that survives the loop guards. The application narrows the same
- * capability inline with `Pick<MonitorService, "getEnabledOnMessageMonitors">`,
- * which narrows the type and not the wiring — a process still had to build a
- * whole `MonitorService`, and with it the evaluator service and the Prisma
- * client behind it. Naming the port is what makes the read composable on its
- * own.
- *
- * `MonitorService` satisfies it structurally, and so does
- * `PostgresMonitorAdapter.create(...)`, which returns that contract.
- */
+/** The monitors an ingested trace should be evaluated against. Narrowing
+ * this port (not the whole MonitorService) makes the read composable. */
 export interface TraceEvaluationMonitor {
   getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
 }
@@ -148,22 +111,9 @@ export interface TraceIoExtraction {
   ): TraceIoValue | null;
 }
 
-/**
- * The legacy trace read, as the tRPC transports over it use it.
- *
- * The implementation is still the application's `TraceService`: it composes
- * ClickHouse reads, blob resolution, coding-agent enrichment and the reviewer
- * correction overlay, and none of that has left `platform/app` yet. This
- * declares only the eleven methods the `traces.*` and `spans.*` surfaces call,
- * so those surfaces can be package-owned before their service is.
- *
- * `protections` is deliberately `unknown`. Every method takes the viewer's
- * read-time redactions and the transports never look inside them — they ask
- * the process for them and hand them straight back — so naming their shape
- * here would only pin a second copy of a type the process owns. The one
- * surface that DOES read a field off them (the correction overlay's
- * visibility window) declares just that field, where it reads it.
- */
+/** The legacy trace read, as tRPC transports use it. Declared here to let
+ * surfaces be package-owned before the implementation. `protections` is
+ * deliberately unknown; transports never inspect them. */
 export interface TraceLegacyRead {
   /** One trace with its spans, or undefined when the project holds no such trace. */
   tryGetById(
@@ -274,20 +224,8 @@ export interface TraceMediaReferenceResolver {
   trySerialize(references: TraceMediaReference[]): string | null;
 }
 
-/**
- * Where media lifted out of a span's content is put.
- *
- * One method, because that is the whole of what the extraction path asks of
- * the object store: hand it bytes and a purpose, get back the id the span
- * attribute is rewritten to point at. The store itself is
- * `@langwatch/stored-object-server`'s content-addressed `StoredObjectsService`,
- * which satisfies this — a feature server package may not reach into another
- * feature's server package, so the process joins the two.
- *
- * `isDuplicate` matters to the caller rather than being incidental: the same
- * image posted on two spans is stored once, and the extraction hook's counters
- * report a re-reference rather than a second write.
- */
+/** Where media lifted out of a span's content is put. Reused by the extraction
+ * path to store bytes and get back the id to rewrite span attributes to. */
 export interface TraceMediaStore {
   storeFromBytes(input: {
     projectId: string;
@@ -299,16 +237,9 @@ export interface TraceMediaStore {
   }): Promise<{ id: string; mediaType: string; isDuplicate: boolean }>;
 }
 
-/**
- * The fail-open reasons the edge extraction reports, under the names the
- * `edge_media_extract_fail_open` counter already carries.
- *
- * The first three are the hook itself standing down — a flag store it could
- * not read, a privacy probe that failed, a store that refused — and the last
- * three are budget outcomes rather than errors: parts left inline because the
- * per-span cap or the extraction deadline was hit, or because one part's store
- * failed while the rest of the span proceeded.
- */
+/** The fail-open reasons the edge extraction reports. First three: hook
+ * standing down (flag store, privacy probe, store refusal). Last three: budget
+ * outcomes (per-span cap, deadline, part store). */
 export type TraceEdgeMediaFailOpenReason =
   | "flag_store"
   | "privacy_probe"
@@ -322,23 +253,9 @@ export interface TraceEdgeMediaTelemetry {
   failOpen(reason: TraceEdgeMediaFailOpenReason, count?: number): void;
 }
 
-/**
- * The project's own model-cost rules, as record-time cost enrichment reads them.
- *
- * This is deliberately NOT the shape the coding-agent cost estimator uses.
- * `CodingAgentCostEstimator.estimateCost` is pure and synchronous over a
- * static catalog, and Trace already has an equivalent read for fold-time
- * cost. Neither can answer this question: an operator's
- * per-project, per-team and per-organization overrides live in a table, they
- * are matched by regex against the model name, and a span enriched from the
- * static catalog when an override exists is billed at the wrong rate with
- * nothing to show that it happened. So the precedent does not transfer, and
- * this port states the read it really is.
- *
- * `ModelProviderApi` satisfies it structurally; nothing narrower exists
- * upstream, which is the reason for declaring it here rather than importing the
- * fourteen-method service.
- */
+/** The project's own model-cost rules, as record-time cost enrichment reads
+ * them. Deliberately not the coding-agent estimator shape: this reads per-project
+ * overrides matched by regex against model names. */
 export interface TraceModelCostCatalog {
   listCosts(input: { projectId: string }): Promise<ModelCost[]>;
 }
@@ -365,28 +282,14 @@ export interface TraceProcessingCommands {
 export interface TraceProcessingInstaller {
   install(eventSourcing: EventSourcing): {
     traceAssignments: TraceTopicAssignment;
-    /**
-     * The registered `recordSpan` command, named because two of Trace's own
-     * paths reach the pipeline through the queue rather than through the fold:
-     * the REST tracked-event handler and the `trackedEventSync` reactor both
-     * mint a synthetic span and have to send it the way an SDK export would.
-     *
-     * It is available only AFTER registration, which is why the process that
-     * needs it hands the subscriber a late-bound proxy rather than the command.
-     */
+    /** The registered recordSpan command. Available only AFTER registration,
+     * so the process that needs it uses a late-bound proxy. */
     commands: TraceProcessingCommands;
   };
 }
 
-/**
- * The exact definition Trace's own builder produces, commands and projections
- * included. Declaring the port against `RegisteredCommand` instead would erase
- * the union to its constraint, and `eventSourcing.register()` would then hand
- * every caller an index-signature command map — `recordSpan` typed as
- * `MappedCommand<Record<string, unknown>> | undefined` rather than as itself.
- * The process root composes subscribers on top of this builder, and every
- * `with*Subscriber` returns `this`, so the composed definition has this type.
- */
+/** The exact definition Trace's builder produces, commands and projections
+ * included. Type-preserves the commands (recordSpan as itself, not as union). */
 export type TraceProcessingPipelineDefinition = ReturnType<
   ReturnType<EventingTracePipelineAdapter["build"]>["build"]
 >;
@@ -398,12 +301,8 @@ export interface TraceProcessingPipeline {
   }): TraceProcessingPipelineDefinition;
 }
 
-/**
- * One product-usage event, as the ingest path emits it.
- *
- * Product analytics, not observability: this is the onboarding funnel's own
- * record that a project started sending traces, and it is keyed by a person.
- */
+/** One product-usage event, as the ingest path emits it. Keyed by userId,
+ * not traced to observability. */
 export type TraceProductEvent = {
   userId: string;
   event: string;
@@ -411,35 +310,14 @@ export type TraceProductEvent = {
   projectId?: string;
 };
 
-/**
- * Where the ingest path's product-usage events go.
- *
- * The trace path emits exactly one, `first_trace_integrated`, at most once per
- * project in that project's lifetime — the terminal step of the onboarding
- * funnel, carrying the SDK language and framework. The application sends it to
- * PostHog through `trackServerEvent`, which no-ops when `POSTHOG_KEY` is unset.
- *
- * Fire-and-forget, and the `void` return says so: this runs inside a projection
- * subscriber on the ingest path, and an analytics sink must never be able to
- * fail a trace.
- */
+/** Where the ingest path's product-usage events go. Fire-and-forget (void
+ * return): runs inside a projection subscriber and must not fail a trace. */
 export interface TraceProductAnalytics {
   record(event: TraceProductEvent): void;
 }
 
-/**
- * The three things the `projectMetadata` subscriber does to a project.
- *
- * It named the whole `ProjectApi` before, which is fourteen capabilities
- * wide and reaches organizations, the LWQL ClickHouse key map and stored
- * objects. A background process that wanted to run this one subscriber had to
- * be able to build all of it — which is why this subscriber, and everything
- * queued behind it, could not leave the application.
- *
- * The published `ProjectApi` satisfies this structurally, so the
- * application keeps passing exactly what it passed before and a process that
- * holds only a project row and an org-admin lookup can now answer it too.
- */
+/** The three things the projectMetadata subscriber does to a project. Narrowed
+ * from the full ProjectApi so background processes can compose just this. */
 export interface TraceProjectMetadata {
   findById(id: string): Promise<Project | null>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
@@ -526,26 +404,16 @@ export interface TraceSpanSpool {
   delete(identity: TraceSpanSpoolIdentity): Promise<void>;
 }
 
-/**
- * The slice of the stored-objects registry the spool needs. Declared here
- * rather than imported so this module depends on a shape, not on the registry
- * class — the registry satisfies it structurally.
- */
+/** The slice of the stored-objects registry the spool needs. Declared as a
+ * shape, not the registry class, so it satisfies structurally. */
 export interface TraceSpoolObjectStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   get(uri: string): Promise<Readable>;
   delete(uri: string): Promise<void>;
 }
 
-/**
- * Destination-agnostic storage for the trace spool, injected so the spool
- * service carries no env coupling and the tests run without members.
- *
- * This is the application's `SpoolStorage` interface as an abstract class. The
- * rename is the only difference: `port-modules` requires a runtime boundary in
- * a strict feature package to be a nominal abstract class, and the composition
- * roots that satisfy it are structural either way.
- */
+/** Destination-agnostic storage for the trace spool, injected so the service
+ * carries no env coupling and tests run without members. */
 export interface TraceSpoolStorage {
   /** Per-project so BYOC tenants resolve their own bucket and credentials. */
   objectStoreFor(projectId: string): TraceSpoolObjectStore;
@@ -558,38 +426,16 @@ export interface TraceSpoolStorage {
   readonly azureRetentionConfirmed: boolean;
 }
 
-/**
- * The v1 spool read, where the reference IS the object key rather than a
- * derived location.
- *
- * The application reaches this path with a raw `S3Client` built from a
- * per-organization resolver. A feature package cannot name a vendor SDK, and
- * this branch is a one-release compatibility window that the v2 format exists
- * to close (langwatch/langwatch-saas#837), so it is an injected port instead:
- * a composition that has no legacy transport omits it, and the legacy branch
- * then refuses by name rather than silently resolving somewhere else.
- */
+/** The v1 spool read, where the reference IS the object key. A one-release
+ * compatibility window since the v2 format exists to close it. */
 export interface TraceSpoolLegacyObject {
   read(input: { projectId: string; key: string }): Promise<Readable>;
   delete(input: { projectId: string; key: string }): Promise<void>;
 }
 
-/**
- * How many tokens a model would charge for a piece of text.
- *
- * It is a port because the answer comes from a vendor encoding table that a
- * feature package must not carry: the application resolves it with `tiktoken`
- * plus a BPE file that is either on disk or fetched over the network, and a
- * process composed from packages supplies the same capability without this
- * package naming the library, the download or the cache.
- *
- * `undefined` is the deliberate answer for "cannot count", not an error. The
- * estimator's whole contract is that a span without usage attributes is left
- * exactly as it arrived rather than stamped with a guess, so an unknown
- * encoding, a failed encode and an empty text all resolve to the same nothing.
- * The application spells this `countTokens`; the `try` prefix is what
- * `fallible-result-naming` requires of a capability that answers absence.
- */
+/** How many tokens a model would charge for a piece of text. Undefined is the
+ * deliberate "cannot count" answer, not an error; spans without usage stay as
+ * they arrived, not stamped with a guess. */
 export interface TraceTokenCounter {
   tryCountTokens(model: string, text: string | undefined): Promise<number | undefined>;
 }
@@ -599,20 +445,9 @@ export interface TraceTopicAssignmentCommand {
   sendAssignTopic(input: AssignTopicCommandData): Promise<void>;
 }
 
-/**
- * The realtime fan-out the trace ingestion path tells a tenant's tabs through.
- *
- * Two subscribers reach it — the trace summary fold advancing and spans landing
- * in storage — and both want one thing: put this already-serialised payload in
- * front of every browser watching this tenant. Neither subscribes, neither
- * emits locally, and neither knows whether the process it is running in is
- * serving a tab at all.
- *
- * The wire format is the contract, not this interface: the subscriber on the
- * far side lives in the application and matches its Redis channel by exact
- * string, so the channel is pinned by literal in the composition test that
- * drives this member, not derived from a constant only one side compiles.
- */
+/** The realtime fan-out the trace ingestion path tells a tenant's tabs through.
+ * Wire format (Redis channel) is the contract; the channel is pinned by literal
+ * in the composition test, not derived from a constant. */
 export interface TraceTenantBroadcast {
   broadcastToTenant(
     tenantId: string,

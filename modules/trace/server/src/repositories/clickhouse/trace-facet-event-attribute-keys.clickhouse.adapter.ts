@@ -12,7 +12,7 @@ export class ClickHouseEventAttributeKeysFacetAdapter {
   }
 
   /**
-   * Discover query for event attribute keys across stored_spans' Events.Attributes maps (Array(Map) per event per span, so this double-arrayJoins to flatten to one key column). Mirrors span-attribute-keys.ts: returns only the key list, values loaded lazily on expand, since a full (key,value) enumeration wouldn't scale against unbounded cardinality. Filtering itself is wired through translateEventAttribute; this only feeds the sidebar's discovery list.
+   * Discovers event attribute keys by flattening per-event Maps.
    */
   static buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");

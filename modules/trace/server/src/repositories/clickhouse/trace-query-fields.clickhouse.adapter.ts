@@ -10,8 +10,7 @@ import { TraceQueryTranslatorsAdapter } from "./trace-query-translators.clickhou
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter.ts";
 
 // ---------------------------------------------------------------------------
-// Registry lookup — single-sources the SQL `expression` from ClickHouseFacetRegistryAdapter.FACET_REGISTRY so
-// the compiled output never drifts from facet discovery.
+// Registry lookup — single-sources SQL expressions from the facet registry.
 // ---------------------------------------------------------------------------
 
 const FACET_BY_KEY = new Map(ClickHouseFacetRegistryAdapter.FACET_REGISTRY.map((d) => [d.key, d]));
@@ -65,7 +64,7 @@ const spanStatusRead: CategoricalRead = (t) =>
   t.spans == null ? UNSUPPORTED : t.spans.map((s) => spanStatusOf(s.statusCode));
 
 /**
- * How one field's definition is built. A field needs two answers that must agree: the SQL predicate a filter compiles to, and the in-memory evaluation used with no query to run. These five builders pair them so a field can't be given one without the other — a field that filters in SQL but not in memory would silently disagree with itself.
+ * Pairs SQL predicates with in-memory evaluations for each field.
  */
 export class TraceQueryFieldsAdapter {
   static create(): TraceQueryFieldsAdapter {
@@ -105,7 +104,7 @@ export class TraceQueryFieldsAdapter {
   }
 
   /**
-   * Cross-table categorical (evaluation_runs/stored_spans): subquery SQL from the registry expression, paired with a per-collection in-memory read (iterates trace.evaluations/trace.spans, fails closed when the collection isn't loaded).
+   * Cross-table categorical paired with per-collection in-memory read.
    */
   static crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
     const def = TraceQueryFieldsAdapter.expressionFacet(key);
@@ -280,7 +279,7 @@ export const FIELD_DEFS = {
 } satisfies Record<KnownField, FieldDef>;
 
 /**
- * Field lookup for both the CH compiler and the in-memory evaluator. A Map, not a plain object: field names come from a user-authored filter string, and a plain-object index resolves constructor/toString/__proto__ off Object.prototype (truthy), slipping past both the save-time !handler gate (compiling constructor:x into nonsense) and the evaluator's !def check (throwing out of the fail-closed matcher). Map.get has own-key semantics, so an inherited name is simply unknown.
+ * Field lookup using Map for safe own-key semantics against user input.
  */
 export const FIELD_DEF_BY_NAME: ReadonlyMap<string, FieldDef> = new Map(Object.entries(FIELD_DEFS));
 

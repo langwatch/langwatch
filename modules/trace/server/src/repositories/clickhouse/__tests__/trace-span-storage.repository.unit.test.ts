@@ -7,11 +7,9 @@ import type {
 } from "../../trace-clickhouse-client.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
-/**
- * TWIN-DRIFT PINS. The application's `SpanStorageClickHouseRepository` writes the same `stored_spans` rows and does not compile against this file, so the table name, the column set in the table's own order, the insert settings and the retention stamp are pinned as literals here. They
- * are a wire format between two writers, and ClickHouse hides drift in it: an insert that omits a column succeeds by filling in that column's default, and no reader can tell a defaulted value from a written one.
- * Spec: modules/trace/specs/span-storage-write.feature
- */
+/** TWIN-DRIFT PINS: table name, column set, insert settings and retention
+ * stamp are pinned as literals. An insert that omits a column succeeds by
+ * filling in the default; no reader can tell. Spec: span-storage-write.feature */
 const STORED_SPANS_TABLE = "stored_spans";
 
 const STORED_SPAN_COLUMNS = [

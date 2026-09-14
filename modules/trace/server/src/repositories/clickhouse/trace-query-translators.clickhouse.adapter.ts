@@ -34,7 +34,7 @@ const NUMERIC_OP_MAP: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /**
- * How one field becomes one predicate. Four entry points are the shapes a field can be filtered by (categorical or numeric range, on the row or across a joined table); everything else is a shared step. The cross-table pair matters most: it filters a trace by something stored on its spans, a subquery rather than a column, and conflating it with the same-row case would silently match every trace with ANY span rather than traces whose spans actually match.
+ * Field translators for categorical/range filters on single-row and cross-table predicates.
  */
 export class TraceQueryTranslatorsAdapter {
   static create(): TraceQueryTranslatorsAdapter {

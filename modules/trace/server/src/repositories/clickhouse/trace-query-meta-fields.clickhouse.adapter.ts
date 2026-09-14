@@ -263,7 +263,7 @@ const SCENARIO_STATUS_DEF: FieldDef = {
 };
 
 /**
- * Trace fields that are not columns: trace_id matches a normalised form, not the stored string; existence fields (has evaluations, has events) are answered by a bounded subquery over another table, not by reading the trace itself. Both need to know which table to reach — existenceNeeds answers that for the evaluation path.
+ * Trace fields that are not columns: trace_id normalization and existence checks.
  */
 export class TraceQueryMetaFieldsAdapter {
   static create(): TraceQueryMetaFieldsAdapter {
@@ -271,7 +271,7 @@ export class TraceQueryMetaFieldsAdapter {
   }
 
   /**
-   * Trailing key for either trace.attribute.<k> (canonical) or the legacy attribute.<k>, or null if not a trace-attribute reference at all. Folds the back-compat alias into one call so callers don't branch on prefix flavour.
+   * Extracts attribute key from trace.attribute.* or attribute.* prefix.
    */
   private static stripTraceAttributePrefix(value: string): string | null {
     if (value.startsWith("trace.attribute.")) {
@@ -473,7 +473,7 @@ export class TraceQueryMetaFieldsAdapter {
   }
 
   /**
-   * Which auxiliary collection a has:<value>/none:<value> reads, or null if answered from the trace summary alone. has is value-polymorphic so it carries no static FieldDef.needs; ClickhouseTraceQueryEvaluationRepository.needs consults this instead.
+   * Which auxiliary collection a has/none filter reads, or null for trace summary.
    */
   static existenceNeeds(value: string): "evaluations" | "events" | null {
     if (value === "eval") return "evaluations";

@@ -1,17 +1,6 @@
 /**
- * What Trace builds for itself, from the process members it declared it reads
- * and its own config.
- *
- * Before this file the collaborators arrived as a `{ trace: { ... } }` bag a
- * hand-written composition handed to the installer. `withModules` resolves
- * `members` against the fourteen keys of `ProcessMembers` and nothing else, so
- * that bag can no longer reach a module and the module builds its own.
- *
- * The api is Trace's PRODUCER role: it ingests, spools, stages commands on the
- * `trace_processing` pipeline and reads. Everything the processing pipeline
- * owns - the fold projections, the rename command, the v1 S3 spool and the
- * process's broadcast fabric - keeps the absence branch the deleted api
- * composition gave it, refusing by name rather than answering emptily.
+ * Trace's own collaborators, built from process members. The API is the producer
+ * role; pipeline-owned features (folds, rename, spool) refuse by name when absent.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -61,17 +50,9 @@ export type TraceBuildConfig = Readonly<{
   processName: string;
   fallbackVisibilityDays: number;
   publicBaseUrl?: string | undefined;
-  /**
-   * Whether THIS process registers the `trace_processing` pipeline when it
-   * composes Trace's read graph. True is the producer role - the api - and it
-   * is the default, so a process that states nothing keeps that behaviour.
-   *
-   * A process that also drains the pipeline states `false`: its install phase
-   * registers Trace's complete definition (subscribers, fold projections, the
-   * real stores) through {@link TraceProcessingServerInstallerAdapter}, which
-   * is this module's code too. Registering the producer definition beside it
-   * would be a second registration of one name, and the runtime refuses that.
-   */
+  /** Whether THIS process registers the trace_processing pipeline. True (default)
+   * is producer (API); false defers to install phase which registers the complete
+   * definition including subscribers and fold projections. */
   registersProcessingPipeline: boolean;
 }>;
 
@@ -115,15 +96,9 @@ export function buildTraceCollaborators(input: {
   };
 }
 
-/**
- * Registers the `trace_processing` pipeline this process produces to, and
- * publishes its three senders.
- *
- * `changeTraceName` is NOT one of them: the rename is the processing role's
- * command, and a producer that staged it would write an event no consumer on
- * this process folds. It refuses by name, which is what the api answered
- * before this module composed itself.
- */
+/** Registers the trace_processing pipeline and publishes three senders.
+ * changeTraceName is not included: it's the processing role's command, and a
+ * producer would write an event no consumer on this process folds. */
 export function buildTraceProducerCommands(input: {
   eventing: EventSourcing;
   processName: string;
@@ -152,23 +127,9 @@ export function buildTraceProducerCommands(input: {
   };
 }
 
-/**
- * The senders of a `trace_processing` registration this process does not make
- * itself, resolved at the first send rather than at composition.
- *
- * A process that drains the pipeline composes Trace's read graph BEFORE its
- * install phase runs, and the install phase is what registers the complete
- * definition. So there is nothing to resolve yet when this runs, and there is
- * no second registration to make: one runtime holds one pipeline per name, and
- * a producer-only definition registered beside the full one would either be
- * refused or - worse, and this is what once shipped - win the name and drain
- * every span into stand-ins that reject by design.
- *
- * Each command therefore looks its sender up on the process's own registration
- * at call time. Every one of the four exists there, the rename included: it is
- * the processing role's command and this IS the processing role, which is why
- * this shape answers it where the producer shape refuses it.
- */
+/** Senders of a trace_processing registration this process does not make
+ * itself, resolved at first send (not composition) so they can be looked up on
+ * the process's own registration after install phase registers the definition. */
 export function buildTraceProcessRegistrationCommands(input: {
   eventing: EventSourcing;
   processName: string;
@@ -255,15 +216,8 @@ function memberClickHouseResolver(
   return resolve as unknown as (tenantId: string) => Promise<ClickHouseClient>;
 }
 
-/**
- * The process's broadcast fabric, absent.
- *
- * Both live-update subscriptions stream off a tenant emitter the PROCESS owns
- * and a redis fan-out writes into. No member carries one and Trace declares no
- * presence peer, so a subscription refuses by name here rather than handing
- * back an in-process emitter nothing would ever publish to - which would read
- * to a browser as a project with no new traces.
- */
+/** The process's broadcast fabric, absent. Subscriptions refuse by name since
+ * no member carries a tenant emitter and Trace declares no presence peer. */
 function refusingBroadcast(refuse: (capability: string) => Error): TracesTrpcEmitters {
   return {
     getTenantEmitter: () => {

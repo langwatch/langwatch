@@ -12,7 +12,7 @@ export class ClickHouseMetadataKeysFacetAdapter {
   }
 
   /**
-   * Discover query for trace metadata attribute keys on trace_summaries.Attributes, mirroring buildSpanAttributeKeysFacetQuery's shape but against the trace table — run independently so the sidebar renders separate sections without one query masking the other on failure. The filter side is handled in filter-to-clickhouse/ast.ts.
+   * Discovers metadata attribute keys on the trace table.
    */
   static buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("OccurredAt");
@@ -50,7 +50,7 @@ export class ClickHouseMetadataKeysFacetAdapter {
   }
 
   /**
-   * Metadata-scoped sibling of {@link ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery}: forces the metadata. namespace onto the prefix so discovery surfaces ONLY metadata.<name> keys, never bare trace attributes. A user sub-search is still honoured by appending it after the namespace.
+   * Metadata-scoped variant forcing the metadata.* namespace on the prefix.
    */
   static buildTraceMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     return ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery({

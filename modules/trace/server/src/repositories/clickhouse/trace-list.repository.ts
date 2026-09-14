@@ -62,7 +62,7 @@ interface TraceSummaryFieldsBase {
 const TABLE_NAME = "trace_summaries" as const;
 
 /**
- * Buffer subtracted from since when bounding the new-trace-count subquery scan on stored_spans. Spans start near their trace's OccurredAt and partitions are weekly, so +/-2 days guarantees a boundary-adjacent matching span is never pruned. Matches the withPartitionHint margin.
+ * Buffer for partition-pruning in new-trace-count subquery; matches withPartitionHint.
  */
 const SINCE_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -154,39 +154,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           GROUP BY TenantId, TraceId
         )`;
 
-    // Page the matching rows first (key + sort columns only), then read the
-    // heavy columns (ComputedInput/ComputedOutput and the rest) for that
-    // bounded page alone. The previous single query materialized those
-    // payloads for every deduped trace in the window before ORDER BY ... LIMIT
-    // trimmed it, and `count() OVER ()` forced the whole deduped set to buffer
-    // — together the dominant read-bytes cost on this list. The total is now a
-    // separate light count that never touches the payload columns.
-    //
-    // The inner stage hands the outer stage the winning rows' full identity
-    // (TenantId, TraceId, UpdatedAt), not just their TraceIds. That identity
-    // IS the dedup result, so the outer stage does not restate `dedupFilter`:
-    // re-stating it made ClickHouse build the whole-window aggregate a second
-    // time to reach rows the inner stage had already named. On a tenant with
-    // ~1.3M traces in the window, dropping that second pass measured 4.45M ->
-    // 2.98M rows read and 4.6s -> 2.3s.
-    //
-    // The outer WHERE does keep the full `whereClause`, not just the base
-    // predicates. `trace_summaries` is a ReplacingMergeTree, so until a merge
-    // runs, two physical rows can share one (TenantId, TraceId, UpdatedAt) and
-    // disagree on everything else — a re-publish at the same version lands in
-    // its own part. Identity alone cannot tell those apart, so the outer stage
-    // has to re-apply the user's filter to pick the version that actually
-    // matches it; without that, a filtered page returns the version that does
-    // not match and disagrees with its own total. Re-applying the filter is
-    // cheap next to the dedup (it is the same predicate over an already
-    // identity-bounded set, and it costs nothing at all on the unfiltered
-    // default view, where `whereClause` IS `baseWhereClause`).
-    //
-    // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
-    // aliasing DateTime to millis in the same scope shadows the column and
-    // breaks the comparison. It also lists explicit columns (no `SELECT *`) so
-    // ClickHouse skips reading the full `Attributes` Map; only a fixed set
-    // of keys flow through to the list mapper (see `mapToTraceListItem`).
+    // Two-stage: page light columns first, then read heavy payloads for page only.
     const [result, countResult] = await Promise.all([
       client.query({
         query: `
@@ -980,7 +948,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // distinct values, fast, not exact counts. Strategy: scan a bounded
     // prefix of rows with the key set and pull distinct values from that
     // sample — surfaces every value in ms for low cardinality; high-
-    // cardinality keys re-query with a search prefix. Counts return 0 (UI hides them for attribute facets).
+    // cardinality keys re-query with a search prefix; counts return 0.
     const ATTR_VALUE_SAMPLE_ROWS = 50_000;
 
     const innerPrefix = params.prefix
@@ -1233,7 +1201,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   }
 
   /**
-   * Predicates a read is bounded by, split in two: baseSql (tenant + time window, pruning partitions, same for every trace version) and sql (the user's filter on top). The split is load-bearing — trace_summaries is a ReplacingMergeTree, so latest-version dedup must decide on baseSql ALONE; folding the filter in would make the newest FILTER-MATCHING row "latest", so a freshly annotated trace could count in both annotation:annotated and annotation:unannotated. Filter after the dedup, never inside it.
+   * WHERE split: baseSql for dedup, sql for filter; dedup must ignore user filter.
    */
   private static whereClause(
     tenantId: string,
@@ -1449,4 +1417,4 @@ type FacetRow = {
 // keys absent so its ?? null / ?? "" fallbacks fire, not present-but-empty.
 // Keys below match findAll's explicit Attributes[...] projections — add a
 // new one in both places. If user-pinned attribute columns ship, prefer an
-// extraAttributeKeys: string[] input over re-introducing the full Map projection this change avoids.
+// extraAttributeKeys: string[] input over reintroducing the full Map projection.

@@ -8,7 +8,9 @@ import {
 import type { TraceSpanIngest } from "./trace.members.ts";
 import { TraceCollectorSpanService } from "../services/span/trace-collector-span.service.ts";
 /**
- * The trace feature's application: the one typed thing every door is given, replacing five previously-private bags (SpansApplication, TracesApplication, TraceEditOverlayApplication, SharedTraceApplication, TracesV2Application) that agreed by attention, not construction, and couldn't see each other's declarations. What lives here as a rule rather than a service's own concern: attribution (changeTraceName + reviewer-correction stamp the caller as an argument, not a session read, so one op serves a browser/API-key/job caller alike); full resolution (#4991: a content-consuming read resolves offloads, a listing read stays on preview); the partition-pruning hint (occurredAtMs must be OMITTED, never undefined); the visibility-window verdict; and the sample draw (list ids, then read those traces in full). A door may still shape its own paging/limits/redactions, but not decide privately what the application does.
+ * Trace feature application: one typed contract replacing five previous bags.
+ * Rules: attribution (caller stamped), full resolution on consuming reads,
+ * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -213,9 +215,8 @@ export type TracesV2SpanReader = Readonly<{
   }): Promise<ModelSpanSampleRow[]>;
 }>;
 
-/**
- * The trace's own summary read, in the one shape all three readers need: occurredAtMs prunes partitions, visibilityCutoffMs applies the plan's window, full resolves offloaded values — the union of what the drawer header, correction overlay and share page each declared separately.
- */
+/** The trace's own summary read: occurredAtMs prunes partitions,
+ * visibilityCutoffMs applies the plan's window, full resolves offloaded values. */
 export type TraceSummaryReader = Readonly<{
   getByTraceId(
     tenantId: string,
@@ -383,9 +384,9 @@ export interface TraceAppDependencies {
   publicBaseUrl?: string;
 }
 
-/**
- * The partition-pruning hint, as a read must receive it: present or absent, never present-and-undefined. Passing the key with no value turns a bounded read into a scan of every weekly partition, cold S3 included — the difference between a 100ms read and a multi-second one.
- */
+/** The partition-pruning hint: present or absent, never undefined.
+ * Omitting the value scans every weekly partition, turning 100ms reads into
+ * multi-second ones. */
 function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Record<string, never> {
   return occurredAtMs !== undefined ? { occurredAtMs } : {};
 }
@@ -868,9 +869,9 @@ export class TraceApp implements TraceApi {
     });
   }
 
-  /**
-   * Whether the plan's visibility window teases this trace's content. Only free plans have a window, so a plan without one answers without reading anything; with one, the trace's own summary decides it — the same read the drawer header makes, keeping the two from disagreeing. A summary that can't be read answers "teased": a correction quotes captured content, so an age we can't establish must not open it — logged, and closed.
-   */
+  /** Whether the plan's visibility window teases this trace's content. Only
+   * free plans have a window; with one, the trace's own summary decides visibility
+   * (same read the drawer header makes). */
   async isTraceWindowRedacted(input: {
     projectId: string;
     traceId: string;
@@ -1154,9 +1155,8 @@ export class TraceApp implements TraceApi {
   // The two things a reader may change about a trace
   // -------------------------------------------------------------------------
 
-  /**
-   * Renames a trace, attributed to the caller who asked for it. Attribution lives here, not the door, because "who renamed this" is a property of the act, not the transport it arrived over. The name itself is validated before it gets here; an invalid one is the door's rejection to report.
-   */
+  /** Renames a trace, attributed to the caller. Attribution is a property of the
+   * act, not the transport. Name is validated by the door. */
   changeTraceName(
     input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
     by: TraceCaller,
@@ -1181,9 +1181,7 @@ export class TraceApp implements TraceApi {
     });
   }
 
-  /**
-   * Saves the correction, attributed to the caller who asked for it. The door used to stamp the reviewer twice — once on a trace's first correction, once on every replacement — two chances to stamp it differently or not at all.
-   */
+  /** Saves the correction, attributed to the caller. */
   saveTraceEditOverlay(
     input: { projectId: string; traceId: string; patch: TraceEditOverlayPatch },
     by: TraceCaller,

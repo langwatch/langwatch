@@ -28,7 +28,7 @@ import {
 const logger = createLogger("langwatch:traces:filter-evaluate");
 
 /**
- * Evaluating a saved query against one trace, in memory — the same query also compiles to CH SQL, and an automation fires from THIS answer while the trace list shows the other, so the walk below mirrors the compiler node-for-node rather than a natural in-memory matcher. Fails CLOSED everywhere: parse error, unknown field, over-cap query, or an undecidable tag all answer false, never a false true (which would fire an automation on a trace nobody asked about).
+ * Evaluates saved queries against traces in memory, mirroring the CH compiler.
  */
 export class ClickhouseTraceQueryEvaluationRepository {
   static create(): ClickhouseTraceQueryEvaluationRepository {
@@ -36,7 +36,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
   }
 
   /**
-   * Evaluate a liqe query against an in-memory trace, mirroring the CH compiler's node walk. Fail-closed: false — never a false true — on any parse error, unknown field, over-cap query (MAX_NODE_COUNT/MAX_PARAM_COUNT), or an undecidable tag ({@link UNSUPPORTED}). An empty query has no constraints, so it matches every trace, mirroring the compiler's no-WHERE-clause case.
+   * Evaluates a query against an in-memory trace, fail-closed on any error.
    */
   static matches(queryText: string, trace: InMemoryTrace): boolean {
     // Reuse the compiler as the validation gate — it enforces the exact

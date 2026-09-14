@@ -6,15 +6,9 @@ import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 
-/**
- * A structural contract behind `trustAbsentMiss` (the always-write change): a
- * `get()`-only store can never answer `undecodable`, because the executor
- * stamps its nulls `absent`. Under `trustAbsentMiss` such a fold's
- * `refoldOnStoreMiss` would then never fire again — dead config that reads like
- * a safety net. The pairing is only visible here: by the time a fold reaches
- * the router its store is wrapped in a cache that declares `getWithApplied`
- * whatever the durable tier behind it can do.
- */
+/** A structural contract behind trustAbsentMiss: a get()-only store can never
+ * answer undecodable since the executor stamps its nulls absent. The pairing is
+ * only visible here; folds are wrapped in a cache by the time they reach router. */
 
 const deps = {
   store: { store: async () => {}, tryGet: async () => null },

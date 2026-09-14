@@ -1,6 +1,5 @@
-/**
- * The two refusals a filter gets before any SQL is built. Neither is the injection defence — every value/key is BOUND as a {name:String} parameter, which makes the query safe. These are the bounds and readable refusal on top: an attribute key is an identifier (punctuation is a typo, not a silent no-match filter), and an unbounded value would carry into the query as-is. Both were unguarded until this test — removing the key's character check failed nothing.
- */
+/** The two refusals a filter gets before any SQL is built: bounded keys and
+ * values. Removes the key's character check and nothing fails. */
 
 import { describe, expect, it } from "vitest";
 import {

@@ -1,9 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
-/**
- * @vitest-environment node
+/** @vitest-environment node
  * @integration
- * Integration coverage for the trace search projection DSL (API Export Traces RFC, Track 1) — the END-TO-END projected shape. Proves specs/traces/trace-search-projection.feature against real infra: compiler plans, CH read runs the bounded events JOIN over real stored_spans, annotations JOIN runs via a fake AnnotationService (no PG testcontainer here), and the per-trace projector renders the requested shape.
- */
+ * Integration coverage for the trace search projection DSL. Proves
+ * specs/traces/trace-search-projection.feature against real infra. */
 import { TraceProjectionCompileService } from "../../../services/projection/trace-projection-compile.service.ts";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";
 import { type ProjectionAnnotation, type AnnotationApi } from "@langwatch/annotation-contract";

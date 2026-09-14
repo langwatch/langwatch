@@ -42,13 +42,7 @@ export type StoredSpanRow = {
 };
 
 /**
- * A stored span row, and a normalized span, as the full-record shape the trace
- * detail view reads.
- *
- * Both directions live here because they have to agree: what the writer
- * flattens, the reader unflattens, and a change to one that misses the other
- * shows up as an attribute that silently stops rendering. Eight entry points,
- * and twenty-one steps that exist only to serve them.
+ * Full-record mapping between stored spans and normalized spans; must stay synchronized.
  */
 export class TraceFullRecordMapper {
   private static spanKind(value: number): NormalizedSpanKind {

@@ -16,17 +16,9 @@ import {
   msToUnixNano,
 } from "./fixtures/trace-summary-test.fixtures.ts";
 
-/**
- * The storage anchor and the span timing baseline, resumed across a
- * read-back (ADR-071 step 3 / migration 00061).
- *
- * A log-led trace freezes its anchor on the first log record, before any span
- * has arrived. If the fold is interrupted there and resumed from its
- * committed row, a late-arriving span that started BEFORE every log must pull
- * the timing baseline back — while the anchor, a storage address, stays
- * exactly where it was written. Decoding either field from the other's column
- * would only show up once a later event reads the one that moved.
- */
+/** The storage anchor and span timing baseline, resumed across a read-back
+ * (ADR-071 step 3). A log-led trace freezes its anchor on the first log
+ * record; late-arriving spans pull the baseline back, not the anchor. */
 
 const TENANT = "tenant-log-led-resume";
 const TRACE_ID = "aaaa0000000000000000000000000002";

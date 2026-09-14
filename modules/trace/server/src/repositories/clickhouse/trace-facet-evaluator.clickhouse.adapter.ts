@@ -6,7 +6,7 @@ import type {
 } from "./trace-facet-registry.clickhouse.adapter.ts";
 
 /**
- * Cap on distinct emitted-label values surfaced per evaluator. Drilldown renders these as clickable filter rows; beyond ~10 the list stops being a quick picker and bloats the discover payload, so only the most frequent survive (ties broken by ClickHouse's sort).
+ * Cap on distinct label values surfaced per evaluator in drilldown.
  */
 const LABEL_VALUES_TOP_N = 10;
 
@@ -16,7 +16,7 @@ export class ClickHouseEvaluatorFacetAdapter {
   }
 
   /**
-   * Evaluator facet: distinct EvaluatorIds labelled by display name (falling back to id). Type is intentionally omitted from the label — a project's evaluators are mostly one type, so the prefix just ate horizontal room the name needs; the id still round-trips via facet_value for saved queries. Each row also carries the aggregates the sidebar drilldown renders inline (pass/fail counts, score min/max, hasLabel/hasScore) computed in the same query so the sidebar avoids a per-evaluator round-trip.
+   * Discovers evaluators with label display and aggregated pass/fail/score stats.
    */
   static buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("ScheduledAt");

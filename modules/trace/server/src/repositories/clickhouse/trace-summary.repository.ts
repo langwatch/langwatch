@@ -18,14 +18,7 @@ import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
 
 /**
- * Fields that are read identically by both the trace summary repository
- * (single-trace fetch) and the trace list repository (paginated list).
- *
- * Both repositories project the same `trace_summaries` table — the only
- * differences are: the list path projects `Attributes` map keys into
- * dedicated columns for fast scans, while the summary path returns the
- * full `Attributes` map plus `Events.*` arrays. These shared fields
- * cover everything else.
+ * Fields shared between trace summary and list repositories from trace_summaries.
  */
 export interface TraceSummaryFieldsBase {
   TraceId: string;
@@ -111,27 +104,7 @@ type ClickHouseSummaryWriteRecord = Omit<
 };
 
 /**
- * The value that lands in the `OccurredAt` partition / TTL column (ADR-087).
- *
- * The fallback chain is a last resort for a state nothing could anchor: one
- * whose every event carried a zero `occurredAt` (the event schema permits it —
- * `nonnegative`, not `positive`), or whose only candidate times were implausibly
- * far in the future. It exists so the partition column can never be the epoch,
- * and each step is validated rather than trusted — `parseClickHouseDateTimeMs`
- * returns 0 on a parse failure, so an unchecked `createdAt` would put the row
- * straight back in 196952, the one outcome this change exists to prevent.
- *
- * ADR-071 names `CreatedAt` as a trap for exactly this use, and it is right: it
- * is fold time, so a rebuild re-stamps it. Accepted here on the same terms
- * `trace_analytics` accepted it — it applies ONLY to a state with no business
- * time at all, and the read-back promotes whatever landed in the column to the
- * frozen anchor, so it stops drifting after the first write.
- *
- * `now` is read here rather than passed because the anchor is validated on every
- * write, not only when first frozen: a row whose committed anchor is more than a
- * day ahead of fold time fails the bound and is rewritten at fold time. That is
- * the one case where an already-committed row changes partition, and it is
- * deliberate.
+ * OccurredAt partition value with fallback chain; validated on every write.
  */
 function storageAnchorForWrite(data: TraceSummaryData): number {
   return firstUsableAnchor({
@@ -364,27 +337,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       return await this.#findInExplicitWindow({ tenantId, traceId, window: options.window });
     }
 
-    // One logical read with two stages, mapped onto queryWindowed so the
-    // outcome lands on `clickhouse_windowed_read_total{table}` exactly once per
-    // call:
-    //
-    //  - Hinted stage (the windowed `run`): when the caller threaded a rough
-    //    timestamp, narrow the heavy read to a ±2-day window around it for
-    //    partition pruning. The IO/Attributes columns are heavy and without
-    //    pruning ClickHouse scans every partition including cold S3 tier — this
-    //    trims drawer-open latency from ~1s to ~100ms. A hit here is the fast
-    //    happy path (outcome `hit`).
-    //  - Fallback stage (the unbounded `run`): the hint is *best-effort*. If the
-    //    hint window misses (clock skew, stale URL, the row's `timestamp` ≠
-    //    trace's actual OccurredAt), or when there was no hint at all, resolve
-    //    the real OccurredAt via a cheap sort-key seek and bound the retry so
-    //    the drawer doesn't 404 on a trace that genuinely exists. This is the
-    //    slow path (outcome `unbounded_hit`/`unbounded_empty`, or `unwindowed`
-    //    when no hint was ever supplied).
-    //
-    // The resolve+retry lives inside the fallback `run`, so the cheap seek fires
-    // only when the hinted stage misses (or is skipped) — never on the happy
-    // path, keeping exactly the same SQL attempts in the same order as before.
+    // Two-stage read: hinted window for partition pruning, fallback unbounded.
     const hasHint = options?.occurredAtMs !== undefined;
 
     try {
@@ -416,22 +369,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   }
 
   /**
-   * Resolve a trace's OccurredAt (the `PARTITION BY toYearWeek(...)` column)
-   * so {@link tryFindByTraceId} can prune partitions even when the caller never
-   * threaded an `occurredAtMs` hint (or the hint window missed). The table is
-   * `ORDER BY (TenantId, TraceId)`, so this is a sort-key point seek over a
-   * couple of granules of small columns — far cheaper than letting the heavy
-   * single-trace read fall back to scanning every weekly partition (incl. cold
-   * S3). For a not-yet-projected / absent trace this also lets the caller skip
-   * the heavy read entirely. Rows that still carry the historical
-   * `OccurredAt = 0` sentinel are reported as found without a usable timestamp
-   * so the caller can preserve correctness with the legacy unbounded fallback.
-   *
-   * Since ADR-087 no NEW row can carry that sentinel — `OccurredAt` is the frozen
-   * storage anchor and every write validates it — so the unbounded arm below is
-   * a legacy-row path that drains as those rows are rewritten or reaped. It is
-   * kept because it is a single-trace read, unlike the batch span read that the
-   * same sentinel drove into `MEMORY_LIMIT_EXCEEDED`.
+   * Resolves OccurredAt via sort-key seek to enable partition pruning.
    */
   private async resolveOccurredAtMs({
     tenantId,
@@ -603,22 +541,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       annotationIds: record.AnnotationIds ?? [],
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
-      // The anchor comes back frozen: whatever the column holds is what the row
-      // was partitioned and TTL'd on, so re-deriving it would be free to move it.
+      // Anchor is frozen; occurrence time from separate column for span baseline.
       storageAnchorMs: record.OccurredAt,
-      // …and the timing baseline comes back from its OWN column, never from the
-      // anchor. Reading it off `OccurredAt` would hand `SpanTimingService` a
-      // log-shaped accept time as a span start and inflate the trace's duration
-      // by the whole ingest lag — and for a log-only trace it would fabricate a
-      // span that never arrived.
-      //
-      // The one exception is a PRE-SPLIT row, where the two were the same column
-      // and `OccurredAt` is the `min(span start)` this field wants. Taking it
-      // there is what lets the population heal without a refold; taking it
-      // anywhere else is the inflation bug above. The branch asks whether the
-      // stamp is at or after the split, not whether it is the current one, so a
-      // later bump cannot reclassify anchored rows (see
-      // isStorageAnchoredVersion).
       occurredAt: isStorageAnchoredVersion(record.Version)
         ? Number(record.EarliestSpanStartMs ?? 0)
         : record.OccurredAt,

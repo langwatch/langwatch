@@ -20,23 +20,9 @@ import {
   msToUnixNano,
 } from "./fixtures/trace-summary-test.fixtures.ts";
 
-/**
- * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00061).
- *
- * `OccurredAt` on `trace_analytics` is the partition key, the lead sort key and
- * the TTL anchor. It used to carry the fold's span timing baseline — the running
- * `min(span.startTimeUnixMs)` — which only SPANS ever set. A trace whose only
- * signal is a log record (Claude Code / Codex "Path B") therefore committed at
- * `new Date(0)`: partition 196952, TTL deadline `1970 + retention`, already past.
- *
- * The two jobs are now separate state: `storageAnchorMs`, frozen on the first
- * contribution of any kind that carries a usable business time, and `occurredAt`,
- * still span-seeded and still the baseline `TotalDurationMs` is measured from.
- *
- * These tests drive the fold through its own dispatch (`projection.apply`) rather
- * than through the exported span helper, because the anchor is applied at that
- * seam — the point of putting it there is that no contribution type can miss it.
- */
+/** The slim fold's STORAGE ANCHOR (ADR-071 step 3). OccurredAt is the partition,
+ * sort and TTL key; now separate from span timing baseline (storageAnchorMs).
+ * Tests drive the fold through projection.apply where the anchor is applied. */
 
 const TENANT = "tenant-anchor";
 const TRACE_ID = "aaaa0000000000000000000000000009";

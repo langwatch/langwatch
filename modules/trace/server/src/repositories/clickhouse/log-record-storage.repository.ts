@@ -12,7 +12,7 @@ import {
 const TABLE_NAME = "stored_log_records" as const;
 
 /**
- * Fallback lookback (no occurredAtMs hint): now-90d..now+2d. stored_log_records is PARTITION BY toYearWeek(TimeUnixMs), tiered to S3 past the hot window, so an unbounded read walks every weekly partition. 90d covers "open a recent trace's raw logs" while staying on hot partitions; +2d mirrors the hint path's clock-skew headroom ({@link DEFAULT_PARTITION_WINDOW_MS}).
+ * Fallback lookback when no occurredAtMs hint: now-90d..now+2d.
  */
 const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 

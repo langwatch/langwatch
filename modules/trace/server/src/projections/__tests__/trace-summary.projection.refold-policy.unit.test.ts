@@ -9,23 +9,9 @@ import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summar
 import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 
-/**
- * Regression guard for the 2026-07-09 re-fold storm. Sharding recordSpan across
- * GroupQueue lanes makes a hot trace's spans reach the fold out of occurredAt
- * order, so the executor's out-of-order detector fires constantly. The trace
- * summary is order-insensitive, so a span is simply folded when it arrives and
- * the event log is never re-read.
- *
- * Was
- * `platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/__tests__/traceSummaryRefoldPolicy.unit.test.ts`.
- * `TraceSummaryFoldProjection` now takes `traceCanonicalisation` and
- * `runtime` deps alongside `store` (`.create(...)`, not a bare constructor);
- * both are pure, no-I/O collaborators built by
- * `./fixtures/trace-summary-test.fixtures`, which this package's other
- * trace-summary fold tests already use.
- *
- * See specs/trace-processing/hot-trace-fold-amplification.feature.
- */
+/** Regression guard for the 2026-07-09 re-fold storm. Hot traces reach the fold
+ * out of occurredAt order; the trace summary is order-insensitive, so spans fold
+ * when they arrive without re-reading the event log. */
 
 const TENANT_ID = createTenantId("project-1");
 const TRACE_ID = "trace-1";

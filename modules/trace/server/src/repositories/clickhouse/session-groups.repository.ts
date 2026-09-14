@@ -18,7 +18,7 @@ const TABLE_NAME = "trace_summaries" as const;
 const CONVERSATION_ID_EXPR = "Attributes['gen_ai.conversation.id']" as const;
 
 /**
- * Buffer around the trace time range bounding the log_records content-search subquery. Log records land near their session's trace activity, so +/-2 days guarantees a boundary-adjacent matching record is never pruned. Matches the trace list's span-pruning margin.
+ * Buffer for content-search subquery pruning around the trace time range.
  */
 const LOG_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -26,7 +26,7 @@ const LOG_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 const MODELS_PER_SESSION_LIMIT = 20;
 
 /**
- * Aggregate expressions per sortable dimension. Float aggregates round IN SQL so the cursor value and the next page's HAVING recompute stay bit-identical — parallel Float64 summation isn't deterministic at full precision, and an unrounded sum can wobble past the keyset boundary, duplicating or skipping a row.
+ * Aggregate expressions per sortable dimension, rounded for keyset pagination.
  */
 const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
   lastActivity: "toFloat64(max(toUnixTimestamp64Milli(OccurredAt)))",
@@ -208,7 +208,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
   }
 
   /**
-   * Membership predicate for filtered reads: a session matches when any trace matches the trace-level filter, OR its log_records transcript contains every free-text term. Applied as an IN over session ids so the outer rollup still sums ALL traces of a matching session — filtering rows before GROUP BY would truncate totals to matching traces only, the page-local bug this lens replaces.
+   * Session membership predicate: any trace matches filter OR log contains all terms.
    */
   private buildSessionMatchClause(
     query: SessionGroupsQuery,

@@ -6,17 +6,17 @@ export const MAX_ATTRIBUTE_KEY_LENGTH = 256;
 const ATTRIBUTE_KEY_PATTERN = /^[a-zA-Z0-9_./:-]+$/;
 
 /**
- * Trace-level attribute filter: matches Attributes[<key>] on trace_summaries. Two prefixes accepted (legacy attribute.<key>, namespaced trace.attribute.<key>) translating to the same SQL — namespaced is preferred (unique root-prefix), but old saved queries keep working unmigrated.
+ * Trace-level attribute filter: two prefixes accepted for backwards compatibility.
  */
 export const TRACE_ATTRIBUTE_PREFIX_LEGACY = "attribute.";
 export const TRACE_ATTRIBUTE_PREFIX = "trace.attribute.";
 /**
- * Prefix for event-attribute filtering: drills into per-event Events.Attributes via a span-level subquery (event attributes live on spans, not the trace summary). event.attribute.<key> is canonical; event.<key> is a back-compat alias, distinct from the bare event:<name> filter matching Events.Name.
+ * Prefix for event-attribute filtering via span-level subquery.
  */
 export const EVENT_ATTRIBUTE_PREFIX_LEGACY = "event.";
 export const EVENT_ATTRIBUTE_PREFIX = "event.attribute.";
 /**
- * Prefix for span-level attribute filtering: span.attribute.<key>:value, drilling into stored_spans.SpanAttributes via a partition-pruned arrayExists/map-lookup subquery — the trace summary doesn't carry arbitrary span attrs, the per-span row does. Same shape as the event-attribute filter.
+ * Prefix for span-level attribute filtering via partition-pruned subquery.
  */
 export const SPAN_ATTRIBUTE_PREFIX = "span.attribute.";
 
@@ -25,7 +25,7 @@ export const SPAN_ATTRIBUTE_PREFIX = "span.attribute.";
 // ---------------------------------------------------------------------------
 
 /**
- * Values and parameters on their way into a CH trace query — the leaf of the translator, knowing nothing about fields/tables/filters, only how to make a value safe to bind. nextParam mints placeholder names so a value is never interpolated into SQL; validateValueLength/validateAttributeKey refuse before that happens.
+ * Sanitizes values and mints parameter names for ClickHouse trace queries.
  */
 export class TraceQueryValuesAdapter {
   static create(): TraceQueryValuesAdapter {
@@ -59,7 +59,7 @@ export class TraceQueryValuesAdapter {
   }
 
   /**
-   * Unique parameter name for the CH SDK to bind. Pass a semantic base ("traceId") so the query reads naturally (WHERE TraceId = {traceId_0:String}, not {f0:String}); the trailing counter keeps names unique when a field repeats in one query.
+   * Mints unique parameter names for the ClickHouse SDK to bind.
    */
   static nextParam(ctx: TranslationContext, base = "f"): string {
     const name = `${base}${base === "f" ? "" : "_"}${ctx.paramCounter}`;
@@ -94,7 +94,7 @@ export class TraceQueryValuesAdapter {
   }
 
   /**
-   * Own-property read of an attribute map, mirroring CH's Attributes[<key>] (own keys only, '' when absent). Filter keys are user-supplied, so a bare attrs[key] would resolve constructor/toString/__proto__ off Object.prototype — not cosmetic: has:attribute.constructor read (attrs[key]??"")!=="" as true on every trace while the compiled Attributes['constructor']!='' matched none.
+   * Safe own-property read to avoid prototype pollution from user-supplied keys.
    */
   static readAttribute(attrs: Record<string, string>, key: string): string {
     return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
@@ -114,7 +114,7 @@ export class TraceQueryValuesAdapter {
   }
 
   /**
-   * Parses a JSON-encoded string array on Attributes (langwatch.labels/prompt_ids), mirroring the trigger matcher's parseJsonArray. JSON.parse already strips the quotes the SQL side trims with trim(BOTH '"' FROM …). Returns null for absent/malformed values.
+   * Parses JSON-encoded string arrays from attribute values.
    */
   static parseJsonStringArray(raw: string | undefined): string[] | null {
     if (!raw) return null;

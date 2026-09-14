@@ -1,15 +1,14 @@
-/**
- * @vitest-environment node
- * The traces-with-spans memory-limit fallback must not exhaust the heap. On OOM the read retries in batches of 25, merged into one map — bounds ClickHouse's peak memory, not ours, since the full result set is rebuilt on this side of the socket (a 980-trace read did that on every worker at once, causing 50 V8 heap deaths over six days). The CH read already failed before the fallback runs, so refusing costs nothing extra, but keeps the failure inside one job instead of taking the process. Spec: specs/clickhouse/bounded-reads.feature
- */
+/** @vitest-environment node
+ * The traces-with-spans memory-limit fallback must not exhaust the heap. On
+ * OOM the read retries in batches, merged into one map. Spec:
+ * specs/clickhouse/bounded-reads.feature */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
-/**
- * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
- */
+/** The process's tenant-keyed connection as this suite supplies it. The
+ * repository takes the resolver, so the fake sits with every other dependency. */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 vi.mock("langwatch", () => ({
@@ -74,9 +73,9 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
   };
 }
 
-/**
- * Refuses the first whole-list span read for memory (triggering the fallback), then serves each batched retry with spansPerTrace rows per trace; trace ids ride in query_params, not SQL text. max_result_rows is honoured the way the server honours it — a mock returning every row regardless couldn't distinguish a pre-decode refusal from a post-decode cap. spanRowsServed records what actually crossed the socket, so a test can assert the heap never saw the rows.
- */
+/** Refuses the first whole-list span read for memory (triggering the
+ * fallback), then serves each batched retry. spanRowsServed records what
+ * actually crossed the socket for heap assertions. */
 function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: number }) {
   let refusedOnce = false;
   const spanReadSettings: Array<Record<string, unknown>> = [];
