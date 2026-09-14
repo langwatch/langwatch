@@ -156,11 +156,13 @@ export const EMAIL_WIDTH = { card: "560px" } as const;
  * centred, at the top of the card, at the auth screens' own 112px.
  *
  * It is a raster copy rather than the `FullLogo` component, which reads the
- * colour mode and cannot leave the browser. `logo.png` is 4247×1040, so 112px
- * wide is 27px tall — the same 112×27.5 the card draws.
+ * colour mode and cannot leave the browser. `logo-wordmark.png` is a raster
+ * export of `FullLogo`'s light-mode paths (`src/components/icons/FullLogo.tsx`),
+ * at 930×228 — the same 155×38 viewBox, scaled up for a sharp render at small
+ * sizes. So 112px wide is 27px tall, same as the viewBox's own ratio.
  */
 export const EMAIL_WORDMARK = {
-  src: "https://app.langwatch.ai/images/logo.png",
+  src: "https://app.langwatch.ai/images/logo-wordmark.png",
   alt: "LangWatch",
   width: "112",
   height: "27",
