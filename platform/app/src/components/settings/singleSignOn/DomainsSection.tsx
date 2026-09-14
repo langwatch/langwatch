@@ -203,7 +203,7 @@ function DomainRow({
    *  a caller that ignores it has thrown the ceremony's answer away. */
   onMinted: (minted: SelfServeIssuedDnsRecord) => void;
 }) {
-  const { chip, next, takeNextStep, claim, prove, remove } =
+  const { chip, next, takeNextStep, removeDomain, claim, prove, remove } =
     useDomainRowActions({
       domain,
       claimed,
@@ -279,7 +279,7 @@ function DomainRow({
               color="fg.muted"
               _hover={{ color: "red.solid" }}
               loading={remove.isPending}
-              onClick={() => remove.mutate(target, settle)}
+              onClick={removeDomain}
             >
               Remove
             </Button>
@@ -756,5 +756,7 @@ function useDomainRowActions({
           },
         });
 
-  return { chip, next, takeNextStep, claim, prove, remove };
+  const removeDomain = () => remove.mutate(target, settle);
+
+  return { chip, next, takeNextStep, removeDomain, claim, prove, remove };
 }
