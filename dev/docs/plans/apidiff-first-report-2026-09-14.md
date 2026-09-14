@@ -37,6 +37,16 @@ only a NEW cause fails the run while the 21 known ones are worked down.
 21 root causes, all new. Caveat: the branch instance boots in place, so it
 carried the checkout's in-flight uncommitted edits at run time.
 
+## Standing triage rule (user direction, 2026-09-14)
+
+Where main answered an error and the branch answers a **HandledError** —
+a clean, named refusal — that is an improvement to KEEP and baseline
+(apidiff's slug for the direction is `server-error-resolved:*`; same-class
+4xx differences are suppressed by default already). Never fix the branch
+back to main's error behavior. The bad direction is unchanged:
+`handled-refusal-degraded:*` (main refused cleanly, branch 500s) is always
+a real defect.
+
 ## Triage, most severe first
 
 1. **Owner-key 2xx→5xx (15 ops)** — `status-class-mismatch:200-500` +
