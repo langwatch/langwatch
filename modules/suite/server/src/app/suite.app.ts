@@ -118,21 +118,13 @@ export class SuiteApp implements SuiteApi {
     });
   }
 
-  /**
-   * Test-only construction: `create`'s own collaborators
-   * ({@link buildSuiteInfrastructure}), with any of them a suite naming to
-   * observe (most often `execution`, since production has none to compose
-   * yet) overridden directly — no `clickhouse` member and no config parse
-   * required. The run projection defaults to the in-memory repository rather
-   * than a real ClickHouse read, since a test that wants ClickHouse asks for
-   * it through `create` instead.
-   */
+  // Test-only construction with overridable collaborators and in-memory run projection.
   static createForTesting(setup: {
     repositories: SuiteRepositories;
     dependencies: SuiteAppDependencies;
     runRepository?: SuiteRunReadRepository;
     infrastructure?: Partial<ReturnType<typeof buildSuiteInfrastructure>>;
-    /** A suite that wants deterministic ids or a fixed clock names them here — {@link SuiteService}'s own seams, not production infrastructure. */
+    /** Deterministic ids and a fixed clock are the service's own seams, not infrastructure. */
     generateId?: () => string;
     now?: () => Instant;
   }): SuiteApp {
