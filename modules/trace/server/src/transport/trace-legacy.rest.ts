@@ -127,8 +127,12 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
    * unlike the v1 family — this deprecated endpoint has always behaved that way,
    * and loosening it would silently accept a typo the caller currently gets told
    * about.
+   *
+   * A method rather than a field: the application a mounted family reads is a
+   * proxy that answers callable operations only, so a property member would
+   * throw where it is read.
    */
-  searchBodySchema: z.ZodType<TSearchBody, TSearchBodyRaw>;
+  searchBodySchema(): z.ZodType<TSearchBody, TSearchBodyRaw>;
   /** Renders a schema failure as the one sentence this family answers with. */
   describeValidationError(error: unknown): string;
 }
@@ -340,7 +344,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       return answer({ error: "Invalid body" }, 400);
     }
 
-    const parsed = app.searchBodySchema.safeParse(body);
+    const parsed = app.searchBodySchema().safeParse(body);
     if (!parsed.success) {
       return answer({ error: app.describeValidationError(parsed.error) }, 400);
     }

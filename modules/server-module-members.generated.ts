@@ -26,7 +26,7 @@ export const serverModuleMembers = {
   evaluator: ["prisma"],
   experiment: [],
   "feature-flag": [],
-  gateway: ["prisma"],
+  gateway: ["clickhouse", "prisma"],
   github: [],
   "hosted-mcp": [],
   identity: ["eventing", "prisma"],

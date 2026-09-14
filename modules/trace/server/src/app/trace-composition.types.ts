@@ -1,4 +1,5 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -20,6 +21,14 @@ import type { TracesTrpcEmitters } from "./trace.app.ts";
 
 export const traceDependencies = {
   annotations: AnnotationApi,
+  /**
+   * The API-key directory the deprecated `/api/trace/*` family resolves its own
+   * project credential through. That family opts out of the framework door
+   * because its refusal bodies predate the framework envelope and a released
+   * SDK parses them, so the door it uses instead is the module's own and needs
+   * the same directory every other door reads.
+   */
+  apiKeys: ApiKeyApi,
   authz: AuthzApi,
   codingAgents: CodingAgentApi,
   dataPrivacy: DataPrivacyApi,

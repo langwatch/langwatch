@@ -1,6 +1,8 @@
 import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-span-ingest.service.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { TraceLegacyCredentialService } from "../services/support/trace-legacy-credential.service.ts";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { LogApi } from "@langwatch/log-contract";
@@ -61,6 +63,12 @@ export type TraceReaderCompositionOptions = {
   annotations: AnnotationApi;
   dataRetention: DataRetentionApi;
   protections: TraceViewerProtectionOptions;
+  /**
+   * The API-key directory the deprecated `/api/trace/*` family's own door
+   * resolves a project credential through. Absent, that family's five
+   * addresses raise by name rather than admitting an unauthenticated caller.
+   */
+  apiKeys?: ApiKeyApi | undefined;
   /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
   filterConditions?:
     | import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions
@@ -195,6 +203,14 @@ export function composeTraceAppDependencies(
     share: options.share,
     broadcast: options.broadcast,
     protections,
+    ...(options.apiKeys
+      ? {
+          legacyCredential: TraceLegacyCredentialService.create({
+            apiKeys: options.apiKeys,
+            authz: options.protections.authz,
+          }),
+        }
+      : {}),
     publicBaseUrl: options.publicBaseUrl,
   };
 }

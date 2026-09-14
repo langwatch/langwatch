@@ -83,6 +83,18 @@ import { traceDependencies } from "./trace-composition.types.ts";
 import { buildTraceCollaborators } from "./trace-composition.build.ts";
 import { composeTraceAppDependencies } from "./trace-read.composition.ts";
 import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
+import {
+  describeTraceLegacyValidationError,
+  traceLegacySearchBodySchema,
+} from "../rules/trace-legacy-search-body.rules.ts";
+import type { TraceLegacyCredentialService } from "../services/support/trace-legacy-credential.service.ts";
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type {
+  TraceLegacyCredential,
+  TraceLegacyReads,
+  TraceLegacySearchFields,
+  TraceLegacyShare,
+} from "../transport/trace-legacy.rest.ts";
 
 const logger = createLogger("langwatch:trace:app");
 
@@ -360,6 +372,13 @@ export interface TraceAppDependencies {
   codingAgents: CodingAgentApi;
   share: ShareApi;
   projects: ProjectApi;
+  /**
+   * The door the deprecated `/api/trace/*` family resolves its own project
+   * credential through. Optional because a process that mounts no REST never
+   * reaches it; `credential` raises by name rather than admitting a caller
+   * when it is absent.
+   */
+  legacyCredential?: TraceLegacyCredentialService;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 }
@@ -1247,5 +1266,68 @@ export class TraceApp implements TraceApi {
     }
 
     return tracePlatformUrl({ publicBaseUrl: this.#dependencies.publicBaseUrl, ...input });
+  }
+
+  // -- the deprecated /api/trace family's own members ----------------------
+  //
+  // `transport/trace-legacy.rest.ts` declares this set; the five addresses it
+  // mounts read nothing else off the application. Every one is a METHOD: a
+  // mounted family reads its application through a proxy that answers callable
+  // operations only, so a property member throws where it is read.
+
+  /**
+   * The project credential that family resolves for itself, and the refusal it
+   * publishes when there is none. Raises rather than refusing when the door was
+   * never composed: a process serving these addresses with no API-key directory
+   * is mis-wired, and answering a caller 401 would hide it.
+   */
+  credential(input: {
+    request: Request;
+    permission: "traces:view" | "traces:share";
+  }): Promise<TraceLegacyCredential> {
+    if (!this.#dependencies.legacyCredential) {
+      throw new Error(
+        "The deprecated trace family asked for a credential, and this process composed Trace without the API-key directory it resolves through",
+      );
+    }
+
+    return this.#dependencies.legacyCredential.resolve(input);
+  }
+
+  /** The four reads those addresses answer from: the application itself. */
+  traces(): TraceLegacyReads {
+    return this;
+  }
+
+  /** The public-link ledger its share pair writes to. */
+  shares(): TraceLegacyShare {
+    return this.#dependencies.share;
+  }
+
+  /**
+   * The API KEY caller's read-time redactions for one project - the same
+   * resolution the v1 family uses, so the two answer one caller alike.
+   */
+  getProtections(
+    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
+  ): Promise<Protections> {
+    const { credential } = input;
+    const scoped = credential.kind === "legacyProjectKey" ? null : credential;
+
+    return this.resolveApiKeyProtections({
+      projectId: input.projectId,
+      apiKeyId: scoped?.apiKeyId ?? null,
+      userId: scoped?.userId ?? null,
+    });
+  }
+
+  /** The body `POST /api/trace/search` accepts, parsed strictly. */
+  searchBodySchema(): z.ZodType<TraceLegacySearchFields, unknown> {
+    return traceLegacySearchBodySchema;
+  }
+
+  /** Renders a schema failure as the one sentence that family answers with. */
+  describeValidationError(error: unknown): string {
+    return describeTraceLegacyValidationError(error);
   }
 }

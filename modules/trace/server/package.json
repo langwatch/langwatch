@@ -75,6 +75,7 @@
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
