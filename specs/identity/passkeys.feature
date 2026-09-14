@@ -309,7 +309,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   Scenario: Removing the last way in is refused
     Given "sam"'s only verified sign-in method is a passkey
     When "sam" tries to remove it
-    Then the refusal carries the code "identity_detach_strands_user"
+    Then the refusal carries the code "LAST_WAY_IN"
     And the screen tells "sam" to add another way in first
     And the passkey still works
 

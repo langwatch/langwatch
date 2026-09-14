@@ -30,6 +30,7 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import {
   AuthRateLimitedError,
   DirectRegistrationUnavailableError,
+  ImpersonationCannotChangeCredentialsError,
 } from "~/server/auth/errors";
 import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
 import { Auth0ApiError } from "~/server/auth0/passwordService";
@@ -66,8 +67,9 @@ function secondsUntil(resetAt: number): number {
  * omission: the session id an operator's request carries is the operator's
  * own, so asking to end every OTHER session of the subject would end the
  * subject's and leave the operator's — the opposite of what the caller means.
- * Password changes should not be reachable while impersonating at all; this is
- * the defensive half of that.
+ * Password writes ARE refused outright while impersonating
+ * (ImpersonationCannotChangeCredentialsError, in both mutations); this null
+ * is the defensive half for any path that reaches a write anyway.
  */
 function sessionToSpare(session: Session): string | null {
   if (session.user.impersonator) return null;
@@ -567,6 +569,16 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx, input }) => {
+      // Refused before anything else: this session's `user` IS the subject
+      // while impersonating, and setFirstPassword demands no proof — so
+      // without this an operator could mint a durable credential on exactly
+      // the SSO-only and passkey-only accounts the procedure exists for.
+      // `sessionToSpare` returning null there is the defensive half of the
+      // same rule; this is the refusal itself.
+      if (ctx.session.user.impersonator) {
+        throw new ImpersonationCannotChangeCredentialsError();
+      }
+
       // The same rules the form ran, from the same module, so the two cannot
       // drift into accepting different passwords.
       const problem = passwordProblem(input.password);
@@ -631,6 +643,15 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx, input }) => {
+      // Same refusal as setPassword, for the same reason. changePassword
+      // does demand the current password, so it is not the open door that
+      // one is — but a support session has no business holding the
+      // subject's password either, and the comment on `sessionToSpare` has
+      // promised this refusal since it was written.
+      if (ctx.session.user.impersonator) {
+        throw new ImpersonationCannotChangeCredentialsError();
+      }
+
       // Resolved provider, not raw env (ADR-027): on a denied SSO deployment
       // the platform gate coerces to email mode, and a user who recovered via
       // the v6 password-reset path owns a `credential` account — they must be

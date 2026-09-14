@@ -2174,6 +2174,20 @@ const presentations = {
     describe: () =>
       "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
   },
+  // better-auth's own codes, thrown by `LastWayInGuard`
+  // (`src/server/better-auth/last-way-in.ts`) on `/passkey/delete-passkey`
+  // and `/two-factor/disable`. See `codes.ts` for why these two are spelled
+  // SCREAMING_CASE rather than our usual snake_case.
+  LAST_WAY_IN: {
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "That is the only way into this account. Add another way to sign in first.",
+  },
+  MFA_REQUIRED_BY_ORGANIZATION: {
+    title: "Your organization requires two-step verification",
+    describe: () =>
+      "Your organization requires two-step verification, so this cannot be removed.",
+  },
   identity_mfa_code_invalid: {
     // Deliberately says nothing about whether two-step verification is even
     // set up on this account. A wrong code and a code for an enrollment
@@ -2364,6 +2378,14 @@ const presentations = {
     title: "Ingestion source not found",
     describe: () =>
       "It may have been archived. Reload to see the current list.",
+  },
+  impersonation_cannot_change_credentials: {
+    // A deliberate denial, like the admin-to-admin impersonation one: how an
+    // account signs in belongs to its owner, and support access must never
+    // mint or replace a credential on it.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. How this account signs in can only be changed by its owner.",
   },
   ingestion_key_not_found: {
     title: "Ingestion key not found",

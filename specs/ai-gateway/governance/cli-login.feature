@@ -170,6 +170,25 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     Then exactly one of them receives the credential
     And the other is told to slow down instead of receiving a second one
 
+  # WHAT THE FENCE COSTS, AND WHERE IT IS PAID. The redemption claim is held
+  # for long enough to cover the whole handout, so releasing it correctly is
+  # the difference between a CLI that retries and one that waits half a minute
+  # for nothing — and between one credential per approval and two.
+
+  @integration
+  Scenario: A refused exchange releases the claim so the CLI can retry
+    Given an approved device code whose exchange cannot be completed yet
+    When the CLI polls and is told the authorization is still pending
+    Then the claim is released rather than held to its timeout
+    And the next poll is answered the same way instead of being told to slow down
+
+  @integration
+  Scenario: A successful exchange keeps its claim until it expires on its own
+    Given a device code that has just been exchanged for its credential
+    When another caller reaches the redemption holding a record it read beforehand
+    Then it is told to slow down rather than handed a second credential
+    And the claim is left to expire on its own, which is what fences that caller out
+
   @unit
   Scenario: An approval that lands during a poll still cuts the next wait short
     Given the CLI has a poll in flight

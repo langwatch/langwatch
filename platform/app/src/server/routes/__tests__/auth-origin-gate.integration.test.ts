@@ -175,6 +175,7 @@ describe("given a dev checkout running on a non-default port", () => {
   });
 
   describe("when the post comes from somewhere else entirely", () => {
+    /** @scenario A cross-site sign-in post reaches no further than the refusal */
     it("is still refused, so the gate has not been weakened", async () => {
       const response = await post(app, "http://evil.example.com");
 

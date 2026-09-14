@@ -411,6 +411,7 @@ describe("the email verification ceremony", () => {
   });
 
   describe("when the same completion is replayed", () => {
+    /** @scenario "A verification proof spends once" */
     it("finds no record the second time: single-use", async () => {
       const { service } = harness();
       const codeVerifier = "verifier";
@@ -435,6 +436,7 @@ describe("the email verification ceremony", () => {
   });
 
   describe("when the link is older than the ceremony's TTL", () => {
+    /** @scenario "A verification proof expires unspent" */
     it("refuses with the expired code, whose remediation is a new link", async () => {
       let clock = 1_000_000;
       const { service } = harness({ now: () => clock });

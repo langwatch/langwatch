@@ -263,6 +263,7 @@ describe("given a sign-up address to confirm", () => {
       });
     });
 
+    /** @scenario "A confirmation link never opens an account it did not create" */
     it("creates nothing when the address gained an account meanwhile", async () => {
       seedLinkCarryingCredential(harness);
       harness.takeAddress();
@@ -314,7 +315,6 @@ describe("given a confirmation link I have already opened", () => {
 
   describe("when the grace window has closed", () => {
     /** @scenario "A spent link stops working once its grace window closes" */
-    /** @scenario Tenant retention never enrolls durable security projections */
     it("says the link expired", async () => {
       harness.advance(SPENT_LINK_GRACE_MS + 1);
 
@@ -324,6 +324,7 @@ describe("given a confirmation link I have already opened", () => {
     });
   });
 
+  /** @scenario "A confirmation link never opens an account it did not create" */
   it("refuses a fresh link for an account already awaiting confirmation", async () => {
     const pending = makeService({ registered: true });
     await pending.service.requestVerification({ email: "sam@acme.com" });

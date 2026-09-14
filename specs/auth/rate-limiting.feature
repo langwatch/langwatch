@@ -37,3 +37,27 @@ Feature: Per-key rate limiting is observable
       When a call is checked against the rate limit
       Then the call is denied
       And the rate-limit-exceeded counter increments for the key's scope
+
+  Rule: Asking for a confirmation link has a budget, per caller and per address
+
+    # The one endpoint a signed-out visitor can use to make us send mail to an
+    # address they have not proved they hold. Two budgets, because the two
+    # abuses are different shapes: a script working through a list of
+    # addresses, and any number of callers turning one stranger's
+    # half-finished sign-up into a way to mail that stranger over and over.
+    # Both refusals stop before the mail is attempted, which is the part that
+    # costs somebody else something.
+
+    @unit
+    Scenario: Asking again and again for a confirmation link stops being answered
+      Given a visitor asking for a confirmation link for a different address every time
+      When that visitor's budget for the hour is spent
+      Then the next request is refused and says how long to wait
+      And no further mail is attempted for it
+
+    @unit
+    Scenario: A stranger's address cannot be mail-bombed through sign-up
+      Given the same unconfirmed address is asked for from a new client each time
+      When that address's budget for the hour is spent
+      Then the next request for it is refused and says how long to wait
+      And no further mail is attempted for that address

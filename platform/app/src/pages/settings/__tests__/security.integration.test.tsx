@@ -263,6 +263,42 @@ describe("<SecuritySettings/>", () => {
       ]);
     });
 
+    /**
+     * The off-state of the deployment setting. The band stands down whole —
+     * offering a Create button with no ceremony endpoint behind it is the one
+     * outcome the gate exists to prevent — and the page is otherwise the page.
+     *
+     * TODO: no tagged scenario states this. `specs/identity/passkeys.feature`
+     * covers the off-state on the sign-in page and the endpoints ("An operator
+     * can turn passkeys off for the whole deployment"), and
+     * `specs/identity/authentication-settings.feature` owns this page's bands
+     * but not the off-state of this one. The scenario that should exist is
+     * "A deployment with passkeys turned off offers no passkey band" in
+     * `specs/identity/authentication-settings.feature`, beside "The page is
+     * four sections, one per subject".
+     */
+    it("leaves the passkeys band out entirely when the deployment turned passkeys off", () => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        MFA_ENROLLMENT_OPEN: true,
+        PASSKEYS_ENABLED: false,
+      };
+      const { container } = renderPage();
+
+      expect(screen.queryByTestId("passkeys-settings-section")).toBeNull();
+      // Absent, not emptied: no heading, no hero, no create offer.
+      expect(screen.queryByText(/passkey/i)).toBeNull();
+      // And the rest of the page is the rest of the page.
+      const sections = Array.from(
+        container.querySelectorAll("[data-testid$='-settings-section']"),
+      ).map((section) => section.getAttribute("data-testid"));
+      expect(sections).toEqual([
+        "email-and-linked-accounts-settings-section",
+        "two-factor-settings-section",
+        "password-settings-section",
+      ]);
+    });
+
     /** @scenario Email addresses and linked accounts sit under one heading */
     it("keeps the addresses, the providers and one action row inside the one band", () => {
       // The connect offer is the method policy's own list now, carried over

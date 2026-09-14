@@ -192,19 +192,18 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the route refuses it with the code "identity_detach_strands_user"
     And the copy the screen would show comes from that code
 
-  # Tagged honestly rather than bound: a passkey has no mirror `Identifier`
-  # row yet. D07 says one is maintained by the fold from the passkey ceremony's
-  # events, and that wiring does not exist — no hook turns
-  # `/passkey/verify-registration` into an attach or `/passkey/delete-passkey`
-  # into a detach, and better-auth's `databaseHooks` cover its own models
-  # rather than a plugin's. So the guard cannot see a passkey to refuse over,
-  # and this route currently deletes the last one. The sibling scenario above
-  # is bound, because the detach route DOES reach the guard.
-  @integration @unimplemented
+  # A passkey has no mirror `Identifier` row, so it never reaches the detach
+  # guard above — but `/passkey/delete-passkey` is refused a different way:
+  # `LastWayInGuard.refuseIfItClosesTheLastDoor` (last-way-in.ts:99-148) runs
+  # on better-auth's `before` hook for this exact path, and the passkey
+  # repository it asks (`passkey-removal.prisma.repository.ts`) answers
+  # "would_strand_user" when nothing else would sign "sam" back in. Proven at
+  # server/better-auth/__tests__/last-way-in-handler.test.ts.
+  @integration
   Scenario: The passkey removal route refuses the last way in the same way
     Given "sam"'s only confirmed sign-in method is a passkey
     When a delete-passkey request reaches the route directly
-    Then the route refuses it with the code "identity_detach_strands_user"
+    Then the route refuses it with the code "LAST_WAY_IN"
     And the passkey still signs "sam" in
 
   # ── The password, on its own ───────────────────────────────────────────

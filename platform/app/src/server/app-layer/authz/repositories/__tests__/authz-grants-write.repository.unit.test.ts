@@ -159,7 +159,10 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
      * so an ADMIN import reassigned to a new custom role would keep answering
      * ADMIN.
      *
-     * @scenario "A reassigned role does not keep the role it was imported with"
+     * No feature scenario names this behavior yet — the annotation here used
+     * to claim "A reassigned role does not keep the role it was imported
+     * with", which exists in no .feature file. Removed rather than bound to
+     * the wrong title.
      */
     it("clears the imported legacy role rather than carrying it", async () => {
       const { repository, prisma } = build();

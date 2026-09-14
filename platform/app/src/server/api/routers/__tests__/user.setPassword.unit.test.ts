@@ -102,17 +102,21 @@ describe("userRouter.setPassword", () => {
         expect.objectContaining({ keepSessionId: "sess-1" }),
       );
     });
+  });
 
-    it("spares nothing while an operator is impersonating", async () => {
-      // The session id in hand is the operator's, so sparing it would sign the
-      // subject out of every device and leave the operator's tab open.
-      await createCaller({ impersonating: true }).setPassword({
-        password: "a-good-password",
+  describe("given an operator is impersonating the account", () => {
+    /** @scenario "An impersonating operator cannot set or change a password" */
+    it("refuses before the credential writer is reached", async () => {
+      await expect(
+        createCaller({ impersonating: true }).setPassword({
+          password: "a-good-password",
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "impersonation_cannot_change_credentials" },
       });
 
-      expect(setFirstPasswordMock).toHaveBeenCalledWith(
-        expect.objectContaining({ keepSessionId: null }),
-      );
+      // The whole point: no credential is minted on the subject.
+      expect(setFirstPasswordMock).not.toHaveBeenCalled();
     });
   });
 

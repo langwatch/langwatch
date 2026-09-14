@@ -8,6 +8,10 @@ Feature: Signing in works on whatever port the app is actually served on
   # which is correct for a cross-site request and wrong for a developer whose
   # checkout simply took a different port.
   #
+  # What that check refuses, and why it refuses rather than guesses, is
+  # specs/auth/auth-origin-pinning.feature. This file is only the case where it
+  # must NOT fire: a checkout on a second port is this installation.
+  #
   # The configured address is written twice: once by the launcher, from the port
   # it is about to bind, and once by the environment file, which is committed
   # with the default port and cannot know about the second checkout. The

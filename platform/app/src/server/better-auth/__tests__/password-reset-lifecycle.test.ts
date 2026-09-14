@@ -18,6 +18,8 @@ vi.mock("../../mailer/resetPasswordEmail", () => ({
 
 import { sendResetPasswordEmail } from "../../mailer/resetPasswordEmail";
 import { emailAndPassword } from "../config/email-and-password";
+import { rateLimit } from "../config/rate-limit";
+import { beforeSessionCreate } from "../hooks";
 import { PasswordResetSessionBridge } from "../password-reset-session";
 import { BetterAuthSessionMinter } from "../session-minter";
 
@@ -38,7 +40,24 @@ function rows(db: MemoryDB, model: string): Record<string, unknown>[] {
   return db[model] ?? [];
 }
 
-function buildHarness() {
+/**
+ * @param sessionGate Wires the production session-create gate (`hooks.ts`) over
+ *   this instance, so the sign-up latch and the deactivation check decide
+ *   whether a session may be opened at all. Off by default: the tests that
+ *   predate it are about the reset itself, and an ungated instance is the
+ *   shorter statement of that.
+ * @param throttled Wires the production rate-limit configuration
+ *   (`config/rate-limit.ts`) so a budget can actually be spent. Off by default
+ *   so the tests above are not counted against the reset endpoint's five an
+ *   hour between them.
+ */
+function buildHarness({
+  sessionGate = false,
+  throttled = false,
+}: {
+  sessionGate?: boolean;
+  throttled?: boolean;
+} = {}) {
   const db: MemoryDB = {
     user: [],
     session: [],
@@ -68,6 +87,44 @@ function buildHarness() {
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
     emailAndPassword: { ...passwordOptions, enabled: true },
+    ...(throttled
+      ? { rateLimit: rateLimit({ hasSecondaryStorage: false }) }
+      : {}),
+    ...(sessionGate
+      ? {
+          databaseHooks: {
+            session: {
+              create: {
+                before: async (session: { userId: string }) => {
+                  const permitted = await beforeSessionCreate({
+                    prisma: {
+                      user: {
+                        findUnique: async () => {
+                          const user = rows(db, "user").find(
+                            (candidate) => candidate.id === session.userId,
+                          );
+                          if (!user) return null;
+
+                          return {
+                            deactivatedAt:
+                              user.deactivatedAt instanceof Date
+                                ? user.deactivatedAt
+                                : null,
+                            signupConfirmationPending:
+                              user.signupConfirmationPending === true,
+                          };
+                        },
+                      },
+                    },
+                    session: { userId: session.userId },
+                  });
+                  return permitted === false ? false : void 0;
+                },
+              },
+            },
+          },
+        }
+      : {}),
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
         await bridge.signInAfterPasswordReset(ctx);
@@ -80,10 +137,14 @@ function buildHarness() {
 
 type Harness = ReturnType<typeof buildHarness>;
 
-function post(path: string, body: Record<string, string>): Request {
+function post(
+  path: string,
+  body: Record<string, string>,
+  headers: Record<string, string> = {},
+): Request {
   return new Request(`http://localhost:3000/api/auth${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -279,6 +340,119 @@ describe("better-auth password reset token lifecycle", () => {
     expect(snapshotCredentialAndSessions(harness)).toEqual(beforeExpiredUse);
     expect((await signIn(harness, email, oldPassword)).status).toBe(200);
     expect((await signIn(harness, email, newPassword)).status).toBe(401);
+  });
+});
+
+/**
+ * RESET IS NOT CONFIRMATION. A sign-up that never proved its address leaves the
+ * account latched shut, and `onPasswordReset` deliberately does not clear that
+ * latch: the row may already hold a credential planted before any mailbox
+ * proof, and a reset proves the mailbox rather than that the account is
+ * anybody's. So the password changes and the door stays closed — which is only
+ * true because the session gate runs for the reset's own mint as well as for a
+ * sign-in.
+ */
+describe("better-auth password reset on an unconfirmed sign-up", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /** @scenario Password reset cannot open a session on an unconfirmed sign-up */
+  it("sets the new password and still opens no session while the latch holds", async () => {
+    const harness = buildHarness({ sessionGate: true });
+    await signUp(harness);
+    const user = rows(harness.db, "user")[0];
+    if (!user) {
+      throw new Error("the sign-up wrote no user row");
+    }
+    user.signupConfirmationPending = true;
+
+    const token = await requestReset(harness);
+    const response = await submitReset({ harness, token });
+
+    // The reset itself succeeds — nothing about it is refused — and it opens
+    // nothing: every session was revoked and the new one was denied at the
+    // gate, so this device leaves with a password and no session.
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(rows(harness.db, "session")).toHaveLength(0);
+
+    // And the account stays shut at the front door too. The credential DID
+    // change, which is the half a reset is allowed to do.
+    const refused = await signIn(harness, email, newPassword);
+    expect(refused.status).toBe(401);
+    await expect(refused.json()).resolves.toMatchObject({
+      code: "FAILED_TO_CREATE_SESSION",
+    });
+    expect((await signIn(harness, email, oldPassword)).status).toBe(401);
+
+    user.signupConfirmationPending = false;
+    expect((await signIn(harness, email, newPassword)).status).toBe(200);
+  });
+});
+
+/**
+ * The cap, spent rather than read off the configuration. A test that asserts
+ * `customRules["/reset-password"]` equals five an hour passes just as well when
+ * the limiter is disabled, the path is misspelled, or the rule is shadowed —
+ * which is how the NextAuth-era `/forget-password` rule matched nothing for a
+ * whole migration. These drive the real endpoints until they are refused.
+ *
+ * Each case uses an address of its own, since better-auth's memory counters are
+ * a process-wide map keyed by caller and path.
+ */
+describe("better-auth password reset rate limit", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const resetRequest = (caller: string) =>
+    post(
+      "/request-password-reset",
+      { email, redirectTo: "/auth/reset-password" },
+      { "x-forwarded-for": caller },
+    );
+
+  /** @scenario Password reset endpoints are rate-limited to five attempts per hour */
+  it("stops answering one caller's reset requests after five in the hour", async () => {
+    const harness = buildHarness({ throttled: true });
+    await signUp(harness);
+    const caller = "203.0.113.11";
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const allowed = await harness.auth.handler(resetRequest(caller));
+      expect(allowed.status).toBe(200);
+    }
+    expect(sendResetPasswordEmail).toHaveBeenCalledTimes(5);
+
+    const refused = await harness.auth.handler(resetRequest(caller));
+
+    expect(refused.status).toBe(429);
+    expect(sendResetPasswordEmail).toHaveBeenCalledTimes(5);
+  });
+
+  /** @scenario Password reset endpoints are rate-limited to five attempts per hour */
+  it("stops accepting one caller's new-password submissions after five in the hour", async () => {
+    const harness = buildHarness({ throttled: true });
+    await signUp(harness);
+    const caller = "203.0.113.12";
+    const guess = (attempt: number) =>
+      harness.bridge.runWithScope(() =>
+        harness.auth.handler(
+          post(
+            "/reset-password",
+            { token: `never-issued-${attempt}`, newPassword },
+            { "x-forwarded-for": caller },
+          ),
+        ),
+      );
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const answered = await guess(attempt);
+      expect(answered.status).toBe(400);
+    }
+
+    expect((await guess(5)).status).toBe(429);
   });
 });
 

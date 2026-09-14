@@ -162,6 +162,22 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When a detach_identifier command is handled for "work"
     Then the Identifier row for "work" remains with state DETACHED and a detachedAt timestamp
 
+  # A backup code is a second step past a way in, never a way in by itself: it
+  # is asked for only once somebody has already been let as far as a challenge,
+  # and no message can be sent to it. So what is LEFT when an identifier is
+  # removed is counted from the identifiers alone, and somebody holding ten
+  # unspent codes and one address still has exactly one way in. Removing the
+  # last identifier for an account with a second factor set up is the case this
+  # would be got wrong in: it looks like an account with two credentials and it
+  # is an account with one.
+  @unit
+  Scenario: Backup codes never count as a way into the account
+    Given "sam" holds one VERIFIED identifier and no other
+    And "sam" has two-step verification enabled with unspent backup codes
+    When a detach_identifier command is handled for that identifier
+    Then the command is refused, because removing it would strand "sam"
+    And no event is emitted, so the identifier still signs them in
+
   @unit
   Scenario: A verification refused because another user holds the address
     Given another user already holds a VERIFIED identifier for "sam.j@acme.com"
@@ -282,6 +298,22 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Given a verification email delivered through a link-scanning gateway
     When the scanner fetches the magic link
     Then the identifier remains unverified and the token remains unconsumed
+
+  # The two ways a proof stops being a proof. A link left in an inbox is the
+  # ordinary one, and the only thing it costs is asking for another; a link
+  # opened twice is the one that matters, because a mailbox somebody else
+  # reaches later must not still carry a working proof.
+  @unit
+  Scenario: A verification proof expires unspent
+    Given a verification link that was never opened
+    When it is opened after the ceremony's lifetime has passed
+    Then the completion is refused as expired, and a fresh link is the way on
+
+  @unit
+  Scenario: A verification proof spends once
+    Given a verification completed with the emailed token and its matching verifier
+    When the identical completion is posted a second time
+    Then the second is refused as invalid, because the proof no longer exists
 
   @unit
   Scenario: The backfill adopts existing accounts and proves itself per user

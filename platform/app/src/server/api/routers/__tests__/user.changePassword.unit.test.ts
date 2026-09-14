@@ -63,10 +63,20 @@ describe("userRouter.changePassword", () => {
     changeFederatedPasswordMock.mockResolvedValue("changed");
   });
 
-  const createCaller = () => {
+  const createCaller = ({
+    impersonating = false,
+  }: {
+    impersonating?: boolean;
+  } = {}) => {
     const ctx = createInnerTRPCContext({
       session: {
-        user: { id: "user-1", email: "sso-born@acme.com" },
+        user: {
+          id: "user-1",
+          email: "sso-born@acme.com",
+          ...(impersonating
+            ? { impersonator: { id: "operator-1", email: "ops@acme.com" } }
+            : {}),
+        },
         sessionId: "sess-1",
         expires: "2099-01-01",
       },
@@ -79,6 +89,24 @@ describe("userRouter.changePassword", () => {
       currentPassword: "current-password",
       newPassword: "brand-new-password-1",
     });
+
+  describe("given an operator is impersonating the account", () => {
+    /** @scenario "An impersonating operator cannot set or change a password" */
+    it("refuses before the credential path is reached", async () => {
+      resolveAuthProviderMock.mockResolvedValue("email");
+
+      await expect(
+        createCaller({ impersonating: true }).changePassword({
+          currentPassword: "current-password",
+          newPassword: "brand-new-password-1",
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "impersonation_cannot_change_credentials" },
+      });
+
+      expect(changePasswordMock).not.toHaveBeenCalled();
+    });
+  });
 
   describe("given a denied SSO deployment coerced to email mode", () => {
     /** @scenario Existing users on an unlicensed deployment self-recover via password reset */

@@ -362,7 +362,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
-  "specs/auth/diagnostic-logging-on-auth-failure.feature",
   "specs/automations/dispatch-timing.feature",
   "specs/automations/notification-templates.feature",
   // ADR-093's design contract, every scenario @unimplemented on purpose: the

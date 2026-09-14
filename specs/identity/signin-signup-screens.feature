@@ -297,6 +297,25 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When a passkey registration is started with it
     Then it is refused before any ceremony begins
     And no system prompt opens for it
+    And an address taken while the ceremony was running is refused again when it finishes
+
+  # The proof is single-use, and both refusals below happen without spending
+  # it — one because there was nothing left to spend, the other because the
+  # address stopped being ours to enroll while the proof was in somebody's
+  # hand. Neither leaves an account behind.
+  @unit
+  Scenario: A spent mailbox proof cannot start a second enrollment
+    Given my address proof was already claimed by an enrollment
+    When a passkey ceremony finishes and offers that proof again
+    Then the enrollment is refused for want of a live proof
+    And no account is created
+
+  @unit
+  Scenario: An address that gained a single sign-on route after its proof is refused without spending anything
+    Given I hold a proof for an address whose domain is now routed to an identity provider
+    When a passkey registration is started with it, and again when the ceremony finishes
+    Then both are refused because this address does not enroll locally
+    And the proof is neither checked nor spent, and no account is created
 
   @integration
   Scenario: A claimed proof whose enrollment failed recovers by email
@@ -704,6 +723,18 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I open a confirmation link that was never issued
     Then the screen says the link expired and offers to send a fresh one
     And the answer never says whether that link was ever issued
+
+  # A link proves an ADDRESS. It never adopts an account, because an account
+  # that appeared after the link was sent may already hold a password or a
+  # passkey somebody else chose — and opening a session on it would hand that
+  # account to whoever happened to be holding the older link.
+  @unit
+  Scenario: A confirmation link never opens an account it did not create
+    Given a confirmation link was sent for an address with no account
+    And an account for that address exists by the time the link is opened
+    When I open the link
+    Then it is refused the way a dead link is, and nothing about that account changes
+    And a link issued for an address whose account was already awaiting confirmation is refused the same way
 
   # The identifier-verification LANDING never spends the link — a mail scanner
   # following it must consume nothing — so it cannot learn that a token is

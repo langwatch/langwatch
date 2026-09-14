@@ -205,6 +205,7 @@ async function callRoute({
 
 describe("BetterAuth last-way request hooks", () => {
   /** @scenario Removing the last way in is refused */
+  /** @scenario The passkey removal route refuses the last way in the same way */
   it("refuses sole passkey deletion before changing memory rows", async () => {
     const harness = buildHarness();
     const { cookie, userId } = await signUpCookie(harness, (status) => {

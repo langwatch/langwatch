@@ -64,6 +64,29 @@ export class NoAddressToConfirmError extends HandledError {
 }
 
 /**
+ * An impersonating operator asked to set or change the subject's password.
+ *
+ * Refused outright: how an account signs in belongs to its owner, and
+ * support access must never mint a credential on it. Without this,
+ * `setPassword` — which exists for accounts holding no password and so
+ * demands no current-password proof — would let an operator create a
+ * durable way into exactly the SSO-only and passkey-only accounts it was
+ * built for.
+ */
+export class ImpersonationCannotChangeCredentialsError extends HandledError {
+  declare readonly code: "impersonation_cannot_change_credentials";
+
+  constructor() {
+    super(
+      "impersonation_cannot_change_credentials",
+      "Credentials cannot be changed while impersonating.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "ImpersonationCannotChangeCredentialsError";
+  }
+}
+
+/**
  * This deployment does not create accounts from a password form: it routes
  * sign-in to an identity provider instead.
  *

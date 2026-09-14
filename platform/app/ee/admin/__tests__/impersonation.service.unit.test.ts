@@ -365,6 +365,7 @@ describe("ImpersonationService", () => {
     });
 
     describe("given the target user does not exist", () => {
+      /** @scenario "An account that does not exist is not impersonated" */
       it("throws UserToImpersonateNotFoundError and leaves the session untouched", async () => {
         const prisma = makePrisma();
         prisma.user.findUnique.mockResolvedValue(null);
@@ -391,6 +392,7 @@ describe("ImpersonationService", () => {
     });
 
     describe("given the target user is deactivated", () => {
+      /** @scenario "A deactivated account cannot be impersonated" */
       it("throws CannotImpersonateDeactivatedUserError with 400 status", async () => {
         const prisma = makePrisma();
         prisma.user.findUnique.mockResolvedValue({
@@ -425,6 +427,7 @@ describe("ImpersonationService", () => {
     });
 
     describe("given the target user is themselves an admin", () => {
+      /** @scenario "An administrator cannot impersonate another administrator" */
       it("throws CannotImpersonateAdminError with 403 status", async () => {
         const prisma = makePrisma();
         prisma.user.findUnique.mockResolvedValue({
@@ -456,6 +459,7 @@ describe("ImpersonationService", () => {
         expect(prisma.session.update).not.toHaveBeenCalled();
       });
 
+      /** @scenario "An administrator cannot impersonate another administrator" */
       it("still refuses when their admin address is only on their identifier", async () => {
         // ADR-101 §5: once a user's backfill is finalized their address lives
         // on the identifier and `User.email` is a stale copy. The session's

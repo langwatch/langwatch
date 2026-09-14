@@ -203,6 +203,7 @@ describe("userRouter.register()", () => {
   });
 
   describe("when no matching mailbox proof is presented", () => {
+    /** @scenario Sign-up proves the address before asking for a credential */
     it("refuses before the credential writer runs", async () => {
       claimAddressProofMock.mockResolvedValue(false);
 

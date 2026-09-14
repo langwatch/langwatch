@@ -20,6 +20,7 @@ function trustedClientKeyPattern(scope: string): RegExp {
 }
 
 describe("public auth rate-limit client identity", () => {
+  /** @scenario "Every public auth entrance resolves its caller the same way" */
   it.each([
     "auth.route",
     "auth.requestSignUpVerification",
@@ -29,12 +30,14 @@ describe("public auth rate-limit client identity", () => {
     expect(routerSource("auth")).toMatch(trustedClientKeyPattern(scope));
   });
 
+  /** @scenario "Every public auth entrance resolves its caller the same way" */
   it("keys user registration on the trusted-proxy-aware client", () => {
     expect(routerSource("user")).toMatch(
       trustedClientKeyPattern("user.register"),
     );
   });
 
+  /** @scenario "Every public auth entrance resolves its caller the same way" */
   it("does not retain direct-peer-only auth call sites", () => {
     expect(routerSource("auth")).not.toContain("getDirectPeerIp");
     expect(routerSource("user")).not.toContain("getDirectPeerIp");

@@ -130,6 +130,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       });
     });
 
+    /** @scenario A passkey is never registered against an address that already has an account */
     it("refuses again after the ceremony, in case it was taken in between", async () => {
       const { ctx } = fakeContext();
       findAddressHolder.mockResolvedValue(signable("someone_else"));
@@ -160,6 +161,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
   });
 
   describe("when the address becomes SSO-routed after mailbox proof", () => {
+    /** @scenario An address that gained a single sign-on route after its proof is refused without spending anything */
     it("refuses both boundaries without spending proof or writing an account", async () => {
       localSignUpIsAllowed.mockResolvedValue(false);
       const { ctx } = fakeContext();
@@ -442,6 +444,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       expect(result.userId).toBe("user_1");
     });
 
+    /** @scenario Signing up with a passkey consumes the verified address proof */
     it("spends the address proof before creating the account", async () => {
       const { ctx } = fakeContext();
 
@@ -460,6 +463,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
       );
     });
 
+    /** @scenario A spent mailbox proof cannot start a second enrollment */
     it("refuses a proof that was spent by another enrollment", async () => {
       const { ctx } = fakeContext();
       claimAddressProof.mockResolvedValue(false);

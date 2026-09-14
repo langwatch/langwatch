@@ -1,12 +1,20 @@
 import {
+  emptyMfaEnrollment,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
   IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   IdentityCommandRefusedError,
+  type MfaEnrollmentState,
+  type MfaFact,
+  type MfaFactInput,
+  reduceMfaEnrollment,
+  remainingBackupCodes,
 } from "@langwatch/identity";
 import { describe, expect, it } from "vitest";
 import { IdentityGuards } from "../guards";
+import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository";
+import { MfaGuards } from "../mfa-guards";
 import {
   ACTOR,
   attachData,
@@ -871,6 +879,116 @@ describe("detachIdentifier strands guard", () => {
       // Nobody could have signed in with it, so removing it takes nothing
       // away — the guard is about ways IN, not about rows.
       expect(await detach(heads, "idf_unverified")).toHaveLength(1);
+    });
+  });
+});
+
+/**
+ * The strands guard, asked about an account that also holds a second factor.
+ *
+ * The enrollment here is REAL — stated by the two-step guards and folded the
+ * way the projection folds them, with codes the consume guard will still spend
+ * — because the invariant is only worth pinning against an account that
+ * genuinely has some. A guard that counted them would read this account as
+ * holding two credentials, and it holds one way in and one extra step past it.
+ */
+describe("detachIdentifier strands guard, given a second factor with unspent backup codes", () => {
+  const ENROLLMENT = "mfaenr_backup";
+
+  /** An ENABLED enrollment holding ten unspent codes, and the guards that
+   *  answer for it, so the test can show the codes are really spendable. */
+  async function enrolledWithBackupCodes(): Promise<{
+    state: MfaEnrollmentState;
+    mfa: MfaGuards;
+  }> {
+    let state = emptyMfaEnrollment({ userId: USER });
+    const enrollments: MfaEnrollmentRepository = {
+      findEnrollment: async () => state,
+      findRequiringOrganizationSlugs: async () => [],
+    };
+    const mfa = new MfaGuards(enrollments);
+    const fold = (facts: MfaFactInput[]) => {
+      state = facts.reduce(
+        (current, fact) =>
+          reduceMfaEnrollment({
+            state: current,
+            fact: { ...fact, occurredAt: T0 } as MfaFact,
+          }),
+        state,
+      );
+    };
+
+    fold(
+      await mfa.enrollMfa({
+        tenantId: USER,
+        userId: USER,
+        commandId: "mfacmd_1",
+        enrollmentId: ENROLLMENT,
+        method: "totp",
+        occurredAtMs: T0,
+        actor: ACTOR,
+      }),
+    );
+    fold(
+      await mfa.confirmMfa({
+        tenantId: USER,
+        userId: USER,
+        commandId: "mfacmd_2",
+        enrollmentId: ENROLLMENT,
+        backupCodeCount: 10,
+        occurredAtMs: T0 + 60_000,
+        actor: ACTOR,
+      }),
+    );
+
+    return { state, mfa };
+  }
+
+  describe("when the account's one verified identifier is removed", () => {
+    /** @scenario "Backup codes never count as a way into the account" */
+    it("is still refused, because a backup code is not a way in", async () => {
+      const { state, mfa } = await enrolledWithBackupCodes();
+
+      // Spendable, not merely recorded: the consume guard accepts one, so
+      // these are codes the account could really use.
+      expect(state.state).toBe("ENABLED");
+      expect(remainingBackupCodes(state)).toBe(10);
+      await expect(
+        mfa.consumeBackupCode({
+          tenantId: USER,
+          userId: USER,
+          commandId: "mfacmd_3",
+          codeIndex: 0,
+          occurredAtMs: T0 + 120_000,
+        }),
+      ).resolves.toHaveLength(1);
+
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(fact({ identifierId: "idf_email", provider: "email" })),
+      );
+
+      const attempt = new IdentityGuards(
+        heads,
+        users,
+        new InMemoryReservations(),
+      ).detachIdentifier({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_d3",
+        identifierId: "idf_email",
+        occurredAtMs: T0 + 5000,
+        actor: ACTOR,
+      });
+
+      await expect(attempt).rejects.toMatchObject({
+        code: "identity_detach_strands_user",
+      });
+      // Refused before any fact exists, so the address still signs them in.
+      expect(heads.heads.get(USER)?.identifiers.idf_email?.state).toBe(
+        "VERIFIED",
+      );
     });
   });
 });

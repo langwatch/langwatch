@@ -112,6 +112,18 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Given the BetterAuth rate-limit configuration
     Then /request-password-reset allows at most 5 attempts per hour
     And /reset-password allows at most 5 attempts per hour
+    And a caller past either number is refused rather than answered
+
+  # A RESET PROVES A MAILBOX, not that a half-created account is anybody's. A
+  # sign-up that never confirmed its address may already hold a credential
+  # planted before any proof arrived, so recovery is not allowed to be the
+  # thing that opens it.
+  @unit
+  Scenario: Password reset cannot open a session on an unconfirmed sign-up
+    Given an account whose sign-up is still waiting for its address to be confirmed
+    When a reset link for that address is opened and a new password submitted
+    Then the password is changed and no session is opened for it
+    And signing in with the new password is still refused until the sign-up is confirmed
 
   # --- Setting the new password (/auth/reset-password) ---
 

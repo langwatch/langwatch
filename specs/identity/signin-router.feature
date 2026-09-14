@@ -131,6 +131,27 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision and its reason code are logged
     And the log carries the domain, never the local part of the address
 
+  # THE BUDGETS ARE THE DEFENCE, since the retirement above means any single
+  # answer tells the asker something. Two of them, because walking a user base
+  # and hounding one address are different shapes of the same abuse: the
+  # per-caller budget is what turns enumeration into months of work, and the
+  # per-address budget is what stops one address being probed from everywhere
+  # at once. Neither number is generous to a script and neither is reachable
+  # by a person signing in.
+  @unit
+  Scenario: Asking about address after address from one place is eventually refused
+    Given a visitor asking the sign-in router about a different address every time
+    When that visitor's budget for the hour is spent
+    Then the next question is refused and says how long to wait
+    And the router is never asked to decide it
+
+  @unit
+  Scenario: One address probed from many places is eventually refused
+    Given the same address is asked about from a new client each time
+    When that address's budget for the hour is spent
+    Then the next question about it is refused and says how long to wait
+    And a question about another address from that same client is still answered
+
   @unit
   Scenario: Auth throttles distinguish callers behind a trusted ingress
     Given two callers reach the auth screen through the same configured trusted proxy
