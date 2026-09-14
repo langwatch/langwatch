@@ -422,6 +422,13 @@ production. Wave 1 ships with, not after:
   org/day/cost_source; any mismatch alerts. This is ADR-034's own
   discipline (its comparator + tripwire flag stayed on after release),
   imported along with its architecture.
+  **Amendment (2026-09-13):** the tripwire is no longer a scheduled job.
+  It is the `costRollupWatch` process manager on the pulled-usage
+  pipeline: a pulled charge marks its day on a per-tenant process and arms
+  one wake at the next 04:23 UTC, and the wake emits one compare intent per
+  marked day through the outbox. The check itself is unchanged — the intent
+  calls the same `CostRollupComparatorService.compareDay`. See the v3.17
+  revision for why.
 - **Puller health surfaced, not just logged**: the thin service joins
   `IngestionSource` status so a day with no rows renders "no data since
   [last successful pull]" — distinct from a genuine $0 day.
@@ -2063,6 +2070,35 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.17 (2026-09-13).** The cost rollup comparator stops being a cron.
+  Its daily check is now driven by the events it checks, on a per-tenant
+  process manager (`costRollupWatch`) mounted on the pulled-usage pipeline.
+  No decision about WHAT is compared changes: the intent calls the same
+  `CostRollupComparatorService.compareDay`, on the same pulled lane, with
+  the same no-self-heal rule.
+  - **Why.** Three reasons, in order of weight. The house rule first: the
+    only drivers are the process wake worker and the outbox, and a calendar
+    entry per governance project was a third one. Then two gaps the cron had
+    on its own terms — it sampled YESTERDAY and only yesterday, so a late
+    correction to an older day was never re-checked, and it fired on every
+    governance project every night whether or not a single charge had landed.
+    Keying the process by the tenant and marking the day each charge falls
+    in closes both: a day that receives a late correction is marked again and
+    re-checked at the next wake, and a tenant with no pulled charges arms no
+    wake at all.
+  - **Mechanism.** A pulled observation or retraction marks its UTC day on
+    the process state and sets `nextWakeAt` to the next 04:23 UTC if no wake
+    is already armed — repeats collapse into that one alarm. The wake emits
+    one `compareDay` outbox intent per marked day, clears the state and
+    disarms. The hour is unchanged and still UTC, for the reason it always
+    was: the rollup buckets days in UTC, and the day has to be closed before
+    anything asks whether its summary is right.
+  - **What goes.** `costRollupComparatorSchedule.ts` and its test, the
+    `governanceCostRollupComparator` scheduler target type, its fire handler,
+    and the boot reconciliation in the composition root. A migration deletes
+    the `ScheduledJob` rows, otherwise the scheduler would claim a slot,
+    find no handler, and warn once a day per tenant forever.
+
 - **v3.16 (2026-09-11).** The metered lane reads the gateway's own
   per-request ledger; the rollup's gateway half is removed. One decision is
   revised: the "one daily rollup" of the one-line summary now holds the pulled
@@ -2082,7 +2118,12 @@ money tables, only the identity tables and read paths.
     compares the pulled lane only (`costRollupComparatorSchedule.ts:67`); an
     active scheduled row for the retired gateway check is switched off at boot
     and never recreated (`:76-86`), and a retired row that fires anyway settles
-    without comparing (`costRollupComparator.service.ts:265`). Gateway rows the
+    without comparing (`costRollupComparator.service.ts:265`).
+    **Amendment (2026-09-13):** v3.17 deletes that module. The pulled-only
+    rule and its tuple now live in `costRollupComparator.service.ts`
+    (`COMPARED_COST_SOURCES`); the boot retirement and the unknown-lane fire
+    have no successor because there are no scheduled rows left to retire or
+    to fire. Gateway rows the
     old fold wrote stay in the rollup; every rollup read carries a pulled-only
     predicate and an integration test proves they count nowhere.
   - **Read side.** `GovernanceGatewaySpendClickHouseRepository` reads
