@@ -202,7 +202,7 @@ export interface ScenarioApi {
   batchArchive(input: {
     projectId: string;
     ids: string[];
-  }): Promise<{ archived: string[]; failed: { id: string; reason: string }[] }>;
+  }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }>;
   moveToTestSuite(input: ScenarioMoveInput): Promise<Scenario>;
   duplicate(
     input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
@@ -248,7 +248,7 @@ export interface ScenarioApi {
   getLastUpdatedAt(input: SimulationLastUpdatedInput): Promise<number>;
   getRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
-  ): Promise<{ runs: SimulationRunData[]; nextCursor: string | null }>;
+  ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }>;
   findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null>;
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number>;
   getBatchHistoryForScenarioSet(

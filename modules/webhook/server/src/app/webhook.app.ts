@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 
 import { WebhookApi, type WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { NO_TOKENS, type FeatureSetup } from "@langwatch/runtime-composition";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
@@ -120,14 +120,9 @@ type WebhookSetup = FeatureSetup<
 
 export class WebhookApp implements WebhookApiContract {
   static readonly contract = WebhookApi;
-  static readonly dependencies = {};
+  static readonly dependencies = NO_TOKENS;
 
-  static create(setup: WebhookSetup): WebhookApp;
-  /** Compatibility construction used by process roots not yet on FeatureSetup. */
-  static create(dependencies: WebhookAppDependencies): WebhookApp;
-  static create(input: WebhookSetup | WebhookAppDependencies): WebhookApp {
-    if (!("repositories" in input)) return new WebhookApp(input);
-
+  static create(input: WebhookSetup): WebhookApp {
     return new WebhookApp({
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
@@ -145,6 +140,13 @@ export class WebhookApp implements WebhookApiContract {
         processStore: input.members.processStore,
       }),
     });
+  }
+
+  /** Compatibility construction used by process roots and tests not yet on
+   *  FeatureSetup — kept off the `create` property itself, since the
+   *  installer requires `create` to carry exactly one call signature. */
+  static fromDependencies(dependencies: WebhookAppDependencies): WebhookApp {
+    return new WebhookApp(dependencies);
   }
 
   readonly #dependencies: WebhookAppDependencies;
@@ -267,7 +269,7 @@ export class WebhookApp implements WebhookApiContract {
   withEntitlement(
     assertEndpointsEntitled: WebhookAppDependencies["assertEndpointsEntitled"],
   ): WebhookApp {
-    return WebhookApp.create({ ...this.#dependencies, assertEndpointsEntitled });
+    return WebhookApp.fromDependencies({ ...this.#dependencies, assertEndpointsEntitled });
   }
 
   /** Endpoint mutation and read. */

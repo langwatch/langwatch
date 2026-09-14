@@ -16,7 +16,7 @@ export interface ScenarioExecutionJob {
   setId: string;
   scenarioName?: string;
   target: {
-    type: "prompt" | "http" | "code" | "workflow" | "connected";
+    type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
     referenceId: string;
   };
   parameters?: RunParameterValues;

@@ -201,7 +201,7 @@ const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = ["prompt", "agent", "c
 /** One target's own metadata, minus the `type` promoted out of it. */
 type PromotedTarget = Readonly<{
   type: ESBatchEvaluationTargetType;
-  metadata: Record<string, unknown> | null;
+  metadata: Record<string, string | number | boolean> | null;
 }>;
 
 /**
@@ -224,6 +224,12 @@ function promoteTargetType(
     throw new Error(
       `Invalid target type '${declared}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
     );
+  }
+
+  if (!metadata) {
+    // Unreachable: `declared` is only a defined string when `metadata` was
+    // truthy and carried its own `type` field.
+    throw new Error(`Invalid target type '${declared}': no metadata to promote it from`);
   }
 
   const { type: _promoted, ...rest } = metadata;

@@ -63,3 +63,10 @@ export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
 export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
 export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.service.ts";
+export {
+  runEvaluatorDefinitionSchema,
+  runEvaluatorFieldSchema,
+  runEvaluatorsSchema,
+  type RunEvaluatorDefinition,
+  type RunEvaluators,
+} from "./scenario-run-evaluators.ts";

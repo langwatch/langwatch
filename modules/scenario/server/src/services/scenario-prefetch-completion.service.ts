@@ -232,6 +232,8 @@ export class ScenarioPrefetchCompletionService {
         return "Connected agent";
       case "http":
         return "HTTP agent";
+      case "voice":
+        return "Voice agent";
     }
   }
 

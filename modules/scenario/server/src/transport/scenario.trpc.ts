@@ -134,7 +134,9 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
     // only their id. Resolved here rather than in the application, because a
     // display name is a concern of this list alone.
     const authorIds = [
-      ...new Set(page.versions.map((version) => version.authorId).filter((id) => !!id)),
+      ...new Set(
+        page.versions.map((version) => version.authorId).filter((id): id is string => !!id),
+      ),
     ];
     const authors = authorIds.length > 0 ? await app.getUserProfiles({ userIds: authorIds }) : [];
     const nameById = new Map(authors.map((author) => [author.id, author.name]));

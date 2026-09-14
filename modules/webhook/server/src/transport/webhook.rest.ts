@@ -138,23 +138,8 @@ const eventsQuerySchema = z
 const endpointIdParams = z.object({ id: z.string().min(1) });
 
 function endpointResponse(endpoint: WebhookEndpointView) {
-  return {
+  const common = {
     id: endpoint.id,
-    destination_kind: endpoint.destinationKind,
-    /** Null on every endpoint that is not an HTTPS one. */
-    url: endpoint.url,
-    sqs: endpoint.sqs
-      ? {
-          queue_url: endpoint.sqs.queueUrl,
-          region: endpoint.sqs.region,
-          account_id: endpoint.sqs.accountId,
-          queue_name: endpoint.sqs.queueName,
-          credential_mode: endpoint.sqs.credentialMode,
-          role_arn: endpoint.sqs.roleArn,
-          external_id: endpoint.sqs.externalId,
-          access_key_id: endpoint.sqs.accessKeyId,
-        }
-      : null,
     enabled_events: endpoint.enabledEvents,
     status: toWireEnum(endpoint.status),
     disabled_reason: endpoint.disabledReason,
@@ -167,6 +152,37 @@ function endpointResponse(endpoint: WebhookEndpointView) {
     max_in_flight: endpoint.maxInFlight,
     created_at: endpoint.createdAt.toISOString(),
     updated_at: endpoint.updatedAt.toISOString(),
+  };
+
+  if (endpoint.destinationKind === "sqs") {
+    if (!endpoint.sqs) {
+      throw new Error(`sqs endpoint ${endpoint.id} is missing its sqs destination`);
+    }
+    return {
+      ...common,
+      destination_kind: "sqs" as const,
+      url: null,
+      sqs: {
+        queue_url: endpoint.sqs.queueUrl,
+        region: endpoint.sqs.region,
+        account_id: endpoint.sqs.accountId,
+        queue_name: endpoint.sqs.queueName,
+        credential_mode: endpoint.sqs.credentialMode,
+        role_arn: endpoint.sqs.roleArn,
+        external_id: endpoint.sqs.externalId,
+        access_key_id: endpoint.sqs.accessKeyId,
+      },
+    };
+  }
+
+  if (!endpoint.url) {
+    throw new Error(`http endpoint ${endpoint.id} is missing its url`);
+  }
+  return {
+    ...common,
+    destination_kind: "http" as const,
+    url: endpoint.url,
+    sqs: null,
   };
 }
 

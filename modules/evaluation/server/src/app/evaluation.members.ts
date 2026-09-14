@@ -1,10 +1,26 @@
-import type { AVAILABLE_EVALUATORS, EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type {
+  AVAILABLE_EVALUATORS,
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
 import type {
   ExecuteEvaluationCommand,
   EvaluationExecutionResult,
   ExecuteEvaluationCommandData,
   EvaluationProcessingEvent,
+  CustomEvaluator,
+  RunTraceEvaluationInput,
+  EvaluationRunOutcome,
+  ReportEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
+import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import type {
+  Trace,
+  Span,
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  EvaluationTraceEvent,
+} from "@langwatch/trace-contract";
 export interface EvaluationInfrastructure {  evaluationCustomEvaluators: EvaluationCustomEvaluators;
   evaluationExecutionTelemetry: EvaluationExecutionTelemetry;
   evaluationInstallEnvironment: EvaluationInstallEnvironment;

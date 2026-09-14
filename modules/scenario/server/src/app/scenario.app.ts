@@ -66,7 +66,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
-import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput } from "@langwatch/scenario-contract";
+import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput, TargetAdapterData, LiteLLMParams } from "@langwatch/scenario-contract";
+import type { AgentAdapter } from "@langwatch/scenario";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
@@ -78,9 +79,6 @@ import type {
 import type { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import type { ScenarioId, ScenarioTestSuiteId } from "./scenario.app.ts";
-import type { ScenarioClock } from "./scenario.app.ts";
-import type { ScenarioSecretCipher } from "./scenario.app.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
 import type { Logger } from "@langwatch/observability";

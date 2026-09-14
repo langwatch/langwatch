@@ -90,6 +90,9 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
           logger: input.logger,
         });
       }
+      case "voice":
+        // No serialized voice adapter exists yet; see voice-agent.adapter.ts.
+        throw new Error("Voice adapter is not yet implemented");
     }
   }
 }

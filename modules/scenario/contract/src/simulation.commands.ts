@@ -23,7 +23,7 @@ export const simulationQueueRunSchema = simulationRunIdentitySchema
     secretParameters: z.record(z.string(), z.string()).optional(),
     target: z
       .object({
-        type: z.enum(["prompt", "http", "code", "workflow"]),
+        type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
         referenceId: z.string(),
       })
       .optional(),

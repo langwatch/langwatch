@@ -189,6 +189,8 @@ function buildSimulationProcessingProducerPipeline(input: { processName: string 
         Promise.reject(producerOnly(processName, "record a suite run item start")),
       completeSuiteRunItem: () =>
         Promise.reject(producerOnly(processName, "complete a suite run item")),
+      regradeSuiteRunItem: () =>
+        Promise.reject(producerOnly(processName, "regrade a suite run item")),
     },
     traceMetricsSync: {
       computeRunMetrics: () =>

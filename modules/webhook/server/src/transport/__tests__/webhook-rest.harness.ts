@@ -63,7 +63,7 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
 
 /** The family over one `WebhookAppDependencies` cut the test supplies. */
 export function mountWebhookRest(dependencies: Partial<WebhookAppDependencies> = {}) {
-  const app = WebhookApp.create({ ...unreachableDependencies(), ...dependencies });
+  const app = WebhookApp.fromDependencies({ ...unreachableDependencies(), ...dependencies });
 
   const runtime = createRestRuntime({
     identity: {

@@ -14,6 +14,7 @@ import {
   type EvaluationExecutionTelemetry,
   type LangevalsEvaluateParams,
 } from "../app/evaluation.members.ts";
+import { NullLangevalsEvaluatorClient } from "./null.langevals-evaluator.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 

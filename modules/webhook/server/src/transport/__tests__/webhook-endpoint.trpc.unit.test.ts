@@ -92,7 +92,7 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
   // that the tests below call reaches them. They throw rather than answering so
   // a future procedure that does reach one fails loudly here instead of passing
   // against a silent stub.
-  const app = WebhookApp.create({
+  const app = WebhookApp.fromDependencies({
     endpoints,
     health: {
       health: () => {
