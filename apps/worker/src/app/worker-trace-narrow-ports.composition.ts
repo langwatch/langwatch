@@ -13,38 +13,8 @@ import {
 } from "@langwatch/trace-server";
 
 /**
- * The four reads and writes the trace-ingestion subscribers make into other
- * features, each as the narrow port Trace declares.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * every one of these subscribers — so nothing in this process reads a monitor
- * or writes a project flag yet. What has to be true today is that this
- * composition root CAN answer all four from published services, without
- * building the fourteen-method `ProjectApi`, the fourteen-method
- * `MonitorService` or the whole `ModelProviderApi` graph first. That is
- * exactly what blocked the conversion: the subscribers named the services, so
- * a process that wanted one capability had to be able to build all of them.
- *
- * WHAT EACH PARAMETER ASKS FOR IS NOW WHAT EACH ADAPTER CALLS, spelled out
- * below rather than named as a whole service. `ProjectApi`,
- * `MonitorService` and `ModelProviderApi` each satisfy their parameter,
- * and so do the read-side services their own features publish
- * (`ProjectMetadataService`, `MonitorCatalogService`,
- * `ModelCostCatalogService`) — which is what `createWorkerTraceCapabilityServices`
- * composes and what makes this reachable from a process with a database and
- * nothing else.
- *
- * Each adapter is a rename and nothing else. The published services satisfy the
- * ports structurally — the method names and signatures are identical — so these
- * classes exist to make the direction of the dependency explicit and to give
- * the composition a place to narrow, not to translate anything.
- *
- * THE FOURTH IS SUPPLIED, NOT DEFAULTED. `first_trace_integrated` goes to
- * PostHog in the application and now goes to PostHog from here too; the sink is
- * a required argument because the only thing this composition could default to
- * is a sink that does not deliver, and a caller who forgot to pass one would
- * get silence that reads exactly like a deployment with no key. Compose it with
- * `createWorkerTraceProductAnalytics`.
+ * Staged but not mounted; answers the four subscriber ports from published
+ * read-side services.
  */
 export function createWorkerTraceNarrowPorts(options: {
   projects: TraceProjectMetadataReader;

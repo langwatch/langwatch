@@ -13,49 +13,8 @@ import {
 } from "@langwatch/project-server";
 
 /**
- * The four capability services `command:recordSpan` and its subscribers read
- * through: three composed from the one Prisma client this process opened, and
- * the privacy resolution taken from the Data Privacy application it booted.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `EventingRecordSpanAdapter` and all fifteen subscribers — so nothing in this process
- * reads a project or a policy yet. What has to be true today is that this
- * composition root CAN build all four from a database and nothing else. That
- * was the halt: the four staged record-time compositions each took a capability
- * service by parameter and NONE of the six was constructible here.
- *
- * WHAT CHANGED, AND WHY IT IS NOT A LOOPHOLE. The wall was never the reads —
- * it was the writes standing behind them. `ProjectApi` requires a
- * credentials port and an `OrganizationService` because `create` mints an
- * ingestion key and `ensureInternal` resolves a team; `DataPrivacyApi`
- * requires an organization directory because `setForScope` has to decide which
- * organization a team scope belongs to; `ModelProviderApi` requires nine
- * collaborators including an `AuthzService` because writing a cost authorizes
- * a scope; `MonitorService` requires an `EvaluatorApi` because creating a
- * monitor resolves the evaluator behind it. Ingestion creates no project,
- * writes no policy, authors no cost and creates no monitor. Each feature now
- * publishes the read half as its own service and composes the wide service on
- * top of it, so both processes answer from one implementation and this one
- * stops building a write graph it never uses.
- *
- * THE COMPLETE REACH, which is what makes the split honest rather than
- * convenient:
- *
- *     ProjectMetadataService        findById, findWithTeam, getWithTeam,
- *                                   updateMetadata, resolveOrgAdmin
- *     DataPrivacyResolution     getResolvedForProject
- *     ModelCostCatalogService       listCosts
- *     MonitorApi                    getEnabledOnMessageMonitors
- *
- * Eight operations over three Prisma models and one booted application. Nothing
- * here opens a connection, reads an environment or chooses a gateway.
- *
- * WHAT IS DELIBERATELY NOT HERE. `FeatureFlagApi` and `AnalyticsService`
- * are the other two services the record path names, and neither was ever the
- * blocker — one is a database, a cache, a config and a clock, the other is
- * `AnalyticsAdapter` over the ClickHouse resolver this process already holds.
- * They arrive with the conversion, which is when this process gains a reason
- * to open either.
+ * Staged but not mounted; the four capability services are now composable from
+ * database.
  */
 export function createWorkerTraceCapabilityServices(options: {
   database: WorkerTraceCapabilityDatabase;

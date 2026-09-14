@@ -6,37 +6,12 @@ import type { OtlpSpan } from "@langwatch/trace-contract";
 import { type TraceSpanContentDrop, type TraceSpanContentDropResult } from "@langwatch/trace-server";
 
 /**
- * The content this process would refuse to store for a project that asked for
- * a category to be dropped.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `EventingRecordSpanAdapter`'s adapters and still drops content on every span it
- * ingests — so nothing in this process drops anything yet. What has to be true
- * today is that this composition root CAN build the path from what it already
- * holds: the scoped data-privacy service and the enforcement flag it already
- * reads for redaction. That is the whole dependency list.
- *
- *     TraceSpanContentDrop             (trace-server declares it)
- *       └─ OtlpSpanContentDropService      (data-privacy-server owns it)
- *            ├─ ContentDropPolicyService   policy → keys, roles, matchers
- *            ├─ CONTENT_KEY_CATALOG        (data-privacy-contract owns it)
- *            └─ DataPrivacyResolution  resolves the scope's policy
- *
- * SEPARATE FROM THE REDACTION COMPOSITION ON PURPOSE, even though both rest on
- * the same policy source: a drop removes a whole attribute and a redaction
- * rewrites one, they fail independently, and a process that can resolve a
- * policy but has no analysis transport should still be able to honour a
- * customer's `drop`.
+ * Staged but not mounted; builds the content-drop path from data-privacy
+ * resolution.
  */
 export function createWorkerTraceContentDrop(options: {
   /**
-   * Resolves the scope's policy.
-   *
-   * The port and not the whole `DataPrivacyService`: a drop reads a policy and
-   * never writes one, and writing is what puts an `OrganizationService` behind
-   * the service. `DataPrivacyService` satisfies this, and so does the
-   * resolution-only service the feature publishes for a process that holds a
-   * database and nothing else.
+   * The port, not the whole DataPrivacyService; drop reads policy only.
    */
   dataPrivacy: DataPrivacyResolution;
   nativePolicyEnforced: boolean;

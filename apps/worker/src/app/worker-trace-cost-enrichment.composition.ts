@@ -5,33 +5,7 @@ import {
 } from "@langwatch/trace-server";
 
 /**
- * The rates this process would stamp on a span whose model a customer has
- * priced themselves.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `EventingRecordSpanAdapter`'s adapters and still enriches every span it ingests — so
- * nothing in this process prices anything yet. What has to be true today is
- * that this composition root CAN build the path from what it already holds:
- * the model-cost catalog port, which `createWorkerTraceNarrowPorts` already
- * answers from a published `ModelProviderApi`. That is the whole
- * dependency list — no Prisma client, no scope resolver, no static registry.
- *
- *     TraceSpanCostEnrichment          (trace-server declares it)
- *       └─ OtlpSpanCostEnrichmentService   (trace-server owns it)
- *            ├─ matchModelCost             (model-provider-contract owns it)
- *            └─ TraceModelCostCatalog  the project's own cost rules
- *                 └─ ModelProviderApi  scope cascade, three tiers
- *
- * The catalog port is taken rather than built here, because the four-port
- * composition already renames `listCosts` onto it; a second adapter doing the
- * same rename would be a second place for the two to disagree.
- *
- * THE MATCHER IS SHARED, NOT COPIED. The cascade that decides which of a
- * customer's rules prices a span already existed in
- * `@langwatch/model-provider-contract`, private, serving the fold's own cost
- * estimate. Record-time enrichment now calls the same exported function. Two
- * copies would have been two answers to "which rule wins", and the
- * disagreement would show up only as a bill.
+ * Staged but not mounted; uses the model-cost catalog. The matcher is shared.
  */
 export function createWorkerTraceCostEnrichment(options: {
   modelCosts: TraceModelCostCatalog;

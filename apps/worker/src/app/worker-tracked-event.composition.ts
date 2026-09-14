@@ -14,34 +14,8 @@ import {
 } from "@langwatch/trace-server";
 
 /**
- * Live span feedback (`langwatch.event`) recorded as a tracked event, on the
- * same path the REST `POST /api/events/track` handler takes.
- *
- * THE TWO PATHS MUST STAY ONE. An SDK that reports a thumbs-up on a span and a
- * customer that POSTs the same rating produce the same row, because both mint a
- * span whose id is a digest of `${trace_id}:${eventId}` and send it through
- * `recordSpan`. That is why this composes the packaged builder rather than
- * writing the span here: a second encoding of the same event is a second answer
- * to "what did this customer rate", and nothing in the fold could tell them
- * apart.
- *
- * WHY IT NEEDED A CONVERSION AT ALL. The builder's last line dispatched through
- * `getApp()` — the process-wide singleton — so nothing outside the application
- * could run it. The dispatch target underneath was already this package's own
- * span collection, so the harvest gave this process a builder it can hand its
- * OWN collection to.
- *
- *     trackedEventSyncHandler                (trace-server owns the subscriber)
- *       └─ TrackedEventSpanService           the harvested builder
- *            └─ TraceSpanCollectionService   dedup + the one command handoff
- *                 ├─ WorkerTraceSpanDedupAdapter   this process's Redis, or none
- *                 └─ WorkerTraceIngressCommandAdapter
- *                      └─ the registered `recordSpan` command
- *
- * THE COMMAND IS LATE-BOUND, and it has to be: the handler is part of the
- * pipeline DEFINITION, and the command only exists once that definition has
- * been registered. The proxy is resolved during installation, which completes
- * before the consumer claims its first job.
+ * Live span feedback recorded via the REST handler path. The two paths must
+ * stay one.
  */
 export type WorkerTrackedEventComposition = {
   /** The `trackedEventSync` subscriber handler, ready to register. */
@@ -95,18 +69,8 @@ const PROCESSING_TTL_SECONDS = 60;
 const CONFIRMED_TTL_SECONDS = 3600;
 
 /**
- * Best-effort span deduplication, on the same Redis keys the application uses.
- *
- * FROZEN TWIN of `platform/app/src/server/app-layer/traces/span-dedupe.service.ts`,
- * and the key format is the reason: while both graphs ingest, the same span may
- * be claimed by either process, and a prefix or separator spelled differently
- * here would give this process its own keyspace — so a span exported twice
- * would be recorded twice, once by each graph.
- *
- * DEDUP NEVER BLOCKS INGESTION. The claim answers `null` when Redis is
- * unreachable and the caller ingests anyway, because losing a cache is not a
- * reason to lose a customer's span; the other two operations report and
- * continue, because failing to tidy up after one span must not fail the span.
+ * Best-effort span deduplication on shared Redis keys. Dedup never blocks
+ * ingestion.
  */
 export function createWorkerTraceSpanDedup(options: {
   redis?: RedisConnection | null;

@@ -15,31 +15,8 @@ import {
 } from "../platform/infrastructure/worker-trace-spool.adapter.ts";
 
 /**
- * The ADR-022 claim check this process would resolve an oversized span through.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `EventingRecordSpanAdapter`'s adapters and still resolves every spooled span it
- * ingests — so nothing in this process reads a spool object yet. What has to be
- * true today is that this composition root CAN build both halves of the claim
- * check from substrates it already holds: the stored-objects runtime the
- * private-infrastructure root already constructs, the AWS client runtime beside
- * it, the tenant-keyed ClickHouse client the event store resolves through, and
- * one new boolean the operator sets on Azure.
- *
- * The two halves are independent and are deliberately composed separately:
- *
- *     TraceSpanSpool                (trace-server declares it)
- *       └─ TraceSpoolService            re-derives the object path from the
- *            └─ TraceSpoolStorage     command's own trusted ids, never
- *                 └─ stored objects       from the reference it carries
- *
- *     TracePayloadReaderRepository            (trace-server declares it)
- *       └─ event_log SELECT             TenantId first, EventId-derived
- *            └─ ClickHouse                partition window, absence -> null
- *
- * The spool is transient and the event log is durable; a process that can read
- * one and not the other still ingests, which is why neither factory requires
- * the other's dependencies.
+ * Staged but not mounted; builds the claim check from stored objects, AWS, and
+ * ClickHouse.
  */
 export function createWorkerTraceSpool(options: {
   runtime: StoredObjectStorageRuntimeAdapter;

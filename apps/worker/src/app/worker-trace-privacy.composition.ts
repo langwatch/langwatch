@@ -13,29 +13,8 @@ import { WorkerPiiAnalysisAdapter } from "../platform/infrastructure/worker-pii-
 import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.ts";
 
 /**
- * The PII redaction this process would scrub an incoming span with.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `EventingRecordSpanAdapter`'s adapters and still redacts every span it ingests — so
- * nothing in this process redacts anything yet. What has to be true today is
- * that this composition root CAN build the whole path from what it already
- * holds: the four privacy variables it now reads, the scoped data-privacy
- * service, and the feature-flag service. That is the entire dependency list.
- *
- * The graph it builds, top to bottom:
- *
- *     TraceSpanPiiRedaction            (trace-server declares it)
- *       └─ OtlpSpanPiiRedactionService     (data-privacy-server owns it)
- *            ├─ DataPrivacyResolution  resolves the scope's policy
- *            ├─ @langwatch/redaction       the native secrets + PII floor
- *            └─ PiiAnalysis            names + locations, out of process
- *                 └─ WorkerPiiAnalysisAdapter   Presidio, Google DLP fallback
- *
- * WHAT IS DELIBERATELY NOT HERE. The service's log and metric halves were not
- * harvested: `LogRedaction` and `MetricRedaction` belong to the log
- * and metric conversions, and the trace conversion reaches this graph through
- * `redact` alone. When those convert, they compose the same service and the
- * same transport rather than a second copy of either.
+ * Staged but not mounted; builds the PII redaction from config, data-privacy,
+ * and Presidio.
  */
 export function createWorkerTracePrivacy(options: {
   config: WorkerTracePrivacyConfig;

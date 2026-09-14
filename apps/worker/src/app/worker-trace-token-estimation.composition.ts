@@ -8,26 +8,8 @@ import { WorkerTiktokenCounterAdapter } from "../platform/infrastructure/worker-
 import type { WorkerTraceTokenizerConfig } from "../platform/config/worker.config.ts";
 
 /**
- * The token counts this process would stamp on a span that arrived without any.
- *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
- * `EventingRecordSpanAdapter`'s adapters and still estimates every LLM span it ingests
- * — so nothing in this process counts a token yet. What has to be true today is
- * that this composition root CAN build the path from what it already holds: the
- * two tokenizer variables it now reads and the feature-flag service. That is
- * the whole dependency list.
- *
- *     TraceSpanTokenEstimation         (trace-server declares it)
- *       └─ OtlpSpanTokenEstimationService  (trace-server owns it)
- *            ├─ FeatureFlagApi         the two kill switches
- *            └─ TraceTokenCounter      the encoding tables
- *                 └─ WorkerTiktokenCounterAdapter   tiktoken, local BPE first
- *
- * The two kill switches are the reason the feature-flag service is a hard
- * dependency rather than an option: `token-estimation-killswitch` and
- * `token-estimation-project-killswitch` are how an operator stops estimation
- * without a deploy, and a process that could not read them would keep
- * estimating after the switch was thrown.
+ * Staged but not mounted; builds the token-estimation from tokenizer and
+ * feature flags.
  */
 export function createWorkerTraceTokenEstimation(options: {
   config: WorkerTraceTokenizerConfig;

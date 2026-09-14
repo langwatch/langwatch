@@ -158,14 +158,8 @@ export async function createWorkerObservabilityApps(
         environment: options.config.infrastructure.modelProvider.environment,
       },
       /**
-       * This process is Trace's PROCESSING role, not its producer one: the
-       * install phase below registers Trace's complete `trace_processing`
-       * definition, so composing the producer registration here as well would
-       * be a second registration of one name - which the runtime refuses.
-       * Trace's commands resolve off that one registration instead.
-       *
-       * `processName` is this process's own, so a capability Trace refuses on
-       * the worker names the worker rather than the api.
+       * This is Trace's PROCESSING role; processName names the worker to avoid
+       * duplicate registration.
        */
       trace: { processName: options.config.serviceName, registersProcessingPipeline: false },
     },

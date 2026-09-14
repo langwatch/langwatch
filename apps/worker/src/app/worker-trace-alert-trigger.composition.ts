@@ -26,40 +26,8 @@ import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-co
 import { passesTraceOriginGuards } from "@langwatch/trace-server";
 
 /**
- * The trace-alert half of `reactor:triggerMatch`, composed in this process.
- *
- * WHAT THIS KEY DOES, because "trigger match" understates it: for every trace
- * that lands, it asks which of the project's automations watch traces and
- * writes one durable MATCH per automation. The settlement process manager
- * downstream turns those matches into the customer's alert — one mail per
- * window rather than one per trace. A process that mounted the trace pipeline
- * without this key would route every other kind of trace work and silently stop
- * every alert a customer had configured.
- *
- *     triggerMatchHandler
- *       └─ TraceAlertTriggerMatchSubscriber   (enterprise governance owns it)
- *            ├─ TraceAlertOriginGuard         packaged `passesTraceOriginGuards`
- *            ├─ TraceAlertTriggerReader       the project's trace automations
- *            │    └─ AutomationTraceTriggerCatalogue   one cached read
- *            ├─ TraceAlertTriggerMatch    one durable match
- *            │    └─ the installer's `recordTriggerMatch` proxy
- *            └─ TraceAlertMetrics         the fleet's match counter
- *
- * THREE BLOCKERS ARE CLEARED HERE, and each was a different kind. The catalogue
- * read was `AutomationService`, whose constructor asks for twelve collaborators
- * because its WRITE half needs them; it is now one narrow port. The match write
- * was the automation pipeline's own command, which this process already
- * publishes as a late-bound recorder. And the subscriber itself lived behind an
- * application-private runtime class; it is composed from the governance
- * package directly, so nothing here needs the application's error sink or its
- * prom-client registry.
- *
- * THE ACTION CLASSIFICATION IS THE FEATURE'S OWN. `notify` and `persist` decide
- * whether settlement debounces the match into a window or writes it through
- * immediately, and the set that splits them is `NOTIFY_TRIGGER_ACTIONS` from
- * the automation contract rather than a list repeated here — a fourth notify
- * action added upstream would otherwise be classified as a persist and fire on
- * every single trace.
+ * For every trace, asks which automations watch and writes one MATCH per
+ * automation. Key blockers are now cleared.
  */
 export function createWorkerTraceAlertTriggerHandler(options: {
   triggers: AutomationTraceTriggerCatalogue;
@@ -105,16 +73,8 @@ class WorkerTraceAlertTriggerAdapter implements TraceAlertTriggerReader {
 }
 
 /**
- * Writes one durable match through the automation pipeline's own command.
- *
- * THE TWO CASTS ARE A ROUND TRIP, not a widening. `action` and
- * `notificationCadence` leave the automation contract as literal unions,
- * cross the governance port as `string` — the port is written that way because
- * governance must not depend on Automation's vocabulary — and arrive back at
- * Automation's own command, which names the unions again. The values are the
- * ones `activeForProject` read off the project's own rows a few lines above,
- * so nothing unvalidated enters here; what is restored is the type the value
- * never stopped having.
+ * Writes one durable match; the casts round-trip validated values through the
+ * port.
  */
 class WorkerTraceAlertTriggerMatchAdapter implements TraceAlertTriggerMatchChannel {
   constructor(private readonly matches: AutomationTriggerMatchRecorder) {}

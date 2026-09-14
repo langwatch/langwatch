@@ -21,23 +21,8 @@ export type WorkerStandaloneExecutableOptions = Readonly<{
 }>;
 
 /**
- * The physical worker executable: one table of what this process is made of.
- *
- *   source      the process's environment, read once and validated once
- *   composition {@link WorkerStandaloneComposition} — the production graph,
- *               which opens its own Postgres, ClickHouse, Redis, AWS and
- *               stored-object runtimes and mounts the complete job registry
- *   signals     SIGTERM and SIGINT, the shutdown deadline, and the exit status
- *               each one produces — all `WorkerExecutable`'s
- *
- * A configuration failure throws out of `boot` before observability or the
- * resource scope exist, which is what makes a misconfigured worker refuse to
- * start rather than come up green with every job failing individually. The
- * failure is written where an operator reads it, and the exit status is
- * non-zero.
- *
- * It imports no legacy application graph, so it cannot start a partial second
- * copy of the platform process.
+ * The standalone worker: configuration, production graph, and signals. Config
+ * failures throw early before observability exists.
  */
 export async function startStandaloneWorker(
   options: WorkerStandaloneExecutableOptions = {},
