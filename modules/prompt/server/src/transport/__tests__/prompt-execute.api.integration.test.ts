@@ -9,53 +9,27 @@
  *
  * @see specs/prompts/playground-conversation.feature
  */
-import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServiceMembers,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { PROMPT_EXECUTE_ENDPOINT } from "@langwatch/prompt-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
+import type { ErrorHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  createPromptExecuteRestApp,
+  promptExecuteRest,
+  promptExecuteRestMembers,
   type PromptExecuteRestMembers,
   type PromptExecuteRestSession,
 } from "../prompt-execute.api.ts";
 
-/** Hono's own refusal wins; anything else degrades to the generic unknown. */
+/** Every handled refusal wins by its own status; anything else is the generic unknown. */
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
-  if (error instanceof HTTPException) return error.getResponse();
   if (error instanceof Error && "httpStatus" in error) {
     const handled = error as Error & { httpStatus: number; code: string };
     return c.json({ code: handled.code }, handled.httpStatus as 403);
   }
   return c.json({ error: "Internal Server Error" }, 500);
 };
-
-function testSecurity(): AppRestSecurity {
-  const pass: MiddlewareHandler = async (_c, next) => next();
-  const ports: RestApiServiceMembers = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => pass,
-    authorizeProjectPermission: () => pass,
-    authorizeApiKeyCeiling: () => pass,
-    authenticateOrganization: () => pass,
-    authorizeOrganizationPermission: () => pass,
-    authorizeRouteTeamPermission: () => pass,
-    authorizeRouteProjectPermission: () => pass,
-    authenticateOrganizationThrowing: pass,
-    authorizeOrganizationPermissionThrowing: () => pass,
-  };
-  return createAppRestSecurity(ports);
-}
 
 /** The smallest form the wire schema accepts. */
 const formValues = {
@@ -86,7 +60,7 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     onEvent({ type: "done" });
   });
 
-  const ports = {
+  const members = {
     isAllowedOrigin,
     resolveSession,
     probeProjectPermission,
@@ -97,13 +71,21 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     ...overrides,
   } as unknown as PromptExecuteRestMembers<PromptExecuteRestSession>;
 
-  const app = createPromptExecuteRestApp<PromptExecuteRestSession>({
-    security: testSecurity(),
-    ports,
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: null }),
+      identify: () => ({ actor: null, scope: null }),
+    },
+  });
+
+  const hono = runtime.mount(promptExecuteRest.router(), {
+    app: () => ({}) as never,
+    onError: boundaryErrorHandler,
+    facts: [bindRestMiddleware(promptExecuteRestMembers, () => members)],
   });
 
   const execute = (body: Record<string, unknown> = {}) =>
-    app.request(PROMPT_EXECUTE_ENDPOINT, {
+    hono.request(`http://api.test${PROMPT_EXECUTE_ENDPOINT}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -116,7 +98,7 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     });
 
   return {
-    app,
+    hono,
     execute,
     isAllowedOrigin,
     resolveSession,
@@ -223,9 +205,9 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the version segment is unknown", () => {
     it("answers 404 instead of falling through", async () => {
-      const { app } = buildApi();
+      const { hono } = buildApi();
 
-      const response = await app.request("/api/prompt-playground/2000-01-01/prompt.execute", {
+      const response = await hono.request("http://api.test/api/prompt-playground/2000-01-01/prompt.execute", {
         method: "POST",
       });
 

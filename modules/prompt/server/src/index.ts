@@ -32,11 +32,9 @@ export {
 } from "./transport/prompt.rest.ts";
 export { promptTrpcTransport } from "./transport/prompt.trpc.ts";
 export { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
-// The playground's execution door still runs on the deleted builder: its
-// refusals have no registered handled codes and its seven process capabilities
-// are functions, which neither a fact nor `PromptApi` can carry.
 export {
-  createPromptExecuteRestApp,
+  promptExecuteRest,
+  promptExecuteRestMembers,
   CrossOriginRefusedError,
   type PromptExecuteRestMembers,
   type PromptExecuteRestSession,

@@ -1,13 +1,18 @@
 /**
- * Local surface's declared permission is enforced on the calling key: the
- * door resolves its own credential rather than the framework's `langy:create`.
+ * Local surface's declared permission is enforced by the framework's own
+ * project door; the identity bridge on top is this family's own.
  * @see specs/langy/langy-local-control.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import {
+  bindRestMiddleware,
+  createRestRuntime,
+  recordProjectCredential,
+  type RestResolvedProjectCredential,
+} from "@langwatch/api/rest";
+import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createLangyLocalRestApp, type LangyLocalRestMembers } from "../langy-local.api.ts";
+import { langyLocalRest, langyLocalRestMembers, type LangyLocalRestMembers } from "../langy-local.api.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "organization-1";
@@ -24,73 +29,56 @@ const renderHandled: ErrorHandler = (error, c) => {
     : c.json({ error: String(error) }, 500);
 };
 
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => next();
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
+const resolvedCredential: RestResolvedProjectCredential = {
+  type: "apiKey",
+  apiKeyId: "key-1",
+  userId: USER_ID,
+  organizationId: ORGANIZATION_ID,
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  project: {
+    id: PROJECT_ID,
+    name: "Project",
+    slug: "project",
+    teamId: "team-1",
+    organizationId: ORGANIZATION_ID,
+    isPersonal: false,
+    ownerUserId: null,
+  },
+};
 
-/** The deployment's ceiling: it throws for a key that lacks the permission. */
-function ceiling(granted: boolean) {
-  return vi.fn(async () => {
-    if (granted) return undefined;
-    throw Object.assign(new Error("api key permission denied"), {
-      httpStatus: 403,
-      code: "api_key_permission_denied",
-    });
+/** The deployment's project door: it throws for a key that lacks the ceiling permission. */
+function projectDoor(granted: boolean) {
+  const authenticate = vi.fn((input: { request: Request; permission: string }) => {
+    if (!granted) {
+      throw Object.assign(new Error("api key permission denied"), {
+        httpStatus: 403,
+        code: "api_key_permission_denied",
+      });
+    }
+    recordProjectCredential(input.request, resolvedCredential);
+    return {
+      actor: { type: "api_key" as const, id: "key-1" },
+      scope: { tier: "project" as const, id: PROJECT_ID },
+    };
   });
+  return authenticate;
 }
 
 function buildApi(options: { granted: boolean }) {
-  const enforceCeiling = ceiling(options.granted);
-  const tryFindVisible = vi.fn(async () => ({ id: CONVERSATION_ID, title: "Instrument tracing" }));
+  const authenticate = projectDoor(options.granted);
+  const tryFindVisible = vi.fn(async () => ({
+    id: CONVERSATION_ID,
+    title: "Instrument tracing",
+    lastModel: "gpt-5-mini",
+  }));
 
-  const ports: LangyLocalRestMembers = {
-    readCredential: () => ({ token: "test-token", projectId: PROJECT_ID }),
-    apiKeys: () =>
-      ({
-        findResolvedToken: async () => ({
-          type: "apiKey" as const,
-          apiKeyId: "key-1",
-          userId: USER_ID,
-          organizationId: ORGANIZATION_ID,
-          ingestSourceType: null,
-          ingestionTemplateId: null,
-          project: {
-            id: PROJECT_ID,
-            name: "Project",
-            slug: "project",
-            teamId: "team-1",
-            organizationId: ORGANIZATION_ID,
-            isPersonal: false,
-            ownerUserId: null,
-          },
-        }),
-        markUsed: vi.fn(),
-      }) as never,
-    enforceCeiling,
-    // The holder HAS Langy access: the refusal below must come from the key's
-    // own grants, not from the person failing the cohort gate.
+  const app = { findByIdVisible: tryFindVisible } as never;
+
+  const members: LangyLocalRestMembers = {
+    // The holder HAS Langy access: the refusal below must come from the
+    // key's own grants, not from the person failing the cohort gate.
     featureFlags: () => ({ isEnabled: async () => true }) as never,
-    actors: () => ({ user: { findUnique: async () => ({ id: USER_ID }) } }) as never,
-    langy: () => ({ tryFindVisible }) as never,
     runtime: () =>
       ({
         presence: { read: async () => null },
@@ -103,12 +91,20 @@ function buildApi(options: { granted: boolean }) {
     skipGate: (() => true) as never,
   };
 
-  const app = createLangyLocalRestApp({ security: passThroughSecurity(), ports });
+  const runtime = createRestRuntime({
+    identity: { authenticate },
+  });
+
+  const hono = runtime.mount(langyLocalRest.router(), {
+    app: () => app,
+    onError: renderHandled,
+    facts: [bindRestMiddleware(langyLocalRestMembers, () => members)],
+  });
 
   return {
-    enforceCeiling,
+    authenticate,
     tryFindVisible,
-    workspace: () => app.request(WORKSPACE_URL, { headers: { "X-Auth-Token": "test-token" } }),
+    workspace: () => hono.request(WORKSPACE_URL),
   };
 }
 
@@ -121,7 +117,7 @@ describe("given a key held by someone with Langy access", () => {
       const response = await api.workspace();
 
       expect(response.status).toBe(403);
-      expect(api.enforceCeiling).toHaveBeenCalledWith(
+      expect(api.authenticate).toHaveBeenCalledWith(
         expect.objectContaining({ permission: "langy:create" }),
       );
       expect(api.tryFindVisible).not.toHaveBeenCalled();

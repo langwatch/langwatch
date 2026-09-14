@@ -249,7 +249,8 @@ export {
   type LangyTurnsRestMembers,
 } from "./transport/langy-turns.rest.ts";
 export {
-  createLangyUiActionsRestApp,
+  langyUiActionsRest,
+  langyUiActionsRestMembers,
   LangyUiActionRestCatalog,
   type LangyUiActionsRestMembers,
 } from "./transport/api-rest/langy-ui-actions.api.ts";
@@ -346,14 +347,16 @@ export {
   type SkipPermissionsProviderRows,
 } from "./services/langy-skip-permissions.service.ts";
 export {
-  createLangyLocalRestApp,
+  langyLocalRest,
+  langyLocalRestMembers,
   type LangyCodeAccessPreferenceReader,
   type LangyGithubInstallationReader,
   type LangyLocalRestCommands,
   type LangyLocalRestMembers,
 } from "./transport/api-rest/langy-local.api.ts";
 export {
-  createLangyLocalControlRestApp,
+  langyLocalControlRest,
+  langyLocalControlRestMembers,
   type LangyLocalControlRestMembers,
 } from "./transport/api-rest/langy-local-control.api.ts";
 export {

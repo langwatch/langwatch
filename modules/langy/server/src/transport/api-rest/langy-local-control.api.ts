@@ -4,20 +4,17 @@
  * the minted session key, authenticated in-handler like the socket.
  */
 
-import { handlerManagedAuth, requires } from "@langwatch/api";
 import {
-  credentialPrincipalOf,
+  defineRestMiddleware,
+  defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectOf,
-  type AppRestSecurityMembers,
-  type EndpointVariables,
-  type MountableRestApp,
-  type ProjectScopedContext,
+  projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import {
   approveControlRequestBodySchema,
   approveControlRequestResponseSchema,
+  LangyApi,
   LangyLocalRequestInvalidError,
   listControlRequestsResponseSchema,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -47,84 +44,60 @@ export type LangyLocalControlRestMembers = Readonly<{
   baseHost: string | undefined;
 }>;
 
+/** What the process supplies this family beyond `LangyApi` and its own door. */
+export const langyLocalControlRestMembers = defineRestMiddleware(
+  "langyLocalControlRestMembers",
+  z.custom<LangyLocalControlRestMembers>(),
+);
+
 /**
- * The access declaration of the connect endpoints. The handler authenticates
- * the minted session key, so the framework's auth is off and the policy
- * registry records why.
+ * The user behind the caller's key. A legacy project key holds no user and
+ * refuses the same way an unknown request id does — the answer never
+ * reveals which requests exist.
  */
-const connectAuth = handlerManagedAuth({
-  reason:
-    "The handler authenticates the minted Langy session key with the same check as the control " +
-    "socket and answers refusals as protocol frames",
-  credential: "apiKey",
-  permissions: ["langy:create"],
-});
+function requireControlUser(request: Request): { userId: string; projectId: string; projectSlug: string } {
+  const resolved = projectCredentialOfRequest(request);
+  const userId = resolved.type === "apiKey" ? resolved.userId : null;
+  if (!userId) throw new LangyLocalRequestInvalidError();
+  return { userId, projectId: resolved.project.id, projectSlug: resolved.project.slug };
+}
 
-export function createLangyLocalControlRestApp(options: {
-  security: AppRestSecurityMembers;
-  ports: LangyLocalControlRestMembers;
-}): MountableRestApp {
-  const { security, ports } = options;
+export const langyLocalControlRest = defineRestRouter(LangyApi)
+  .withNamespace("langy")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("project")
+  .withAddressing("literal", { v1Twin: false })
 
-  const { service, policy } = security.createProjectVersionedApp({
-    name: "langy-control",
-    basePath: "/api/langy/control",
-    errorEnvelope: "canonical",
-  });
+  // The static /connect paths go first: a `/:id` verb registered before them
+  // would answer for the segment "connect". Not this framework's concern
+  // (paths are literal here), kept for readability parity with the routes
+  // below.
 
-  type ControlContext = ProjectScopedContext<EndpointVariables>;
+  // ── connect: the folder authenticates its own minted session key ──────────
 
-  /**
-   * The user behind the caller's key. A legacy project key holds no user and
-   * refuses the same way an unknown request id does — the answer never
-   * reveals which requests exist.
-   */
-  const requireUser = (c: ControlContext): string => {
-    const credential = credentialPrincipalOf(c);
-    const userId = credential.kind === "apiKey" ? credential.userId : null;
-    if (!userId) throw new LangyLocalRequestInvalidError();
-    return userId;
-  };
-
-  const listHandler = async (c: ControlContext) => {
-    const requests = await ports.runtime().requests.listOpen({
-      projectId: projectOf(c).id,
-      userId: requireUser(c),
-    });
-    return { requests: requests.map((request) => ControlRequestService.toWire(request)) };
-  };
-
-  const approveHandler = async (c: ControlContext, input: { id: string }) => {
-    const project = projectOf(c);
-    const approved = await ports.runtime().requests.approve({
-      requestId: input.id,
-      userId: requireUser(c),
-      projectId: project.id,
-    });
-    return {
-      sessionKey: approved.sessionKey,
-      endpoint: (ports.baseHost ?? "").replace(/\/+$/, ""),
-      conversation: {
-        id: approved.request.conversationId,
-        title: approved.request.conversationTitle,
-        url: conversationUrl(approved.request.conversationId, ports.baseHost, project.slug),
-      },
-    };
-  };
-
-  const cancelHandler = async (c: ControlContext, input: { id: string }) => {
-    await ports.runtime().requests.cancel({
-      requestId: input.id,
-      userId: requireUser(c),
-      projectId: projectOf(c).id,
-    });
-    return { id: input.id, cancelled: true as const };
-  };
-
-  const registerHandler = async (c: ControlContext) => {
-    const frame = registerFrameSchema.safeParse(await c.req.json().catch(() => null));
+  .post("/api/langy/control/connect/register", "langyControlConnectRegister")
+  .withAccess({
+    kind: "public",
+    reason:
+      "the handler authenticates the minted Langy session key with the same check as the " +
+      "control socket and answers refusals as protocol frames",
+  })
+  .withRawBody("text")
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({
+    description: "The registered frame with its instance token, or the refused frame with its reason.",
+  })
+  .withMiddleware(langyLocalControlRestMembers)
+  .handle(async ({ raw, request }, members) => {
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      body = null;
+    }
+    const frame = registerFrameSchema.safeParse(body);
     if (!frame.success) {
-      return c.json(
+      return Response.json(
         {
           frame: {
             type: "refused" as const,
@@ -133,18 +106,18 @@ export function createLangyLocalControlRestApp(options: {
             message: `The body must be a register frame with protocol ${LOCAL_CONTROL_PROTOCOL_VERSION}.`,
           },
         },
-        422,
+        { status: 422 },
       );
     }
-    const authorization = c.req.header("authorization");
-    const projectId = c.req.header("x-project-id");
-    const outcome = await ports.longPoll().register({
+    const authorization = request.headers.get("authorization");
+    const projectId = request.headers.get("x-project-id");
+    const outcome = await members.longPoll().register({
       ...(authorization ? { authorization } : {}),
       ...(projectId ? { projectId } : {}),
       frame: frame.data,
     });
     if (!outcome.ok) {
-      return c.json(
+      return Response.json(
         {
           frame: {
             type: "refused" as const,
@@ -153,98 +126,148 @@ export function createLangyLocalControlRestApp(options: {
             message: outcome.message,
           },
         },
-        403,
+        { status: 403 },
       );
     }
-    return c.json({ frame: outcome.reply, instanceToken: outcome.token }, 200);
-  };
+    return Response.json({ frame: outcome.reply, instanceToken: outcome.token }, { status: 200 });
+  })
 
-  const pollHandler = async (c: ControlContext) => {
-    const answer = await ports.longPoll().poll({
-      token: c.req.header(INSTANCE_TOKEN_HEADER) ?? "",
-      inFlightCallIds: (c.req.query("inFlight") ?? "").split(",").filter(Boolean),
-      signal: c.req.raw.signal,
+  .get("/api/langy/control/connect/poll", "langyControlConnectPoll")
+  .withAccess({
+    kind: "public",
+    reason:
+      "the handler authenticates the minted Langy session key with the same check as the " +
+      "control socket and answers refusals as protocol frames",
+  })
+  .withQuery(langyControlPollQuerySchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({
+    description: "The frames waiting for the folder, or 410 when the instance token is not known.",
+  })
+  .withMiddleware(langyLocalControlRestMembers)
+  .handle(async ({ input, request, signal }, members) => {
+    const answer = await members.longPoll().poll({
+      token: request.headers.get(INSTANCE_TOKEN_HEADER) ?? "",
+      inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean),
+      signal,
     });
-    if (!answer.ok) return c.json({ frames: [] }, 410);
-    return c.json({ frames: answer.frames }, 200);
-  };
+    if (!answer.ok) return Response.json({ frames: [] }, { status: 410 });
+    return Response.json({ frames: answer.frames }, { status: 200 });
+  })
 
-  const framesHandler = async (c: ControlContext) => {
-    const body = langyControlFramesBodySchema.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ accepted: 0 }, 422);
-    const answer = await ports.longPoll().frames({
-      token: c.req.header(INSTANCE_TOKEN_HEADER) ?? "",
+  .post("/api/langy/control/connect/frames", "langyControlConnectFrames")
+  .withAccess({
+    kind: "public",
+    reason:
+      "the handler authenticates the minted Langy session key with the same check as the " +
+      "control socket and answers refusals as protocol frames",
+  })
+  .withRawBody("text")
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({
+    description: "How many frames were taken, or 410 when the instance token is not known.",
+  })
+  .withMiddleware(langyLocalControlRestMembers)
+  .handle(async ({ raw, request }, members) => {
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(raw);
+    } catch {
+      parsedBody = null;
+    }
+    const body = langyControlFramesBodySchema.safeParse(parsedBody);
+    if (!body.success) return Response.json({ accepted: 0 }, { status: 422 });
+    const answer = await members.longPoll().frames({
+      token: request.headers.get(INSTANCE_TOKEN_HEADER) ?? "",
       frames: body.data.frames,
     });
-    if (!answer.ok) return c.json({ accepted: 0 }, 410);
-    return c.json({ accepted: body.data.frames.length }, 200);
-  };
+    if (!answer.ok) return Response.json({ accepted: 0 }, { status: 410 });
+    return Response.json({ accepted: body.data.frames.length }, { status: 200 });
+  })
 
-  const connectDoor = policy(connectAuth);
+  // ── requests: the developer's own key, resolved to a user ─────────────────
 
-  // The static /connect paths go first: a `/:id` verb registered before them
-  // would answer for the segment "connect".
-  return service
-    .registerRoute("post", "/connect/register", MANAGEMENT_API_VERSION, registerHandler, (b) =>
-      connectDoor(b).withRawResponse(
-        "the registered frame with its instance token, or the refused frame with its reason",
-      ),
-    )
-    .registerRoute("get", "/connect/poll", MANAGEMENT_API_VERSION, pollHandler, (b) =>
-      connectDoor(b)
-        .withQuery(langyControlPollQuerySchema)
-        .withRawResponse(
-          "the frames waiting for the folder, or 410 when the instance token is not known",
-        ),
-    )
-    .registerRoute("post", "/connect/frames", MANAGEMENT_API_VERSION, framesHandler, (b) =>
-      connectDoor(b).withRawResponse(
-        "how many frames were taken, or 410 when the instance token is not known",
-      ),
-    )
-    .registerRoute("get", "/requests", MANAGEMENT_API_VERSION, listHandler, (b) =>
-      policy(requires("langy:view"))(b)
-        .withOutput(listControlRequestsResponseSchema)
-        .withDocs({
-          summary: "List Langy control requests",
-          description:
-            "List the open requests Langy made for a folder of mine in this project. Only the " +
-            "person Langy asked ever sees a request, and each one expires fifteen minutes " +
-            "after it was made.",
-          operationId: "listLangyControlRequests",
-          tags: ["Langy"],
-        }),
-    )
-    .registerRoute("post", "/requests/:id/approve", MANAGEMENT_API_VERSION, approveHandler, (b) =>
-      policy(requires("langy:create"))(b)
-        .withParams(langyControlIdParamsSchema)
-        .withInput(approveControlRequestBodySchema)
-        .withOutput(approveControlRequestResponseSchema)
-        .withDocs({
-          summary: "Approve a Langy control request",
-          description:
-            "Approve one request and share the current folder with the conversation that " +
-            "asked. Answers with a Langy session key scoped to that conversation, which is " +
-            "never shown again. A request is single use: a second approval is refused.",
-          operationId: "approveLangyControlRequest",
-          tags: ["Langy"],
-        }),
-    )
-    .registerRoute("post", "/requests/:id/cancel", MANAGEMENT_API_VERSION, cancelHandler, (b) =>
-      policy(requires("langy:create"))(b)
-        .withParams(langyControlIdParamsSchema)
-        .withOutput(langyControlCancelResultSchema)
-        .withDocs({
-          summary: "Cancel a Langy control request",
-          description:
-            "Refuse one request from the terminal. The card in the chat reads that sharing " +
-            "was cancelled, and Langy's next turn offers the choice again.",
-          operationId: "cancelLangyControlRequest",
-          tags: ["Langy"],
-        }),
-    )
-    .build();
-}
+  .get("/api/langy/control/requests", "listLangyControlRequests")
+  .withPermission("langy:view")
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({
+    description:
+      "List the open requests Langy made for a folder of mine in this project. Only the " +
+      "person Langy asked ever sees a request, and each one expires fifteen minutes after " +
+      "it was made.",
+  })
+  .withMiddleware(langyLocalControlRestMembers)
+  .handle(async ({ request }, members) => {
+    const auth = requireControlUser(request);
+    const requests = await members.runtime().requests.listOpen({
+      projectId: auth.projectId,
+      userId: auth.userId,
+    });
+    return Response.json(
+      listControlRequestsResponseSchema.parse({
+        requests: requests.map((r) => ControlRequestService.toWire(r)),
+      }),
+      { status: 200 },
+    );
+  })
+
+  .post("/api/langy/control/requests/:id/approve", "approveLangyControlRequest")
+  .withPermission("langy:create")
+  .withParams(langyControlIdParamsSchema)
+  .withInput(approveControlRequestBodySchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({
+    description:
+      "Approve one request and share the current folder with the conversation that asked. " +
+      "Answers with a Langy session key scoped to that conversation, which is never shown " +
+      "again. A request is single use: a second approval is refused.",
+  })
+  .withMiddleware(langyLocalControlRestMembers)
+  .handle(async ({ input, request }, members) => {
+    const auth = requireControlUser(request);
+    const approved = await members.runtime().requests.approve({
+      requestId: input.id,
+      userId: auth.userId,
+      projectId: auth.projectId,
+    });
+    return Response.json(
+      approveControlRequestResponseSchema.parse({
+        sessionKey: approved.sessionKey,
+        endpoint: (members.baseHost ?? "").replace(/\/+$/, ""),
+        conversation: {
+          id: approved.request.conversationId,
+          title: approved.request.conversationTitle,
+          url: conversationUrl(approved.request.conversationId, members.baseHost, auth.projectSlug),
+        },
+      }),
+      { status: 200 },
+    );
+  })
+
+  .post("/api/langy/control/requests/:id/cancel", "cancelLangyControlRequest")
+  .withPermission("langy:create")
+  .withParams(langyControlIdParamsSchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({
+    description:
+      "Refuse one request from the terminal. The card in the chat reads that sharing was " +
+      "cancelled, and Langy's next turn offers the choice again.",
+  })
+  .withMiddleware(langyLocalControlRestMembers)
+  .handle(async ({ input, request }, members) => {
+    const auth = requireControlUser(request);
+    await members.runtime().requests.cancel({
+      requestId: input.id,
+      userId: auth.userId,
+      projectId: auth.projectId,
+    });
+    return Response.json(
+      langyControlCancelResultSchema.parse({ id: input.id, cancelled: true }),
+      { status: 200 },
+    );
+  })
+
+  .build();
 
 export type { RegisterAnswer };
 type RegisterAnswer = z.infer<typeof langyControlRegisterAnswerSchema>;

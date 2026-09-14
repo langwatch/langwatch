@@ -4,21 +4,19 @@
  * stderr is `/dev/null`, so the HTTP answer is all it has.
  */
 
-import { handlerManagedAuth } from "@langwatch/api";
+import { PayloadTooLargeError } from "@langwatch/api";
 import {
-  bodyLimit,
-  type AppRestSecurityMembers,
-  type EndpointVariables,
+  defineRestMiddleware,
+  defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type MountableRestApp,
-  type ServiceContext,
+  projectCredentialOfRequest,
 } from "@langwatch/api/rest";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   BASH_DEFAULT_TIMEOUT_MS,
   CALL_POLL_HOLD_MS,
   createControlRequestResponseSchema,
-  LangyApiCredentialInvalidError,
-  LangyApiCredentialMissingError,
+  LangyApi,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
@@ -30,7 +28,6 @@ import {
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
-import type { LangyApp } from "#app/langy.app";
 import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
 import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 import type { ControlSkipGate } from "#rules/langy-local-session-contract.rules";
@@ -38,28 +35,17 @@ import { conversationTitle, conversationUrl } from "#rules/langy-local-session-t
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import type { UserWaitEvents } from "../../rules/langy-local-user-wait-record.rules.ts";
-import type { LangyRestCredentialMembers } from "./langy-rest-credentials.api.ts";
 import { nowInstant } from "@langwatch/time";
-
-const AUTH_REASON =
-  "session key resolved in-handler by the API-key service, then bridged to the owning user by " +
-  "the key-identity service; the conversation in the body is proved against that user and project";
 
 /** A local call is a small JSON document, never an upload. */
 const MAX_BODY_BYTES = 256 * 1024;
 
 /**
  * The permission this door declares AND the one it enforces. One constant, so
- * the declaration the OpenAPI surface publishes and the check the handler runs
- * cannot drift into disagreeing about what a caller needs.
+ * the declaration the OpenAPI surface publishes and the check the framework
+ * runs cannot drift into disagreeing about what a caller needs.
  */
 const LOCAL_PERMISSION = "langy:create" as const;
-
-const localAuth = handlerManagedAuth({
-  reason: AUTH_REASON,
-  permissions: [LOCAL_PERMISSION],
-  credential: "apiKey",
-});
 
 /** The conversation writes this door and its runtime record. */
 export type LangyLocalRestCommands = UserWaitEvents &
@@ -93,126 +79,136 @@ export type LangyGithubInstallationReader = Readonly<{
   readInstallation(projectId: string): Promise<{ installed: boolean; accountLogin?: string }>;
 }>;
 
-/** Everything the local surface reaches that Langy does not own. */
-export type LangyLocalRestMembers = LangyRestCredentialMembers &
-  Readonly<{
-    /** The SAME application the browser's Langy procedures resolve on. */
-    langy: () => LangyApp;
-    /** This process's local-control runtime: presence, calls, waits, requests. */
-    runtime: () => LocalControlRuntime;
-    /** The durable record of a request and of a revoked skip policy. */
-    commands: () => LangyLocalRestCommands;
-    /** The person's own code access choice. */
-    users: () => LangyCodeAccessPreferenceReader;
-    /** The GitHub half of the code access card. */
-    github: () => LangyGithubInstallationReader;
-    /** This deployment's own origin, for the follow-along link. */
-    baseHost: string | undefined;
-    /** Whether the conversation's model may skip permission cards. */
-    skipGate: ControlSkipGate;
-  }>;
+/**
+ * Everything the local surface reaches that neither `LangyApi` nor the
+ * framework's own project door supplies: the identity bridge's flag store,
+ * this process's local-control runtime, and the code-access card's own
+ * sources. Credential resolution and the `langy:create` ceiling are the
+ * door's job now (`.withCredential("project").withPermission(...)`).
+ */
+export type LangyLocalRestMembers = Readonly<{
+  /** This deployment's flag store, for the identity bridge. */
+  featureFlags: () => FeatureFlagApi;
+  /** This process's local-control runtime: presence, calls, waits, requests. */
+  runtime: () => LocalControlRuntime;
+  /** The durable record of a request and of a revoked skip policy. */
+  commands: () => LangyLocalRestCommands;
+  /** The person's own code access choice. */
+  users: () => LangyCodeAccessPreferenceReader;
+  /** The GitHub half of the code access card. */
+  github: () => LangyGithubInstallationReader;
+  /** This deployment's own origin, for the follow-along link. */
+  baseHost: string | undefined;
+  /** Whether the conversation's model may skip permission cards. */
+  skipGate: ControlSkipGate;
+}>;
 
-export function createLangyLocalRestApp(options: {
-  security: AppRestSecurityMembers;
-  ports: LangyLocalRestMembers;
-}): MountableRestApp {
-  const { security, ports } = options;
+/** What the process supplies this family beyond `LangyApi` and its own door. */
+export const langyLocalRestMembers = defineRestMiddleware(
+  "langyLocalRestMembers",
+  z.custom<LangyLocalRestMembers>(),
+);
 
-  const { service: restService, policy } = security.createServiceVersionedApp({
-    name: "langy-local",
-    basePath: "/api/langy",
-    // The command line posts these exact paths; the surface serves one
-    // generation rather than a dated namespace.
-    staticGeneration: "v1",
-    errorEnvelope: "canonical",
+/**
+ * The door already authenticated the key and enforced `langy:create` as its
+ * ceiling; this is the identity bridge on top - the owning user, proved
+ * against the deployment's own Langy access decision.
+ */
+async function resolveLocalCaller(input: {
+  request: Request;
+  members: LangyLocalRestMembers;
+}): Promise<{
+  userId: string;
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+}> {
+  const resolved = projectCredentialOfRequest(input.request);
+  const identity = await LangyKeyIdentityService.create({
+    featureFlags: input.members.featureFlags(),
+  }).resolve({ resolved });
+  if (!identity.ok) {
+    throw new LangyApiIdentityDeniedError(
+      identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
+      identity.message,
+    );
+  }
+  return {
+    userId: identity.userId,
+    projectId: resolved.project.id,
+    projectName: resolved.project.name,
+    projectSlug: resolved.project.slug,
+  };
+}
+
+/**
+ * The conversation the caller named, proved against the key. Invisible
+ * dies as not-found, not refusal, so a foreign id never confirms it exists.
+ */
+async function requireConversation(input: {
+  app: LangyApi;
+  conversationId: string;
+  projectId: string;
+  userId: string;
+}) {
+  const conversation = await input.app.findByIdVisible({
+    id: input.conversationId,
+    projectId: input.projectId,
+    userId: input.userId,
   });
+  if (!conversation) throw new LangyConversationNotFoundError(input.conversationId);
+  return conversation;
+}
 
-  const localDoor = policy(localAuth);
+/** Hono's own 404, byte-for-byte what an unmounted path returns. */
+const notFoundAnswer = (): Response => new Response("404 Not Found", { status: 404 });
 
-  /**
-   * Authenticate the key, enforce the permission this door declares, then
-   * resolve the owning user. Order is the shared chain's: credential (401),
-   * the KEY's own ceiling (403), then the identity bridge. The ceiling is
-   * checked against the credential rather than its holder — a deliberately
-   * narrowed key must not reach local control on the strength of what the
-   * person who made it may do.
-   */
-  const authorize = async (c: ServiceContext<EndpointVariables>) => {
-    const credentials = ports.readCredential(c.req.raw);
-    if (!credentials) throw new LangyApiCredentialMissingError();
+/** Parses and validates a JSON body a composed schema can't declare via `.withInput()`. */
+function parseJsonBody<T extends z.ZodType>(raw: string, schema: T): z.infer<T> {
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    body = null;
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) throw new LangyApiRequestInvalidError(parsed.error.issues);
+  return parsed.data;
+}
 
-    const resolved = await ports.apiKeys().findResolvedToken({
-      token: credentials.token,
-      projectId: credentials.projectId,
-    });
-    if (!resolved) throw new LangyApiCredentialInvalidError();
+const workspaceQuerySchema = z.object({ conversationId: z.string().optional() });
+const createRequestBodySchema = z.object({ conversationId: z.string().min(1) });
 
-    await ports.enforceCeiling({ resolved, permission: LOCAL_PERMISSION });
-
-    const identity = await LangyKeyIdentityService.create({
-      featureFlags: ports.featureFlags(),
-    }).resolve({ resolved });
-    if (!identity.ok) {
-      throw new LangyApiIdentityDeniedError(
-        identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
-        identity.message,
-      );
-    }
-    return {
-      userId: identity.userId,
-      projectId: resolved.project.id,
-      projectName: resolved.project.name,
-      projectSlug: resolved.project.slug,
-    };
-  };
-
-  /**
-   * The conversation the caller named, proved against the key. Invisible
-   * dies as not-found, not refusal, so a foreign id never confirms it exists.
-   */
-  const requireConversation = async (input: {
-    conversationId: string;
-    projectId: string;
-    userId: string;
-  }) => {
-    const conversation = await ports.langy().tryFindVisible({
-      id: input.conversationId,
-      projectId: input.projectId,
-      userId: input.userId,
-    });
-    if (!conversation) throw new LangyConversationNotFoundError(input.conversationId);
-    return conversation;
-  };
-
-  const parseBody = async <T extends z.ZodType>(
-    c: ServiceContext<EndpointVariables>,
-    schema: T,
-  ): Promise<z.infer<T>> => {
-    const parsed = schema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      throw new LangyApiRequestInvalidError(parsed.error.issues);
-    }
-    return parsed.data;
-  };
+export const langyLocalRest = defineRestRouter(LangyApi)
+  .withNamespace("langy")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("project")
+  .withAddressing("literal", { v1Twin: false })
 
   // ── what `code_access` reads ──────────────────────────────────────────────
 
-  const workspaceHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const conversationId = c.req.query("conversationId") ?? "";
-    await requireConversation({ ...auth, conversationId });
+  .get("/api/langy/local/workspace", "langyLocalWorkspace")
+  .withPermission(LOCAL_PERMISSION)
+  .withQuery(workspaceQuerySchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The code access card's own status document, as the command line reads it." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, input, request }, members) => {
+    const auth = await resolveLocalCaller({ request, members });
+    const conversationId = input.conversationId ?? "";
+    await requireConversation({ app, conversationId, projectId: auth.projectId, userId: auth.userId });
 
-    const runtime = ports.runtime();
+    const runtime = members.runtime();
     const connected = await runtime.presence.read(conversationId);
     const pendingRequest = await runtime.requests.tryFindOpenForConversation({
       projectId: auth.projectId,
       userId: auth.userId,
       conversationId,
     });
-    const preference = await ports.users().tryReadPreference(auth.userId);
-    const github = await ports.github().readInstallation(auth.projectId);
+    const preference = await members.users().tryReadPreference(auth.userId);
+    const github = await members.github().readInstallation(auth.projectId);
 
-    return c.json(
+    return Response.json(
       workspaceStatusSchema.parse({
         connected: connected !== null,
         ...(connected ? { workspace: connected.workspace } : {}),
@@ -220,68 +216,88 @@ export function createLangyLocalRestApp(options: {
         github,
         ...(pendingRequest ? { pendingRequest: ControlRequestService.toWire(pendingRequest) } : {}),
       }),
-      200,
+      { status: 200 },
     );
-  };
+  })
 
   // ── the control request the card renders ──────────────────────────────────
 
-  const createRequestHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const body = await parseBody(c, z.object({ conversationId: z.string().min(1) }));
+  .post("/api/langy/local/requests", "langyLocalCreateRequest")
+  .withPermission(LOCAL_PERMISSION)
+  .withInput(createRequestBodySchema)
+  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The recorded request and the command that approves it." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, input, request }, members) => {
+    const auth = await resolveLocalCaller({ request, members });
     const conversation = await requireConversation({
-      ...auth,
-      conversationId: body.conversationId,
+      app,
+      conversationId: input.conversationId,
+      projectId: auth.projectId,
+      userId: auth.userId,
     });
 
-    const request = await ports.runtime().requests.create({
+    const localRequest = await members.runtime().requests.create({
       projectId: auth.projectId,
       projectName: auth.projectName,
       userId: auth.userId,
       conversationId: conversation.id,
       conversationTitle: conversationTitle(conversation.title),
-      conversationUrl: conversationUrl(conversation.id, ports.baseHost, auth.projectSlug),
+      conversationUrl: conversationUrl(conversation.id, members.baseHost, auth.projectSlug),
     });
-    await ports.commands().requestLocalControl({
+    await members.commands().requestLocalControl({
       tenantId: auth.projectId,
       occurredAt: nowInstant().epochMilliseconds,
       conversationId: conversation.id,
-      requestId: request.id,
+      requestId: localRequest.id,
       userId: auth.userId,
-      expiresAt: request.expiresAt,
+      expiresAt: localRequest.expiresAt,
       command: SHARE_CONTROL_COMMAND,
     });
 
-    return c.json(
+    return Response.json(
       createControlRequestResponseSchema.parse({
-        request: ControlRequestService.toWire(request),
+        request: ControlRequestService.toWire(localRequest),
         command: SHARE_CONTROL_COMMAND,
       }),
-      200,
+      { status: 200 },
     );
-  };
+  })
 
   // ── one local tool call ───────────────────────────────────────────────────
 
-  const startCallHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const body = await parseBody(c, langyLocalStartCallRequestSchema);
+  .post("/api/langy/local/calls", "langyLocalStartCall")
+  .withPermission(LOCAL_PERMISSION)
+  // `langyLocalStartCallRequestSchema` intersects a discriminated union, which
+  // `.withInput()`'s `SourceSchema` does not admit; parsed by hand instead,
+  // exactly as this route always has.
+  .withRawBody("text")
+  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The started call's own id." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, raw, request }, members) => {
+    const body = parseJsonBody(raw, langyLocalStartCallRequestSchema);
+    const auth = await resolveLocalCaller({ request, members });
     const conversation = await requireConversation({
-      ...auth,
+      app,
       conversationId: body.conversationId,
+      projectId: auth.projectId,
+      userId: auth.userId,
     });
 
     // The skip choice is answered by the model the conversation runs on, and
     // that model can change between two calls, so it is re-read here: the
     // command that would have run without a card asks again.
     await reconcileSkipPolicy({
-      runtime: ports.runtime(),
+      runtime: members.runtime(),
       projectId: auth.projectId,
       conversationId: body.conversationId,
       model: conversation.lastModel,
-      skipGate: ports.skipGate,
+      skipGate: members.skipGate,
       changePolicy: async (args) => {
-        await ports.commands().changeLocalPolicy({
+        await members.commands().changeLocalPolicy({
           tenantId: auth.projectId,
           occurredAt: nowInstant().epochMilliseconds,
           ...args,
@@ -293,7 +309,7 @@ export function createLangyLocalRestApp(options: {
       body.tool === "local_bash" && body.params.timeout
         ? body.params.timeout * 1000
         : BASH_DEFAULT_TIMEOUT_MS;
-    const call = await ports.runtime().dispatcher.start({
+    const call = await members.runtime().dispatcher.start({
       projectId: auth.projectId,
       conversationId: body.conversationId,
       turnId: body.turnId,
@@ -301,111 +317,117 @@ export function createLangyLocalRestApp(options: {
       call: { tool: body.tool, params: body.params } as never,
       timeoutMs,
     });
-    return c.json({ callId: call.callId }, 200);
-  };
+    return Response.json({ callId: call.callId }, { status: 200 });
+  })
 
-  const readCallHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const runtime = ports.runtime();
-    const call = await runtime.dispatcher.tryRead(c.req.param("id") ?? "");
-    if (!call || call.projectId !== auth.projectId) return c.notFound();
-    await requireConversation({ ...auth, conversationId: call.conversationId });
+  .get("/api/langy/local/calls/:id", "langyLocalReadCall")
+  .withPermission(LOCAL_PERMISSION)
+  .withParams(langyLocalCallIdParamsSchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The call's answer, or a plain 404 while it is still running." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, input, request, signal }, members) => {
+    const auth = await resolveLocalCaller({ request, members });
+    const runtime = members.runtime();
+    const call = await runtime.dispatcher.tryRead(input.id);
+    if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
+    await requireConversation({
+      app,
+      conversationId: call.conversationId,
+      projectId: auth.projectId,
+      userId: auth.userId,
+    });
 
     const answer = await runtime.dispatcher.tryPoll({
       callId: call.callId,
       holdMs: CALL_POLL_HOLD_MS,
-      signal: c.req.raw.signal,
+      signal,
     });
-    if (!answer) return c.notFound();
-    return c.json(answer, 200);
-  };
+    if (!answer) return notFoundAnswer();
+    return Response.json(answer, { status: 200 });
+  })
 
-  const cancelCallHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const runtime = ports.runtime();
-    const call = await runtime.dispatcher.tryRead(c.req.param("id") ?? "");
-    if (!call || call.projectId !== auth.projectId) return c.notFound();
-    await requireConversation({ ...auth, conversationId: call.conversationId });
+  .post("/api/langy/local/calls/:id/cancel", "langyLocalCancelCall")
+  .withPermission(LOCAL_PERMISSION)
+  .withParams(langyLocalCallIdParamsSchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The cancelled call's own id." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, input, request }, members) => {
+    const auth = await resolveLocalCaller({ request, members });
+    const runtime = members.runtime();
+    const call = await runtime.dispatcher.tryRead(input.id);
+    if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
+    await requireConversation({
+      app,
+      conversationId: call.conversationId,
+      projectId: auth.projectId,
+      userId: auth.userId,
+    });
 
     await runtime.dispatcher.tryCancel({ callId: call.callId });
     await runtime.waits.cancelTurn({
       conversationId: call.conversationId,
       turnId: call.turnId,
     });
-    return c.json({ callId: call.callId, cancelled: true }, 200);
-  };
+    return Response.json({ callId: call.callId, cancelled: true }, { status: 200 });
+  })
 
   // ── the question the worker asks ──────────────────────────────────────────
 
-  const startWaitHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const body = await parseBody(c, langyLocalStartWaitRequestSchema);
-    await requireConversation({ ...auth, conversationId: body.conversationId });
+  .post("/api/langy/waits", "langyLocalStartWait")
+  .withPermission(LOCAL_PERMISSION)
+  // Same composed-schema reason as `/local/calls` above.
+  .withRawBody("text")
+  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The started wait's own id." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, raw, request }, members) => {
+    const body = parseJsonBody(raw, langyLocalStartWaitRequestSchema);
+    const auth = await resolveLocalCaller({ request, members });
+    await requireConversation({
+      app,
+      conversationId: body.conversationId,
+      projectId: auth.projectId,
+      userId: auth.userId,
+    });
 
-    const wait = await ports.runtime().waits.startQuestion({
+    const wait = await members.runtime().waits.startQuestion({
       projectId: auth.projectId,
       conversationId: body.conversationId,
       turnId: body.turnId,
       ...(body.toolCallId ? { toolCallId: body.toolCallId } : {}),
       questions: body.questions,
     });
-    return c.json({ waitId: wait.waitId }, 200);
-  };
+    return Response.json({ waitId: wait.waitId }, { status: 200 });
+  })
 
-  const readWaitHandler = async (c: ServiceContext<EndpointVariables>) => {
-    const auth = await authorize(c);
-    const runtime = ports.runtime();
-    const wait = await runtime.waits.tryRead(c.req.param("id") ?? "");
-    if (!wait || wait.projectId !== auth.projectId) return c.notFound();
-    await requireConversation({ ...auth, conversationId: wait.conversationId });
+  .get("/api/langy/waits/:id", "langyLocalReadWait")
+  .withPermission(LOCAL_PERMISSION)
+  .withParams(langyLocalCallIdParamsSchema)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ description: "The answered question, or a plain 404 while it is still waiting." })
+  .withMiddleware(langyLocalRestMembers)
+  .handle(async ({ app, input, request, signal }, members) => {
+    const auth = await resolveLocalCaller({ request, members });
+    const runtime = members.runtime();
+    const wait = await runtime.waits.tryRead(input.id);
+    if (!wait || wait.projectId !== auth.projectId) return notFoundAnswer();
+    await requireConversation({
+      app,
+      conversationId: wait.conversationId,
+      projectId: auth.projectId,
+      userId: auth.userId,
+    });
 
     const answer = await runtime.waits.tryPoll({
       waitId: wait.waitId,
       holdMs: CALL_POLL_HOLD_MS,
-      signal: c.req.raw.signal,
+      signal,
     });
-    if (!answer) return c.notFound();
-    return c.json(answer, 200);
-  };
+    if (!answer) return notFoundAnswer();
+    return Response.json(answer, { status: 200 });
+  })
 
-  return restService
-    .registerRoute("get", "/local/workspace", MANAGEMENT_API_VERSION, workspaceHandler, (b) =>
-      localDoor(b).withRawResponse(
-        "the code access card's own status document, as the command line reads it",
-      ),
-    )
-    .registerRoute("post", "/local/requests", MANAGEMENT_API_VERSION, createRequestHandler, (b) =>
-      localDoor(b)
-        .withMiddleware(bodyLimit({ maxSize: MAX_BODY_BYTES }))
-        .withRawResponse("the recorded request and the command that approves it"),
-    )
-    .registerRoute("post", "/local/calls", MANAGEMENT_API_VERSION, startCallHandler, (b) =>
-      localDoor(b)
-        .withMiddleware(bodyLimit({ maxSize: MAX_BODY_BYTES }))
-        .withRawResponse("the started call's own id"),
-    )
-    .registerRoute("get", "/local/calls/:id", MANAGEMENT_API_VERSION, readCallHandler, (b) =>
-      localDoor(b)
-        .withParams(langyLocalCallIdParamsSchema)
-        .withRawResponse("the call's answer, or Hono's own 404 while it is still running"),
-    )
-    .registerRoute(
-      "post",
-      "/local/calls/:id/cancel",
-      MANAGEMENT_API_VERSION,
-      cancelCallHandler,
-      (b) =>
-        localDoor(b).withParams(langyLocalCallIdParamsSchema).withRawResponse("the cancelled call's own id"),
-    )
-    .registerRoute("post", "/waits", MANAGEMENT_API_VERSION, startWaitHandler, (b) =>
-      localDoor(b)
-        .withMiddleware(bodyLimit({ maxSize: MAX_BODY_BYTES }))
-        .withRawResponse("the started wait's own id"),
-    )
-    .registerRoute("get", "/waits/:id", MANAGEMENT_API_VERSION, readWaitHandler, (b) =>
-      localDoor(b)
-        .withParams(langyLocalCallIdParamsSchema)
-        .withRawResponse("the answered question, or Hono's own 404 while it is still waiting"),
-    )
-    .build();
-}
+  .build();

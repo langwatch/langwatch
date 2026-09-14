@@ -15,31 +15,29 @@
  * API-key-authenticated SDK surface, and this is a browser endpoint with no
  * stable contract, kept out of the published OpenAPI document.
  */
-import { handlerManagedAuth } from "@langwatch/api";
-import {
-  type AppRestSecurity,
-  type MountableRestApp,
-  validator as zValidator,
-} from "@langwatch/api/rest";
+import { deferredScope } from "@langwatch/api/access";
+import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   executeRequestSchema,
   parseLLMError,
+  PromptApi,
   type PlaygroundStreamEvent,
-  PROMPT_EXECUTE_PATH,
-  PROMPT_PLAYGROUND_BASE_PATH,
-  type PromptExecuteRequest,
+  PROMPT_EXECUTE_ENDPOINT,
 } from "@langwatch/prompt-contract";
 import { LlmModelNotSetError, type StudioServerEvent } from "@langwatch/workflow-contract";
-import type { SSEStreamingApi } from "hono/streaming";
-import { streamSSE } from "hono/streaming";
+import { z } from "zod";
 
 import { buildPromptExecutionEvent, outputConfigsFor } from "#rules/prompt-execution-event.rules";
 import { handleEngineEvent } from "#rules/prompt-execution-stream.rules";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
 const logger = createLogger("langwatch:prompt-playground");
+
+const AUTH_REASON =
+  "browser session resolved in-handler behind an origin gate; prompts:view checked against " +
+  "the body's projectId, with the demo project refused because execution spends provider credit";
 
 /** The signed-in person this door reads. */
 export type PromptExecuteRestSession = Readonly<{ user: Readonly<{ id: string }> }>;
@@ -100,6 +98,12 @@ export interface PromptExecuteRestMembers<TSession extends PromptExecuteRestSess
   reportError?: ((error: unknown, context: { projectId: string }) => void) | undefined;
 }
 
+/** What the process supplies this door beyond `PromptApi` and its own door. */
+export const promptExecuteRestMembers = defineRestMiddleware(
+  "promptExecuteRestMembers",
+  z.custom<PromptExecuteRestMembers<PromptExecuteRestSession>>(),
+);
+
 /** The handled CODE an error carries, or nothing. */
 function handledCodeOf(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
@@ -107,43 +111,78 @@ function handledCodeOf(error: unknown): string | undefined {
   return typeof code === "string" ? code : undefined;
 }
 
+/** One SSE frame, in the exact wire shape `hono/streaming`'s `writeSSE` writes. */
+function sseFrame(event: PlaygroundStreamEvent): Uint8Array {
+  return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+/**
+ * A `text/event-stream` `Response` a `withRawResponse` route can return
+ * directly — the seam `defineRestRouter` publishes for a route that writes
+ * its own bytes, used here exactly as the auth door's own raw 302 uses it.
+ */
+function createSseResponse(
+  run: (send: (event: PlaygroundStreamEvent) => void, isAborted: () => boolean) => Promise<void>,
+): Response {
+  let aborted = false;
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: PlaygroundStreamEvent) => {
+        if (aborted) return;
+        try {
+          controller.enqueue(sseFrame(event));
+        } catch {
+          // The reader is already gone; further writes are unobservable.
+        }
+      };
+      try {
+        await run(send, () => aborted);
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // Already closed by a cancel().
+        }
+      }
+    },
+    cancel() {
+      aborted = true;
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      // hono's streamSSE sets the content type, cache and connection headers
+      // but not this one, and a reverse proxy that buffers the response would
+      // hold every event until the run finished — which is indistinguishable
+      // from the engine not streaming at all.
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
 /** Runs one execution, reporting it on the SSE stream. */
 async function streamPromptExecution({
-  stream,
+  send,
+  isAborted,
   projectId,
   preparedEvent,
   traceId,
   outputConfigs,
   postEvent,
 }: {
-  stream: SSEStreamingApi;
+  send: (event: PlaygroundStreamEvent) => void;
+  isAborted: () => boolean;
   projectId: string;
   preparedEvent: StudioClientEvent;
   traceId: string;
   outputConfigs: ReturnType<typeof outputConfigsFor>;
   postEvent: PromptExecuteRestMembers<PromptExecuteRestSession>["postEvent"];
 }): Promise<void> {
-  let aborted = false;
-  stream.onAbort(() => {
-    aborted = true;
-  });
-
-  // Writes are chained, not awaited at the call site: the engine reports
-  // events synchronously, and the stream helper below must not resolve until
-  // the last chained write has flushed — hono closes the stream the moment the
-  // callback settles, dropping anything still queued.
-  let pendingWrites: Promise<unknown> = Promise.resolve();
-  const send = (event: PlaygroundStreamEvent) => {
-    pendingWrites = pendingWrites
-      .then(() => stream.writeSSE({ data: JSON.stringify(event) }))
-      // A reader who navigated away is the expected cause, and the chain is
-      // what `finally` awaits: unhandled, one rejection travels down every
-      // later `.then` and turns a disconnect into a route failure.
-      .catch((error) => {
-        logger.debug({ error, projectId }, "playground stream write failed");
-      });
-  };
-
   let sentSoFar = "";
   let finished = false;
   const finish = () => {
@@ -158,7 +197,7 @@ async function streamPromptExecution({
     await postEvent({
       projectId,
       event: preparedEvent,
-      isAborted: () => Promise.resolve(aborted),
+      isAborted: () => Promise.resolve(isAborted()),
       onEvent: (serverEvent: StudioServerEvent) => {
         const result = handleEngineEvent({
           serverEvent,
@@ -178,123 +217,113 @@ async function streamPromptExecution({
     });
   } finally {
     finish();
-    await pendingWrites;
   }
 }
 
 /** `/api/prompt-playground/<version>/prompt.execute`, bound to one process. */
-export function createPromptExecuteRestApp<TSession extends PromptExecuteRestSession>(options: {
-  security: AppRestSecurity;
-  ports: PromptExecuteRestMembers<TSession>;
-}): MountableRestApp {
-  const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: PROMPT_PLAYGROUND_BASE_PATH });
+export const promptExecuteRest = defineRestRouter(PromptApi)
+  .withNamespace("prompt-playground")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("browser")
+  .withAddressing("literal", { v1Twin: false })
 
-  // The check is real but not expressible as a bare `permission`: it also
-  // refuses the demo project, whose blanket `prompts:view` grant is a *view*
-  // grant and execution spends provider credit.
-  const sessionAuth = () =>
-    handlerManagedAuth({
-      reason:
-        "browser session resolved in-handler behind an origin gate; prompts:view checked " +
-        "against the body's projectId, with the demo project refused because execution " +
-        "spends provider credit",
-      permissions: ["prompts:view"],
-      credential: "session",
+  .post(PROMPT_EXECUTE_ENDPOINT, "promptExecute")
+  .withAccess(deferredScope({ reason: AUTH_REASON }))
+  .withInput(executeRequestSchema)
+  .withRawResponse({ produces: ["application/json", "text/event-stream"] })
+  .withDocs({
+    description:
+      "Not a stable contract - deliberately kept out of the published OpenAPI document. " +
+      "Streams Server-Sent Events on success.",
+  })
+  .withMiddleware(promptExecuteRestMembers)
+  .handle(async ({ input, request }, members) => {
+    // The origin gate runs before the session is read: the session cookie's
+    // only browser-side protection is SameSite=Lax, which is a site boundary
+    // rather than an origin one, so a sibling subdomain slips past it.
+    const allowed = members.isAllowedOrigin({
+      method: request.method,
+      origin: request.headers.get("origin") ?? undefined,
+      referer: request.headers.get("referer") ?? undefined,
     });
-
-  secured
-    .access(sessionAuth())
-    .post(PROMPT_EXECUTE_PATH, zValidator("json", executeRequestSchema), async (c) => {
-      // The origin gate runs before the session is read: the session cookie's
-      // only browser-side protection is SameSite=Lax, which is a site boundary
-      // rather than an origin one, so a sibling subdomain slips past it.
-      const allowed = ports.isAllowedOrigin({
-        method: c.req.method,
-        origin: c.req.header("origin"),
-        referer: c.req.header("referer"),
-      });
-      if (!allowed) {
-        // The detail lives in the log, not the response: a misconfigured base
-        // URL and a real cross-site POST must be tellable apart somewhere.
-        logger.warn(
-          {
-            origin: c.req.header("origin"),
-            referer: c.req.header("referer"),
-            path: c.req.path,
-          },
-          "refused cross-origin playground request",
-        );
-        throw new CrossOriginRefusedError();
-      }
-
-      const session = await ports.resolveSession(c.req.raw);
-      if (!session) {
-        return c.json({ error: "You must be logged in to access this endpoint." }, 401);
-      }
-
-      const { projectId, formValues, variables, messages, threadId } = c.req.valid(
-        "json",
-      ) as PromptExecuteRequest;
-
-      const permitted =
-        !ports.isDemoProject(projectId) &&
-        (await ports.probeProjectPermission(session, projectId, "prompts:view"));
-      if (!permitted) {
-        return c.json({ error: "You do not have permission to access this endpoint." }, 403);
-      }
-
-      // Allocated before anything that can throw: the error path streams under
-      // the same id, so the conversation's trace affordance points at the run
-      // that failed rather than at nothing (#853).
-      const traceId = ports.newTraceId();
-
-      let preparedEvent: StudioClientEvent;
-      try {
-        preparedEvent = await ports.prepareStudioEvent({
-          projectId,
-          event: buildPromptExecutionEvent({
-            formValues,
-            messages,
-            variables,
-            traceId,
-            threadId: threadId ?? traceId,
-          }),
-        });
-      } catch (error) {
-        // A dataset still normalising is a client precondition, not a fault.
-        // Matched on the handled CODE: the dataset feature's own class is in
-        // another feature's server package, which this one may not name.
-        if (handledCodeOf(error) === "dataset_not_ready") {
-          return c.json({ error: (error as Error).message }, 425);
-        }
-        // A node with no model is fixable in the editor, not a server fault.
-        if (error instanceof LlmModelNotSetError) {
-          return c.json({ error: error.message }, 422);
-        }
-        logger.error({ error, projectId }, "could not prepare a playground run");
-        ports.reportError?.(error, { projectId });
-        return c.json({ error: "Could not prepare this prompt run." }, 500);
-      }
-
-      // hono's streamSSE sets the content type, cache and connection headers
-      // but not this one, and a reverse proxy that buffers the response would
-      // hold every event until the run finished — which is indistinguishable
-      // from the engine not streaming at all.
-      c.header("X-Accel-Buffering", "no");
-
-      return streamSSE(c, (stream) =>
-        streamPromptExecution({
-          stream,
-          projectId,
-          preparedEvent,
-          traceId,
-          outputConfigs: outputConfigsFor(formValues),
-          postEvent:
-            ports.postEvent as PromptExecuteRestMembers<PromptExecuteRestSession>["postEvent"],
-        }),
+    if (!allowed) {
+      // The detail lives in the log, not the response: a misconfigured base
+      // URL and a real cross-site POST must be tellable apart somewhere.
+      logger.warn(
+        {
+          origin: request.headers.get("origin"),
+          referer: request.headers.get("referer"),
+          path: new URL(request.url).pathname,
+        },
+        "refused cross-origin playground request",
       );
-    });
+      throw new CrossOriginRefusedError();
+    }
 
-  return secured.mountable;
-}
+    const session = await members.resolveSession(request);
+    if (!session) {
+      return Response.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
+    }
+
+    const { projectId, formValues, variables, messages, threadId } = input;
+
+    const permitted =
+      !members.isDemoProject(projectId) &&
+      (await members.probeProjectPermission(session, projectId, "prompts:view"));
+    if (!permitted) {
+      return Response.json(
+        { error: "You do not have permission to access this endpoint." },
+        { status: 403 },
+      );
+    }
+
+    // Allocated before anything that can throw: the error path streams under
+    // the same id, so the conversation's trace affordance points at the run
+    // that failed rather than at nothing (#853).
+    const traceId = members.newTraceId();
+
+    let preparedEvent: StudioClientEvent;
+    try {
+      preparedEvent = await members.prepareStudioEvent({
+        projectId,
+        event: buildPromptExecutionEvent({
+          formValues,
+          messages,
+          variables,
+          traceId,
+          threadId: threadId ?? traceId,
+        }),
+      });
+    } catch (error) {
+      // A dataset still normalising is a client precondition, not a fault.
+      // Matched on the handled CODE: the dataset feature's own class is in
+      // another feature's server package, which this one may not name.
+      if (handledCodeOf(error) === "dataset_not_ready") {
+        return Response.json(
+          { error: error instanceof Error ? error.message : String(error) },
+          { status: 425 },
+        );
+      }
+      // A node with no model is fixable in the editor, not a server fault.
+      if (error instanceof LlmModelNotSetError) {
+        return Response.json({ error: error.message }, { status: 422 });
+      }
+      logger.error({ error, projectId }, "could not prepare a playground run");
+      members.reportError?.(error, { projectId });
+      return Response.json({ error: "Could not prepare this prompt run." }, { status: 500 });
+    }
+
+    return createSseResponse((send, isAborted) =>
+      streamPromptExecution({
+        send,
+        isAborted,
+        projectId,
+        preparedEvent,
+        traceId,
+        outputConfigs: outputConfigsFor(formValues),
+        postEvent: members.postEvent,
+      }),
+    );
+  })
+
+  .build();
