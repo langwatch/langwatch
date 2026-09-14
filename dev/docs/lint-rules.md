@@ -409,7 +409,7 @@ Messages:
   - what: Rules module {{path}} may only export functions and constants (found {{found}}).
   - fix: Move the class or `new` into a service or adapter and pass its result in.
 - `serverPath`
-  - what: `{{path}}` has no home in layout v0. Only this shape is allowed: index.ts, <feature>.server.ts, app/<feature>.app.ts, transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), channels/ (the interface, the bundle, the registry, and a tier folder beside them), eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, tasks/<name>.task.ts, migrations/, app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks).
+  - what: `{{path}}` has no home in layout v0. Only this shape is allowed: index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), channels/ (the interface, the bundle, the registry, and a tier folder beside them), eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, tasks/<name>.task.ts, migrations/, app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks).
   - fix: Move it to the directory matching its artifact suffix.
 
 ## `langwatch/feature-source-subject`

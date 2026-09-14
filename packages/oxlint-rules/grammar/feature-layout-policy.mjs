@@ -96,7 +96,7 @@ export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:app|commands|errors|events|queries
  * the reader into the shape the patterns refuse; a test pins the two together.
  */
 export const SERVER_HOMES =
-  "index.ts, <feature>.server.ts, app/<feature>.app.ts, " +
+  "index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, " +
   "transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, " +
   "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
   "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
@@ -109,6 +109,9 @@ export const SERVER_PATTERNS = [
   new RegExp(`^${NAME}\\.server\\.ts$`),
   // A feature app groups its public services; transport adapters stay outside it.
   new RegExp(`^app/${NAME}\\.app\\.ts$`),
+  // The closed record of members a process hands the app (ADR-144), declared
+  // beside the app it feeds.
+  new RegExp(`^app/${NAME}\\.members\\.ts$`),
   // The ported process composition a converted module still carries. A named,
   // documented artifact rather than a refusal, because redlining it mid-recovery
   // helps nobody; the expectation is that it shrinks to nothing as repositories

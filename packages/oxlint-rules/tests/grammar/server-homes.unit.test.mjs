@@ -13,6 +13,7 @@ const EXAMPLE = [
   "index.ts",
   "annotation.server.ts",
   "app/annotation.app.ts",
+  "app/annotation.members.ts",
   "transport/annotation.rest.ts",
   "transport/annotation.trpc.ts",
   "services/annotation.service.ts",
@@ -59,6 +60,21 @@ describe("given the closed server allowlist", () => {
     it("keeps the artifact scoped to app/, one per module", () => {
       expect(hasHome("annotation-composition.build.ts")).toBe(false);
       expect(hasHome("composition/annotation.build.ts")).toBe(false);
+    });
+  });
+
+  describe("when a converted module declares its member record beside the app", () => {
+    /** @scenario "Only the allowed shape has a home" */
+    it("admits app/<feature>.members.ts and names it in the message", () => {
+      expect(hasHome("app/annotation.members.ts")).toBe(true);
+      expect(SERVER_HOMES).toContain("app/<feature>.members.ts");
+    });
+
+    /** @scenario "Only the allowed shape has a home" */
+    it("keeps the artifact scoped to app/ with the dotted suffix", () => {
+      expect(hasHome("annotation.members.ts")).toBe(false);
+      expect(hasHome("app/annotation-members.ts")).toBe(false);
+      expect(hasHome("members/annotation.members.ts")).toBe(false);
     });
   });
 
