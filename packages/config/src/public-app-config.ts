@@ -1,24 +1,7 @@
 /**
- * The public application config: the exact contract a browser is handed, and
- * the meta tag that carries it there.
- *
- * It lives in `@langwatch/config` because both ends of the wire need it and
- * they are different processes. The API process builds the tag and injects it
- * into the HTML shell it serves; the browser bundle reads it back out of the
- * document. While this lived in `apps/ui` the API's static surface was a
- * backend graph rooted in a browser application — the exact shape
- * `frontend-boundary.unit.test.ts` refuses, and one that would have gone
- * unnoticed until somebody put a React import in the module next door.
- *
- * Nothing here reads an environment variable. The projection that does is
- * `./public-app-config.projection`, and it is deliberately a separate module:
- * it declares the NAMES of the deployment's secret variables at module scope,
- * and this one is on the browser's import graph.
- *
- * `readPublicAppConfig` is not here either. It reaches for `document`, so it
- * belongs to the browser application; it decodes through
- * `parsePublicAppConfigMetaContent` below, so there is one encoding on both
- * sides of the tag rather than two that must agree.
+ * Public application config: the exact contract a browser is handed. Lives in @langwatch/config
+ * because both the API (builds and injects the meta tag) and browser (reads it) need it and they
+ * are different processes. Does not read env vars; `./public-app-config.projection` does that.
  */
 import { z } from "zod";
 

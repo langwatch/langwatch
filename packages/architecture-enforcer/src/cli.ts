@@ -333,7 +333,7 @@ function describeCrash(error: unknown): string {
   return String(error);
 }
 
-/** One line per registered policy: its id, the spec its scenarios live in, and its baseline file, if it has one. */
+/** Format each registered policy: id, spec, and baseline file (if present). */
 function formatPolicyList(): string {
   const rows = POLICIES.map(
     (policy) => `${policy.id}\n  spec: ${policy.spec}\n  baseline: ${policy.baseline ?? "none"}`,

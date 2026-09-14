@@ -16,15 +16,9 @@ import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./
 import type { RestMultipart } from "./request.ts";
 import type { EndpointDocs, RouteResponse } from "./response.ts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// What a declared REST route publishes: its operation id and the answer the
-// declaration named.
-//
-// Parameters are NOT written here, and neither is the body of a route the
-// runtime parses for itself: hono-openapi's own validators already carry that
-// metadata, and the document is generated from the mounted app. A route that
-// reads its own bytes has no validator, so its body is written here.
-// ─────────────────────────────────────────────────────────────────────────────
+// What a declared REST route publishes: operation id and the answer the declaration named.
+// Parameters and runtime-parsed bodies are NOT written here (hono-openapi validators carry
+// that metadata). Routes that read their own bytes (no validator) have their body written here.
 
 /**
  * What a declaration adds to the operation its route already publishes: the
@@ -383,16 +377,9 @@ export function securityForCredentialClass({
   return SECURITY_BY_CREDENTIAL_CLASS[credentialClass];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The 3.1 spelling of an exclusive bound.
-//
-// The document declares `openapi: 3.1.0`, where a schema is JSON Schema
-// 2020-12 and `exclusiveMinimum` / `exclusiveMaximum` are numbers. The schema
-// builders still emit the OpenAPI 3.0 spelling: a boolean flag next to a
-// `minimum` or `maximum`. Strict validators reject it, and a client generator
-// reading it either drops the bound or errors, so a `z.number().int().positive()`
-// reached integrators as an unbounded integer.
-// ─────────────────────────────────────────────────────────────────────────────
+// The 3.1 spelling of an exclusive bound. Document declares `openapi: 3.1.0` where
+// `exclusiveMinimum` / `exclusiveMaximum` are numbers, but schema builders emit the 3.0 spelling
+// (boolean flags). Strict validators reject it; client generators drop the bound or error.
 
 /** Whether the value is a plain object worth walking into. */
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -245,25 +245,10 @@ export function coerceToEpoch(value: string | number): number {
 export const successSchema = z.object({ success: z.boolean() });
 
 /**
- * The canonical REST error envelope.
- *
- * One shape for every refusal the API can answer with, so a caller writes one
- * reader:
- *
- *     { "error": { "type": "bad_request",
- *                  "code": "validation_error",
- *                  "message": "The query parameters didn't match the expected shape.",
- *                  "retryable": false,
- *                  "meta": { "target": "query", "fields": ["from"] } } }
- *
- * `type` is the status CLASS, derived from the HTTP status and drawn from a
- * closed set ({@link API_ERROR_TYPE_BY_STATUS}). `code` is the specific, stable
- * machine name for what happened, and is the field to branch on. `message` is a
- * sentence for a human, never parsed. `meta` carries the structured detail the
- * sentence deliberately leaves out. `retryable` is an explicit instruction.
- *
- * `tips`, `docs_url` and `fault` are the remediation channel, carried by both
- * planes (`pkg/herr` on the Go side) whenever the handled error has them.
+ * The canonical REST error envelope: one shape for every refusal so a caller writes one reader.
+ * `type` is the HTTP status class, `code` is the stable machine name (branch on this), `message`
+ * is for humans, `meta` carries structured detail, `retryable` is explicit. `tips`, `docs_url`
+ * and `fault` carry remediation when present.
  */
 export const apiErrorSchema = z.object({
   error: z.object({

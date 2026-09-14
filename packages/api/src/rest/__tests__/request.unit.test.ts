@@ -521,16 +521,9 @@ describe("the size the request body cap is willing to trust", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The receipt ledger behind `Idempotency-Key`.
-//
-// Driven against an in-memory receipt store that keeps the ONE property the
-// protocol is built on: the unique index over (scopeId, key), so a second insert
-// under a live key loses rather than creating alongside the first. Everything
-// the ledger decides — replay, refusal, takeover — is read off that loss.
-//
-// @see specs/ai-gateway/idempotency.feature
-// ─────────────────────────────────────────────────────────────────────────────
+// The receipt ledger behind `Idempotency-Key`. Unique index over (scopeId, key) ensures
+// a second insert under a live key loses rather than creating alongside the first. Everything
+// the ledger decides (replay, refusal, takeover) is read off that loss. @see idempotency.feature
 
 const SCOPE = "project_acme";
 const KEY = "order-4711";

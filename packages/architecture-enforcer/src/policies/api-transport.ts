@@ -807,17 +807,10 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
     const apiApplication = pkg.kind === "application" && pkg.applicationRole === "api";
     if (!strictFeatureApi && !apiApplication) continue;
 
-    // A strict feature package keeps its doors under `src/transport/<surface>/`.
-    // `src/api/` is the name that directory used to have, and four packages
-    // still publish a family from it, so both roots are scanned: dropping the
-    // old one would stop checking them, and dropping the new one stopped
-    // checking everything else — which is what happened when the rename landed
-    // and this list still said `src/api` alone.
-    // The api application's transport is its request-handling surface —
-    // `app-trpc/`, `app-rest/`, and the feature transports under `features/`.
-    // `*.composition.ts`, `*.mount.ts` and `platform/infrastructure/**` are
-    // the composition seam, not transport, so they are scanned by
-    // prisma-containment and application-boundaries instead (R3).
+    // Strict feature packages scan both `src/transport/<surface>/` (new) and `src/api/` (legacy
+    // name that four packages still use). API application scans `app-trpc/`, `app-rest/`, and
+    // `features/`. Composition seam (*.composition.ts, *.mount.ts, platform/infrastructure/**)
+    // scanned by prisma-containment and application-boundaries instead.
     const sourceRoots = strictFeatureApi
       ? [join(pkg.root, "src", "transport"), join(pkg.root, "src", "api")]
       : [
@@ -1839,16 +1832,9 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
 }
 
 /**
- * The credential facts a request arrives with, as keys on the framework's own
- * context bag.
- *
- * A handler that reaches for these is doing the boundary's job by hand: it
- * gets an untyped `any`, it cannot see the credential CLASS (a legacy project
- * key and a service key both arrive with no user id), and it decides
- * authorization from whichever half it happened to read. That is exactly how
- * `/api/coding-agent/pull-request-usage` came to substitute a key's OWNER for
- * the key. The context is the APPLICATION's — the services and the request's
- * own plumbing; who is calling arrives as typed input.
+ * Credential facts a request arrives with, as keys on the framework's context bag.
+ * A handler reaching for these does the boundary's job by hand: it gets untyped `any` and
+ * cannot see the credential CLASS, so it decides auth from whichever half it happened to read.
  */
 const CREDENTIAL_CONTEXT_KEYS = new Set([
   "apiKeyId",

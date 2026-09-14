@@ -3,15 +3,9 @@ import { z } from "zod";
 import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
- * The LangWatch SDK identity a process exports its own operational telemetry
- * under, at the deployment's own spelling.
- *
- * `apiKey` and `endpoint` stay optional: a process given neither exports no
- * telemetry and says so at boot rather than refusing to start. Every reader
- * of this block still owns its OWN self-ingest refusal — a process pointed at
- * its own public origin must not export into itself — because that refusal
- * needs the reader's own listener addresses, which this shared block does not
- * know.
+ * SDK identity a process exports operational telemetry under. Both `apiKey` and `endpoint`
+ * optional. Each reader still owns its own self-ingest refusal since the block doesn't know
+ * the reader's listener addresses.
  */
 export const observabilityConfigDefinition = RuntimeConfig.define({
   apiKey: Config.optionalSecret({ env: "LANGWATCH_API_KEY" }),

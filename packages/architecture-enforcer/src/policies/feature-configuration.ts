@@ -4,14 +4,9 @@ import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../types.ts";
 
 /**
- * A feature that reads runtime configuration declares it once, in its own
- * contract, and no application declares a second reading of the same variable.
- *
- * Two applications that each bind `IS_SAAS` at their own leaf, with their own
- * schema, is how one deployment ends up with two answers to one question. The
- * check is over environment BINDINGS rather than imports because that is the
- * thing that must be unique: a variable has one owner, and every process reads
- * it through that owner's schema.
+ * A feature declares runtime configuration once in its contract; no application declares
+ * a second reading of the same variable. The check is over environment BINDINGS (not imports)
+ * because the variable has one owner and every process reads it through that owner's schema.
  */
 const APPLICATION_CONFIG_DIRECTORIES = [
   join("apps", "api", "src", "platform", "config"),

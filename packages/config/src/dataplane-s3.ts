@@ -1,21 +1,9 @@
 import { z } from "zod";
 
 /**
- * The per-organization S3 accounts a deployment declares, one variable each:
- *
- *     DATAPLANE_S3__<label>__<organizationId>={"endpoint":…,"bucket":…,
- *                                              "accessKeyId":…,"secretAccessKey":…}
- *
- * The `<label>` is a human-readable customer name and carries no meaning; the
- * last `__`-separated segment is the organization id the route is keyed by.
- * Nothing but the variable NAME carries that id, which is why this is read off
- * the environment directly rather than declared as a config leaf: a
- * declarative projection can only name variables it knows in advance.
- *
- * Every process that addresses a tenant's own bucket resolves it here, so a
- * route parsed by one is the route every other one parses. Two processes
- * splitting `<label>__<organizationId>` differently would write a customer's
- * objects where they cannot read them, and neither side would report an error.
+ * Per-organization S3 accounts: `DATAPLANE_S3__<label>__<organizationId>={…}`. The last segment
+ * is the org id (keyed by variable name, not config leaf). All processes must parse it the same
+ * way or customer data gets misaddressed.
  */
 
 const dataplaneS3RouteSchema = z.object({
@@ -42,13 +30,9 @@ export type DataplaneS3RoutingTable = {
 export const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
 
 /**
- * Reads every `DATAPLANE_S3__*` variable in `source` into a routing table.
- *
- * A malformed entry is SKIPPED and reported rather than raised: one customer's
- * bad JSON must not stop the process that serves everyone else. A DUPLICATE
- * organization id THROWS, because two routes for one tenant is a question this
- * process cannot answer, and answering it wrong addresses their data somewhere
- * they cannot read it.
+ * Parse `DATAPLANE_S3__*` variables into a routing table. Malformed entries are skipped
+ * (one customer's bad JSON must not stop the whole process). Duplicate org ids throw
+ * (two routes for one tenant misaddresses data).
  */
 export function parseDataplaneS3RoutingTable(
   source: Readonly<Record<string, unknown>>,

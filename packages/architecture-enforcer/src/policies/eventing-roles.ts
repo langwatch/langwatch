@@ -244,20 +244,9 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
 }
 
 /**
- * Beside the subscriber, in its `__tests__` directory.
- *
- * This used to look in `<pkg>/tests/subscribers/`, and went on looking there
- * after `5f9acf2b79` moved every feature package's tests next to the code they
- * cover. Twenty of the twenty-two subscribers it reported had a redelivery test
- * the whole time, in `src/subscribers/__tests__/` — the location
- * `feature-layout.ts` names as the one a test may occupy. A rule that reports a
- * test as missing while reading it is worse than no rule: it costs the reader
- * the same attention as a real finding and teaches them the policy is noise.
- *
- * No package uses the old path any more, so this checks one location rather
- * than accepting both. A redelivery test somewhere else in the package still
- * counts as absent, which is the point — the pairing has to be visible from the
- * subscriber's own directory.
+ * Redelivery test in the subscriber's `__tests__` directory. The old path `<pkg>/tests/` is no
+ * longer used; this checks one location so a missing test somewhere else still counts as absent.
+ * The pairing must be visible from the subscriber's own directory.
  */
 function subscriberRedeliveryTest(file: string): string {
   const subject = basename(file, ".ts");

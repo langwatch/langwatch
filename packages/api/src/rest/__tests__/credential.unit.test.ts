@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
- * What a REST handler is allowed to learn about the credential its request
- * arrived with: the principal read off the context, and the two guards
- * standing between a key and a person's own usage data.
- *
- * The refusals are pinned by `code` rather than by the sentence they carry:
- * the words are copy and the client renders its own, but the code is what a
- * caller branches on.
+ * What a REST handler learns about the credential: the principal, and the two guards
+ * standing between a key and personal usage data. Refusals branch on `code`, not copy.
  */
 
 import {

@@ -465,7 +465,9 @@ function forbiddenBrowserCapabilityImport(specifier: string): string | undefined
 const commentFreeSources = new Map<string, string>();
 
 /**
- * The source with comments blanked to spaces (not removed, so offsets stay lined up). Capability checks are regex over raw text, so a docblock that only NAMES a capability read as a use of it; the PARSER, not a bare scanner, avoids the same trap with template literals.
+ * Source with comments blanked to spaces (not removed, so offsets stay lined up). Capability
+ * checks are regex over raw text, so a docblock that only names a capability reads as a use of
+ * it; the parser, not a bare scanner, avoids this trap with template literals.
  */
 function withoutComments(source: string): string {
   // No comment marker, nothing to blank, and no reason to parse the file.
@@ -584,7 +586,9 @@ export type PortableModuleOracle = {
 };
 
 /**
- * Whether a first-party module is portable into browser UI, decided by reading it, not its package name (the prior name test wrongly refused framework-free modules like `@langwatch/handled-error`'s subpaths). Portable means the VALUE closure stays clear of React/JSX, transport/router/session/storage, server, Prisma, env and Node builtins (`import type` is erased). An unresolvable specifier is left to the caller's own rule.
+ * Whether a first-party module is portable into browser UI (read, not package name). Portable
+ * means VALUE closure stays clear of React, transport, server, Prisma, env and Node builtins
+ * (`import type` is erased). Unresolvable specifiers deferred to caller's rule.
  */
 function createPortableModuleOracle({ root }: { root: string }): PortableModuleOracle {
   let resolver: WorkspaceModuleResolver | undefined;

@@ -1,8 +1,7 @@
-// @langwatch/api -- the transport-agnostic half Everything here is true of a LangWatch API call whatever carries
-// it: the error vocabulary and its wire envelope, the access-policy vocabulary that says what credential an
-// operation accepts, the capability ports, and the Standard Schema boundary. None of it imports a transport
-// framework. The Hono service framework is `@langwatch/api/rest`; the tRPC root and its policy middleware are
-// `@langwatch/api/trpc`. Neither is re-exported here on purpose: a consumer that wants a transport names it.
+// @langwatch/api — transport-agnostic half of the API; shared error vocabulary, access policies,
+// capability ports, Standard Schema boundary. The Hono service framework is `@langwatch/api/rest`;
+// tRPC root and policy middleware are `@langwatch/api/trpc`. Neither is re-exported here: a
+// consumer that wants a transport names it.
 
 export {
   AuthenticatedActorRequiredError,

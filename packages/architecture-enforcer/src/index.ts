@@ -220,7 +220,7 @@ export type { FilenameMigrationPlan, FilenameRename } from "./tools/filename-mig
 const DECLARATIONS_POLICY = "declarations";
 const LEGACY_FEATURE_FRAGMENTS_POLICY = "legacy-feature-fragments";
 
-/** The registry entries `lintWorkspace` (and the CLI's check mode) actually calls, given its options. */
+/** The registry entries `lintWorkspace` and the CLI actually call, given its options. */
 export function enabledPolicies(
   options: Pick<LintWorkspaceOptions, "declarations" | "legacyFeatureFragments"> = {},
 ): readonly PolicyDefinition[] {

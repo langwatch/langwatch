@@ -138,9 +138,10 @@ export function requires<P extends AuthzPermission>(
 }
 
 /**
- * Require an RBAC permission through the API-key ceiling. Legacy project API keys bypass the ceiling (full access — the historical behaviour of
- * project keys); scoped API keys must satisfy `effective = ApiKey ∩ user` for the permission at the project scope. This is the public REST surface's
- * equivalent of `requires(...)`, kept distinct so the registry records that the gate is the API-key ceiling rather than a strict role check.
+ * Require an RBAC permission through the API-key ceiling. Legacy project API keys bypass the
+ * ceiling (full access — the historical behaviour of project keys); scoped API keys must
+ * satisfy `effective = ApiKey ∩ user` for the permission at the project scope. Equivalent to
+ * `requires(...)` but kept distinct so the registry records the gate as the API-key ceiling.
  */
 export function apiKeyPermission<P extends AuthzPermission>(
   permission: P,
@@ -169,9 +170,9 @@ export function requiresOnProject<P extends AuthzPermission>(
 }
 
 /**
- * Require an RBAC permission at the scope of the team the route addresses, for org apps that operate on one team
- * at a time. The project twin's reasoning applies unchanged: `requires(...)` resolves at organization scope, so a
- * team-scoped binding could never pass and an org-wide grant reached every team in the org.
+ * Require an RBAC permission at team scope, for org apps operating on one team at a time.
+ * `requires(...)` resolves at org scope, so a team-scoped binding could never pass and an
+ * org-wide grant reached every team in the org.
  */
 export function requiresOnTeam<P extends AuthzPermission>(
   permission: P,
@@ -225,9 +226,10 @@ export function internalSecret(reason: string): {
 }
 
 /**
- * The route authenticates and authorizes WITHIN its handler (legacy pattern: in-handler API-key resolution, `getServerAuthSession`, signature checks, or a framework like tRPC/BetterAuth
- * that runs its own per-request RBAC). The builder applies no auth chain; `reason` documents how the handler enforces access so the route is still a reviewable registry entry rather than
- * an unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)` strategy when the auth can be expressed as middleware.
+ * The route authenticates and authorizes within its handler (legacy pattern: in-handler
+ * API-key resolution, `getServerAuthSession`, signature checks, or a framework like tRPC).
+ * `reason` documents how the handler enforces access so the route is still reviewable.
+ * Prefer `requires(...)` / `internalSecret(...)` when the auth can be expressed as middleware.
  */
 export function handlerManagedAuth({
   reason,

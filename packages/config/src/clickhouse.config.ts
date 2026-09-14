@@ -3,16 +3,9 @@ import { z } from "zod";
 import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
- * One organization whose data lives on its own ClickHouse server.
- *
- * These used to be a variable per customer,
- * `CLICKHOUSE_URL__<label>__<organizationId>`, whose name carried the id — so
- * `packages/secrets/keys.json`, which classifies by exact key and does no
- * prefix matching, could not name a single one of them. Every one carried
- * `user:password@host` past the classifier: `haven env` printed it in full and
- * the vault could not resolve it by name, and the prefix scan that read them
- * was the one route around `secrets-through-source`. One key holds the whole
- * family now, and it is classified once as a composite secret.
+ * One organization's data on its own ClickHouse server. Was per-customer variables with ids in
+ * names (`CLICKHOUSE_URL__<label>__<organizationId>`), which the secrets classifier couldn't
+ * match. Now one key for the whole family, classified once as a composite secret.
  */
 const clickhousePrivateRouteSchema = z.object({
   organizationId: z.string().min(1),
@@ -36,15 +29,9 @@ export interface ClickHousePrivateRoutes {
 }
 
 /**
- * Reads `CLICKHOUSE_PRIVATE_ROUTES` into the routes a process may reach.
- *
- * A malformed ENTRY is skipped and reported rather than raised: one customer's
- * bad entry must not stop the process that serves everyone else. A DUPLICATE
- * organization id throws, because two servers for one tenant is a question
- * this process cannot answer, and answering it wrong reads or writes their
- * data on somebody else's server. Malformed JSON throws for the same reason:
- * silently reading it as "no private routes" sends every private tenant to the
- * shared server, which is the failure this whole family exists to prevent.
+ * Parse `CLICKHOUSE_PRIVATE_ROUTES` into reachable routes. Malformed entries are skipped;
+ * duplicate org ids and malformed JSON throw (silently treating them as "no private routes"
+ * sends every private tenant to the shared server, which this family prevents).
  */
 export function parseClickHousePrivateRoutes(raw: string | undefined): ClickHousePrivateRoutes {
   const value = raw?.trim();

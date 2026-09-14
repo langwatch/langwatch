@@ -311,17 +311,9 @@ interface ValidationResult {
   /** The raw candidate the schema rejected; both container versions supply it. */
   data?: unknown;
   /**
-   * Two shapes, because hono-openapi changed containers at v1.
-   *
-   * v0.4 wrapped `@hono/zod-validator` and handed the hook zod's `ZodError`
-   * itself, so the issues lived under `.issues`. v1 wraps
-   * `@hono/standard-validator` and hands over the Standard Schema failure —
-   * the issue array, bare.
-   *
-   * Both are accepted rather than only the current one: reading `.issues` off
-   * an array yields `undefined`, and `undefined ?? []` is an empty violation
-   * list, so getting this wrong does not throw. It ships a 422 that names no
-   * field at all - the exact detail this whole seam exists to preserve.
+   * Two shapes: v0.4 handed zod's `ZodError` (issues under `.issues`), v1 hands the issue
+   * array bare. Both are accepted; reading `.issues` off an array yields `undefined` and
+   * `undefined ?? []` silently produces an empty list.
    */
   error?: { issues?: ZodIssue[] } | readonly ZodIssue[];
 }
@@ -1058,15 +1050,9 @@ export function getSSECompletion(c: Context): Promise<SSECompletion> | undefined
   return completions.get(c);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fan-out to every browser watching one tenant, as a REST family uses it.
-//
-// Delivery is Redis pub/sub with a local fallback, and which of the two is live
-// depends on the process, so the transport takes the capability rather than the
-// mechanism. The rate-limited call answers whether the event was published; a
-// family that broadcasts a delta does not act on that, which is why the results
-// are typed as `unknown` rather than pinned.
-// ─────────────────────────────────────────────────────────────────────────────
+// Fan-out to every browser watching one tenant. Delivery is Redis pub/sub with a local
+// fallback; which is live depends on the process. Rate-limited calls return whether the event
+// was published (families that broadcast deltas don't act on it).
 
 export interface AppRestBroadcast {
   broadcastToTenant(
