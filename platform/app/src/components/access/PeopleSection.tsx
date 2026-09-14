@@ -151,152 +151,16 @@ function usePeopleListState({
     [department.departments],
   );
 
-  const queryClient = api.useUtils();
   const { openDrawer } = useDrawer();
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const rawCut = searchParams.get(CUT_PARAM);
-  const cut: Cut = CUTS.includes(rawCut as Cut) ? (rawCut as Cut) : "all";
-  const selectCut = (next: string) =>
-    setSearchParams(
-      (previous) => {
-        const params = new URLSearchParams(previous);
-        // Everybody is the default, so it stays out of the address entirely.
-        if (next === "all") params.delete(CUT_PARAM);
-        else params.set(CUT_PARAM, next);
-        return params;
-      },
-      { replace: true },
-    );
+  const { cut, selectCut } = useCutFromUrl();
 
-  const {
-    open: isInviteLinkOpen,
-    onOpen: onInviteLinkOpen,
-    onClose: onInviteLinkClose,
-  } = useDisclosure();
-
-  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
-    { organizationId: organization.id },
-    { enabled: !!organization.id },
-  );
-
-  const [selectedInvites, setSelectedInvites] = useState<
-    { inviteCode: string; email: string }[]
-  >([]);
-
-  useEffect(() => {
-    if (selectedInvites.length > 0) onInviteLinkOpen();
-  }, [selectedInvites, onInviteLinkOpen]);
-
-  const publicEnv = usePublicEnv();
-  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
-
-  const { resendInvite, revokeInvite } = useInviteActions({
-    organizationId: organization.id,
-    hasEmailProvider: hasEmailProvider ?? false,
-    onInviteCreated: setSelectedInvites,
-    onClose: () => {
-      // Nothing to close: the invite flow is its own drawer.
-    },
-    refetchInvites: () => void pendingInvites.refetch(),
-    pricingModel: (organization as { pricingModel?: string }).pricingModel,
-    activePlanFree: activePlan.free,
-    activePlanType: activePlan.type,
-    activePlanSource: activePlan.planSource,
-  });
-
-  const { deleteMember, deleting } = useDeleteMember(organization.id);
-
-  // WHO IS ABOUT TO BE REMOVED, and null while nobody is. The row menu called
-  // the mutation straight from its click handler, so a stray press on "Remove
-  // from organization" ended somebody's membership with nothing in between —
-  // while the identical action in `PersonDrawer` has always been behind a
-  // confirmation, as group and role deletion are.
-  const [confirmingRemoval, setConfirmingRemoval] = useState<{
-    userId: string;
-    label: string;
-  } | null>(null);
-
-  const { setMemberDisabled } = useMemberDisableAction({
-    organizationId: organization.id,
-    onChanged: () => {
-      void queryClient.organization.getOrganizationWithMembersAndTheirTeams
-        .invalidate()
-        .catch((error) => {
-          captureException(error, {
-            tags: { organizationId: organization.id },
-          });
-        });
-      void queryClient.limits.getUsage.invalidate();
-      void queryClient.licenseEnforcement.checkLimit.invalidate();
-    },
-  });
-
-  const viewInviteLink = (inviteCode: string, email: string) => {
-    setSelectedInvites([{ inviteCode, email }]);
-    onInviteLinkOpen();
-  };
-
-  const onInviteModalClose = () => {
-    setSelectedInvites([]);
-    onInviteLinkClose();
-  };
-
-  /**
-   * Why each person is here. A second query on purpose: the list must never
-   * wait on it, and a provenance read that fails leaves every row without a
-   * chip rather than leaving the page without rows.
-   */
-  const provenance = api.organization.getMemberProvenance.useQuery(
-    { organizationId: organization.id },
-    { enabled: !!organization.id && canManage },
-  );
-
-  const sortedMembers = useMemo(
-    () =>
-      [...organization.members].sort((a, b) =>
-        (a.user.name ?? a.user.email ?? "").localeCompare(
-          b.user.name ?? b.user.email ?? "",
-        ),
-      ),
-    [organization.members],
-  );
-
-  const canDeleteMember = (memberId: string) =>
-    canManage && organization.members.length > 1 && memberId !== user?.id;
-
-  // Unlike deleting, disabling is reversible and is how an organization gets
-  // back within its licensed seats, so it stays available down to the last
-  // member. The server refuses the cases that would strand the org.
-  const canDisableMember = (memberId: string) =>
-    canManage && memberId !== user?.id;
-
-  const invites = useMemo(
-    () => pendingInvites.data ?? [],
-    [pendingInvites.data],
-  );
-  /** Only the ones still waiting on somebody are a person on the way in. A
-   *  revoked invitation is a record, and it stays readable under its own cut. */
-  const openInvites = useMemo(
-    () =>
-      invites.filter(
-        (invite) =>
-          invite.displayStatus === "PENDING" ||
-          invite.displayStatus === "EXPIRED",
-      ),
-    [invites],
-  );
-
-  const joinRequests = useJoinRequests({
-    organizationId: organization.id,
+  const invitesFlow = useInviteFlow({ organization, activePlan });
+  const removal = useMemberRemoval(organization.id);
+  const reads = usePeopleListReads({
+    organization,
     canManage,
-  });
-
-  // What a person can prove is a fact about them and stays beside them; the
-  // REQUIREMENT is a condition of signing in and lives on Authentication.
-  const twoStep = useTwoStepRequirement({
-    organizationId: organization.id,
-    canManage,
+    userId: user?.id,
   });
 
   return {
@@ -307,26 +171,9 @@ function usePeopleListState({
     openDrawer,
     cut,
     selectCut,
-    isInviteLinkOpen,
-    selectedInvites,
-    pendingInvites,
-    resendInvite,
-    revokeInvite,
-    deleteMember,
-    deleting,
-    confirmingRemoval,
-    setConfirmingRemoval,
-    setMemberDisabled,
-    viewInviteLink,
-    onInviteModalClose,
-    provenance,
-    sortedMembers,
-    canDeleteMember,
-    canDisableMember,
-    invites,
-    openInvites,
-    joinRequests,
-    twoStep,
+    ...invitesFlow,
+    ...removal,
+    ...reads,
   };
 }
 
@@ -339,35 +186,7 @@ function PeopleList({
   teams: TeamWithProjects[];
   activePlan: PlanInfo;
 }) {
-  const {
-    canManage,
-    department,
-    showDepartment,
-    departmentNameById,
-    openDrawer,
-    cut,
-    selectCut,
-    isInviteLinkOpen,
-    selectedInvites,
-    pendingInvites,
-    resendInvite,
-    revokeInvite,
-    deleteMember,
-    deleting,
-    confirmingRemoval,
-    setConfirmingRemoval,
-    setMemberDisabled,
-    viewInviteLink,
-    onInviteModalClose,
-    provenance,
-    sortedMembers,
-    canDeleteMember,
-    canDisableMember,
-    invites,
-    openInvites,
-    joinRequests,
-    twoStep,
-  } = usePeopleListState({ organization, activePlan });
+  const people = usePeopleListState({ organization, activePlan });
 
   return (
     <>
@@ -375,83 +194,74 @@ function PeopleList({
         <PeopleHeader
           organizationId={organization.id}
           activePlan={activePlan}
-          canManage={canManage}
-          cut={cut}
-          onSelectCut={selectCut}
-          memberCount={sortedMembers.length}
-          openInviteCount={openInvites.length}
-          invitesLoaded={!!pendingInvites.data}
-          requestCount={joinRequests.requests.length}
-          onInvite={openDrawer}
+          canManage={people.canManage}
+          cut={people.cut}
+          onSelectCut={people.selectCut}
+          memberCount={people.sortedMembers.length}
+          openInviteCount={people.openInvites.length}
+          invitesLoaded={!!people.pendingInvites.data}
+          requestCount={people.joinRequests.requests.length}
+          onInvite={people.openDrawer}
         />
 
-        {provenance.isError && (
-          <SectionErrorNotice
-            error={provenance.error}
-            fallbackTitle="Couldn't work out why each person is here"
-          />
-        )}
-
-        {pendingInvites.isError && (
-          <SectionErrorNotice
-            error={pendingInvites.error}
-            fallbackTitle="Couldn't load your invitations"
-          />
-        )}
+        <PeopleReadNotices
+          provenance={people.provenance}
+          pendingInvites={people.pendingInvites}
+        />
 
         {/* Who walked in without anybody approving, above the list they are
             in. Only where somebody is actually looking at the joiners. */}
-        {(cut === "all" || cut === "waiting") && (
-          <AutomaticJoinsNotice joins={joinRequests.automaticJoins} />
+        {(people.cut === "all" || people.cut === "waiting") && (
+          <AutomaticJoinsNotice joins={people.joinRequests.automaticJoins} />
         )}
 
         <PeopleRows
-          cut={cut}
+          cut={people.cut}
           organizationId={organization.id}
-          members={sortedMembers}
-          invites={invites}
-          openInvites={openInvites}
+          members={people.sortedMembers}
+          invites={people.invites}
+          openInvites={people.openInvites}
           teams={teams}
-          canManage={canManage}
-          provenance={provenance.data}
-          department={department}
-          departmentNameById={departmentNameById}
-          showDepartment={showDepartment}
-          twoStep={twoStep}
-          joinRequests={joinRequests}
-          canDeleteMember={canDeleteMember}
-          canDisableMember={canDisableMember}
-          onOpenPerson={(userId) => openDrawer("person", { userId })}
-          onSetDisabled={setMemberDisabled}
-          onRequestRemoval={setConfirmingRemoval}
-          onViewInviteLink={viewInviteLink}
-          onResendInvite={resendInvite}
-          onRevokeInvite={revokeInvite}
+          canManage={people.canManage}
+          provenance={people.provenance.data}
+          department={people.department}
+          departmentNameById={people.departmentNameById}
+          showDepartment={people.showDepartment}
+          twoStep={people.twoStep}
+          joinRequests={people.joinRequests}
+          canDeleteMember={people.canDeleteMember}
+          canDisableMember={people.canDisableMember}
+          onOpenPerson={(userId) => people.openDrawer("person", { userId })}
+          onSetDisabled={people.setMemberDisabled}
+          onRequestRemoval={people.setConfirmingRemoval}
+          onViewInviteLink={people.viewInviteLink}
+          onResendInvite={people.resendInvite}
+          onRevokeInvite={people.revokeInvite}
         />
       </VStack>
 
       <InviteLinkDialog
-        open={isInviteLinkOpen}
-        invites={selectedInvites}
-        onClose={onInviteModalClose}
+        open={people.isInviteLinkOpen}
+        invites={people.selectedInvites}
+        onClose={people.onInviteModalClose}
       />
 
       <ConfirmDialog
-        open={confirmingRemoval !== null}
+        open={people.confirmingRemoval !== null}
         onOpenChange={(isOpen) => {
-          if (!isOpen) setConfirmingRemoval(null);
+          if (!isOpen) people.setConfirmingRemoval(null);
         }}
         title="Remove from organization"
         message={`Remove ${
-          confirmingRemoval?.label ?? "this member"
+          people.confirmingRemoval?.label ?? "this member"
         } from this organization? They lose access to everything in it.`}
         confirmLabel="Remove"
         tone="danger"
-        loading={deleting}
+        loading={people.deleting}
         onConfirm={() => {
-          if (!confirmingRemoval) return;
-          deleteMember(confirmingRemoval.userId);
-          setConfirmingRemoval(null);
+          if (!people.confirmingRemoval) return;
+          people.deleteMember(people.confirmingRemoval.userId);
+          people.setConfirmingRemoval(null);
         }}
       />
     </>
@@ -1019,5 +829,268 @@ function PeopleRows({
     <IdentityRowList data-testid="people-list" empty={emptyTextFor(cut)}>
       {[...memberRows, ...inviteRows, ...requestRows]}
     </IdentityRowList>
+  );
+}
+
+/**
+ * Invitations: the pending list, the actions on one, and the link dialog.
+ *
+ * The dialog opens off `selectedInvites` rather than a boolean, because the
+ * thing it shows IS the selection — a freshly created invite arrives here the
+ * same way one picked from the table does.
+ */
+function useInviteFlow({
+  organization,
+  activePlan,
+}: {
+  organization: OrganizationWithMembersAndTheirTeams;
+  activePlan: PlanInfo;
+}) {
+  const {
+    open: isInviteLinkOpen,
+    onOpen: onInviteLinkOpen,
+    onClose: onInviteLinkClose,
+  } = useDisclosure();
+
+  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization.id },
+  );
+
+  const [selectedInvites, setSelectedInvites] = useState<
+    { inviteCode: string; email: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (selectedInvites.length > 0) onInviteLinkOpen();
+  }, [selectedInvites, onInviteLinkOpen]);
+
+  const publicEnv = usePublicEnv();
+  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
+
+  const { resendInvite, revokeInvite } = useInviteActions({
+    organizationId: organization.id,
+    hasEmailProvider: hasEmailProvider ?? false,
+    onInviteCreated: setSelectedInvites,
+    onClose: () => {
+      // Nothing to close: the invite flow is its own drawer.
+    },
+    refetchInvites: () => void pendingInvites.refetch(),
+    pricingModel: (organization as { pricingModel?: string }).pricingModel,
+    activePlanFree: activePlan.free,
+    activePlanType: activePlan.type,
+    activePlanSource: activePlan.planSource,
+  });
+
+  const viewInviteLink = (inviteCode: string, email: string) => {
+    setSelectedInvites([{ inviteCode, email }]);
+    onInviteLinkOpen();
+  };
+
+  const onInviteModalClose = () => {
+    setSelectedInvites([]);
+    onInviteLinkClose();
+  };
+
+  return {
+    isInviteLinkOpen,
+    selectedInvites,
+    pendingInvites,
+    resendInvite,
+    revokeInvite,
+    viewInviteLink,
+    onInviteModalClose,
+  };
+}
+
+/**
+ * Which cut of the list is showing, kept in the address.
+ *
+ * "Everybody" is the default, so it stays OUT of the address entirely — a
+ * shared link should read as the thing somebody was looking at, not as the
+ * absence of a filter. Replaced rather than pushed: changing a filter is not
+ * a place to go back to.
+ */
+function useCutFromUrl() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawCut = searchParams.get(CUT_PARAM);
+  const cut: Cut = CUTS.includes(rawCut as Cut) ? (rawCut as Cut) : "all";
+  const selectCut = (next: string) =>
+    setSearchParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        // Everybody is the default, so it stays out of the address entirely.
+        if (next === "all") params.delete(CUT_PARAM);
+        else params.set(CUT_PARAM, next);
+        return params;
+      },
+      { replace: true },
+    );
+
+  return { cut, selectCut };
+}
+
+/**
+ * Removing a member, and the gentler thing to do instead.
+ *
+ * `confirmingRemoval` is null while nobody is about to go. The row menu used
+ * to call the mutation straight from its click handler, so a stray press on
+ * "Remove from organization" ended somebody's membership with nothing in
+ * between — while the identical action in PersonDrawer has always been behind
+ * a confirmation, as group and role deletion are.
+ */
+function useMemberRemoval(organizationId: string) {
+  const queryClient = api.useUtils();
+  const { deleteMember, deleting } = useDeleteMember(organizationId);
+
+  // WHO IS ABOUT TO BE REMOVED, and null while nobody is. The row menu called
+  // the mutation straight from its click handler, so a stray press on "Remove
+  // from organization" ended somebody's membership with nothing in between —
+  // while the identical action in `PersonDrawer` has always been behind a
+  // confirmation, as group and role deletion are.
+  const [confirmingRemoval, setConfirmingRemoval] = useState<{
+    userId: string;
+    label: string;
+  } | null>(null);
+
+  const { setMemberDisabled } = useMemberDisableAction({
+    organizationId,
+    onChanged: () => {
+      void queryClient.organization.getOrganizationWithMembersAndTheirTeams
+        .invalidate()
+        .catch((error) => {
+          captureException(error, {
+            tags: { organizationId },
+          });
+        });
+      void queryClient.limits.getUsage.invalidate();
+      void queryClient.licenseEnforcement.checkLimit.invalidate();
+    },
+  });
+
+  return {
+    deleteMember,
+    deleting,
+    confirmingRemoval,
+    setConfirmingRemoval,
+    setMemberDisabled,
+  };
+}
+
+/**
+ * The reads the list draws from, and who may act on whom.
+ *
+ * Provenance, join requests and two-step standing are separate queries on
+ * purpose: the list must never wait on any of them, and one that fails leaves
+ * its column empty rather than leaving the page without rows.
+ */
+function usePeopleListReads({
+  organization,
+  canManage,
+  userId,
+}: {
+  organization: OrganizationWithMembersAndTheirTeams;
+  canManage: boolean;
+  userId: string | undefined;
+}) {
+  /**
+   * Why each person is here. A second query on purpose: the list must never
+   * wait on it, and a provenance read that fails leaves every row without a
+   * chip rather than leaving the page without rows.
+   */
+  const provenance = api.organization.getMemberProvenance.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization.id && canManage },
+  );
+
+  const sortedMembers = useMemo(
+    () =>
+      [...organization.members].sort((a, b) =>
+        (a.user.name ?? a.user.email ?? "").localeCompare(
+          b.user.name ?? b.user.email ?? "",
+        ),
+      ),
+    [organization.members],
+  );
+
+  const canDeleteMember = (memberId: string) =>
+    canManage && organization.members.length > 1 && memberId !== userId;
+
+  // Unlike deleting, disabling is reversible and is how an organization gets
+  // back within its licensed seats, so it stays available down to the last
+  // member. The server refuses the cases that would strand the org.
+  const canDisableMember = (memberId: string) =>
+    canManage && memberId !== userId;
+
+  const invites = useMemo(
+    () => pendingInvites.data ?? [],
+    [pendingInvites.data],
+  );
+  /** Only the ones still waiting on somebody are a person on the way in. A
+   *  revoked invitation is a record, and it stays readable under its own cut. */
+  const openInvites = useMemo(
+    () =>
+      invites.filter(
+        (invite) =>
+          invite.displayStatus === "PENDING" ||
+          invite.displayStatus === "EXPIRED",
+      ),
+    [invites],
+  );
+
+  const joinRequests = useJoinRequests({
+    organizationId: organization.id,
+    canManage,
+  });
+
+  // What a person can prove is a fact about them and stays beside them; the
+  // REQUIREMENT is a condition of signing in and lives on Authentication.
+  const twoStep = useTwoStepRequirement({
+    organizationId: organization.id,
+    canManage,
+  });
+
+  return {
+    provenance,
+    sortedMembers,
+    canDeleteMember,
+    canDisableMember,
+    invites,
+    openInvites,
+    joinRequests,
+    twoStep,
+  };
+}
+
+/**
+ * The two reads the list can lose without losing the list.
+ *
+ * Provenance and invitations are separate queries so the roster never waits on
+ * them; when one fails it says so here, above rows that are still correct,
+ * rather than replacing the page with an error.
+ */
+function PeopleReadNotices({
+  provenance,
+  pendingInvites,
+}: {
+  provenance: { isError: boolean; error: unknown };
+  pendingInvites: { isError: boolean; error: unknown };
+}) {
+  return (
+    <>
+      {provenance.isError && (
+        <SectionErrorNotice
+          error={provenance.error}
+          fallbackTitle="Couldn't work out why each person is here"
+        />
+      )}
+
+      {pendingInvites.isError && (
+        <SectionErrorNotice
+          error={pendingInvites.error}
+          fallbackTitle="Couldn't load your invitations"
+        />
+      )}
+    </>
   );
 }
