@@ -16,21 +16,22 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { PrismaGatewayElevenLabsCredentialRepository } from "../../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
+import { createLogger } from "@langwatch/observability";
+import { PrismaGatewayElevenLabsCredentialRepository } from "../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp, membersFrom } from "@langwatch/runtime-composition";
 
-import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
-import type { GatewayModelProviderCredentials, GatewaySpendConfirmation } from "../../../app/gateway.members.ts";
-import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process.ts";
-import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service.ts";
+import { ModelCatalogGatewaySpendRatingAdapter } from "../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import type { GatewayModelProviderCredentials, GatewaySpendConfirmation } from "../../app/gateway.members.ts";
+import type { ConfirmSpendCommandData } from "../../processes/gateway-spend-commands.process.ts";
+import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
-} from "../../../services/gateway-realtime-session.service.ts";
-import { PrismaGatewayRealtimeSessionRepository } from "../../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
-import { gatewayServer } from "../../../gateway.server.ts";
-import { elevenLabsSignature, elevenLabsWebhookRest } from "../../elevenlabs-webhook.rest.ts";
+} from "../../services/gateway-realtime-session.service.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
+import { gatewayServer } from "../../gateway.server.ts";
+import { elevenLabsSignature, elevenLabsWebhookRest } from "../elevenlabs-webhook.rest.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {
@@ -41,9 +42,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:gateway:test:elevenlabs-webhook"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -98,22 +100,24 @@ async function mountWebhook(): Promise<MountableRestApp> {
     spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
     spendConfirmation: new RecordingSpendConfirmation(),
   };
-  const runtime = await createApp({ role: "api", config: {} })
-    .withModule(gatewayServer, {
-      members: {
-        elevenLabsWebhook: {
-          credentials: {
-            providers: PrismaGatewayElevenLabsCredentialRepository.create({
-              get database() {
-                return database();
-              },
-            }),
-            credentials: new PlainCustomKeys(),
-          },
-          sessions: sessionCollaborators(),
+  const runtime = await createApp({
+    role: "api",
+    config: {},
+    members: membersFrom({
+      elevenLabsWebhook: {
+        credentials: {
+          providers: PrismaGatewayElevenLabsCredentialRepository.create({
+            get database() {
+              return database();
+            },
+          }),
+          credentials: new PlainCustomKeys(),
         },
+        sessions: sessionCollaborators(),
       },
-    })
+    }),
+  })
+    .withModules([gatewayServer])
     .boot();
   const gateway = runtime.module(gatewayServer).provided;
   const rest = createRestRuntime({
@@ -126,6 +130,11 @@ async function mountWebhook(): Promise<MountableRestApp> {
 
   return rest.mount(elevenLabsWebhookRest.router(), {
     app: () => gateway,
+    onError: (error, c) =>
+      c.json(
+        { error: { type: "internal_error", code: "internal_error", message: String(error) } },
+        500,
+      ),
     facts: [
       bindRestMiddleware(elevenLabsSignature, (context) => ({
         signature: context.req.header("elevenlabs-signature"),

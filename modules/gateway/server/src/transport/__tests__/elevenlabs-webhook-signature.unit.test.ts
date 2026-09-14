@@ -6,7 +6,7 @@
  */
 import { createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
-import { GatewayElevenLabsWebhookService } from "../../../services/gateway-elevenlabs-webhook.service.ts";
+import { GatewayElevenLabsWebhookService } from "../../services/gateway-elevenlabs-webhook.service.ts";
 
 const SECRET = "wsec_test";
 const BODY = '{"type":"post_call_transcription","data":{"conversation_id":"conv_1"}}';
