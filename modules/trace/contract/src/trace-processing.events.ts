@@ -91,33 +91,15 @@ export function isSpanRecordedEvent(event: TraceProcessingEvent): event is SpanR
 }
 
 /**
- * The claim-check twin of `span_received` (ADR-069): the routing seam stages
- * this in place of the full event for a subscriber that opted in, and the
- * handler reads the span back from its canonical store.
- *
- * This is a STAGED QUEUE PAYLOAD, not an event — a plain versioned DTO owned
- * by the staging lane. It is never appended to the event log (the durable
- * event stays `span_received`); see the constant's docblock for the
- * versioning contract. Its fields mirror the event envelope field-for-field
- * (same names, same validators) so the wire shape is byte-identical to what
- * earlier builds staged and parsed.
+ * Claim-check for `span_received` (ADR-069): staged for subscribers who opt in.
+ * Payload, not event; never logged. Fields mirror event envelope.
  */
 export const spanReferencedPayloadDataSchema = z.object({
   traceId: z.string(),
   spanId: z.string(),
   /** The raw wire span name, mirrored so gates and debugging never need the store. */
   spanName: z.string(),
-  /**
-   * The span's own start, epoch ms, parsed off the wire `startTimeUnixNano`,
-   * or null when the wire value is unparseable.
-   *
-   * Descriptive only. Resolution is a durable event-store lookup keyed by
-   * `(tenantId, aggregateType, aggregateId, id)`, so a null here costs the
-   * reader nothing — there is no partition window to center and nothing to go
-   * blind. A reader that still resolves through a time-windowed span store may
-   * use this as a hint, but it is not the reference's key and a null is an
-   * ordinary value, not a degraded one.
-   */
+  /** Span start time (epoch ms) from wire, or null if unparseable. Descriptive only. */
   startTimeUnixMs: z.number().nullable(),
 });
 
@@ -139,13 +121,8 @@ export type SpanReferencedPayloadData = z.infer<typeof spanReferencedPayloadData
 export type SpanReferencedPayload = z.infer<typeof spanReferencedPayloadSchema>;
 
 /**
- * Discriminate-then-validate read of a staged payload.
- *
- * Returns `null` when the payload does not even claim to be a span reference
- * (the caller falls through to its full-event path). But once the payload
- * claims the type, a shape or version this build cannot read THROWS into the
- * queue's retry — falling through would let a mixed-deploy job be mistaken
- * for another kind of payload and silently no-op.
+ * Read staged payload. Returns null if not a span reference; throws on shape/
+ * version mismatch (to prevent mixed-deploy mistaken no-op).
  */
 export function parseSpanReferencedPayload(value: unknown): SpanReferencedPayload | null {
   const candidate = z.object({ type: z.unknown() }).safeParse(value);
@@ -156,24 +133,8 @@ export function parseSpanReferencedPayload(value: unknown): SpanReferencedPayloa
 }
 
 /**
- * Builds the staged reference for a matched `span_received` event, mirroring
- * the envelope fields the scheduler orders, groups, and dedups by (same id,
- * aggregate, tenant, occurredAt).
- *
- * Identity only, always. The reference names the durable event and never
- * carries the raw span: the resolving read is an event-store lookup keyed by
- * `(tenantId, aggregateType, aggregateId, id)`, and `span_received` carries
- * exactly one span, so that key alone identifies it. `spanId`, `spanName` and
- * `startTimeUnixMs` are descriptive — they let a gate or a log line skip the
- * store, and none of them is the key. There is therefore no shape of event
- * this function cannot reference, and no path on which a raw payload rides the
- * queue.
- *
- * Total at runtime, not merely against the type. This runs as an `enqueue`
- * hook on the shared routing seam, which has no retry, so a throw here would
- * permanently lose that subscriber's job (ADR-069). The schema types
- * `data.span` as present, but the value reaching this function is untrusted
- * wire data behind a cast, so every field is read defensively.
+ * Build staged reference for `span_received`. Identity only; descriptive fields
+ * let gates/logs skip the store. Total at runtime (no retry on routing seam).
  */
 export function makeSpanReferencedPayload(event: SpanReceivedEvent): SpanReferencedPayload {
   const span: Partial<SpanReceivedEvent["data"]["span"]> = event.data.span ?? {};
@@ -198,21 +159,8 @@ export function makeSpanReferencedPayload(event: SpanReceivedEvent): SpanReferen
 }
 
 /**
- * ns→ms off the wire `startTimeUnixNano`, total: null on anything unparseable
- * or non-positive.
- *
- * Delegates to the pipeline's canonical normalizer rather than re-deriving the
- * shapes: `startTimeUnixNano` is a `Fixed64`, which off an OTLP/protobuf decode
- * is a `{low, high}` Long — `parseOtlpBody` decodes without
- * `toObject({longs: String})`, so the Long shape reaches here unchanged, and a
- * string/number-only parse silently read it as "no start". The normalizer
- * throws on an unrecognised shape; this seam must be TOTAL (ADR-069: a throw on
- * the retry-less routing path permanently loses the job), so the throw is
- * contained here and reported as null.
- *
- * Parsing a 19-digit ns value through a double loses sub-microsecond precision,
- * which is sub-millisecond after the divide — well inside what partition
- * windowing tolerates.
+ * Parse ns→ms from wire `startTimeUnixNano`. Delegates to pipeline normalizer.
+ * Total return (null on error); precision loss in double is acceptable.
  */
 function fixed64ToNanoseconds(normalized: z.infer<typeof fixed64Schema>): number {
   if (typeof normalized === "number") return normalized;

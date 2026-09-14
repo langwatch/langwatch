@@ -1,31 +1,7 @@
 /**
- * FROZEN TWIN of the COLLECTOR half of
- * `platform/app/src/shared/traces/mediaParts.ts`. The application keeps its
- * copy while both graphs ingest; edit neither without editing the other.
- *
- * This is the walk that turns an arbitrary span input/output value into the
- * media parts a trace carries — part-first (an object that IS a media part is
- * surfaced and not descended into), generic recursion over every object key
- * and array element, and marker-gated nested-JSON-string hops so a typed-raw
- * envelope still surfaces its media. It mirrors the ingestion-side extraction
- * walker: same depth ceiling, same part-first-stop rule, same marker gate. The
- * two must agree on which shapes they reach — a part the extractor
- * externalizes but the collector never surfaces is stored bytes nothing
- * renders.
- *
- * IT LIVES IN THE CONTRACT because it is the input to the trace-summary media
- * REFERENCES (see `trace-media-ref.ts`), which ride on `TraceListItem` and are
- * read back by the trace read path and the list transport as well as written
- * by the fold. A walk one graph performs differently is a reference one graph
- * mints and the other does not.
- *
- * DELIBERATE DIFFERENCE FROM THE TWIN, and it is a subtraction rather than a
- * change: the application's module also carries five RENDER-side helpers —
- * `isSafeMediaUrl`, `parseNotCapturedMedia`, `mediaRefToMediaData`,
- * `audioPartToMediaData` and `collectAudioParts`. None of them is reached by
- * the walk or by reference collection; they belong to the trace web surface
- * and travel with its conversion. Every function the walk actually calls is
- * here, byte for byte.
+ * FROZEN TWIN: platform/app/src/shared/traces/mediaParts.ts (collector half).
+ * Walk that extracts media parts from span input/output. Must match ingestion walker
+ * for consistent reference collection. See `trace-media-ref.ts` for references.
  */
 import { containsMediaMarkers } from "./trace-media-markers.ts";
 import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
@@ -157,19 +133,8 @@ function providerMediaToMediaData(
 }
 
 /**
- * THE ONE DELIBERATE DIFFERENCE FROM THE TWIN. The application wraps a raw, header-less
- * realtime turn (`pcm16`, companded G.711) into a playable WAV before surfacing it, because a
- * bare `data:audio/wav` carrying raw PCM is silently unplayable. That wrapper is byte work —
- * `Buffer` on the server, `atob`/`btoa` in the browser — and this package is
- * environment-neutral by construction: its tsconfig names `lib: ["es2022"]` and no runtime
- * types.
- *
- * The difference cannot change what this walk is used for. Reference collection
- * (`trace-media-ref.ts`) admits only `/api/files/` addresses; a wrapped WAV is an inline
- * `data:` source, so BOTH copies contribute exactly no reference for a raw-PCM turn. What the
- * application gets and this does not is a playable part for a RENDERER, and the renderer that
- * wants one converts with the trace web surface, which keeps the wrapper. Pinned in
- * `trace-media-ref.unit.test.ts`.
+ * DELIBERATE DIFFERENCE: application wraps raw PCM audio into playable WAV
+ * (byte work). This package omits it; reference collection ignores data: anyway.
  */
 function inputAudioToMediaData(
   p: Readonly<{ data?: string; url?: string; format?: string; mimeType?: string }>,
@@ -204,17 +169,8 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
 }
 
 /**
- * Collection gate: which mapped parts may be auto-mounted (players, <img>,
- * chips) by the strips and list previews.
- *
- * Only content our own pipeline produced — externalized `/api/files/`
- * references and inline `data:` payloads — passes. An external http(s) URL
- * inside span content would otherwise mount an <img>/<audio>/<video src>
- * that beacons every viewer's IP and timing to an attacker-chosen host, and
- * a `javascript:` URL would reach an anchor href. External links stay links
- * in the raw text view. Applies to EVERY part category: a `binary` part
- * declaring an image mime resolves to an <img> just like an `image` part
- * does, so it is gated the same way.
+ * Collection gate for rendering (auto-mount players/<img>/<video>). Only mount
+ * our content (stored objects or data:), not external URLs (security risk).
  */
 export function isRenderableCollectedMedia(media: MediaPartData): boolean {
   if (media.type === "binary") {
@@ -280,14 +236,8 @@ function bareStringToMediaData(value: string): MediaPartData | null {
 }
 
 /**
- * Structured walk of an arbitrary trace input/output value, collecting every
- * media part (audio, images, video, attachments).
- *
- * Mirrors the ingestion-side extraction walker: part-first (an object that IS
- * a media part is surfaced and not descended into), generic recursion over
- * every object key and array element, and media-hint-gated nested JSON
- * strings so a typed-raw envelope (`{type:"raw", value:"[{...}]"}`) still
- * surfaces its media.
+ * Collect media parts from arbitrary trace input/output values. Mirrors
+ * ingestion walker: part-first, recursive, with media-hint-gated nested JSON.
  */
 export function collectMediaParts(value: unknown, depth = 0): MediaPartData[] {
   return collectAnnotatedMediaParts(value, depth).map((part) => part.media);

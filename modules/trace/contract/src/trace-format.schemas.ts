@@ -545,7 +545,7 @@ export const evaluationSchema = z.object({
   name: z.string(),
   type: z.string().optional().nullable(),
   is_guardrail: z.boolean().optional().nullable(),
-  evaluation_thread_id: z.string().optional().nullable(), // Thread ID used for thread-based evaluation data
+  evaluation_thread_id: z.string().optional().nullable(), // Thread ID
   status: evaluationStatusSchema,
   passed: z.boolean().optional().nullable(),
   score: z.number().optional().nullable(),

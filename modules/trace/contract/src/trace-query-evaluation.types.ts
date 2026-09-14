@@ -22,7 +22,8 @@ export interface TranslationContext {
 export type FieldHandler = (tag: TagToken, negated: boolean, context: TranslationContext) => string;
 
 /**
- * Minimal per-span shape the in-memory evaluator reads for span-scoped fields (spanType/spanName/spanStatus). Deriving spans at dispatch time is a later phase, so InMemoryTrace.spans is typically absent today and those fields evaluate to {@link UNSUPPORTED}. Pinned now so field defs can be written against a stable contract.
+ * Minimal per-span shape for in-memory evaluator span-scoped fields. Spans
+ * typically absent (derived later); evaluate to UNSUPPORTED. Pinned for contract.
  */
 export interface DerivedSpanRow {
   /** `stored_spans.SpanName`. */
@@ -34,7 +35,8 @@ export interface DerivedSpanRow {
 }
 
 /**
- * Trace data a field's in-memory predicate can read. summary is the fold state the dispatcher always has; auxiliary collections (see {@link FieldDef.needs}) load lazily and are null/absent until a phase wires them, so a field reading a missing one returns {@link UNSUPPORTED}.
+ * Trace data available to field predicates. summary is always loaded;
+ * auxiliary collections load lazily and return UNSUPPORTED if missing.
  */
 export interface InMemoryTrace {
   summary: TraceSummaryData;
@@ -44,7 +46,8 @@ export interface InMemoryTrace {
 }
 
 /**
- * Returned by evaluateInMemory when a field can't be positively evaluated from data available at dispatch (size, span-scoped fields, an unloaded cross-table collection). Any such tag fails the whole query closed to false — the in-memory side never guesses true.
+ * Returned by evaluateInMemory when field can't be evaluated from available
+ * data (size, spans, unloaded collections). Any such tag fails query to false.
  */
 export const UNSUPPORTED = Symbol("unsupported-at-dispatch");
 export type Unsupported = typeof UNSUPPORTED;
@@ -63,7 +66,8 @@ export type CategoricalRead = (trace: InMemoryTrace) => string | string[] | null
 export type RangeRead = (trace: InMemoryTrace) => number | number[] | null | Unsupported;
 
 /**
- * A single filter field, declaring BOTH sides so they can't drift: CH compilation and the in-memory predicate. build-handlers.ts asserts every known field maps to one via satisfies Record<KnownField, FieldDef> — a field missing either side, or a stray key, fails to compile.
+ * Single filter field declaring BOTH sides (ClickHouse + in-memory predicate)
+ * so they can't drift. Every known field maps to one via satisfies.
  */
 export interface FieldDef {
   /** Compiles the tag to a parameterised ClickHouse WHERE fragment. */

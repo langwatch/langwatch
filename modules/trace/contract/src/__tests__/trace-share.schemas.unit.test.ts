@@ -9,16 +9,8 @@ import {
 } from "../index.ts";
 
 /**
- * The share payload's output schema is the structural half of the leak-
- * prevention contract (`sharedTrace.shareSafe.unit.test.ts` covers the
- * value half — the per-viewer gates). It is applied as the procedure's
- * `.output()` parser, so what it strips never leaves the server.
- *
- * The property under test: a field that is not named in
- * `sharedTrace.schemas.ts` cannot reach an anonymous viewer, even when an
- * internal read schema grows one. That is what makes ADR-057's "a new column on
- * an internal read can never silently leak" true at runtime rather than by
- * convention.
+ * Share payload output schema enforces the leak-prevention contract (ADR-057):
+ * applied as `.output()` parser, so stripped fields never reach the client.
  */
 
 const validPayload = () => ({

@@ -1,13 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Provider media shapes reaching the content-part decoder
- * (specs/trace-processing/trace-media-blob-extraction.feature).
- *
- * Instrumentation for the Anthropic and Google SDKs records the request the
- * customer sent, so a media part arrives in that provider's own vocabulary
- * rather than in the AG-UI one. These pin the two translations: Anthropic's
- * `source` variants and Gemini's typeless `inline_data` carrier.
+ * Provider media shapes reaching the decoder as provider vocabulary (Anthropic
+ * `source`, Gemini `inline_data`) are normalized to AG-UI form. See
+ * specs/trace-processing/trace-media-blob-extraction.feature.
  */
 
 import { describe, expect, it } from "vitest";

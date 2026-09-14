@@ -2,14 +2,8 @@ import { z } from "zod";
 import { TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
 
 /**
- * The transport inputs and results the trace EXPLORER's browser code sends, as
- * opposed to the domain values it renders.
- *
- * They live in the contract because two packages have to agree on them and
- * neither may import the other: `@langwatch/trace-server` parses them at the
- * tRPC procedure, and `@langwatch/trace-web` types its hooks against the
- * router `apps/api` exports. A copy in either package would be a copy that
- * can drift.
+ * Transport inputs and results for trace explorer's browser code. Lives in
+ * contract because server and web packages can't import each other and must agree.
  */
 
 /**

@@ -1,15 +1,8 @@
 import type { ProjectionPlan } from "./trace-projection.types.ts";
 
 /**
- * The shared analytics filter selection, as the legacy trace read consumes it.
- *
- * Declared structurally rather than inferred from the analytics schema: the
- * schema is the ANALYTICS feature's, it lives in that feature's browser
- * package (the dashboards define every filter field), and a server package may
- * not value-import a browser one. What the read needs from it is the shape,
- * which is stated here; the schema itself still arrives at the transport as
- * `TracesTrpcMembers.filterInputSchema`, so what a caller may SEND is still
- * checked against the real thing.
+ * Analytics filter selection shape (server can't import analytics browser
+ * package for schema). Validated at transport via `TracesTrpcMembers.filterInputSchema`.
  */
 export type TraceSharedFiltersInput = {
   projectId: string;
@@ -25,13 +18,8 @@ export type TraceSharedFiltersInput = {
 };
 
 /**
- * The INPUTS to the legacy trace read.
- *
- * The results the same read answers with live in `@langwatch/trace-contract`
- * (`trace-read.contract.ts`), beside the trace formats they are built from, so
- * a transport can name them without importing this application. The inputs
- * stay here because they are derived from the shared analytics filter schema
- * and the projection plan, neither of which has left the application yet.
+ * Inputs to the legacy trace read. Results live in `trace-contract` (alongside
+ * trace formats); inputs stay here since they derive from analytics schema and projection.
  */
 
 /** Time axis that `startDate`/`endDate` and the keyset cursor apply to. */

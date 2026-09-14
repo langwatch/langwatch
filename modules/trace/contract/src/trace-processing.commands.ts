@@ -61,13 +61,8 @@ export const resolveOriginCommandDataSchema = z.object({
 export type ResolveOriginCommandData = z.infer<typeof resolveOriginCommandDataSchema>;
 
 /**
- * Strict input shape for the user-facing rename API. The trim is applied
- * upstream (in the app-layer service) before this schema runs, so this
- * rejects pure-whitespace and over-long names without an extra transform
- * step that defineCommand's `z.ZodObject<z.ZodRawShape>` constraint
- * doesn't accept. Anything that fails this Zod check should bubble up
- * as a `ValidationError` (HandledError) rather than reaching the command
- * pipeline.
+ * Input shape for rename API. Trim applied upstream; schema rejects
+ * whitespace/over-length without extra step. Failures are HandledError.
  */
 export const changeTraceNameInputSchema = z.object({
   newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),

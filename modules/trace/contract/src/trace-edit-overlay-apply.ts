@@ -1,11 +1,6 @@
 /**
- * A correction as the canonical trace carries it: the trace read the dataset
- * path and the API hand out. `applyTraceEditOverlayToViews.ts` holds the same
- * corrections against the drawer's own shapes, and both read one patch through
- * the span index built here.
- *
- * The patch is applied as given. What a viewer may read is decided before it
- * reaches here, by `redactPatchForViewer`.
+ * Apply trace corrections as received. Viewer redaction is handled separately by
+ * `redactPatchForViewer`; drawer mirrors corrections via `applyTraceEditOverlayToViews.ts`.
  */
 import type { Span, Trace } from "./trace-format.schemas.ts";
 import {
@@ -145,14 +140,8 @@ function correctedSpans({
 }
 
 /**
- * The trace's metadata with the correction laid over it, or null when the
- * correction says nothing about it.
- *
- * The correction is an overlay on the map rather than a replacement of it: a
- * key it names replaces what the trace recorded, a `null` value removes that
- * key, and a key it does not name stays as captured. That is what lets a
- * correction change one label without restating everything the platform
- * stamped. A `null` in place of the whole map clears the metadata.
+ * Trace metadata with correction applied. Correction is an overlay: named keys
+ * replace, null removes, unnamed stay. Null value clears entire metadata.
  */
 function correctedMetadata({
   trace,
@@ -174,15 +163,8 @@ function correctedMetadata({
 }
 
 /**
- * Applies a correction to a canonical trace. Returns the very same trace when
- * the correction leaves every field it carries untouched, so a caller can
- * compare references to learn whether anything was corrected without diffing
- * the payload. An edit whose value equals the captured one still produces a new
- * trace: equality is a property of the values, not of the correction.
- *
- * Timings, metrics, evaluations and events are never touched: a correction
- * says what the trace should have contained, not how long it took or what it
- * cost.
+ * Apply correction to canonical trace. Returns same reference when untouched
+ * (for equality checks). Timings, metrics, evaluations, and events are never modified.
  */
 export function applyOverlayToTrace({
   trace,

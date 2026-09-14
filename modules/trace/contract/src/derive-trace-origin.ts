@@ -1,15 +1,6 @@
 /**
- * A trace's origin is stamped onto `Attributes['langwatch.origin']`, but the
- * stamp is applied late (`OriginResolved`), so a trace that has not been
- * resolved yet carries no key at all. ClickHouse returns `''` for a missing
- * map key — not the default — so every reader has to coalesce, and every
- * reader has to coalesce *the same way*, or the SQL and the in-memory
- * evaluator disagree about which traces are `origin:application`.
- *
- * That disagreement is not theoretical: an automation filtering on
- * `origin:application` fired on unstamped traces in the in-memory dispatch
- * evaluator while the identical query returned none of them in the trace
- * list. Both sides now derive from the constants below.
+ * Origin is stamped late, so unresolved traces lack the key. ClickHouse returns
+ * empty string for missing keys; SQL and in-memory readers must coalesce identically.
  */
 export const DEFAULT_TRACE_ORIGIN = "application";
 

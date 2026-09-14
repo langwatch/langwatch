@@ -16,15 +16,8 @@ export const exportFormatSchema = z.enum(["csv", "json"]);
 export type ExportFormat = z.infer<typeof exportFormatSchema>;
 
 /**
- * Everything a download request states EXCEPT which filters it narrows by.
- *
- * The filter selection is the ANALYTICS feature's schema — its keys are that
- * feature's enumerated filter fields, and a trace package may not reach into
- * another feature's server package for them. So the shape is published here
- * without that one key and the process joins the two at the mount, which is
- * the same seam the trace read stack already takes its filter translator
- * across. Stating it as a shape rather than a schema is what makes the join a
- * single spread rather than a second, drifting description of the request.
+ * Export request shape, excluding filters (from analytics feature). Published
+ * as shape (not schema) so mount-point join is single spread without drift.
  */
 export const traceExportRequestShape = {
   projectId: z.string(),

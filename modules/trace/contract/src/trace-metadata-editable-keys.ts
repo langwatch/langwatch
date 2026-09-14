@@ -1,12 +1,6 @@
 /**
- * Which of a trace's metadata keys a correction may touch, and how one of them
- * lines up with the row the drawer shows for it.
- *
- * The drawer reads the trace header, whose attribute map keeps the ingested
- * namespaces (`metadata.` for what the caller sent, `langwatch.` for what the
- * platform stamped), while a correction is written in the bare keys the
- * canonical trace metadata uses, which is what a dataset mapping reads. These
- * three functions are the only place the two spellings meet.
+ * Maps metadata key spellings: attributes use `metadata.` (caller) and
+ * `langwatch.` (platform) prefixes; corrections use bare keys. Three functions bridge.
  */
 
 /** Prefix the ingest path gives every metadata key the caller sent. */
@@ -44,13 +38,8 @@ export function isTraceMetadataKeyEditable(key: string): boolean {
 }
 
 /**
- * The metadata key one summary attribute row corrects, or null when the row is
- * not the trace's own metadata at all.
- *
- * Three rows are: a `metadata.` prefixed key (what the caller sent), the labels
- * attribute, and a bare key. A dotted key in any other namespace
- * (`service.name`, `gen_ai.*`, `telemetry.*`) describes the run that produced
- * the trace rather than the trace, so it carries no correction.
+ * Metadata key one summary attribute row corrects (filtering out run-describing
+ * attributes like service.name, gen_ai.*, telemetry.*).
  */
 export function traceMetadataKeyForAttribute(attributeKey: string): string | null {
   const key = bareMetadataKey(attributeKey);

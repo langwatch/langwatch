@@ -933,15 +933,8 @@ describe("analyzeOrGroups", () => {
     });
 
     it("does NOT thread an outer NOT down to inner members (KNOWN LIMITATION)", () => {
-      // `analyzeOrGroups`'s walker descends through UnaryOperator
-      // without tracking negation, so `NOT (status:error OR
-      // status:warning)` produces a group where each member's
-      // `negated` flag is `false`. The sidebar consumer reads
-      // include/exclude state separately via `buildFacetStateLookup`,
-      // which DOES walk negation correctly — so the visible "excluded"
-      // chip styling lands. Pinning current behaviour so a later
-      // negation-threading fix is a deliberate, visible change rather
-      // than a silent shift.
+      // KNOWN LIMITATION: walker doesn't track negation in OR groups. Sidebar reads
+      // it via `buildFacetStateLookup`, so styling works. Pinned for deliberate changes.
       const result = analyzeOrGroups(parse("NOT (status:error OR status:warning)"));
       const members = firstGroup(result).members;
       expect(members.every((m) => m.negated === false)).toBe(true);

@@ -9,16 +9,8 @@
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
- * Converts flat dot-notation keys into nested objects.
- *
- * Uses `Object.create(null)` for all objects (root and intermediate) to
- * eliminate prototype pollution vectors entirely. DANGEROUS_KEYS are also
- * blocked as a defence-in-depth measure.
- *
- * Leaf values (arrays, objects, scalars) are preserved as-is.
- *
- * @example
- * safeUnflatten({ "a.b.c": 1 }) // → { a: { b: { c: 1 } } }
+ * Unflatten flat dot-notation keys to nested objects with prototype pollution
+ * protection via Object.create(null) and DANGEROUS_KEYS blocklist.
  */
 export function safeUnflatten(flat: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = Object.create(null);

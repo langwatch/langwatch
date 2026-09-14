@@ -1,7 +1,9 @@
 import { HandledError } from "@langwatch/handled-error";
 
 /**
- * The export could not be produced — raised when it fails to START (service could not be built, or the sizing count query blew up) and the underlying failure has nothing handled to say. Deliberately NOT a wrapper for every infra fault: an already-handled failure (`query_timeout`, `clickhouse_unavailable`, `time_range_too_wide`) says something more specific and travels on its own, with the unhandled cause riding the reason chain so the log keeps it while the customer gets copy written for them (registry: `export_failed`). `fault: platform` explicit since this is an unannotated-would-be-routine-noise 5xx.
+ * Export failed to start (service build failed or sizing query failed). Not a
+ * wrapper for all infra faults: handled failures like `query_timeout` travel alone.
+ * `fault: platform` explicit since this is a 5xx that would otherwise be routine noise.
  */
 export class ExportFailedError extends HandledError {
   declare readonly code: "export_failed";
@@ -17,7 +19,8 @@ export class ExportFailedError extends HandledError {
 }
 
 /**
- * No live auth session behind the request — a known cause the customer can act on (sign in again), which is exactly what the registry's `unauthorized` copy says, and a 401 rather than the generic string body this route used to hand-roll.
+ * No active auth session. Known cause the customer can act on (sign in again).
+ * 401 status with registry-keyed copy (`unauthorized`).
  */
 export class ExportUnauthenticatedError extends HandledError {
   declare readonly code: "unauthorized";

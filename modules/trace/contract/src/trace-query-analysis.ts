@@ -187,14 +187,8 @@ export interface OrGroupMember {
 }
 
 /**
- * Cross-facet OR group: a `LogicalExpression` whose OR-joined branches
- * span more than one field. The sidebar reads this to render its
- * "linked" badge + connector and to decide which facet rows belong to
- * which OR group.
- *
- * `id` is a stable hash of the group's location so consumers can use
- * it for coloring / connector-line keying without having to re-derive
- * it on every render.
+ * Cross-facet OR group with stable hash ID for coloring and connector keying
+ * without re-derivation on each render.
  */
 export interface OrGroup {
   id: string;
@@ -230,15 +224,8 @@ function memberKey(field: string, value: string): string {
 }
 
 /**
- * Walk the AST and produce a structured map of every OR group. A
- * group is any `LogicalExpression` (op = OR) with two or more Tag
- * descendants — *including* same-field ORs like
- * `(status:error OR status:warning)`, which the sidebar can already
- * render as multiple selected values within one section but for
- * which the user still wants the connector line as visual
- * confirmation that those values are linked. Nested OR subtrees are
- * flattened into the same group — the visual treatment doesn't
- * distinguish `(a OR b OR c)` from `((a OR b) OR c)`.
+ * Walk AST, produce structured map of OR groups. Includes same-field ORs,
+ * flattens nested OR subtrees into same group.
  */
 type OrGroupAccumulator = Readonly<{
   groups: OrGroup[];

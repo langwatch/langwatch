@@ -63,7 +63,7 @@ function kindFromMime(mimeType: string): TraceMediaRef["kind"] {
   return "file";
 }
 
-/** Trace-summary refs only ever point at our own stored-objects route (external/data:/javascript: rejected). */
+/** Only accept stored-objects refs; reject external URLs and data:/javascript. */
 function isStoredObjectRefUrl(url: string): boolean {
   return url.startsWith("/api/files/") && !url.includes("..");
 }
@@ -98,7 +98,7 @@ function mediaRefOf(part: CollectedMediaPart): TraceMediaRef | null {
   return null;
 }
 
-/** Walks a span IO value and returns the compact reference list — the fold-side consumer of `collectMediaParts`. */
+/** Compact media reference list from span IO (fold-side consumer of `collectMediaParts`). */
 export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
   const seen = new Set<string>();
