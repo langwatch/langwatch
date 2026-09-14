@@ -21,13 +21,10 @@ import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls.tsx";
-// DANGLING: `declarationsCountLine` / `SuiteDeclarationsRow` do not exist
-// anywhere in this tree (not on MERGE_HEAD's main either, under this or any
-// name grep found) - part of the never-ported suite-editor surface, along
-// with SuiteEditorDrawer, suiteEditorStore, SuiteEvaluatorsSection,
-// useOpenSuiteEditor, useOpenScenarioEvaluatorEditor, useProjectEvaluators
-// and evaluators/attachment-rules. See handoff merge-scenario-dangling-imports.
-import { declarationsCountLine, SuiteDeclarationsRow } from "../suite/suite-declarations-row.tsx";
+import {
+  declarationsCountLine,
+  SuiteDeclarationsRow,
+} from "../../../elements/agent-testing/suite/suite-declarations-row.tsx";
 import type { CasesPanelProps } from "./cases-panel.tsx";
 import { RecentRunsMenu } from "./recent-runs-menu.tsx";
 

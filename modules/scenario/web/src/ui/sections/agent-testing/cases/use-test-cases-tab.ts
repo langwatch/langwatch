@@ -12,11 +12,6 @@ import type {
 } from "@langwatch/analytics-web/surfaces/period-selector";
 import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useDrawer } from "@langwatch/ui-drawer";
-// DANGLING: `useOpenSuiteEditor` / `OpenSuiteEditorParams` do not exist
-// anywhere in this tree - part of the never-ported suite-editor surface
-// (SuiteEditorDrawer, suiteEditorStore, SuiteEvaluatorsSection,
-// evaluators/attachment-rules, useOpenScenarioEvaluatorEditor,
-// useProjectEvaluators). See handoff merge-scenario-dangling-imports.
 import {
   type OpenSuiteEditorParams,
   useOpenSuiteEditor,

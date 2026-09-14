@@ -3,6 +3,7 @@
  */
 
 import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
@@ -182,6 +183,14 @@ export type ScenarioApiMap = {
   prompts: { getAllPromptsForProject: QL };
   traces: { getById: Q };
   workflow: { create: M };
+
+  /** The project's saved evaluators, which the suite editor and the run
+   * dialog attach onto scenarios and read pills for. */
+  evaluators: {
+    getAll: {
+      query: { input: { projectId: string }; output: EvaluatorWithFields[] };
+    };
+  };
 };
 
 /** What each procedure in the map takes. */

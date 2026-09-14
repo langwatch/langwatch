@@ -209,3 +209,12 @@ export function EvaluatorPill({
     </HStack>
   );
 }
+
+/** The row a suite editor or a run dialog lays its evaluator pills in. */
+export function EvaluatorPillRow({ children }: { children: React.ReactNode }) {
+  return (
+    <HStack gap={1.5} flexWrap="wrap" alignItems="center">
+      {children}
+    </HStack>
+  );
+}

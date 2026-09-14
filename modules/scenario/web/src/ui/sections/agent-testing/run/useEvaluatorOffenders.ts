@@ -11,14 +11,11 @@ import { readHandledError } from "~/features/errors";
 import {
   type EvaluatorAttachment,
   parseEvaluatorAttachments,
-} from "~/server/scenarios/evaluator-attachments";
-// DANGLING: `evaluators/attachment-rules` does not exist anywhere in this
-// tree - part of the never-ported suite-editor/evaluator-attach surface. See
-// handoff merge-scenario-dangling-imports.
+} from "@langwatch/scenario-contract";
 import {
   type AttachableEvaluator,
   missingInputsOf,
-} from "../evaluators/attachment-rules";
+} from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import type { ScopeScenario } from "./run-scope-section.tsx";
 import type { RunScope } from "./run-configuration";
 import {

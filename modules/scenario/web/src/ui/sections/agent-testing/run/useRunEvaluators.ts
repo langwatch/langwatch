@@ -11,19 +11,14 @@
  */
 
 import { useCallback } from "react";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
-import { api } from "~/utils/api";
-import { useRouter } from "~/utils/compat/next-router";
-// DANGLING: `evaluators/useOpenScenarioEvaluatorEditor`,
-// `evaluators/useProjectEvaluators` and `suite/useOpenSuiteEditor` do not
-// exist anywhere in this tree - part of the never-ported
-// suite-editor/evaluator-attach surface. See handoff
-// merge-scenario-dangling-imports.
-import { useOpenScenarioEvaluatorEditor } from "../evaluators/useOpenScenarioEvaluatorEditor";
-import { useProjectEvaluators } from "../evaluators/useProjectEvaluators";
-import { useOpenSuiteEditor } from "../suite/useOpenSuiteEditor";
+import { useDrawer } from "@langwatch/ui-drawer";
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
+import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
+import { useOpenSuiteEditor } from "../../../../behavior/agent-testing/suite/use-open-suite-editor.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import type { ScopeScenario } from "./run-scope-section.tsx";
 import type { RunScope } from "./run-configuration";
 import { isEvaluatorFlowDrawer, type SuiteRow } from "./run-evaluators";

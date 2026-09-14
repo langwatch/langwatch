@@ -11,13 +11,10 @@ import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluator
 import { setFlowCallbacks, type useDrawer } from "~/hooks/useDrawer";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import type { api } from "~/utils/api";
-// DANGLING: `evaluators/attachment-rules` does not exist anywhere in this
-// tree - part of the never-ported suite-editor/evaluator-attach surface. See
-// handoff merge-scenario-dangling-imports.
 import {
   type AttachableEvaluator,
   evaluatorFitsPlanLevel,
-} from "../evaluators/attachment-rules";
+} from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import type { SetExtras } from "./useEditAndAttachExtra";
 
 /** The evaluator ids a run plan cannot feed, hidden from the attach list. */

@@ -16,16 +16,12 @@ import type {
   ScenarioMapping,
 } from "~/server/scenarios/evaluator-attachments";
 import type { api } from "~/utils/api";
-// DANGLING: `evaluators/attachment-rules` and
-// `evaluators/useOpenScenarioEvaluatorEditor` do not exist anywhere in this
-// tree - part of the never-ported suite-editor/evaluator-attach surface. See
-// handoff merge-scenario-dangling-imports.
 import {
   type AttachableEvaluator,
   newAttachment,
   opensOnAttach,
-} from "../evaluators/attachment-rules";
-import type { useOpenScenarioEvaluatorEditor } from "../evaluators/useOpenScenarioEvaluatorEditor";
+} from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
+import type { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 import type { InheritedSuite } from "./run-evaluators";
 import { useAddExtraFlow } from "./useAddExtraFlow";
 
