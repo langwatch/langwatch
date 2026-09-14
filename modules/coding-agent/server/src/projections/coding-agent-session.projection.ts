@@ -21,29 +21,7 @@ import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.pr
 import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
 import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metric.projection.ts";
 
-/**
- * The coding-agent session fold (ADR-056).
- *
- * One row per SESSION — the aggregate id is the provider session key (or the
- * fallback trace id), so a session that spans several traces folds into ONE
- * row and a metric-only session can exist at all. The dispatchers on the
- * source pipelines gate and lift, so every event that arrives here is a
- * coding-agent contribution; the fold only applies.
- *
- * Metric-fed fields (lines of code, commits, PRs, edit decisions, active
- * time) overlay through `metric_facts_contributed` with replace-not-increment
- * semantics per ADR-056 §5. The converged per-series totals themselves live
- * in `session_metric_series`.
- *
- * State continuity (ADR-066): the store reads its own last committed row back
- * (`get` → `findBySessionIdWithApplied` → `CodingAgentSessionStateMapper.fromRow`).
- * The typed read-back columns (migrations 00053/00054) close the round-trip gap
- * the projected row otherwise left, so the delivery path does not re-fold from
- * the event log. Read-back applies only to rows stamped with the current
- * projection version — a row written before those columns existed is reported
- * as a miss and refolded once, then rewritten at the current version (see
- * `options` below).
- */
+/** Session fold; spans multiple traces via provider session key or trace id fallback. */
 const codingAgentSessionEvents = [
   spanFactsContributedEventSchema,
   logFactsContributedEventSchema,
@@ -58,63 +36,13 @@ const codingAgentSessionEvents = [
  */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-23";
 
-/**
- * The stamp rows carried while migrations 00053 and 00054 shipped.
- *
- * Neither migration bumped the projection version, so this stamp spans BOTH
- * sides of the read-back columns: rows written before 00053 deployed carry it
- * with those columns absent, and rows written after carry it with them fully
- * populated. The version alone therefore cannot decide whether a row is
- * decodable — see `EventingCodingAgentSessionStoreAdapter.getWithApplied` for the second half
- * of the discriminator.
- *
- * Still accepted after the 2026-07-28, 2026-08-02 and 2026-08-10 bumps,
- * deliberately: these rows predate
- * the logs-only fold entirely, so no agent folded a turn from both a log and a
- * span into them. They are stale in shape, never double-counted, and the
- * discriminator already covers the shape. (The same trade holds for the 00074
- * context-economics columns: a pre-stamp row decodes them as zeros, which is
- * honest for sessions that old, and a replay can backfill them if they ever
- * matter. And for the 00077 branch set: a pre-stamp row decodes it empty, and
- * the read side falls back to the single branch such a row does carry.)
- *
- * Rejecting them would buy nothing anyway. They also predate Cowork detection,
- * so their contributions were stored labelled `claude_code` and a refold
- * replays exactly that (see the version docblock above) — the label and the
- * logs-only counts it gates are only corrected by re-ingestion, never by
- * refolding. Accepting the stamp trades no correctness for one avoided refold
- * wave over every session that predates migrations 00053/00054.
- */
+/** Stamp rows from migrations 00053/00054; version alone cannot decide decodability. */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP = "2026-07-21";
 
-/**
- * How far a session's StartedAt (the table's partition column) may drift from
- * the business time a read is anchored on — a folded event's occurredAt, or a
- * trace-session mapping's timestamp. Sessions run for hours and a late signal
- * can move StartedAt backwards, so the window is ±7 days rather than pinned to
- * the exact ms. Declared once here, on the fold; direct callers derive their
- * window from this too, never from their own arithmetic.
- */
+/** StartedAt drift window (±7 days); declared once for all callers to share. */
 export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * How many same-session events one load/apply/store cycle may coalesce.
- *
- * Lower than the platform default (500) because this fold persists the
- * applied-event-id watermark INTO its ClickHouse row (migration 00054): on a
- * fresh delivery the stored set is exactly the batch's ids, so the coalesce
- * ceiling IS the per-row watermark size. `coding_agent_sessions` is a
- * ReplacingMergeTree that only collapses rows sharing the full sort key, and a
- * late earlier-starting span shifts StartedAt, so superseded row versions — each
- * carrying their own watermark — survive until TTL. 128 ids is a few KB per
- * version instead of ~15-20 KB, and still drains a backed-up hot session in
- * 128-event bites: the amplification collapse comes from coalescing at all, not
- * from the size of the ceiling.
- *
- * Must stay below MAX_APPLIED_EVENT_IDS (the Redis cache trims the set at that
- * cap; a batch at or above it would break redelivery dedup — the projection
- * router rejects such a config at registration).
- */
+/** Coalesce max batch; limited to ~few KB per version to avoid watermark bloat. */
 export const CODING_AGENT_SESSION_COALESCE_MAX_BATCH = 128;
 
 /**
@@ -629,30 +557,7 @@ const titleSourceFromRow = (value: string): SessionTitleSource | null =>
 /** An empty string in a row column reads back as "unset" (null) in state. */
 const nullIfEmpty = (value: string): string | null => (value === "" ? null : value);
 
-/**
- * Decode the fold's working state from its persisted row — the `fromRow`
- * inverse of {@link CodingAgentSessionRowMapper.toRow} (ADR-066).
- *
- * This is a deserialize, NOT a rebuild. A rebuild replays the aggregate's
- * history from `event_log`; this only maps the columns of the last committed
- * projection back into the state shape, so `store.find()` can return the state
- * that Redis (or, on a miss, ClickHouse) already holds. It derives nothing.
- *
- * The row mirrors the state field-for-field; the only conversions are the
- * nullable identity fields (stored as "" ) mapping back to null, `steps`
- * zipping with the parallel `stepStartedAt`, and `metricSeries` re-keying by
- * series id.
- *
- * This decoder is TOTAL: handed a row whose read-back columns are absent it
- * still answers, mapping the ClickHouse column defaults to state defaults (no
- * sub-agent ids, every step starting at 0, no previous context size, no metric
- * units). Those defaults are indistinguishable from real values, so deciding
- * WHETHER a row may be decoded is the store's job, not this function's:
- * `getWithApplied` refuses any row stamped with an older projection version and
- * reports a store miss, and the fold's `refoldOnStoreMiss` rebuilds that session
- * from `event_log` once. A caller that bypasses the version gate gets the
- * defaults above.
- */
+/** Deserialize fold state from persisted row; total decoder mapping defaults for absent columns. */
 export class CodingAgentSessionStateMapper {
   private constructor() {}
 

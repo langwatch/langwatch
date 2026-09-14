@@ -29,16 +29,8 @@ export interface ReplayableSession {
 }
 
 /**
- * Opening a session's terminal replay.
- *
- * A session is a conversation of many turns and the replay reads the last of
- * them, so the trace has to be looked up before anything can open. The lookup
- * is the same one the drawer itself caches, so hovering a row pays for it
- * ahead of the click and the click usually opens on the next frame.
- *
- * The drawer opens over the sessions page rather than navigating to the
- * explorer: the global mount renders it wherever the reader is, so closing it
- * puts them back on the table they narrowed rather than on a fresh one.
+ * Opens session terminal replay by looking up last turn (drawer caches it);
+ * drawer renders globally, so closing returns to original page.
  */
 export function useTerminalReplay({ projectId, projectSlug }: TerminalReplayInput) {
   const utils = codingAgentApi.useUtils();

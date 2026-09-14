@@ -3,18 +3,7 @@ import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-/**
- * A number with a thin bar underneath saying how it compares to the other rows
- * on the page, in the same voice as the trace list's latency columns.
- *
- * The bar carries ONE signal, and only one: where this row sits among its
- * visible peers. It scales to the p95 of the column's own values, fills
- * completely and turns red at or past that mark, and is drawn in blue below
- * it. The value above it is a number like any other in its column, in the
- * column's own color; anything more a value has to say is said on hover.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
- */
+/** Number with percentile bar showing position among visible peers; red at/past p95. */
 
 const BAR_WIDTH = "48px";
 const BAR_HEIGHT = "3px";

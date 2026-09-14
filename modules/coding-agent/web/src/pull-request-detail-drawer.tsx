@@ -16,20 +16,7 @@ import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
 import { ModelsSection } from "./models-section.tsx";
 import { SessionsSection } from "./pull-request-sessions-section.tsx";
 
-/**
- * One pull request in full: what it cost, who worked on it, what each model
- * consumed, and the sessions that ran on it.
- *
- * Facts only. Nothing here carries a session's title or any of its content:
- * titles are derived content and are gated on the session surfaces that own
- * them, and the read behind this drawer carries none.
- *
- * A contributor is a person when the work ran in their own workspace, and the
- * project itself when it ran in a shared one, where it opens that project's
- * traces.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
- */
+/** PR detail: cost, contributors, model breakdown, sessions; facts only, no content. */
 
 export interface PullRequestDetailDrawerProps {
   projectId: string;

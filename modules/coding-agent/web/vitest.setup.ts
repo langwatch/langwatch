@@ -1,17 +1,6 @@
 /**
- * What every test in this package needs before it renders anything.
- *
- * The same three things `@langwatch/gateway-web` states for itself, for the
- * same reasons, now that this package renders whole tables rather than cells. `@testing-library/jest-dom` registers the DOM matchers the
- * suites moved from `platform/app` were written against — `toHaveTextContent`,
- * `toHaveAttribute`, `toBeChecked` — which that application registered in its
- * own global setup, so the assertions travel unchanged rather than being
- * rewritten into `.textContent` comparisons.
- *
- * The other two are browser APIs jsdom does not ship and Chakra's overlays
- * reach for on the way to positioning themselves. A missing `ResizeObserver`
- * surfaces as an unhandled rejection out of an animation frame rather than as a
- * failure, so a shard fails with its own summary all green.
+ * Setup: DOM matchers (@testing-library/jest-dom), ResizeObserver, matchMedia
+ * (browser APIs jsdom doesn't ship; Chakra overlays reach for them).
  */
 
 import "@testing-library/jest-dom/vitest";

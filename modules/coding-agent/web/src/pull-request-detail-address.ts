@@ -1,23 +1,5 @@
-/**
- * Which pull request the detail drawer is open on, kept in the address.
- *
- * `platform/app` opened this drawer through the application's drawer registry,
- * which writes the drawer's name and its scalar props into the query string.
- * That registry is application composition a feature-web package may not reach,
- * and the registered platform copy of the drawer dies with the pages it was
- * registered for. What the spec asks for is the behaviour rather than the
- * registry — the address carries the pull request, so the same link reopens it
- * (specs/coding-agent/pull-request-linkage.feature) — so the tables keep it in
- * a query key of their own and render the drawer inline. The same answer
- * `@langwatch/gateway-web`'s routing-policy editor gives.
- *
- * ONE KEY RATHER THAN THREE. A pull request is named by three values and they
- * are only meaningful together; three keys let a half-written address open a
- * drawer that queries for nothing. `|` separates them because a repository
- * host, an `owner/name` and a number can none of them contain one.
- */
+/** PR in address enables link-reopening; one key separates three values with "|". */
 
-/** The one pull request a detail drawer is about. */
 export type PullRequestDetailRef = {
   repositoryHost: string;
   repositoryFullName: string;

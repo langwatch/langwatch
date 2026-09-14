@@ -1,19 +1,6 @@
-/**
- * The p95 of the values a table page is actually showing, used to scale a
- * row's inline comparison bar against its own peers rather than against an
- * absolute ceiling nobody knows.
- *
- * Zeroes are excluded: a page of mostly empty rows would otherwise drag the
- * percentile to nothing and paint every real value as an outlier.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
- */
+/** P95 excluding zeroes; scales row's comparison bar against visible peers. */
 
-/**
- * Fewer than this many values carrying something, and no bar is drawn at all.
- * Two points describe no distribution, so a bar over them would be a shape
- * with no meaning rather than a comparison.
- */
+/** No bar drawn below this many non-zero values (two points describe no distribution). */
 export const MIN_VALUES_FOR_PERCENTILE = 3;
 
 export interface PercentileStats {

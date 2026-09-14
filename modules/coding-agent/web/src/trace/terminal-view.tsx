@@ -125,30 +125,13 @@ type ContextMarker =
     };
 
 /**
- * Where the context grew into a new size band, and where a cache rebuild
- * ("dead site" — the session paid to re-send context it already had cached)
- * happened. Keyed by the fullIndex of the NEXT visible entry after the model
- * call that triggered it, since `model_call` entries themselves render
- * nothing — see {@link TerminalView}'s `visibleIndices`.
- *
- * Band crossings only (not every call) so a long session gets a small
- * handful of "context is getting big" notes rather than one after every
- * single turn. Dead sites always show — `findCacheRebuilds` is already
- * gated to genuine rebuilds (≥1000 tokens, ≥50% of the prior context), so
- * it doesn't need the same restraint.
- *
- * A crossing is a comparison against the call BEFORE it. While earlier turns
- * are still unloaded, the band state at the walk's start is unknown, and a
- * note drawn from a guess gets redrawn when the truth arrives: the note the
- * reader was looking at vanishes and the transcript under it shifts by a
- * line. So until the first loaded call that carries a band, `historyComplete:
- * false` suppresses the note — loading history can then only add lines above
- * the reader, never remove one below them.
+ * Marks context band crossings and cache rebuilds; suppresses false markers
+ * until history fully loads (band state: known vs guessed).
  */
+
 /**
- * The size band the walk believes the session is in. `known` says whether that
- * belief is the truth rather than a guess: a call with no band leaves it as it
- * was, since the sticky label above it could have been anything.
+ * The size band the walk believes the session is in; `known` says whether
+ * belief is truth or guess (call with no band leaves it unchanged).
  */
 type BandState = { label: string | null; known: boolean };
 
@@ -263,13 +246,8 @@ function forwardDividersToVisible({
 }
 
 /**
- * A row the screen holds still across a commit, and where it sat under the top
- * edge. Following it is what keeps the reader's eyes on the same line while
- * history stacks up above them.
- *
- * Held by the row's own key rather than its index, since a prepend shifts every
- * index down by the number of entries that arrived. A view drawn without
- * `rowKeys` has no stable row identity and takes no anchor at all.
+ * Anchors row across history load to keep reader on same line; held by key
+ * not index for stability when prepends shift indices.
  */
 interface ScrollAnchor {
   rowKey: string;
@@ -360,21 +338,8 @@ interface TerminalViewProps {
 }
 
 /**
- * A recreation of how a Claude Code session looked in the terminal — the
- * WHOLE session, not the last turn. Deliberately NOT a "terminal widget": no
- * window frame, no traffic lights, no title bar. Claude Code doesn't draw
- * those — it prints into the terminal you already have, and its entire
- * hierarchy is carried by a handful of glyphs (see {@link GLYPH}) at one
- * monospace size. Adding chrome around it makes it read as a screenshot of a
- * terminal rather than as the session itself.
- *
- * There is no drag-to-scrub control — a real terminal doesn't have one. The
- * whole session is always on screen; scrolling through it IS the time
- * travel, and the bottom bar's running totals track whatever beat is
- * currently at the bottom of the viewport. New output pulls the screen down
- * with it only while already caught up at the bottom, exactly like `tail -f`
- * — scroll up to read history and it stays put, with a "Jump to bottom"
- * affordance to snap back.
+ * Terminal recreation (whole session, no chrome); scroll-to-timewarp with bottom
+ * bar tracking, auto-scroll catch-up, jump-to-bottom affordance.
  */
 export const TerminalView = memo(function TerminalView({
   entries,
@@ -708,14 +673,8 @@ export const TerminalView = memo(function TerminalView({
 });
 
 /**
- * The session's running total at the reader's position: what the turns above
- * the loaded window carry, plus what the loaded window has counted so far.
- *
- * `undefined` for the earlier part means there is no session above the loaded
- * window, so the loaded total IS the session total. `null` means the turns are
- * there but one of them does not carry this field, so the session total cannot
- * be stated and the bar drops the stat rather than reporting a sum that is
- * short by the turns it could not read.
+ * Session total at reader position (earlier turns + loaded window count);
+ * undefined=no prior turns, null=missing field (incomplete).
  */
 function sessionTotal({
   earlier,
@@ -1259,7 +1218,10 @@ function NotificationLine({ label, body }: { label: string; body: string }) {
   );
 }
 
-/** The user's prompt: `❯ what they typed`. Sets itself apart with the caret's colour, the same way the CLI does — not a background panel. */
+/**
+ * The user's prompt: `❯ what they typed`. Sets itself apart with the caret's
+ * colour, the same way the CLI does — not a background panel.
+ */
 function PromptLine({ text }: { text: string | null }) {
   if (!text?.trim()) return null;
   return (
@@ -1545,13 +1507,8 @@ function AsciiBox({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The bottom bar — Claude Code's own idiom: a box-drawn input bar (the
- * session's name standing in for what you'd type) with a thin status line
- * underneath it (`⏵⏵ …`). Reports what the session had cost by the beat
- * currently scrolled to the bottom of the viewport — no drag control,
- * scrolling IS the time travel. Fixed to the bottom of the pane, both the
- * box and the line under it — neither scrolls away with the transcript
- * above.
+ * Bottom bar with session name, box-drawn input, status line; fixed to bottom,
+ * reports cost at current scroll position (no drag control).
  */
 function StatusLine({
   stepCount,
@@ -1620,13 +1577,8 @@ function StatusLine({
 }
 
 /**
- * The bar's cost stat: the running figure at the reader's position, and the
- * session total beside it when the session holds more than the position
- * covers. "$12.34 of $210.00" — the first number moves with the scroll, the
- * second is the same figure the Usage tab shows. They fold from the same
- * spans, so once everything is loaded and read to the end the two meet, and
- * the suffix drops rather than stating "$210.00 of $210.00". Tiny fold
- * rounding is not "more session", hence the cent of slack.
+ * Cost stat format: "$X of $Y" where first number follows scroll, second is
+ * session total (drops when same as running figure when fully loaded).
  */
 export function statusLineCostLabel({
   costUsd,

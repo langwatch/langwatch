@@ -8,15 +8,7 @@ import {
 } from "./column-sort.ts";
 import { PULL_REQUEST_STATUS_SORT_RANK, type PullRequestStatus } from "./pull-request-status.ts";
 
-/**
- * The Pull Requests table's columns, named against the shared column-sort
- * shape in `columnSort.ts`.
- *
- * The table opens on the work that moved most recently, because that is the
- * question the page is asked most: what is warm right now.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
- */
+/** PR table columns; opens on last-activity (what is warm right now). */
 
 export type PullRequestSortColumn =
   | "number"

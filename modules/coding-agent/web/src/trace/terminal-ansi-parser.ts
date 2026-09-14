@@ -1,25 +1,6 @@
 /**
- * Minimal, dependency-free ANSI SGR parser.
- *
- * Claude Code (and any `xterm-256color` session) emits tool output — `git`,
- * test runners, build tools — peppered with raw ANSI escape codes
- * (`\x1b[32m…\x1b[0m`). Rendered verbatim that's noise. This parser turns a
- * raw string into styled lines/segments that a React component can paint as
- * real colours.
- *
- * Scope: it understands SGR (Select Graphic Rendition, the `ESC[…m` family):
- * the 16 base colours, xterm-256 (`38;5;n` / `48;5;n`), truecolor
- * (`38;2;r;g;b`), and the bold/dim/italic/underline/inverse/strikethrough
- * attributes plus their resets. Every other control sequence (cursor moves,
- * screen clears, OSC title-setting) is recognised and *dropped* so it never
- * leaks into the visible text. Carriage returns collapse to the terminal's
- * overwrite behaviour so progress bars don't spam the output.
- *
- * The parser is deliberately palette-free: colours come back as either a
- * *named* ANSI colour (which the renderer maps to a theme-aware token, so the
- * same "red" reads correctly in light and dark) or a concrete rgb hex (for
- * 256/truecolor, which have no theme-aware equivalent). See
- * `terminalView/palette.ts` for the mapping.
+ * Parse ANSI SGR escape codes to styled segments; understands 16 base colors,
+ * xterm-256, truecolor, and attributes (bold/dim/italic/underline/inverse/strikethrough).
  */
 
 const ESC = "\x1b";
@@ -269,13 +250,8 @@ function styleKey(style: AnsiStyle): string {
 }
 
 /**
- * Parse a raw string containing ANSI escape codes into styled lines. Each line
- * is a list of contiguous same-style segments. Newlines split lines; a bare
- * carriage return (no following newline) resets the current line's visible
- * content, mimicking a terminal's overwrite so progress output collapses to
- * its final frame. Non-SGR control sequences and stray control characters are
- * dropped. Never throws — malformed or binary input degrades to best-effort
- * text.
+ * Parse raw string with ANSI codes into styled lines; handles carriage returns
+ * (terminal overwrite), non-SGR control sequences (dropped), never throws.
  */
 export function parseAnsi(input: string): AnsiLine[] {
   const lines: AnsiLine[] = [];
@@ -376,16 +352,8 @@ export function parseAnsi(input: string): AnsiLine[] {
 }
 
 /**
- * Scan a CSI sequence (`ESC [ params final`) starting at the ESC at `start`:
- * params/intermediates are 0x20-0x3F, then one final byte in 0x40-0x7E.
- * Returns the index to resume at and, when the sequence was a complete SGR
- * (final byte `m`), its parameter string — every other final byte (cursor
- * moves, clears, …) is consumed and dropped.
- *
- * The final byte is consumed only when it really is one: a sequence
- * interrupted mid-params (chunked/truncated output) is followed by a REAL
- * character — often `\n` — which must be re-processed as text, not swallowed
- * as the sequence's final byte (that eats line breaks).
+ * Scan CSI sequence; returns resume index and SGR param string (or null for
+ * non-SGR). Handles interrupted sequences without swallowing following characters.
  */
 function scanCsi(input: string, start: number): { next: number; sgrParams: string | null } {
   const len = input.length;

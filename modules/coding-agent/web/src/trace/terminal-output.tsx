@@ -31,15 +31,8 @@ interface TerminalOutputProps {
 }
 
 /**
- * Renders a block of terminal output as plain monospace text — no card, no
- * border, no header bar. Claude Code doesn't draw a "results panel" around a
- * command's output; it just prints it, and a long run collapses to a
- * handful of lines with a fold marker rather than a scrollbar.
- *
- * The text is selectable (drag-select copies the clean, de-ANSI'd text) and
- * a click on the block (outside a drag-selection) copies it whole — the two
- * ways Claude Code lets you lift terminal output, without a visible button
- * for either.
+ * Renders terminal output monospace (no frame); selectable text de-ANSIs on
+ * drag-select, click-to-copy; collapses long runs to line/size limit.
  */
 export const TerminalOutput = memo(function TerminalOutput({
   text,

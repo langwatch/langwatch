@@ -17,19 +17,8 @@ export type {
 export { codingAgentSchema } from "./coding-agent-definition.ts";
 export { isModelCallSpan, readString } from "./coding-agent-span.ts";
 
-/**
- * The agent registry — ordered, first match wins.
- *
- * Adding an agent is one definition file plus one entry here; the engine
- * (`coding-agent-normalization.ts`) folds the registry into the
- * shared detection, prefix-stripping, and vocabulary tables. Nothing else
- * changes.
- *
- * Order is load-bearing in exactly one place: claude_cowork sits before
- * claude_code because Cowork reuses the Claude Code runtime (anthropic
- * scope, claude_code-namespaced names) and only its service identity
- * distinguishes it — the more specific signal must be asked first.
- */
+// Agent registry ordered first-match-wins; claude_cowork before claude_code
+// because only service identity distinguishes them.
 export const CODING_AGENT_REGISTRY = [
   claudeCoworkAgent,
   claudeCodeAgent,
@@ -55,20 +44,7 @@ if (duplicateAgentId !== undefined) {
   );
 }
 
-/**
- * The agents whose telemetry is events-only (`logsOnly` on the definition) —
- * membership lives on the registry so adding an agent touches `agents/`
- * only; the session derivation gates its event-folding on this set.
- *
- * Typed `ReadonlySet<string>`, not `ReadonlySet<CodingAgent>`, deliberately.
- * What gets tested against it is the `agent` on a stored contribution, which
- * is `z.string().min(1)` because it is decoded from a durable event and may
- * name an agent this build's union no longer has (or does not yet have).
- * Narrowing the set would push a cast onto that boundary, which is the one
- * place the looser type is load-bearing. The ids themselves are still checked
- * — each definition satisfies `CodingAgentDefinition`, whose `id` IS the
- * union, and the duplicate guard above closes the gap `satisfies` leaves.
- */
+/** Events-only agents; string-typed to handle agents this build no longer has. */
 export const LOGS_ONLY_AGENT_IDS: ReadonlySet<string> = new Set(
   CODING_AGENT_REGISTRY.filter((agent) => agent.logsOnly === true).map((agent) => agent.id),
 );

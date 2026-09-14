@@ -1,17 +1,8 @@
 import type { AnsiColor, AnsiColorName } from "./terminal-ansi-parser.ts";
 
 /**
- * A real terminal is dark, saturated, and high-contrast — REGARDLESS of
- * whether the app around it is in light or dark mode. Every value below is a
- * fixed hex, not a Chakra semantic token: the app's `.fg`/`.solid` tokens are
- * deliberately toned down for body text, and that reads as washed-out here.
- * This is the same class of exception `ansiColorToken`'s truecolor passthrough
- * already made — pinned because the design requirement IS a specific,
- * unthemed palette (what a real terminal looks like), not a themeable one.
- *
- * Named colours below are calibrated against a common dark terminal ANSI
- * scheme (the one VS Code's integrated terminal ships), not invented —
- * verified readable against the mark's own gradient and against each other.
+ * Fixed terminal palette (independent of app theme) calibrated against VS Code
+ * scheme; hex values only (not theme tokens).
  */
 const NAMED_HEX: Record<AnsiColorName, string> = {
   black: "#6B6B6B",
@@ -54,7 +45,10 @@ export function ansiColorToken(color: AnsiColor): string {
 export const TERMINAL_TOKENS = {
   screenBg: "#0A0A0A",
   screenFg: "#E8E8E8",
-  /** The "Jump to bottom" pill only — everything else sits on `screenBg` itself, one continuous surface. */
+  /**
+   * The "Jump to bottom" pill only — everything else sits on `screenBg`,
+   * one continuous surface.
+   */
   frameBg: "#141414",
   border: "#2A2A2A",
   faint: "#8A8A8A",
@@ -69,13 +63,8 @@ export const TERMINAL_TOKENS = {
 } as const;
 
 /**
- * A real terminal font stack, not the generic system-mono Chakra's `mono`
- * token resolves to. Nerd Font variants come first — the ones developers who
- * customise their shell prompt are most likely to already have installed
- * (Powerlevel10k's own setup guide recommends MesloLGS NF specifically) —
- * carrying the box-drawing and powerline glyphs a plain system mono lacks.
- * Falls through to the same system stack when none is installed, so nothing
- * breaks for a reader who's never touched their terminal font.
+ * Terminal font stack: Nerd Fonts first (Powerlevel10k support), falling
+ * through to system mono when none installed.
  */
 export const TERMINAL_FONT_STACK =
   '"MesloLGS NF", "FiraCode Nerd Font", "JetBrainsMono Nerd Font", "Hack Nerd Font", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';

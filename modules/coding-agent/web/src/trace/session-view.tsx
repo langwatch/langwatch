@@ -16,16 +16,8 @@ import { TokenTimelineChart } from "./token-timeline-chart.tsx";
 import { deriveTokenTimeline, findCacheRebuilds } from "./token-timeline.ts";
 
 /**
- * The session overview for a coding agent.
- *
- * A coding-agent trace is a SESSION, not an exchange: hundreds of spans, dozens
- * of model calls, a hundred tool runs. The Terminal tab replays it moment by
- * moment, which is the right way to read what happened but the wrong way to
- * answer "was this session healthy, and what did it cost me". This is the other
- * half — the same session, folded.
- *
- * Everything here comes from one pre-folded row (ADR-056), so the screen costs a
- * single point read rather than re-walking 800 spans in the browser.
+ * Session overview: folded metrics (ADR-056) answering health and cost, not
+ * moment-by-moment replay. Pre-folded row enables single-read instead of re-walking 800 spans.
  */
 
 interface SessionViewProps {
@@ -526,7 +518,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** Border / background / text colour for a toned Stat — one place, so Cache health and Context noise read consistently with the existing warning-only stats. */
+/**
+ * Border / background / text colour for a toned Stat — one place, so Cache health and
+ * Context noise read consistently with the existing warning-only stats.
+ */
 const STAT_TONE_COLORS: Record<ContextHealthTone, { border: string; bg: string; fg: string }> = {
   success: { border: "green.solid/30", bg: "green.solid/8", fg: "green.fg" },
   info: { border: "border", bg: "bg.subtle", fg: "fg" },

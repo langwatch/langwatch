@@ -1,18 +1,8 @@
 import type { CodingAgentSessionDisplay } from "./session-display.ts";
 
 /**
- * What's worth NOTICING about a coding-agent session.
- *
- * A wall of counters is not insight. Anyone can read "cache created: 318,404"
- * off a stat grid and learn nothing, because the number only means something
- * against the thing it should be compared to. The job of this module is to do
- * that comparison and say the sentence out loud: *this session paid to rebuild
- * its cache four times*, *you spent six minutes waiting to approve things*,
- * *it got cut off, so the answer is incomplete*.
- *
- * Deliberately a pure function of the row: no query, no hook, no JSX. That keeps
- * every rule below testable as an assertion about a session, which is exactly
- * what they are.
+ * Extracts meaningful signals from session data; compares raw numbers to baselines for
+ * actionable insights. Pure function of the row (no query/hook/JSX) for testability.
  */
 
 export type SessionSignalTone = "danger" | "warning" | "info";

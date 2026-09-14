@@ -1,14 +1,7 @@
 import { z } from "zod";
 
-/**
- * Agent Definition Types
- *
- * The coding-agent pipeline knows each agent through one pure, declarative
- * definition (see the sibling files) registered in `./index.ts` — the same
- * registration shape the trace canonicalisation extractors use. The engine in
- * `coding-agent-normalization.ts` folds the registry into the
- * shared vocabulary; nothing outside `agents/` compares vendor literals.
- */
+// Declarative agent definitions registered in index.ts; normalization engine
+// folds them into shared vocabulary; nothing outside agents/ uses vendor literals.
 
 /** The agents we can name. `unknown` is not a failure — it is an honest answer. */
 export const codingAgentSchema = z.enum([
@@ -168,38 +161,12 @@ export interface CodingAgentDefinition {
    */
   foldsToolRunsFromEvents?: boolean;
 
-  /**
-   * Tool names that are this agent's dispatch plumbing rather than actions
-   * of their own: every tool the model invokes THROUGH one of these
-   * re-enters the agent's tool registry and reports its own `tool_result`,
-   * so folding the wrapper too would count each carried action twice.
-   * Codex's code-mode `exec` tool is the reason this exists — the model
-   * sends it a script, and each `tools.exec_command(...)` call inside the
-   * script dispatches (and reports) on its own.
-   */
+  /** Dispatch wrappers that re-enter the tool registry; exclude to avoid double-counting. */
   wrapperToolNames?: readonly string[];
 
-  /**
-   * True when this agent stamps its provider session id on every
-   * session-relevant log event, so a log record WITHOUT one is ambient
-   * process telemetry (an auth refresh, a crash report) rather than session
-   * activity — the log dispatcher then declines the contribution instead of
-   * minting a session keyed on the record's trace. Codex stamps
-   * `conversation.id` on every session event through its telemetry macro;
-   * the records from its `log_only` scope carry none and describe none.
-   */
+  /** Logs without session id stamp are ambient process telemetry, not session activity. */
   logsRequireSessionKey?: boolean;
 
-  /**
-   * True when the agent's telemetry is events-only (no spans): the session
-   * fold then folds model calls and tool runs from its LOG events.
-   *
-   * This is the double-count gate, and it is ENFORCED on both sides —
-   * `applyLogToCodingAgentSession` folds those facts only for a logs-only
-   * agent, and `applySpanToCodingAgentSession` skips them only for one. It
-   * cannot be a rule about what an agent is allowed to emit: an agent with
-   * this flag may still export the equivalent spans (Cowork does, behind its
-   * beta trace-export flag), and the pipeline accepts them for their identity.
-   */
+  /** Events-only telemetry: session fold gets model calls and tool runs from LOG events. */
   logsOnly?: boolean;
 }

@@ -1,21 +1,8 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 /**
- * Claude Code's real tool span, and the `tool.output` span event it carries
- * when `OTEL_LOG_TOOL_CONTENT=1`.
- *
- * The event's attributes are per-tool (verified against the CLI bundle):
- *
- *   Bash   → `bash_command`, `output`   (stdout)
- *   Read   → `file_path`,   `content`   (the file that was read)
- *   Write  → `file_path`,   `content`   (what was written)
- *   Edit   → `file_path`,   `diff`      (a REAL structured patch)
- *
- * This is strictly better than re-deriving tool I/O from the model's message
- * history: the history holds what the model was *told* the tool returned (capped,
- * and for Edit only the `old_string`/`new_string` we'd have to diff ourselves),
- * whereas the span holds what actually happened — plus how long it took and
- * whether it failed.
+ * Tool spans with per-tool attributes (verified against CLI bundle) plus timing
+ * and failure info; better than re-deriving from model message history.
  */
 const TOOL_SPAN = "claude_code.tool";
 const TOOL_EXECUTION_SPAN = "claude_code.tool.execution";
@@ -48,15 +35,8 @@ function str(value: unknown): string | null {
 }
 
 /**
- * Index the trace's tool spans by their OWN span id, so a `tool` entry from
- * the coding-agent transcript (which carries `spanId` directly, off the SAME
- * span this reads) can be matched to what actually ran. `tool.execution`
- * children contribute the failure signal — the outer `tool` span covers
- * permission + execution, so it can look "ok" while the body failed.
- *
- * Keyed by span id rather than `tool_use_id`: the transcript is agent-neutral
- * and not every agent's tool span carries a model-issued call id, but every
- * span has an id.
+ * Index tool spans by span id for transcript matching; keyed by span id since
+ * not every agent's span carries model-issued call id.
  */
 export function indexToolSpansBySpanId({
   spans,

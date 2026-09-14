@@ -4,15 +4,7 @@ import type { CodingAgentSessionEventRecord } from "../projections/coding-agent-
 import type { CodingAgentTraceSessionRecord } from "../projections/coding-agent-trace-sessions.projection.ts";
 import type { SessionMetricSeriesRecord } from "../projections/session-metric-series.projection.ts";
 
-/**
- * Appends records through Coding Agent's named projection-persistence adapter.
- *
- * Every coding-agent map projection writes the same way: one `ensure` per
- * batch, stamped with the tenant's trace retention and falling back to the
- * platform default when the resolver produced none. Retention is default-on,
- * so that fallback is load-bearing, and holding it in one place is what keeps
- * a change to it from having to be repeated once per store.
- */
+/** Append via projection-persistence adapter; unifies retention fallback logic. */
 abstract class CodingAgentAppendStore<TRecord> implements AppendStore<TRecord> {
   protected constructor(private readonly defaultRetentionDays: number) {}
 

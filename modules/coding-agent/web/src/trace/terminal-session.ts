@@ -1,14 +1,8 @@
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 
 /**
- * Running totals at each point in the transcript, so scrubbing to entry _k_
- * can show the cost/tokens/elapsed accumulated up to and including it — the
- * "watch the cost tick up as you travel through time" HUD.
- *
- * Built over the FULL entry list, including `model_call` entries (which carry
- * economics but render nothing) — so the totals advance at the exact point in
- * the sequence the model call actually happened, not just at the visible
- * beats around it.
+ * Running totals at each transcript point (cost, tokens, elapsed) for scrubbing
+ * HUD; built over full entry list including invisible model_call entries.
  */
 export interface TimelinePoint {
   index: number;

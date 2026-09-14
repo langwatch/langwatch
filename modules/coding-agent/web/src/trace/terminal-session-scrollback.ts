@@ -18,13 +18,8 @@ export type EarlierTotals = {
 };
 
 /**
- * A coding agent session is many traces, one per turn, and the Terminal tab
- * opens on ONE of them. Reading the session back means walking the session's
- * earlier turns and prepending them above the turn already on screen.
- *
- * Merging happens here, away from React, because it is arithmetic: which
- * entries end up in which order, what each row's stable identity is, and where
- * one turn ends and the next begins.
+ * Merges multiple session turns (oldest first) into one transcript; arithmetic
+ * (order, row identity, turn boundaries) handled away from React.
  */
 
 /** One turn of the session, as read. */
@@ -64,13 +59,8 @@ export interface MergedSession {
 }
 
 /**
- * Fold the loaded turns, oldest first, into one transcript.
- *
- * `firstTurnNumber` is the session position of `turns[0]`, so the dividers can
- * say "turn 4 of 12" while only four turns are in memory. No divider is drawn
- * above the oldest loaded content: what sits there is either the top of the
- * session or the affordance to load more, and a rule above the first row would
- * claim a boundary that has nothing on the other side of it.
+ * Fold turns oldest-first into one transcript; `firstTurnNumber` allows dividers
+ * to name turns by session position when partial.
  */
 export function mergeSessionTurns(
   turns: readonly LoadedTurn[],

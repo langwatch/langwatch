@@ -1,22 +1,6 @@
-/**
- * One vocabulary for every coding agent.
- *
- * Claude Code, Cowork, opencode, Codex, Gemini CLI and Copilot all describe
- * the same handful of things — a model call, a tool run, a prompt, a denial,
- * a token — and every one of them spells those things differently. This
- * module is where that ends: raw wire strings in, one canonical fact out.
- * Nothing downstream of here should ever compare against a vendor's literal.
- *
- * WHO each agent is lives in `../agents/` — one pure definition per agent,
- * registered in an ordered registry (the trace-canonicalisation extractor
- * shape). This engine folds the registry into the shared detection,
- * prefix-stripping and alias tables; the per-vendor evidence lives with each
- * definition. Adding an agent touches `agents/` only.
- *
- * The rules here are not guesses. They come from reading each agent's source
- * and from 30 days of live telemetry, and each surprising one carries the
- * evidence that forced it.
- */
+// One vocabulary for all coding agents; folds registry definitions into
+// shared detection, prefix-stripping and alias tables; downstream code never
+// compares vendor literals.
 
 import { CODING_AGENT_REGISTRY } from "./index.ts";
 import type {
@@ -27,17 +11,7 @@ import type {
   TokenType,
 } from "./coding-agent-definition.ts";
 
-/**
- * Which agent produced this record.
- *
- * Deliberately NOT keyed on instrumentation scope alone. Claude Code uses
- * `com.anthropic.claude_code.events` and opencode uses `com.opencode`, but
- * Codex uses whatever `service_name` it was configured with — there is no
- * stable scope string to match on. The NAME of the span/metric/event is the
- * reliable signal, so that is what definitions key on, with the scope and
- * service as supporting hints. Registry order resolves the one genuine
- * overlap (Cowork before Claude Code — see `agents/index.ts`).
- */
+/** Detect agent from record name (reliable signal), not scope (varies by vendor). */
 export function detectCodingAgent({
   scopeName,
   recordName,
@@ -60,27 +34,7 @@ export function detectCodingAgent({
   return "unknown";
 }
 
-/**
- * The conversation this record belongs to.
- *
- * The single most load-bearing function here, because it is the ONLY key every
- * agent agrees on — and they agree on it under four different names:
- *
- *   - Claude Code / Cowork: `session.id` on logs and metrics,
- *     `gen_ai.conversation.id` on SPANS. Verified identical: the same UUID
- *     appears under both keys for the same trace, so a span and a log of one
- *     session do join.
- *   - opencode:    `session.id` everywhere.
- *   - Codex:       `conversation.id` on every log EVENT. Its turn SPAN is the
- *     exception the shared order cannot serve — there
- *     `gen_ai.conversation.id` is the id of the TURN and the session rides
- *     `thread.id` — so the codex definition carries a `sessionKeyFromSpan`
- *     hook and span callers resolve through
- *     {@link resolveSpanConversationKey}.
- *
- * Order matters only in that all of these are the same value when more than one
- * is present, so the first hit wins and no agent is disadvantaged.
- */
+/** The sole session key every agent agrees on; varies by vendor under four different names. */
 export function resolveConversationKey(attrs: Record<string, unknown>): string | null {
   const candidates = ["session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"];
   for (const key of candidates) {
@@ -265,15 +219,7 @@ export function isCodingAgentMetricName(metricName: string): boolean {
   );
 }
 
-/**
- * The scalar coding-agent vocabulary a log contribution carries so the
- * session fold can run entirely on contribution events. Content never rides
- * here: prompts and replies stay in the canonical row; these are lengths,
- * ids, names and counters. Raw key names are preserved on purpose — the
- * fold's derivation reads the same keys off every signal's contribution, so
- * the paths cannot drift. Exported because the span dispatcher lifts the
- * same vocabulary off span attributes.
- */
+/** Scalar vocabulary for log contributions; content stays in the canonical row. */
 export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "event.name",
   "session.id",
@@ -403,26 +349,10 @@ export const SESSION_CONTEXT_EVENT_NAME = "langwatch.session_context";
  */
 export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
 
-/**
- * The fact key a prompt-derived name rides on. Separate from
- * {@link SESSION_TITLE_FACT_KEY} because the two obey different precedence: a
- * generated title always replaces what the row has, while a prompt-derived
- * name only fills an empty one. Most sessions never get a generated title
- * (the agent generates one for a minority of interactive sessions and no
- * headless session), and a row named by what the user first asked beats an
- * untitled one.
- */
+/** Prompt-derived session name, lower precedence than generated title. */
 export const SESSION_TITLE_FALLBACK_FACT_KEY = "langwatch.session.title_fallback";
 
-/**
- * The fact key the session's own name rides on, lifted from the companion
- * event's `langwatch.session.name` attribute. The capture seams MIRROR the
- * name the harness itself holds — claude's `--name` flag and `/rename`
- * command, codex's thread name — rather than inventing one, so renaming the
- * session in the harness renames it here. Highest-precedence of the three:
- * the newest name replaces the row's title in place and neither derived
- * title may clobber it.
- */
+/** Session's own name from harness (`--name`, `/rename`, thread name); highest precedence. */
 export const SESSION_NAME_FACT_KEY = "langwatch.session.name";
 
 /**
@@ -452,16 +382,7 @@ export function sessionTitleFromPrompt(text: string): string | null {
   return collapsed.slice(0, MAX_PROMPT_TITLE_CHARS);
 }
 
-/**
- * The agent a record DECLARES itself to be, when that name is one LangWatch
- * knows. Only the companion event declares anything; every other record is
- * named by {@link detectCodingAgent} from evidence the agent itself emitted.
- *
- * Unknown names answer null rather than passing through: the declaration is
- * attacker-supplied in the same sense every wire attribute is, and a label the
- * registry cannot resolve would become a permanent agent id on the session row
- * (agent labeling is first-writer-wins in the fold).
- */
+/** Declared agent name from companion event (only source), null if unknown. */
 export function declaredCodingAgent(facts: Record<string, unknown>): CodingAgent | null {
   const declared = facts["coding_agent.name"];
   if (typeof declared !== "string" || declared.length === 0) return null;
@@ -469,38 +390,7 @@ export function declaredCodingAgent(facts: Record<string, unknown>): CodingAgent
   return match?.id ?? null;
 }
 
-/**
- * The coding-agent facts off one log record, for its trace contribution —
- * or null when the record is not a coding agent's, which doubles as the
- * consumer-side gate (a contribution without the lift never reaches the
- * session fold).
- *
- * **Deliberately blind to `service.name`**, unlike `detectCodingAgent`. This
- * runs on every ingested log record, and the service name lives only inside
- * `resourceAttributesFlatJson` — there is no extracted column for it — so
- * consulting it here would put a JSON parse on the whole log firehose to
- * answer a question that is almost always "no". That is the cost ADR-069
- * exists to refuse, so the gate stays on the cheap signals (scope, event name)
- * and the caller supplies `service.name` afterwards, to LABEL a record this
- * has already admitted.
- *
- * The residual gap is narrow and known: an agent identified by service name
- * ALONE, emitting bare event names under a scope this does not recognise,
- * would be declined here. Cowork is not that case — it reuses Claude Code's
- * runtime, so its records carry the anthropic scope and `claude_code.*` event
- * names and pass on those. An agent that genuinely needs naming by service
- * alone needs a `ServiceName` column extracted on the canonical log record
- * first; do not close it by parsing resource attributes in this path.
- *
- * LANGWATCH COMPANION-EVENT ADMISSION: {@link SESSION_CONTEXT_EVENT_NAME} is
- * admitted by its own name, ahead of detection. It is the event a LangWatch
- * hook emits to carry the repository, branch and worktree identity no agent
- * exports itself, and it is deliberately NOT dressed up in a vendor's
- * instrumentation scope, so detection would decline it. The gate stays one
- * string equality on the firehose, which is the same cost ADR-069 already
- * accepts here; WHICH agent the event belongs to is what the event declares,
- * read by {@link declaredCodingAgent} at the contribution.
- */
+/** Extract coding-agent facts from log record; consumer-side gate for session fold. */
 export function liftCodingAgentLogFacts({
   scopeName,
   attributes,

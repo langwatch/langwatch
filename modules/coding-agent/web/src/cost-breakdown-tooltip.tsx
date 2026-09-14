@@ -1,15 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatCost } from "@langwatch/design-system/display-formatters";
 
-/**
- * The cost breakdown behind a cost value: what was really billed, what a
- * bundled plan carried, and the list-price total of the two.
- *
- * The package's own copy of the trace explorer's tooltip content, taken rather
- * than imported because it lives under `platform/app`'s `features/traces-v2`
- * and a feature-web package may not reach in. `formatCost` is the shared one,
- * so the numbers still read identically in both places.
- */
+/** Cost breakdown tooltip; package copy of trace explorer (lives in platform/app). */
 function TooltipRow({ label, value }: { label: string; value: string }) {
   return (
     <HStack justify="space-between" gap={4} align="flex-start" minWidth={0}>

@@ -147,17 +147,7 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   };
 }
 
-/**
- * Is a `span_received` payload's body readable at all — does it carry a span
- * object to gate, normalize and lift?
- *
- * Deliberately structural rather than a `spanReceivedEventSchema.parse`: a full
- * parse would turn any drift inside a span the event log already accepted into
- * a job that throws on every one of its 25 attempts and then parks the trace's
- * group — the blocked-group class this whole change exists to remove. The type
- * and the body's presence are what separate "cannot read" from "decline"; the
- * fields within a span the seam already gated stay the normalizer's business.
- */
+/** Check payload body readability without full parse (avoid blocked-group issue). */
 function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
   return readableSpanBodySchema.safeParse(event.data).success;
 }
@@ -226,21 +216,7 @@ async function handleFullEvent({
   );
 }
 
-/**
- * Normalizes a full event's span, or reports the failure and yields `null`.
- *
- * Normalization is a pure function of the span's own bytes, so a body it cannot
- * read fails identically on every redelivery. Throwing would spend all 25
- * attempts re-deriving the same failure and then park the TRACE's group —
- * losing every other span's facts in that group to save one span that was never
- * recoverable. That is the blocked-group class this whole change removes, so an
- * unreadable body completes quietly and loudly instead: logged for an operator,
- * not retried.
- *
- * This is the only path such a span can reach, because the seam already failed
- * to lift it (`makeSpanFactsLiftedPayload` stages the full event on a
- * normalizer throw) — which is exactly why it must not throw here too.
- */
+/** Normalize span or report failure; completes quietly to avoid blocked-group loss. */
 function normalizeOrReport({
   event,
   normalization,
@@ -268,30 +244,7 @@ function normalizeOrReport({
   }
 }
 
-/**
- * Lifts a matched span's facts at the routing seam so the staged job carries
- * its own finished result (ADR-069's bounded derivation).
- *
- * Total at runtime, exactly like `makeSpanReferencedPayload` and for the same
- * reason: this runs as an `enqueue` hook on the shared routing seam, which has
- * no retry, so a throw here would permanently lose the job. Normalization runs
- * on untrusted wire data, so it is wrapped rather than trusted.
- *
- * The result is validated against the very schema the consumer parses with,
- * and a payload that does not validate is DISCARDED in favour of staging the
- * whole event. That is what makes the staged shape provably readable: the
- * consumer's `parseSpanFactsLiftedPayload` throws on a shape it cannot read
- * (correctly — it must never half-process), so staging an unvalidated
- * derivation would convert a malformed span into a job that fails all 25
- * attempts and then blocks its group, which is the exact failure class this
- * change removes.
- *
- * The fallback is the FULL EVENT, never the claim-check: the full-event path
- * resolves with no store read at all, so the rare malformed span costs
- * scheduling-plane bytes instead of re-introducing the race. Only spans this
- * seam cannot lift take it, and `filter` has already established that the span
- * carries a listed coding-agent name.
- */
+/** Lift span facts at routing seam (bounded derivation); stages full event as fallback. */
 function makeSpanFactsLiftedPayload({
   event,
   normalization,
@@ -437,27 +390,7 @@ function liftContribution({
   };
 }
 
-/**
- * The dedup identity, read from either staged shape with total field picks —
- * `makeId` runs on the staging path, so it must never throw.
- *
- * A span with no usable wire id keys on the event's own CORRELATION id — the
- * envelope KSUID — instead of on an empty string. That case is real, not
- * theoretical: an id-less span reaches this function as a reference carrying
- * `spanId: ""` and as a whole `span_received` whose nested span id is equally
- * empty, and both fall through to the correlation id below. Keying it on `""`
- * would collapse every id-less coding-agent span in a trace onto one
- * `…:<tenant>:<trace>:` key, so the second one inside the TTL would dedup away
- * and its facts would be silently dropped.
- *
- * The correlation id is the right fallback precisely because it is what ties a
- * claim-check back to the event it was lifted from: `makeSpanReferencedPayload`
- * copies `event.id` verbatim, so the key stays stable across the reference
- * upgrade while dedup degrades to per-event — the weakest form that still
- * loses nothing. The event's `idempotencyKey` is NOT usable here: it is
- * `<tenant>:<trace>:<spanId>`, which collapses on exactly the same id-less
- * spans.
- */
+/** Dedup identity; uses correlation id fallback for id-less spans. */
 function dedupIdentity(payload: TraceProcessingEvent): {
   tenantId: string;
   aggregateId: string;

@@ -15,20 +15,7 @@ import { EmptySection, Section } from "./detail-section.tsx";
 /** One session as the pull request detail lists it. */
 type DetailSession = DetailPayload["sessions"][number];
 
-/**
- * The sessions that ran on the pull request: the title the agent generated for
- * each one, then its start time, contributor, agent, tokens and cost.
- *
- * The title is the only conversation-derived value here, and the read decides
- * whether this reader gets it, per the project each session ran in. A session
- * with none, and a session whose title this reader may not see, both read as
- * untitled: the row is still worth listing for what it consumed.
- *
- * Choosing a row replays that session in the terminal, the same way the
- * Sessions table does and through the same hook. The replay opens over this
- * drawer rather than replacing it, so closing it comes back to the pull
- * request the reader was reading.
- */
+/** Sessions on PR (title, start, contributor, agent, tokens, cost); row replays terminal. */
 export const SessionsSection: React.FC<{
   projectId: string;
   sessions: DetailPayload["sessions"];

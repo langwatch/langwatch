@@ -5,15 +5,8 @@ import { AnsiText } from "./terminal-ansi-text.tsx";
 import { TERMINAL_FONT_STACK } from "./terminal-palette.ts";
 
 /**
- * A file's content, syntax-highlighted the way an editor would show it — not
- * plain terminal text. Used for Read/Write output specifically (a real file,
- * with a real extension), not for Bash stdout, which usually isn't code in
- * any one language.
- *
- * Renders plain (unhighlighted) text while the grammar loads, then swaps in
- * Shiki's HTML once ready. Shiki's own theme background is stripped so the
- * highlighted block sits flush on the terminal's own near-black screen
- * rather than carrying its own panel.
+ * Syntax-highlighted code for Read/Write output (editor-like, not terminal);
+ * renders plain text while grammar loads, then swaps Shiki's HTML.
  */
 export const SyntaxHighlightedCode = memo(function SyntaxHighlightedCode({
   code,

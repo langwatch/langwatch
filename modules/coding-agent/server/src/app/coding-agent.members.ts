@@ -63,34 +63,13 @@ export interface CodingAgentCallerScopeDirectory {
 /** The two cuts a pull-request rollup is resolved over. */
 export type CodingAgentScopePermission = "traces:view" | "cost:view";
 
-/**
- * Who a cross-project cut is resolved for.
- *
- * A person reads with their own bindings. A CREDENTIAL reads with its own,
- * and that is not the same reach: a key can carry bindings NARROWER than its
- * holder's, which is the whole point of a restricted key, so a scope resolved
- * from the holder alone would let a deliberately narrowed key read with the
- * holder's full access. An organization SERVICE key owns no user at all - the
- * credential a continuous-integration job holds - and reads with its bindings
- * alone, which is what `userId: null` says.
- */
+// Cross-project cut resolver; API keys may narrow holder's access, so scope
+// resolved from key's bindings, not holder's; SERVICE keys have no user.
 export type CodingAgentScopeCaller =
   | { readonly kind: "user"; readonly userId: string }
   | { readonly kind: "apiKey"; readonly apiKeyId: string; readonly userId: string | null };
 
-/**
- * Which of a set of projects one caller holds each permission on, answered in
- * a fixed number of queries rather than one per project.
- *
- * A batch rather than a probe per project on purpose, and ONE batch for both
- * permissions rather than one each: the cuts run over every project in an
- * organization, and a fan-out of individual decisions is what starves the
- * connection pool on a large tenant. Two single-permission batches would
- * collect the same grant snapshot twice for the same answer.
- *
- * Absent answers deny. A project the batch did not answer for is refused
- * rather than assumed, so a short answer can only narrow the scope.
- */
+/** Batch permission resolution; absent answers deny. */
 export interface CodingAgentScopePermissions {
   projectCuts(input: {
     caller: CodingAgentScopeCaller;
@@ -105,21 +84,7 @@ export interface CodingAgentClock {
   nowMs(): number;
 }
 
-/**
- * What a coding-agent session's cost is priced from.
- *
- * The fold used to take the whole `ModelProviderApi` — every provider row,
- * every default, every credential and the authorization service behind them —
- * to call this one method, and that method reads nothing but the platform's
- * immutable static cost registry: `estimateModelCost(input, staticCostRates())`
- * with no query, no tenant and no I/O. A worker that folds sessions needs the
- * pricing, not the graph, and naming the method here is what lets it compose
- * the pipeline without also composing the App's provider stack.
- *
- * `ModelProviderApi` satisfies it: the published service carries this
- * method with this signature, which is what keeps the frozen registration in
- * `platform/app` compiling.
- */
+/** Static cost pricing for sessions; reduces dependencies in the worker. */
 export interface CodingAgentCostEstimator {
   /** Prices one model call from its token facts. */
   estimateCost(input: ModelCostEstimateInput): number;
@@ -138,20 +103,7 @@ export interface CodingAgentCostMetrics {
   recordReported(input: CodingAgentCostMetric): void;
 }
 
-/**
- * The one project write a folded session performs.
- *
- * Storing a session stamps its project as having seen coding-agent activity,
- * so the settings surfaces can tell a project that has ever run an agent from
- * one that has not. It is a single throttled `UPDATE` against one column — and
- * to reach it the pipeline used to take the whole project application, which
- * is composed from a Prisma repository, an authorization service, a topic
- * clustering port, a credentials adapter and the transports' collaborators.
- * None of those is asked anything here.
- *
- * `ProjectApi` satisfies it: the module's application carries this method with
- * this signature, so a composition root hands its app straight over.
- */
+/** Single throttled write to mark projects as having seen agent activity. */
 export interface CodingAgentProjectActivity {
   /**
    * Records that this project has just seen coding-agent session activity.
@@ -163,21 +115,7 @@ export interface CodingAgentProjectActivity {
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
 }
 
-/**
- * The GitHub demand path, as the session fold's mapping subscriber uses it.
- *
- * The subscriber asks two questions and no more: whether a repository host is
- * one this instance's GitHub App can answer for, and — for a branch somebody
- * is looking at right now — which pull requests have hosted it. The published
- * `GithubService` carries thirty methods composed from an organization
- * service, a project service and both transports' collaborators, so taking it
- * whole is what kept this subscriber unmountable outside the App.
- *
- * `GithubService` satisfies it, and so does the branch-demand composition a
- * worker builds from its own database: both carry these two methods with these
- * signatures, which is what keeps the frozen registration in `platform/app`
- * compiling.
- */
+/** GitHub demand path; answers two questions for the mapping subscriber. */
 export interface CodingAgentPullRequestMapping {
   /** Whether this instance's GitHub App can answer for that repository host. */
   canMapRepositoryHost(repositoryHost: string): boolean;

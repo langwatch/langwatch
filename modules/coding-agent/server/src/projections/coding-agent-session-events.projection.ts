@@ -13,25 +13,7 @@ const contributionEventDataSchema = z.object({
   facts: contributionFactsSchema,
 });
 
-/**
- * One row per coding-agent session EVENT, the per-call fact table
- * (`coding_agent_session_events`). Where `coding_agent_sessions` converges a
- * session into one row of totals, this keeps the sequence: every model call
- * with its own context and cost, every compaction with its before/after
- * tokens, every rate limit, tool run and prompt, ordered by time within the
- * session. One scan answers the questions totals erase: cost between two
- * compactions, tool mix around a rate limit, context growth call by call.
- *
- * Log-driven only, deliberately: the `api_request` log event is the one
- * carrier with tokens + cost + duration + request id together, so consuming
- * only logs makes double-counting against `llm_request` spans impossible by
- * construction. Span-only agents (codex today) contribute no `model_call`
- * rows until they grow a log carrier: documented degradation, not a bug.
- *
- * Scalar columns only; no free-form attribute map. The wire rides user
- * identity on nearly every event and content lives in the canonical rows, so
- * `recordId` reaches `log_records` for anything not typed here.
- */
+/** Per-call facts table; log-driven only to prevent double-counting against spans. */
 export interface CodingAgentSessionEventRecord {
   tenantId: string;
   sessionId: string;
@@ -88,20 +70,7 @@ export interface CodingAgentSessionEventRecord {
   branch: string;
 }
 
-/**
- * Raw wire event names that become rows, mapped to the row's EventKind.
- * Everything else (hooks, plugin loads, MCP connections, request/response
- * bodies) maps to null and contributes no row. The session fold still
- * counted it where relevant, and the body events' content stays in
- * `log_records`.
- *
- * Wire names arrive CodingAgentSessionEventsMapProjection.bare (`api_request`) from Claude Code and namespaced
- * (`claude_code.api_refusal`) from agents that prefix; both spellings map.
- *
- * The single declaration behind BOTH the row and the enqueue-time gate: adding
- * a name here makes the projection map it and makes the gate admit it, in one
- * edit. See {@link CodingAgentSessionEventsMapProjection.accepts}.
- */
+/** Wire event names that become rows; single declaration powers both row and gate. */
 export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
   api_request: "model_call",
   compaction: "compaction",
@@ -118,26 +87,7 @@ export const EVENT_KIND_BY_RAW_NAME: Record<string, string> = {
   subagent_completed: "subagent_completed",
 };
 
-/**
- * The enqueue-time gate (ADR-069 invariant 4): does this contribution become a
- * row at all?
- *
- * Every coding-agent log record is contributed to its session, and most of
- * them are not rows here — hooks, plugin loads, MCP connections and the two
- * body events are 71% of a measured session's records. Without this gate each
- * of them minted a queue job that deserialized a payload, ran `map()`, got
- * `null` and wrote nothing.
- *
- * It cannot disagree with `map()` because it is not a second opinion: both
- * evaluate `CodingAgentSessionEventsMapProjection.resolveEventKind(CodingAgentSessionEventsMapProjection.rawEventName(event))`, and `map()` returns `null`
- * on exactly the answer this returns `false` on. Any future reason for `map()`
- * to decline an event must be added BELOW that check, never inside
- * `resolveEventKind`, or the gate silently narrows with it.
- *
- * Total by construction: a body that carries no readable `event.name` reads as
- * `""`, which resolves to `null` — declined the same way an unlisted name is,
- * because `map()` would also have written nothing for it.
- */
+/** Enqueue-time gate (ADR-069 invariant 4); gates on resolveEventKind, mirrors map(). */
 const events = [logFactsContributedEventSchema] as const;
 
 export class CodingAgentSessionEventsMapProjection

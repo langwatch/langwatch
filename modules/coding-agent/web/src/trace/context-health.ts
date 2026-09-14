@@ -1,17 +1,6 @@
 /**
- * Context-window utilization banding.
- *
- * Grounded in the same degradation curve currently being discussed for
- * Claude's 1M context beta (anthropics/claude-code#35296): performance
- * doesn't fall off a cliff at 100% used, it degrades progressively —
- * repetition and fabrication creep in well before the window is full. The
- * bands below give that curve a name instead of a raw percentage, the same
- * way `deriveSessionSignals` turns a token count into a sentence.
- *
- * `peakContextTokens` (the biggest single call's context — see the
- * fold-projection docs) is what gets banded, not a cumulative sum: the
- * question is "how full did the window get at its worst", not "how many
- * tokens did this session ever touch".
+ * Context-window utilization banding by performance degradation curve; measures
+ * `peakContextTokens` (max single call) against the session's widest context window.
  */
 
 export type ContextHealthTone = "success" | "info" | "warning" | "danger";

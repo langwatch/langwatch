@@ -10,13 +10,8 @@ const CELL = {
 } as const;
 
 /**
- * Claude Code's REAL patch for an Edit, as the CLI itself drew it: line numbers
- * down the gutter, added lines green, removed lines red, context dimmed.
- *
- * Distinct from {@link TerminalDiff}, which synthesizes a diff from the Edit
- * tool's `old_string` / `new_string` when no span patch is available. This one
- * renders the structured patch the tool actually produced, so the line numbers
- * are the file's real line numbers and the context lines are real context.
+ * Renders structured patch from Edit tool (real line numbers, real context);
+ * distinct from TerminalDiff which synthesizes from old_string/new_string.
  */
 export const TerminalPatch = memo(function TerminalPatch({
   hunks,

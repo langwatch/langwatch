@@ -28,20 +28,7 @@ const TITLE_QUERY_SOURCE = "generate_session_title";
 const logger = createLogger("langwatch:coding-agent:log-facts-dispatch");
 const flatAttributesSchema = z.record(z.string(), z.unknown());
 
-/**
- * The log→session dispatcher (ADR-056 §2): a subscriber on log-processing's
- * stored canonical records that lifts a coding-agent log's scalar facts and
- * contributes them to its session.
- *
- * `liftCodingAgentLogFacts` is the gate — it returns null for anything that
- * is not a coding agent's record, so an ordinary application log costs one
- * detection call. The lifted vocabulary is scalars only; the record's
- * content stays in the canonical row, reachable via `recordId`.
- *
- * Two facts are DERIVED here rather than lifted, because both live somewhere
- * the vocabulary cannot reach: the resource's `service.version`, and the
- * generated conversation title, which sits inside one response body.
- */
+/** Log→session dispatcher; lifts scalar facts and derives two facts from response body. */
 export function createCodingAgentLogFactsDispatchSubscriber(deps: {
   contributeLogFacts: (data: ContributeLogFactsCommandData) => Promise<void>;
   traceCanonicalisation: TraceCanonicalisationService;
@@ -192,16 +179,7 @@ function stampPromptTitleFallback({
   if (title !== null) facts[SESSION_TITLE_FALLBACK_FACT_KEY] = title;
 }
 
-/**
- * The agent a contribution is labeled with, or null when nothing names one.
- *
- * The record's own evidence names it for everything except the LangWatch
- * companion event, which carries no vendor evidence at all and declares its
- * agent instead. A declaration LangWatch cannot resolve contributes nothing:
- * `unknown` must never reach a contribution (`contributionBaseSchema`), and
- * the companion event is usually a session's FIRST signal, so a bad label
- * here would be the one the first-writer-wins fold keeps forever.
- */
+/** Resolve agent label; rejects unknown (from LangWatch companion event declaration). */
 function resolveContributionAgent({
   scopeName,
   attributes,

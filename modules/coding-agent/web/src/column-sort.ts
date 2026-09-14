@@ -1,17 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-/**
- * The order a personal list table reads in, and the way back to it.
- *
- * Which columns a table has is its own business; how a column behaves is not.
- * Every one of these tables opens on the work that moved most recently, any
- * heading can take over from there, and a third click on the same heading hands
- * the table back the order it opened in, so trying a sort costs nothing. That
- * shape lives here, and each table names its own columns against it.
- *
- * Specs: specs/coding-agent/pull-request-linkage.feature,
- *        specs/coding-agent/sessions-screen.feature.
- */
+/** Default sort (last update) with three-click-return, shared by all list tables. */
 
 export type SortDirection = "asc" | "desc";
 

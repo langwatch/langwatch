@@ -14,23 +14,7 @@ import {
 
 const logger = createLogger("langwatch:coding-agent:metric-facts-dispatch");
 
-/**
- * The metric→session dispatcher (ADR-056 §2): a subscriber on
- * metric-processing's stored canonical datapoints that lifts a coding-agent
- * metric's session-keyed value and contributes it as a CONVERGED unit.
- *
- * Temporality decides what the unit is:
- * - a CUMULATIVE point already carries its series' converged total, so the
- *   unit is the series (`seriesId`) and a later observation replaces it;
- * - a DELTA point is an increment that must sum exactly once, so the unit is
- *   the point itself (`pointId`) — each delta is its own converged row, a
- *   re-delivery replaces it, and the read-side SUM adds them.
- * Either way the projection replaces and never increments (ADR-056 §5).
- *
- * A coding-agent metric with no session key is fleet-level by design
- * upstream (Codex, Copilot) — it stays in the canonical metric tables and
- * contributes nothing here.
- */
+/** Metric→session dispatcher; converges CUMULATIVE by series or DELTA by point. */
 export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
   contributeMetricFacts: (data: ContributeMetricFactsCommandData) => Promise<void>;
 }): EventSubscriberDefinition<MetricProcessingEvent> {

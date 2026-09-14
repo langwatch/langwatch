@@ -1,20 +1,5 @@
-/**
- * Coding-assistant span noise filter.
- *
- * codex (instrumentation scope `codex_cli_rs`) and opencode (scope `opencode`)
- * export their ENTIRE internal call graph over OTLP: DB queries, file IO,
- * config reads, auth, websockets, session init, plugin enumeration. For a
- * single "hello" that is hundreds of spans fragmented across dozens of trace
- * ids, burying the few spans that represent actual model and tool activity. In
- * an LLM-observability product that is pure noise (claude reads cleanly because
- * its log-only telemetry is folded into one focused tree).
- *
- * This filter keeps only the AI-semantic spans for those two KNOWN tools and
- * drops the infra plumbing. It is gated on the instrumentation scope name, so
- * any OTHER OTLP (customer apps, custom SDKs, OpenInference, Traceloop, raw
- * OTLP) is NEVER touched. A trace whose spans are all filtered never gets
- * created, which is what removes the infra-only fragment traces.
- */
+// Filter codex/opencode's internal span noise (DB, file IO, auth) by scope;
+// keeps AI-semantic spans only; other OTLP sources never touched.
 
 export const CODEX_SCOPE = "codex_cli_rs";
 /**
@@ -57,17 +42,7 @@ function isAiSemanticCodingAgentSpan({
 }): boolean {
   const hasGenAi = attributeKeys.some((k) => k.startsWith("gen_ai."));
   if (CODEX_SCOPES.has(scopeName)) {
-    // The turn rollup is the authoritative AI span; model-call spans
-    // (handle_responses) carry native gen_ai.usage.
-    //
-    // Tool spans are deliberately NOT kept. codex propagates trace context
-    // unreliably for them: a run's harness-level spans (exec_command,
-    // apply_patch) routinely carry a parent that lives in a DIFFERENT trace,
-    // so keeping them mints a one-span trace per tool call, which is the
-    // fragment noise this filter exists to prevent. Nothing is lost: every
-    // codex tool run also emits a `codex.tool_result` log carrying the tool
-    // name, arguments, output, duration and success, and the terminal
-    // transcript renders tool calls from those.
+    // Keep turn rollup and model-call spans; tool spans emit as log events instead.
     return spanName === CODEX_TURN_SPAN || hasGenAi;
   }
   if (scopeName === OPENCODE_SCOPE) {

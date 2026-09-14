@@ -1,15 +1,8 @@
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 
 /**
- * One model call's token composition, in the order it happened.
- *
- * The session fold (ADR-041) only ever carries the SUM across a whole
- * session — `cacheReadTokens`, `cacheCreationTokens` as two scalars. That
- * answers "how much did this session reuse vs rebuild in total", but not
- * "where" — which call, at what point in the conversation, spent the money.
- * This is the per-call breakdown that answers that, built client-side from
- * spans the drawer already reads, rather than growing the bounded fold with
- * an array that scales with session length.
+ * Per-call token composition from spans; answers "where" (not just "how much")
+ * tokens spent (session fold only gives totals).
  */
 export interface TokenTimelinePoint {
   index: number;
@@ -42,7 +35,10 @@ export function deriveTokenTimeline(entries: TranscriptEntry[]): TokenTimelinePo
 
 /** A call that re-created most of the context instead of reading it from cache. */
 export interface CacheRebuildEvent {
-  /** Zero-based position among the session's model calls — matches {@link TokenTimelinePoint.index}, so the chart and the annotation can name the same call. */
+  /**
+   * Zero-based position among the session's model calls — matches
+   * {@link TokenTimelinePoint.index}, so chart and annotation name same call.
+   */
   callIndex: number;
   atMs: number;
   cacheCreationTokens: number;

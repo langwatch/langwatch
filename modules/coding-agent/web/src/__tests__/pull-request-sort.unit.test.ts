@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The Pull Requests table's order: what it opens on, what each column does
- * with the first, second and third click, and where a row a column does not
- * apply to ends up.
- *
+ * Pull Requests table order: initial state, column click behavior, and
+ * row placement for inapplicable columns.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it } from "vitest";

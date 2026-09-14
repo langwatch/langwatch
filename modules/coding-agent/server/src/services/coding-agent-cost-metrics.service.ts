@@ -4,22 +4,7 @@ import type {
   CodingAgentCostMetric,
 } from "../app/coding-agent.members.ts";
 
-/**
- * The cost-drift canary (see specs/trace-processing/coding-agent-cost.feature).
- *
- * Two dollar counters, one per pricing authority: what the model registry
- * computes for a call's tokens, and what the agent reports it was billed for
- * the same call. Per model, because that is the grain a stale price lives at:
- * their ratio drifting from ~1 for one model is the alarm that either our
- * registry or the agent's own pricing went stale — it caught the registry
- * pricing hour-long cache writes short-lived, and Claude Code billing Sonnet 5
- * at a withdrawn price, on the same day.
- *
- * Recorded after contribution events commit. A bounded, process-local event-id
- * set suppresses immediate queue redelivery while avoiding unbounded memory.
- * Counters and this set both reset on worker restart, so this is an
- * operational metric rather than a durable billing ledger.
- */
+/** Cost-drift canary comparing registry vs agent pricing; see coding-agent-cost.feature. */
 export class OtelCodingAgentCostMetricsAdapter implements CodingAgentCostMetrics {
   private readonly recorded = new Set<string>();
 

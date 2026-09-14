@@ -13,14 +13,8 @@ interface TerminalDiffProps {
 }
 
 /**
- * Claude Code-style code diff: removed lines on a full-width red block,
- * added lines on a full-width green block, context dimmed, each with its
- * line number and a `+`/`-`/` ` gutter — the same block a real diff pager
- * draws, not a card with a border around it.
- *
- * Used only when no real structured patch is available (see
- * {@link TerminalPatch}, the primary path) — this one synthesizes a diff
- * from the Edit tool's own `old_string`/`new_string`.
+ * Claude Code-style diff (removed/added/context on colored blocks with line numbers);
+ * synthesizes from Edit tool's old_string/new_string when no structured patch exists.
  */
 export const TerminalDiff = memo(function TerminalDiff({
   oldText,

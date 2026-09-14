@@ -1,26 +1,4 @@
-/**
- * The surface a coding-agent activity table is mounted in, faked.
- *
- * The tables read the world through `CodingAgentActivityHost`: what the
- * reader may do, what the address says, and where a notice goes. A test that
- * mounts one therefore has to answer that port, and answering it ad hoc per
- * file is how three suites come to disagree about what a viewer is.
- *
- * `fakeCodingAgentActivityHost` builds the port from a small configuration and
- * records everything written through it, so an assertion about a navigation or
- * a toast reads off `host.recording` rather than off a spy on a module.
- * `renderWithCodingAgentHost` mounts a tree underneath it and owns the one
- * piece of state a static double cannot have: the query string. The pull
- * request detail drawer opens from `?pullRequest=`, so a click that writes the
- * address has to come back as a re-render, or the drawer never opens and the
- * test proves nothing.
- *
- * Permissions resolve through `permissionSatisfiedBy`, the authz contract's own
- * hierarchy rule, rather than through a set-membership check written here — the
- * same choice `@langwatch/gateway-web`'s harness makes, and for the same
- * reason: a test that passes against this double cannot pass by disagreeing
- * with the rule the server applies.
- */
+/** Test harness for activity tables; fakes host, records writes, owns query-string state. */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";

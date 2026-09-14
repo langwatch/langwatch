@@ -6,16 +6,7 @@ import {
   useColumnSort,
 } from "./column-sort.ts";
 
-/**
- * The Sessions table's columns, named against the shared column-sort shape in
- * `columnSort.ts`.
- *
- * The table opens on the session that moved most recently, because the reader
- * arrives asking what they were just doing and what it cost. Every column can
- * take over from there, and a third click hands the opening order back.
- *
- * Spec: specs/coding-agent/sessions-screen.feature.
- */
+/** Sessions table columns; opens on last-update (what were they just doing). */
 
 export type SessionsSortColumn =
   | "session"
