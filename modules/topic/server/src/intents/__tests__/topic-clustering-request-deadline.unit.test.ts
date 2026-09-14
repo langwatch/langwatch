@@ -1,12 +1,6 @@
 /**
- * Regression: the langevals clustering call had no client deadline, so a slow
- * page could outlive TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS. The outbox row
- * then became visible again, a second replica leased it, and two runs
- * clustered the same page concurrently — destructive in batch mode, where
- * `storeResults` deletes the topic model before recreating it.
- *
- * These tests advance real timers to fire the deadline and observe what the
- * call actually does when it trips.
+ * Regression: langevals call needs deadline to avoid outliving the lease.
+ * Tests fire the deadline and observe the call's response.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";

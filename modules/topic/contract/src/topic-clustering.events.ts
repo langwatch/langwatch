@@ -37,13 +37,8 @@ export type TopicClusteringRequestedEventData = z.infer<
 >;
 
 /**
- * TopicClusteringRunStarted — the effect began working a page.
- *
- * Without it the log only records how runs END, so "a run is in progress"
- * is not rebuildable by replay: a scheduled run emits nothing at its start
- * (the wake is process-internal), and a run that finishes in a single page
- * never looks in-flight at all. The settings page has to infer it, and got
- * it wrong.
+ * TopicClusteringRunStarted — needed to rebuild in-progress state on replay.
+ * Without it, only run completion is logged.
  */
 export const topicClusteringRunStartedEventDataSchema = z.object({
   /** Logical run identity, shared by every page of one backlog walk. */

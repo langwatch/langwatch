@@ -1,15 +1,6 @@
 /**
- * Regression test for the prod incident where storeResults silently
- * dropped trace→topic assignments on SaaS.
- *
- * Original repro: storeResults ran a legacy ES dual-write BEFORE the
- * AssignTopic command queue. With ES unconfigured on SaaS, the throwing
- * proxy bubbled up and the queue never fired — trace_summaries.TopicId
- * stayed null forever, leaving "Top Topics" empty in the UI.
- *
- * Fix: deleted the ES dual-write entirely. The AssignTopic queue is now
- * the only path. This test pins that contract so a future re-add of an
- * ES write would have to deliberately update the test.
+ * Regression: storeResults silently dropped assignments when ES was unconfigured.
+ * Deleted ES dual-write; AssignTopic queue is now the only path.
  */
 import { describe, expect, it } from "vitest";
 import { storeResults } from "../topic-clustering-runner.intent.ts";

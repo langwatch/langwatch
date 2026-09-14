@@ -1,12 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for StoredObjectDestinationPolicyAdapter — the BYOC-first destination
- * precedence that used to live inside StoredObjectsService's default
- * `mintStorageUri` (issue #6323 backend-flip posture). `mintStoredObjectUri`
- * (from @langwatch/stored-object-contract) turns the resolved destination
- * into the actual storage URI, mirroring what a composition root's injected
- * `mintStorageUri` does in production.
+ * Tests for StoredObjectDestinationPolicyAdapter — BYOC-first destination precedence.
  */
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -142,13 +136,8 @@ describe("StoredObjectDestinationPolicyAdapter", () => {
 });
 
 /**
- * A destination port composed from `resolveAzureCredentials`, mirroring what
- * a composition root wires `StoredObjectAzureDestination` to in
- * production. Used below to test the full BYOC -> azure -> global S3 -> local
- * filesystem precedence chain that used to live in one function,
- * `resolveProjectStorageDestination` — now split across
- * `StoredObjectDestinationPolicyAdapter` (the precedence) and
- * `resolveAzureCredentials` (the azure-arm validation).
+ * Destination port for testing the BYOC -> azure -> global S3 -> local
+ * filesystem precedence chain split across Adapter and credential resolution.
  */
 class ConfiguredAzureDestination extends StoredObjectAzureDestination {
   constructor(private readonly config: AzureBlobCredentialsConfig) {

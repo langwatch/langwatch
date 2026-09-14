@@ -1,6 +1,6 @@
 /**
- * Verifies that all five stored_object_* Prometheus metrics are registered with the correct names and label sets. These metrics are
- * emitted by StoredObjectsService through its telemetry port and surfaced at /metrics via prom-client's default registry.
+ * Verifies the five stored_object_* Prometheus metrics are registered with correct names and
+ * labels, emitted by StoredObjectsService and surfaced at /metrics via prom-client.
  * @vitest-environment node
  */
 

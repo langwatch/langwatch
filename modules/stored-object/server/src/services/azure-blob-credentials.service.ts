@@ -4,9 +4,8 @@
  */
 
 /**
- * Resolved Azure credentials for exactly one auth mode. A discriminated union — deliberately, so a construction site that only
- * destructures `accountKey` fails to compile against the token-mode arms instead of reading `undefined` at runtime (AC "Adding
- * an auth mode forces every Azure credential construction site to be revisited").
+ * Resolved Azure credentials for exactly one auth mode — a discriminated union to catch
+ * missing cases at compile time instead of failing at runtime.
  */
 export type AzureCredentials =
   | {
@@ -60,9 +59,8 @@ export type AzureTokenAuthMode = Extract<
 >["mode"];
 
 /**
- * Thrown whenever Azure Blob configuration is incomplete or contradictory — a required var is missing, a shared key is set alongside a token mode, an auth mode is set without
- * the azure backend selected, a token-based endpoint is not https, a sovereign endpoint has no matching authority host, or the platform never injected the AKS
- * workload-identity values. Fails loud, naming exactly what's wrong — no silent fallback to S3, the local filesystem, or a different auth mode than the operator chose.
+ * Thrown when Azure Blob configuration is incomplete or contradictory. Fails loud,
+ * naming exactly what's wrong.
  */
 export class AzureBackendMisconfiguredError extends Error {
   readonly missingVariables: string[];
@@ -77,9 +75,8 @@ export class AzureBackendMisconfiguredError extends Error {
 const PUBLIC_CLOUD_SUFFIX = ".blob.core.windows.net";
 
 /**
- * The name of the test-only escape hatch that allows a plaintext HTTP endpoint in a token-based auth mode (e.g. driving a local emulator
- * without TLS). A bearer token must never be transmitted over plaintext in any real deployment, so the composition root must never resolve
- * it to `true` outside a test process. Named here only so the refusal below can tell an operator which knob they reached for.
+ * Test-only escape hatch for plaintext HTTP endpoints in token auth mode.
+ * Never true outside tests; never transmitted plaintext in production.
  */
 export const ALLOW_INSECURE_TOKEN_ENDPOINT_ENV =
   "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS";
@@ -152,9 +149,8 @@ function assertSovereignAuthority({
 }
 
 /**
- * `workloadIdentity` relies entirely on values the AKS azure-workload-identity admission webhook injects into the pod (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_FEDERATED_TOKEN_FILE — and
- * optionally AZURE_AUTHORITY_HOST). These are Microsoft's own standard variable names, owned by the webhook rather than by our own schema, and the composition root reads them under those
- * names. Their absence means the webhook never mutated this pod — never that the operator forgot to set them by hand, so the error must not suggest that.
+ * workloadIdentity relies on AKS webhook injections (AZURE_CLIENT_ID, AZURE_TENANT_ID,
+ * AZURE_FEDERATED_TOKEN_FILE). Absence means the webhook never ran.
  */
 function assertWorkloadIdentityInjectedValues(identity: AzureInjectedIdentity): void {
   const clientId = identity.clientId;
@@ -183,9 +179,8 @@ function assertWorkloadIdentityInjectedValues(identity: AzureInjectedIdentity): 
 }
 
 /**
- * Dead-config guard, for WRITE resolution only. Reads are deliberately exempt (`purpose: "read"`): an operator migrating OFF Azure flips the backend toggle to s3
- * and leaves the AZURE_BLOB_* values in place so the objects already written stay readable — the mirror image of the legacyS3ReadBucket path we document for the
- * S3->Azure direction. Refusing to build a read driver there would strand every historical azure-blob:// object behind an "unregistered scheme" error.
+ * Dead-config guard for WRITE only. Reads exempt to allow migration OFF Azure with
+ * existing blobs readable.
  */
 function assertTokenModeIsSelected({
   purpose,
@@ -260,9 +255,8 @@ function assertRequiredVariablesPresent({
 }
 
 /**
- * The two transport guards every token-mode credential must pass, exported as one seam so ALL construction sites share them: a bearer token must never travel a plaintext connection, and
- * a non-public-cloud endpoint must name the identity authority its tokens come from. The migration task builds its credentials from its own OBJECT_STORAGE_MIGRATION_* namespace rather
- * than through `resolveAzureCredentials`, and bypassing these guards there would let a migration run leak bearer tokens the app itself refuses to.
+ * Transport guards every token-mode credential must pass: no plaintext for bearer
+ * tokens, sovereign endpoints must name authority host.
  */
 function assertTokenModeTransportSafety({
   endpointBaseUrl,

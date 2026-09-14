@@ -1,23 +1,6 @@
 /**
- * Module-scoped Azure AD token cache + acquisition for token-based Azure
- * Blob auth modes (issue #6087).
- *
- * Cached at MODULE scope, keyed by identity — NOT per `AzureBlobDriver`
- * instance: `createStorageRegistry` builds a new driver on every request,
- * so an instance-scoped cache would re-exchange a token on every single
- * storage operation. NOT a single unkeyed cache either: once per-project
- * BYOC identity lands (#6088), two projects resolving to different
- * identities must never share a token — an unkeyed cache would leak one
- * tenant's bearer token into another tenant's requests. The key is
- * `${authorityHost}|${tenantId}|${clientId}|${audience}`.
- *
- * `tenantId` and `clientId` now travel ON the credential rather than being
- * read from process globals, which is what the #6088 note on the platform
- * copy of this module asked for: a per-project identity varies the credential
- * and therefore varies the cache key, so two identities can no longer share
- * one cached bearer token. `mode` is still not part of the key, so a
- * deployment that resolved two different modes against the same identity and
- * audience would still share an entry; no composition does that today.
+ * Module-scoped Azure AD token cache keyed by identity, not instance
+ * (issue #6087). Per-project BYOC identity (#6088) prevents token leaks.
  */
 import {
   AzureCliCredential,
@@ -50,15 +33,8 @@ const tokenCache = new Map<string, CacheEntry>();
 
 /** Thrown when the identity provider rejects a token request. Never carries credential material. */
 /**
- * Entra returns a machine-readable AADSTS code on every rejection, and it is
- * the single most useful line an operator can have — AADSTS70021 ("no matching
- * federated identity record") means the federated credential's issuer, subject
- * or audience does not match the token the cluster presented, which is the most
- * common workload-identity misconfiguration by a wide margin.
- *
- * The code is an error identifier, not credential material, so it is safe to
- * surface. The surrounding SDK message is not: it can quote the request and
- * the assertion. We extract the code and discard everything else.
+ * Extract AADSTS code from Entra rejection — it's safe to surface and invaluable
+ * for operators. Discard SDK message which may quote credentials.
  */
 const AADSTS_CODE = /\bAADSTS\d{4,6}\b/;
 

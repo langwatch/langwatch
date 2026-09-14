@@ -354,9 +354,8 @@ export class StoredObjectsService {
   }
 
   /**
-   * summed `size_bytes` of the project's live stored objects, optionally scoped to one `purpose` (e.g. "evaluation_inputs").
-   * This is the durable-object side of a tenant's storage usage, alongside the ClickHouse row bytes.
-   * Returns the storage-accounting byte ledger for a project (ADR-040): the
+   * Storage usage byte ledger for a project (ADR-040): summed size_bytes
+   * of live objects, optionally scoped by purpose.
    */
   async getStorageUsageByProject({
     projectId,

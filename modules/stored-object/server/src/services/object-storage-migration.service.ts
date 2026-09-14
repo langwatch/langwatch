@@ -51,9 +51,8 @@ export type MigrationPlan = {
   eligibleStoredObjects: number;
   eligibleDatasetChunks: number;
   /**
-   * Live rows whose scheme is neither the source nor the destination (e.g. `file://` on a deployment that once used local
-   * storage). They are outside this migration's scope — untouched, still readable through scheme dispatch — but the plan must
-   * say they exist: a total that silently excludes them tells the operator the migration covers more than it does.
+   * Live rows outside migration scope (different scheme). Must be reported so
+   * operator knows total coverage.
    */
   foreignSchemeRows: number;
   foreignSchemes: string[];
@@ -163,11 +162,8 @@ export class ObjectStorageMigrationService {
       );
       if (isAlreadyDestinationScheme) {
         if (row.storage_uri !== destinationUri) {
-          // This aborts the whole run, so it has to say WHICH row. The two addresses themselves
-          // cannot go in the message: they differ only in the bucket / storage account, which is
-          // exactly what redactStorageUri masks, so quoting them would print two identical strings.
-          // The id is what lets the operator look the row up and tell a mis-set destination endpoint
-          // from real corruption.
+          // Say WHICH row since this aborts. IDs let operator look it up; addresses
+          // redact identically so quoting them is useless.
           throw new MigrationBlockedError(
             `Stored object ${row.id} (project ${row.project_id}) already uses the ` +
               `${this.deps.destination.scheme} scheme, but its recorded bucket/account is not ` +
@@ -214,9 +210,8 @@ export class ObjectStorageMigrationService {
   }
 
   /**
-   * A chunk can already live ONLY at the destination: a dataset uploaded while the destination provider was briefly active (the backend-flip posture
-   * #6323 documents), or a previous reverse migration. Chunks carry no recorded digest, so there is no source to verify against — presence at the
-   * destination is the strongest available check, and aborting would deny the operator every other copy this run could safely make.
+   * Chunks can live only at destination (backend-flip or prior reverse migration).
+   * No digest to verify; presence is the strongest check.
    */
   private async copyDatasetChunk({
     sourceUri,
@@ -397,9 +392,8 @@ export class ObjectStorageMigrationService {
   }
 
   /**
-   * Yields rows on the source or destination scheme; anything else — a `file://` row from a local-filesystem deployment, an address left by an unrelated
-   * earlier migration — is out of this migration's scope. Those rows are NOT touched and stay readable through scheme dispatch, but they must never
-   * vanish silently: `onForeignScheme` lets `buildPlan` count and name them so the operator's plan states what will not migrate.
+   * Yields source/destination scheme rows. Other schemes (file://, unrelated migrations)
+   * must be counted in plan; never vanish silently.
    */
   private async *eligibleStoredObjects(
     scope: EligibleScope,

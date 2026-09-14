@@ -31,15 +31,8 @@ export class TopicApp implements TopicApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {};
   /**
-   * The durable clustering wake the status panel reads: a process-manager
-   * instance row, kept in the same Postgres this process already holds.
-   * Built here, over `prisma`, the way identity builds its pipelines over
-   * `eventing` — no separate `schedule` infrastructure member exists, so the
-   * old per-role split (worker builds an eventing-backed reader, the api
-   * process fakes "not scheduled") is gone: every process that installs
-   * Topic now reads the same durable row. The staleness clock (`now`) is not
-   * read here at all — `TopicService` already defaults it to `Date.now`, and
-   * no deleted composition ever overrode it.
+   * Durable clustering wake: process-manager row in Postgres, shared across
+   * all processes that install Topic.
    */
   static readonly reads = reads("prisma");
 

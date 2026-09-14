@@ -1,13 +1,6 @@
 /**
- * Guards the bounded-memory setting on the topic-clustering page fetch.
- *
- * The outer page query reads ComputedInput (a potentially large payload) for
- * up to 2000 traces. Peak memory scales with the number of read streams holding
- * a ComputedInput block at once; for tenants with large inputs that peak crossed
- * max_memory_usage_per_query (MEMORY_LIMIT_EXCEEDED). This is a background
- * clustering batch, so the read must be capped to a small max_threads to keep
- * peak memory under the per-query limit — and the query must stream (no outer
- * ORDER BY / LIMIT top-N buffer holding every ComputedInput at once).
+ * Guards bounded-memory setting on topic-clustering page fetch.
+ * Large ComputedInput payloads require small max_threads and streaming to stay under limit.
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The stored-objects read route authorizes by the OBJECT's purpose, not by a
- * single hardwired permission: trace media guards on `traces:view`, scenario
- * media on `scenarios:view` — separate permission categories that custom
- * roles can grant independently. This pins the mapping the route's
- * post-read gate (`authorizeFilePurpose`) applies.
+ * Read route authorizes by object purpose (traces:view vs scenarios:view).
  */
 import { describe, expect, it } from "vitest";
 import { requiredPermissionForPurpose } from "../stored-object-file.rest.ts";

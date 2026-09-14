@@ -83,19 +83,8 @@ export type TopicModelRecordSource =
 export const TOPIC_CLUSTERING_RUN_HISTORY_LIMIT = 50;
 
 /**
- * A run that began this long ago is considered abandoned: the daily wake
- * stops deferring to it and starts a fresh run, and a manual request may
- * preempt it. The single definition shared by the clustering process (which
- * abandons runs) and the topic service (which stops REPORTING them on the
- * same clock, so the read model and the scheduler can never disagree).
- *
- * Measured from the run's START, not its last page. Measuring from the last
- * page made this bound unenforceable: a backlog walk refreshes `updatedAtMs`
- * on every page, so a walk that starts at its slot and stalls five hours in
- * still looks fresh at the next slot, defers it, and only recovers a day
- * later — 48h of no clustering against a documented ≤24h. Sitting under the
- * 24h wake period is what makes "one lost completion event cannot block
- * scheduling for more than a day" actually true.
+ * Stale run threshold (≤24h). Measured from START, not last update, so
+ * backlog walks that pause don't extend the deadline indefinitely.
  */
 export const TOPIC_CLUSTERING_STALE_RUN_MS = 20 * 60 * 60 * 1000;
 

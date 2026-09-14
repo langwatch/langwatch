@@ -197,11 +197,8 @@ describe("storeFromBytes", () => {
     });
 
     it("dedup probe goes through tryFindById (by deterministic id), not by sha256 — a regression to the scan-all-partitions path would surface here", async () => {
-      // Lock the dedup-probe contract: the hot path computes id = deriveStoredObjectId(projectId, sha256)
-      // and looks up via tryFindById. tryFindById uses the (project_id, id) primary key seek; the old sha256 path
-      // scanned every weekly partition incl. cold S3. Asserting the *exact* derived id so a future change to
-      // the id derivation (e.g. salt swap, hash family change) is caught here rather than later in the dedup
-      // correctness.
+      // Dedup uses deterministic id lookup, not partition scan. Asserting the exact id
+      // catches changes to id derivation logic.
       vi.mocked(repo.tryFindById).mockResolvedValue(null);
 
       const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");

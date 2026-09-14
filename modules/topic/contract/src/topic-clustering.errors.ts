@@ -1,25 +1,6 @@
 /**
- * Classifies a clustering failure into something the customer can act on
- * versus an internal fault (ADR-051). User-actionable failures surface with
- * guidance on the settings page (and feed the planned home-notice/email
- * follow-up); internal ones read as "we're on it".
- *
- * HOW THIS DECIDES, and why it is not pattern matching.
- *
- * The code that FAILS knows why it failed. It knows whether it was resolving
- * the project's model configuration or posting to langevals; that is a fact,
- * available for free at the throw site. Reconstructing it afterwards by
- * regexing the message string is strictly worse information: the earlier cut
- * of this classification matched `/\b403\b/` and `/billing/i` anywhere in the
- * text, so ClickHouse reading cold parts off S3, or any internal error whose
- * body happened to quote an upstream `401`, was reported to the customer as
- * *their* credentials being wrong. It sent people to rotate keys that were
- * fine while the actual outage was ours, and it only held together as long as
- * nobody reworded an error.
- *
- * So failures we understand are thrown as {@link ClusteringError} with an
- * explicit code, and anything else is INTERNAL — not the customer's problem
- * until we can say otherwise. That is the safe direction to be wrong in.
+ * Classifies clustering failures: user-actionable (ADR-051) vs internal faults.
+ * Explicit codes at throw site, never string matching.
  */
 
 export const CLUSTERING_ERROR_CODES = {
@@ -31,15 +12,8 @@ export const CLUSTERING_ERROR_CODES = {
    */
   MODEL_NOT_CONFIGURED: "model_not_configured",
   /**
-   * The model provider rejected the customer's credentials.
-   *
-   * NOTHING SETS THIS TODAY, deliberately. We never call the provider — we
-   * hand litellm params to langevals and it makes the call — so a provider
-   * auth failure reaches us only as the body of a langevals 5xx. Guessing at
-   * that body is what this file used to do, and it was wrong often enough to
-   * be worse than silence. The code stays defined because rows already carry
-   * it and the settings page still renders fixed copy for it; setting it again
-   * needs langevals to return a STRUCTURED provider error, not prose.
+   * Model provider auth rejection. Defined for backwards compatibility but
+   * not set until langevals returns structured provider errors.
    */
   MODEL_PROVIDER_AUTH: "model_provider_auth",
   /** The model provider refused for quota/billing reasons. Same caveat as

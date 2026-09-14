@@ -1,7 +1,6 @@
 /**
- * Unit tests for the Azure Blob token cache + acquisition module (issue #6087). `@azure/identity` is
- * mocked so tests control exactly when an exchange resolves, rejects, and what it returns — the real
- * SDK network calls are exercised only by the (out of scope here) integration suites.
+ * Unit tests for the Azure Blob token cache + acquisition module (issue #6087). `@azure/identity`
+ * is mocked so tests control token exchange resolution. Real SDK calls are in integration suites.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

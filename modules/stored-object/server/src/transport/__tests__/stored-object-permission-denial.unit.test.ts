@@ -1,20 +1,8 @@
 /** @vitest-environment node */
 
 /**
- * Telling a refusal apart from an outage, on the file-read route.
- *
- * This predicate decides 403-vs-5xx, and it used to decide it by comparing the
- * denial's message word for word:
- *
- *   err.message === "You do not have permission to access this project resource"
- *
- * which made a copy edit a silent behaviour change — reword that sentence and
- * every denial here quietly becomes a server fault, with nothing to catch it.
- * `code` is the stable half of a handled error precisely so control flow can
- * rest on it, and unlike `instanceof` it survives a serialisation boundary.
- *
- * The "outage" half matters just as much: masking a dropped connection as a 403
- * would tell the caller they lack access to a file they own.
+ * Permission denial (403) vs outage (5xx) predicate. Decides on stable error code,
+ * not message text which can change silently.
  */
 import {
   LiteMemberRestrictedError,
