@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
+import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 import {
   parseScenarioFieldValues,
   parseSuiteFieldDefinitions,
@@ -39,6 +40,11 @@ export const scenarioSchema = z
     // keyed by field identifier. A field with no value has no key. See
     // specs/scenarios/scenario-fields.feature.
     fields: z.preprocess((raw) => parseScenarioFieldValues(raw), scenarioFieldValuesSchema),
+    // The simulated caller's voice for a voice target, stored as written.
+    // Null for a non-voice scenario. Read with `parseCallerVoiceConfig`,
+    // which tolerates older stored shapes. Defaulted so pre-column fixtures
+    // still parse. See specs/features/agents/voice-agents-v1.feature.
+    callerVoice: jsonValueSchema.nullable().default(null),
     testSuiteId: z.string().min(1).nullable().default(null),
     version: z.number().int().positive().default(1),
     lastUpdatedById: z.string().nullable(),
@@ -66,10 +72,7 @@ export const scenarioTestSuiteSchema = z
     kind: z.literal("test_suite"),
     scope: jsonValueSchema.nullable(),
     fields: z.preprocess((raw) => parseSuiteFieldDefinitions(raw), suiteFieldDefinitionsSchema),
-    evaluators: z.preprocess(
-      (raw) => parseEvaluatorAttachments(raw),
-      evaluatorAttachmentsSchema,
-    ),
+    evaluators: z.preprocess((raw) => parseEvaluatorAttachments(raw), evaluatorAttachmentsSchema),
     archivedAt: z.date().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -136,6 +139,11 @@ const scenarioFieldsSchema = z
     lastUpdatedById: z.string().nullable().optional(),
     testSuiteId: z.string().min(1).nullable().optional(),
     fields: scenarioFieldValuesSchema.optional(),
+    // The simulated caller's voice for a voice target. Absent leaves it
+    // unset (create) or keeps the current voice (update); send the default
+    // config to clear. Never null: a plain null is not a valid Prisma JSON
+    // write, matching the pre-module router's contract.
+    callerVoice: callerVoiceConfigSchema.optional(),
   })
   .strict();
 

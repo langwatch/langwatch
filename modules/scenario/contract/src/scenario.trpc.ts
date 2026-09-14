@@ -12,7 +12,11 @@ import { z } from "zod";
 
 import { MAX_ATOM_PAGE } from "./result-atoms.ts";
 import { runNoteSchema } from "./run-note.ts";
-import { runParameterValuesSchema, scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
+import {
+  runParameterValuesSchema,
+  scenarioParameterDefinitionsSchema,
+} from "./scenario.parameters.ts";
+import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 import {
   MAX_RUN_CONFIGURATIONS,
   resultAtomsPageSchema,
@@ -70,6 +74,10 @@ export const scenarioTrpcCreateSchema = projectSchema.extend({
   minTurns: z.number().int().min(0).max(100).nullish(),
   // The test suite this case is filed in; absent or null = unfiled.
   testSuiteId: z.string().nullish(),
+  // The simulated caller's voice for a voice target. Absent leaves it unset;
+  // send the default config to clear. Never null: a plain null is not a
+  // valid Prisma JSON write.
+  callerVoice: callerVoiceConfigSchema.optional(),
 });
 
 export const scenarioTrpcUpdateSchema = projectSchema.extend({
@@ -85,6 +93,10 @@ export const scenarioTrpcUpdateSchema = projectSchema.extend({
   minTurns: z.number().int().min(0).max(100).nullish(),
   // Absent = keep the current test suite; null = unfile; a test suite id = move.
   testSuiteId: z.string().nullish(),
+  // The simulated caller's voice for a voice target. Absent keeps the
+  // current voice; send the default config to clear. Never null: a plain
+  // null is not a valid Prisma JSON write.
+  callerVoice: callerVoiceConfigSchema.optional(),
   // The version the editor loaded. When sent, a save against any other
   // version is refused with scenario_stale_version instead of overwriting
   // the newer save. Absent = save over whatever is there.
@@ -159,9 +171,7 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
 
   /** A test suite id files the case there; null unfiles it. */
   .mutation("moveToTestSuite")
-  .withInput(
-    projectSchema.extend({ scenarioId: z.string(), testSuiteId: z.string().nullable() }),
-  )
+  .withInput(projectSchema.extend({ scenarioId: z.string(), testSuiteId: z.string().nullable() }))
   .withOutput(scenarioSchema)
 
   .mutation("duplicate")
@@ -250,9 +260,7 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
    * window. Clients poll this and invalidate the run reads when it advances.
    */
   .query("getSuiteRunFreshness")
-  .withInput(
-    projectSchema.extend({ scenarioSetId: z.string().optional() }).extend(dateRangeFields),
-  )
+  .withInput(projectSchema.extend({ scenarioSetId: z.string().optional() }).extend(dateRangeFields))
   .withOutput(simulationRunFreshnessSchema)
 
   .query("getScenarioSetRunData")
