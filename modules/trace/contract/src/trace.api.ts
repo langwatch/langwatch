@@ -17,6 +17,7 @@ import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput } from "./trace.queries.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
+import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   EvaluationTraceReadInput,
@@ -79,6 +80,7 @@ export interface TraceApi {
     query: TraceLegacyListInput;
     protections: unknown;
     options?: {
+      dateField?: TraceDateField;
       downloadMode?: boolean;
       includeSpans?: boolean;
       resolveBlobs?: boolean;
