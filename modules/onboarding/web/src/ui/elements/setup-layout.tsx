@@ -4,15 +4,7 @@ import { LogOut } from "react-feather";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 
 /**
- * The frame the signed-out-ish setup pages sit in.
- *
- * TWO THINGS CHANGED AND BOTH ARE THE APPLICATION'S. Signing out is one
- * identity client per document and a feature package may not construct one, so
- * it is asked of the host. And the `<title>` did not travel: `<Head>` was the
- * application's compatibility shim for a framework this application does not
- * run, and setting a document title from a layout is the `documentTitle`
- * capability's job — the same silent drop the gateway, governance and front-door
- * families each recorded.
+ * Frame for setup pages; delegates signing out and document title to the host.
  */
 export const SetupLayout = ({
   children,

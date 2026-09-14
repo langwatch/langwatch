@@ -1,28 +1,6 @@
 /**
- * The one question this package asks the application that mounts it.
- *
- * Same shape every governed web package before it declares: an abstract class
- * the package defines without importing anything of ours, and a plain adapter on
- * the application side. Five screens and ~40 modules moved with their call sites
- * unchanged because the shims in `behavior/` answer the platform hook NAMES off
- * this port.
- *
- * ## `revealProjectApiKey()` IS EXPLICIT, AND THAT IS THE POINT
- *
- * Two surfaces here print the project's legacy base key — the setup guide's
- * "Connect to LangWatch" card and, in `@langwatch/api-key-web`, the `/authorize`
- * handoff. `apps/ui`'s scope graph (`UiScopeOrganization`) carries ids, names and
- * slugs and NO key, deliberately: the base key is a project-level write
- * credential that `organization.getAll` redacts to `""` for anyone without
- * `project:update`, and widening the shell's graph to carry it would put a
- * credential in front of every surface that reads a scope.
- *
- * So the key is a SEPARATE question with a name that says what it does. The host
- * answers it from the same `organization.getAll` read the shell already holds —
- * the same procedure, the same server-side permission check, one cache entry —
- * and answers `undefined` when the reader is not entitled to it. A screen that
- * gets `undefined` renders an empty field, which is exactly what the platform
- * page did with a redacted key.
+ * Abstract port the application implements to answer scope and API key queries;
+ * key is separate to avoid spreading credentials across unrelated surfaces.
  */
 
 import { createContext, useContext } from "react";
@@ -131,13 +109,8 @@ export abstract class OnboardingHostApi {
   ): void;
 
   /**
-   * WHAT IS DELIBERATELY NOT HERE: the deployment.
-   *
-   * `behavior/use-public-env` decodes the `langwatch-public-config` meta tag
-   * itself, because half the modules that read it are also mounted by
-   * `@langwatch/trace-web`'s Integrate drawer, which mounts no onboarding host.
-   * A port method would have thrown there — and did, until trace-web's suite
-   * caught it.
+   * Deployment config is not here; see use-public-env to support modules shared
+   * with packages that don't mount this host.
    */
 
   abstract featureFlag(flag: string): OnboardingFlagReading;

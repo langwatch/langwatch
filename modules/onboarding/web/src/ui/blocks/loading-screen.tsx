@@ -14,25 +14,8 @@ const FADE_OUT_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
- * The wait, and its way out.
- *
- * Every caller of this screen early-returns it — `if (loading) return
- * <LoadingScreen />` — so the moment loading ends React simply deletes it and
- * the page appears with a cut. A motion `exit` cannot help: motion only plays
- * an exit for a child of `AnimatePresence`, because something has to keep the
- * element in the tree while it leaves, and an early return keeps nothing.
- * Wiring thirteen call sites into keyed presences to buy one fade is a lot of
- * blast radius for a transition.
- *
- * So the screen sees itself out. On the way out it leaves a copy of its own
- * rendered self pinned over the page and dissolves that instead — the real
- * element is already gone, the copy is inert, and the page underneath is fully
- * live and interactive the whole time. The copy is made in a LAYOUT effect
- * cleanup, which runs in the same commit that removes the original and before
- * the browser paints, so there is never a frame with neither on screen.
- *
- * The result is the thing that was actually wanted: the app is revealed from
- * under the loading screen, rather than replacing it.
+ * Fades out the loading screen by copying itself before unmounting, since early
+ * returns prevent exit animations.
  */
 export const LoadingScreen = () => {
   const reduceMotion = useOnboardingHost().prefersReducedMotion();

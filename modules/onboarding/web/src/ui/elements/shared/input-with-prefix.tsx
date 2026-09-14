@@ -29,9 +29,7 @@ interface InputWithPrefixProps {
 }
 
 /**
- * A flexible input component with optional prefix, visibility toggle, and copy actions.
- *
- * Single Responsibility: Provides a unified input field with configurable addons for prefixes and action buttons.
+ * Flexible input with prefix, visibility toggle, and copy buttons.
  */
 export function InputWithPrefix({
   value,

@@ -1,17 +1,6 @@
 /**
- * The orange accent surfaces the onboarding screens paint on selected cards and
- * icon chips.
- *
- * These exist because a raw palette step is a light-mode-only decision. `bg`
- * set to `orange.50` renders the same near-white in both modes, while the text
- * on top of it follows `fg` and flips to near-white in dark mode — so the copy
- * disappears into its own card. Every accent surface in onboarding therefore
- * names both sides.
- *
- * The pairs are the source; the Chakra conditional objects are the convenient
- * form. A component that already holds a `useColorModeValue` call consumes the
- * pair, everything else spreads the conditional object straight onto the prop —
- * either way there is one place to change the accent.
+ * Defines light/dark color pairs for accent surfaces to avoid light-mode-only
+ * palette steps.
  */
 
 /** A light value and its dark-mode counterpart. */

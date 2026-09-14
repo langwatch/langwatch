@@ -9,13 +9,8 @@ export function JsonHighlight({
 }: {
   code: string;
   /**
-   * 1-indexed line numbers to call out with a background tint. Used by
-   * the empty-state onboarding to flag the env-var lines (API key,
-   * project id, endpoint) the user actually has to copy. Highlight
-   * styling itself comes from the global rule in
-   * `packages/design-system/src/system/config.ts`
-   * (`[data-line][data-highlight]:after`) so every code block in the
-   * app shares the same orange accent.
+   * 1-indexed line numbers to highlight with orange accent; guides users to
+   * copy env vars.
    */
   highlightLines?: number[];
 }): React.ReactElement {

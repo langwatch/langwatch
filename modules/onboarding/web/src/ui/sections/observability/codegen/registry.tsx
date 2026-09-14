@@ -48,16 +48,8 @@ export interface SnippetRef {
 }
 
 /**
- * Category split surfaced by the traces-v2 empty-state onboarding:
- *   - "agents" — frameworks that orchestrate LLM calls (LangChain, Vercel AI,
- *     CrewAI, no/low-code flow tools…). What most users adopting LangWatch
- *     today are building.
- *   - "traditional" — direct LLM clients (OpenAI, Anthropic, Gemini…) and
- *     transport-level options (OpenTelemetry, Spring AI). Useful for teams
- *     who haven't picked an agent framework yet.
- *
- * Purely a UI-grouping concern — the backend treats every integration the
- * same way.
+ * UI grouping for integration discovery: agents (frameworks like LangChain) vs
+ * traditional (direct LLM clients).
  */
 export type IntegrationCategory = "agents" | "traditional";
 

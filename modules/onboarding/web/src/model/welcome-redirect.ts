@@ -1,12 +1,6 @@
 /**
- * Pure decision for the welcome screen's mount effect: does this user need
- * onboarding, or where do they go instead? (ADR-038 v6)
- *
- * - Belonging to an organization is what "already onboarded" means: never show
- *   the create-org form to a member of one (it would mint a duplicate org) —
- *   send them home and let the resolver pick /me, the project, or /settings.
- * - Personal-workspace teams never count as onboarded projects and are
- *   never a redirect target.
+ * Decides if user needs onboarding or redirects based on org membership (see
+ * ADR-038 v6).
  */
 
 interface WelcomeOrg {

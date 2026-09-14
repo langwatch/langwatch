@@ -1,11 +1,6 @@
 /**
- * `useRequiredSession`, narrowed to what the welcome flow asks of it.
- *
- * The application hook carried a 200-line public-route table and a sign-in
- * redirect; neither travelled, for the reason the trace family gives — a
- * redirect is the shell's policy, and these addresses are reachable in front of
- * a session in more ways than one. What is left is the reading: who is here, and
- * whether that answer has arrived.
+ * Reads current user and session status without redirect logic (which belongs
+ * to the shell).
  */
 
 import { useOnboardingHost } from "../model/onboarding-host.ts";

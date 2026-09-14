@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Analytics instrumentation on the coding-agent onboarding screen.
- *
- * The screen renders install commands and an MCP config that EMBED the
- * project API key, so the property allowlist is a privacy property, not a
- * tidiness one: every payload must stay a fixed identifier and must never
- * carry the copied string.
+ * Analytics for coding-agent screen; allowlist is privacy-critical since
+ * commands embed the API key.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

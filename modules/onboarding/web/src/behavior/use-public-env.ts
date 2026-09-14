@@ -1,36 +1,6 @@
 /**
- * What the deployment is, as this package reads it.
- *
- * `~/hooks/usePublicEnv` composed two halves: the STATIC one, read out of the
- * `langwatch-public-config` meta tag the web boot boundary injects, and a
- * per-viewer one the `publicEnv` procedure answered. Nothing in this family
- * reads the per-viewer half, so what is left is the static half — read HERE
- * rather than asked of the host, and that is a correctness requirement rather
- * than a preference.
- *
- * THE MODULES THIS READER SERVES ARE MOUNTED BY TWO PACKAGES. The observability
- * codegen, the two coding-agent screens and the OpenTelemetry setup all render
- * inside `@langwatch/trace-web`'s Integrate drawer as well as inside this
- * family's own product flow, and the explorer mounts no onboarding host. A
- * reading that came off this package's port would throw the moment the drawer
- * opened — which is exactly what it did, caught by trace-web's own suite.
- *
- * The static half comes from `@langwatch/ui/public-config` in the application,
- * and `@langwatch/ui` IS `apps/ui` — a feature package that named it would close
- * a cycle back onto the application that mounts it. So the meta tag is decoded
- * here, narrowed to the two keys this family reads, exactly as
- * `@langwatch/trace-web` does for the same reason.
- *
- * THE META NAME AND THE TWO FIELD NAMES ARE A RESTATEMENT and carry the
- * alignment obligation the data-governance snapshots record: rename one in
- * `apps/ui/src/model/public-config.ts` without renaming it here and the welcome
- * flow forks the wrong way and the snippets print an empty endpoint.
- *
- * A MISSING TAG READS AS "UNKNOWN DEPLOYMENT" rather than throwing. The
- * application's own reader throws, which is right for a boot boundary and wrong
- * here: a test that mounts one onboarding surface should not have to stage a
- * document, and an endpoint the reader can copy is worth less than a page that
- * renders.
+ * Reads static deployment config from meta tag, avoiding circular dependency and
+ * supporting modules mounted by multiple packages.
  */
 
 import { useMemo } from "react";
