@@ -68,6 +68,7 @@
  * @see ../provisioning/accessModel.ts — the database-layer isolation this backs up
  */
 
+import { LWQL_MAX_RESULT_ROWS } from "../limits";
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
@@ -200,6 +201,17 @@ export interface AcceptedLangWatchQL {
    * outermost query first, then what it contains.
    */
   readonly blocks: readonly LangWatchQLQueryBlock[];
+  /**
+   * Whether the service should append the default `LIMIT` before executing.
+   *
+   * `true` when no top-level `SELECT` names a `LIMIT` or an `OFFSET` of its own,
+   * so the statement is otherwise unbounded and the service caps it at
+   * {@link LWQL_MAX_RESULT_ROWS}. A statement that already pages — any top-level
+   * `LIMIT`/`OFFSET` — is left exactly as written. The append is the one edit
+   * this API makes to a submitted statement; a too-high `LIMIT` is refused
+   * before it gets here (`LIMIT_TOO_HIGH`).
+   */
+  readonly appendRowLimit: boolean;
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -274,6 +286,16 @@ interface Frame {
   readonly block?: BlockAccumulator;
 }
 
+/** What a top-level `SELECT` declared about how many rows it returns. */
+interface TopLevelLimit {
+  /** Whether it named a `LIMIT` or an `OFFSET` at all — if so, it is left as written. */
+  readonly hasClause: boolean;
+  /** The `LIMIT` row count when it is a plain non-negative integer literal, else `null`. */
+  readonly staticRows: number | null;
+  /** Where the `LIMIT` sits, for the refusal that names a too-high one. */
+  readonly at?: SqlSourcePosition;
+}
+
 /** Everything the walk accumulates. */
 interface WalkContext {
   readonly policy: ResolvedLangWatchQLPolicy;
@@ -281,6 +303,13 @@ interface WalkContext {
   readonly tables: Set<string>;
   readonly parameters: Map<string, string>;
   readonly blocks: BlockAccumulator[];
+  /**
+   * One entry per top-level `SELECT` (a bare query, or each branch of a
+   * `UNION`). Subquery limits are excluded — they bound an inner read, not the
+   * response — so this is what decides the appended default `LIMIT` and the
+   * `LIMIT_TOO_HIGH` refusal.
+   */
+  readonly topLevelLimits: TopLevelLimit[];
 }
 
 interface NodeArgs {
@@ -378,6 +407,9 @@ const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
     "Read from one of the analytics datasets listed by GET /api/v1/query/schema instead of a table function.",
   FUNCTION_NOT_ALLOWED:
     "Rewrite the expression using one of the functions named in this violation's allowedFunctions.",
+  LIMIT_TOO_HIGH: `Lower the LIMIT to ${LWQL_MAX_RESULT_ROWS.toLocaleString(
+    "en-US",
+  )} rows or fewer, and page the rest with LIMIT/OFFSET and an ORDER BY.`,
   GATED_COLUMN:
     "Remove the field, or use one of the columns named in this violation's availableColumns.",
   WILDCARD_NOT_ALLOWED:
@@ -389,7 +421,10 @@ const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
 
 /** The sharper fields a call site can attach on top of the {@link DEFAULT_VIOLATION_HINTS} floor. */
 type ViolationExtra = Partial<
-  Pick<LangWatchQLViolation, "availableDatasets" | "dataset" | "availableColumns">
+  Pick<
+    LangWatchQLViolation,
+    "availableDatasets" | "dataset" | "availableColumns" | "maxRows"
+  >
 >;
 
 function report({
@@ -765,7 +800,44 @@ function walkInterpolatedColumn({ value, node, frame, ctx }: FieldArgs): void {
  * Opens this SELECT's block and brings its CTE names into scope, before
  * anything else is walked.
  */
+/**
+ * The row count a `LIMIT` names, when it is a plain non-negative integer
+ * literal — the only shape whose value is knowable before execution.
+ *
+ * A `LIMIT` that is an expression or a bound parameter reads back `null`: its
+ * value is decided at run time, so it is neither refused as too high nor
+ * counted as absent. The byte ceiling still bounds what such a query returns.
+ */
+function readStaticLimitRows(limit: unknown): number | null {
+  if (!isNode(limit) || limit.type !== "Literal") return null;
+  const { value } = limit;
+  const rows =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+  return Number.isInteger(rows) && rows >= 0 ? rows : null;
+}
+
+/**
+ * Records how a top-level `SELECT` bounds its own result, so the entry point can
+ * decide the appended default `LIMIT` and refuse a too-high one. A `SELECT`
+ * inside a subquery bounds an inner read, not the response, and is skipped.
+ */
+function recordTopLevelLimit({ node, frame, ctx }: NodeArgs): void {
+  if (frame.isInSubquery) return;
+  const limitNode = node.limit;
+  const at = isNode(limitNode) ? positionOf(limitNode) : undefined;
+  ctx.topLevelLimits.push({
+    hasClause: limitNode !== undefined || node.offset !== undefined,
+    staticRows: readStaticLimitRows(limitNode),
+    ...(at ? { at } : {}),
+  });
+}
+
 function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
+  recordTopLevelLimit({ node, frame, ctx });
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
@@ -1539,6 +1611,7 @@ export function validateLangWatchQL({
 
   const ctx = createWalkContext(resolveLangWatchQLPolicy(policy));
   walkNode(screened.statement, ROOT_FRAME, ctx);
+  reportTooHighLimits(ctx);
 
   if (ctx.violations.length > 0)
     return { ok: false, violations: ctx.violations };
@@ -1554,7 +1627,37 @@ export function validateLangWatchQL({
       hasGroupBy: block.hasGroupBy,
       isAggregated: block.isAggregated,
     })),
+    // Append the default cap only when nothing top-level already pages: any
+    // top-level LIMIT or OFFSET means the caller is bounding the result
+    // themselves, and the statement is executed exactly as written.
+    appendRowLimit:
+      ctx.topLevelLimits.length > 0 &&
+      ctx.topLevelLimits.every((limit) => !limit.hasClause),
   };
+}
+
+/**
+ * Refuses a statement whose own top-level `LIMIT` asks for more than the row
+ * cap. A dynamic `LIMIT` (an expression or a bound parameter) is not refused —
+ * its value is not knowable here, and the byte ceiling still bounds the result.
+ */
+function reportTooHighLimits(ctx: WalkContext): void {
+  for (const limit of ctx.topLevelLimits) {
+    if (ctx.violations.length >= MAX_VIOLATIONS) return;
+    if (limit.staticRows === null || limit.staticRows <= LWQL_MAX_RESULT_ROWS)
+      continue;
+    ctx.violations.push({
+      code: "LIMIT_TOO_HIGH",
+      clause: "limit",
+      message:
+        `The LIMIT of ${limit.staticRows.toLocaleString("en-US")} rows is above the maximum of ` +
+        `${LWQL_MAX_RESULT_ROWS.toLocaleString("en-US")} rows this API returns per request. ` +
+        `Lower it and page the rest with LIMIT/OFFSET and an ORDER BY.`,
+      hint: DEFAULT_VIOLATION_HINTS.LIMIT_TOO_HIGH,
+      maxRows: LWQL_MAX_RESULT_ROWS,
+      ...(limit.at ? { at: limit.at } : {}),
+    });
+  }
 }
 
 const NO_CTES: ReadonlySet<string> = new Set<string>();
@@ -1653,5 +1756,6 @@ function createWalkContext(policy: ResolvedLangWatchQLPolicy): WalkContext {
     tables: new Set<string>(),
     parameters: new Map<string, string>(),
     blocks: [],
+    topLevelLimits: [],
   };
 }

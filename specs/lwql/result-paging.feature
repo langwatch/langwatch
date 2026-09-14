@@ -13,3 +13,39 @@ Feature: A large answer is paged, never cut
       Given a user with an API key with access to a project with a lot of data
       When they run a query whose answer is larger than one page
       Then they get one page and a way to ask for the next
+
+  Rule: A large result is capped, never silently cut
+
+    # The row cap is applied to the statement itself: a statement that names no
+    # LIMIT has the default one appended before it runs, so an unbounded answer
+    # comes back as one page rather than a stream.
+    @unit
+    Scenario: A statement with no LIMIT is capped at the row ceiling
+      Given a statement that names no LIMIT of its own
+      When it is validated
+      Then it is flagged for the default row LIMIT to be appended before it runs
+      And a statement that already pages with LIMIT or OFFSET is left exactly as written
+
+    # A caller asking for more than one page can have at once is told so before
+    # the query runs, with the cap and how to page named on the refusal.
+    @unit
+    Scenario: A LIMIT above the ceiling is refused before the query runs
+      Given a statement whose own LIMIT asks for more than the row ceiling
+      When it is validated
+      Then it is refused with LIMIT_TOO_HIGH, naming the cap and to page with LIMIT/OFFSET and ORDER BY
+
+    # The cap comes back as a whole page of exactly that many rows, with no
+    # truncation flag and no diagnostic: nothing was cut, the answer was bounded.
+    @integration
+    Scenario: A capped result comes back as one page, never silently cut
+      Given a query whose answer is larger than the row ceiling
+      When it runs without naming a LIMIT
+      Then it returns a full page at the ceiling, with no truncation flag and no diagnostic
+
+    # A result too wide to serialise is refused outright rather than cut, so a
+    # partial body never masquerades as a whole one.
+    @integration
+    Scenario: A result past the byte ceiling is refused, never cut
+      Given a query whose result exceeds the byte ceiling
+      When it runs
+      Then it is refused with lwql_result_too_large naming the byte cap, never a partial body

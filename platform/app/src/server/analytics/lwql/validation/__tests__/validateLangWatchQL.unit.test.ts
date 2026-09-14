@@ -637,6 +637,7 @@ describe("validateLangWatchQL", () => {
       ["FUNCTION_NOT_ALLOWED", "SELECT unsupportedFn(TraceId) FROM traces"],
       ["GATED_COLUMN", "SELECT body FROM traces"],
       ["WILDCARD_NOT_ALLOWED", "SELECT * FROM traces"],
+      ["LIMIT_TOO_HIGH", "SELECT TraceId FROM traces LIMIT 10001"],
       [
         "NESTING_TOO_DEEP",
         "SELECT ((((((TraceId)))))) FROM traces",
@@ -674,6 +675,7 @@ describe("validateLangWatchQL", () => {
         "FUNCTION_NOT_ALLOWED",
         "GATED_COLUMN",
         "WILDCARD_NOT_ALLOWED",
+        "LIMIT_TOO_HIGH",
         "NESTING_TOO_DEEP",
         "UNSUPPORTED_SYNTAX",
       ]);
@@ -856,6 +858,60 @@ describe("validateLangWatchQL", () => {
       );
 
       expect(blocks.map((block) => block.isAggregated)).toEqual([false, true]);
+    });
+  });
+
+  describe("given the row cap on what one request returns", () => {
+    /** @scenario "A statement with no LIMIT is capped at the row ceiling" */
+    it("flags a statement that names no LIMIT for the default cap to be appended", () => {
+      const result = validate("SELECT TraceId FROM traces WHERE Cost > 1");
+      expect(result.ok && result.appendRowLimit).toBe(true);
+    });
+
+    it("leaves a statement that already names a LIMIT alone", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 20");
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("leaves a statement that pages with OFFSET alone", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces ORDER BY TraceId LIMIT 20 OFFSET 40",
+      );
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("accepts a LIMIT at exactly the cap without flagging an append", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 10000");
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    /** @scenario "A LIMIT above the ceiling is refused before the query runs" */
+    it("refuses a LIMIT above the cap, naming the cap and how to page", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 10001");
+      expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
+      const violation =
+        !result.ok
+          ? result.violations.find((v) => v.code === "LIMIT_TOO_HIGH")
+          : undefined;
+      expect(violation?.maxRows).toBe(10000);
+      expect(violation?.clause).toBe("limit");
+      expect(violation?.hint).toMatch(/LIMIT\/OFFSET/);
+    });
+
+    it("does not refuse a LIMIT whose value is a bound parameter", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT {n:UInt32}");
+      expect(codesOf(result)).toEqual([]);
+      // A dynamic LIMIT is treated as present, so the default cap is not appended.
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("refuses a UNION branch whose own LIMIT is over the cap", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 5 " +
+          "UNION ALL SELECT TraceId FROM spans LIMIT 99999",
+      );
+      expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
     });
   });
 });

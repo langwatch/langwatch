@@ -3,13 +3,10 @@
  * never touches.
  *
  * A fake executor rather than a mock, because the interesting claims are about
- * *what reached the database* — the statement, the tenant capability, the fact
- * that nothing reached it at all — and those are artifacts to inspect, not call
- * sequences to verify. The fake records; the tests read the record.
- *
- * The capping the executor itself does is asserted against
- * {@link applyLangWatchQLResultLimits} directly, because a fake that implemented
- * its own truncation would prove only that the fake truncates.
+ * *what reached the database* — the statement (including the default `LIMIT`
+ * the service appends), the tenant capability, the fact that nothing reached it
+ * at all — and those are artifacts to inspect, not call sequences to verify.
+ * The fake records; the tests read the record.
  *
  * @see specs/lwql/api.feature
  */
@@ -19,12 +16,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { Protections } from "../../../traces/protections";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
-  applyLangWatchQLResultLimits,
+  DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
 } from "../executor";
 import { lwqlTenantCapability } from "../capability";
 import { recordingExecutor } from "../executor.testFakes";
 import {
+  appendDefaultRowLimit,
   closeLangWatchQLService,
   LangWatchQLService,
   setLangWatchQLService,
@@ -114,7 +112,7 @@ async function metaOf(
 
 describe("given the LangWatchQL service", () => {
   describe("when a permitted query is submitted", () => {
-    it("hands the executor the submitted statement, byte for byte", async () => {
+    it("hands the executor the submitted statement, verbatim but for the appended default LIMIT", async () => {
       const executor = recordingExecutor();
       const sql =
         "SELECT   TraceId,\n  count() AS n\nFROM analytics.traces\nGROUP BY TraceId";
@@ -126,6 +124,26 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(executor.calls).toHaveLength(1);
+      // The statement was not named a LIMIT, so the cap is appended and nothing
+      // else is changed: the submitted text is a prefix of what ran.
+      expect(executor.calls[0]!.sql).toBe(
+        appendDefaultRowLimit(sql, DEFAULT_LWQL_RESULT_LIMITS.maxRows),
+      );
+    });
+
+    it("leaves a statement that already names a LIMIT exactly as written", async () => {
+      const executor = recordingExecutor();
+      const sql =
+        "SELECT TraceId FROM analytics.traces " +
+        "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3) " +
+        "ORDER BY TraceId LIMIT 50";
+
+      await serviceWith(executor).execute({
+        projects: [PROJECT],
+        protections: FULLY_PERMITTED,
+        sql,
+      });
+
       expect(executor.calls[0]!.sql).toBe(sql);
     });
 
@@ -219,28 +237,60 @@ describe("given the LangWatchQL service", () => {
       expect(result.columns).toEqual([{ name: "value", type: "UInt64" }]);
       expect(result.rows).toEqual([{ value: 1 }]);
       expect(result.statistics.rowsRead).toBe(10);
-      expect(result.truncated).toBe(false);
       expect(result.diagnostics).toEqual([]);
     });
   });
 
-  describe("when the executor reports the result was cut short", () => {
-    it("marks truncation and carries a diagnostic naming the ceiling", async () => {
-      const result = await serviceWith(
-        recordingExecutor({ truncated: true }),
-      ).execute({
-        projects: [PROJECT],
-        protections: FULLY_PERMITTED,
-        sql:
-          "SELECT TraceId FROM analytics.traces " +
-          "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)",
+  describe("when the result outgrows the byte ceiling", () => {
+    /** @scenario "Overflow throws and never silently truncates" */
+    it("refuses it outright, naming the byte cap, rather than cutting it", async () => {
+      const wideRows = [...Array(20).keys()].map((index) => ({
+        index,
+        value: "x".repeat(500),
+      }));
+      const service = new LangWatchQLService({
+        executor: recordingExecutor({ rows: wideRows }),
+        database: DATABASE,
+        limits: { maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows, maxResultBytes: 500 },
       });
 
-      expect(result.truncated).toBe(true);
-      expect(result.diagnostics.map((entry) => entry.code)).toEqual([
-        "RESULT_TRUNCATED",
-      ]);
-      expect(result.diagnostics[0]!.meta).toMatchObject({ maxRows: 10_000 });
+      expect(
+        await codeOf(() =>
+          service.execute({
+            projects: [PROJECT],
+            protections: FULLY_PERMITTED,
+            sql: BOUNDED_COUNT,
+          }),
+        ),
+      ).toBe("lwql_result_too_large");
+      expect(await metaOf(() =>
+        service.execute({
+          projects: [PROJECT],
+          protections: FULLY_PERMITTED,
+          sql: BOUNDED_COUNT,
+        }),
+      )).toMatchObject({ maxResultBytes: 500 });
+    });
+
+    it("returns the whole result when it fits under the byte ceiling", async () => {
+      const result = await new LangWatchQLService({
+        executor: recordingExecutor({
+          rows: [{ value: 1 }, { value: 2 }],
+          statistics: {
+            elapsedMs: 1,
+            rowsRead: 2,
+            bytesRead: 8,
+            rowsReturned: 2,
+          },
+        }),
+        database: DATABASE,
+      }).execute({
+        projects: [PROJECT],
+        protections: FULLY_PERMITTED,
+        sql: BOUNDED_COUNT,
+      });
+
+      expect(result.rows).toEqual([{ value: 1 }, { value: 2 }]);
     });
   });
 
@@ -526,8 +576,11 @@ describe("given the LangWatchQL service", () => {
         dashboard_context_period_start: "2026-02-20 00:00:00",
         dashboard_context_period_end: "2026-02-27 00:00:00",
       });
-      // The statement itself is never rewritten to carry them.
-      expect(executor.calls[0]!.sql).toBe(PERIOD_SQL);
+      // The window is carried in the bound parameters, never injected into the
+      // statement; the only edit to the text is the appended default LIMIT.
+      expect(executor.calls[0]!.sql).toBe(
+        appendDefaultRowLimit(PERIOD_SQL, DEFAULT_LWQL_RESULT_LIMITS.maxRows),
+      );
       expect(result.followsTimeWindow).toBe(true);
     });
 
@@ -703,7 +756,9 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(result.followsTimeWindow).toBe(false);
-      expect(executor.calls[0]!.sql).toBe(BOUNDED_COUNT);
+      expect(executor.calls[0]!.sql).toBe(
+        appendDefaultRowLimit(BOUNDED_COUNT, DEFAULT_LWQL_RESULT_LIMITS.maxRows),
+      );
       expect(
         executor.calls[0]!.parameters,
         "a window was injected into a statement that never asked for one",
@@ -897,51 +952,6 @@ describe("given the LangWatchQL service", () => {
       // Nothing reached the database: the refusal is before execution, not a
       // query that ran and quietly answered nothing.
       expect(executor.calls).toHaveLength(0);
-    });
-  });
-});
-
-describe("given the result ceilings", () => {
-  const rows = [...Array(50).keys()].map((index) => ({
-    index,
-    value: "x".repeat(100),
-  }));
-
-  describe("when the row ceiling is reached", () => {
-    it("cuts the result at the ceiling and reports that it did", () => {
-      const capped = applyLangWatchQLResultLimits({
-        rows,
-        limits: { maxRows: 10, maxResultBytes: 10_000_000 },
-      });
-
-      expect(capped.rows).toHaveLength(10);
-      expect(capped.truncated).toBe(true);
-      expect(capped.rows[0]).toEqual(rows[0]);
-    });
-  });
-
-  describe("when the byte ceiling is reached first", () => {
-    it("cuts the result short of the row ceiling and reports that it did", () => {
-      const capped = applyLangWatchQLResultLimits({
-        rows,
-        limits: { maxRows: 1_000, maxResultBytes: 500 },
-      });
-
-      expect(capped.rows.length).toBeGreaterThan(0);
-      expect(capped.rows.length).toBeLessThan(rows.length);
-      expect(capped.truncated).toBe(true);
-    });
-  });
-
-  describe("when the result fits", () => {
-    it("returns every row and reports no truncation", () => {
-      const capped = applyLangWatchQLResultLimits({
-        rows,
-        limits: { maxRows: 1_000, maxResultBytes: 10_000_000 },
-      });
-
-      expect(capped.rows).toEqual(rows);
-      expect(capped.truncated).toBe(false);
     });
   });
 });

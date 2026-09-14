@@ -21,8 +21,6 @@
  *    answer waiting to disagree with the first.
  *  - Result rules (`MISSING_TIME_BUCKETS`, `INCOMPLETE_COMPARISON_PERIOD`) read
  *    the typed columns and rows that came back.
- *  - `RESULT_TRUNCATED` reads the executor's own report that a response ceiling
- *    cut the answer short.
  *
  * ## Under-report rather than over-report
  *
@@ -41,7 +39,7 @@ import {
   type LangWatchQLViewDefinition,
   lwqlGrainColumns,
 } from "./catalog/types";
-import type { LangWatchQLColumn, LangWatchQLResultLimits } from "./executor";
+import type { LangWatchQLColumn } from "./executor";
 import type {
   AcceptedLangWatchQL,
   LangWatchQLQueryBlock,
@@ -51,15 +49,14 @@ import type {
  * Every note this API can attach to a result.
  *
  * A code is here because a caller would *do something different* on seeing it,
- * which is the same bar the violation codes are held to. The set is the four
- * rules issue #6480 scopes — fanout, truncation, comparison period, missing
- * buckets — plus the unfiltered-time-range rule, which is here because the
- * partition-pruning measurement recorded in `./provisioning/catalogStatements.ts` puts an eight-fold
- * read cost on exactly that shape.
+ * which is the same bar the violation codes are held to. The set is the
+ * query-shape and result rules issue #6480 scopes — fanout, comparison period,
+ * missing buckets — plus the unfiltered-time-range rule, which is here because
+ * the partition-pruning measurement recorded in
+ * `./provisioning/catalogStatements.ts` puts an eight-fold read cost on exactly
+ * that shape.
  */
 export const LWQL_DIAGNOSTIC_CODES = [
-  /** A response ceiling cut the answer short. */
-  "RESULT_TRUNCATED",
   /** A join repeats one dataset's rows once per row of another. */
   "POSSIBLE_FANOUT",
   /** A dataset was read with no predicate on the column that prunes it. */
@@ -111,11 +108,6 @@ export interface LangWatchQLDiagnosticsInput {
   readonly views: readonly LangWatchQLViewDefinition[];
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
-  /** Whether a response ceiling cut the result short. */
-  readonly truncated: boolean;
-  readonly limits: LangWatchQLResultLimits;
-  /** Rows actually handed back, after the ceilings. */
-  readonly rowsReturned: number;
   /**
    * The instant "has this bucket finished yet" is asked against.
    *
@@ -129,41 +121,15 @@ export interface LangWatchQLDiagnosticsInput {
 /**
  * Every diagnostic a finished query earns, in a stable order.
  *
- * Pure. Truncation first because it changes what the other rules are looking
- * at: a cut-off result can be missing the buckets they would have read.
+ * Pure.
  */
 export function lwqlDiagnostics(
   input: LangWatchQLDiagnosticsInput,
 ): readonly LangWatchQLDiagnostic[] {
   return [
-    ...truncationDiagnostics(input),
     ...fanoutDiagnostics(input),
     ...unboundedTimeRangeDiagnostics(input),
     ...timeBucketDiagnostics(input),
-  ];
-}
-
-// ---------------------------------------------------------------------------
-// Truncation
-// ---------------------------------------------------------------------------
-
-function truncationDiagnostics({
-  truncated,
-  limits,
-  rowsReturned,
-}: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
-  if (!truncated) return [];
-  return [
-    {
-      code: "RESULT_TRUNCATED",
-      message:
-        "The result was cut off at this API's response ceiling. Aggregate further, or narrow the query, to see the whole answer.",
-      meta: {
-        maxRows: limits.maxRows,
-        maxResultBytes: limits.maxResultBytes,
-        rowsReturned,
-      },
-    },
   ];
 }
 

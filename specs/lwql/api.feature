@@ -495,10 +495,10 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query executes and returns tabular results
 
   @integration
-  Scenario: Results carry typed columns, rows, execution statistics, truncation state, and diagnostics
+  Scenario: Results carry typed columns, rows, execution statistics, and diagnostics
     Given an authenticated API client
     When it executes a LangWatchQL query
-    Then the response contains typed columns, rows, execution statistics, truncation state, and structured diagnostics
+    Then the response contains typed columns, rows, execution statistics, and structured diagnostics
 
   @integration
   Scenario: Parameterized queries re-run deterministically through the REST API
@@ -703,8 +703,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query is rejected or terminated within its resource envelope
     And other tenants' queries continue to execute
 
-  # @unimplemented: resource governance lands with the executor PR of #6480.
-  @integration @unimplemented
+  # Bound (#8085): the row cap is applied to the statement itself (a default
+  # LIMIT is appended, a too-high one refused as LIMIT_TOO_HIGH) and the byte
+  # ceiling is a hard lwql_result_too_large error, so no partial result is ever
+  # returned in place of the whole one.
+  @integration
   Scenario: Overflow throws and never silently truncates
     Given an authenticated API client
     When a query exceeds any resource limit
@@ -715,11 +718,10 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # Diagnostics (bound in this PR — advisory, never a refusal)
   # ---------------------------------------------------------------------------
 
-  @integration
-  Scenario: Truncation diagnostic fires when results are cut off
-    Given an authenticated API client
-    When a query's results are truncated by the result-size limit
-    Then the response marks truncation explicitly
+  # The truncation diagnostic was removed with the truncated flag (#8085): a
+  # result is never silently cut, so there is nothing for it to mark. A result
+  # too large is refused outright — see "Overflow throws and never silently
+  # truncates" above.
 
   @integration
   Scenario: Incomplete or misaligned comparison period diagnostic fires
@@ -941,7 +943,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: The schema endpoint names which permission unlocks each gated column
 #     (per-column gate kinds, not a collapsed boolean)
 # AC "execute native ClickHouse SQL via REST" → Scenario: Client executes native ClickHouse SQL through the documented REST endpoint
-# AC "typed columns, rows, stats, truncation, diagnostics" → Scenario: Results carry typed columns, rows, execution statistics, truncation state, and diagnostics
+# AC "typed columns, rows, stats, diagnostics" → Scenario: Results carry typed columns, rows, execution statistics, and diagnostics
 # AC "parameterized queries re-run deterministically"
 #   → Scenario: Parameterized queries re-run deterministically through the REST API
 #   → Scenario: A parameterized query missing a bound value is refused before execution
@@ -1043,15 +1045,16 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #    the endpoint adds row and byte ceilings on what is returned, and can relax neither)
 # AC "pathological join contained; no tenant monopoly" → Scenario: A pathological join is contained within its resource envelope
 # AC "overflow throws, never silent truncation" → Scenario: Overflow throws and never silently truncates
-#   (the never-SILENT half ships and is bound by the truncation scenario below; the
-#    throws-on-a-database-ceiling half needs a deterministic way to exhaust one)
+#   (#8085: the row cap is applied to the statement — a default LIMIT appended, a
+#    too-high one refused as LIMIT_TOO_HIGH — and the byte ceiling is a hard
+#    lwql_result_too_large error, so no partial result is ever returned)
 #
 # Diagnostics:
 # AC "four rules, each fixture-triggered"
 #   → Scenario: Fanout warning on a trace-to-span join (POSSIBLE_FANOUT)
-#   → Scenario: Truncation diagnostic fires when results are cut off (RESULT_TRUNCATED)
 #   → Scenario: Incomplete or misaligned comparison period diagnostic fires (INCOMPLETE_COMPARISON_PERIOD)
 #   → Scenario: Missing time buckets diagnostic fires (MISSING_TIME_BUCKETS)
+#   (the RESULT_TRUNCATED rule was removed in #8085 with the truncated flag)
 # AC "clean = no known issue detected" → Scenario: Clean diagnostic status is documented as no known issue detected
 # (a fifth rule beyond the four the issue scopes, because the partition-pruning
 #  measurement recorded in src/server/analytics/lwql/provisioning/catalogStatements.ts puts an

@@ -38,10 +38,12 @@
  * The settings profile pins `readonly`, `max_execution_time` and
  * `max_memory_usage` `CONST`, so a query that outgrows the *database's* budget
  * is killed by the server and surfaces as a coded error. The ceilings this
- * layer adds are about the response — how many rows, how many bytes — and they
- * truncate rather than throw, always marked. Neither can be relaxed by a
- * caller: the first because `readonly = 1` refuses the setting change, the
- * second because it is not in the request shape.
+ * layer adds are about the response, and neither cuts silently: a statement
+ * that names no `LIMIT` is capped by one this layer appends (a too-high
+ * explicit `LIMIT` is refused before execution), and a result past the byte
+ * ceiling is refused outright as `lwql_result_too_large`. Neither can be
+ * relaxed by a caller: the row cap is applied to the statement itself, the byte
+ * ceiling is not in the request shape.
  *
  * @see specs/lwql/api.feature
  * @see ./provisioning/accessModel.ts — the isolation this composes over
@@ -60,6 +62,7 @@ import {
 import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
 import {
   LangWatchQLParameterMissingError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
 } from "./errors";
 import {
@@ -170,13 +173,50 @@ function resolveRunGranularityOrRefuseUnfilled({
   return granularity;
 }
 
+/**
+ * Appends the default row `LIMIT` to a statement that named none.
+ *
+ * A trailing `;` is stripped and the clause goes on its own line, so it is
+ * neither swallowed by a trailing line comment nor turned into a second
+ * statement. This is the one edit this API makes to a submitted statement: the
+ * validator decides when it applies (`appendRowLimit`, only when nothing
+ * top-level already pages) and refuses a too-high explicit `LIMIT` before this
+ * runs.
+ */
+export function appendDefaultRowLimit(sql: string, maxRows: number): string {
+  const trimmed = sql.replace(/;\s*$/u, "").replace(/\s+$/u, "");
+  return `${trimmed}\nLIMIT ${maxRows}`;
+}
+
+/**
+ * Refuses a result whose JSON encoding exceeds the byte ceiling, naming the cap.
+ *
+ * The work is bounded: the row count is already capped by the appended (or the
+ * caller's own) `LIMIT` before this runs, so this walks at most that many rows.
+ *
+ * @throws {LangWatchQLResultTooLargeError} when the rows exceed `maxResultBytes`.
+ */
+function assertResultWithinByteCeiling({
+  rows,
+  maxResultBytes,
+}: {
+  rows: readonly Record<string, unknown>[];
+  maxResultBytes: number;
+}): void {
+  let bytes = 0;
+  for (const row of rows) {
+    bytes += JSON.stringify(row)?.length ?? 0;
+    if (bytes > maxResultBytes) {
+      throw new LangWatchQLResultTooLargeError(maxResultBytes);
+    }
+  }
+}
+
 /** What a caller gets back from the query endpoint. */
 export interface LangWatchQLQueryResult {
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: LangWatchQLStatistics;
-  /** Whether a result ceiling cut the answer short. */
-  readonly truncated: boolean;
   /**
    * Notes about the result. An empty list means no known issue was detected,
    * which is not a claim that the answer is the one the caller meant — see
@@ -591,14 +631,27 @@ export class LangWatchQLService {
     };
 
     const execution = await executor.execute({
-      sql,
+      // The submitted statement, with one edit and no other: a default `LIMIT`
+      // appended when the caller named none, so an unbounded query is capped
+      // rather than streamed. A statement that already pages is sent verbatim.
+      sql: validation.appendRowLimit
+        ? appendDefaultRowLimit(sql, this.limits.maxRows)
+        : sql,
       ...(Object.keys(executionParameters).length > 0
         ? { parameters: executionParameters }
         : {}),
       tenantCapability: lwqlTenantCapabilitySet({
         secrets: projects.map((project) => project.lwqlKey),
       }),
-      limits: this.limits,
+    });
+
+    // A finished result larger than the byte ceiling is refused outright rather
+    // than cut: a body that looks whole but is missing its tail is the worse
+    // failure for an analytics caller. The row count is already bounded by the
+    // LIMIT above; this is the ceiling a query can still overshoot on width.
+    assertResultWithinByteCeiling({
+      rows: execution.rows,
+      maxResultBytes: this.limits.maxResultBytes,
     });
 
     // The facts the walk recorded, plus what actually came back. Both halves
@@ -610,9 +663,6 @@ export class LangWatchQLService {
       views: this.views,
       columns: execution.columns,
       rows: execution.rows,
-      truncated: execution.truncated,
-      limits: this.limits,
-      rowsReturned: execution.statistics.rowsReturned,
       now: this.now(),
     });
 
@@ -623,7 +673,6 @@ export class LangWatchQLService {
         rowsReturned: execution.statistics.rowsReturned,
         rowsRead: execution.statistics.rowsRead,
         elapsedMs: execution.statistics.elapsedMs,
-        truncated: execution.truncated,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
@@ -635,7 +684,6 @@ export class LangWatchQLService {
       columns: execution.columns,
       rows: execution.rows,
       statistics: execution.statistics,
-      truncated: execution.truncated,
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,

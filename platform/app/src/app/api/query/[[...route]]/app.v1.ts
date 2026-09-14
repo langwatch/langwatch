@@ -138,10 +138,10 @@ const HEADER_RULE =
  * the enforced caps cannot drift. Formatted with thousands separators for a
  * reader.
  */
-const RESULT_CEILINGS = `A response carries at most ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows and about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes. When a result reaches either ceiling it is cut off there, the top-level \`truncated\` field is \`true\`, and a \`RESULT_TRUNCATED\` diagnostic reports the applied row cap in its \`meta.maxRows\`.`;
+const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows: that \`LIMIT\` is appended before the query runs. A statement whose own \`LIMIT\` asks for more is refused with \`LIMIT_TOO_HIGH\` — lower it and page the rest with \`LIMIT\`/\`OFFSET\` and an \`ORDER BY\`. A result whose body exceeds about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes is refused outright with \`lwql_result_too_large\`, never cut — select fewer columns or a smaller \`LIMIT\`.`;
 
 const RUN_DESCRIPTION =
-  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
+  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
   `${HEADER_RULE}\n\n` +
   `${RESULT_CEILINGS}\n\n` +
@@ -175,7 +175,7 @@ function registerRun(secured: QuerySecuredApp): void {
         ...canonicalUnprocessableResponses,
         200: {
           description:
-            "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the projects the key can read.",
+            "The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read.",
           content: {
             "application/json": { schema: resolver(lwqlResultSchema) },
           },

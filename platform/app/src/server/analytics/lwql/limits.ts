@@ -38,6 +38,33 @@
 export const MAX_LWQL_LENGTH = 50_000;
 
 /**
+ * The row cap this API enforces, in one place.
+ *
+ * Two seams read it and must not disagree. The validator refuses a statement
+ * whose own top-level `LIMIT` asks for more than this (`LIMIT_TOO_HIGH`), and
+ * the service appends `LIMIT {this}` to a statement that names none — so "the
+ * most rows a request may ask for" and "the ceiling a bare query is capped at"
+ * are the same number by construction rather than by coincidence. A caller who
+ * needs more pages with `LIMIT`/`OFFSET` and an `ORDER BY`, which is what the
+ * refusal's remediation tells them.
+ *
+ * Kept here rather than in `./executor.ts` because the validator resolves the
+ * cap on the save path too, where no executor exists, and pulling it from
+ * `executor.ts` would drag the ClickHouse client into that path.
+ */
+export const LWQL_MAX_RESULT_ROWS = 10_000;
+
+/**
+ * The byte ceiling a finished result may not exceed, in one place.
+ *
+ * A hard error rather than a silent cut: a JSON body larger than this fails
+ * with `lwql_result_too_large` naming the cap, because a partial result that
+ * looks whole is the worse failure for an analytics caller. Read by the service
+ * after the rows come back.
+ */
+export const LWQL_MAX_RESULT_BYTES = 8_000_000;
+
+/**
  * Ceilings pinned `CONST` by the profile.
  *
  * Belt and braces rather than the load-bearing control: `readonly = 1` already

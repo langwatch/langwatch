@@ -81,7 +81,6 @@ export const lwqlResultSchema = z.object({
     bytesRead: z.number(),
     rowsReturned: z.number(),
   }),
-  truncated: z.boolean(),
   // Whether the statement DECLARED the reserved time-window parameters and was
   // therefore given the surface's window. It is not a claim about the rows: the
   // author writes the comparison, so a statement that declares the names and

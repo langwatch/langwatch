@@ -1050,7 +1050,7 @@ export interface paths {
          *
          *     An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.
          *
-         *     A response carries at most 10,000 rows and about 8,000,000 bytes. When a result reaches either ceiling it is cut off there, the top-level `truncated` field is `true`, and a `RESULT_TRUNCATED` diagnostic reports the applied row cap in its `meta.maxRows`.
+         *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
          *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
          */
@@ -8906,14 +8906,13 @@ export interface operations {
                             bytesRead: number;
                             rowsReturned: number;
                         };
-                        truncated: boolean;
                         followsTimeWindow: boolean;
                         followsGranularity: boolean;
                         granularitySeconds?: number;
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            code: "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;

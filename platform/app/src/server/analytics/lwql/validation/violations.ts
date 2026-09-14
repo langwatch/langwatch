@@ -53,6 +53,16 @@ export const LWQL_VIOLATION_CODES = [
   "GATED_COLUMN",
   /** A wildcard column set was selected while restricted fields exist. */
   "WILDCARD_NOT_ALLOWED",
+  /**
+   * The statement's own top-level `LIMIT` asks for more rows than one request
+   * may return.
+   *
+   * Its own code rather than `UNSUPPORTED_SYNTAX` because the remedy is precise
+   * and mechanical: lower the `LIMIT` to the cap and page the rest with
+   * `LIMIT`/`OFFSET` and an `ORDER BY`. The cap and that advice ride on the
+   * violation (`maxRows`, `hint`).
+   */
+  "LIMIT_TOO_HIGH",
   /** Subqueries, CTEs, or expressions nested past the allowed depth. */
   "NESTING_TOO_DEEP",
   /** The default-deny fallthrough: syntax the validator does not recognise. */
@@ -132,6 +142,12 @@ export interface LangWatchQLViolation {
    * alongside it when the policy carries column data for that dataset.
    */
   readonly availableColumns?: readonly string[];
+  /**
+   * The row cap a `LIMIT_TOO_HIGH` refusal names — the largest `LIMIT` one
+   * request may carry. Attached to that code alone, so a refused caller learns
+   * the ceiling to page under without a second round trip.
+   */
+  readonly maxRows?: number;
 }
 
 /**

@@ -25,6 +25,7 @@ export {
   LangWatchQLParameterMissingError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLReservedParameterTypeError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
 } from "./errors";
 export type {
@@ -34,18 +35,22 @@ export type {
   LangWatchQLStatistics,
 } from "./executor";
 export {
-  applyLangWatchQLResultLimits,
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
   lwqlConnectionFromEnv,
 } from "./executor";
-export { MAX_LWQL_LENGTH } from "./limits";
+export {
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+  MAX_LWQL_LENGTH,
+} from "./limits";
 export type {
   LangWatchQLCaller,
   LangWatchQLQueryResult,
   ValidatedLangWatchQL,
 } from "./lwql.service";
 export {
+  appendDefaultRowLimit,
   closeLangWatchQLService,
   createLangWatchQLService,
   DEFAULT_LWQL_DATABASE,

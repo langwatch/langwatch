@@ -725,8 +725,8 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       ]);
     });
 
-    /** @scenario "Results carry typed columns, rows, execution statistics, truncation state, and diagnostics" */
-    it("answers with typed columns, rows, execution statistics, truncation state and diagnostics", async () => {
+    /** @scenario "Results carry typed columns, rows, execution statistics, and diagnostics" */
+    it("answers with typed columns, rows, execution statistics and diagnostics", async () => {
       const body = await run(
         openProject,
         `SELECT TraceId, TotalDurationMs FROM ${database}.traces ` +
@@ -746,7 +746,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       expect(body.statistics.rowsReturned).toBe(3);
       expect(typeof body.statistics.elapsedMs).toBe("number");
       expect(typeof body.statistics.bytesRead).toBe("number");
-      expect(body.truncated).toBe(false);
+      expect(body.truncated).toBeUndefined();
       expect(body.diagnostics).toEqual([]);
     });
 
@@ -1482,45 +1482,55 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     });
   });
 
-  describe("when the result outgrows the response ceiling", () => {
-    /**
-     * The ceiling value is lowered for this case rather than seeding ten
-     * thousand rows: the mechanism is the same code either way, and the claim
-     * under test is that overflow is *marked* rather than silently dropped.
-     */
-    /** @scenario "Truncation diagnostic fires when results are cut off" */
-    /** @scenario "A result over the row cap is still truncated with a diagnostic" */
-    it("cuts the result at the ceiling and says so, in the body and in a diagnostic", async () => {
-      // Bounded on the time column, so the only diagnostic either run can earn
-      // is the truncation one this case is about.
-      const traceIds =
-        `SELECT TraceId FROM ${database}.traces ` +
-        `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
-        `ORDER BY TraceId`;
+  describe("when the result is larger than one response holds", () => {
+    // The bound is lowered rather than seeding ten thousand rows: the mechanism
+    // is the same code either way.
+    const traceIds =
+      `SELECT TraceId FROM ${database}.traces ` +
+      `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
+      `ORDER BY TraceId`;
+
+    const serviceWithLimits = (limits: {
+      maxRows: number;
+      maxResultBytes: number;
+    }) =>
+      new LangWatchQLService({
+        executor: createLangWatchQLExecutor({
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        }),
+        database,
+        limits,
+      });
+
+    /** @scenario "A capped result comes back as one page, never silently cut" */
+    it("caps a LIMIT-less statement at the row ceiling by appending it, with no diagnostic", async () => {
       const full = await run(openProject, traceIds);
       expect(full.rows.length).toBeGreaterThan(2);
-      expect(full.truncated).toBe(false);
 
       setLangWatchQLService(
-        new LangWatchQLService({
-          executor: createLangWatchQLExecutor({
-            ...harness.restrictedConnection(),
-            database,
-            tenantSetting: harness.names.tenantSetting,
-          }),
-          database,
-          limits: { maxRows: 2, maxResultBytes: 8_000_000 },
-        }),
+        serviceWithLimits({ maxRows: 2, maxResultBytes: 8_000_000 }),
       );
       try {
         const capped = await run(openProject, traceIds);
         expect(capped.rows).toHaveLength(2);
         expect(capped.rows).toEqual(full.rows.slice(0, 2));
-        expect(capped.truncated).toBe(true);
-        expect(capped.statistics.rowsReturned).toBe(2);
-        expect(capped.diagnostics.map((entry: any) => entry.code)).toEqual([
-          "RESULT_TRUNCATED",
-        ]);
+        expect(capped.truncated).toBeUndefined();
+        expect(capped.diagnostics).toEqual([]);
+      } finally {
+        restoreShippedService();
+      }
+    });
+
+    /** @scenario "Overflow throws and never silently truncates" */
+    /** @scenario "A result past the byte ceiling is refused, never cut" */
+    it("refuses a result past the byte ceiling with lwql_result_too_large, never a partial body", async () => {
+      setLangWatchQLService(serviceWithLimits({ maxRows: 10_000, maxResultBytes: 10 }));
+      try {
+        const error = await refuse(openProject, traceIds);
+        expect(error.code).toBe("lwql_result_too_large");
+        expect(error.meta).toMatchObject({ maxResultBytes: 10 });
       } finally {
         restoreShippedService();
       }
@@ -1781,7 +1791,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
 
   describe("when the statement the database ran is compared with the one submitted", () => {
     /** @scenario "Submitted SQL is never automatically rewritten" */
-    it("executes the submitted statement, with nothing injected into it", async () => {
+    it("executes the submitted statement, with nothing but the default LIMIT appended after it", async () => {
       const marker = `rewrite_probe_${nanoid(8).replace(/[^a-zA-Z0-9]/g, "")}`;
       const sql = `SELECT count() AS ${marker} FROM ${database}.traces`;
       await run(openProject, sql);
@@ -1802,9 +1812,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         logged[0]!.query.includes(sql),
         `the database ran a different statement:\n${logged[0]!.query}`,
       ).toBe(true);
-      // Nothing was added inside the statement: the only thing the transport
-      // appends is the FORMAT the driver needs to read the response back.
-      expect(logged[0]!.query.replace(sql, "").trim()).toBe("FORMAT JSON");
+      // The caller's text is untouched; the only additions are the default row
+      // LIMIT this API appends when the caller names none, and the FORMAT the
+      // driver needs to read the response back. Nothing is injected *inside* it.
+      const appended = logged[0]!.query.replace(sql, "").trim();
+      expect(appended).toMatch(/^LIMIT\s+\d+/i);
+      expect(appended).toContain("FORMAT JSON");
     });
   });
 

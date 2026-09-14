@@ -120,7 +120,6 @@ export function lwqlResult(
       bytesRead: 65_536,
       rowsReturned: 1,
     },
-    truncated: false,
     diagnostics: [],
     followsTimeWindow: true,
     followsGranularity: false,

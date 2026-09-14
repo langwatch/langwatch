@@ -25,7 +25,6 @@ import {
   lwqlDiagnostics,
 } from "../diagnostics";
 import type { LangWatchQLColumn } from "../executor";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../executor";
 import { validateLangWatchQL } from "../validation/validate";
 
 const DATABASE = "analytics";
@@ -49,13 +48,11 @@ function diagnose({
   sql,
   columns = [],
   rows = [],
-  truncated = false,
   now = LONG_AFTER,
 }: {
   sql: string;
   columns?: readonly LangWatchQLColumn[];
   rows?: readonly Record<string, unknown>[];
-  truncated?: boolean;
   now?: Date;
 }): readonly LangWatchQLDiagnostic[] {
   const validation = validateLangWatchQL({
@@ -80,9 +77,6 @@ function diagnose({
     views: LWQL_VIEW_CATALOG,
     columns,
     rows,
-    truncated,
-    limits: DEFAULT_LWQL_RESULT_LIMITS,
-    rowsReturned: rows.length,
     now,
   });
 }
@@ -140,22 +134,6 @@ describe("given a LangWatchQL query that ran", () => {
           `the clean status claims to be ${overclaim}`,
         ).not.toContain(overclaim);
       }
-    });
-  });
-
-  describe("when a response ceiling cut the result short", () => {
-    it("names the ceiling and how many rows survived it", () => {
-      const diagnostics = diagnose({
-        sql: BOUNDED_TRACES,
-        rows: [{ TraceId: "a" }, { TraceId: "b" }],
-        truncated: true,
-      });
-
-      expect(codesOf(diagnostics)).toEqual(["RESULT_TRUNCATED"]);
-      expect(find(diagnostics, "RESULT_TRUNCATED")!.meta).toMatchObject({
-        maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
-        rowsReturned: 2,
-      });
     });
   });
 
@@ -537,7 +515,7 @@ describe("given a LangWatchQL query that ran", () => {
   });
 
   describe("when several things are worth reading twice at once", () => {
-    it("carries every one of them, truncation first", () => {
+    it("carries every one of them together", () => {
       const diagnostics = diagnose({
         sql:
           "SELECT toStartOfHour(t.OccurredAt) AS bucket, sum(t.TotalDurationMs) AS total " +
@@ -552,11 +530,9 @@ describe("given a LangWatchQL query that ran", () => {
           hourlyBucket("2026-02-20 11:00:00"),
           hourlyBucket("2026-02-20 14:00:00"),
         ],
-        truncated: true,
       });
 
       expect(codesOf(diagnostics)).toEqual([
-        "RESULT_TRUNCATED",
         "POSSIBLE_FANOUT",
         "UNBOUNDED_TIME_RANGE",
         "UNBOUNDED_TIME_RANGE",

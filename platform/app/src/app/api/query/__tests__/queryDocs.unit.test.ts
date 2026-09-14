@@ -104,7 +104,7 @@ describe("docs/api-reference/query/overview.mdx", () => {
   describe("when the response ceilings are documented", () => {
     const content = readDocs();
 
-    /** @scenario "The query docs and OpenAPI description state the response ceilings" */
+    /** @scenario "A statement with no LIMIT is capped at the row ceiling" */
     it("states the row cap derived from DEFAULT_LWQL_RESULT_LIMITS", () => {
       expect(content).toContain(
         `${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows`,
@@ -117,13 +117,18 @@ describe("docs/api-reference/query/overview.mdx", () => {
       );
     });
 
-    it("describes the top-level truncated field", () => {
-      expect(content).toContain("truncated");
+    /** @scenario "A statement with no LIMIT is capped at the row ceiling" */
+    it("states the default LIMIT is appended and how to page past it", () => {
+      expect(content).toContain("LIMIT");
+      expect(content).toContain("OFFSET");
+      expect(content).toContain("ORDER BY");
     });
 
-    it("describes the RESULT_TRUNCATED diagnostic and its meta.maxRows", () => {
-      expect(content).toContain("RESULT_TRUNCATED");
-      expect(content).toContain("maxRows");
+    /** @scenario "A LIMIT above the ceiling is refused before the query runs" */
+    /** @scenario "A result past the byte ceiling is refused, never cut" */
+    it("names the LIMIT_TOO_HIGH refusal and the byte hard error", () => {
+      expect(content).toContain("LIMIT_TOO_HIGH");
+      expect(content).toContain("lwql_result_too_large");
     });
   });
 });

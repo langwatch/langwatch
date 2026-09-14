@@ -18,7 +18,6 @@ const { mockFeatureFlagIsEnabled, mockExecute, deployment } = vi.hoisted(
       columns: [],
       rows: [],
       statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-      truncated: false,
       diagnostics: [],
     }),
     /** Whether this deployment has a LangWatchQL identity to run queries as. */

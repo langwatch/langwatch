@@ -178,15 +178,29 @@ describe("given the generated OpenAPI document", () => {
     });
 
     describe("when the run door's description is checked for the response ceilings", () => {
-      /** @scenario "The query docs and OpenAPI description state the response ceilings" */
-      it("states the 10,000 row and 8,000,000 byte caps, truncated, and RESULT_TRUNCATED/meta.maxRows", () => {
+      /** @scenario "A statement with no LIMIT is capped at the row ceiling" */
+      /** @scenario "A LIMIT above the ceiling is refused before the query runs" */
+      it("states the appended row cap, the LIMIT_TOO_HIGH refusal and the byte hard error", () => {
         const description: string = paths[RUN]?.post?.description ?? "";
 
         expect(description).toMatch(/10,?000\s*rows?/i);
         expect(description).toMatch(/8,?000,?000\s*bytes?/i);
-        expect(description).toContain("truncated");
-        expect(description).toContain("RESULT_TRUNCATED");
-        expect(description).toContain("maxRows");
+        expect(description).toContain("LIMIT_TOO_HIGH");
+        expect(description).toContain("lwql_result_too_large");
+        expect(description).toContain("OFFSET");
+      });
+
+      /** @scenario "Overflow throws and never silently truncates" */
+      it("no longer advertises a truncated flag or a RESULT_TRUNCATED diagnostic", () => {
+        const description: string = paths[RUN]?.post?.description ?? "";
+        const resultSchema = responseSchema({
+          path: RUN,
+          method: "post",
+          status: "200",
+        });
+
+        expect(description).not.toContain("RESULT_TRUNCATED");
+        expect(resultSchema?.properties?.truncated).toBeUndefined();
       });
     });
   });
