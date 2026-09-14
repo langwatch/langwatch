@@ -106,6 +106,7 @@ export function lintRestDoorWithoutMount(snapshot: WorkspaceSnapshot): Architect
   const { root } = snapshot;
   const file = baselinePath({ root, policy: REST_DOOR_WITHOUT_MOUNT_BASELINE });
   const baseline = readBaseline({ policy: REST_DOOR_WITHOUT_MOUNT_BASELINE, file });
+
   const violations = [
     ...baseline.violations,
     ...emptyBaselineRows({ read: baseline, policy: REST_DOOR_WITHOUT_MOUNT_BASELINE, file }),
@@ -178,6 +179,7 @@ export function lintPortsAndAdaptersFolders(snapshot: WorkspaceSnapshot): Archit
   const { root } = snapshot;
   const file = baselinePath({ root, policy: PORTS_AND_ADAPTERS_FOLDERS_BASELINE });
   const baseline = readBaseline({ policy: PORTS_AND_ADAPTERS_FOLDERS_BASELINE, file });
+
   const violations = [
     ...baseline.violations,
     ...emptyBaselineRows({ read: baseline, policy: PORTS_AND_ADAPTERS_FOLDERS_BASELINE, file }),
@@ -349,6 +351,7 @@ export function collectMountFileIsOneCallFindings(root: string): MountFileFindin
     join(root, MOUNT_FILE_ROOT),
     (path) => MOUNT_FILE_PATTERN.test(path) && !/__tests__/.test(path),
   );
+
   const findings: MountFileFinding[] = [];
 
   for (const file of files) {
@@ -374,6 +377,7 @@ export function collectMountFileIsOneCallFindings(root: string): MountFileFindin
           for (const declaration of statement.declarationList.declarations) {
             exportedFunctions.push(declaration.initializer as ts.ArrowFunction);
           }
+
           continue;
         }
       }
@@ -386,6 +390,7 @@ export function collectMountFileIsOneCallFindings(root: string): MountFileFindin
         path,
         reason: "carries a top-level declaration besides imports and one exported mount function",
       });
+
       continue;
     }
 
@@ -428,6 +433,7 @@ export function lintMountFileIsOneCall(snapshot: WorkspaceSnapshot): Architectur
   const { root } = snapshot;
   const file = baselinePath({ root, policy: MOUNT_FILE_IS_ONE_CALL_BASELINE });
   const baseline = readBaseline({ policy: MOUNT_FILE_IS_ONE_CALL_BASELINE, file });
+
   const violations = [
     ...baseline.violations,
     ...emptyBaselineRows({ read: baseline, policy: MOUNT_FILE_IS_ONE_CALL_BASELINE, file }),

@@ -17,14 +17,17 @@ import { bodyLimit } from "../request.ts";
 
 async function listen(server: Server): Promise<number> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
   return (server.address() as AddressInfo).port;
 }
 
 /** The production bridge, fronting a route that echoes back what it read. */
 function createEchoServer(maxSize: number): Server {
   const app = new Hono();
+
   app.post("/echo", bodyLimit({ maxSize }), async (c) => {
     const body = await c.req.text();
+
     return c.json({ length: body.length, body });
   });
 
@@ -38,6 +41,7 @@ function createEchoServer(maxSize: number): Server {
 /** A body delivered as a stream, which makes undici send it chunked. */
 function streamed(payload: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
+
   return new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(encoder.encode(payload));
@@ -51,6 +55,7 @@ describe("the request body cap behind the Node bridge", () => {
 
   afterEach(async () => {
     if (server) await new Promise((resolve) => server!.close(resolve));
+
     server = undefined;
   });
 
@@ -62,6 +67,7 @@ describe("the request body cap behind the Node bridge", () => {
         const port = await listen(server);
 
         const payload = JSON.stringify({ resourceSpans: [] });
+
         const response = await fetch(`http://127.0.0.1:${port}/echo`, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -71,6 +77,7 @@ describe("the request body cap behind the Node bridge", () => {
         });
 
         expect(response.status).toBe(200);
+
         expect(await response.json()).toEqual({
           length: payload.length,
           body: payload,
@@ -105,6 +112,7 @@ describe("the request body cap behind the Node bridge", () => {
         const port = await listen(server);
 
         const payload = JSON.stringify({ resourceSpans: [] });
+
         const response = await fetch(`http://127.0.0.1:${port}/echo`, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -112,6 +120,7 @@ describe("the request body cap behind the Node bridge", () => {
         });
 
         expect(response.status).toBe(200);
+
         expect(await response.json()).toEqual({
           length: payload.length,
           body: payload,
@@ -143,14 +152,17 @@ describe("the request body cap behind the Node bridge", () => {
   describe("given hono's own body-limit on the same wiring", () => {
     it("answers 500 to the chunked request this module serves", async () => {
       const app = new Hono();
+
       app.post("/echo", honoBodyLimit({ maxSize: 1024 }), async (c) =>
         c.json({ body: await c.req.text() }),
       );
+
       server = createServer(
         getRequestListener((request: Request) => app.fetch(request), {
           overrideGlobalObjects: false,
         }),
       );
+
       const port = await listen(server);
 
       const response = await fetch(`http://127.0.0.1:${port}/echo`, {

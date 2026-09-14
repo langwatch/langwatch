@@ -72,6 +72,7 @@ function packageTypes(files: readonly string[]): PackageTypes {
         ts.isClassDeclaration(statement) ||
         ts.isInterfaceDeclaration(statement) ||
         ts.isTypeAliasDeclaration(statement);
+
       if (!isTypeDeclaration || !statement.name) continue;
 
       const declarations = declarationsByName.get(statement.name.text) ?? [];
@@ -89,6 +90,7 @@ function memberExposesProjectionWrite(member: ts.TypeElement | ts.ClassElement):
     ts.isMethodDeclaration(member) ||
     ts.isPropertySignature(member) ||
     ts.isPropertyDeclaration(member);
+
   if (!isCapability) return false;
 
   const name = declarationName(member.name);
@@ -147,11 +149,13 @@ function declarationExposesProjectionWrite(
   const exposedMembers = ts.isInterfaceDeclaration(declaration)
     ? [...declaration.members]
     : [...declaration.members].filter((member) => !isPrivateClassMember(member));
+
   if (exposedMembers.some(memberExposesProjectionWrite)) return true;
 
   const exposesNestedWrite = exposedMembers
     .flatMap(memberTypeNodes)
     .some((type) => typeExposesProjectionWrite(type, types, seen));
+
   if (exposesNestedWrite) return true;
 
   const heritageTypes = declaration.heritageClauses?.flatMap((clause) => clause.types) ?? [];
@@ -175,6 +179,7 @@ function typeExposesProjectionWrite(
   }
 
   let reference: string | null = null;
+
   if (ts.isTypeReferenceNode(node)) {
     reference = referencedTypeName(node.typeName);
   } else if (ts.isExpressionWithTypeArguments(node)) {
@@ -187,6 +192,7 @@ function typeExposesProjectionWrite(
     if (PROJECTION_WRITE_TYPES.has(canonicalName)) return true;
 
     const declarations = types.declarationsByName.get(canonicalName) ?? [];
+
     if (
       declarations.some((declaration) =>
         declarationExposesProjectionWrite(declaration, types, seen),
@@ -197,6 +203,7 @@ function typeExposesProjectionWrite(
   }
 
   let exposesWrite = false;
+
   ts.forEachChild(node, (child) => {
     if (!exposesWrite && typeExposesProjectionWrite(child, types, seen)) {
       exposesWrite = true;
@@ -219,6 +226,7 @@ function serviceDependencyTypes(service: ts.ClassDeclaration): ts.TypeNode[] {
       ts.isMethodDeclaration(member) ||
       ts.isGetAccessorDeclaration(member) ||
       ts.isSetAccessorDeclaration(member);
+
     if (!isCallable) continue;
 
     for (const parameter of member.parameters) {
@@ -253,6 +261,7 @@ function lintServiceFile(
 
       const line =
         sourceFile.getLineAndCharacterOfPosition(dependency.getStart(sourceFile)).line + 1;
+
       violations.push({
         policy: "service-projection-write-boundary",
         file,
@@ -282,6 +291,7 @@ export function lintServiceProjectionBoundaries(
       directory: join(pkg.root, "src"),
       accept: (file) => file.endsWith(".ts"),
     });
+
     const types = packageTypes(sourceFiles);
 
     for (const file of sourceFiles.filter(isDomainServiceFile)) {

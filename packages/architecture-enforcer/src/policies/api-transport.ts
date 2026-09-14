@@ -90,6 +90,7 @@ function isRawAppConstruction(
 
 function dynamicCompositionImports(source: ts.SourceFile): ts.CallExpression[] {
   const imports: ts.CallExpression[] = [];
+
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
@@ -139,9 +140,11 @@ function featureBindingAnalysis(
     if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier)) continue;
 
     const specifier = moduleSpecifier.text;
+
     const bindings = ts.isImportDeclaration(statement)
       ? statement.importClause?.namedBindings
       : undefined;
+
     if (specifier === "@langwatch/api/composition") {
       report(
         statement,
@@ -179,6 +182,7 @@ function featureBindingAnalysis(
     if (bindings && ts.isNamespaceImport(bindings) && isApiModuleSpecifier(specifier)) {
       apiNamespaceNames.add(bindings.name.text);
       bindingNames.add(`${bindings.name.text}.createTrpcHandlerBinding`);
+
       for (const builder of [
         "createRestService",
         "createTrpcService",
@@ -206,6 +210,7 @@ function transportFiles(
   packages: readonly ClassifiedPackage[],
 ): { file: string; surface: Surface }[] {
   const found: { file: string; surface: Surface }[] = [];
+
   for (const pkg of packages) {
     if (pkg.kind !== "server") continue;
 
@@ -217,6 +222,7 @@ function transportFiles(
     }
 
     const root = join(pkg.root, "src", "transport");
+
     for (const surface of ["rest", "trpc"] as const) {
       const direct = join(root, `${pkg.feature}.${surface}.ts`);
       if (existsSync(direct)) found.push({ file: direct, surface });
@@ -247,25 +253,33 @@ export function featureServerTransportFindings(file: string, contents: string): 
     true,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
+
   const findings: Finding[] = [];
+
   const lineOf = (node: ts.Node): number =>
     source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+
   const report = (node: ts.Node, message: string, allowed: string): void => {
     findings.push({ file, line: lineOf(node), message, allowed });
   };
+
   const isTransport = file.includes(`${sep}transport${sep}api-`);
+
   const { bindingNames, apiBuilderNames, apiNamespaceNames, rawAppNames, rawTrpcNames } =
     featureBindingAnalysis(source, report);
+
   const hasApiImport = source.statements.some(
     (statement) =>
       ts.isImportDeclaration(statement) &&
       ts.isStringLiteral(statement.moduleSpecifier) &&
       isApiModuleSpecifier(statement.moduleSpecifier.text),
   );
+
   const isApiTransport =
     isTransport || apiBuilderNames.size > 0 || apiNamespaceNames.size > 0 || hasApiImport;
 
   const dynamicCompositionImport = dynamicCompositionImports(source);
+
   for (const node of dynamicCompositionImport) {
     report(
       node,
@@ -277,11 +291,13 @@ export function featureServerTransportFindings(file: string, contents: string): 
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const callee = node.expression;
+
       const calleeText = ts.isIdentifier(callee)
         ? callee.text
         : ts.isPropertyAccessExpression(callee)
           ? `${callee.expression.getText(source)}.${callee.name.text}`
           : "";
+
       if (bindingNames.has(calleeText) || calleeText.endsWith(".createTrpcHandlerBinding")) {
         report(
           node,
@@ -351,6 +367,7 @@ export function featureServerTransportFindings(file: string, contents: string): 
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return findings.sort((left, right) => left.line - right.line);
@@ -362,8 +379,10 @@ function inspectHandler(
   source: ts.SourceFile,
 ): void {
   const argument = call.arguments[0];
+
   const callback =
     argument && ts.isParenthesizedExpression(argument) ? argument.expression : argument;
+
   const resolved =
     callback && ts.isIdentifier(callback)
       ? source.statements.find(
@@ -380,6 +399,7 @@ function inspectHandler(
               )),
         )
       : callback;
+
   const resolvedHandler =
     resolved && ts.isVariableStatement(resolved)
       ? resolved.declarationList.declarations.find(
@@ -388,6 +408,7 @@ function inspectHandler(
             declaration.name.text === callback?.getText(source),
         )?.initializer
       : resolved;
+
   if (
     !resolvedHandler ||
     (!ts.isArrowFunction(resolvedHandler) &&
@@ -401,6 +422,7 @@ function inspectHandler(
 
   if (ts.isObjectBindingPattern(first.name)) {
     const rawNames = new Set<string>();
+
     for (const element of first.name.elements) {
       if (element.dotDotDotToken) {
         report(
@@ -408,16 +430,19 @@ function inspectHandler(
           "Handler receives a spread raw context object (ADR-133).",
           "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
         );
+
         continue;
       }
 
       const property = element.propertyName ?? element.name;
+
       if (ts.isIdentifier(property) && !ALLOWED_HANDLER_FIELDS.has(property.text)) {
         report(
           first,
           `Handler receives raw context field "${property.text}" (ADR-133).`,
           "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
         );
+
         if (ts.isIdentifier(element.name)) rawNames.add(element.name.text);
       }
     }
@@ -444,6 +469,7 @@ function handlerAliases(
   report: (node: ts.Node, message: string, allowed: string) => void,
 ): Set<string> {
   const names = new Set([root]);
+
   const visit = (node: ts.Node): void => {
     if (
       ts.isVariableDeclaration(node) &&
@@ -456,6 +482,7 @@ function handlerAliases(
       if (ts.isObjectBindingPattern(node.name)) {
         for (const element of node.name.elements) {
           const property = element.propertyName ?? element.name;
+
           if (
             ts.isIdentifier(property) &&
             !ALLOWED_HANDLER_FIELDS.has(property.text) &&
@@ -466,6 +493,7 @@ function handlerAliases(
               `Handler receives raw context field "${property.text}" (ADR-133).`,
               "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
             );
+
             names.add(element.name.text);
           }
         }
@@ -474,6 +502,7 @@ function handlerAliases(
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(body, visit);
 
   return names;
@@ -492,11 +521,13 @@ function inspectRawContextBody(
           ts.isStringLiteral(node.argumentExpression)
         ? node.argumentExpression.text
         : undefined;
+
     const receiver =
       (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
       ts.isIdentifier(node.expression)
         ? node.expression.text
         : undefined;
+
     if (receiver === name && property && RAW_CONTEXT_FIELDS.has(property)) {
       report(
         node,
@@ -507,6 +538,7 @@ function inspectRawContextBody(
 
     ts.forEachChild(node, visit);
   };
+
   visit(body);
 }
 
@@ -518,6 +550,7 @@ function importedBindings(statement: ts.ImportDeclaration): string[] {
   if (clause.name) names.push(clause.name.text);
 
   const bindings = clause.namedBindings;
+
   if (bindings && ts.isNamedImports(bindings)) {
     for (const element of bindings.elements) {
       names.push(element.propertyName?.text ?? element.name.text);
@@ -554,6 +587,7 @@ function importFindings(
     if (surface === "rest") {
       if (specifier === "hono-openapi" || specifier.startsWith("hono-openapi/")) {
         const doors = names.filter((name) => HONO_OPENAPI_DOOR.has(name));
+
         if (doors.length > 0) {
           report({
             line,
@@ -611,6 +645,7 @@ function nodeFindings(
       ts.isNewExpression(node) &&
       ts.isIdentifier(node.expression) &&
       RAW_APP_CONSTRUCTORS.has(node.expression.text);
+
     if (constructsRawApp && ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
       report({
         line: lineOf(node),
@@ -622,11 +657,13 @@ function nodeFindings(
 
     if (surface === "trpc" && ts.isCallExpression(node)) {
       const callee = node.expression;
+
       const name = ts.isIdentifier(callee)
         ? callee.text
         : ts.isPropertyAccessExpression(callee)
           ? callee.name.text
           : null;
+
       if (name === "router" && node.arguments.length === 1) {
         report({
           line: lineOf(node),
@@ -648,6 +685,7 @@ function nodeFindings(
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 }
 
@@ -664,10 +702,13 @@ export function apiTransportFrameworkFindings(
     true,
     ts.ScriptKind.TS,
   );
+
   const findings: Finding[] = [];
+
   const report = (finding: Omit<Finding, "file">): void => {
     findings.push({ file, ...finding });
   };
+
   importFindings(file, source, surface, report);
   nodeFindings(source, surface, report);
 
@@ -784,8 +825,10 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
           join(pkg.root, "src", "app-rest"),
           join(pkg.root, "src", "features"),
         ];
+
     const isScannedApiApplicationSource = (file: string): boolean =>
       isProductionSource(file) && !/\.(?:mount|composition)\.ts$/.test(file);
+
     for (const sourceRoot of sourceRoots) {
       for (const file of walkFiles(
         sourceRoot,
@@ -864,6 +907,7 @@ function importReferences(source: ts.SourceFile): ImportReference[] {
       const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
       const firstArgument = node.arguments[0];
+
       if ((dynamicImport || requireCall) && firstArgument && ts.isStringLiteral(firstArgument)) {
         references.push({ node, specifier: firstArgument.text, importedNames: [] });
       }
@@ -884,10 +928,12 @@ function forbiddenImportReason(
   const specifier = reference.specifier.replaceAll("\\", "/");
   const segments = specifier.split("/").filter(Boolean);
   const basename = segments.at(-1)?.replace(/\.[cm]?[jt]sx?$/, "") ?? "";
+
   const importsRepository =
     segments.includes("repositories") ||
     /(?:^|[.-])repository$/.test(basename) ||
     reference.importedNames.some((name) => name.endsWith("Repository"));
+
   if (importsRepository) return "repository";
 
   if (
@@ -941,6 +987,7 @@ function expressionName(node: ts.Expression): string | null {
 function localFunctions(source: ts.SourceFile): ReadonlyMap<string, ts.FunctionLikeDeclaration> {
   const functions = new Map<string, ts.FunctionLikeDeclaration>();
   const ambiguous = new Set<string>();
+
   const add = (name: string, declaration: ts.FunctionLikeDeclaration): void => {
     if (functions.has(name)) {
       functions.delete(name);
@@ -1038,17 +1085,23 @@ const FLUENT_ENDPOINT_METHODS = new Set([
 
 function isFluentEndpointHandle(call: ts.CallExpression): boolean {
   if (!ts.isPropertyAccessExpression(call.expression)) return false;
+
   let receiver: ts.Expression = call.expression.expression;
+
   while (ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)) {
     if (FLUENT_ENDPOINT_METHODS.has(receiver.expression.name.text)) return true;
+
     receiver = receiver.expression.expression;
   }
 
   let current: ts.Node = call;
+
   while (current.parent) {
     current = current.parent;
     if (!ts.isArrowFunction(current) && !ts.isFunctionExpression(current)) continue;
+
     const parent = current.parent;
+
     if (
       ts.isCallExpression(parent) &&
       ts.isPropertyAccessExpression(parent.expression) &&
@@ -1066,6 +1119,7 @@ function isFluentEndpointHandle(call: ts.CallExpression): boolean {
 
 function unwrapHandlerExpression(expression: ts.Expression): ts.Expression {
   let current = expression;
+
   while (
     ts.isParenthesizedExpression(current) ||
     ts.isAsExpression(current) ||
@@ -1074,6 +1128,7 @@ function unwrapHandlerExpression(expression: ts.Expression): ts.Expression {
   ) {
     current = current.expression;
   }
+
   return current;
 }
 
@@ -1081,6 +1136,7 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
   const violations: ArchitectureViolation[] = [];
   const functions = localFunctions(source);
   const visited = new Set<ts.FunctionLikeDeclaration>();
+
   const report = (node: ts.Node, message: string, allowed: string): void => {
     violations.push({
       policy: "api-transport-handler-boundary",
@@ -1090,8 +1146,10 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       allowed,
     });
   };
+
   const allowedContextFields = new Set(["input", "app", "actor", "scope", "signal"]);
   const rawFields = new Set(["req", "request", "res", "response", "ctx", "context", "headers"]);
+
   const transportMethods = new Set([
     "json",
     "body",
@@ -1105,14 +1163,17 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
 
   const inspect = (handler: ts.FunctionLikeDeclaration): void => {
     if (visited.has(handler) || !handler.body) return;
+
     visited.add(handler);
 
     const first = handler.parameters[0];
     const contextNames = new Set<string>();
     if (first && ts.isIdentifier(first.name)) contextNames.add(first.name.text);
+
     if (first && ts.isObjectBindingPattern(first.name)) {
       for (const element of first.name.elements) {
         const key = element.propertyName ?? element.name;
+
         if (ts.isIdentifier(key) && !allowedContextFields.has(key.text)) {
           report(
             element,
@@ -1124,10 +1185,13 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
     }
 
     const aliases = new Set<string>(contextNames);
+
     const pathStartsAtContext = (expression: ts.Expression): boolean => {
       const path = propertyPath(expression);
+
       return Boolean(path && path.length === 1 && aliases.has(path[0]!));
     };
+
     const pathIsDirectContextMember = (expression: ts.Expression): boolean => {
       const path = propertyPath(expression);
       if (path && path.length === 1 && aliases.has(path[0]!)) return true;
@@ -1138,11 +1202,13 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
         ts.isStringLiteral(expression.argumentExpression)
       ) {
         const parent = propertyPath(expression.expression);
+
         return Boolean(parent && parent.length === 1 && aliases.has(parent[0]!));
       }
 
       return false;
     };
+
     const directContextMemberName = (expression: ts.Expression): string | null => {
       if (
         ts.isPropertyAccessExpression(expression) &&
@@ -1150,6 +1216,7 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       ) {
         return expression.name.text;
       }
+
       if (
         ts.isElementAccessExpression(expression) &&
         expression.argumentExpression &&
@@ -1158,8 +1225,10 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       ) {
         return expression.argumentExpression.text;
       }
+
       return null;
     };
+
     const visit = (node: ts.Node): void => {
       if (ts.isVariableDeclaration(node) && node.initializer && ts.isIdentifier(node.name)) {
         if (pathStartsAtContext(node.initializer)) aliases.add(node.name.text);
@@ -1167,11 +1236,13 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
 
       if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
         const member = directContextMemberName(node);
+
         const propertyName = ts.isPropertyAccessExpression(node)
           ? node.name.text
           : ts.isStringLiteral(node.argumentExpression)
             ? node.argumentExpression.text
             : null;
+
         if ((member && rawFields.has(member)) || propertyName === "headers") {
           report(
             node,
@@ -1186,6 +1257,7 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
         const member = directContextMemberName(node.expression);
         const methodName = node.expression.name.text;
+
         if (transportMethods.has(methodName)) {
           report(
             node,
@@ -1222,6 +1294,7 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
 
       if (ts.isReturnStatement(node) && node.expression) {
         const expression = node.expression;
+
         if (
           (ts.isIdentifier(expression) && expression.text === "NO_CONTENT") ||
           (ts.isPropertyAccessExpression(expression) && expression.name.text === "NO_CONTENT")
@@ -1236,14 +1309,17 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
 
       ts.forEachChild(node, visit);
     };
+
     visit(handler.body);
   };
 
   const visitRegistration = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const registration = handlerRegistration(node);
+
       if (registration) {
         const inline = unwrapHandlerExpression(registration.candidate);
+
         if (!registration.fluent) {
           report(
             registration.candidate,
@@ -1257,13 +1333,17 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
             "Keep the handler next to its endpoint verb, input, output and permission declarations so the complete boundary is reviewable.",
           );
         }
+
         const handler = resolveHandler(registration.candidate, functions);
         if (handler) inspect(handler);
       }
     }
+
     ts.forEachChild(node, visitRegistration);
   };
+
   ts.forEachChild(source, visitRegistration);
+
   return violations;
 }
 
@@ -1272,6 +1352,7 @@ function resolveHandler(
   functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
 ): ts.FunctionLikeDeclaration | null {
   if (!candidate) return null;
+
   candidate = unwrapHandlerExpression(candidate);
 
   if (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate)) return candidate;
@@ -1325,6 +1406,7 @@ function serviceOrRepositoryConstruction(
 
 function importedCanonicalNames(source: ts.SourceFile): ReadonlyMap<string, string> {
   const names = new Map<string, string>();
+
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
 
@@ -1347,12 +1429,15 @@ function handlerConstructionViolations(
   const functions = localFunctions(source);
   const canonicalNames = importedCanonicalNames(source);
   const visitedHandlers = new Set<ts.FunctionLikeDeclaration>();
+
   const visitHandler = (handler: ts.FunctionLikeDeclaration): void => {
     if (visitedHandlers.has(handler) || !handler.body) return;
 
     visitedHandlers.add(handler);
+
     const visit = (node: ts.Node): void => {
       const construction = serviceOrRepositoryConstruction(node, canonicalNames);
+
       if (construction) {
         violations.push({
           policy: "api-transport-construction",
@@ -1366,8 +1451,10 @@ function handlerConstructionViolations(
 
       ts.forEachChild(node, visit);
     };
+
     visit(handler.body);
   };
+
   const visitRegistration = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const handler = handlerForEndpoint(node, functions);
@@ -1376,6 +1463,7 @@ function handlerConstructionViolations(
 
     ts.forEachChild(node, visitRegistration);
   };
+
   ts.forEachChild(source, visitRegistration);
 
   return violations;
@@ -1400,8 +1488,10 @@ function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string
       .map((parameter) => (ts.isIdentifier(parameter.name) ? parameter.name.text : null))
       .filter((name): name is string => name !== null),
   );
+
   const isServicePath = (path: string[]): boolean =>
     (path.length >= 3 && contextNames.has(path[0]!) && path[1] === "app") || aliases.has(path[0]!);
+
   const bind = (name: ts.BindingName, path: string[]): void => {
     if (ts.isIdentifier(name)) {
       if (isServicePath(path)) aliases.add(name.text);
@@ -1415,11 +1505,13 @@ function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string
       if (element.dotDotDotToken) continue;
 
       const key = element.propertyName ?? element.name;
+
       if (ts.isIdentifier(key) || ts.isStringLiteral(key)) {
         bind(element.name, [...path, key.text]);
       }
     }
   };
+
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
       const path = propertyPath(node.initializer);
@@ -1428,6 +1520,7 @@ function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string
 
     ts.forEachChild(node, visit);
   };
+
   visit(handler.body);
 
   return aliases;
@@ -1464,19 +1557,23 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
   const violations: ArchitectureViolation[] = [];
   const functions = localFunctions(source);
   const visitedHandlers = new Set<ts.FunctionLikeDeclaration>();
+
   const inspect = (handler: ts.FunctionLikeDeclaration): void => {
     if (visitedHandlers.has(handler) || !handler.body) return;
 
     visitedHandlers.add(handler);
+
     const contextNames = new Set(
       handler.parameters
         .map((parameter) => (ts.isIdentifier(parameter.name) ? parameter.name.text : null))
         .filter((name): name is string => name !== null),
     );
+
     const aliases = serviceAliases(handler);
     const serviceCalls: ts.CallExpression[] = [];
     const controlFlow: ts.Node[] = [];
     const nestedServiceCalls: ts.CallExpression[] = [];
+
     const visit = (node: ts.Node, nestedFunction: boolean): void => {
       const entersNestedFunction = node !== handler.body && ts.isFunctionLike(node);
       const nested = nestedFunction || entersNestedFunction;
@@ -1489,10 +1586,12 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
 
       ts.forEachChild(node, (child) => visit(child, nested));
     };
+
     visit(handler.body, false);
 
     if (serviceCalls.length > 1) {
       const second = serviceCalls[1]!;
+
       violations.push({
         policy: "api-transport-handler-shape",
         file,
@@ -1505,6 +1604,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
 
     if (nestedServiceCalls.length > 0) {
       const nestedCall = nestedServiceCalls[0]!;
+
       violations.push({
         policy: "api-transport-handler-shape",
         file,
@@ -1517,6 +1617,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
 
     if (controlFlow.length > 0) {
       const branch = controlFlow[0]!;
+
       violations.push({
         policy: "api-transport-handler-shape",
         file,
@@ -1538,6 +1639,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
       });
     }
   };
+
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const handler = handlerForEndpoint(node, functions);
@@ -1546,6 +1648,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return violations;
@@ -1553,6 +1656,7 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
 
 function honoBindings(source: ts.SourceFile): ReadonlySet<string> {
   const bindings = new Set<string>();
+
   for (const statement of source.statements) {
     if (
       !ts.isImportDeclaration(statement) ||
@@ -1583,6 +1687,7 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
   if (honoTypes.size === 0) return [];
 
   const receivers = new Set<string>();
+
   const collect = (node: ts.Node): void => {
     if (
       ts.isVariableDeclaration(node) &&
@@ -1605,9 +1710,11 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
 
     ts.forEachChild(node, collect);
   };
+
   ts.forEachChild(source, collect);
 
   const violations: ArchitectureViolation[] = [];
+
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
@@ -1628,6 +1735,7 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return violations;
@@ -1671,15 +1779,19 @@ function stringDispatchMember(node: ts.Expression): "query" | "mutate" | null {
 
 function stringLocatorViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   const visit = (node: ts.Node): void => {
     const isMethod = ts.isMethodDeclaration(node) || ts.isMethodSignature(node);
     const methodName = isMethod ? declarationName(node) : null;
+
     const isFunctionProperty =
       (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) &&
       (declarationName(node) === "query" || declarationName(node) === "mutate") &&
       node.type !== void 0 &&
       ts.isFunctionTypeNode(node.type);
+
     const functionPropertyName = isFunctionProperty ? declarationName(node) : null;
+
     if (
       (isMethod &&
         (methodName === "query" || methodName === "mutate") &&
@@ -1690,6 +1802,7 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
         returnsPromise(node.type.type))
     ) {
       const dispatchName = methodName ?? functionPropertyName;
+
       violations.push({
         policy: "api-transport-service-locator",
         file,
@@ -1719,6 +1832,7 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return violations;
@@ -1747,6 +1861,7 @@ const CREDENTIAL_CONTEXT_KEYS = new Set([
 /** `<something>.get("<credential key>")` anywhere in a transport source. */
 function credentialContextViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
@@ -1771,6 +1886,7 @@ function credentialContextViolations(file: string, source: ts.SourceFile): Archi
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return violations;
@@ -1800,6 +1916,7 @@ function lintSource(transport: TransportSource): ArchitectureViolation[] {
   violations.push(...handlerShapeViolations(transport.file, source));
   violations.push(...handlerBoundaryViolations(transport.file, source));
   violations.push(...stringLocatorViolations(transport.file, source));
+
   if (transport.strictFeatureApi) {
     violations.push(...rawHonoViolations(transport.file, source));
   }

@@ -54,6 +54,7 @@ export function manifestDependencies(manifest: PackageManifest): Record<string, 
 function exportViolations(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const keys = exportKeys(pkg.manifest.exports);
   const violations: ArchitectureViolation[] = [];
+
   if (keys.length === 0) {
     violations.push({
       policy: "public-exports",
@@ -65,6 +66,7 @@ function exportViolations(pkg: ClassifiedPackage): ArchitectureViolation[] {
   for (const key of keys) {
     const isUndeliberatePublicEntry =
       key.includes("*") || key === "./src" || key.startsWith("./src/");
+
     if (isUndeliberatePublicEntry) {
       violations.push({
         policy: "public-exports",
@@ -179,6 +181,7 @@ const enterpriseCompositionTargetCheck: DependencyCheck = (pkg, target, dependen
     pkg.kind === "enterprise-composition" &&
     target.feature &&
     !compatibleEnterpriseCompositionTarget(target);
+
   if (!isIncompatibleTarget) return undefined;
 
   return {
@@ -208,8 +211,10 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
     pkg.kind === "application" &&
     target.kind === "enterprise-composition" &&
     matchingEnterpriseComposition(pkg, target);
+
   const crossesIntoEnterprise =
     !pkg.enterprise && target.enterprise && !isMatchingApplicationComposition;
+
   if (!crossesIntoEnterprise) return undefined;
 
   return {
@@ -238,6 +243,7 @@ const crossFeatureCheck: DependencyCheck = (pkg, target, dependency) => {
 const contractImplementationCheck: DependencyCheck = (pkg, target, dependency) => {
   const dependsOnOwnImplementation =
     pkg.kind === "contract" && target.feature === pkg.feature && target.kind !== "contract";
+
   if (!dependsOnOwnImplementation) return undefined;
 
   return {
@@ -305,6 +311,7 @@ function dependencyViolations(
     }
 
     const violation = check(pkg, target, dependency);
+
     return violation ? [violation] : [];
   });
 

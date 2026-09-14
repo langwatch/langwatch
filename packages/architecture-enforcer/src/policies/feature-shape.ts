@@ -238,6 +238,7 @@ function serverFindings(
     const contractTested =
       isDirectory(join(memory, "__tests__")) ||
       files(join(repositories, "__tests__")).some((name) => name.endsWith(".contract.test.ts"));
+
     if (isDirectory(memory) && !contractTested) add("memory-twin-untested", memory);
   }
 
@@ -359,6 +360,7 @@ export function lintFeatureShape(snapshot: WorkspaceSnapshot): ArchitectureViola
   const { root, catalogue, packages } = snapshot;
   const file = baselineFile(root);
   const baseline = readBaseline({ policy: FEATURE_SHAPE_BASELINE, file });
+
   const violations = [
     ...baseline.violations,
     ...emptyBaselineRows({ read: baseline, policy: FEATURE_SHAPE_BASELINE, file }),

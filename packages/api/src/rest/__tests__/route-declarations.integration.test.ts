@@ -183,6 +183,7 @@ describe("given a route that declares the trail it leaves", () => {
       const answer = await call(mounted({ audit: sink }), "DELETE", "/api/api-keys/key-one");
 
       expect(answer.status).toBe(410);
+
       expect(sink.rows).toEqual([
         {
           actorId: "user-1",

@@ -67,6 +67,7 @@ function workspacePath(root: string, path: string): string {
 /** Every module specifier the TypeScript grammar treats as one. */
 function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
   const literals: ts.StringLiteral[] = [];
+
   const visit = (node: ts.Node): void => {
     if (!ts.isStringLiteral(node)) {
       ts.forEachChild(node, visit);
@@ -77,15 +78,18 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
     const parent = node.parent;
     const isImport = ts.isImportDeclaration(parent) && parent.moduleSpecifier === node;
     const isExport = ts.isExportDeclaration(parent) && parent.moduleSpecifier === node;
+
     const isImportType =
       ts.isImportTypeNode(parent) &&
       ts.isLiteralTypeNode(parent.argument) &&
       parent.argument.literal === node;
+
     const isDynamic =
       ts.isCallExpression(parent) &&
       parent.arguments[0] === node &&
       (parent.expression.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(parent.expression) && parent.expression.text === "require"));
+
     const isMockPath =
       ts.isCallExpression(parent) &&
       parent.arguments[0] === node &&
@@ -94,11 +98,13 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
       ["mock", "doMock", "unmock", "importActual", "importMock"].includes(
         parent.expression.name.text,
       );
+
     const isModuleSpecifier = isImport || isExport || isImportType || isDynamic || isMockPath;
     if (isModuleSpecifier) literals.push(node);
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(sourceFile, visit);
 
   return literals;
@@ -115,6 +121,7 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
   const base = resolve(dirname(file), specifier);
   const javascriptExtension = specifier.match(/\.(?:m?js|cjs)$/)?.[0];
   const extensionless = javascriptExtension ? base.slice(0, -javascriptExtension.length) : base;
+
   const candidates = [
     ...(javascriptExtension ? [] : [base]),
     ...[".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].map(
@@ -122,6 +129,7 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
     ),
     ...[".ts", ".tsx", ".js", ".jsx"].map((extension) => `${base}/index${extension}`),
   ];
+
   for (const candidate of candidates) {
     if (isExistingFile(candidate)) return candidate;
   }
@@ -169,6 +177,7 @@ function selfReferenceTarget(input: {
 
   const declared = exportsMap?.[subpath];
   const fromExports = declaredExportsTarget(declared);
+
   if (typeof fromExports === "string") {
     const resolved = resolve(packageRoot, fromExports);
     if (isExistingFile(resolved)) return resolved;
@@ -176,6 +185,7 @@ function selfReferenceTarget(input: {
 
   const base =
     subpath === "." ? `${packageRoot}/src/index` : `${packageRoot}/src/${subpath.slice(2)}`;
+
   for (const candidate of [
     base,
     ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
@@ -225,20 +235,24 @@ export function chooseSubject(
   if (named.length > 0) return named[0];
 
   const mirrorDirectory = dirname(mirrorPath);
+
   if (mirrorDirectory !== ".") {
     const agreeing = sorted.filter((target) => dirname(target).endsWith(`/${mirrorDirectory}`));
     if (agreeing.length > 0) return agreeing[0];
   }
 
   const byDirectory = new Map<string, number>();
+
   for (const target of sorted) {
     byDirectory.set(dirname(target), (byDirectory.get(dirname(target)) ?? 0) + 1);
   }
 
   let best: string | undefined;
   let bestCount = 0;
+
   for (const target of sorted) {
     const count = byDirectory.get(dirname(target)) ?? 0;
+
     if (count > bestCount) {
       best = target;
       bestCount = count;
@@ -281,6 +295,7 @@ export function rewriteRelativeSpecifiers(input: {
     if (!next.startsWith(".")) next = `./${next}`;
 
     const writtenExtension = literal.text.match(/\.[cm]?[jt]sx?$/)?.[0];
+
     if (!writtenExtension) next = next.replace(SOURCE_FILE, "");
     else if (/\.(?:m?js|cjs)$/.test(writtenExtension)) {
       next = next.replace(SOURCE_FILE, writtenExtension);
@@ -298,6 +313,7 @@ export function rewriteRelativeSpecifiers(input: {
   if (replacements.length === 0) return source;
 
   let output = source;
+
   for (const replacement of [...replacements].sort((a, b) => b.start - a.start)) {
     output = output.slice(0, replacement.start) + replacement.text + output.slice(replacement.end);
   }
@@ -338,9 +354,11 @@ function sourceImports(input: {
     const target =
       relativeModuleTarget(file, literal.text) ??
       selfReferenceTarget({ specifier: literal.text, packageName, packageRoot, exportsMap });
+
     if (!target) continue;
 
     const resolved = resolve(target);
+
     if (resolved.startsWith(`${sourceRoot}${sep}`)) {
       found.push(target);
       continue;
@@ -376,6 +394,7 @@ function planPackage(
 
   for (const file of walkFiles(testsRoot, (path) => SOURCE_FILE.test(path))) {
     const mirrorPath = workspacePath(testsRoot, file);
+
     const imports = sourceImports({
       file,
       sourceRoot,
@@ -386,6 +405,7 @@ function planPackage(
     });
 
     const subject = chooseSubject(file, mirrorPath, imports);
+
     if (subject) {
       // A TEST lands directly in the __tests__ beside its subject. Anything
       // else — a fixture, a helper — keeps its path under tests/, because its
@@ -403,12 +423,14 @@ function planPackage(
     // fixture directories each holding an `index.ts` are three files, and
     // flattening them would silently make them one.
     const helperDestination = helperDestinations.get(file);
+
     if (helperDestination) {
       moves.push({
         from: file,
         to: `${helperDestination}/${mirrorPath}`,
         subject: helperDestination,
       });
+
       continue;
     }
 
@@ -451,9 +473,11 @@ function packagesWithMirroredTests(root: string): MirroredPackage[] {
  */
 function helperDestinationsFor(moves: TestMove[], testsRoot: string): Map<string, string> {
   const helperDestinations = new Map<string, string>();
+
   for (const { from, to } of moves) {
     const source = readFileSync(from, "utf8");
     const sourceFile = ts.createSourceFile(from, source, ts.ScriptTarget.Latest, true);
+
     for (const literal of moduleSpecifierNodes(sourceFile)) {
       const target = relativeModuleTarget(from, literal.text);
       const isMirroredHelper = target && resolve(target).startsWith(`${testsRoot}${sep}`);
@@ -492,8 +516,10 @@ function planEveryPackage(root: string): {
 function collisionsAmong(moves: TestMove[]): string[] {
   const byDestination = new Map<string, string>();
   const collisions: string[] = [];
+
   for (const move of moves) {
     const owner = byDestination.get(move.to);
+
     if (owner) collisions.push(`${owner} and ${move.from} both target ${move.to}`);
     else byDestination.set(move.to, move.from);
   }
@@ -504,6 +530,7 @@ function collisionsAmong(moves: TestMove[]): string[] {
 function editsFor(moves: TestMove[]): Map<string, string> {
   const moved = new Map(moves.map((move) => [move.from, move.to]));
   const edits = new Map<string, string>();
+
   for (const move of moves) {
     const output = rewriteRelativeSpecifiers({
       from: move.from,
@@ -511,6 +538,7 @@ function editsFor(moves: TestMove[]): Map<string, string> {
       source: readFileSync(move.from, "utf8"),
       moved,
     });
+
     edits.set(move.from, output);
   }
 

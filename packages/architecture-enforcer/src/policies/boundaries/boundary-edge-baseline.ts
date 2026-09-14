@@ -119,6 +119,7 @@ export function lintBoundaryEdgeBaseline(
     policy: BOUNDARY_EDGE_BASELINE,
     file: resolve(root, baselineReference),
   });
+
   violations.push(...reference.violations);
 
   if (!reference.exists) {

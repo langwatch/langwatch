@@ -85,6 +85,7 @@ export function walkFiles(
   const visit = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
+
       if (entry.isDirectory()) {
         if (isIgnoredDirectory({ name: entry.name, ignored: options?.ignoredDirectories }))
           continue;

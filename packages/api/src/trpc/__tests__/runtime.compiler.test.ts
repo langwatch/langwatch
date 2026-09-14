@@ -93,9 +93,11 @@ function compile(path: string): string {
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
+
     return "";
   } catch (error) {
     const processError = error as { stdout?: string; stderr?: string };
+
     return `${processError.stdout ?? ""}${processError.stderr ?? ""}`;
   }
 }

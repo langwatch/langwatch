@@ -151,6 +151,7 @@ describe("given two routers built under one namespace", () => {
     /** @scenario "A namespace too large for one declaration is claimed once" */
     it("answers one router of the process's own root, with both procedure sets on it", () => {
       const root = TrpcRootDefinition.forContext<object>().create();
+
       const runtime = createTrpcRuntime({
         root,
         procedure: root.procedure,

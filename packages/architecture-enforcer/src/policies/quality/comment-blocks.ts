@@ -116,6 +116,7 @@ export function lintCommentBlockRoots(
 ): CommentBlockRootsBaselineCheck {
   const file = commentBlockRootsFile(root);
   const current = readBaseline({ policy: COMMENT_BLOCK_ROOTS_BASELINE, file });
+
   const found = new Set(
     current.entries.map((entry) => entry.key).filter((key) => existsSync(join(root, key))),
   );
@@ -150,6 +151,7 @@ export function lintCommentBlockRoots(
     policy: COMMENT_BLOCK_ROOTS_BASELINE,
     file: resolve(root, baselineReference),
   });
+
   violations.push(...reference.violations);
 
   if (!reference.exists) {
@@ -242,6 +244,7 @@ function mergeBase(root: string): string | undefined {
  */
 export function changedSourceFiles(root: string): string[] {
   const resolvedRoot = resolve(root);
+
   if (!gitOutput(resolvedRoot, ["rev-parse", "--is-inside-work-tree"])) {
     return allSourceFiles(resolvedRoot);
   }
@@ -250,7 +253,9 @@ export function changedSourceFiles(root: string): string[] {
     ...gitPaths(resolvedRoot, ["diff", "--name-only", "-z", "--diff-filter=ACMR", "HEAD"]),
     ...gitPaths(resolvedRoot, ["ls-files", "--others", "--exclude-standard", "-z"]),
   ]);
+
   const base = mergeBase(resolvedRoot);
+
   if (base) {
     for (const path of gitPaths(resolvedRoot, [
       "diff",
@@ -274,6 +279,7 @@ function sourceFiles(root: string, files: readonly string[] | undefined): string
 
 function commentRanges(source: string, file: ts.SourceFile): Array<{ pos: number; end: number }> {
   const ranges = new Map<string, { pos: number; end: number }>();
+
   const add = (comments: ts.CommentRange[] | undefined): void => {
     for (const comment of comments ?? []) {
       ranges.set(`${comment.pos}:${comment.end}`, {
@@ -282,6 +288,7 @@ function commentRanges(source: string, file: ts.SourceFile): Array<{ pos: number
       });
     }
   };
+
   const visit = (node: ts.Node): void => {
     add(ts.getLeadingCommentRanges(source, node.pos));
     add(ts.getTrailingCommentRanges(source, node.end));

@@ -255,10 +255,12 @@ export function excludedPolicyIds(
 
 export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
   const root = resolve(options.root);
+
   const snapshot = buildWorkspaceSnapshot({
     root,
     changedFiles: options.changedFiles ?? changedSourceFiles(root),
   });
+
   const excluded = excludedPolicyIds(options);
 
   return lintPolicies(snapshot, enabledPolicies(options)).filter(

@@ -45,6 +45,7 @@ function declarationAt(path: string, outputs: Map<string, string>): string | und
 function reachableDeclarations(roots: Set<string>, outputs: Map<string, string>): Set<string> {
   const reachable = new Set<string>();
   const pending = [...roots];
+
   while (pending.length > 0) {
     const file = pending.pop();
     if (!file) continue;
@@ -54,6 +55,7 @@ function reachableDeclarations(roots: Set<string>, outputs: Map<string, string>)
 
     reachable.add(file);
     const source = outputs.get(file) ?? "";
+
     for (const imported of ts.preProcessFile(source, true, true).importedFiles) {
       if (!imported.fileName.startsWith(".")) continue;
 
@@ -85,16 +87,20 @@ function violationsForPackage(pkg: ClassifiedPackage): ArchitectureViolation[] |
     },
     tsconfigPath,
   );
+
   const program = ts.createProgram(parsed.fileNames, parsed.options);
   const publicFiles = publicDeclarationFiles(pkg);
   const outputs = new Map<string, string>();
+
   program.emit(undefined, (file, text) => {
     if (file.endsWith(".d.ts")) outputs.set(file, text);
   });
 
   const violations: ArchitectureViolation[] = [];
+
   for (const file of reachableDeclarations(publicFiles, outputs)) {
     const source = outputs.get(file) ?? "";
+
     for (const forbidden of FORBIDDEN_DECLARATION) {
       if (forbidden.pattern.test(source)) {
         violations.push({

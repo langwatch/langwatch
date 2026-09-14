@@ -85,6 +85,7 @@ function setupAlias(
   if (visited.has(key)) return false;
 
   visited.add(key);
+
   const declaration = parsed(file).statements.find(
     (item): item is ts.TypeAliasDeclaration =>
       ts.isTypeAliasDeclaration(item) && item.name.text === name,
@@ -129,6 +130,7 @@ function shadowedTypeParameter(type: ts.TypeReferenceNode): boolean {
 
   const name = type.typeName.text;
   let parent = type.parent;
+
   while (parent) {
     const parameters = declaredTypeParameters(parent);
     if (parameters?.some((parameter) => parameter.name.text === name)) return true;
@@ -163,6 +165,7 @@ export function hasCanonicalAppFactory(
 
       const allowsAlternateInput =
         parameter.questionToken || parameter.dotDotDotToken || parameter.initializer;
+
       if (allowsAlternateInput) return false;
 
       return canonicalSetup(parameter.type, file, resolver);
@@ -256,6 +259,7 @@ function exportedDeclaration<T extends ExportedDeclaration>(
   if (!existsSync(file)) return void 0;
 
   visited.add(key);
+
   for (const statement of source(file).statements) {
     const declaration = declarationOf(statement, name);
     const isExported = declaration !== void 0 && modifier(statement, ts.SyntaxKind.ExportKeyword);
@@ -274,6 +278,7 @@ function exportedDeclaration<T extends ExportedDeclaration>(
       acceptsExport,
       visited,
     );
+
     if (found) return found;
   }
 
@@ -359,6 +364,7 @@ function importedClass(
     if (!item) continue;
 
     const target = resolver.resolve({ file, specifier: statement.moduleSpecifier.text });
+
     if (target !== void 0)
       return exportedClass(target, (item.propertyName ?? item.name).text, resolver);
   }
@@ -384,6 +390,7 @@ function importedInterface(
     if (!item) continue;
 
     const target = resolver.resolve({ file, specifier: statement.moduleSpecifier.text });
+
     if (target !== void 0)
       return exportedInterface(target, (item.propertyName ?? item.name).text, resolver);
   }
@@ -409,6 +416,7 @@ function importedVariable(
     if (!item) continue;
 
     const target = resolver.resolve({ file, specifier: statement.moduleSpecifier.text });
+
     if (target !== void 0)
       return exportedVariable(target, (item.propertyName ?? item.name).text, resolver);
   }
@@ -497,6 +505,7 @@ function canonicalApiTokenDeclaration(
   const interfaceDeclaration = exportedInterface(declaration.file, parts.typeName.text, resolver);
 
   const matchesFeature = parts.argument.text === basename(declaration.file, ".api.ts");
+
   const matchesCanonicalFile = canonicalFeatureFiles
     ? canonicalFeatureFiles.get(parts.argument.text) === declaration.file
     : canonicalApiFile(declaration.file, parts.argument.text);
@@ -531,11 +540,13 @@ function validApiTokenDeclaration(
         (d) => ts.isIdentifier(d.name) && d.name.text === apiName(feature),
       ),
   );
+
   if (!statement || !ts.isVariableStatement(statement)) return false;
 
   const declaration = statement.declarationList.declarations.find(
     (d) => ts.isIdentifier(d.name) && d.name.text === apiName(feature),
   );
+
   const call = validApiTokenVariable(declaration);
   if (!call) return false;
 
@@ -599,6 +610,7 @@ function typeReferenceLeaks(
   if (visited.has(key)) return false;
 
   visited.add(key);
+
   const alias = source(file).statements.find(
     (statement): statement is ts.TypeAliasDeclaration =>
       ts.isTypeAliasDeclaration(statement) && statement.name.text === typeName,
@@ -621,9 +633,11 @@ function typeLeaksImplementation(
   }
 
   let nested = false;
+
   ts.forEachChild(type, (child) => {
     const childLeaks =
       ts.isTypeNode(child) && typeLeaksImplementation(child, file, resolver, visited);
+
     if (childLeaks) nested = true;
   });
 
@@ -662,10 +676,12 @@ function memberName(name: ts.PropertyName | ts.BindingName | undefined): string 
 
   const isLiteralName =
     ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name);
+
   if (isLiteralName) return name.text;
 
   const isStringComputedName =
     ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression);
+
   if (isStringComputedName) return name.expression.text;
 
   return void 0;
@@ -708,6 +724,7 @@ function contractViolations(
   const file = join(contractRoot, "src", `${feature}.api.ts`);
   const name = apiName(feature);
   const add = (message: string, allowed: string) => appViolation(file, message, allowed);
+
   if (!existsSync(file))
     return [
       add(
@@ -720,7 +737,9 @@ function contractViolations(
     directory: join(contractRoot, "src"),
     accept: (path) => path.endsWith(".api.ts") && !path.includes("/__tests__/"),
   });
+
   const violations: ArchitectureViolation[] = [];
+
   if (modules.length !== 1)
     violations.push(
       add(
@@ -733,7 +752,9 @@ function contractViolations(
     (item): item is ts.InterfaceDeclaration =>
       ts.isInterfaceDeclaration(item) && item.name.text === name,
   );
+
   const validApi = validContractApi(api, file, resolver);
+
   if (!validApi) {
     violations.push(
       add(
@@ -745,6 +766,7 @@ function contractViolations(
 
   const token = exportedVariable(file, name, resolver);
   const validToken = validContractToken(api, token, file, feature, resolver);
+
   if (!validToken)
     violations.push(
       add(
@@ -756,6 +778,7 @@ function contractViolations(
   const index = join(contractRoot, "src/index.ts");
   const exportedApi = exportedInterface(index, name, resolver);
   const exportedToken = exportedVariable(index, name, resolver);
+
   if (exportedApi?.file !== file || exportedToken?.file !== file)
     violations.push(
       add(
@@ -867,6 +890,7 @@ function validConcreteMember(
   provided: Set<string>,
 ): boolean {
   const isInstanceProperty = ts.isPropertyDeclaration(member);
+
   if (isInstanceProperty && !modifier(member, ts.SyntaxKind.StaticKeyword)) {
     const name = callableFieldName(member, operations);
     if (!name) return false;
@@ -877,6 +901,7 @@ function validConcreteMember(
   }
 
   const isPropertyOrParameter = ts.isPropertyDeclaration(member) || ts.isParameter(member);
+
   if (isPropertyOrParameter) {
     return validDefinedProperty(
       member,
@@ -891,6 +916,7 @@ function validConcreteMember(
 
   const isStaticOrNonMethod =
     !ts.isMethodDeclaration(member) || modifier(member, ts.SyntaxKind.StaticKeyword);
+
   if (isStaticOrNonMethod) return isStaticCreate(member);
 
   const name = memberName(member.name);
@@ -915,6 +941,7 @@ function validDefinedConcreteSurface(
 
   const provided = new Set<string>();
   const metadata = new Set(["contract", "dependencies", "configSchema", "repositories"]);
+
   for (const member of publicMembers(app)) {
     if (
       !validConcreteMember(
@@ -971,16 +998,20 @@ function validDefinedDependencies(
       member.name.getText() === "dependencies" &&
       modifier(member, ts.SyntaxKind.StaticKeyword),
   );
+
   if (!declaration?.initializer) return false;
 
   let dependencies: ts.Expression = declaration.initializer;
+
   if (ts.isIdentifier(dependencies)) {
     const dependencyName = dependencies.text;
+
     const local = source(file)
       .statements.flatMap((statement) =>
         ts.isVariableStatement(statement) ? [...statement.declarationList.declarations] : [],
       )
       .find((item) => ts.isIdentifier(item.name) && item.name.text === dependencyName);
+
     dependencies = local?.initializer ?? dependencies;
   }
 
@@ -1034,6 +1065,7 @@ function factoryViolations(
   resolver: WorkspaceModuleResolver,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   if (!hasPrivateAppConstructor(app)) {
     violations.push(
       appViolation(
@@ -1074,9 +1106,11 @@ function concreteAppViolations(
 
   const operations = apiOperations(api.node, resolver);
   const violations: ArchitectureViolation[] = [];
+
   for (const file of productionFiles(snapshot, serverRoot))
     for (const statement of classDeclarations(file)) {
       const inheritedApp = hasInheritedApp(statement);
+
       if (inheritedApp) {
         violations.push(
           appViolation(
@@ -1085,6 +1119,7 @@ function concreteAppViolations(
             "Implement the feature API directly and keep implementation state in ECMAScript private members.",
           ),
         );
+
         continue;
       }
 
@@ -1101,6 +1136,7 @@ function concreteAppViolations(
         catalogueFeatures,
         canonicalFeatureFiles,
       );
+
       if (!valid)
         violations.push(
           appViolation(
@@ -1189,6 +1225,7 @@ function installerImports(parsed: ts.SourceFile): {
   const legacyNames = new Set<string>();
   const definedNames = new Set<string>();
   const namespaces = new Set<string>();
+
   for (const statement of parsed.statements.filter(ts.isImportDeclaration)) {
     collectInstallerImport(statement, legacyNames, definedNames, namespaces);
   }
@@ -1203,6 +1240,7 @@ function collectInstallerImport(
   namespaces: Set<string>,
 ): void {
   const moduleName = statement.moduleSpecifier;
+
   if (!ts.isStringLiteral(moduleName) || moduleName.text !== "@langwatch/runtime-composition")
     return;
 
@@ -1217,6 +1255,7 @@ function collectInstallerImport(
 
   for (const item of bindings.elements) {
     const imported = (item.propertyName ?? item.name).text;
+
     if (imported === "serverFeature") {
       legacyNames.add(item.name.text);
     }
@@ -1234,6 +1273,7 @@ function isInstallerCall(
   if (!ts.isCallExpression(node)) return void 0;
 
   const callee = node.expression;
+
   if (ts.isIdentifier(callee)) {
     if (imports.legacyNames.has(callee.text)) {
       return { call: node, kind: "legacy" };
@@ -1280,6 +1320,7 @@ function installerChain(file: string, node: ts.CallExpression, kind: Installer["
   let app: ts.Expression | undefined;
   const stages: string[] = [];
   let current = node;
+
   while (ts.isPropertyAccessExpression(current.parent)) {
     const access = current.parent;
     stages.push(access.name.text);
@@ -1290,6 +1331,7 @@ function installerChain(file: string, node: ts.CallExpression, kind: Installer["
     }
 
     const hasWithAppArgument = access.name.text === "withApp" && access.parent.arguments.length > 0;
+
     if (hasWithAppArgument) {
       app = access.parent.arguments[0];
     }
@@ -1305,17 +1347,20 @@ function installerChain(file: string, node: ts.CallExpression, kind: Installer["
 
 function installers(snapshot: WorkspaceSnapshot, serverRoot: string): Installer[] {
   const result: Installer[] = [];
+
   for (const file of productionFiles(snapshot, serverRoot)) {
     if (!sourceText({ file }).includes("@langwatch/runtime-composition")) continue;
 
     const parsed = source(file);
     const imports = installerImports(parsed);
+
     const visit = (node: ts.Node): void => {
       const installer = isInstallerCall(node, imports);
       if (installer) result.push(installerChain(file, installer.call, installer.kind));
 
       ts.forEachChild(node, visit);
     };
+
     visit(parsed);
   }
 
@@ -1369,6 +1414,7 @@ function definedInstallerViolations(
   canonicalFeatureFiles: ReadonlyMap<string, string>,
 ): ArchitectureViolation[] {
   const { file, call, providers } = declaration;
+
   const violations = canonicalInstaller(file, call, pkg)
     ? []
     : [
@@ -1378,13 +1424,17 @@ function definedInstallerViolations(
           `Declare defineServerModule("${pkg.feature}") in src/${pkg.feature}.server.ts.`,
         ),
       ];
+
   const app = declaration.app;
+
   const appDeclaration =
     app && ts.isIdentifier(app) ? importedClass(file, app.text, resolver) : void 0;
+
   const contractFile = join(contractRoot, "src", `${pkg.feature}.api.ts`);
   const api = exportedInterface(contractFile, apiName(pkg.feature ?? ""), resolver);
   const token = exportedVariable(contractFile, apiName(pkg.feature ?? ""), resolver);
   const operations = api ? apiOperations(api.node, resolver) : new Set<string>();
+
   const validApp = validDefinedApp(
     api,
     token,
@@ -1409,6 +1459,7 @@ function definedInstallerViolations(
   if (!declaration.complete) return pushInvalidInstaller();
 
   const valid = hasValidStages;
+
   function pushInvalidInstaller(): ArchitectureViolation[] {
     violations.push(
       appViolation(
@@ -1448,6 +1499,7 @@ function validDefinedApp(
     contractFile,
     resolver,
   );
+
   if (!implementsOwnContract) return false;
 
   if (
@@ -1489,23 +1541,28 @@ function validDefinedStages(stages: string[]): boolean {
   const hasRepositories = stages[0] === "withRepositories";
   const appIndex = hasRepositories ? 1 : 0;
   if (stages[appIndex] !== "withApp") return false;
+
   // `build` is optional: every stage answers a declaration that is already
   // installable, so a module that states its last half is finished.
   const tail =
     stages.at(-1) === "build" ? stages.slice(appIndex + 1, -1) : stages.slice(appIndex + 1);
+
   if (tail.some((stage) => !DECLARED_MODULE_STAGES.has(stage))) return false;
+
   return new Set(tail).size === tail.length;
 }
 
 export function lintFeatureAppContracts(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, catalogue } = snapshot;
   const violations: ArchitectureViolation[] = [];
+
   const canonicalFeatureFiles = new Map(
     catalogue.map((item) => [
       item.id,
       join(root, item.root, "contract", "src", `${item.id}.api.ts`),
     ]),
   );
+
   for (const owner of catalogue) {
     violations.push(
       ...lintFeatureOwner(
@@ -1532,14 +1589,17 @@ function lintFeatureOwner(
 ): ArchitectureViolation[] {
   const ownerRoot = join(snapshot.root, owner.root);
   const isEnterprise = owner.classification === "enterprise";
+
   const surfaces = packages.filter(
     (pkg) => pkg.feature === owner.id && pkg.enterprise === isEnterprise,
   );
+
   const server = surfaces.find((pkg) => pkg.kind === "server");
   if (!server) return [];
 
   const contract = surfaces.find((pkg) => pkg.kind === "contract");
   const contractRoot = contract?.root ?? join(ownerRoot, "contract");
+
   const violations = contract
     ? []
     : [
@@ -1549,7 +1609,9 @@ function lintFeatureOwner(
           "Give the feature its real portable app and service contracts, including browser-owned behaviour; do not create an empty app or invent a server package.",
         ),
       ];
+
   violations.push(...contractViolations(snapshot, contractRoot, owner.id, resolver));
+
   for (const surface of surfaces) {
     if (surface.kind === "server" || surface.kind === "web")
       violations.push(
@@ -1566,9 +1628,11 @@ function lintFeatureOwner(
   }
 
   const declarations = installers(snapshot, server.root);
+
   if (declarations.length === 0) {
     const installerFile = join(server.root, "src", `${owner.id}.server.ts`);
     const hidden = existsSync(installerFile);
+
     violations.push(
       appViolation(
         installerFile,
@@ -1790,6 +1854,7 @@ function isFeatureSetupImport(file: string, name: string): boolean {
     const moduleName = ts.isStringLiteral(statement.moduleSpecifier)
       ? statement.moduleSpecifier.text
       : "";
+
     if (!moduleName.startsWith("@langwatch/runtime-composition")) return false;
 
     const bindings = statement.importClause.namedBindings;
@@ -1810,6 +1875,7 @@ function isFeatureSetupTypeName(typeNameNode: ts.EntityName, file: string): bool
 
   const isFeatureSetupMember = typeNameNode.right.text === "FeatureSetup";
   const namespace = ts.isIdentifier(typeNameNode.left) ? typeNameNode.left.text : undefined;
+
   if (!isFeatureSetupMember || !namespace) {
     return false;
   }
@@ -1822,6 +1888,7 @@ function isFeatureSetupTypeName(typeNameNode: ts.EntityName, file: string): bool
     const moduleName = ts.isStringLiteral(statement.moduleSpecifier)
       ? statement.moduleSpecifier.text
       : "";
+
     if (!moduleName.startsWith("@langwatch/runtime-composition")) {
       return false;
     }
@@ -1857,6 +1924,7 @@ function setupInfrastructureReference(
   visited.add(key);
 
   const next = new Map(substitutions);
+
   target.node.typeParameters?.forEach((parameter, index) => {
     const argument = type.typeArguments?.[index];
     if (argument) next.set(parameter.name.text, argument);
@@ -1900,19 +1968,26 @@ function apiOrService(
   if (!owner || !owner.directory.includes(`${sep}modules${sep}`)) return undefined;
 
   const feature = appFeature(local.file, packages);
+
   const expected = feature
     ?.split("-")
     .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
     .join("");
+
   const serviceFile =
     local.file.includes(`${sep}modules${sep}`) && /\.service\.[^/]+$/.test(local.file);
+
   const declaredName = declarationName(local.node, short);
+
   const canonicalName =
     !expected || declaredName === `${expected}Api` || declaredName === `${expected}Service`;
+
   const ownServiceClass =
     ts.isClassDeclaration(local.node) && (serviceFile || declaredName.endsWith("Service"));
+
   const ownCanonicalService = declaredName.endsWith("Service") && canonicalName;
   const moduleApi = declaredName.endsWith("Api") && local.file.includes(".api.");
+
   if (!moduleApi && !ownServiceClass && !ownCanonicalService) {
     return undefined;
   }
@@ -1989,6 +2064,7 @@ function literalTypes(type: ts.TypeNode, context: PropertyContext): Finding[] {
 
 function referenceTypes(type: ts.TypeReferenceNode, context: PropertyContext): Finding[] {
   const { file, resolver, substitutions } = context;
+
   if (hasSubstitution(type, substitutions)) {
     const name = substitutionName(type);
     const substituted = name ? substitutions.get(name) : undefined;
@@ -2205,6 +2281,7 @@ function inspectFactory(
   if (!infrastructure) return [];
 
   const parsed = source(file);
+
   const findings = propertyTypes(infrastructure, {
     file,
     resolver,
@@ -2212,6 +2289,7 @@ function inspectFactory(
     visited: new Set(),
     packages,
   });
+
   const violations = findings.map((finding) =>
     capabilityViolation(finding, file, app, packages, resolver, parsed),
   );

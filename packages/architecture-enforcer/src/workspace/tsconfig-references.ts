@@ -61,12 +61,15 @@ function workspaceGlobs(root: string): string[] {
 
   const globs: string[] = [];
   let inside = false;
+
   for (const line of readFileSync(manifest, "utf8").split("\n")) {
     if (/^packages:\s*$/.test(line)) {
       inside = true;
       continue;
     }
+
     if (inside && /^\S/.test(line)) break;
+
     const entry = /^\s+-\s+["']?([^"'#\s]+)["']?\s*$/.exec(line);
     if (inside && entry?.[1]) globs.push(entry[1]);
   }
@@ -76,21 +79,27 @@ function workspaceGlobs(root: string): string[] {
 
 function expandGlob(root: string, pattern: string): string[] {
   let directories = [root];
+
   for (const segment of pattern.split("/")) {
     const next: string[] = [];
+
     for (const directory of directories) {
       if (segment !== "*") {
         const candidate = join(directory, segment);
         if (existsSync(candidate) && statSync(candidate).isDirectory()) next.push(candidate);
+
         continue;
       }
+
       if (!existsSync(directory)) continue;
+
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
           next.push(join(directory, entry.name));
         }
       }
     }
+
     directories = next;
   }
 
@@ -106,6 +115,7 @@ function workspaceNames(dependencies: Record<string, string> | undefined): strin
 
 export function readWorkspaceMembers(root: string): WorkspaceMember[] {
   const members = new Map<string, WorkspaceMember>();
+
   for (const pattern of workspaceGlobs(root)) {
     for (const directory of expandGlob(root, pattern)) {
       const manifestPath = join(directory, "package.json");
@@ -182,16 +192,19 @@ function firstCycle(
 
   const walk = (node: string): string[] | undefined => {
     if (onPath.has(node)) return [...path.slice(path.indexOf(node)), node];
+
     if (done.has(node)) return void 0;
 
     path.push(node);
     onPath.add(node);
+
     for (const next of edges.get(node) ?? []) {
       if (dropped.has(`${node}\n${next}`)) continue;
 
       const cycle = walk(next);
       if (cycle) return cycle;
     }
+
     path.pop();
     onPath.delete(node);
     done.add(node);
@@ -215,11 +228,14 @@ function firstCycle(
  */
 function droppedEdges(edges: ReadonlyMap<string, readonly string[]>): Set<string> {
   const dropped = new Set<string>();
+
   for (let cycle = firstCycle(edges, dropped); cycle; cycle = firstCycle(edges, dropped)) {
     const candidates = cycle.slice(0, -1).map((node, index) => `${node}\n${cycle[index + 1]}`);
+
     const enough = candidates.find(
       (candidate) => !firstCycle(edges, new Set([...dropped, candidate])),
     );
+
     dropped.add(enough ?? candidates[0] ?? "");
   }
 
@@ -240,6 +256,7 @@ export function deriveProjects(
 
     const producer = producerFile(member.directory);
     if (!producer) return void 0;
+
     // A group member never references a sibling: the group builds them together.
     if (groupMembers.has(member.directory) && consumerIsMember) return groupSolution;
 
@@ -256,6 +273,7 @@ export function deriveProjects(
   // The declaration graph as the manifests describe it, the group's own
   // references included, so a cycle is found wherever it runs.
   const buildEdges = new Map<string, string[]>();
+
   buildEdges.set(
     groupSolution,
     existsSync(groupSolution)
@@ -264,20 +282,24 @@ export function deriveProjects(
         )
       : [],
   );
+
   for (const member of members) {
     const isGroupMember = groupMembers.has(member.directory);
     const producer = producerFile(member.directory);
     if (!producer) continue;
 
     const edges = isGroupMember ? [groupSolution] : targetsFor(member.dependencies, false);
+
     buildEdges.set(
       producer,
       unique(edges).filter((edge) => edge !== producer),
     );
   }
+
   const dropped = droppedEdges(buildEdges);
 
   const projects: DerivedProject[] = [];
+
   for (const member of members) {
     const isGroupMember = groupMembers.has(member.directory);
     const ownProducer = isGroupMember ? groupSolution : producerFile(member.directory);

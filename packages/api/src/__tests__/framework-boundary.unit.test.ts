@@ -15,12 +15,14 @@ function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) return sourceFiles(path);
+
     return /\.tsx?$/.test(entry.name) ? [path] : [];
   });
 }
 
 function importSpecifiers(file: string): string[] {
   const source = readFileSync(file, "utf8");
+
   return [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map(
     (match) => match[1] ?? "",
   );
@@ -45,6 +47,7 @@ describe("the @langwatch/api package boundary", () => {
     /** @scenario "The package owns the framework and nothing else" */
     it("imports no platform application, product feature, enterprise or Prisma module", () => {
       expect(files.length).toBeGreaterThan(0);
+
       const offences = files.flatMap((file) =>
         importSpecifiers(file).flatMap((specifier) =>
           FORBIDDEN_SPECIFIER.filter(({ pattern }) => pattern.test(specifier)).map(
@@ -61,11 +64,13 @@ describe("the @langwatch/api package boundary", () => {
       const manifest = JSON.parse(
         readFileSync(join(packageRoot, "package.json"), "utf8"),
       ) as Record<string, Record<string, string>>;
+
       const firstParty = Object.keys(manifest.dependencies ?? {}).filter((name) =>
         name.startsWith("@langwatch/"),
       );
 
       expect(firstParty.length).toBeGreaterThan(0);
+
       expect(
         firstParty.filter((name) => /-(server|web)$/.test(name) || name.includes("enterprise")),
       ).toEqual([]);

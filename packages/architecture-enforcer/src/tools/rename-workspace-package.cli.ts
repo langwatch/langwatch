@@ -24,8 +24,10 @@ function parseArguments(argv: string[]): {
   let root = process.cwd();
   let allStringLiterals = false;
   const files: string[] = [];
+
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
+
     if (value === "--from") from = argv[++index];
     else if (value === "--to") to = argv[++index];
     else if (value === "--root") root = resolve(argv[++index] ?? ".");
@@ -50,9 +52,11 @@ function parseArguments(argv: string[]): {
 try {
   const options = parseArguments(process.argv.slice(2));
   let changed = 0;
+
   for (const input of options.files) {
     const file = resolve(options.root, input);
     const source = readFileSync(file, "utf8");
+
     const output = renameWorkspaceReference({
       file,
       source,
@@ -60,12 +64,15 @@ try {
       to: options.to,
       allStringLiterals: options.allStringLiterals,
     });
+
     if (output === source) continue;
 
     changed += 1;
+
     process.stdout.write(
       `${options.write ? "updated" : "would update"} ${relative(options.root, file)}\n`,
     );
+
     if (options.write) writeFileSync(file, output, "utf8");
   }
 

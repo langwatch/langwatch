@@ -71,6 +71,7 @@ function isTestFile(file: string): boolean {
 
 function baseCalleeName(expression: ts.Expression): string | undefined {
   let current = expression;
+
   while (true) {
     if (ts.isPropertyAccessExpression(current)) {
       current = current.expression;
@@ -111,9 +112,11 @@ function testCallback(call: ts.CallExpression, scope: string): TestCall | undefi
 
 function collectTestCalls(source: ts.SourceFile): TestCall[] {
   const tests: TestCall[] = [];
+
   const visit = (node: ts.Node, scope = "file"): void => {
     if (ts.isCallExpression(node)) {
       const suite = callbackFromCall(node, SUITE_CALLBACKS);
+
       if (suite) {
         visit(suite.body, `suite:${node.getStart(source)}`);
 
@@ -126,6 +129,7 @@ function collectTestCalls(source: ts.SourceFile): TestCall[] {
 
     ts.forEachChild(node, (child) => visit(child, scope));
   };
+
   visit(source);
 
   return tests;
@@ -153,6 +157,7 @@ function isAssertionCall(node: ts.CallExpression): boolean {
 
 function containsAssertion(callback: TestCallback, assertionHelpers: ReadonlySet<string>): boolean {
   let assertion = false;
+
   const visit = (node: ts.Node): void => {
     if (assertion) return;
 
@@ -160,11 +165,13 @@ function containsAssertion(callback: TestCallback, assertionHelpers: ReadonlySet
       const helper = ts.isIdentifier(node.expression)
         ? assertionHelpers.has(node.expression.text)
         : false;
+
       if (isAssertionCall(node) || helper) assertion = true;
     }
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(callback.body, visit);
 
   return assertion;
@@ -208,6 +215,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
       if (assertsType(node) || nodeContainsAssertion(node.body)) helpers.add(node.name.text);
     } else if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
       const initializer = node.initializer;
+
       if (
         initializer &&
         (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) &&
@@ -219,6 +227,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return helpers;
@@ -226,6 +235,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
 
 function nodeContainsAssertion(node: ts.Node): boolean {
   let assertion = false;
+
   const visit = (child: ts.Node): void => {
     if (assertion) return;
 
@@ -233,6 +243,7 @@ function nodeContainsAssertion(node: ts.Node): boolean {
 
     ts.forEachChild(child, visit);
   };
+
   visit(node);
 
   return assertion;
@@ -324,23 +335,27 @@ function isTautologicalAssertion(node: ts.CallExpression): boolean {
 
 function isSchemaLiteralEchoAssertion(node: ts.CallExpression): boolean {
   const assertion = matcherCall(node);
+
   if (!assertion || !["toBe", "toEqual", "toStrictEqual"].includes(assertion.matcher)) {
     return false;
   }
 
   const actual = assertion.expect.arguments[0];
   const expected = node.arguments[0];
+
   if (!actual || !expected || !ts.isCallExpression(actual)) {
     return false;
   }
 
   const callee = actual.expression;
+
   if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== "parse") {
     return false;
   }
 
   const schema = callee.expression;
   const input = actual.arguments[0];
+
   if (!ts.isIdentifier(schema) || !/schema$/i.test(schema.text) || !input) {
     return false;
   }
@@ -371,6 +386,7 @@ function isEmptySnapshotAssertion(node: ts.CallExpression): boolean {
 
 function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
   const bindings: ImportBinding[] = [];
+
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
       continue;
@@ -407,6 +423,7 @@ function isModuleMockCallee(callee: ts.Expression): boolean {
 
 function collectMockedModules(source: ts.SourceFile): Set<string> {
   const modules = new Set<string>();
+
   const visit = (node: ts.Node): void => {
     if (!ts.isCallExpression(node) || node.arguments.length === 0) {
       ts.forEachChild(node, visit);
@@ -417,12 +434,14 @@ function collectMockedModules(source: ts.SourceFile): Set<string> {
     const callee = node.expression;
     const isMock = isModuleMockCallee(callee);
     const module = node.arguments[0];
+
     if (isMock && module !== void 0 && ts.isStringLiteral(module)) {
       modules.add(module.text);
     }
 
     ts.forEachChild(node, visit);
   };
+
   visit(source);
 
   return modules;
@@ -430,6 +449,7 @@ function collectMockedModules(source: ts.SourceFile): Set<string> {
 
 function callbackUsesName(callback: TestCallback, name: string): boolean {
   let found = false;
+
   const visit = (node: ts.Node): void => {
     if (found) return;
 
@@ -437,6 +457,7 @@ function callbackUsesName(callback: TestCallback, name: string): boolean {
 
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(callback.body, visit);
 
   return found;
@@ -489,6 +510,7 @@ function lintTestFile(file: string): ArchitectureViolation[] {
   const imports = collectImportBindings(source);
   const mockedModules = collectMockedModules(source);
   const assertionHelpers = collectAssertionHelpers(source);
+
   for (const binding of imports) {
     if (IMPORTED_ASSERTION_HELPER.test(binding.name)) assertionHelpers.add(binding.name);
   }
@@ -511,7 +533,9 @@ function lintTestFile(file: string): ArchitectureViolation[] {
       canonicalCaseTable(source, test.call),
       canonicalTestBody(source, test.callback),
     ].join(":");
+
     const duplicate = duplicateBodies.get(bodyKey);
+
     if (duplicate) {
       violations.push({
         policy: "test-quality",
@@ -537,6 +561,7 @@ function lintTestFile(file: string): ArchitectureViolation[] {
         message: `Test uses ${JSON.stringify(binding.name)} from its mocked subject module ${JSON.stringify(binding.module)}.`,
         allowed: "Mock collaborators, not the behaviour under test.",
       });
+
       break;
     }
   }
@@ -580,6 +605,7 @@ function lintTestFile(file: string): ArchitectureViolation[] {
 
     ts.forEachChild(node, visit);
   };
+
   visit(source);
 
   return violations;

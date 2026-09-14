@@ -43,9 +43,11 @@ describe("redactAuditArgs", () => {
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("AIzaSyTheCustomersRealKey");
+
         expect(redacted.customKeys).toEqual({
           GEMINI_API_KEY: "[redacted]",
         });
+
         // The rest of the record is what makes it worth keeping.
         expect(redacted.provider).toBe("gemini");
         expect(redacted.organizationId).toBe("org-1");
@@ -80,6 +82,7 @@ describe("redactAuditArgs", () => {
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("sk-the-real-token");
+
         expect(redacted.extraHeaders).toEqual([
           { key: "Authorization", value: "[redacted]" },
           { key: "X-Tenant", value: "[redacted]" },
@@ -113,6 +116,7 @@ describe("redactAuditArgs", () => {
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("private_key");
+
         expect(redacted.providerConfig).toEqual({
           serviceAccountJson: "[redacted]",
         });
@@ -309,10 +313,12 @@ describe("redactAuditArgs", () => {
           }) as Record<string, unknown>;
 
           expect(JSON.stringify(redacted)).not.toContain("tok-live-1");
+
           expect(redacted.parameters).toEqual({
             api_token: "[redacted]",
             region: "[redacted]",
           });
+
           expect(redacted.projectId).toBe("proj-1");
         },
       );
@@ -451,6 +457,7 @@ describe("handleTrpcCallLogging", () => {
           expect.objectContaining({ path: "suites.getAll", duration: 42 }),
           "trpc call",
         );
+
         expect(log.warn).not.toHaveBeenCalled();
         expect(log.error).not.toHaveBeenCalled();
         expect(capture).not.toHaveBeenCalled();
@@ -463,6 +470,7 @@ describe("handleTrpcCallLogging", () => {
       it("derives 500 from TRPCError code, logs at error level, and captures", () => {
         const log = createMockLog();
         const capture = vi.fn();
+
         const error = new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "boom",
@@ -483,6 +491,7 @@ describe("handleTrpcCallLogging", () => {
           }),
           "trpc call",
         );
+
         expect(capture).toHaveBeenCalledWith(error);
         expect(log.info).not.toHaveBeenCalled();
       });
@@ -492,6 +501,7 @@ describe("handleTrpcCallLogging", () => {
       it("derives 400 from TRPCError code and logs at warn level", () => {
         const log = createMockLog();
         const capture = vi.fn();
+
         const error = new TRPCError({
           code: "BAD_REQUEST",
           message: "bad request",
@@ -508,6 +518,7 @@ describe("handleTrpcCallLogging", () => {
           expect.objectContaining({ error, statusCode: 400 }),
           "trpc call",
         );
+
         expect(capture).not.toHaveBeenCalled();
         expect(log.error).not.toHaveBeenCalled();
       });
@@ -517,6 +528,7 @@ describe("handleTrpcCallLogging", () => {
       it("derives 404 from TRPCError code and logs at info level", () => {
         const log = createMockLog();
         const capture = vi.fn();
+
         const error = new TRPCError({
           code: "NOT_FOUND",
           message: "not found",
@@ -533,6 +545,7 @@ describe("handleTrpcCallLogging", () => {
           expect.objectContaining({ error, statusCode: 404 }),
           "trpc call",
         );
+
         expect(capture).not.toHaveBeenCalled();
         expect(log.warn).not.toHaveBeenCalled();
       });
@@ -555,6 +568,7 @@ describe("handleTrpcCallLogging", () => {
           expect.objectContaining({ statusCode: 500 }),
           "trpc call",
         );
+
         expect(capture).toHaveBeenCalledWith(error);
       });
     });
@@ -592,6 +606,7 @@ describe("handleTrpcCallLogging", () => {
         const log = createMockLog();
         const capture = vi.fn();
         const cause = new CustomerBoom();
+
         const error = new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: cause.message,
@@ -613,6 +628,7 @@ describe("handleTrpcCallLogging", () => {
           }),
           "trpc call",
         );
+
         expect(log.error).not.toHaveBeenCalled();
         expect(capture).not.toHaveBeenCalled();
       });
@@ -622,6 +638,7 @@ describe("handleTrpcCallLogging", () => {
         const log = createMockLog();
         const capture = vi.fn();
         const cause = new PlatformBoom();
+
         const error = new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: cause.message,
@@ -645,6 +662,7 @@ describe("handleTrpcCallLogging", () => {
           }),
           "trpc call",
         );
+
         expect(capture).not.toHaveBeenCalled();
       });
 
@@ -657,6 +675,7 @@ describe("handleTrpcCallLogging", () => {
         const log = createMockLog();
         const capture = vi.fn();
         const cause = new ProviderBoom();
+
         const error = new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: cause.message,
@@ -678,6 +697,7 @@ describe("handleTrpcCallLogging", () => {
           }),
           "trpc call",
         );
+
         expect(capture).not.toHaveBeenCalled();
       });
     });
@@ -735,6 +755,7 @@ describe("a call that succeeds slowly", () => {
         });
 
         expect(log.info).not.toHaveBeenCalled();
+
         expect(log.warn).toHaveBeenCalledWith(
           expect.objectContaining({
             path: "limits.getUsage",
@@ -750,6 +771,7 @@ describe("a call that succeeds slowly", () => {
       /** @scenario "A failed slow call keeps the level its failure earned" */
       it("keeps the level its failure earned rather than the slow warning", () => {
         const log = createMockLog();
+
         const error = new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "boom",
@@ -838,6 +860,7 @@ describe("a call that succeeds slowly", () => {
         callSlowly({ log, times: 1, now: THROTTLE_MS });
 
         expect(log.warn).toHaveBeenCalledTimes(2);
+
         expect(log.warn.mock.calls[1]![0]).toMatchObject({
           suppressedSincePrevious: 49,
         });

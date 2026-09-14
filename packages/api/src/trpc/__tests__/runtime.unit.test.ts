@@ -69,6 +69,7 @@ const root = TrpcRootDefinition.forContext<ReviewContext>().create({});
 describe("TrpcRootDefinition", () => {
   it("builds a caller whose procedure receives the declared context", async () => {
     const typed = TrpcRootDefinition.forContext<{ actor: { id: string } }>().create({});
+
     const router = typed.router({
       actorId: typed.procedure.query(({ ctx }) => ctx.actor.id),
     });
@@ -797,6 +798,7 @@ describe("a procedure that names several permissions together", () => {
       expect((failure as { cause: { meta: Record<string, unknown> } }).cause.meta).toMatchObject({
         permission: "analytics:view",
       });
+
       expect(ran).toEqual([]);
       expect(harness.asked).toEqual(["evaluations:view", "analytics:view"]);
     });
@@ -923,6 +925,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
     }).listUsers({ organizationId: "org-1" });
 
     expect(answer).toEqual({ count: 3 });
+
     expect(asked).toEqual([
       { entitlement: "enterprise", scope: { tier: "organization", id: "org-1" } },
     ]);
@@ -945,6 +948,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
       code: "FORBIDDEN",
       cause: { code: "enterprise_plan_required" },
     });
+
     expect(ran).toBe(false);
   });
 

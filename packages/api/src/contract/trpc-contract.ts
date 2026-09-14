@@ -119,6 +119,7 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
     withInput: (input: z.ZodType) => {
       assertUndeclared(namespace, name, members);
       const declared = { ...members, [name]: { kind, input, output: undefined } };
+
       return {
         ...contractBuilder(namespace, declared),
         withOutput: (output: z.ZodType) =>

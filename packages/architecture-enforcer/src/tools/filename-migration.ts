@@ -50,11 +50,14 @@ function kebab(value: string): string {
 function collapseRepeatedQualifiers(parts: string[]): string[] {
   const collapsed = [...parts];
   let changed = true;
+
   while (changed && collapsed.length > 1) {
     changed = false;
+
     for (let index = 0; index < collapsed.length - 1; index += 1) {
       const left = collapsed[index]!;
       const right = collapsed[index + 1]!;
+
       if (left === right || right.startsWith(`${left}-`)) {
         collapsed.splice(index, 1);
         changed = true;
@@ -77,6 +80,7 @@ function canonicalFilename(name: string): string {
   const stem = name.slice(0, -extension.length);
   const parts = stem.split(".");
   const artifact = parts.at(-1);
+
   if (artifact && CANONICAL_ARTIFACTS.has(artifact) && parts.length > 2) {
     const qualifiers = collapseRepeatedQualifiers(parts.slice(0, -1).map(kebab));
 
@@ -123,9 +127,11 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
   const base = resolve(dirname(file), specifier);
   const javascriptExtension = specifier.match(/\.(?:m?js|cjs)$/)?.[0];
   const extensionless = javascriptExtension ? base.slice(0, -javascriptExtension.length) : base;
+
   const typedCandidates = [".ts", ".tsx", ".mts", ".cts"].map(
     (extension) => `${extensionless}${extension}`,
   );
+
   const candidates = [
     ...(javascriptExtension ? typedCandidates : [base, ...typedCandidates]),
     ...(javascriptExtension ? [base] : []),
@@ -142,6 +148,7 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
 
 function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
   const literals: ts.StringLiteral[] = [];
+
   const visit = (node: ts.Node): void => {
     if (!ts.isStringLiteral(node)) {
       ts.forEachChild(node, visit);
@@ -152,24 +159,30 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
     const parent = node.parent;
     const isImportDeclaration = ts.isImportDeclaration(parent) && parent.moduleSpecifier === node;
     const isExportDeclaration = ts.isExportDeclaration(parent) && parent.moduleSpecifier === node;
+
     const isImportType =
       ts.isImportTypeNode(parent) &&
       ts.isLiteralTypeNode(parent.argument) &&
       parent.argument.literal === node;
+
     const isExternalModule = ts.isExternalModuleReference(parent) && parent.expression === node;
     const isCallWithFirstArgument = ts.isCallExpression(parent) && parent.arguments[0] === node;
+
     const isDynamicImport =
       isCallWithFirstArgument && parent.expression.kind === ts.SyntaxKind.ImportKeyword;
+
     const isRequireCall = isCallWithFirstArgument && ts.isIdentifier(parent.expression);
     const isNamedRequire = isRequireCall && parent.expression.text === "require";
     const isDeclarationSpecifier = isImportDeclaration || isExportDeclaration || isImportType;
     const isRuntimeSpecifier = isExternalModule || isDynamicImport || isNamedRequire;
+
     if (isDeclarationSpecifier || isRuntimeSpecifier) {
       literals.push(node);
     }
 
     ts.forEachChild(node, visit);
   };
+
   visit(sourceFile);
 
   return literals;
@@ -182,6 +195,7 @@ function replaceModuleSpecifiers(
 ): string {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const replacements: Array<{ start: number; end: number; text: string }> = [];
+
   for (const literal of moduleSpecifierNodes(sourceFile)) {
     const target = relativeModuleTarget(file, literal.text);
     const renamed = target && mappings.get(target);
@@ -191,6 +205,7 @@ function replaceModuleSpecifiers(
     if (!next.startsWith(".")) next = `./${next}`;
 
     const sourceExtension = literal.text.match(/\.[cm]?[jt]sx?$/)?.[0];
+
     if (!sourceExtension) {
       next = next.replace(/\.[cm]?[jt]sx?$/, "");
     } else if (/\.(?:m?js|cjs)$/.test(sourceExtension)) {
@@ -222,6 +237,7 @@ function replaceJsonPaths(file: string, source: string, mappings: FilenameRename
   const sourceFile = ts.parseJsonText(file, source);
   const replacements: Array<{ start: number; end: number; text: string }> = [];
   const pathMap = new Map<string, string>();
+
   for (const mapping of mappings) {
     const oldPath = relative(dirname(file), mapping.from).split(sep).join("/");
     const newPath = relative(dirname(file), mapping.to).split(sep).join("/");
@@ -232,6 +248,7 @@ function replaceJsonPaths(file: string, source: string, mappings: FilenameRename
   const visit = (node: ts.Node): void => {
     if (ts.isStringLiteral(node)) {
       const replacement = pathMap.get(node.text);
+
       if (replacement) {
         replacements.push({
           start: node.getStart(sourceFile) + 1,
@@ -243,6 +260,7 @@ function replaceJsonPaths(file: string, source: string, mappings: FilenameRename
 
     ts.forEachChild(node, visit);
   };
+
   visit(sourceFile);
 
   return applyReplacements(source, replacements);
@@ -258,10 +276,12 @@ function replaceDocumentationPaths(
   mappings: FilenameRename[],
 ): string {
   let output = source;
+
   for (const mapping of mappings) {
     const oldPath = relative(root, mapping.from).split(sep).join("/");
     const newPath = relative(root, mapping.to).split(sep).join("/");
     const escaped = oldPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     // Match full workspace-relative paths only; bare basenames and prose are
     // deliberately left alone.
     output = output.replace(
@@ -280,9 +300,11 @@ function documentationPathReferences(
   mappings: FilenameRename[],
 ): string[] {
   const references: string[] = [];
+
   for (const mapping of mappings) {
     const oldPath = relative(root, mapping.from).split(sep).join("/");
     const escaped = oldPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     if (new RegExp(`(^|[^A-Za-z0-9_./-])${escaped}(?=$|[^A-Za-z0-9_./-])`).test(source)) {
       references.push(`${relative(root, file).split(sep).join("/")}: ${oldPath}`);
     }
@@ -295,6 +317,7 @@ export function collectFilenameMigrationMappings(rootInput: string): FilenameRen
   const root = resolve(rootInput);
   const files = strictSourceFiles(root);
   const mappings: FilenameRename[] = [];
+
   for (const file of files) {
     const name = basename(file);
     const alreadyCanonical = name.endsWith(".d.ts") || isLowerKebabFilename(name);
@@ -314,12 +337,15 @@ function collectCollisions(
 ): string[] {
   const targetOwners = new Map<string, string>();
   const collisions: string[] = [];
+
   for (const mapping of mappings) {
     const owner = targetOwners.get(mapping.to);
+
     if (owner && owner !== mapping.from)
       collisions.push(`${mapping.from} -> ${mapping.to} (also ${owner})`);
 
     targetOwners.set(mapping.to, mapping.from);
+
     if (mappingBySource.has(mapping.to)) {
       collisions.push(`${mapping.from} -> ${mapping.to} (target is also being renamed)`);
     } else if (existsSync(mapping.to)) {
@@ -338,6 +364,7 @@ function editSourceFiles(
 ): Map<string, string> {
   const edits = new Map<string, string>();
   const sourceFiles = repositoryFiles(root, (path) => SOURCE_FILE.test(path));
+
   for (const file of sourceFiles) {
     const source = readFileSync(file, "utf8");
     const mayReference = sourceNeedles.some((needle) => source.includes(needle));
@@ -357,11 +384,13 @@ function editJsonFiles(
   sourceNeedles: string[],
 ): Map<string, string> {
   const edits = new Map<string, string>();
+
   const jsonFiles = repositoryFiles(root, (path) => {
     const name = basename(path);
 
     return name === "package.json" || /^tsconfig(?:\..+)?\.json$/.test(name);
   });
+
   for (const file of jsonFiles) {
     const source = readFileSync(file, "utf8");
     const mayReference = sourceNeedles.some((needle) => source.includes(needle));
@@ -381,6 +410,7 @@ function editDocumentationFiles(
 ): { edits: Map<string, string>; remainingTextualReferences: string[] } {
   const edits = new Map<string, string>();
   const remainingTextualReferences: string[] = [];
+
   for (const file of documentationPathFiles(root)) {
     const source = readFileSync(file, "utf8");
     const output = replaceDocumentationPaths(root, source, mappings);
@@ -396,12 +426,14 @@ export function planFilenameMigration(rootInput: string): FilenameMigrationPlan 
   const root = resolve(rootInput);
   const mappings = collectFilenameMigrationMappings(root);
   const mappingBySource = new Map(mappings.map((mapping) => [mapping.from, mapping.to]));
+
   const sourceNeedles = mappings.map((mapping) =>
     basename(mapping.from).replace(/\.[cm]?[jt]sx?$/, ""),
   );
 
   const collisions = collectCollisions(mappings, mappingBySource);
   const documentation = editDocumentationFiles(root, mappings);
+
   const edits = new Map([
     ...editSourceFiles(root, mappingBySource, sourceNeedles),
     ...editJsonFiles(root, mappings, sourceNeedles),

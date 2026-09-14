@@ -35,19 +35,23 @@ function enterpriseDirectiveLine(source: string, file: string): number | undefin
 
   const parsed = sourceFile({ file });
   const comments = new Map<number, ts.CommentRange>();
+
   const visit = (node: ts.Node): void => {
     const ranges = [
       ...(ts.getLeadingCommentRanges(source, node.pos) ?? []),
       ...(ts.getTrailingCommentRanges(source, node.end) ?? []),
     ];
+
     for (const range of ranges) comments.set(range.pos, range);
 
     ts.forEachChild(node, visit);
   };
+
   visit(parsed);
 
   for (const comment of [...comments.values()].sort((left, right) => left.pos - right.pos)) {
     const lines = source.slice(comment.pos, comment.end).split(/\r?\n/);
+
     const index = lines.findIndex((line) => {
       const text = line
         .trim()
@@ -56,6 +60,7 @@ function enterpriseDirectiveLine(source: string, file: string): number | undefin
 
       return ENTERPRISE_DIRECTIVE.test(text);
     });
+
     if (index >= 0) return parsed.getLineAndCharacterOfPosition(comment.pos).line + index + 1;
   }
 
@@ -76,6 +81,7 @@ function isEnterprisePackageFile(root: string, file: string): boolean {
 export function lintEnterpriseSourceLicense(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
   const violations: ArchitectureViolation[] = [];
+
   const licensedFiles = ["apps", "enterprise", "modules", "packages"].flatMap((directory) =>
     snapshot.files({
       directory: `${root}/${directory}`,

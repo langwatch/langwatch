@@ -305,6 +305,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
       mountMethodGuards({ app, served });
 
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
+
       app.onError(options.onError);
 
       return app;
@@ -566,6 +567,7 @@ function deprecationLog<Api>({
   return async (context, next) => {
     if (!reportedDeprecations.has(key)) {
       reportedDeprecations.add(key);
+
       ports.deprecationLog?.deprecatedRouteCalled({
         family,
         operation: route.operation,
@@ -828,6 +830,7 @@ function handlerMiddleware<Api>({
     if (stored) return stored;
 
     const actor = doorActorOf({ credential, actor: decision.actor });
+
     const run = async (): Promise<Response | undefined> => {
       const result = await auditing({
         route,

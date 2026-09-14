@@ -115,6 +115,7 @@ export function collectLegacyFeatureFragments(
   packages: readonly ClassifiedPackage[],
 ): LegacyFeatureFragment[] {
   const migratedFeatures = new Set(packages.flatMap((pkg) => (pkg.feature ? [pkg.feature] : [])));
+
   const subjectOwners = catalogue.flatMap((entry) =>
     migratedFeatures.has(entry.id)
       ? entry.subjects.map((subject) => ({
@@ -123,11 +124,13 @@ export function collectLegacyFeatureFragments(
         }))
       : [],
   );
+
   const legacyRoot = join(root, "platform", "app", "src");
   const fragments: LegacyFeatureFragment[] = [];
 
   for (const file of walkFiles(legacyRoot, (path) => {
     const isProductionSource = SOURCE_FILE.test(path) && !TEST_SOURCE.test(path);
+
     const isNotTestDirectory =
       !path.includes(`${sep}__tests__${sep}`) && !path.includes(`${sep}__mocks__${sep}`);
 
@@ -136,6 +139,7 @@ export function collectLegacyFeatureFragments(
     const workspaceFile = workspacePath(root, file);
     const segments = sourceSegments(workspaceFile);
     const matchingFeatures = new Set<string>();
+
     for (const owner of subjectOwners) {
       if (!segments.some((segment) => owner.forms.has(segment))) continue;
 
@@ -159,6 +163,7 @@ export function formatLegacyFeatureFragmentBaseline(
 ): string {
   const sorted = [...fragments].sort(compareFragments);
   const lines = ["{", '  "version": 0,', '  "fragments": ['];
+
   for (const [index, fragment] of sorted.entries()) {
     lines.push(`    ${JSON.stringify(fragment)}${index + 1 === sorted.length ? "" : ","}`);
   }
@@ -176,6 +181,7 @@ function readBaseline(root: string): {
   if (!existsSync(path)) return { baseline: [], violations: [] };
 
   let value: unknown;
+
   try {
     value = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
@@ -192,6 +198,7 @@ function readBaseline(root: string): {
   }
 
   const baselineResult = legacyBaselineSchema.safeParse(value);
+
   if (!baselineResult.success) {
     return {
       baseline: [],
@@ -207,14 +214,18 @@ function readBaseline(root: string): {
 
   const violations: ArchitectureViolation[] = [];
   const baseline: LegacyFeatureFragment[] = [];
+
   for (const [index, entry] of baselineResult.data.fragments.entries()) {
     const isObjectEntry = typeof entry === "object" && entry !== null && !Array.isArray(entry);
     const keys = isObjectEntry ? Object.keys(entry) : [];
+
     const hasCanonicalKeys =
       isObjectEntry &&
       keys.length === 3 &&
       ["feature", "file", "kind"].every((key, keyIndex) => keys[keyIndex] === key);
+
     const entryResult = legacyFragmentEntrySchema.safeParse(entry);
+
     if (!entryResult.success || !hasCanonicalKeys) {
       violations.push({
         policy: "legacy-feature-fragment-baseline",
@@ -222,6 +233,7 @@ function readBaseline(root: string): {
         message: `Legacy feature fragment baseline entry ${index} is malformed.`,
         allowed: "Use feature, file, and a recognised kind in canonical key order.",
       });
+
       continue;
     }
 
@@ -240,6 +252,7 @@ function readBaseline(root: string): {
   }
 
   const keys = baseline.map(fragmentFileKey);
+
   if (new Set(keys).size !== keys.length) {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
@@ -257,6 +270,7 @@ export function lintLegacyFeatureFragments(snapshot: WorkspaceSnapshot): Archite
   const path = join(root, BASELINE_PATH);
   const { baseline, violations } = readBaseline(root);
   const actual = collectLegacyFeatureFragments(root, catalogue, packages);
+
   if (existsSync(path) && baseline.length === 0 && violations.length === 0) {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
@@ -268,6 +282,7 @@ export function lintLegacyFeatureFragments(snapshot: WorkspaceSnapshot): Archite
 
   const actualByKey = new Map(actual.map((fragment) => [fragmentKey(fragment), fragment]));
   const baselineByKey = new Map(baseline.map((fragment) => [fragmentKey(fragment), fragment]));
+
   for (const fragment of actual) {
     if (baselineByKey.has(fragmentKey(fragment))) continue;
 

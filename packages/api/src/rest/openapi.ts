@@ -111,6 +111,7 @@ export function restRouteDocumentation({
 
   if (deprecated) {
     options.deprecated = true;
+
     options.description = [options.description, deprecationNotice(deprecated)]
       .filter((part) => part !== undefined && part !== "")
       .join(" ");
@@ -378,6 +379,7 @@ export function securityForCredentialClass({
         "for it, or drop the describeRoute() so it stops being advertised.",
     );
   }
+
   return SECURITY_BY_CREDENTIAL_CLASS[credentialClass];
 }
 
@@ -407,14 +409,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function normalizeExclusiveBounds<T>(document: T): T {
   walk(document);
+
   return document;
 }
 
 function walk(node: unknown): void {
   if (Array.isArray(node)) {
     for (const child of node) walk(child);
+
     return;
   }
+
   if (!isRecord(node)) return;
 
   normalizeBound({ node, flag: "exclusiveMinimum", bound: "minimum" });
@@ -436,11 +441,14 @@ function normalizeBound({
   if (typeof value !== "boolean") return;
 
   const limit = node[bound];
+
   if (value && typeof limit === "number") {
     node[flag] = limit;
     delete node[bound];
+
     return;
   }
+
   delete node[flag];
 }
 

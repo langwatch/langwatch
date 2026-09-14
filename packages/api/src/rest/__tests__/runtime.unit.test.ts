@@ -299,9 +299,11 @@ describe("defineRestRouter", () => {
     /** @scenario "An endpoint that declares several answers may not also declare one" */
     it("refuses a map with no success status, or with more than two", () => {
       expect(() => route().responds({ 503: report })).toThrow(/one or two 2xx answers/);
+
       expect(() => route().responds({ 200: report, 201: report, 202: report })).toThrow(
         /one or two 2xx answers/,
       );
+
       expect(() => route().responds({})).toThrow(/no answers/);
       expect(() => route().responds({ 700: report })).toThrow(/outside 200–599/);
     });
@@ -627,6 +629,7 @@ describe("RestVersionSelector", () => {
 
   it("uses a supported header when the path is unversioned", () => {
     expect(selector.headerName).toBe(API_VERSION_HEADER);
+
     expect(selector.select({ headerVersion: "v1" })).toEqual({
       version: "v1",
       source: "header",
@@ -654,6 +657,7 @@ describe("RestVersionSelector", () => {
     expect(() => RestVersionSelector.create({ versions: [], latestVersion: "v1" })).toThrow(
       /at least one supported version/,
     );
+
     expect(() => RestVersionSelector.create({ versions: ["v1"], latestVersion: "v2" })).toThrow(
       /latestVersion must be supported/,
     );
@@ -734,6 +738,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ran: true });
+
     expect(asked).toEqual([
       { entitlement: "enterprise", scope: { tier: "organization", id: "org-1" } },
     ]);
@@ -826,6 +831,7 @@ describe("a create declared replayable under a caller's key", () => {
         deleteMany: async ({ where }) => {
           for (const [at, row] of rows) {
             if (row.id !== where.id) continue;
+
             if (where.claimId !== undefined && row.claimId !== where.claimId) continue;
 
             rows.delete(at);
@@ -929,6 +935,7 @@ describe("a create declared replayable under a caller's key", () => {
     const mismatch = await post({ app, key: "key-00000002", name: "digests" });
 
     expect(mismatch.status).toBe(409);
+
     expect(await mismatch.json()).toMatchObject({
       code: "idempotency_error",
       meta: { reason: "body_mismatch" },

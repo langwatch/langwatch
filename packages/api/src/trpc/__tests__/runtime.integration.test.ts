@@ -51,6 +51,7 @@ function zodFailure(parse: () => unknown): unknown {
   } catch (error) {
     return error;
   }
+
   throw new Error("Expected the parse to fail");
 }
 
@@ -140,6 +141,7 @@ async function callTrpcDoor(failure: unknown): Promise<TrpcAnswer> {
 async function callRestDoor(failure: unknown): Promise<{ status: number; code: string }> {
   const app = new Hono();
   app.onError(createErrorHandler());
+
   app.get("/save", () => {
     throw failure;
   });
@@ -159,6 +161,7 @@ describe("a bare ZodError raised inside a service", () => {
       expect(answer.status).toBe(422);
       expect(answer.status).toBeLessThan(500);
       expect(answer.transportCode).toBe("UNPROCESSABLE_CONTENT");
+
       expect(answer.handled).toMatchObject({
         code: "validation_error",
         httpStatus: 422,

@@ -238,6 +238,7 @@ function checkFindings(
 ): ArchitectureViolation[] {
   const { root } = options;
   const excluded = excludedPolicyIds(options);
+
   const workspace = lintPolicies(snapshot, cliEnabledPolicies(options)).filter(
     (violation) => !excluded.has(violation.policy),
   );

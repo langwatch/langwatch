@@ -54,23 +54,28 @@ function makePorts(
   decisions: TrpcAuthorizationDecisions;
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";
+
   const getDecision =
     options.getDecision ??
     vi
       .fn<(input: AuthzGetDecisionInput) => Promise<PermissionDecision>>()
       .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" });
+
   const getProjectAnyDecision =
     options.getProjectAnyDecision ??
     vi
       .fn<(input: AuthzGetProjectAnyDecisionInput) => Promise<PermissionDecision>>()
       .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" });
+
   const checkScopeLineage =
     vi.fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>();
+
   const decisions: TrpcAuthorizationDecisions = {
     getDecision,
     getProjectAnyDecision,
     checkScopeLineage,
   };
+
   return {
     identity: { actor: () => (actorId ? { id: actorId } : undefined) },
     authorization: { forRequest: () => decisions },
@@ -92,6 +97,7 @@ const rejection = async (run: () => Promise<unknown>): Promise<TRPCError> => {
   } catch (error) {
     return error as TRPCError;
   }
+
   throw new Error("expected the middleware to throw");
 };
 
@@ -116,6 +122,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
           permission: "traces:view",
           scope: { tier: "project", id: "proj-1" },
         });
+
         expect(ctx.permissionChecked).toBe(true);
         expect(next).toHaveBeenCalled();
       });
@@ -156,6 +163,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
               .mockResolvedValue({ permitted: true, organizationRole: "EXTERNAL" }),
           }),
         );
+
         const ctx = ctxFor();
 
         await checks.permission({ permission: "traces:view" })({
@@ -177,6 +185,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
             getDecision: vi.fn().mockResolvedValue({ permitted: true, organizationRole: null }),
           }),
         );
+
         const ctx = ctxFor();
 
         await checks.permission({ permission: "organization:view" })({
@@ -196,7 +205,9 @@ describe("createDeclaredAuthzMiddlewares", () => {
         const ports = makePorts({
           getDecision: vi.fn().mockResolvedValue({ permitted: false, organizationRole: "MEMBER" }),
         });
+
         const checks = createDeclaredAuthzMiddlewares(ports);
+
         const error = await rejection(() =>
           checks.permission({ permission: "traces:view" })({
             ctx: ctxFor(),
@@ -204,6 +215,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
             next: vi.fn(),
           }),
         );
+
         expect(error.cause).toBeInstanceOf(PermissionDeniedError);
         const cause = error.cause as PermissionDeniedError;
         expect(cause.code).toBe("permission_denied");
@@ -215,7 +227,9 @@ describe("createDeclaredAuthzMiddlewares", () => {
         const ports = makePorts({
           getDecision: vi.fn().mockResolvedValue({ permitted: false, organizationRole: null }),
         });
+
         const checks = createDeclaredAuthzMiddlewares(ports);
+
         const error = await rejection(() =>
           checks.permission({ permission: "traces:view" })({
             ctx: ctxFor(),
@@ -223,6 +237,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
             next: vi.fn(),
           }),
         );
+
         expect((error.cause as PermissionDeniedError).code).toBe("permission_denied");
         expect(error.message).not.toContain("does-not-exist");
       });
@@ -234,7 +249,9 @@ describe("createDeclaredAuthzMiddlewares", () => {
             .fn()
             .mockResolvedValue({ permitted: false, organizationRole: "EXTERNAL" }),
         });
+
         const checks = createDeclaredAuthzMiddlewares(ports);
+
         const error = await rejection(() =>
           checks.permission({ permission: "team:manage" })({
             ctx: ctxFor(),
@@ -242,6 +259,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
             next: vi.fn(),
           }),
         );
+
         expect((error.cause as Error).message).toContain("lite member");
       });
 
@@ -254,6 +272,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
               .mockResolvedValue({ permitted: false, organizationRole: "MEMBER" }),
           }),
         );
+
         const ctx = ctxFor();
         const next = vi.fn();
 
@@ -283,11 +302,13 @@ describe("createDeclaredAuthzMiddlewares", () => {
         input: { projectId: "proj-1" },
         next: vi.fn().mockReturnValue("next-called"),
       });
+
       expect(ports.decisions.getProjectAnyDecision).toHaveBeenCalledWith({
         userId: "alice",
         projectId: "proj-1",
         permissions: ["traces:view", "scenarios:view"],
       });
+
       expect(ctx.permissionChecked).toBe(true);
 
       const denyingPorts = makePorts({
@@ -295,7 +316,9 @@ describe("createDeclaredAuthzMiddlewares", () => {
           .fn()
           .mockResolvedValue({ permitted: false, organizationRole: "MEMBER" }),
       });
+
       const denyingChecks = createDeclaredAuthzMiddlewares(denyingPorts);
+
       const error = await rejection(() =>
         denyingChecks.permissionAny(["traces:view", "scenarios:view"])({
           ctx: ctxFor(),
@@ -303,6 +326,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
           next: vi.fn(),
         }),
       );
+
       expect((error.cause as PermissionDeniedError).meta).toMatchObject({
         permission: "traces:view",
       });
@@ -312,6 +336,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
     it("answers a blank project id as invalid input, not an internal error", async () => {
       const ports = makePorts();
       const checks = createDeclaredAuthzMiddlewares(ports);
+
       const error = await rejection(() =>
         checks.permissionAny(["traces:view", "scenarios:view"])({
           ctx: ctxFor(),
@@ -319,6 +344,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
           next: vi.fn(),
         }),
       );
+
       expect(error.code).toBe("BAD_REQUEST");
       expect(error.cause).toBeInstanceOf(BlankScopeIdError);
       expect(ports.decisions.getProjectAnyDecision).not.toHaveBeenCalled();
@@ -333,6 +359,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
       const ctx = ctxFor();
       await middleware({ ctx, input: {}, next: vi.fn().mockReturnValue("next-called") });
       expect(ctx.permissionChecked).toBe(true);
+
       expect(authzDeclarationOf(middleware)).toMatchObject({
         kind: "no-permission",
         reason: "user-scoped preferences only",
@@ -343,6 +370,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
     it("still refuses an unallowed scope id at runtime, defense in depth", async () => {
       const checks = createDeclaredAuthzMiddlewares(makePorts());
       const middleware = checks.noPermission({ reason: "nothing scoped" });
+
       await expect(
         middleware({ ctx: ctxFor(), input: { projectId: "proj-1" }, next: vi.fn() }),
       ).rejects.toThrow("projectId is not allowed");
@@ -351,6 +379,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
         reason: "creation flow",
         allow: { organizationId: "creating inside this organization" },
       });
+
       await expect(
         allowed({
           ctx: ctxFor(),
@@ -365,13 +394,16 @@ describe("createDeclaredAuthzMiddlewares", () => {
     /** @scenario "A service-authorized procedure declares the permissions its service enforces" */
     it("marks the check as deferred and names the enforced permissions", async () => {
       const checks = createDeclaredAuthzMiddlewares(makePorts());
+
       const middleware = checks.serviceAuthorized({
         reason: "the row's own scope set decides",
         permissions: ["traces:view"],
       });
+
       const ctx = ctxFor();
       await middleware({ ctx, next: vi.fn().mockReturnValue("next-called") });
       expect(ctx.permissionChecked).toBe(true);
+
       expect(authzDeclarationOf(middleware)).toMatchObject({
         kind: "service-authorized",
         permissions: ["traces:view"],
@@ -413,6 +445,7 @@ describe("createScopeLineageGuard", () => {
           widest: { tier: "organization", id: "org_victim" },
           entries: [],
         });
+
       const guard = createScopeLineageGuard(lineagePorts(checkScopeLineage));
       const next = vi.fn();
 
@@ -428,8 +461,10 @@ describe("createScopeLineageGuard", () => {
         organizationId: "org_victim",
         projectId: "project_mine",
       });
+
       expect(next).not.toHaveBeenCalled();
       expect(error.cause).toBeInstanceOf(PermissionDeniedError);
+
       expect((error.cause as PermissionDeniedError).meta).toMatchObject({
         permission: "auditLog:view",
         scopeType: "organization",
@@ -447,6 +482,7 @@ describe("createScopeLineageGuard", () => {
           widest: { tier: "project", id: "project_ghost" },
           entries: [],
         });
+
       const guard = createScopeLineageGuard(lineagePorts(checkScopeLineage));
       const next = vi.fn();
 
@@ -457,6 +493,7 @@ describe("createScopeLineageGuard", () => {
           next,
         }),
       ).rejects.toBeInstanceOf(Error);
+
       expect(next).not.toHaveBeenCalled();
     });
   });
@@ -467,6 +504,7 @@ describe("createScopeLineageGuard", () => {
       const checkScopeLineage = vi
         .fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>()
         .mockResolvedValue({ kind: "consistent" });
+
       const guard = createScopeLineageGuard(lineagePorts(checkScopeLineage));
       const next = vi.fn().mockReturnValue("handled");
 
@@ -477,6 +515,7 @@ describe("createScopeLineageGuard", () => {
           next,
         }),
       ).resolves.toBe("handled");
+
       expect(next).toHaveBeenCalledTimes(1);
     });
   });
@@ -517,6 +556,7 @@ describe("PendingPermissionProcedureBuilder", () => {
           "input" | "use" | "permission" | "permissionAny" | "noPermission" | "authorizeInService"
         >
       >;
+
       expect(true satisfies _DeclarationIsMandatoryByConstruction).toBe(true);
     });
   });

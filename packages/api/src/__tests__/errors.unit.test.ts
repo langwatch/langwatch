@@ -23,6 +23,7 @@ class TestError extends HandledError {
 function zodErrorFrom(parse: () => unknown): ZodError {
   try {
     parse();
+
     throw new Error("expected a ZodError");
   } catch (err) {
     return err as ZodError;
@@ -32,6 +33,7 @@ function zodErrorFrom(parse: () => unknown): ZodError {
 /** Minimal Hono-ish context for the error handler. */
 function fakeContext() {
   const store = new Map<string, unknown>();
+
   return {
     req: { method: "POST", path: "/api/things" },
     get: (key: string) => store.get(key),
@@ -168,6 +170,7 @@ describe("formatError", () => {
         reasons: [],
         retryable: false,
       }));
+
       const impostor = Object.assign(new Error("not really handled"), {
         isHandled: true,
         serialize,
@@ -203,10 +206,12 @@ describe("formatError", () => {
     it("degrades non-JSON metadata and invalid handled statuses to an internal error", () => {
       const circular: Record<string, unknown> = {};
       circular.self = circular;
+
       const invalidMeta = new TestError("trusted_error", "server copy", {
         httpStatus: 409,
         meta: circular,
       });
+
       const invalidStatus = new TestError("trusted_error", "server copy", {
         httpStatus: 200,
       });
@@ -215,6 +220,7 @@ describe("formatError", () => {
         status: 500,
         body: { code: "internal_error" },
       });
+
       expect(formatError({ err: invalidStatus })).toMatchObject({
         status: 500,
         body: { code: "internal_error" },
@@ -239,6 +245,7 @@ describe("formatError", () => {
       expect(status).toBe(422);
       expect(body.code).toBe("validation_error");
       expect(body.message).toBe("validation_error");
+
       expect(body.reasons).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -313,6 +320,7 @@ describe("formatError", () => {
       (nodeEnv) => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = nodeEnv;
+
         try {
           const err = new Error("secret internal details");
           const { status, body } = formatError({ err });
@@ -376,10 +384,12 @@ describe("createErrorHandler", () => {
 
     it("carries the traceId through for the request logger", () => {
       const handler = createErrorHandler();
+
       const err = new TestError("upstream_down", "Upstream is down", {
         httpStatus: 502,
         fault: "provider",
       });
+
       (err as { traceId?: string }).traceId = "trace-abc";
       const c = fakeContext();
 
@@ -406,6 +416,7 @@ describe("createErrorHandler", () => {
         status: number;
         error: HandledError;
       };
+
       expect(resolved.status).toBe(422);
       expect(HandledError.isHandled(resolved.error)).toBe(true);
       expect(resolved.error.code).toBe("validation_error");

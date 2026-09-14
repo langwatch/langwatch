@@ -84,6 +84,7 @@ function bindingNames(name: ts.BindingName): readonly ts.Identifier[] {
   if (ts.isIdentifier(name)) return [name];
 
   const identifiers: ts.Identifier[] = [];
+
   for (const element of name.elements) {
     if (ts.isBindingElement(element)) identifiers.push(...bindingNames(element.name));
   }
@@ -147,6 +148,7 @@ function unwrap(node: ts.Expression): ts.Expression {
 function moduleSpecifier(node: ts.Expression): string | undefined {
   const expression = unwrap(node);
   if (!ts.isCallExpression(expression)) return void 0;
+
   if (expression.arguments.length !== 1) return void 0;
 
   const argument = expression.arguments[0];
@@ -197,6 +199,7 @@ function accessFingerprint(
   if (context.parent && isStatementLike(context.parent)) context = context.parent;
 
   const normalized = context.getText(source).replace(/\s+/g, " ").trim();
+
   const prefix = source.text
     .slice(context.getStart(source), node.getStart(source))
     .replace(/\s+/g, " ")
@@ -219,6 +222,7 @@ function statementDeclares(node: ts.Node, name: string): boolean {
     const declaresLocalVariable =
       ts.isVariableDeclaration(item) &&
       bindingNames(item.name).some((identifier) => identifier.text === name);
+
     if (declaresLocalVariable) return true;
 
     const declaresLocalNamed =
@@ -226,9 +230,11 @@ function statementDeclares(node: ts.Node, name: string): boolean {
         ts.isClassDeclaration(item) ||
         ts.isEnumDeclaration(item)) &&
       item.name?.text === name;
+
     if (declaresLocalNamed) return true;
 
     let found = false;
+
     ts.forEachChild(item, (child) => {
       found ||= visit(child);
     });
@@ -275,6 +281,7 @@ function isShadowedByBlockDeclaration(
     const containsImportedBinding =
       binding.declaration.getStart() >= statement.getStart() &&
       binding.declaration.getEnd() <= statement.getEnd();
+
     if (statementDeclares(statement, node.text) && !containsImportedBinding) {
       return true;
     }
@@ -285,10 +292,13 @@ function isShadowedByBlockDeclaration(
 
 function isShadowed(node: ts.Identifier, binding: Binding): boolean {
   let child: ts.Node = node;
+
   while (child.parent) {
     const parent = child.parent;
     if (isShadowedByParameter(parent, node.text)) return true;
+
     if (isShadowedByCatchClause(parent, node.text)) return true;
+
     if (isShadowedByBlockDeclaration(parent, node, binding)) return true;
 
     child = parent;
@@ -347,6 +357,7 @@ function recordAccess(
   const baseFingerprint = accessFingerprint(ctx.source, node, symbol, kind);
   const ordinal = ctx.fingerprintOccurrences.get(baseFingerprint) ?? 0;
   ctx.fingerprintOccurrences.set(baseFingerprint, ordinal + 1);
+
   ctx.accesses.push({
     file: workspacePath(ctx.root, ctx.file),
     symbol,
@@ -364,6 +375,7 @@ function isAccessorReference(
   specifier: string | undefined,
 ): boolean {
   if (specifier !== void 0 && isAccessorModule(ctx.root, ctx.file, specifier)) return true;
+
   if (!ts.isIdentifier(expression)) return false;
 
   const namespace = ctx.namespaces.get(expression.text);
@@ -375,8 +387,10 @@ function trackDestructuredBindingElement(ctx: FileAccessContext, element: ts.Bin
   if (element.dotDotDotToken || !ts.isIdentifier(element.name)) return;
 
   const property = element.propertyName;
+
   const isNamedProperty =
     property !== undefined && (ts.isIdentifier(property) || ts.isStringLiteral(property));
+
   const symbol = symbolNamed(isNamedProperty ? property.text : element.name.text);
   if (!symbol) return;
 
@@ -410,8 +424,11 @@ function trackDestructuredBindings(
 function trackImportStatement(ctx: FileAccessContext, statement: ts.ImportDeclaration): void {
   const clause = statement.importClause;
   if (!clause) return;
+
   if (clause.isTypeOnly) return;
+
   if (!ts.isStringLiteral(statement.moduleSpecifier)) return;
+
   if (!isAccessorModule(ctx.root, ctx.file, statement.moduleSpecifier.text)) return;
 
   const namedBindings = clause.namedBindings;
@@ -442,11 +459,14 @@ function trackExportStatement(ctx: FileAccessContext, statement: ts.ExportDeclar
 
   const module = statement.moduleSpecifier;
   if (!module) return;
+
   if (!ts.isStringLiteral(module)) return;
 
   const clause = statement.exportClause;
   if (!clause) return;
+
   if (!ts.isNamedExports(clause)) return;
+
   if (!isAccessorModule(ctx.root, ctx.file, module.text)) return;
 
   for (const element of clause.elements) {
@@ -482,6 +502,7 @@ function trackIdentifierReference(ctx: FileAccessContext, node: ts.Identifier): 
 
   const binding = ctx.direct.get(node.text);
   if (!binding) return;
+
   if (isShadowed(node, binding)) return;
 
   recordAccess(ctx, node, binding.symbol, "reference", node.text);
@@ -520,6 +541,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
     true,
     scriptKind(file),
   );
+
   const ctx: FileAccessContext = {
     root,
     file,
@@ -538,6 +560,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
     visitFileAccessNode(ctx, node);
     ts.forEachChild(node, visit);
   };
+
   ts.forEachChild(source, visit);
 
   return ctx.accesses.sort(
@@ -575,6 +598,7 @@ function readBaseline(root: string): {
   if (!existsSync(file)) return { entries: [], violations: [] };
 
   let value: unknown;
+
   try {
     value = JSON.parse(readFileSync(file, "utf8"));
   } catch (error) {
@@ -591,6 +615,7 @@ function readBaseline(root: string): {
   }
 
   const document = baselineSchema.safeParse(value);
+
   if (!document.success)
     return {
       entries: [],
@@ -605,8 +630,10 @@ function readBaseline(root: string): {
 
   const entries: BaselineEntry[] = [];
   const violations: ArchitectureViolation[] = [];
+
   for (const [index, value] of document.data.accesses.entries()) {
     const result = baselineEntrySchema.safeParse(value);
+
     if (result.success) entries.push(result.data);
     else
       violations.push({
@@ -618,6 +645,7 @@ function readBaseline(root: string): {
 
   const sorted = [...entries].sort((left, right) => key(left).localeCompare(key(right)));
   const isUnsorted = entries.some((item, index) => key(item) !== key(sorted[index]!));
+
   if (isUnsorted)
     violations.push({
       policy: "global-app-access-baseline",
@@ -642,6 +670,7 @@ export function lintGlobalAppAccess(snapshot: WorkspaceSnapshot): ArchitectureVi
   const { entries, violations } = readBaseline(root);
   const baseline = new Set(entries.map(key));
   const currentKeys = new Set(current.map((access) => key(entry(access))));
+
   for (const access of current) {
     const isBaselined = baseline.has(key(entry(access)));
     if (isBaselined) continue;

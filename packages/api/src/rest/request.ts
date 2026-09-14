@@ -99,6 +99,7 @@ export class SchemaFailure extends HandledError {
         ...(violation.received !== undefined ? { received: violation.received } : {}),
       },
     });
+
     this.name = "SchemaFailure";
   }
 }
@@ -121,6 +122,7 @@ export class RequestValidationError extends HandledError {
       reasons: args.violations.map((v) => new SchemaFailure(v)),
       ...remediation("validation_error"),
     });
+
     this.name = "RequestValidationError";
   }
 }
@@ -139,6 +141,7 @@ export function requestValidationErrorFrom({
   input?: unknown;
 }): RequestValidationError {
   const issues = issuesOf(error as ValidationResult["error"]);
+
   return new RequestValidationError({
     target,
     violations: issues.map((issue) => violationOf(issue, input)),
@@ -168,6 +171,7 @@ class MalformedRequestError extends HandledError {
       meta: { target: args.target, detail: args.detail },
       ...remediation("malformed_request"),
     });
+
     this.name = "MalformedRequestError";
   }
 }
@@ -190,36 +194,45 @@ function expectationOf(issue: ZodIssue, input: unknown): Record<string, unknown>
     // off the raw input instead - scalars only, an object here is a shape
     // mistake that belongs in no envelope.
     const received = valueAt(input, issue.path);
+
     return {
       expected: [...issue.values],
       ...(isWireScalar(received) ? { received } : {}),
     };
   }
+
   if (issue.code === "invalid_type") {
     return { expected: issue.expected };
   }
+
   if (issue.code === UNRECOGNIZED_KEYS) {
     return { unrecognized: issue.keys };
   }
+
   // A `superRefine` issue with `params: { expected, received }` gets the
   // same structured channel enum failures get, so a caller reads ONE shape.
   if (issue.code === "custom" && issue.params) {
     const params = issue.params as Record<string, unknown>;
+
     return {
       ...(params.expected !== undefined ? { expected: params.expected } : {}),
       ...(params.received !== undefined ? { received: params.received } : {}),
     };
   }
+
   return {};
 }
 
 /** The value at a zod issue path, or undefined when the path cannot be walked. */
 function valueAt(input: unknown, path: ReadonlyArray<PropertyKey>): unknown {
   let current = input;
+
   for (const key of path) {
     if (current === null || typeof current !== "object") return undefined;
+
     current = (current as Record<PropertyKey, unknown>)[key];
   }
+
   return current;
 }
 
@@ -257,12 +270,14 @@ function build(
       const answered = await hook(result, c);
       if (answered) return answered;
     }
+
     if (!result.success) {
       throw new RequestValidationError({
         target,
         violations: issuesOf(result.error).map((issue) => violationOf(issue, result.data)),
       });
     }
+
     return undefined;
   }) as never);
 
@@ -270,6 +285,7 @@ function build(
     // A failure raised before the route ran is the validator's; anything after
     // `next()` belongs to the handler and passes through untouched.
     let entered = false;
+
     try {
       return await validate(c, async () => {
         entered = true;
@@ -279,6 +295,7 @@ function build(
       if (!entered && isMalformedBody(error)) {
         throw new MalformedRequestError({ target, detail: error.message });
       }
+
       throw error;
     }
   };
@@ -312,6 +329,7 @@ interface ValidationResult {
 /** The issues a validation failure carries, from either container shape. */
 function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
   if (!error) return [];
+
   return Array.isArray(error) ? [...error] : ((error as { issues?: ZodIssue[] }).issues ?? []);
 }
 
@@ -558,17 +576,21 @@ export async function drainWithinCap(
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
+
     size += value.length;
     if (size > maxSize) return null;
+
     chunks.push(value);
   }
 
   const drained = new Uint8Array(new ArrayBuffer(size));
   let offset = 0;
+
   for (const chunk of chunks) {
     drained.set(chunk, offset);
     offset += chunk.length;
   }
+
   return drained;
 }
 
@@ -585,6 +607,7 @@ export function declaredSize(headers: Headers): number | null {
   // A length past the safe-integer range cannot be compared against the cap
   // meaningfully, so it drains and gets refused at the cap like any other body.
   const declared = Number(header);
+
   return Number.isSafeInteger(declared) ? declared : null;
 }
 
@@ -601,6 +624,7 @@ function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Requ
 /** Caps the size of a request body, rejecting anything larger with 413. */
 export const bodyLimit = (options: BodyLimitOptions): MiddlewareHandler => {
   const { maxSize } = options;
+
   const onError =
     options.onError ??
     (() => {
@@ -616,6 +640,7 @@ export const bodyLimit = (options: BodyLimitOptions): MiddlewareHandler => {
     // A declared length is authoritative and free to read, so an oversized
     // body is rejected before a single byte arrives.
     const declared = declaredSize(request.headers);
+
     if (declared !== null) {
       return declared > maxSize ? onError(c, next) : next();
     }
@@ -641,6 +666,7 @@ const headersGetter = {
 function injectTraceHeaders(c: Context): void {
   const carrier: Record<string, string> = {};
   propagation.inject(otContext.active(), carrier);
+
   for (const [key, value] of Object.entries(carrier)) {
     try {
       c.res.headers.set(key, value);
@@ -671,28 +697,35 @@ export function tracerMiddleware(options?: { name?: string }) {
         async (span) => {
           let requestError: unknown;
           let isFinished = false;
+
           const finishSpan = () => {
             if (isFinished) return;
+
             isFinished = true;
 
             const organizationId = c.get("organization")?.id;
             const projectId = c.get("project")?.id;
             const userId = c.get("user")?.id;
+
             if (organizationId) {
               span.setAttribute("organization.id", organizationId);
             }
+
             if (projectId) {
               span.setAttribute("tenant.id", projectId);
             }
+
             if (userId) {
               span.setAttribute("user.id", userId);
             }
 
             const error = requestError ?? c.error;
+
             if (error) {
               span.recordException(error as Error);
               span.setStatus({ code: SpanStatusCode.ERROR });
             }
+
             span.end();
           };
 
@@ -704,9 +737,11 @@ export function tracerMiddleware(options?: { name?: string }) {
             await next();
           } catch (err) {
             requestError = err;
+
             throw err;
           } finally {
             injectTraceHeaders(c);
+
             runAfterSSECompletion({
               c,
               onSettled: finishSpan,
@@ -730,6 +765,7 @@ export function loggerMiddleware(options?: { name?: string }) {
 
   return async (c: Context, next: Next): Promise<void> => {
     if (c.get(REQUEST_LOG_CLAIM)) return next();
+
     c.set(REQUEST_LOG_CLAIM, true);
 
     const ctx = {
@@ -753,6 +789,7 @@ export function loggerMiddleware(options?: { name?: string }) {
         });
       } catch (err) {
         error = err;
+
         throw err;
       } finally {
         const logRequest = () => {
@@ -763,6 +800,7 @@ export function loggerMiddleware(options?: { name?: string }) {
           // 500 for an error the caller received as a 422 ValidationError.
           const resolved = c.get(RESOLVED_ERROR) as ResolvedError | undefined;
           const requestError = resolved ? resolved.error : error || c.error;
+
           const statusCode =
             resolved?.status ??
             (requestError ? getStatusCodeFromError(requestError) : c.res.status);
@@ -792,6 +830,7 @@ export function loggerMiddleware(options?: { name?: string }) {
           // A status the route DECLARED is an answer, not a fault.
           if (!requestError && c.get(DECLARED_ANSWER) === true) {
             logDeclaredAnswer(logger, record);
+
             return;
           }
 
@@ -832,8 +871,10 @@ function runAfterSSECompletion({
   onStreamError: (error: Error) => void;
 }): void {
   const streamCompletion = getSSECompletion(c);
+
   if (!streamCompletion) {
     onSettled();
+
     return;
   }
 
@@ -909,8 +950,10 @@ function createTypedStream<TEvents extends Record<string, ApiSchema>>({
     async emit(event, data) {
       let value: unknown = data;
       const schema = events[event];
+
       if (schema) {
         const result = await parseApiSchema(schema, data);
+
         if (!result.success) {
           await sseStream.writeSSE({
             event: "error",
@@ -919,10 +962,13 @@ function createTypedStream<TEvents extends Record<string, ApiSchema>>({
               issues: result.error.issues,
             }),
           });
+
           throw result.error;
         }
+
         value = result.data;
       }
+
       await sseStream.writeSSE({
         event: String(event),
         data: JSON.stringify(value),
@@ -975,9 +1021,11 @@ export function createSSEResponse<TEvents extends Record<string, ApiSchema>>({
   onError?: (error: Error) => void | Promise<void>;
 }): Response {
   let finish!: (result: SSECompletion) => void;
+
   const completion = new Promise<SSECompletion>((resolve) => {
     finish = resolve;
   });
+
   completions.set(c, completion);
 
   return streamSSE(
@@ -995,6 +1043,7 @@ export function createSSEResponse<TEvents extends Record<string, ApiSchema>>({
     },
     async (error) => {
       c.error = error;
+
       try {
         await onError?.(error);
       } finally {
@@ -1040,7 +1089,9 @@ export interface AppRestBroadcast {
 
 function normalize(value: unknown): unknown {
   if (typeof value === "bigint") return value.toString();
+
   if (Array.isArray(value)) return value.map(normalize);
+
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
@@ -1048,6 +1099,7 @@ function normalize(value: unknown): unknown {
         .map(([key, child]) => [key, normalize(child)]),
     );
   }
+
   return value;
 }
 

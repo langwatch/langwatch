@@ -59,6 +59,7 @@ export function readFeatureCatalogue(
   violations: ArchitectureViolation[],
 ): FeatureCatalogueEntry[] {
   const path = join(workspaceRoot, "modules", "catalogue.json");
+
   if (!existsSync(path)) {
     violations.push(
       issue(
@@ -72,6 +73,7 @@ export function readFeatureCatalogue(
   }
 
   let rawCatalogue: unknown;
+
   try {
     rawCatalogue = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
@@ -86,6 +88,7 @@ export function readFeatureCatalogue(
   }
 
   const catalogueResult = featureCatalogueSchema.safeParse(rawCatalogue);
+
   if (!catalogueResult.success) {
     violations.push(issue(path, "Feature catalogue must contain version 0 and a features array."));
 
@@ -110,10 +113,12 @@ export function readFeatureCatalogue(
           `Feature catalogue entry ${index} must contain only id, root, classification, and subjects.`,
         ),
       );
+
       continue;
     }
 
     const entryResult = featureCatalogueEntrySchema.safeParse(raw);
+
     if (!entryResult.success) {
       violations.push(
         issue(
@@ -122,11 +127,13 @@ export function readFeatureCatalogue(
           "Use a singular lower-case kebab-case id, its derived root, a core or enterprise classification, and a sorted duplicate-free subjects array.",
         ),
       );
+
       continue;
     }
 
     const { classification, id, root, subjects } = entryResult.data;
     const expected = expectedRoot(id, classification);
+
     if (root !== expected) {
       violations.push(
         issue(
@@ -151,6 +158,7 @@ export function readFeatureCatalogue(
 
     for (const subject of subjects) {
       const owner = subjectOwners.get(subject);
+
       if (owner && owner !== id) {
         violations.push(
           issue(
@@ -177,6 +185,7 @@ export function readFeatureCatalogue(
 
     return classificationOrder || left.id.localeCompare(right.id);
   });
+
   if (!sorted.every((entry, index) => entry.id === entries[index]?.id)) {
     violations.push(
       issue(

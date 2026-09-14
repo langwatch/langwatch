@@ -15,29 +15,37 @@ function hasOnlyExportedAbstractPortClasses(path: string): boolean {
     ts.ScriptTarget.Latest,
     false,
   );
+
   let hasPort = false;
+
   for (const statement of source.statements) {
     const isTypeDeclaration =
       ts.isClassDeclaration(statement) ||
       ts.isInterfaceDeclaration(statement) ||
       ts.isTypeAliasDeclaration(statement);
+
     const isValueDeclaration =
       ts.isFunctionDeclaration(statement) || ts.isEnumDeclaration(statement);
+
     const named = isTypeDeclaration || isValueDeclaration;
     const isPortDeclaration = named && statement.name?.text.endsWith("Port");
+
     if (!isPortDeclaration) {
       continue;
     }
 
     const modifiers = statement.modifiers ?? [];
+
     if (!modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
       continue;
     }
 
     hasPort = true;
+
     const isAbstractPortClass =
       ts.isClassDeclaration(statement) &&
       modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.AbstractKeyword);
+
     if (!isAbstractPortClass) {
       return false;
     }

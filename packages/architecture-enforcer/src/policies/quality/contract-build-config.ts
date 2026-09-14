@@ -52,6 +52,7 @@ function violationForPackage(pkg: ClassifiedPackage): ArchitectureViolation | un
   }
 
   let rawConfig: unknown;
+
   try {
     rawConfig = JSON.parse(readFileSync(file, "utf8"));
   } catch {
@@ -73,10 +74,12 @@ function violationForPackage(pkg: ClassifiedPackage): ArchitectureViolation | un
   }
 
   const config = result.data;
+
   const isSourceOnlyBuild =
     config.compilerOptions?.rootDir === "src" &&
     sourceOnlyInclude(config.include) &&
     excludesTests(config.exclude);
+
   if (isSourceOnlyBuild) return undefined;
 
   return {

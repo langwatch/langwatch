@@ -41,10 +41,13 @@ function isBoundarySource(file: string, root: string): boolean {
   const isEnterpriseFeature = parts.slice(0, 2).join("/") === "enterprise/modules";
   const featureOffset = isEnterpriseFeature ? 1 : 0;
   const isFeature = isCoreFeature || isEnterpriseFeature;
+
   const isContract =
     isFeature && parts[2 + featureOffset] === "contract" && parts[3 + featureOffset] === "src";
+
   const isServerApp =
     isFeature && parts[2 + featureOffset] === "server" && parts[4 + featureOffset] === "app";
+
   const isApplicationComposition = isApplicationCompositionPath(parts, file);
 
   return isContract || isServerApp || isApplicationComposition;
@@ -69,6 +72,7 @@ type Scope = Set<string>;
 
 function scopeDeclarations(source: ts.SourceFile): WeakMap<ts.Node, Scope> {
   const declarations = new WeakMap<ts.Node, Scope>();
+
   const ensureScope = (node: ts.Node): Scope => {
     const existing = declarations.get(node);
     if (existing) return existing;
@@ -78,14 +82,18 @@ function scopeDeclarations(source: ts.SourceFile): WeakMap<ts.Node, Scope> {
 
     return scope;
   };
+
   const addName = (scope: Scope, name: ts.BindingName | ts.Identifier | undefined): void => {
     if (name && ts.isIdentifier(name)) scope.add(name.text);
   };
+
   const hasTypeParameters = (node: ts.Node): boolean =>
     (node as { typeParameters?: readonly ts.TypeParameterDeclaration[] }).typeParameters !==
     undefined;
+
   const isScope = (node: ts.Node): boolean => {
     const isStructuralScope = ts.isSourceFile(node) || ts.isModuleBlock(node) || ts.isBlock(node);
+
     const isGenericDeclaration =
       ts.isTypeAliasDeclaration(node) ||
       ts.isInterfaceDeclaration(node) ||
@@ -93,8 +101,10 @@ function scopeDeclarations(source: ts.SourceFile): WeakMap<ts.Node, Scope> {
 
     return isStructuralScope || isGenericDeclaration || hasTypeParameters(node);
   };
+
   const typeParameters = (node: ts.Node): readonly ts.TypeParameterDeclaration[] =>
     (node as { typeParameters?: readonly ts.TypeParameterDeclaration[] }).typeParameters ?? [];
+
   const visit = (node: ts.Node, parentScope: Scope): void => {
     const ownScope = isScope(node) ? ensureScope(node) : parentScope;
 
@@ -185,6 +195,7 @@ function boundaryViolations(file: string): ArchitectureViolation[] {
   const source = parsed(file);
   const scopes = scopeDeclarations(source);
   const violations: ArchitectureViolation[] = [];
+
   const report = (node: ts.Node, message: string): void => {
     violations.push({
       policy: POLICY,
@@ -240,6 +251,7 @@ function boundaryViolations(file: string): ArchitectureViolation[] {
 
 export function lintBoundarySignatureMirrors(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
+
   const files = [join(root, "modules"), join(root, "enterprise"), join(root, "apps")]
     .flatMap((directory) =>
       snapshot.files({ directory, accept: (file) => isBoundarySource(file, root) }),

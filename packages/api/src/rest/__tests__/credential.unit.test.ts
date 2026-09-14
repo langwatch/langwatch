@@ -145,6 +145,7 @@ function refusalCode(call: () => unknown): string | undefined {
   } catch (error) {
     return (error as { code?: string }).code;
   }
+
   return undefined;
 }
 

@@ -246,12 +246,14 @@ function registeredAddresses(registry: readonly RegisteredRoute[]): {
 } {
   const addresses = new Set<string>();
   const paths = new Set<string>();
+
   for (const route of registry) {
     for (const path of [route.path, route.canonicalPath ?? route.path]) {
       addresses.add(`${route.method.toUpperCase()} ${path}`);
       paths.add(path);
     }
   }
+
   return { addresses, paths };
 }
 
@@ -266,12 +268,15 @@ export function undeclaredRoutes(options: {
 }): string[] {
   const { addresses, paths } = registeredAddresses(options.registry);
   const undeclared = new Set<string>();
+
   for (const route of options.app.routes) {
     if (isUnenumerableMount(route.method, route.path)) continue;
+
     const address = `${route.method.toUpperCase()} ${route.path}`;
     const guard = route.method.toUpperCase() === "ALL" && paths.has(route.path);
     if (!addresses.has(address) && !guard) undeclared.add(address);
   }
+
   return [...undeclared].sort();
 }
 
@@ -286,6 +291,7 @@ export function assertEveryRouteDeclared(options: {
 }): void {
   const undeclared = undeclaredRoutes(options);
   if (undeclared.length === 0) return;
+
   throw new Error(
     `REST routes mounted with no declared access policy: ${undeclared.join(", ")}. ` +
       "Declare them with defineRestRouter and mount them on the process's REST runtime. " +
@@ -325,6 +331,7 @@ export function collectAuthDiagnostics(request: {
 }): AuthDiagnostics {
   const get = (name: string) => request.header(name) ?? null;
   const xAuthToken = request.header("x-auth-token");
+
   return {
     path: request.path,
     method: request.method,
@@ -355,11 +362,13 @@ export function isInternalSecretValid({
   const presented = authorizationHeader?.startsWith("Bearer ")
     ? authorizationHeader.slice("Bearer ".length)
     : authorizationHeader;
+
   if (!presented) return false;
 
   const presentedBytes = Buffer.from(presented);
   const expectedBytes = Buffer.from(expected);
   if (presentedBytes.length !== expectedBytes.length) return false;
+
   return timingSafeEqual(presentedBytes, expectedBytes);
 }
 
@@ -390,6 +399,7 @@ export type AppRestManagementAudit = (entry: {
 export function managementActor(c: Context): string {
   const userId = c.get("apiKeyUserId") as string | null | undefined;
   if (userId) return userId;
+
   return `apikey:${c.get("apiKeyId") as string}`;
 }
 

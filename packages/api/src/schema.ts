@@ -28,12 +28,15 @@ export function parseApiSchemaSync(schema: ApiSchema, value: unknown): ApiSchema
       input: unknown,
     ) => { success: true; data: unknown } | { success: false; error: ApiSchemaError };
   };
+
   if (zodLike.safeParse) return zodLike.safeParse(value);
 
   const result = schema["~standard"].validate(value);
+
   if (result instanceof Promise) {
     throw new TypeError("Async Standard Schemas are not supported here");
   }
+
   return result.issues
     ? { success: false, error: createApiSchemaError(result.issues) }
     : { success: true, data: result.value };
@@ -45,9 +48,11 @@ export async function parseApiSchema(schema: ApiSchema, value: unknown): Promise
       input: unknown,
     ) => Promise<{ success: true; data: unknown } | { success: false; error: ApiSchemaError }>;
   };
+
   if (zodLike.safeParseAsync) return zodLike.safeParseAsync(value);
 
   const result = await schema["~standard"].validate(value);
+
   return result.issues
     ? { success: false, error: createApiSchemaError(result.issues) }
     : { success: true, data: result.value };
@@ -56,24 +61,30 @@ export async function parseApiSchema(schema: ApiSchema, value: unknown): Promise
 export function createApiSchemaError(issues: readonly ApiSchemaIssue[]): ApiSchemaError {
   const wrapped = new Error("Validation error") as ApiSchemaError;
   wrapped.name = "ZodError";
+
   Object.defineProperties(wrapped, {
     issues: { value: issues, enumerable: true },
     flatten: {
       value: () => {
         const formErrors: string[] = [];
         const fieldErrors: Record<string, string[]> = {};
+
         for (const issue of issues) {
           const field = pathOf(issue.path);
+
           if (!field) {
             formErrors.push(issue.message);
             continue;
           }
+
           (fieldErrors[field] ??= []).push(issue.message);
         }
+
         return { formErrors, fieldErrors };
       },
     },
   });
+
   return wrapped;
 }
 

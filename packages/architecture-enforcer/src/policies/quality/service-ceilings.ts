@@ -65,18 +65,22 @@ function isFunctionLike(node: ts.Node): node is ts.FunctionLikeDeclaration {
 
 function complexityOf(node: ts.Node): number {
   let complexity = 1;
+
   const visit = (current: ts.Node): void => {
     if (isFunctionLike(current)) return;
 
     const isControlFlow = COMPLEXITY_CONTROL_FLOW.has(current.kind);
+
     const isShortCircuit =
       ts.isBinaryExpression(current) && COMPLEXITY_SHORT_CIRCUIT.has(current.operatorToken.kind);
+
     if (isControlFlow || isShortCircuit) {
       complexity += 1;
     }
 
     ts.forEachChild(current, visit);
   };
+
   ts.forEachChild(node, visit);
 
   return complexity;
@@ -84,6 +88,7 @@ function complexityOf(node: ts.Node): number {
 
 function measureService(path: string, source: string): ServiceMeasurement {
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+
   const measurement: ServiceMeasurement = {
     moduleLines: source.split("\n").length,
     methodLines: 0,
@@ -91,13 +96,16 @@ function measureService(path: string, source: string): ServiceMeasurement {
     complexity: 0,
     lineLength: Math.max(...source.split("\n").map((line) => line.length), 0),
   };
+
   const visit = (node: ts.Node): void => {
     const body = isFunctionLike(node) ? node.body : void 0;
+
     if (body !== void 0 && ts.isBlock(body)) {
       const methodLines =
         file.getLineAndCharacterOfPosition(body.end).line -
         file.getLineAndCharacterOfPosition(body.getStart(file)).line +
         1;
+
       measurement.methodLines = Math.max(measurement.methodLines, methodLines);
       measurement.statements = Math.max(measurement.statements, body.statements.length);
       measurement.complexity = Math.max(measurement.complexity, complexityOf(body));
@@ -105,6 +113,7 @@ function measureService(path: string, source: string): ServiceMeasurement {
 
     ts.forEachChild(node, visit);
   };
+
   visit(file);
 
   return measurement;
@@ -115,6 +124,7 @@ function exceeds(measurement: ServiceMeasurement, ceiling: ServiceMeasurement): 
     measurement.moduleLines > ceiling.moduleLines ||
     measurement.methodLines > ceiling.methodLines ||
     measurement.statements > ceiling.statements;
+
   const exceedsComplexity =
     measurement.complexity > ceiling.complexity || measurement.lineLength > ceiling.lineLength;
 

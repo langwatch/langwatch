@@ -169,6 +169,7 @@ export function credentialPrincipalOfToken(
   resolved: RestResolvedProjectCredential,
 ): RestProjectCredentialPrincipal {
   if (resolved.type !== "apiKey") return { kind: "legacyProjectKey" };
+
   return {
     kind: "apiKey",
     apiKeyId: resolved.apiKeyId,
@@ -205,11 +206,13 @@ export function organizationCredentialPrincipalOfToken(
  */
 export function credentialPrincipalOf(c: Context): RestProjectCredentialPrincipal {
   const resolved = c.get("resolvedToken") as RestResolvedProjectCredential | undefined;
+
   if (!resolved) {
     throw new Error(
       "A handler asked for the request's credential principal with no resolved credential — mount the project authentication middleware before it",
     );
   }
+
   return credentialPrincipalOfToken(resolved);
 }
 
@@ -220,11 +223,13 @@ export function credentialPrincipalOf(c: Context): RestProjectCredentialPrincipa
  */
 export function organizationCredentialPrincipalOf(c: Context): RestOrganizationCredentialPrincipal {
   const resolved = c.get("orgResolvedToken") as RestResolvedOrganizationCredential | undefined;
+
   if (!resolved) {
     throw new Error(
       "A handler asked for the request's organization credential principal with no resolved credential — mount the organization authentication middleware before it",
     );
   }
+
   return organizationCredentialPrincipalOfToken(resolved);
 }
 
@@ -284,6 +289,7 @@ export function recordBrowserCaller(request: Request, caller: RestBrowserCaller)
  */
 export function projectCredentialOfRequest(request: Request): RestResolvedProjectCredential {
   const credential = projectCredentials.get(request);
+
   if (!credential) {
     throw new Error(
       "A module bound a fact from the project credential, and this request's door resolved none",
@@ -298,6 +304,7 @@ export function organizationCredentialOfRequest(
   request: Request,
 ): RestResolvedOrganizationCredential {
   const credential = organizationCredentials.get(request);
+
   if (!credential) {
     throw new Error(
       "A module bound a fact from the organization credential, and this request's door resolved none",
@@ -351,12 +358,14 @@ export function projectOf(
   context: ScopeReader<"project", AppRestProjectVariables["project"]>,
 ): AppRestProjectVariables["project"] {
   const project = context.get("project");
+
   if (!project) {
     throw new Error(
       "No project on the request context: this route is not on a project-scoped family, " +
         "or its own door did not run",
     );
   }
+
   return project;
 }
 
@@ -365,12 +374,14 @@ export function organizationOf(
   context: ScopeReader<"organization", AppRestOrganizationVariables["organization"]>,
 ): AppRestOrganizationVariables["organization"] {
   const organization = context.get("organization");
+
   if (!organization) {
     throw new Error(
       "No organization on the request context: this route is not on an organization-scoped " +
         "family, or its own door did not run",
     );
   }
+
   return organization;
 }
 
@@ -416,6 +427,7 @@ export class PersonalProjectKeyRequiredError extends HandledError {
         ...options,
       },
     );
+
     this.name = "PersonalProjectKeyRequiredError";
   }
 }
@@ -441,6 +453,7 @@ export class PersonalUsageKeyMismatchError extends HandledError {
         ...options,
       },
     );
+
     this.name = "PersonalUsageKeyMismatchError";
   }
 }
@@ -466,6 +479,7 @@ export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
         ...options,
       },
     );
+
     this.name = "PersonalUsageServiceKeyUnsupportedError";
   }
 }
@@ -491,14 +505,18 @@ export function resolvePersonalCaller({
   if (!project.isPersonal || !project.ownerUserId) {
     throw new PersonalProjectKeyRequiredError();
   }
+
   if (credential.kind === "legacyProjectKey") {
     return project.ownerUserId;
   }
+
   if (credential.userId === null) {
     throw new PersonalUsageServiceKeyUnsupportedError();
   }
+
   if (credential.userId !== project.ownerUserId) {
     throw new PersonalUsageKeyMismatchError();
   }
+
   return project.ownerUserId;
 }

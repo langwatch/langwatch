@@ -252,6 +252,7 @@ export function lintSourceFolderShape(snapshot: WorkspaceSnapshot): Architecture
   const { root } = snapshot;
   const file = baselineFile(root);
   const baseline = readBaseline({ policy: SOURCE_FOLDER_SHAPE_BASELINE, file });
+
   const violations = [
     ...baseline.violations,
     ...emptyBaselineRows({ read: baseline, policy: SOURCE_FOLDER_SHAPE_BASELINE, file }),

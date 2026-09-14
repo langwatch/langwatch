@@ -46,6 +46,7 @@ function findRepoRoot(from: string): string {
     if (existsSync(join(directory, "pnpm-workspace.yaml"))) return directory;
 
     const parent = dirname(directory);
+
     if (parent === directory) {
       throw new Error(
         `pnpm-workspace.yaml not found above ${from}; is this inside the repository?`,
@@ -67,11 +68,13 @@ function discoverPackageSpecRoots(packagesRoot: string): string[] {
   if (!existsSync(packagesRoot)) return [];
 
   const roots: string[] = [];
+
   const visit = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name === "node_modules") continue;
 
       const path = join(directory, entry.name);
+
       if (entry.name === "specs") {
         roots.push(path);
       } else {
@@ -79,6 +82,7 @@ function discoverPackageSpecRoots(packagesRoot: string): string[] {
       }
     }
   };
+
   visit(packagesRoot);
 
   return roots.sort();
@@ -949,12 +953,14 @@ function parseFeature(absPath: string): Scenario[] {
     }
 
     const scenarioMatch = trimmed.match(/^Scenario(?:\s+Outline)?:\s*(.+)$/);
+
     if (scenarioMatch) {
       scenarios.push({
         title: scenarioMatch[1]!.trim(),
         tags: [...featureTags, ...pendingTags],
         line: i + 1,
       });
+
       pendingTags = [];
       continue;
     }
@@ -977,6 +983,7 @@ function parseFeature(absPath: string): Scenario[] {
 function walkFiles(root: string, predicate: (name: string) => boolean): string[] {
   const out: string[] = [];
   let entries: string[];
+
   try {
     entries = readdirSync(root);
   } catch {
@@ -988,6 +995,7 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
 
     const full = join(root, entry);
     let s;
+
     try {
       s = statSync(full);
     } catch {
@@ -1087,6 +1095,7 @@ function markerlessBindingSpans(src: string): { start: number; end: number }[] {
 
   for (let i = 0; i < src.length;) {
     const end = blockCommentAt(src, i) ?? tripleQuoteAt(src, i);
+
     if (end === null) {
       i++;
       continue;
@@ -1119,6 +1128,7 @@ export function findScenarioAnnotations(
   let spans: { start: number; end: number }[] | null = null;
 
   ANNOTATION_RE.lastIndex = 0;
+
   for (let m = ANNOTATION_RE.exec(src); m !== null; m = ANNOTATION_RE.exec(src)) {
     const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
     if (!title) continue;
@@ -1147,8 +1157,10 @@ export function findScenarioAnnotations(
 export function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
+
   while (i < len) {
     const ch = src[i];
+
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
       continue;
@@ -1199,16 +1211,19 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
 function collectAllBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
+
   for (const r of testRoots) {
     files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)));
   }
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
+
     for (const a of findScenarioAnnotations(src)) {
       if (!isFollowedByTestCall(src, a.end)) continue;
 
       const line = src.slice(0, a.index).split("\n").length;
+
       bindings.push({
         title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
@@ -1320,8 +1335,10 @@ const GO_SUBTEST_SCAN_BUDGET = 4096;
  */
 function skipGoSpaceAndComments(src: string, start: number, limit: number): number {
   let i = start;
+
   while (i < limit) {
     const ch = src[i];
+
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
       continue;
@@ -1370,8 +1387,10 @@ function isGoSubtestDeclaration(rest: string): boolean {
       const quote = ch;
       i++;
       let closed = false;
+
       while (i < limit) {
         const c = rest[i];
+
         if (c === "\\") {
           i += 2;
           continue;
@@ -1380,6 +1399,7 @@ function isGoSubtestDeclaration(rest: string): boolean {
         if (c === "\n") return false;
 
         i++;
+
         if (c === quote) {
           closed = true;
           break;
@@ -1451,16 +1471,19 @@ function isFollowedByGoTestFunc(src: string, start: number): boolean {
 export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
+
   for (const r of testRoots) {
     files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => GO_TEST_FILE_RE.test(n)));
   }
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
+
     for (const a of findScenarioAnnotations(src)) {
       if (!isFollowedByGoTestFunc(src, a.end)) continue;
 
       const line = src.slice(0, a.index).split("\n").length;
+
       bindings.push({
         title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
@@ -1476,8 +1499,10 @@ function pastBalancedParens(src: string, open: number): number {
   const len = src.length;
   let depth = 1;
   let j = open + 1;
+
   while (j < len && depth > 0) {
     const c = src[j];
+
     if (c === "(") depth++;
     else if (c === ")") depth--;
 
@@ -1519,8 +1544,10 @@ function pastPythonDecorator(src: string, at: number): number {
 function isFollowedByPythonTestFunc(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
+
   while (i < len) {
     const ch = src[i];
+
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
       continue;
@@ -1553,6 +1580,7 @@ const PYTHON_HASH_ANNOTATION_RE =
 function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
+
   for (const r of testRoots) {
     files.push(...walkFiles(resolve(REPO_ROOT, r), (n) => PYTHON_TEST_FILE_RE.test(n)));
   }
@@ -1565,6 +1593,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
       if (!isFollowedByPythonTestFunc(src, a.end)) continue;
 
       const line = src.slice(0, a.index).split("\n").length;
+
       bindings.push({
         title: a.title,
         ref: { file: relative(REPO_ROOT, file), line },
@@ -1573,6 +1602,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
 
     // Hash-comment form (mirrors Bats).
     const lines = src.split("\n");
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? "";
       const hm = line.match(PYTHON_HASH_ANNOTATION_RE);
@@ -1655,6 +1685,7 @@ function collectShellBindings(testRoots: string[]): CollectedBinding[] {
 
 function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
   const byTitle = new Map<string, BindingRef[]>();
+
   for (const b of bindings) {
     const existing = byTitle.get(b.title) ?? [];
     existing.push(b.ref);
@@ -1667,11 +1698,13 @@ function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
 function buildReport(featureRelPath: string, bindingsByTitle: Map<string, BindingRef[]>): Report {
   const absFeature = resolve(REPO_ROOT, featureRelPath);
   const allScenarios = parseFeature(absFeature);
+
   const scenarios = allScenarios.filter(
     (s) => s.tags.some((t) => BOUND_TAGS.has(t)) && !s.tags.includes(UNIMPLEMENTED_TAG),
   );
 
   const unbound: Scenario[] = [];
+
   const annotated: AnnotatedScenario[] = scenarios.map((s) => {
     const binds = bindingsByTitle.get(s.title) ?? [];
     if (binds.length === 0) unbound.push(s);
@@ -1777,10 +1810,12 @@ function printEnforcedReport(r: Report): void {
   }
 
   console.log(`\n  Unbound scenarios:`);
+
   for (const s of r.unbound) {
     const tags = s.tags.join(" ");
     console.log(`    ✗ [${tags}] ${s.title}`);
     console.log(`      ${r.feature}:${s.line}`);
+
     console.log(
       `      Add: /** @scenario ${s.title} */ above an it(...) test, or # @scenario "${s.title}" above an @test in a .bats file`,
     );
@@ -1794,9 +1829,11 @@ function printLegacySummary(reports: LegacyReport[]): void {
   const totalBound = reports.reduce((s, r) => s + r.bound, 0);
   const totalScenarios = reports.reduce((s, r) => s + r.total, 0);
   console.log(`\nLegacy (tolerated — not failing CI):`);
+
   console.log(
     `  ${reports.length} file(s), ${totalBound}/${totalScenarios} bound, ${totalUnbound} unbound`,
   );
+
   for (const r of reports) {
     console.log(`  · ${r.feature}  ${r.bound}/${r.total} bound, ${r.unbound} unbound`);
   }
@@ -1809,6 +1846,7 @@ function printLegacySummary(reports: LegacyReport[]): void {
 /** Why a file enforces nothing — untagged, parked, or a mix of the two. */
 function describeInert(r: InertReport): string {
   const head = `0 of ${r.totalScenarios} scenario(s) enforced`;
+
   if (r.unimplemented === 0) {
     return `${head} — none tagged @unit/@integration/@e2e/@regression`;
   }
@@ -1826,10 +1864,12 @@ function printInertSummary(reports: InertReport[]): void {
   const invisible = reports.reduce((s, r) => s + r.totalScenarios, 0);
   const parked = reports.reduce((s, r) => s + r.unimplemented, 0);
   console.log(`\nInert (no enforced scenarios — tolerated via LEGACY_INERT):`);
+
   console.log(
     `  ${reports.length} file(s) hold ${invisible} scenario(s) this check cannot see` +
       (parked > 0 ? ` (${parked} of them parked as @unimplemented).` : "."),
   );
+
   console.log(
     `  Tag them @unit/@integration to measure them, or @unimplemented to declare the gap. See dev/docs/TESTING_PHILOSOPHY.md.`,
   );
@@ -1839,9 +1879,11 @@ function printNewInert(reports: InertReport[]): void {
   if (reports.length === 0) return;
 
   console.log(`\nFeature files that enforce no scenario at all:`);
+
   for (const r of reports) {
     console.log(`  ✗ ${r.feature}`);
     console.log(`      ${describeInert(r)}`);
+
     console.log(
       `      Tag the scenarios @unit / @integration / @e2e / @regression and bind them, or add this file to LEGACY_INERT with a reason.`,
     );
@@ -1871,15 +1913,19 @@ export function formatUnknownAnnotations(unknown: UnknownAnnotation[]): string[]
   const lines = [
     `\nAnnotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`,
   ];
+
   const byFile = new Map<string, UnknownAnnotation[]>();
+
   for (const a of unknown) {
     const list = byFile.get(a.ref.file);
+
     if (list) list.push(a);
     else byFile.set(a.ref.file, [a]);
   }
 
   for (const [file, entries] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
     lines.push(`\n  ▸ ${file}`);
+
     for (const a of entries) {
       lines.push(`    ✗ @scenario ${a.title}`);
       lines.push(`      line ${a.ref.line}`);
@@ -1904,6 +1950,7 @@ function validateExemptionList({
 }): string[] {
   const errors: string[] = [];
   const seen = new Set<string>();
+
   for (const entry of entries) {
     if (seen.has(entry)) {
       errors.push(`${name} contains duplicate entry: ${entry}`);
@@ -1911,8 +1958,10 @@ function validateExemptionList({
     }
 
     seen.add(entry);
+
     if (!allFeatures.includes(entry)) {
       const abs = resolve(REPO_ROOT, entry);
+
       if (!existsSync(abs)) {
         errors.push(`${name} entry does not resolve to an existing .feature file: ${entry}`);
       } else {
@@ -1983,9 +2032,11 @@ function analyzeParity(): ParityAnalysis {
     ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
     ...collectPythonBindings(DEFAULT_PYTHON_TEST_ROOTS),
   ];
+
   const bindingsByTitle = indexByTitle(bindings);
 
   const allKnownTitles = new Set<string>();
+
   for (const f of allFeatures) {
     for (const s of parseFeature(resolve(REPO_ROOT, f))) {
       allKnownTitles.add(s.title);
@@ -2004,6 +2055,7 @@ function analyzeParity(): ParityAnalysis {
   for (const f of allFeatures) {
     const report = buildReport(f, bindingsByTitle);
     allReports.push(report);
+
     if (legacySet.has(f)) {
       legacy.push(toLegacyReport(report));
     } else {
@@ -2050,6 +2102,7 @@ function analyzeParity(): ParityAnalysis {
 function printParityReport(a: ParityAnalysis): void {
   console.log("Feature-file parity check");
   console.log("=========================");
+
   console.log(
     `Enforced: ${a.enforced.length} file(s) · Legacy: ${a.legacy.length} file(s) · Inert: ${a.inert.length} file(s)`,
   );
@@ -2107,6 +2160,7 @@ function fatalReasons(a: ParityAnalysis): string[] {
       )}`,
     );
   }
+
   if (a.newPartial.length > 0) {
     reasons.push(
       `${a.newPartial.length} file(s) mix enforced scenarios with untagged ones — tag the untagged scenarios (@unit/@integration/@e2e/@regression, or @unimplemented for a tracked gap), delete them, or add the file to LEGACY_PARTIAL with a reason: ${a.newPartial
@@ -2114,6 +2168,7 @@ function fatalReasons(a: ParityAnalysis): string[] {
         .join(", ")}`,
     );
   }
+
   if (a.stalePartial.length > 0) {
     reasons.push(
       `${a.stalePartial.length} file(s) in LEGACY_PARTIAL are now fully tagged — remove them from the list: ${a.stalePartial.join(
@@ -2121,6 +2176,7 @@ function fatalReasons(a: ParityAnalysis): string[] {
       )}`,
     );
   }
+
   if (a.listErrors.length > 0) {
     reasons.push(`${a.listErrors.length} exemption-list error(s)`);
   }
@@ -2131,9 +2187,11 @@ function fatalReasons(a: ParityAnalysis): string[] {
 function printOkSummary(a: ParityAnalysis): void {
   const enforcedTotal = a.enforced.reduce((s, r) => s + r.scenarios.length, 0);
   const legacyUnbound = a.legacy.reduce((s, r) => s + r.unbound, 0);
+
   console.log(
     `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${a.enforced.length} file(s).`,
   );
+
   if (a.legacy.length > 0) {
     console.log(
       `    ${legacyUnbound} unbound scenario(s) tolerated in ${a.legacy.length} legacy file(s).`,
@@ -2142,12 +2200,15 @@ function printOkSummary(a: ParityAnalysis): void {
 
   if (a.exemptInert.length > 0) {
     const invisible = a.exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
+
     console.log(
       `    ${a.exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
     );
   }
+
   if (a.exemptPartial.length > 0) {
     const untagged = a.exemptPartial.reduce((s, r) => s + r.untagged, 0);
+
     console.log(
       `    ${a.exemptPartial.length} partially-tagged file(s) exempted via LEGACY_PARTIAL — ${untagged} scenario(s) untagged and unmeasured beside their enforced ones.`,
     );
@@ -2183,6 +2244,7 @@ function main(): void {
   }
 
   const reasons = fatalReasons(analysis);
+
   if (reasons.length > 0) {
     if (!asJson) {
       // The list name is already inside each message.
@@ -2220,6 +2282,7 @@ export function isEntryModule({
 
 function realPathOrResolved(p: string): string {
   const abs = resolve(p);
+
   try {
     return realpathSync(abs);
   } catch {

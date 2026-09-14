@@ -165,19 +165,25 @@ export async function resolveTrustedHandlerArguments<TContext, App, Input>(
   },
 ): Promise<Readonly<{ app: App; actor: TrpcHandlerActor; scope: AuthzDeclaredScopeId | null }>> {
   const resolved = await TrpcHandlerBinding.resolve(binding, request);
+
   if (resolved.actor === null) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
   }
+
   const parsedActor = actorSchema.parse(resolved.actor);
   const ledgerActor = toLedgerActor(parsedActor);
+
   if (ledgerActor.id === null) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
   }
+
   const actor: TrpcHandlerActor =
     parsedActor.type === "user" || parsedActor.type === "api_key"
       ? parsedActor
       : { ...parsedActor, id: ledgerActor.id };
+
   const scope = resolved.scope === null ? null : declaredScopeIdSchema.parse(resolved.scope);
+
   return {
     app: resolved.app,
     actor,
@@ -979,6 +985,7 @@ function factBindings<TContext>(
   options: TrpcMountOptions<TContext> | undefined,
 ): ReadonlyMap<string, TrpcFactBinding<TContext>> {
   const facts = options?.facts ?? [];
+
   facts.forEach((binding, index) => {
     if (!binding?.fact?.name) {
       throw new Error(
@@ -986,6 +993,7 @@ function factBindings<TContext>(
       );
     }
   });
+
   return new Map(facts.map((binding) => [binding.fact.name, binding] as const));
 }
 
@@ -1658,21 +1666,26 @@ export interface TrpcErrorCausePayload {
 
 function donatedMessage(cause: unknown): string | undefined {
   if (typeof cause !== "object" || cause === null) return undefined;
+
   const message = (cause as { message?: unknown }).message;
+
   return typeof message === "string" && message.length > 0 ? message : undefined;
 }
 
 function isInheritedFromCause(message: string, cause: unknown): boolean {
   let current = cause;
+
   for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
     if (current === null || current === undefined) return false;
 
     const donated = donatedMessage(current);
     if (donated !== undefined && message.includes(donated)) return true;
+
     if (typeof current !== "object") return true;
 
     current = (current as { cause?: unknown }).cause;
   }
+
   return current !== null && current !== undefined;
 }
 
@@ -1694,13 +1707,16 @@ export function createTrpcErrorFormatter(
       : isZodLikeError(error.cause)
         ? ValidationError.fromZodError(error.cause)
         : null;
+
     const isInternalServerError =
       error.code === "INTERNAL_SERVER_ERROR" || shape?.data?.code === "INTERNAL_SERVER_ERROR";
+
     const message = handled
       ? handled.code
       : isInternalServerError
         ? HandledError.toUserMessage(error.cause)
         : shape.message;
+
     const isAuthoredMessage =
       !handled &&
       !isInternalServerError &&
@@ -1708,6 +1724,7 @@ export function createTrpcErrorFormatter(
       shape.message.length > 0 &&
       shape.message !== error.code &&
       !isInheritedFromCause(shape.message, error.cause);
+
     const shapeData = { ...shape.data };
     delete shapeData.stack;
 

@@ -83,6 +83,7 @@ export function clickhouseTables(root: string): Map<string, string> {
     .filter((file) => file.endsWith(".sql"))
     .sort()) {
     const statements = upStatements(readFileSync(join(directory, name), "utf8"));
+
     for (const match of statements.matchAll(DDL)) {
       const table = match[2];
       if (!table) continue;
@@ -97,6 +98,7 @@ export function clickhouseTables(root: string): Map<string, string> {
 
 function foldMaterialisedViews(live: ReadonlyMap<string, string>): Map<string, string> {
   const folded = new Map<string, string>();
+
   for (const [table, migration] of live) {
     const target = table.endsWith("_mv") ? table.slice(0, -"_mv".length) : table;
     if (!folded.has(target) || target === table) folded.set(target, migration);
@@ -108,6 +110,7 @@ function foldMaterialisedViews(live: ReadonlyMap<string, string>): Map<string, s
 /** The directories a module's ClickHouse access can live in, module by module. */
 function scanRoots(root: string, catalogue: readonly FeatureCatalogueEntry[]): ScanRoot[] {
   const ids = new Set(catalogue.map((feature) => feature.id));
+
   const roots = catalogue.map((feature) => ({
     module: feature.id,
     directory: join(root, feature.root),
@@ -130,6 +133,7 @@ function scanRoots(root: string, catalogue: readonly FeatureCatalogueEntry[]): S
 /** File-level `const NAME = "table"` bindings, so `FROM ${NAME}` resolves. */
 function literalConstants(source: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>();
+
   for (const statement of source.statements.filter(ts.isVariableStatement)) {
     for (const declaration of statement.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name)) continue;
@@ -163,6 +167,7 @@ function record(reader: Reader, node: ts.Node, table: string, write: boolean): v
 /** Every table a SQL literal names, with the verb that says whether it is written. */
 function readSql(reader: Reader, node: ts.Node): void {
   const text = node.getText(reader.source);
+
   for (const match of text.matchAll(NAMED_TABLE)) {
     const table = match[2];
     if (table) record(reader, node, table, !READING_VERBS.has((match[1] ?? "").toLowerCase()));
@@ -186,6 +191,7 @@ function insertedTable(reader: Reader, node: ts.CallExpression): string | undefi
     (entry): entry is ts.PropertyAssignment =>
       ts.isPropertyAssignment(entry) && ts.isIdentifier(entry.name) && entry.name.text === "table",
   );
+
   if (!property) return void 0;
 
   const value = property.initializer;
@@ -210,6 +216,7 @@ function readFile({
 
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const reader: Reader = { source, module, tables, constants: literalConstants(source), found };
+
   const visit = (node: ts.Node): void => {
     if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) readSql(reader, node);
 
@@ -220,6 +227,7 @@ function readFile({
 
     ts.forEachChild(node, visit);
   };
+
   visit(source);
 }
 
@@ -230,6 +238,7 @@ function collectAccess(
   tables: ReadonlyMap<string, string>,
 ): Access[] {
   const found: Access[] = [];
+
   for (const scan of scanRoots(root, catalogue)) {
     if (!existsSync(scan.directory)) continue;
 
@@ -237,6 +246,7 @@ function collectAccess(
       scan.directory,
       (file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file),
     );
+
     for (const file of files.sort()) readFile({ file, module: scan.module, tables, found });
   }
 
@@ -248,9 +258,11 @@ type Finding = { key: string; file: string; line?: number; message: string };
 /** The one module that writes each table, in the order the tree declares them. */
 function owners(access: readonly Access[]): Map<string, Access[]> {
   const writers = new Map<string, Access[]>();
+
   for (const entry of access.filter((item) => item.write)) {
     const modules = writers.get(entry.table) ?? [];
     if (!modules.some((item) => item.module === entry.module)) modules.push(entry);
+
     writers.set(entry.table, modules);
   }
 
@@ -264,20 +276,24 @@ function collectFindings(
 ): Finding[] {
   const writers = owners(access);
   const findings = new Map<string, Finding>();
+
   for (const [table, migration] of [...tables].sort()) {
     const modules = writers.get(table) ?? [];
     const owner = modules[0];
+
     if (!owner) {
       findings.set(`${UNOWNED}|${table}`, {
         key: `${UNOWNED}|${table}`,
         file: join(root, migration),
         message: `Table ${table} has no module owner.`,
       });
+
       continue;
     }
 
     for (const extra of modules.slice(1)) {
       const key = `${extra.module}|${table}`;
+
       findings.set(key, {
         key,
         file: extra.file,
@@ -352,6 +368,7 @@ export function lintClickhouseTableOwnershipAt({
 }): ArchitectureViolation[] {
   const file = baselinePath({ root, policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE });
   const baseline = readBaseline({ policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE, file });
+
   const violations = [
     ...baseline.violations,
     ...emptyBaselineRows({ read: baseline, policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE, file }),
@@ -359,6 +376,7 @@ export function lintClickhouseTableOwnershipAt({
 
   const findings = collectClickhouseOwnershipFindings(root, catalogue);
   const baselined = liveKeys({ entries: baseline.entries });
+
   for (const finding of findings) {
     if (baselined.has(finding.key)) continue;
 

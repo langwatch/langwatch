@@ -142,6 +142,7 @@ export function sourceFile({
     parents,
     resolvedKind,
   );
+
   syntaxTrees.set(key, stamp(file, { tree: new WeakRef(parsed), parents }));
 
   return parsed;
@@ -200,6 +201,7 @@ function importRecordFor(node: ts.Node): ImportRecordInput | undefined {
   }
 
   const isNamedExport = ts.isExportDeclaration(node) && node.moduleSpecifier;
+
   if (isNamedExport) {
     return {
       node: node.moduleSpecifier,
@@ -210,6 +212,7 @@ function importRecordFor(node: ts.Node): ImportRecordInput | undefined {
 
   const isImportEquals =
     ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference);
+
   if (isImportEquals) {
     return {
       node: node.moduleReference,
@@ -244,6 +247,7 @@ function collectParsedSource(file: string): ParsedSource {
       options.specifier !== void 0 && ts.isStringLiteralLike(options.specifier)
         ? options.specifier
         : void 0;
+
     imports.push({
       file,
       line: source.getLineAndCharacterOfPosition(options.node.getStart(source)).line + 1,
@@ -298,12 +302,14 @@ function isFile(path: string): boolean {
 export function resolveSourceCandidate({ candidate }: { candidate: string }): string | undefined {
   // An ESM-style ".js" specifier points at a TypeScript source on disk.
   const stems = candidate.endsWith(".js") ? [candidate, candidate.slice(0, -3)] : [candidate];
+
   for (const stem of stems) {
     const paths = [
       stem,
       ...SOURCE_EXTENSIONS.map((extension) => `${stem}${extension}`),
       ...SOURCE_EXTENSIONS.map((extension) => join(stem, `index${extension}`)),
     ];
+
     const found = paths.find((path) => isFile(path));
     if (found) return found;
   }
@@ -330,6 +336,7 @@ function conditionTarget(value: unknown): string | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
 
   const record = value as Record<string, unknown>;
+
   for (const condition of EXPORT_CONDITIONS) {
     if (!(condition in record)) continue;
 
@@ -346,6 +353,7 @@ function subpathTarget(options: {
 }): string | undefined {
   const { manifest, subpath } = options;
   const map = manifest.exports;
+
   if (map === void 0 || map === null) {
     return subpath === "." ? manifest.main : void 0;
   }
@@ -367,6 +375,7 @@ function subpathTarget(options: {
 
 function readManifestRecord(options: { manifestPath: string }): PackageManifestRecord | undefined {
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(readFileSync(options.manifestPath, "utf8"));
   } catch {
@@ -381,6 +390,7 @@ function readManifestRecord(options: { manifestPath: string }): PackageManifestR
     exports?: unknown;
     imports?: unknown;
   };
+
   if (typeof manifest.name !== "string") return void 0;
 
   return {
@@ -402,6 +412,7 @@ function collectManifests(options: {
   found: PackageManifestRecord[];
 }): void {
   const manifestPath = join(options.directory, "package.json");
+
   if (isFile(manifestPath)) {
     const record = readManifestRecord({ manifestPath });
     if (record) options.found.push(record);
@@ -410,6 +421,7 @@ function collectManifests(options: {
   if (options.depth === 0) return;
 
   let entries;
+
   try {
     entries = readdirSync(options.directory, { withFileTypes: true });
   } catch {
@@ -431,6 +443,7 @@ function collectManifests(options: {
 
 function collectWorkspaceManifests(root: string): PackageManifestRecord[] {
   const found: PackageManifestRecord[] = [];
+
   for (const workspaceRoot of WORKSPACE_ROOTS) {
     const directory = join(root, workspaceRoot);
     if (!existsSync(directory)) continue;
@@ -499,6 +512,7 @@ function resolveSubpathImport(
   if (!map || !owner) return void 0;
 
   const exactTarget = conditionTarget(map[options.specifier]);
+
   if (exactTarget) {
     return resolveSourceCandidate({ candidate: resolve(owner.directory, exactTarget) });
   }
@@ -541,6 +555,7 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
   const found = collectWorkspaceManifests(root);
 
   const packages = new Map<string, PackageManifestRecord>();
+
   for (const record of found) {
     if (!packages.has(record.name)) packages.set(record.name, record);
   }
@@ -608,9 +623,11 @@ function edgesForFile(
 ): string[] {
   const { resolve: resolveSpecifier, forbidden, terminal, emitted } = options;
   const edges: string[] = [];
+
   for (const entry of valueImports({ file })) {
     const target = resolveSpecifier({ specifier: entry.specifier, file });
     const reason = forbidden({ specifier: entry.specifier, file, target });
+
     if (reason !== void 0) {
       if (!seeds.has(file)) seeds.set(file, reason);
 
@@ -648,6 +665,7 @@ export function walkValueImportGraph({
     const edges = edgesForFile(file, options, seeds);
 
     children.set(file, edges);
+
     for (const edge of edges) {
       if (seen.has(edge)) continue;
 
@@ -667,9 +685,11 @@ export function walkValueImportGraph({
 /** Every edge's target mapped back to the files that reach it, the reverse of `graph.children`. */
 function parentsIndex(graph: ValueImportGraph): Map<string, string[]> {
   const parents = new Map<string, string[]>();
+
   for (const [file, edges] of graph.children) {
     for (const edge of edges) {
       const known = parents.get(edge);
+
       if (known) known.push(file);
       else parents.set(edge, [file]);
     }
@@ -685,6 +705,7 @@ function floodViaFromSeeds(
 ): Map<string, string | undefined> {
   const via = new Map<string, string | undefined>();
   const work: string[] = [];
+
   for (const file of graph.seeds.keys()) {
     via.set(file, void 0);
     work.push(file);
@@ -692,6 +713,7 @@ function floodViaFromSeeds(
 
   while (work.length > 0) {
     const node = work.pop()!;
+
     for (const parent of parents.get(node) ?? []) {
       if (via.has(parent)) continue;
 
@@ -714,10 +736,12 @@ function chainFromRoot(
   const chain: string[] = [];
   const guard = new Set<string>();
   let cursor: string | undefined = root;
+
   while (cursor !== void 0 && !guard.has(cursor)) {
     guard.add(cursor);
     chain.push(cursor);
     const next: string | undefined = via.get(cursor);
+
     if (next === void 0) {
       chain.push(graph.seeds.get(cursor)!);
       break;
@@ -740,6 +764,7 @@ export function chainsToSeeds({
   const via = floodViaFromSeeds(graph, parents);
 
   const chains = new Map<string, string[]>();
+
   for (const root of roots) {
     const chain = chainFromRoot(root, via, graph);
     if (chain) chains.set(root, chain);

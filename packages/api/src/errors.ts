@@ -38,6 +38,7 @@ export class ProjectInputMismatchError extends HandledError {
       "The requested project is not the project authorized for this request",
       { httpStatus: 403 },
     );
+
     this.name = "ProjectInputMismatchError";
   }
 }
@@ -58,6 +59,7 @@ export class ScopeInputMismatchError extends HandledError {
       "The requested scope is not the scope authorized for this request",
       { httpStatus: 403, meta: { field: scope } },
     );
+
     this.name = "ScopeInputMismatchError";
   }
 }
@@ -67,6 +69,7 @@ export class AuthenticatedActorRequiredError extends HandledError {
     super("authenticated_actor_required", "This operation requires a credential bound to a user", {
       httpStatus: 403,
     });
+
     this.name = "AuthenticatedActorRequiredError";
   }
 }
@@ -76,6 +79,7 @@ export class ApiVersionConflictError extends HandledError {
     super("api_version_conflict", "The API version in the URL and header must match", {
       httpStatus: 400,
     });
+
     this.name = "ApiVersionConflictError";
   }
 }
@@ -92,6 +96,7 @@ export class ApiVersionUnavailableError extends HandledError {
     super("api_version_unavailable", "The requested API version is not available", {
       httpStatus: 404,
     });
+
     this.name = "ApiVersionUnavailableError";
   }
 }
@@ -113,6 +118,7 @@ export class PayloadTooLargeError extends HandledError {
     super("payload_too_large", "The request body is larger than this endpoint accepts", {
       httpStatus: 413,
     });
+
     this.name = "PayloadTooLargeError";
   }
 }
@@ -138,6 +144,7 @@ export class EnterprisePlanRequiredError extends HandledError {
       fault: "customer",
       ...remediation("enterprise_plan_required"),
     });
+
     this.name = "EnterprisePlanRequiredError";
   }
 }
@@ -215,6 +222,7 @@ function finalizeErrorResponse({
   // value — see ErrorResponseBody.type.
   body.kind = body.code;
   body.type = body.code;
+
   return { status, body };
 }
 
@@ -223,23 +231,29 @@ function handledErrorToResponse({ err }: { err: HandledError }): {
   body: ErrorResponseBody;
 } {
   let serialized: ReturnType<typeof HandledError.serializeTrusted>;
+
   try {
     const candidate = HandledError.serializeTrusted(err);
     const json = JSON.stringify(candidate);
+
     if (json === void 0) {
       return internalErrorResponse();
     }
+
     const wire: unknown = JSON.parse(json);
     const parsed = serializedHandledErrorSchema.safeParse(wire);
+
     if (!parsed.success) {
       return internalErrorResponse();
     }
+
     serialized = parsed.data;
   } catch {
     return internalErrorResponse();
   }
 
   const status = serialized.httpStatus;
+
   if (!validHttpStatus(status)) {
     return internalErrorResponse();
   }
@@ -293,8 +307,10 @@ function formatError({ err }: { err: unknown }): {
   // 3. Error with `status` property (e.g. Hono HTTPException). Its message is
   // untrusted: an adapter may put a downstream response body in it.
   const errObj = err as Record<string, unknown>;
+
   if (err instanceof Error && typeof errObj.status === "number") {
     const status = validHttpStatus(errObj.status) ? errObj.status : 500;
+
     return finalizeErrorResponse({
       status,
       body: {
@@ -314,6 +330,7 @@ function internalErrorResponse(): {
   body: ErrorResponseBody;
 } {
   const status: ContentfulStatusCode = 500;
+
   return finalizeErrorResponse({
     status,
     body: {
@@ -391,6 +408,7 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
         ? { traceId: effective.traceId }
         : {}),
     };
+
     c.set(RESOLVED_ERROR, resolved);
 
     return c.json(body, status);

@@ -159,6 +159,7 @@ function sourceFiles(root: string): string[] {
       !file.includes(`${sep}__tests__${sep}`) &&
       !file.includes(`${sep}__mocks__${sep}`),
   );
+
   scans.set(root, found);
 
   return found;
@@ -169,6 +170,7 @@ function resolveUiSourceImport(sourceImport: SourceImport, sourceRoot: string): 
     file: sourceImport.file,
     specifier: sourceImport.specifier,
   });
+
   if (relativeTarget) return relativeTarget;
 
   if (!/^(?:~|@)\//.test(sourceImport.specifier)) return void 0;
@@ -186,6 +188,7 @@ function readUiFeatureCatalogue(root: string): {
   if (!existsSync(path)) return { catalogue: void 0, violations: [] };
 
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
@@ -202,6 +205,7 @@ function readUiFeatureCatalogue(root: string): {
   }
 
   const result = uiFeatureCatalogueSchema.safeParse(parsed);
+
   if (!result.success) {
     return {
       catalogue: void 0,
@@ -219,6 +223,7 @@ function readUiFeatureCatalogue(root: string): {
   const roots = new Set<string>();
   const violations: ArchitectureViolation[] = [];
   const governedWebPackages = new Set<string>();
+
   for (const packageName of result.data.governedWebPackages) {
     if (governedWebPackages.has(packageName)) {
       violations.push({
@@ -261,6 +266,7 @@ function exportTarget(value: unknown): string | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
 
   const record = value as Record<string, unknown>;
+
   for (const key of ["default", "import", "types", "node"]) {
     const target = exportTarget(record[key]);
     if (target) return target;
@@ -297,10 +303,12 @@ function capabilityForSpecifier(
       (candidate) => specifier === candidate.name || specifier.startsWith(`${candidate.name}/`),
     )
     .sort((left, right) => right.name.length - left.name.length)[0];
+
   if (!pkg || specifier === pkg.name) return void 0;
 
   const exportPath = `./${specifier.slice(pkg.name.length + 1)}`;
   const match = exportPath.match(/^\.\/(screens|surfaces)\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/);
+
   if (match) {
     return {
       packageName: pkg.name,
@@ -317,6 +325,7 @@ function capabilityForSpecifier(
   const screenOwners = catalogue.features.filter((feature) =>
     feature.uses.screens.includes(specifier),
   );
+
   const surfaceConsumers = catalogue.features.filter((feature) =>
     feature.uses.surfaces.includes(specifier),
   );
@@ -376,6 +385,7 @@ function uiFeatureModuleForFile(uiFeaturesRoot: string, file: string): UiFeature
   const featureRoot = join(uiFeaturesRoot, feature);
   const segments = relative(featureRoot, file).split(sep);
   const [first, second] = segments;
+
   if (segments.length === 1 && first === "index.ts") {
     return { kind: "entry", feature };
   }
@@ -428,7 +438,7 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   if (
     /^@langwatch\/(?:[^/]+-server|platform-api|server|worker)(?:\/|$)/.test(specifier) ||
     /^@langwatch\/prisma-client(?:\/|$)/.test(specifier) ||
-    /^@prisma\//.test(specifier)
+    specifier.startsWith("@prisma/")
   ) {
     return "server, API, worker, or Prisma implementation";
   }
@@ -471,12 +481,15 @@ function withoutComments(source: string): string {
     true,
     ts.ScriptKind.TSX,
   );
+
   const characters = source.split("");
+
   const blank = (range: ts.CommentRange): void => {
     for (let index = range.pos; index < range.end; index += 1) {
       if (characters[index] !== "\n") characters[index] = " ";
     }
   };
+
   // Tokens rather than nodes: `forEachChild` skips punctuation, and a JSX
   // comment lives in the trivia before the closing brace of `{/* ... */}`.
   const visit = (node: ts.Node): void => {
@@ -593,13 +606,16 @@ function createPortableModuleOracle({ root }: { root: string }): PortableModuleO
     if (known !== void 0) return known;
 
     const workspace = (resolver ??= createWorkspaceModuleResolver({ root }));
+
     const packageName = specifier
       .split("/")
       .slice(0, specifier.startsWith("@") ? 2 : 1)
       .join("/");
+
     const entry = workspace.packages.has(packageName)
       ? workspace.resolve({ specifier, file: join(root, "package.json") })
       : void 0;
+
     const portable =
       entry !== void 0 &&
       walkValueImportGraph({
@@ -653,6 +669,7 @@ function collaboratingSurfaceImport({
   const nestedSurface = specifier.match(
     /^(@langwatch\/[a-z0-9-]+-web)\/surfaces\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/,
   );
+
   if (nestedSurface) {
     if (nestedSurface[1] === ownPackageName) return false;
 
@@ -662,6 +679,7 @@ function collaboratingSurfaceImport({
   }
 
   const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
+
   if (!capability || capability.kind !== "surface" || capability.packageName === ownPackageName) {
     return false;
   }
@@ -742,8 +760,10 @@ function lintUiRootDirectories(root: string): ArchitectureViolation[] {
 
   return sourceFiles(sourceRoot).flatMap((file) => {
     const segments = relative(sourceRoot, file).split(sep);
+
     const isPackageEntry =
       segments.length === 1 && (segments[0] === "index.ts" || segments[0] === "ui.entrypoint.tsx");
+
     if (isPackageEntry || (segments.length > 1 && UI_SOURCE_DIRECTORIES.has(segments[0]!))) {
       return [];
     }
@@ -785,8 +805,10 @@ function lintUiFeatureRoots(root: string, catalogue: UiFeatureCatalogue): Archit
   const featuresRoot = join(root, "apps", "ui", "src", "features");
   const declaredRoots = new Set(catalogue.features.map((feature) => feature.root));
   const violations: ArchitectureViolation[] = [];
+
   for (const feature of catalogue.features) {
     const path = join(featuresRoot, feature.root);
+
     if (!existsSync(path)) {
       violations.push({
         policy: "ui-feature-catalogue",
@@ -798,6 +820,7 @@ function lintUiFeatureRoots(root: string, catalogue: UiFeatureCatalogue): Archit
 
   for (const file of sourceFiles(featuresRoot)) {
     const owner = featureForFile(featuresRoot, file);
+
     if (owner && !declaredRoots.has(owner)) {
       violations.push({
         policy: "ui-feature-catalogue",
@@ -820,6 +843,7 @@ function lintUiFeatureStructure(root: string): ArchitectureViolation[] {
     if (!feature) continue;
 
     const module = uiFeatureModuleForFile(featuresRoot, file);
+
     if (!module) {
       violations.push({
         policy: "ui-feature-layout",
@@ -827,6 +851,7 @@ function lintUiFeatureStructure(root: string): ArchitectureViolation[] {
         message:
           "Private apps/ui feature code must live in model, behavior, or ui/{elements,blocks,sections}; only features/<feature>/index.ts may live at the feature root.",
       });
+
       continue;
     }
 
@@ -866,6 +891,7 @@ function lintDeclaredCapabilities(
   const violations: ArchitectureViolation[] = [];
   const cataloguePath = join(root, UI_FEATURE_CATALOGUE_PATH);
   const governedWebPackages = new Set(catalogue.governedWebPackages);
+
   for (const feature of catalogue.features) {
     for (const [kind, specifiers] of [
       ["screen", feature.uses.screens],
@@ -874,6 +900,7 @@ function lintDeclaredCapabilities(
       for (const specifier of specifiers) {
         const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
         const pkg = webPackageForSpecifier(webPackages, specifier);
+
         if (!capability || !pkg || !packageExports(pkg).has(capability.exportPath)) {
           violations.push({
             policy: "ui-web-capability-declaration",
@@ -881,6 +908,7 @@ function lintDeclaredCapabilities(
             specifier,
             message: `Declared ${kind} capability must name one exact exported screens/* or surfaces/* entry.`,
           });
+
           continue;
         }
 
@@ -945,8 +973,10 @@ function lintWebPublicExports(
   catalogue: UiFeatureCatalogue,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   for (const pkg of webPackages) {
     const exports = packageExports(pkg);
+
     for (const [exportPath, target] of exports) {
       if (isTestOnlyExportTarget(target)) continue;
 
@@ -955,6 +985,7 @@ function lintWebPublicExports(
         `${pkg.name}/${exportPath.slice(2)}`,
         catalogue,
       );
+
       if (!capability) {
         violations.push({
           policy: "ui-web-public-entry",
@@ -1039,6 +1070,7 @@ function lintUiSourceBoundaries(
     }
 
     const code = withoutComments(source);
+
     if (/\bAppRouter\b/.test(code)) {
       violations.push({
         policy: "ui-backend-access",
@@ -1067,6 +1099,7 @@ function lintUiSourceBoundaries(
           message:
             "Browser UI module imports and requires must use a statically analyzable literal.",
         });
+
         continue;
       }
 
@@ -1075,6 +1108,7 @@ function lintUiSourceBoundaries(
         (isLegacyApplicationRelativeImport(root, file, sourceImport.specifier)
           ? "legacy platform/app implementation"
           : void 0);
+
       if (forbidden) {
         violations.push({
           policy: "ui-backend-access",
@@ -1089,6 +1123,7 @@ function lintUiSourceBoundaries(
         importerFeature && !forbidden
           ? forbiddenFrontendFeatureImport({ specifier: sourceImport.specifier, portable })
           : void 0;
+
       if (forbiddenFeatureImport) {
         violations.push({
           policy: "ui-browser-capability",
@@ -1101,6 +1136,7 @@ function lintUiSourceBoundaries(
       }
 
       const target = resolveUiSourceImport(sourceImport, sourceRoot);
+
       if (target && !isWithin(sourceRoot, target)) {
         violations.push({
           policy: "ui-dependency-direction",
@@ -1118,12 +1154,16 @@ function lintUiSourceBoundaries(
         const [targetArea = ""] = relative(sourceRoot, target).split(sep);
         const importerGlobalLayer = uiGlobalLayerForFile(sourceRoot, file);
         const targetGlobalLayer = uiGlobalLayerForFile(sourceRoot, target);
+
         const globalLayerImportsPrivateFeature =
           UI_GLOBAL_DIRECTORIES.has(importerArea) && targetArea === "features";
+
         const globalLayerImportsCompositionBoundary =
           UI_GLOBAL_DIRECTORIES.has(importerArea) && UI_COMPOSITION_DIRECTORIES.has(targetArea);
+
         const privateFeatureImportsCompositionBoundary =
           importerArea === "features" && UI_COMPOSITION_DIRECTORIES.has(targetArea);
+
         if (globalLayerImportsPrivateFeature || globalLayerImportsCompositionBoundary) {
           violations.push({
             policy: "ui-dependency-direction",
@@ -1186,10 +1226,12 @@ function lintUiSourceBoundaries(
           message: `Frontend UI may not consume ungoverned web package ${JSON.stringify(webPackage.name)}.`,
           allowed: "Govern the package and pass its public export and closure checks first.",
         });
+
         continue;
       }
 
       const capability = capabilityForSpecifier(webPackages, sourceImport.specifier, catalogue);
+
       if (!capability) {
         violations.push({
           policy: "ui-web-public-entry",
@@ -1198,10 +1240,12 @@ function lintUiSourceBoundaries(
           specifier: sourceImport.specifier,
           message: `Feature web package ${webPackage.name} may only be imported through a declared flat entry or explicit screens/* or surfaces/* entry.`,
         });
+
         continue;
       }
 
       const exports = packageExports(webPackage);
+
       if (!exports.has(capability.exportPath)) {
         violations.push({
           policy: "ui-web-public-entry",
@@ -1220,10 +1264,12 @@ function lintUiSourceBoundaries(
           specifier: sourceImport.specifier,
           message: "Only a named frontend feature may import a feature-web screen or surface.",
         });
+
         continue;
       }
 
       const declared = declaredUses(importerFeature);
+
       if (!declared.has(sourceImport.specifier)) {
         violations.push({
           policy: "ui-web-capability-declaration",
@@ -1290,6 +1336,7 @@ function lintUiSourceBoundaries(
       }
     }
   };
+
   for (const feature of featureEdges.keys()) visit(feature, feature, new Set([feature]));
 
   return violations;
@@ -1329,6 +1376,7 @@ function screenClosureStep({
 }): { violations: ArchitectureViolation[]; next: string[] } {
   const violations: ArchitectureViolation[] = [];
   const next: string[] = [];
+
   for (const browserCapability of browserCapabilitySourceViolations(
     sourceText({ file: current }),
   )) {
@@ -1350,6 +1398,7 @@ function screenClosureStep({
         specifier: sourceImport.specifier,
         message: "An owner-only screen may not load a non-literal module specifier.",
       });
+
       continue;
     }
 
@@ -1363,6 +1412,7 @@ function screenClosureStep({
       (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
         ? "legacy platform/app implementation"
         : void 0);
+
     if (forbiddenImport) {
       violations.push({
         policy: "ui-screen-closure",
@@ -1377,6 +1427,7 @@ function screenClosureStep({
       file: sourceImport.file,
       specifier: sourceImport.specifier,
     });
+
     if (!targetFile) continue;
 
     if (!isWithin(sourceRoot, targetFile)) {
@@ -1388,6 +1439,7 @@ function screenClosureStep({
         message: "An owner-only screen may not reach source outside its web package.",
         allowed: "Import portable contracts through their public workspace package.",
       });
+
       continue;
     }
 
@@ -1404,8 +1456,10 @@ function lintWebScreenClosures(
   portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   for (const pkg of webPackages) {
     const sourceRoot = join(pkg.root, "src");
+
     for (const [exportPath, target] of packageExports(pkg)) {
       if (isTestOnlyExportTarget(target)) continue;
 
@@ -1414,9 +1468,11 @@ function lintWebScreenClosures(
         `${pkg.name}/${exportPath.slice(2)}`,
         catalogue,
       );
+
       if (!capability || capability.kind !== "screen") continue;
 
       const entry = resolve(pkg.root, target);
+
       if (!isWithin(sourceRoot, entry) || !existsSync(entry)) {
         violations.push({
           policy: "ui-screen-closure",
@@ -1424,16 +1480,19 @@ function lintWebScreenClosures(
           specifier: exportPath,
           message: "A screen export must resolve to a local source module.",
         });
+
         continue;
       }
 
       const pending = [entry];
       const visited = new Set<string>();
+
       while (pending.length > 0) {
         const current = pending.pop()!;
         if (visited.has(current)) continue;
 
         visited.add(current);
+
         const step = screenClosureStep({
           root,
           sourceRoot,
@@ -1444,6 +1503,7 @@ function lintWebScreenClosures(
           ownPackageName: pkg.name,
           catalogue,
         });
+
         violations.push(...step.violations);
         pending.push(...step.next);
       }
@@ -1481,6 +1541,7 @@ function surfaceClosureStep({
 }): { violations: ArchitectureViolation[]; next: { file: string; chain: string[] }[] } {
   const violations: ArchitectureViolation[] = [];
   const next: { file: string; chain: string[] }[] = [];
+
   for (const used of browserCapabilitySourceViolations(sourceText({ file: current }))) {
     violations.push({
       policy: "ui-surface-closure",
@@ -1493,13 +1554,16 @@ function surfaceClosureStep({
 
   const forbidden = forbiddenSurfaceDirectory(sourceRoot, current);
   const surfaceId = surfaceIdForPath(sourceRoot, current);
+
   const escapedSurface = !implementationRoots.some((implementation) =>
     isWithin(implementation, current),
   );
+
   if (forbidden || escapedSurface || (surfaceId !== void 0 && surfaceId !== capability.id)) {
     const dependencyPath = chain
       .map((path) => relative(sourceRoot, path).split(sep).join("/"))
       .join(" -> ");
+
     violations.push({
       policy: "ui-surface-closure",
       file: current,
@@ -1525,6 +1589,7 @@ function surfaceClosureStep({
         specifier: sourceImport.specifier,
         message: "A shareable surface may not load a non-literal module specifier.",
       });
+
       continue;
     }
 
@@ -1538,6 +1603,7 @@ function surfaceClosureStep({
       (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
         ? "legacy platform/app implementation"
         : void 0);
+
     if (forbiddenImport) {
       violations.push({
         policy: "ui-surface-closure",
@@ -1552,6 +1618,7 @@ function surfaceClosureStep({
       file: sourceImport.file,
       specifier: sourceImport.specifier,
     });
+
     if (!targetFile) continue;
 
     if (!isWithin(sourceRoot, targetFile)) {
@@ -1563,6 +1630,7 @@ function surfaceClosureStep({
         message: "A shareable surface may not reach source outside its web package.",
         allowed: "Import portable contracts through their public workspace package.",
       });
+
       continue;
     }
 
@@ -1579,9 +1647,11 @@ function lintWebSurfaceClosures(
   portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   for (const pkg of webPackages) {
     const exports = packageExports(pkg);
     const sourceRoot = join(pkg.root, "src");
+
     for (const [exportPath, target] of exports) {
       if (isTestOnlyExportTarget(target)) continue;
 
@@ -1590,9 +1660,11 @@ function lintWebSurfaceClosures(
         `${pkg.name}/${exportPath.slice(2)}`,
         catalogue,
       );
+
       if (!capability || capability.kind !== "surface") continue;
 
       const entry = resolve(pkg.root, target);
+
       if (!isWithin(sourceRoot, entry) || !existsSync(entry)) {
         violations.push({
           policy: "ui-surface-closure",
@@ -1600,10 +1672,12 @@ function lintWebSurfaceClosures(
           specifier: exportPath,
           message: "A surface export must resolve to a local source module.",
         });
+
         continue;
       }
 
       const surfaceRoot = join(sourceRoot, "surfaces", capability.id);
+
       // A surface is the public door onto the package's own implementation, not a
       // second copy of it. The door may reach the package's shared model, behavior
       // and ui layers as well as its own directory; the forbidden directories, the
@@ -1614,14 +1688,17 @@ function lintWebSurfaceClosures(
         join(sourceRoot, "behavior"),
         join(sourceRoot, "ui"),
       ];
+
       const pending = [{ file: entry, chain: [entry] }];
       const visited = new Set<string>();
+
       while (pending.length > 0) {
         const currentNode = pending.pop()!;
         const { file: current, chain } = currentNode;
         if (visited.has(current)) continue;
 
         visited.add(current);
+
         const step = surfaceClosureStep({
           root,
           sourceRoot,
@@ -1635,6 +1712,7 @@ function lintWebSurfaceClosures(
           ownPackageName: pkg.name,
           catalogue,
         });
+
         violations.push(...step.violations);
         pending.push(...step.next);
       }
@@ -1664,6 +1742,7 @@ function webPrivateModuleForFile(
 ): WebPrivateModule | undefined {
   const segments = relative(sourceRoot, file).split(sep);
   const [first, second, third, fourth] = segments;
+
   if (segments.length === 1 && (isWebRootException(file) || flatPublicEntries.has(file))) {
     return { kind: "package-entry" };
   }
@@ -1727,12 +1806,14 @@ function readWebFeatureDeclarations(sourceRoot: string): {
 
     const featureRoot = join(featuresRoot, entry.name);
     const declarationPath = join(featureRoot, "feature.json");
+
     if (!WEB_FEATURE_NAME.test(entry.name)) {
       violations.push({
         policy: "ui-web-feature-layout",
         file: featureRoot,
         message: `Web feature directories must use lower-kebab-case names; ${JSON.stringify(entry.name)} does not.`,
       });
+
       continue;
     }
 
@@ -1744,10 +1825,12 @@ function readWebFeatureDeclarations(sourceRoot: string): {
         allowed:
           "Add { version: 0, dependencies: [] } before importing another private web feature.",
       });
+
       continue;
     }
 
     let parsed: unknown;
+
     try {
       parsed = JSON.parse(readFileSync(declarationPath, "utf8"));
     } catch (error) {
@@ -1756,16 +1839,19 @@ function readWebFeatureDeclarations(sourceRoot: string): {
         file: declarationPath,
         message: `Web feature declaration must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       });
+
       continue;
     }
 
     const result = webFeatureDeclarationSchema.safeParse(parsed);
+
     if (!result.success) {
       violations.push({
         policy: "ui-web-feature-declaration",
         file: declarationPath,
         message: `Web feature declaration must match version 0: ${result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
       });
+
       continue;
     }
 
@@ -1809,6 +1895,7 @@ function canPrivateLayerDependOn(
 ): boolean {
   const sourceLayer = source.layer === "ui" ? source.uiLayer : source.layer;
   const targetLayer = target.layer === "ui" ? target.uiLayer : target.layer;
+
   const allowed: Record<string, readonly string[]> = {
     model: ["model"],
     behavior: ["model", "behavior"],
@@ -1843,6 +1930,7 @@ function webPrivateImportViolations({
   featureEdges: Map<string, Set<string>>;
 }): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   if (
     (module.kind === "global" || module.kind === "feature" || module.kind === "feature-entry") &&
     (target.kind === "screen" || target.kind === "surface")
@@ -1878,6 +1966,7 @@ function webPrivateImportViolations({
   if (module.kind === "screen" && target.kind === "screen") {
     const sourceScreen = relative(sourceRoot, file).split(sep)[1];
     const targetScreen = relative(sourceRoot, targetFile).split(sep)[1];
+
     if (sourceScreen !== targetScreen) {
       violations.push({
         policy: "ui-web-screen-leakage",
@@ -1939,6 +2028,7 @@ function webPrivateImportViolations({
     }
 
     const declaration = declarations.get(module.feature);
+
     if (!declaration?.dependencies.includes(target.feature)) {
       violations.push({
         policy: "ui-web-feature-dependency-declaration",
@@ -1966,6 +2056,7 @@ function webPrivateImportViolations({
       message: `Web feature ${JSON.stringify(module.feature)} may only import the public entry of ${JSON.stringify(target.feature)}.`,
       allowed: `Import features/${target.feature}/index.ts and declare the dependency.`,
     });
+
     const edges = featureEdges.get(module.feature) ?? new Set<string>();
     edges.add(target.feature);
     featureEdges.set(module.feature, edges);
@@ -2003,6 +2094,7 @@ function lintWebPrivateStructure(
   catalogue: UiFeatureCatalogue,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   for (const pkg of webPackages) {
     const sourceRoot = join(pkg.root, "src");
     if (!existsSync(sourceRoot)) continue;
@@ -2021,8 +2113,10 @@ function lintWebPrivateStructure(
 
     const { declarations, violations: declarationViolations } =
       readWebFeatureDeclarations(sourceRoot);
+
     violations.push(...declarationViolations);
     const featureEdges = new Map<string, Set<string>>();
+
     for (const [feature, declaration] of declarations) {
       featureEdges.set(
         feature,
@@ -2033,6 +2127,7 @@ function lintWebPrivateStructure(
     for (const file of sourceFiles(sourceRoot)) {
       const segments = relative(sourceRoot, file).split(sep);
       const module = webPrivateModuleForFile(sourceRoot, file, flatPublicEntries);
+
       if (segments.length === 1 && !isWebRootException(file) && !flatPublicEntries.has(file)) {
         violations.push({
           policy: "ui-web-root-flat",
@@ -2059,6 +2154,7 @@ function lintWebPrivateStructure(
           message:
             "Private feature-web code must live in model, behavior, ui/{elements,blocks,sections}, or features/<feature>/{model,behavior,ui}.",
         });
+
         continue;
       }
 
@@ -2071,6 +2167,7 @@ function lintWebPrivateStructure(
         if (!targetFile || !isWithin(sourceRoot, targetFile)) continue;
 
         const target = webPrivateModuleForFile(sourceRoot, targetFile, flatPublicEntries);
+
         if (!target) {
           violations.push({
             policy: "ui-web-private-layout",
@@ -2080,6 +2177,7 @@ function lintWebPrivateStructure(
             message:
               "Feature-web code may not import a local module outside the governed private layout.",
           });
+
           continue;
         }
 
@@ -2103,6 +2201,7 @@ function lintWebPrivateStructure(
     const lowLinks = new Map<string, number>();
     const stack: string[] = [];
     const onStack = new Set<string>();
+
     const visit = (feature: string): void => {
       indices.set(feature, nextIndex);
       lowLinks.set(feature, nextIndex);
@@ -2123,6 +2222,7 @@ function lintWebPrivateStructure(
 
       const component: string[] = [];
       let member: string | undefined;
+
       do {
         member = stack.pop();
         if (member === void 0) break;
@@ -2134,6 +2234,7 @@ function lintWebPrivateStructure(
       if (component.length < 2) return;
 
       const cycle = component.sort();
+
       violations.push({
         policy: "ui-web-feature-cycle",
         file: join(sourceRoot, "features", cycle[0]!, "feature.json"),
@@ -2141,6 +2242,7 @@ function lintWebPrivateStructure(
         allowed: "Invert the dependency or extract a real package-global collaborator.",
       });
     };
+
     for (const feature of [...featureEdges.keys()].sort()) {
       if (!indices.has(feature)) visit(feature);
     }
@@ -2158,6 +2260,7 @@ export function lintFrontendUiBoundaries(snapshot: WorkspaceSnapshot): Architect
   const webPackages = packages.filter(
     (pkg): pkg is WebPackage => pkg.kind === "web" && pkg.feature !== void 0,
   );
+
   const selectedPackageNames = new Set(catalogue.governedWebPackages);
   const selectedWebPackages = webPackages.filter((pkg) => selectedPackageNames.has(pkg.name));
   const portable = createPortableModuleOracle({ root });
@@ -2191,6 +2294,7 @@ export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): Readonl
   const webPackages = packages.filter(
     (pkg): pkg is WebPackage => pkg.kind === "web" && pkg.feature !== void 0,
   );
+
   const governed = new Set(catalogue.governedWebPackages);
   const allowed = new Set<string>();
 
@@ -2198,11 +2302,13 @@ export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): Readonl
     const source = webPackages.find(
       (pkg) => pkg.feature === feature.root && governed.has(pkg.name),
     );
+
     if (!source) continue;
 
     for (const specifier of feature.uses.surfaces) {
       const target = webPackageForSpecifier(webPackages, specifier);
       const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
+
       if (
         !target ||
         !governed.has(target.name) ||

@@ -27,6 +27,7 @@ export function prismaModelNames(root: string): Map<string, string> {
   if (!existsSync(schemaFile)) return models;
 
   const schema = readFileSync(schemaFile, "utf8");
+
   for (const match of schema.matchAll(/^model\s+(\w+)\s*\{([\s\S]*?)^\}/gm)) {
     const name = match[1];
     if (name) models.set(name, /@@map\(\s*"([^"]+)"\s*\)/.exec(match[2] ?? "")?.[1] ?? name);
@@ -79,6 +80,7 @@ function importedBindings(source: ts.SourceFile): Bindings {
   const namespaces = new Set<string>();
   const repositoryBases = new Set<string>();
   const repositoryNamespaces = new Set<string>();
+
   for (const statement of source.statements.filter(ts.isImportDeclaration)) {
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
@@ -131,11 +133,13 @@ function nativeRepositoryCall(node: ts.Node, bindings: Bindings): ts.CallExpress
 
   const factory = node.expression;
   const isNativeFactory = ["for", "transactionalFor"].includes(factory.name.text);
+
   return isNativeFactory && isRepositoryBase(factory.expression, bindings) ? node : void 0;
 }
 
 function isNativeClaimHeritage(call: ts.CallExpression, file: string): boolean {
   const heritage = call.parent;
+
   return (
     ts.isExpressionWithTypeArguments(heritage) &&
     heritage.expression === call &&
@@ -191,6 +195,7 @@ function claimCalls(source: ts.SourceFile, violations: ArchitectureViolation[]):
   const calls: ClaimCall[] = [];
   const bindings = importedBindings(source);
   violations.push(...lintFactoryExports(source));
+
   const visit = (node: ts.Node): void => {
     if (rejectsNamespaceForward(node, bindings)) {
       violations.push(
@@ -204,6 +209,7 @@ function claimCalls(source: ts.SourceFile, violations: ArchitectureViolation[]):
     if (isFactoryReference(node, bindings)) {
       const parent = node.parent;
       const directCall = ts.isCallExpression(parent) && parent.expression === node;
+
       if (directCall) {
         calls.push({ call: parent, source: "tables" });
       } else {
@@ -218,6 +224,7 @@ function claimCalls(source: ts.SourceFile, violations: ArchitectureViolation[]):
 
     ts.forEachChild(node, visit);
   };
+
   visit(source);
 
   return calls;
@@ -229,11 +236,14 @@ function nativeRepositoryClaims(
 ): ClaimCall[] {
   const calls: ClaimCall[] = [];
   const bindings = importedBindings(source);
+
   const visit = (node: ts.Node): void => {
     const call = nativeRepositoryCall(node, bindings);
+
     if (call) {
       if (!isNativeClaimHeritage(call, source.fileName)) {
         const line = source.getLineAndCharacterOfPosition(call.getStart(source)).line + 1;
+
         violations.push(
           issue(
             source.fileName,
@@ -242,11 +252,13 @@ function nativeRepositoryClaims(
           ),
         );
       }
+
       calls.push({ call, source: "repository" });
     }
 
     if (ts.isExpressionWithTypeArguments(node) && isRepositoryBase(node.expression, bindings)) {
       const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+
       violations.push(
         issue(
           source.fileName,
@@ -258,6 +270,7 @@ function nativeRepositoryClaims(
 
     ts.forEachChild(node, visit);
   };
+
   visit(source);
 
   return calls;
@@ -272,8 +285,10 @@ function readClaim(
   const { call } = claim;
   const file = source.fileName;
   const line = source.getLineAndCharacterOfPosition(call.getStart(source)).line + 1;
+
   const validLocation =
     claim.source === "tables" ? isClaimProperty(call, file) : isNativeClaimHeritage(call, file);
+
   if (!validLocation) {
     violations.push(
       issue(file, "Prisma table claims belong to a static readonly repository declaration.", line),
@@ -281,6 +296,7 @@ function readClaim(
   }
 
   const computed = call.arguments.some((argument) => !ts.isStringLiteral(argument));
+
   if (call.arguments.length === 0 || computed) {
     violations.push(
       issue(
@@ -327,14 +343,17 @@ function checkOwners(
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const owners = new Map<string, Claim>();
+
   for (const claim of claims) {
     const table = models.get(claim.model);
+
     if (!table) {
       violations.push(issue(claim.file, `Unknown Prisma model ${claim.model}.`, claim.line));
       continue;
     }
 
     const previous = owners.get(table);
+
     if (previous && previous.feature !== claim.feature) {
       violations.push(
         issue(

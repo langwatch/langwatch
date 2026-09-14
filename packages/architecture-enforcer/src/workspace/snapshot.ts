@@ -46,6 +46,7 @@ function readFeatureConfiguration(
   layoutVersion: FeatureLayoutVersion | undefined;
 } {
   const path = join(featureRoot, "feature.json");
+
   if (!existsSync(path)) {
     violations.push({
       policy: "feature-source-layout",
@@ -58,6 +59,7 @@ function readFeatureConfiguration(
   }
 
   let value: unknown;
+
   try {
     value = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
@@ -74,6 +76,7 @@ function readFeatureConfiguration(
     typeof value === "object" && value !== null && "layoutVersion" in value
       ? (value as { layoutVersion?: unknown }).layoutVersion
       : void 0;
+
   if (layoutVersion !== 0) {
     violations.push({
       policy: "feature-source-layout",
@@ -86,6 +89,7 @@ function readFeatureConfiguration(
   }
 
   const keys = Object.keys(value as Record<string, unknown>);
+
   if (keys.length !== 1 || keys[0] !== "layoutVersion") {
     violations.push({
       policy: "feature-source-subject",
@@ -123,6 +127,7 @@ export function discoverClassifiedPackages(root: string): {
       const featureRoot = join(featuresRoot, feature);
       const { layoutVersion } = readFeatureConfiguration(featureRoot, violations);
       const catalogueEntry = catalogueByRoot.get(featureRoot);
+
       if (!catalogueEntry) {
         violations.push({
           policy: "feature-catalogue",
@@ -140,6 +145,7 @@ export function discoverClassifiedPackages(root: string): {
       }
 
       const featureManifest = join(featureRoot, "package.json");
+
       if (existsSync(featureManifest)) {
         violations.push({
           policy: "feature-layout",
@@ -160,14 +166,17 @@ export function discoverClassifiedPackages(root: string): {
             message: `Unknown feature package role "${roleName}".`,
             allowed: "Use contract, server, or web; documentation belongs at the feature root.",
           });
+
           continue;
         }
 
         const role = roleName as FeaturePackageRole;
         const manifest = readManifest(manifestPath);
+
         const expectedName = enterprise
           ? `@langwatch/enterprise-${feature}-${role}`
           : `@langwatch/${feature}-${role}`;
+
         if (manifest.name !== expectedName) {
           violations.push({
             policy: "feature-layout",
@@ -196,6 +205,7 @@ export function discoverClassifiedPackages(root: string): {
   discoverFeatures(join(root, "enterprise", "modules"), true);
 
   const sharedApplicationRoot = join(root, "apps", "shared");
+
   if (existsSync(sharedApplicationRoot)) {
     violations.push({
       policy: "application-layout",
@@ -207,6 +217,7 @@ export function discoverClassifiedPackages(root: string): {
   }
 
   const applicationsRoot = join(root, "apps");
+
   for (const directory of directories(applicationsRoot)) {
     if (APPLICATION_PACKAGES.some(({ path }) => path === directory)) continue;
 
@@ -227,6 +238,7 @@ export function discoverClassifiedPackages(root: string): {
     if (!existsSync(manifestPath)) continue;
 
     const manifest = readManifest(manifestPath);
+
     if (manifest.name !== application.name) {
       violations.push({
         policy: "application-layout",
@@ -248,8 +260,10 @@ export function discoverClassifiedPackages(root: string): {
 
   const devRuntimeRoot = join(root, "tools", "dev-runtime");
   const devRuntimeManifest = join(devRuntimeRoot, "package.json");
+
   if (existsSync(devRuntimeManifest)) {
     const manifest = readManifest(devRuntimeManifest);
+
     if (manifest.private !== true) {
       violations.push({
         policy: "application-layout",
@@ -273,6 +287,7 @@ export function discoverClassifiedPackages(root: string): {
   const enterpriseLicense = join(enterpriseRoot, "LICENSE.md");
   const enterpriseReadme = join(enterpriseRoot, "README.md");
   const enterpriseManifest = join(enterpriseRoot, "package.json");
+
   const hasEnterprisePackages =
     existsSync(enterpriseManifest) ||
     ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) =>
@@ -310,6 +325,7 @@ export function discoverClassifiedPackages(root: string): {
 
   if (existsSync(enterpriseManifest)) {
     const manifest = readManifest(enterpriseManifest);
+
     if (manifest.name !== "@langwatch/enterprise") {
       violations.push({
         policy: "enterprise-layout",
@@ -348,6 +364,7 @@ export function discoverClassifiedPackages(root: string): {
     if (!existsSync(manifestPath)) continue;
 
     const manifest = readManifest(manifestPath);
+
     if (manifest.name !== composition.name) {
       violations.push({
         policy: "enterprise-layout",
@@ -384,6 +401,7 @@ export function discoverClassifiedPackages(root: string): {
     }
 
     const compositionRoot = join(enterpriseRoot, "packages", "composition");
+
     for (const directory of directories(compositionRoot)) {
       if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
         continue;
@@ -432,8 +450,10 @@ export function discoverClassifiedPackages(root: string): {
 
   const designSystemRoot = join(root, "packages", "design-system");
   const designSystemManifest = join(designSystemRoot, "package.json");
+
   if (existsSync(designSystemManifest)) {
     const manifest = readManifest(designSystemManifest);
+
     if (manifest.name !== "@langwatch/design-system") {
       violations.push({
         policy: "feature-layout",
@@ -454,8 +474,10 @@ export function discoverClassifiedPackages(root: string): {
 
   const architectureLintRoot = join(root, "packages", "architecture-enforcer");
   const architectureLintManifest = join(architectureLintRoot, "package.json");
+
   if (existsSync(architectureLintManifest)) {
     const manifest = readManifest(architectureLintManifest);
+
     packages.push({
       name: manifest.name ?? "@langwatch/architecture-enforcer",
       root: architectureLintRoot,
@@ -468,8 +490,10 @@ export function discoverClassifiedPackages(root: string): {
 
   const configRoot = join(root, "packages", "config");
   const configManifest = join(configRoot, "package.json");
+
   if (existsSync(configManifest)) {
     const manifest = readManifest(configManifest);
+
     packages.push({
       name: manifest.name ?? "@langwatch/config",
       root: configRoot,
@@ -481,8 +505,10 @@ export function discoverClassifiedPackages(root: string): {
   }
 
   const names = new Map<string, string>();
+
   for (const pkg of packages) {
     const existing = names.get(pkg.name);
+
     if (existing) {
       violations.push({
         policy: "feature-layout",

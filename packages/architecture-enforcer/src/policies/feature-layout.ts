@@ -58,10 +58,12 @@ const FEATURE_API_VOCABULARY = new Set(["moduleApi", "ModuleApiToken", "ModuleNa
 function compositionBindingsBeyondFeatureApi(statement: ts.ImportDeclaration): string[] {
   const clause = statement.importClause;
   if (!clause) return [];
+
   if (clause.name) return ["a default import"];
 
   const bindings = clause.namedBindings;
   if (!bindings) return [];
+
   if (!ts.isNamedImports(bindings)) return ["a namespace import"];
 
   return bindings.elements
@@ -77,6 +79,7 @@ function lintContract(
     directory: `${pkg.root}/src`,
     accept: (path) => /\.[cm]?[jt]sx?$/.test(path),
   });
+
   const services = files.filter((file) => {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (TEST_DIRECTORY.test(path)) return false;
@@ -85,9 +88,12 @@ function lintContract(
 
     return CONTRACT_ARTIFACT.test(filename) || isFeatureApiContract(path, pkg.feature);
   });
+
   const violations: ArchitectureViolation[] = [];
+
   if (services.length > 0) {
     const api = `${pkg.root}/src/${pkg.feature}.api.ts`;
+
     if (existsSync(api)) {
       for (const statement of sourceFile({ file: api }).statements) {
         if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
@@ -176,6 +182,7 @@ function lintRulesImports(
   resolver: WorkspaceModuleResolver,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   const allowed =
     "A rules/ file may import only node:*, other rules/ modules in the same package, *-contract packages, and framework-free workspace packages.";
 
@@ -188,6 +195,7 @@ function lintRulesImports(
       if (relativeTarget?.startsWith("rules/")) continue;
 
       const kind = relativeTarget ? rulesImplementationKind(relativeTarget) : void 0;
+
       violations.push(
         violation(
           file,
@@ -195,10 +203,12 @@ function lintRulesImports(
           allowed,
         ),
       );
+
       continue;
     }
 
     const named = namedForbiddenSpecifier(specifier);
+
     if (named) {
       violations.push(
         violation(
@@ -207,6 +217,7 @@ function lintRulesImports(
           allowed,
         ),
       );
+
       continue;
     }
 
@@ -228,10 +239,12 @@ function lintRulesImports(
 
 function lintServer(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   const files = snapshot.files({
     directory: `${pkg.root}/src`,
     accept: (path) => /\.[cm]?[jt]sx?$/.test(path),
   });
+
   let serviceCount = 0;
 
   for (const file of files) {
@@ -301,6 +314,7 @@ function manifestTargets(value: unknown): string[] {
 /** Public entrypoints from the exports map and src/index.ts. */
 function packageEntrypoints(pkg: ClassifiedPackage): string[] {
   const targets = new Set<string>(["src/index.ts"]);
+
   for (const target of manifestTargets(pkg.manifest.exports)) {
     const isDeclaration = target.endsWith(".d.ts");
     if (isDeclaration) continue;
@@ -320,8 +334,10 @@ function packageImportsMap(pkg: ClassifiedPackage): Record<string, unknown> | un
   if (packageImportsCache.has(pkg.manifestPath)) return packageImportsCache.get(pkg.manifestPath);
 
   let map: Record<string, unknown> | undefined;
+
   try {
     const raw = JSON.parse(readFileSync(pkg.manifestPath, "utf8")) as { imports?: unknown };
+
     if (raw.imports && typeof raw.imports === "object" && !Array.isArray(raw.imports)) {
       map = raw.imports as Record<string, unknown>;
     }
@@ -364,6 +380,7 @@ function resolveSpecifier(
   pkg: ClassifiedPackage,
 ): string | undefined {
   let base: string | undefined;
+
   if (specifier.startsWith(".")) {
     base = resolve(dirname(fromFile), specifier);
   } else if (specifier.startsWith("#")) {
@@ -479,6 +496,7 @@ function resolveBindingOrigin(
 
     if (clause.name?.text === name) {
       const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+
       if (target && resolveBindingOrigin(target, "default", pkg, visited, allowTestingDoubles))
         return true;
     }
@@ -489,6 +507,7 @@ function resolveBindingOrigin(
 
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         const imported = element.propertyName?.text ?? element.name.text;
+
         if (target && resolveBindingOrigin(target, imported, pkg, visited, allowTestingDoubles))
           return true;
       }
@@ -569,6 +588,7 @@ function statementExposesPrivateValue({
   if (statement.isTypeOnly) return false;
 
   const clause = statement.exportClause;
+
   if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
     const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
     if (!target) return false;
@@ -619,6 +639,7 @@ function lintPrivateServerExportsForEntry(
   const allowTestingDoubles = basename(file) === "testing.ts";
   const sourceFile = parseModule(file);
   const violations: ArchitectureViolation[] = [];
+
   const add = (node: ts.Node, specifier?: string): void => {
     violations.push({
       policy: "private-runtime-export",
@@ -644,6 +665,7 @@ function lintPrivateServerExportsForEntry(
       // specifier when resolution fails, so an unresolvable import naming a
       // private directory is still caught.
       const originPath = target ? workspacePath(`${pkg.root}/src`, target) : specifierText;
+
       if (
         PRIVATE_SERVER_EXPORT.test(originPath) &&
         !(allowTestingDoubles && TESTING_ENTRY_DOUBLE.test(originPath))
@@ -689,6 +711,7 @@ function lintPrivateServerExportsForEntry(
 
 function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   for (const file of packageEntrypoints(pkg)) {
     violations.push(...lintPrivateServerExportsForEntry(pkg, file));
   }

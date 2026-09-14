@@ -37,12 +37,14 @@ function camelCase(featureId: string): string {
 
 function bindingsIn(file: string): string[] {
   const source = readFileSync(file, "utf8");
+
   return [...source.matchAll(ENV_BINDING)].map((match) => match[1] ?? "");
 }
 
 function featureConfigModules(root: string, feature: FeatureCatalogueEntry): string[] {
   const directory = join(root, feature.root, "contract", "src");
   if (!existsSync(directory)) return [];
+
   return readdirSync(directory)
     .filter((name) => CONFIG_MODULE.test(name))
     .map((name) => join(directory, name));
@@ -60,9 +62,11 @@ export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): Architect
 
       const source = readFileSync(file, "utf8");
       const name = camelCase(feature.id);
+
       const declaresSchema =
         source.includes(`export const ${name}ServerConfigSchema`) ||
         source.includes(`export const ${name}WebConfigSchema`);
+
       if (!declaresSchema) {
         violations.push(
           issue(
@@ -75,6 +79,7 @@ export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): Architect
 
       for (const binding of bindingsIn(file)) {
         const owner = owners.get(binding);
+
         if (owner !== undefined && owner !== file) {
           violations.push(
             issue(
@@ -83,8 +88,10 @@ export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): Architect
               "One environment variable has one owning feature. Read the owner's leaf instead of binding it a second time.",
             ),
           );
+
           continue;
         }
+
         owners.set(binding, file);
       }
     }
@@ -98,9 +105,11 @@ export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): Architect
       if (!name.endsWith(".config.ts")) continue;
 
       const file = join(absolute, name);
+
       for (const binding of bindingsIn(file)) {
         const owner = owners.get(binding);
         if (owner === undefined) continue;
+
         violations.push(
           issue(
             file,

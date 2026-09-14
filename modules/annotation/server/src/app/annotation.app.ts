@@ -600,8 +600,10 @@ export class AnnotationApp implements AnnotationApi {
 
     const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
     const annotationMap = new Map<string, typeof annotationsWithUsers>();
+
     for (const annotation of annotationsWithUsers) {
       const existing = annotationMap.get(annotation.traceId);
+
       if (existing) {
         existing.push(annotation);
       } else {

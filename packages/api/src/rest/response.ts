@@ -226,7 +226,9 @@ export function isFrameworkRefusal(
   error: unknown,
 ): error is Error & { status: ContentfulStatusCode; getResponse: () => Response } {
   if (!(error instanceof Error)) return false;
+
   const candidate = error as { status?: unknown; getResponse?: unknown };
+
   return typeof candidate.status === "number" && typeof candidate.getResponse === "function";
 }
 
@@ -586,8 +588,11 @@ export function requestTraceIds(c: Context): {
  */
 function resolveResponseStatus(error: unknown): ContentfulStatusCode {
   if (error instanceof HttpError) return error.status;
+
   if (HandledError.isHandled(error)) return error.httpStatus as ContentfulStatusCode;
+
   if (isFrameworkRefusal(error)) return error.status;
+
   return 500;
 }
 
@@ -609,9 +614,11 @@ export function createFamilyErrorHandler(options: {
 
   return async (error, c) => {
     error = options.mapError?.(error) ?? error;
+
     for (const [name, value] of Object.entries(options.headers?.(error) ?? {})) {
       c.header(name, value);
     }
+
     // Same order as the response dispatch below, so the logged status is
     // always the status the caller received.
     const status = resolveResponseStatus(error);
@@ -619,6 +626,7 @@ export function createFamilyErrorHandler(options: {
     // A refusal the caller can act on is their fact, not our outage: logging
     // a 404 or a 422 at error level buries the real failures under routine ones.
     const log = status >= 500 ? logger.error : logger.warn;
+
     log.call(
       logger,
       {
@@ -644,11 +652,13 @@ export function createFamilyErrorHandler(options: {
     // A framework refusal carries a status the caller can act on, and the
     // boundary renders it.
     const isDomainOrFrameworkHandled = HandledError.isHandled(error) || isFrameworkRefusal(error);
+
     if (isDomainOrFrameworkHandled) {
       return options.boundary(error, c);
     }
 
     const internalError = new InternalServerError();
+
     return c.json(errorSchema.parse(internalError), internalError.status);
   };
 }

@@ -42,6 +42,7 @@ export const DECLARATION_BUDGET_FILE = "packages/architecture-enforcer/src/decla
 /** The committed budgets, read from the file that carries them. */
 export function readDeclarationBudgets(root: string): DeclarationBudgets {
   const path = join(root, DECLARATION_BUDGET_FILE);
+
   return budgetSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
@@ -55,6 +56,7 @@ const FILES_LINE = /^Files:\s+(\d+)\s*$/m;
 export function readFileCount(diagnostics: string): number | undefined {
   const stripped = diagnostics.replace(/\[[0-9;]*m/g, "");
   const match = FILES_LINE.exec(stripped);
+
   return match?.[1] === undefined ? undefined : Number(match[1]);
 }
 

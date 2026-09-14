@@ -33,6 +33,7 @@ function measure(root: string, budget: DeclarationBudget): number | undefined {
       maxBuffer: 64 * 1024 * 1024,
     },
   );
+
   return readFileCount(`${run.stdout ?? ""}\n${run.stderr ?? ""}`);
 }
 
@@ -40,6 +41,7 @@ function describe(verdict: BudgetVerdict): string {
   if (verdict.state === "within") {
     return `  ok   ${verdict.package}: ${verdict.files} files, budget ${verdict.budget}`;
   }
+
   return `  FAIL ${verdict.message}`;
 }
 

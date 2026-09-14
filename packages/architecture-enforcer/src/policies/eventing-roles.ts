@@ -62,6 +62,7 @@ function roleOf(file: string): EventingRole | null {
 
   const isProcessManagerFile =
     PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file);
+
   if (isProcessManagerFile) return "process";
 
   return null;
@@ -76,6 +77,7 @@ function callName(expression: ts.LeftHandSideExpression): string | null {
 
   const isPropertyAccess =
     ts.isPropertyAccessExpression(expression) || ts.isPropertyAccessChain(expression);
+
   if (isPropertyAccess) {
     return expression.name.text;
   }
@@ -132,9 +134,11 @@ function checkAsyncDeclaration(node: ts.Node, role: EventingRole): RoleFinding |
   const isPurityRole = role === "projection" || role === "process";
   const isFunctionDeclaration = ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node);
   const isCallableDeclaration = ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
+
   const isAsyncDeclaration =
     (isFunctionDeclaration || isCallableDeclaration) &&
     node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
+
   if (!isAsyncDeclaration || !isPurityRole) return null;
 
   return {
@@ -183,6 +187,7 @@ function checkDurableEventCall(node: ts.Node, role: EventingRole): RoleFinding |
 function checkDynamicImport(node: ts.Node, role: EventingRole): RoleFinding | null {
   const isDynamicImport =
     ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword;
+
   if (!isDynamicImport || !(role === "projection" || role === "process")) return null;
 
   return {
@@ -203,6 +208,7 @@ const ROLE_FILE_CHECKS = [
 
 function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[] {
   const source = sourceText({ file });
+
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -210,6 +216,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
     true,
     ts.ScriptKind.TS,
   );
+
   const violations: ArchitectureViolation[] = [];
   const seen = new Set<string>();
 
@@ -230,6 +237,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
 
     ts.forEachChild(node, visit);
   };
+
   visit(sourceFile);
 
   return violations;
@@ -295,6 +303,7 @@ function violationsForRoleFile(
   const pkg = packageByFile.find(
     (candidate) => file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
   );
+
   if (pkg?.layoutVersion !== 0) return violations;
 
   return [...violations, ...lintStrictSubscriberTest(file, pkg)];

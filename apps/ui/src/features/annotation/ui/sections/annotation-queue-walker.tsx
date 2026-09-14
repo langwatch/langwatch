@@ -486,6 +486,7 @@ function QueueWalker() {
     // The card offering this button is still drawn from the item left behind,
     // so acting on it would take away what the reviewer has stepped off.
     if (stepIsStale) return;
+
     if (!projectId || !currentQueueItemId) return;
 
     removeQueueItems(

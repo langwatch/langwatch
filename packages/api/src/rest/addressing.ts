@@ -67,12 +67,14 @@ export function isDateVersion(value: string): value is DateVersion {
 /** Asserts the version argument of a declaration. */
 export function assertVersionLabel(version: string): void {
   if (version === VERSION_PREVIEW) return;
+
   if (version === VERSION_LATEST) {
     throw new Error(
       `API version "latest" is derived from the dated registrations and ` +
         `cannot be registered; name a real date in YYYY-MM-DD form`,
     );
   }
+
   if (!isDateVersion(version)) {
     throw new RangeError(
       `Invalid API version "${version}"; expected a real date in YYYY-MM-DD form`,
@@ -95,10 +97,13 @@ const VERSION_SEGMENT = /^v\d+$/;
  */
 export function canonicalV1Path(path: string): string | null {
   if (path !== "/api" && !path.startsWith("/api/")) return null;
+
   const rest = path.slice("/api".length);
   if (rest === "" || rest === "/") return null;
+
   const segments = rest.split("/").filter((segment) => segment.length > 0);
   if (segments.some((segment) => VERSION_SEGMENT.test(segment))) return null;
+
   return `${V1_PREFIX}${rest}`;
 }
 
@@ -106,7 +111,9 @@ export function canonicalV1Path(path: string): string | null {
 export function undescribedStack(stack: readonly MiddlewareHandler[]): MiddlewareHandler[] {
   return stack.map((handler) => {
     if (Reflect.get(handler, uniqueSymbol) === void 0) return handler;
+
     const passthrough: MiddlewareHandler = async (context, next) => handler(context, next);
+
     return passthrough;
   });
 }
@@ -155,15 +162,19 @@ export class RestVersionSelector {
     if (versions.length === 0) {
       throw new Error("REST version selector requires at least one supported version");
     }
+
     if (new Set(versions).size !== versions.length) {
       throw new Error("REST version selector versions must be unique");
     }
+
     if (versions.some((version) => version.trim() === "")) {
       throw new Error("REST version selector versions must not be blank");
     }
+
     if (!versions.includes(latestVersion)) {
       throw new Error("REST version selector latestVersion must be supported");
     }
+
     if (headerName.trim() === "") {
       throw new Error("REST version selector headerName must not be blank");
     }
@@ -180,24 +191,30 @@ export class RestVersionSelector {
     if (pathVersion !== void 0 && headerVersion !== void 0 && pathVersion !== headerVersion) {
       throw new ApiVersionConflictError();
     }
+
     if (pathVersion !== void 0) {
       this.assertSupported(pathVersion);
     }
+
     if (headerVersion !== void 0) {
       this.assertSupported(headerVersion);
     }
+
     if (pathVersion !== void 0) {
       return { version: pathVersion, source: "path" };
     }
+
     if (headerVersion !== void 0) {
       return { version: headerVersion, source: "header" };
     }
+
     return { version: this.latestVersion, source: "latest" };
   }
 
   private assertSupported(version: string): void {
     if (!this.versions.has(version)) {
       const supported = [...this.versions].join(", ");
+
       throw new InvalidApiVersionError(`one of ${supported}`);
     }
   }
@@ -213,6 +230,7 @@ export function restVersionSelectorMiddleware({
       pathVersion,
       headerVersion: context.req.header(selector.headerName) ?? void 0,
     });
+
     try {
       await next();
     } finally {

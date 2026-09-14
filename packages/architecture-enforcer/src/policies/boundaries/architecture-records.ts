@@ -32,6 +32,7 @@ function markdownFiles(path: string): string[] {
 
 function sectionBody(content: string, section: string): string | undefined {
   const escaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   const match = content.match(
     new RegExp(`^#{2,3} ${escaped}\\s*$([\\s\\S]*?)(?=^#{2,3} |(?![\\s\\S]))`, "m"),
   );
@@ -81,6 +82,7 @@ function boundaryRecordShapeViolations(options: {
 
   const indexLinksBoundary =
     existsSync(index) && readFileSync(index, "utf8").includes(boundaryName);
+
   if (existsSync(index) && !indexLinksBoundary) {
     violations.push({
       policy: "architecture-record",
@@ -98,9 +100,11 @@ function violationsForRoot(root: string): ArchitectureViolation[] {
   const specs = join(root, "specs");
   const index = join(adrs, "README.md");
   const records = markdownFiles(adrs);
+
   const featureSpecs = existsSync(specs)
     ? readdirSync(specs).filter((file) => file.endsWith(".feature"))
     : [];
+
   const violations: ArchitectureViolation[] = [];
 
   if (!existsSync(index)) {
@@ -149,6 +153,7 @@ export function lintArchitectureRecords(snapshot: WorkspaceSnapshot): Architectu
   // repository-level application ADR/spec. Package-local records belong to
   // reusable ownership boundaries, not each executable wrapper.
   const roots = new Map<string, string | undefined>();
+
   for (const pkg of packages) {
     if (pkg.kind === "application") continue;
 

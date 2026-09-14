@@ -31,9 +31,11 @@ function sourceEdits(
 ): TextEdit[] {
   const kind =
     file.endsWith(".tsx") || file.endsWith(".jsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
   const edits: TextEdit[] = [];
   const editedStarts = new Set<number>();
+
   const add = (node: ts.Node | undefined) => {
     if (!node || !ts.isStringLiteralLike(node)) return;
 
@@ -44,12 +46,14 @@ function sourceEdits(
     if (editedStarts.has(start)) return;
 
     editedStarts.add(start);
+
     edits.push({
       start,
       end: node.getEnd(),
       text: quoteLike(source, node, next),
     });
   };
+
   const visit = (node: ts.Node): void => {
     if (allStringLiterals && ts.isStringLiteralLike(node)) {
       add(node);
@@ -70,6 +74,7 @@ function sourceEdits(
 
     ts.forEachChild(node, visit);
   };
+
   visit(sourceFile);
 
   return edits;
@@ -78,9 +83,11 @@ function sourceEdits(
 function jsonEdits(file: string, source: string, from: string, to: string): TextEdit[] {
   const sourceFile = ts.parseJsonText(file, source);
   const edits: TextEdit[] = [];
+
   const visit = (node: ts.Node): void => {
     if (ts.isStringLiteral(node)) {
       const next = replacement(node.text, from, to);
+
       if (next !== undefined) {
         edits.push({
           start: node.getStart(sourceFile),
@@ -92,6 +99,7 @@ function jsonEdits(file: string, source: string, from: string, to: string): Text
 
     ts.forEachChild(node, visit);
   };
+
   visit(sourceFile);
 
   return edits;
@@ -114,6 +122,7 @@ export function renameWorkspaceReference(input: {
   allStringLiterals?: boolean;
 }): string {
   const extension = extname(input.file);
+
   if (SOURCE_EXTENSIONS.has(extension)) {
     return applyEdits(
       input.source,

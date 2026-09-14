@@ -66,6 +66,7 @@ function projectGraph(root: string, violations: ArchitectureViolation[]): Map<st
 
     const parsed = ts.parseConfigFileTextToJson(file, readFileSync(file, "utf8"));
     const result = configSchema.safeParse(parsed.config);
+
     if (parsed.error || !result.success) {
       violations.push({
         policy: "declaration-project-references",
@@ -79,6 +80,7 @@ function projectGraph(root: string, violations: ArchitectureViolation[]): Map<st
     const references = (result.data.references ?? []).map(({ path }) =>
       configPath(resolve(dirname(file), path)),
     );
+
     projects.set(file, { file, config: result.data, references });
     active.add(file);
     for (const target of references) visit(target, file);
@@ -95,6 +97,7 @@ function projectGraph(root: string, violations: ArchitectureViolation[]): Map<st
 function reachableProjects(start: string, projects: ReadonlyMap<string, Project>): Set<string> {
   const result = new Set<string>();
   const pending = [start];
+
   while (pending.length > 0) {
     const current = pending.pop();
     if (!current || result.has(current)) continue;
@@ -108,11 +111,13 @@ function reachableProjects(start: string, projects: ReadonlyMap<string, Project>
 
 function producerDirectories(projects: ReadonlyMap<string, Project>): Map<string, string> {
   const producerByDirectory = new Map<string, string>();
+
   for (const project of projects.values()) {
     const options = project.config.compilerOptions;
     if (!options?.emitDeclarationOnly || options.noEmit === true) continue;
 
     producerByDirectory.set(dirname(project.file), project.file);
+
     for (const member of project.config.langwatchDeclarationGroup?.members ?? []) {
       producerByDirectory.set(resolve(dirname(project.file), member.directory), project.file);
     }
@@ -124,6 +129,7 @@ function producerDirectories(projects: ReadonlyMap<string, Project>): Map<string
 /** References are derived from package.json; a hand edit drifts from what the workspace declares. */
 function lintReferenceSync(root: string): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+
   for (const project of deriveWorkspaceReferences(root)) {
     const missing = project.references.filter((entry) => !project.current.includes(entry));
     const extra = project.current.filter((entry) => !project.references.includes(entry));
@@ -134,6 +140,7 @@ function lintReferenceSync(root: string): ArchitectureViolation[] {
       ...missing.map((entry) => `missing ${entry}`),
       ...extra.map((entry) => `extra ${entry}`),
     ];
+
     violations.push({
       policy: "declaration-project-references",
       file: relative(root, project.file),
@@ -159,12 +166,15 @@ export function lintDeclarationProjectReferences(
   const producerByName = new Map(
     packages.map((pkg) => [pkg.name, producerByDirectory.get(pkg.root)]),
   );
+
   const reachableByProducer = new Map<string, Set<string>>();
+
   for (const pkg of packages) {
     const producer = producerByName.get(pkg.name);
     if (!producer) continue;
 
     let reachable = reachableByProducer.get(producer);
+
     if (!reachable) {
       reachable = reachableProjects(producer, projects);
       reachableByProducer.set(producer, reachable);
@@ -175,6 +185,7 @@ export function lintDeclarationProjectReferences(
       ...pkg.manifest.optionalDependencies,
       ...pkg.manifest.peerDependencies,
     };
+
     for (const name of Object.keys(dependencies)) {
       const dependencyProducer = producerByName.get(name);
       if (!dependencyProducer || reachable.has(dependencyProducer)) continue;

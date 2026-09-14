@@ -40,6 +40,7 @@ export function readIdempotencyKey(raw: string | undefined | null): string | nul
   if (raw === undefined || raw === null) return null;
 
   const key = raw.trim();
+
   if (key.length < MIN_KEY_LENGTH || key.length > MAX_KEY_LENGTH) {
     throw new RequestValidationError({
       target: "header",
@@ -166,6 +167,7 @@ export function idempotentJson({
   // so a replay cannot drift from the response it is standing in for.
   c.header("Content-Type", "application/json");
   if (outcome.serializedBody === "") return c.body(null, outcome.status as ContentfulStatusCode);
+
   return c.body(outcome.serializedBody, outcome.status as ContentfulStatusCode);
 }
 
@@ -219,6 +221,7 @@ export class IdempotencyConflictError extends HandledError {
       fault: "customer",
       retryable: reason === "in_progress",
     });
+
     this.name = "IdempotencyConflictError";
   }
 }
@@ -334,6 +337,7 @@ export async function withIdempotency({
 }: WithIdempotencyParams): Promise<IdempotentOutcome> {
   if (key === null) {
     const response = await handler();
+
     return { isReplayed: false, status: response.status, response };
   }
 
@@ -341,6 +345,7 @@ export async function withIdempotency({
     operation,
     body: validatedBody,
   });
+
   const claim = await claimReceipt({
     receipts,
     cipher,
@@ -364,10 +369,12 @@ export async function withIdempotency({
 
   try {
     let response: Response;
+
     try {
       response = await handler();
     } catch (error) {
       await releaseClaim({ receipts, receiptId, claimId });
+
       throw error;
     }
 
@@ -401,6 +408,7 @@ export async function withIdempotency({
  */
 async function readResponseBytes(response: Response): Promise<string> {
   if (response.body === null) return "";
+
   return await response.clone().text();
 }
 
@@ -431,12 +439,14 @@ function startClaimHeartbeat({
       })
       .then(({ count }) => {
         if (count > 0) return;
+
         // The claim is somebody else's now. Warn once and stop, rather than
         // writing nothing every interval for the rest of the handler.
         idempotencyLogger.warn(
           { receiptId, claimId },
           "Stopped reporting an idempotency claim this request no longer holds",
         );
+
         clearInterval(timer);
       })
       .catch((error) => {
@@ -446,6 +456,7 @@ function startClaimHeartbeat({
         );
       });
   }, HEARTBEAT_INTERVAL_MS);
+
   timer.unref();
 
   return { stop: () => clearInterval(timer) };
@@ -531,6 +542,7 @@ async function claimReceipt({
       requestFingerprint,
       now,
     });
+
     if (claimed !== null) return claimed;
 
     const existing = await receipts.idempotencyReceipt.findUnique({
@@ -548,6 +560,7 @@ async function claimReceipt({
       requestFingerprint,
       now,
     });
+
     if (verdict.kind !== "retry") return verdict;
   }
 
@@ -586,9 +599,11 @@ async function insertPendingReceipt({
       },
       select: { id: true },
     });
+
     return { kind: "claimed", receiptId: created.id, claimId };
   } catch (error) {
     if (isUniqueViolation(error)) return null;
+
     throw error;
   }
 }
@@ -618,6 +633,7 @@ async function takeOverClaim({
   now: Instant;
 }): Promise<ExistingVerdict> {
   const claimId = randomUUID();
+
   const { count } = await receipts.idempotencyReceipt.updateMany({
     where: { id: existing.id, claimId: existing.claimId, responseStatus: null },
     data: {
@@ -638,6 +654,7 @@ async function takeOverClaim({
     },
     "Took over an idempotency claim that stopped reporting itself alive",
   );
+
   return { kind: "claimed", receiptId: existing.id, claimId };
 }
 
@@ -664,6 +681,7 @@ async function readExistingReceipt({
   // fresh key regardless of what the stale row happens to say.
   if (existing.expiresAt.getTime() <= now.epochMilliseconds) {
     await discardReceipt({ receipts, receiptId: existing.id });
+
     return { kind: "retry" };
   }
 
@@ -681,15 +699,18 @@ async function readExistingReceipt({
     if (!isClaimAbandoned({ heartbeatAt: fromDate(existing.heartbeatAt), now })) {
       throw new IdempotencyConflictError("in_progress");
     }
+
     return await takeOverClaim({ receipts, existing, now });
   }
 
   const serializedBody = readStoredBody({ receipt: existing, cipher });
+
   // Nothing readable to replay, so the receipt cannot answer for the key. Same
   // handling as expiry: drop it and let the request through as a first use,
   // which is strictly better than refusing a create the caller can never make.
   if (serializedBody === null) {
     await discardReceipt({ receipts, receiptId: existing.id });
+
     return { kind: "retry" };
   }
 
@@ -722,6 +743,7 @@ export function readStoredBody({
       { receiptId: receipt.id, error },
       "Dropping an unreadable idempotency receipt, likely CREDENTIALS_SECRET rotated since it was written",
     );
+
     return null;
   }
 }
@@ -743,6 +765,7 @@ async function releaseClaim({
     const { count } = await receipts.idempotencyReceipt.deleteMany({
       where: { id: receiptId, claimId },
     });
+
     if (count === 0) {
       idempotencyLogger.warn(
         { receiptId, claimId },

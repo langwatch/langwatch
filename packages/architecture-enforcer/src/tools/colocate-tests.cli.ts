@@ -32,6 +32,7 @@ if (plan.collisions.length > 0) {
       .map((collision) => `  ${collision}`)
       .join("\n")}\n`,
   );
+
   process.exit(1);
 }
 
@@ -47,14 +48,17 @@ if (!write) {
   process.stdout.write(
     `\n${plan.moves.length} file(s) would move, ${plan.unresolved.length} left alone.\n`,
   );
+
   process.exit(0);
 }
 
 for (const move of plan.moves) {
   mkdirSync(dirname(move.to), { recursive: true });
+
   execFileSync("git", ["-C", root, "mv", move.from, move.to], {
     stdio: ["ignore", "ignore", "pipe"],
   });
+
   const edited = plan.edits.get(move.from);
   if (edited !== undefined) writeFileSync(move.to, edited);
 }

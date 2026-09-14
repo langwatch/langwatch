@@ -47,6 +47,7 @@ describe("the cross-check a process boots behind", () => {
       const app = mounted();
 
       expect(undeclaredRoutes({ app, registry: allRegisteredRoutes() })).toEqual([]);
+
       expect(() =>
         assertEveryRouteDeclared({ app, registry: allRegisteredRoutes() }),
       ).not.toThrow();
@@ -63,6 +64,7 @@ describe("the cross-check a process boots behind", () => {
       expect(undeclaredRoutes({ app, registry: allRegisteredRoutes() })).toEqual([
         "GET /api/secrets/smuggled",
       ]);
+
       expect(() => assertEveryRouteDeclared({ app, registry: allRegisteredRoutes() })).toThrow(
         /no declared access policy: GET \/api\/secrets\/smuggled/,
       );

@@ -84,13 +84,16 @@ export function credentialClassFor({
   policy: AccessPolicy;
 }): CredentialClass {
   if (policy.kind === "public") return "none";
+
   if (policy.kind === "internal") return "internal";
+
   if (policy.kind === "handlerManaged") {
     return handlerManagedCredentialClass({
       scope,
       credential: policy.credential,
     });
   }
+
   return CLASS_BY_APP_SCOPE[scope];
 }
 
@@ -114,9 +117,12 @@ function handlerManagedCredentialClass({
   credential: HandlerCredential;
 }): CredentialClass {
   if (credential === "internal") return "internal";
+
   if (credential === "session") return "session";
+
   // apiKey / both, on an app whose scope names no key family of its own.
   if (scope === "service" || scope === "session") return "project_api_key";
+
   return CLASS_BY_APP_SCOPE[scope];
 }
 
@@ -201,6 +207,7 @@ export function publicEndpoint(reason: string): {
   readonly reason: string;
 } {
   assertReason(reason, "publicEndpoint");
+
   return { kind: "public", reason };
 }
 
@@ -213,6 +220,7 @@ export function internalSecret(reason: string): {
   readonly reason: string;
 } {
   assertReason(reason, "internalSecret");
+
   return { kind: "internal", reason };
 }
 
@@ -237,6 +245,7 @@ export function handlerManagedAuth({
   permissions: readonly AuthzPermission[];
 }): Extract<AccessPolicy, { kind: "handlerManaged" }> {
   assertReason(reason, "handlerManagedAuth");
+
   return { kind: "handlerManaged", reason, permissions, credential };
 }
 
@@ -247,6 +256,7 @@ export function isApiKeyReachable(policy: AccessPolicy): boolean {
   if (policy.kind === "handlerManaged") {
     return policy.credential === "apiKey" || policy.credential === "both";
   }
+
   return policy.kind !== "public" && policy.kind !== "internal";
 }
 

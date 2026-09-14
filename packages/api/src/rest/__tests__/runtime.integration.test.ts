@@ -342,6 +342,7 @@ describe("the document a declared route publishes", () => {
   /** @scenario "A route's declared tags reach the published document" */
   it("files the operation under the tags the declaration named", async () => {
     const published = await generateSpecs(secretsApp(), SPEC_OPTIONS);
+
     const dated = published.paths?.[`/api/secrets/${VERSION}`] as
       | { get?: { tags?: string[] } }
       | undefined;
@@ -411,6 +412,7 @@ describe("a route whose declaration names the facts it needs", () => {
       });
 
       expect(response.status).toBe(200);
+
       await expect(response.json()).resolves.toEqual({
         id: "report-1",
         platformUrl: "https://app.langwatch.test/acme/reports/report-1",
@@ -471,6 +473,7 @@ describe("a family declared v1-only", () => {
     expect(registered.filter((address) => address.startsWith("GET "))).toEqual([
       "GET /api/v1/run-plans/:id",
     ]);
+
     expect(registered.some((address) => address.includes("/v1/v1"))).toBe(false);
   });
 
@@ -566,6 +569,7 @@ describe("a family the declaration marked superseded", () => {
     await app.request(`/api/legacy-reports/${VERSION}/report-2`);
 
     expect(deprecatedRouteCalled).toHaveBeenCalledTimes(1);
+
     expect(deprecatedRouteCalled).toHaveBeenCalledWith({
       family: "legacy-reports",
       operation: "getLegacyReport",
@@ -605,6 +609,7 @@ describe("a family the declaration marked superseded", () => {
   /** @scenario "A route's declared responses reach the published document" */
   it("publishes the answers the route documented beside its declared success", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);
+
     const item = published.paths?.["/api/legacy-reports/{id}"] as
       | { get?: { responses?: Record<string, { description?: string }> } }
       | undefined;
@@ -629,9 +634,11 @@ describe("a route declared public", () => {
   /** @scenario "A route that answers without a credential resolves none" */
   it("is published with no security requirement, unlike its scoped siblings", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);
+
     const publicItem = published.paths?.["/api/legacy-reports/health"] as
       | { get?: { security?: unknown[] } }
       | undefined;
+
     const scopedItem = published.paths?.["/api/legacy-reports/{id}"] as
       | { get?: { security?: unknown[] } }
       | undefined;
@@ -951,10 +958,12 @@ function projectsApp(permitted = true): {
 } {
   const scope = { tier: "organization", id: ORGANIZATION_ID } as const;
   const identify = vi.fn(() => ({ actor: null, scope }));
+
   const authenticate = vi.fn(() => ({
     actor: { type: "api_key", id: "key-1" } as const,
     scope,
   }));
+
   const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
 
   const runtime = createRestRuntime({ identity: { authenticate, identify, authorize } });
@@ -993,6 +1002,7 @@ describe("a route the family's own door alone gates", () => {
   /** @scenario "A route the family's own door alone gates asks no permission of it" */
   it("keeps the family's security scheme, unlike a public route", async () => {
     const published = await generateSpecs(projectsApp().app, SPEC_OPTIONS);
+
     const item = published.paths?.["/api/projects"] as
       | { get?: { security?: unknown[] } }
       | undefined;
@@ -1009,6 +1019,7 @@ describe("a route whose permission is checked at the scope its path names", () =
     const response = await app.request(`/api/projects/${VERSION}/${PROJECT_ID}`);
 
     expect(response.status).toBe(200);
+
     await expect(response.json()).resolves.toEqual({
       id: PROJECT_ID,
       scopeId: ORGANIZATION_ID,
@@ -1254,6 +1265,7 @@ describe("a route that declares the several answers it may give", () => {
   /** @scenario "An endpoint declares the several answers it may give" */
   it("lists every declared status in the published document", async () => {
     const published = await generateSpecs(platformHealthApp().app, SPEC_OPTIONS);
+
     const item = published.paths?.["/api/v1/platform-health"] as
       | { get?: { responses?: Record<string, { description?: string }> } }
       | undefined;
@@ -1275,6 +1287,7 @@ describe("a route that declares the several answers it may give", () => {
         fields: expect.objectContaining({ statusCode: 503 }),
       }),
     );
+
     expect(rows.some((row) => row.level === "error")).toBe(false);
   });
 
@@ -1356,6 +1369,7 @@ describe("a family behind one directory connection's SCIM token", () => {
     const response = await scimApp().request("/api/scim/v1/Users");
 
     expect(response.status).toBe(200);
+
     await expect(response.json()).resolves.toEqual({
       tier: "organization",
       organizationId: ORGANIZATION_ID,
@@ -1369,6 +1383,7 @@ describe("a family behind one directory connection's SCIM token", () => {
     const route = getRoutePolicy("get", "/api/scim/v1/Users");
 
     expect(route).toMatchObject({ credentialClass: "scim_token" });
+
     expect(
       securityForCredentialClass({
         operationKey: "GET /api/scim/v1/Users",
@@ -1434,6 +1449,7 @@ describe("a route whose body is the evidence", () => {
       headers: { "Content-Type": "application/json" },
       body: exact,
     });
+
     const text = await hooksApp().request("/api/v1/hooks/text/hook-1", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1465,6 +1481,7 @@ describe("a route whose body is the evidence", () => {
       required: true,
       content: { "application/octet-stream": {} },
     });
+
     expect((paths["/api/v1/hooks/text/{id}"] as any)?.post?.requestBody).toEqual({
       required: true,
       content: { "application/json": {} },
@@ -1556,6 +1573,7 @@ describe("a route that writes its own answer", () => {
       "application/octet-stream": {},
       "text/plain": {},
     });
+
     expect(item?.get?.responses?.["200"]?.content?.["text/plain"]?.schema).toBeUndefined();
   });
 
@@ -1613,10 +1631,12 @@ function aliasHost(): Hono {
   const runtime = createRestRuntime({
     identity: { authenticate: () => ({ actor: null, scope: null }) },
   });
+
   const family = runtime.mount(aliases.router(), {
     app: () => objectApplication,
     onError: createErrorHandler(),
   });
+
   const host = new Hono();
 
   host.route("/", family);
@@ -1652,6 +1672,7 @@ describe("one path that answers every method", () => {
 
     expect(await passedOn.text()).toBe("the namespace behind the alias");
     expect(unknown.status).toBe(404);
+
     expect(seenByAlias).toEqual([
       "GET /api/v1/aliased/its-own",
       "GET /api/v1/aliased/nobody-owns-this",
@@ -1756,6 +1777,7 @@ describe("a route whose answer takes one of several shapes", () => {
       status: "existing",
       id: "u-1",
     });
+
     await expect((await createUpload(app, "new")).json()).resolves.toEqual({
       status: "pending",
       url: "https://upload.test/u-2",
@@ -1771,6 +1793,7 @@ describe("a route whose answer takes one of several shapes", () => {
   /** @scenario "A route answers one of several shapes, told apart by a field" */
   it("publishes both shapes with the field that tells them apart", async () => {
     const published = await generateSpecs(uploadsApp(), SPEC_OPTIONS);
+
     const schema = (published.paths?.["/api/v1/uploads"] as any)?.post?.responses?.["200"]
       ?.content?.["application/json"]?.schema;
 
@@ -1846,6 +1869,7 @@ describe("a family whose published paths are its whole contract", () => {
     await expect((await app.request("/api/evaluations/list")).json()).resolves.toEqual({
       evaluators: ["exact_match"],
     });
+
     await expect((await app.request("/api/v1/evaluations/list")).json()).resolves.toEqual({
       evaluators: ["exact_match"],
     });
@@ -1861,6 +1885,7 @@ describe("a family whose published paths are its whole contract", () => {
 
     expect(addresses(app).some((address) => address.includes("apiVersion"))).toBe(false);
     expect(addresses(app).some((address) => address.includes(VERSION))).toBe(false);
+
     expect(getRoutePolicy("get", "/api/evaluations/list")).toMatchObject({
       family: "evaluations-legacy",
       canonicalPath: "/api/v1/evaluations/list",
@@ -1934,6 +1959,7 @@ describe("a family whose protocol fixes the generation its path names", () => {
     expect((await app.request("/api/scim/v2/Users")).status).toBe(200);
     expect((await app.request("/api/scim/v1/Users")).status).toBe(404);
     expect((await app.request("/api/v1/scim/Users")).status).toBe(404);
+
     expect(addresses(app).filter((address) => address.startsWith("GET "))).toEqual([
       "GET /api/scim/v2/Users",
     ]);
@@ -1946,6 +1972,7 @@ describe("a family whose protocol fixes the generation its path names", () => {
     expect(() => family().withAddressing("dated", { generation: "v2" })).toThrow(
       /names no generation in its own path/,
     );
+
     expect(() => family().withAddressing("v1-in-path", { generation: "two" })).toThrow(
       /spelled v1, v2/,
     );
@@ -2124,6 +2151,7 @@ describe("a request that carries files beside its fields", () => {
     const response = await upload(body);
 
     expect(response.status).toBe(200);
+
     await expect(response.json()).resolves.toEqual({
       id: "stored-report.csv",
       name: "project-1:report.csv",
@@ -2146,6 +2174,7 @@ describe("a request that carries files beside its fields", () => {
   /** @scenario "A request carries files beside its fields" */
   it("describes the body as multipart, with each file part as binary", async () => {
     const published = await generateSpecs(datasetApp(), SPEC_OPTIONS);
+
     const schema = (published.paths?.["/api/v1/dataset/upload"] as any)?.post?.requestBody
       ?.content?.["multipart/form-data"]?.schema;
 
@@ -2161,6 +2190,7 @@ describe("a request that carries files beside its fields", () => {
         .withNamespace("dataset")
         .withVersion(VERSION)
         .post("/upload", "uploadDataset");
+
     const multipart = {
       fields: z.object({ a: z.string() }),
       files: { file: { required: true } },
@@ -2171,9 +2201,11 @@ describe("a request that carries files beside its fields", () => {
         .withInput(z.object({ name: z.string() }))
         .withMultipart(multipart),
     ).toThrow(/declares its body twice/);
+
     expect(() => route().withMultipart(multipart).withRawBody("bytes")).toThrow(
       /declares its body twice/,
     );
+
     expect(() => route().withMultipart({ fields: z.object({ a: z.string() }), files: {} })).toThrow(
       /names no file part/,
     );
@@ -2203,6 +2235,7 @@ describe("an upsert whose status says only whether it created", () => {
   /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
   it("lists both successes in the document it publishes", async () => {
     const published = await generateSpecs(datasetApp(), SPEC_OPTIONS);
+
     const answers = (published.paths?.["/api/v1/dataset/records/{recordId}"] as any)?.patch
       ?.responses;
 
@@ -2385,12 +2418,14 @@ describe("a family behind the instance administrator's own key", () => {
     const route = getRoutePolicy("post", "/api/v1/instance/organizations");
 
     expect(route).toMatchObject({ credentialClass: "instance_admin_api_key" });
+
     expect(
       securityForCredentialClass({
         operationKey: "POST /api/v1/instance/organizations",
         credentialClass: route!.credentialClass,
       }),
     ).toEqual([{ instance_admin_key: [] }]);
+
     expect(securityRequirement("instance-admin")).toEqual([{ instance_admin_key: [] }]);
   });
 
@@ -2535,6 +2570,7 @@ describe("a route whose answer stands for a while", () => {
   /** @scenario "A cache failure degrades to a handler call" */
   it("runs the handler and serves the caller when the store cannot be read", async () => {
     const { app } = catalogueApp();
+
     const runtime = createRestRuntime({
       identity: {
         authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
@@ -2556,6 +2592,7 @@ describe("a route whose answer stands for a while", () => {
 
     expect((await app.request("/api/v1/catalogue/one")).status).toBe(200);
     expect((await degraded.request("/api/v1/catalogue/one")).status).toBe(200);
+
     expect(logsFor("langwatch:api:endpoint-capabilities").some((row) => row.level === "warn")).toBe(
       true,
     );
@@ -2576,6 +2613,7 @@ describe("a route whose answer stands for a while", () => {
         .withCache({ ttlSeconds: 60, tag: "catalogue" })
         .handle(async () => {}),
     ).toThrow(/no answer of its own/);
+
     expect(() => route().withCache({ ttlSeconds: 0, tag: "catalogue" })).toThrow(/no time at all/);
     expect(() => route().withCache({ ttlSeconds: 60, tag: " " })).toThrow(/under no tag/);
   });

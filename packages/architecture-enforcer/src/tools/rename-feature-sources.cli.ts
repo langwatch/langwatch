@@ -26,9 +26,11 @@ for (let index = 2; index < process.argv.length; index += 1) {
 
 try {
   const plan = planFilenameMigration(root);
+
   process.stdout.write(
     `${plan.mappings.length} filename mapping${plan.mappings.length === 1 ? "" : "s"}\n`,
   );
+
   for (const mapping of plan.mappings) {
     process.stdout.write(`${relative(root, mapping.from)} -> ${relative(root, mapping.to)}\n`);
   }
@@ -36,6 +38,7 @@ try {
   process.stdout.write(
     `${plan.edits.size} reference file${plan.edits.size === 1 ? "" : "s"} would change\n`,
   );
+
   if (plan.collisions.length) {
     process.stderr.write(`Collisions:\n${plan.collisions.join("\n")}\n`);
   }
@@ -54,6 +57,7 @@ try {
     process.exitCode = 1;
   } else if (write) {
     applyFilenameMigration(plan);
+
     process.stdout.write(
       `Applied ${plan.mappings.length} filename mapping${plan.mappings.length === 1 ? "" : "s"}.\n`,
     );

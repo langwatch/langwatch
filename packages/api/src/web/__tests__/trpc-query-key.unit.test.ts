@@ -61,6 +61,7 @@ describe("feature tRPC bindings", () => {
 
     it("nests the path so a procedure-wide key prefixes every keyed query under it", () => {
       const wide = trpcQueryKey("tracesV2.list") as readonly [readonly string[]];
+
       const narrow = trpcQueryKey("tracesV2.list", {
         input: { projectId: "project_1" },
         type: "query",

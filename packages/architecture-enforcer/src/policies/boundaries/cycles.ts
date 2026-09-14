@@ -7,6 +7,7 @@ export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[]
 
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
   const graph = new Map<string, string[]>();
+
   for (const pkg of packages) {
     graph.set(
       pkg.name,
@@ -18,6 +19,7 @@ export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[]
   const visited = new Set<string>();
   const stack: string[] = [];
   const cycles = new Set<string>();
+
   const visit = (name: string) => {
     if (active.has(name)) {
       const start = stack.indexOf(name);
@@ -36,6 +38,7 @@ export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[]
     stack.pop();
     active.delete(name);
   };
+
   for (const name of graph.keys()) visit(name);
 
   return [...cycles].sort().map((cycle) => ({

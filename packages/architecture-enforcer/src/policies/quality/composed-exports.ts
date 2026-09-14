@@ -127,6 +127,7 @@ function subdirectories(path: string): string[] {
  */
 export function serverPackageIndexes({ root }: { root: string }): string[] {
   const indexes: string[] = [];
+
   const push = (file: string): void => {
     if (existsSync(file)) indexes.push(file);
   };
@@ -168,6 +169,7 @@ function exportedNames({
   seen.add(file);
   const source = parseFile(file);
   const names: ExportedName[] = [];
+
   for (const statement of source.statements) {
     if (ts.isExportDeclaration(statement)) {
       if (statement.isTypeOnly) continue;
@@ -176,6 +178,7 @@ function exportedNames({
         statement.moduleSpecifier !== void 0 && ts.isStringLiteralLike(statement.moduleSpecifier)
           ? resolveSpecifier({ specifier: statement.moduleSpecifier.text, file })
           : void 0;
+
       if (statement.exportClause === void 0) {
         if (target !== void 0)
           names.push(...exportedNames({ file: target, resolveSpecifier, seen }));
@@ -199,6 +202,7 @@ function exportedNames({
           .getModifiers(statement)
           ?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
       : false;
+
     if (exported !== true) continue;
 
     if (ts.isClassDeclaration(statement) || ts.isFunctionDeclaration(statement)) {
@@ -222,6 +226,7 @@ const excludedDeclarations = new Map<string, Set<string>>();
  */
 function isExcludedDeclaration({ name, file }: { name: string; file: string }): boolean {
   let excluded = excludedDeclarations.get(file);
+
   if (excluded === void 0) {
     excluded = new Set<string>();
     excludedDeclarations.set(file, excluded);
@@ -246,8 +251,10 @@ export function collectComposedExportSubjects({
   const resolveSpecifier = (resolver ?? createWorkspaceModuleResolver({ root })).resolve;
   const subjects: ComposedExportSubject[] = [];
   const claimed = new Set<string>();
+
   for (const indexFile of serverPackageIndexes({ root })) {
     const packagePath = relative(root, resolve(indexFile, "..", ".."));
+
     for (const exported of exportedNames({
       file: indexFile,
       resolveSpecifier,
@@ -263,6 +270,7 @@ export function collectComposedExportSubjects({
       if (claimed.has(key)) continue;
 
       claimed.add(key);
+
       subjects.push({
         key,
         name: exported.name,
@@ -293,6 +301,7 @@ export function reachableFiles({
   resolver?: WorkspaceModuleResolver;
 }): Set<string> {
   const roots = ENTRYPOINTS.map((path) => join(root, path)).filter((path) => existsSync(path));
+
   const graph = walkValueImportGraph({
     roots,
     resolve: (resolver ?? createWorkspaceModuleResolver({ root })).resolve,
@@ -345,12 +354,14 @@ function valueReferences({
   declaredHere: ReadonlySet<string>;
 }): string[] {
   const found: string[] = [];
+
   const visit = (node: ts.Node): void => {
     // `class X extends Y` needs Y at runtime, so an extends clause is a value
     // reference even though the node it hangs on is a type node. `implements`
     // is erased and stays excluded.
     if (ts.isExpressionWithTypeArguments(node)) {
       const clause = node.parent;
+
       if (ts.isHeritageClause(clause) && clause.token === ts.SyntaxKind.ExtendsKeyword) {
         visit(node.expression);
       }
@@ -390,6 +401,7 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
   const subjects = collectComposedExportSubjects({ root, resolver });
   const wanted = new Set(subjects.map((subject) => subject.name));
   const declaredIn = new Map<string, Set<string>>();
+
   for (const subject of subjects) {
     const file = join(root, subject.declaringFile);
     const names = declaredIn.get(file) ?? new Set<string>();
@@ -398,11 +410,13 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
   }
 
   const composed = new Set<string>();
+
   for (const file of reachableFiles({ root, resolver })) {
     if (!/\.[cm]?tsx?$/.test(file) || file.endsWith(".d.ts")) continue;
 
     const words = mentionedWords({ file });
     let candidate = false;
+
     for (const word of words) {
       if (wanted.has(word) && !composed.has(word)) candidate = true;
     }

@@ -363,6 +363,7 @@ describe("given a reviewer walking their annotation queue", () => {
         const annotate = screen.getByRole("button", {
           name: "annotate this turn",
         });
+
         const openTurn = screen.getByRole("button", {
           name: "pick another turn",
         });

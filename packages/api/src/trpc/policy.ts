@@ -405,11 +405,13 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
         // a given. Answering "unauthenticated" before any id is looked at
         // keeps an anonymous caller from learning anything about the scope.
         const actor = ports.identity.actor(ctx);
+
         if (!actor) {
           throw new TRPCError({ code: "UNAUTHORIZED" });
         }
 
         const scope = requireDeclaredScope({ permission: required, input, via });
+
         const { permitted, organizationRole, denialReason } = await ports.authorization
           .forRequest(ctx)
           .getDecision({
@@ -417,6 +419,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
             permission: required,
             scope,
           });
+
         if (!permitted) {
           throw deniedError({
             permission: required,
@@ -426,6 +429,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
             denials: ports.denials,
           });
         }
+
         // Legacy parity: the organization tier never carried a role onto the
         // context, so only the project/team resolutions (non-null role) do.
         if (organizationRole !== null) {
@@ -433,6 +437,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
         }
 
         markPermissionChecked(ctx);
+
         return next();
       },
     );
@@ -450,9 +455,11 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
       { kind: "permission-any", permissions },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
         const actor = ports.identity.actor(ctx);
+
         if (!actor) {
           throw new TRPCError({ code: "UNAUTHORIZED" });
         }
+
         // Always the project tier, so the field is named outright — but read
         // through the same resolution the single-permission seam uses, so the
         // blank-versus-missing split is decided in exactly one place.
@@ -461,6 +468,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
           input,
           via: "projectId",
         });
+
         const { permitted, organizationRole, denialReason } = await ports.authorization
           .forRequest(ctx)
           .getProjectAnyDecision({
@@ -468,6 +476,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
             projectId,
             permissions,
           });
+
         if (!permitted) {
           throw deniedError({
             permission: permissions[0],
@@ -477,8 +486,10 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
             denials: ports.denials,
           });
         }
+
         rememberOrganizationRole(ctx, organizationRole);
         markPermissionChecked(ctx);
+
         return next();
       },
     );
@@ -500,12 +511,15 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
       { kind: "no-permission", reason, allow },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
         const allowedKeys = Object.keys(allow ?? {});
+
         for (const key of SENSITIVE_SCOPE_FIELDS) {
           if (key in input && !allowedKeys.includes(key)) {
             throw new Error(`${key} is not allowed to be used without permission check`);
           }
         }
+
         markPermissionChecked(ctx);
+
         return next();
       },
     );
@@ -536,6 +550,7 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
       },
       async ({ ctx, next }: TrpcContextOnlyCheckParams<TContext>) => {
         markPermissionChecked(ctx);
+
         return next();
       },
     );
@@ -554,9 +569,11 @@ function requireDeclaredScope({
 }): DeclaredScopeId {
   const resolution = resolveDeclaredScope({ permission, input, via });
   if (resolution.resolved) return resolution.scope;
+
   if (resolution.unresolved.reason === "blank") {
     throw blankScopeId({ field: resolution.unresolved.field });
   }
+
   throw wiringBug({ permission, via });
 }
 
@@ -568,6 +585,7 @@ function requireDeclaredScope({
  */
 function blankScopeId({ field }: { field: string }): TRPCError {
   const blank = new BlankScopeIdError({ field });
+
   return new TRPCError({
     code: "BAD_REQUEST",
     message: blank.message,
@@ -592,6 +610,7 @@ function wiringBug({
   via?: ScopeTierField;
 }): TRPCError {
   authzLogger.error({ permission, via }, "declared permission's input carries no usable scope id");
+
   return new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
     message: "Something went wrong. Please try again.",
@@ -623,12 +642,14 @@ function deniedError({
   // permission nobody can grant them while the seat is off.
   if (denialReason === "membership-disabled") {
     const disabled = denials.membershipDisabled();
+
     return new TRPCError({
       code: "UNAUTHORIZED",
       message: disabled.message,
       cause: disabled,
     });
   }
+
   // String comparison on purpose: a VALUE import of the organization role enum
   // would put the generated Prisma client on this module's graph for one
   // constant.
@@ -639,11 +660,13 @@ function deniedError({
       cause: denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown"),
     });
   }
+
   const denied = new PermissionDeniedError({
     permission,
     scope: { type: scope.tier, id: scope.id },
     denialReason: denialReason ?? "no-binding",
   });
+
   // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
   // here: `handledErrorMiddleware` re-derives it from the handled cause's
   // `httpStatus` (403) — the caller IS authenticated, they just lack the
@@ -713,11 +736,13 @@ export function createScopeLineageGuard<TContext>(
       const lineage = await ports.authorization
         .forRequest(ctx)
         .checkScopeLineage(asScopeLineageInput(input));
+
       if (lineage.kind === "consistent") {
         return next();
       }
 
       const { widest } = lineage;
+
       const denied = new PermissionDeniedError({
         permission: declaredPermissionOf(declaration),
         scope: { type: widest.tier, id: widest.id },
@@ -1109,6 +1134,7 @@ function middlewareList(value: unknown): readonly unknown[] {
   }
 
   const middlewares = value._middlewares;
+
   return Array.isArray(middlewares) ? middlewares : [];
 }
 
@@ -1127,19 +1153,23 @@ function procedureMiddlewareList(value: unknown): readonly unknown[] {
   if ((typeof value !== "object" && typeof value !== "function") || value === null) {
     throw new Error(`Not a tRPC procedure: ${typeof value}`);
   }
+
   if (!("_def" in value)) {
     throw new Error("tRPC procedure carries no `_def` to read its middlewares from");
   }
 
   const definition = (value as { _def: unknown })._def;
+
   if (typeof definition !== "object" || definition === null || !("middlewares" in definition)) {
     throw new Error("tRPC procedure `_def` carries no `middlewares` list");
   }
 
   const middlewares = (definition as { middlewares: unknown }).middlewares;
+
   if (!Array.isArray(middlewares)) {
     throw new Error("tRPC procedure `_def.middlewares` is not a list");
   }
+
   return middlewares;
 }
 
@@ -1153,8 +1183,10 @@ export function createIsPublicProcedure(
   enforceUserIsAuthed: unknown,
 ): (procedure: unknown) => boolean {
   const authMiddlewares = middlewareList(enforceUserIsAuthed);
+
   return (procedure: unknown) => {
     const middlewares = procedureMiddlewareList(procedure);
+
     return !middlewares.some((middleware) => authMiddlewares.includes(middleware));
   };
 }
@@ -1203,11 +1235,13 @@ function recordSpanError(span: Span, error: unknown, asError: (failure: unknown)
   // depending on where in the chain the failure was caught.
   const candidate = error instanceof TRPCError ? error.cause : error;
   const handled = HandledError.isHandled(candidate) ? candidate : undefined;
+
   if (handled) {
     span.setAttributes({
       "langwatch.error.code": handled.code,
       "langwatch.error.fault": handled.fault,
     });
+
     if (handled.fault === "customer") return;
   }
 
@@ -1244,6 +1278,7 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
     // domain status survives on the wire as `data.error.httpStatus`, and
     // `handleTrpcCallLogging` records the handled status rather than this one.
   };
+
   // Every 4xx a handled error raises needs a line here. The fallback is
   // INTERNAL_SERVER_ERROR, so a missing entry books a customer-side refusal as
   // a server fault. 5xx are deliberately left to the fallback.
@@ -1300,6 +1335,7 @@ export function createTrpcRuntimePolicy<
         message: "Permission check is required",
       });
     }
+
     return next();
   });
 
@@ -1317,6 +1353,7 @@ export function createTrpcRuntimePolicy<
   const auditErrors = async ({ ctx, next, path, type, input, getRawInput }: AuditErrorsParams) => {
     const result = await next();
     const actor = ports.identity.actor(ctx);
+
     if (
       (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
       !result.ok &&
@@ -1326,6 +1363,7 @@ export function createTrpcRuntimePolicy<
     ) {
       const auditedInput = input ?? (await getRawInput());
       const scopeIds = auditScopeIds(auditedInput);
+
       await ports.audit.record({
         userId: actor.id,
         organizationId: scopeIds.organizationId,
@@ -1355,6 +1393,7 @@ export function createTrpcRuntimePolicy<
   const auditLogMutations = root.middleware(
     async ({ ctx, next, type, path, input, getRawInput }) => {
       const actor = ports.identity.actor(ctx);
+
       if (type !== "mutation" || !actor || isAuditLogExempt(path)) {
         return next();
       }
@@ -1419,9 +1458,11 @@ export function createTrpcRuntimePolicy<
         },
         parentContext,
       );
+
       trpcFailureTraceIds.remember(result.error, span);
       recordSpanError(span, result.error, asError);
       span.end();
+
       return result;
     }
 
@@ -1433,11 +1474,14 @@ export function createTrpcRuntimePolicy<
           // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
           // returned as { ok: false, error } result objects — NOT thrown.
           const result = await next();
+
           if (!result.ok) {
             trpcFailureTraceIds.remember(result.error, span);
             recordSpanError(span, result.error, asError);
           }
+
           span.end();
+
           return result;
         },
       ),
@@ -1465,6 +1509,7 @@ export function createTrpcRuntimePolicy<
     if (result.ok) return result;
 
     const cause = result.error.cause;
+
     if (HandledError.isHandled(cause)) {
       throw new TRPCError({
         code: handledErrorToTRPCCode(cause),
@@ -1478,6 +1523,7 @@ export function createTrpcRuntimePolicy<
       // formatter performs, so the serialised payload on the wire is byte for
       // byte what it already was — only `data.code` and the HTTP status change.
       const validation = ValidationError.fromZodError(cause);
+
       throw new TRPCError({
         code: handledErrorToTRPCCode(validation),
         // The code, not `validation.message`: zod's `message` is the whole
@@ -1489,6 +1535,7 @@ export function createTrpcRuntimePolicy<
     }
 
     const translated = ports.causes.translate(cause);
+
     if (translated) {
       throw new TRPCError({
         code: translated.code,
@@ -1502,6 +1549,7 @@ export function createTrpcRuntimePolicy<
 
   const loggerMiddleware = root.middleware(async ({ path, type, input, ctx, next }) => {
     const scopeIds = auditScopeIds(input);
+
     const requestContext: RequestContext = {
       organizationId: scopeIds.organizationId,
       projectId: scopeIds.projectId,

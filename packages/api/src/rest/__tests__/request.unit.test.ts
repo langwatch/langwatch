@@ -42,6 +42,7 @@ import { bodyLimit, validator as zValidator } from "../request.ts";
 const handleError: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const { code, meta, reasons, ...rest } = error.serialize();
+
     return c.json(
       {
         ...rest,
@@ -55,6 +56,7 @@ const handleError: ErrorHandler = (error, c) => {
   }
 
   const { status } = error as Error & { status?: ContentfulStatusCode };
+
   return c.json({ error: error.message }, status ?? 500);
 };
 
@@ -74,9 +76,11 @@ const schema = z.object({
 function appWith(hook?: Parameters<typeof zValidator>[2]) {
   const app = new Hono();
   app.onError(handleError);
+
   app.post("/", zValidator("json", schema, hook), (c) =>
     c.json({ ok: true, received: c.req.valid("json") }),
   );
+
   return app;
 }
 
@@ -113,11 +117,13 @@ describe("the REST boundary's request validator", () => {
 
       const body = await res.json();
       expect(body.reasons).toHaveLength(3);
+
       expect(body.reasons.map((r: { meta: { field: string } }) => r.meta.field)).toEqual([
         "name",
         "metric",
         "limit",
       ]);
+
       expect(body.fields).toEqual(["name", "metric", "limit"]);
     });
 
@@ -167,6 +173,7 @@ describe("the REST boundary's request validator", () => {
     // about what the schema wanted. The schema says so itself via `params`,
     // and the boundary surfaces it exactly like an enum failure.
     const catalog = new Set(["catalog/a", "catalog/b"]);
+
     const catalogSchema = z.object({
       kind: z.string().superRefine((kind, ctx) => {
         if (!catalog.has(kind)) {
@@ -183,6 +190,7 @@ describe("the REST boundary's request validator", () => {
       const app = new Hono();
       app.onError(handleError);
       app.post("/", zValidator("json", catalogSchema), (c) => c.json({ ok: true }));
+
       return app;
     };
 
@@ -200,6 +208,7 @@ describe("the REST boundary's request validator", () => {
       const bareSchema = z.object({
         kind: z.string().refine(() => false, { message: "no" }),
       });
+
       const app = new Hono();
       app.onError(handleError);
       app.post("/", zValidator("json", bareSchema), (c) => c.json({ ok: true }));
@@ -259,6 +268,7 @@ describe("the REST boundary's request validator", () => {
       const res = await post({ name: "ok", metric: "cost" });
 
       expect(res.status).toBe(200);
+
       expect(await res.json()).toEqual({
         ok: true,
         received: { name: "ok", metric: "cost" },
@@ -287,6 +297,7 @@ describe("the REST boundary's request validator", () => {
       // wrapper did not track whether the handler had been entered.
       const app = new Hono();
       app.onError(handleError);
+
       app.post("/", zValidator("json", schema), () => {
         throw Object.assign(new Error("handler said no"), { status: 400 });
       });
@@ -317,6 +328,7 @@ function cappedRequest({
 }): Request {
   const headers = new Headers({ "content-type": "application/json" });
   for (const [name, value] of Object.entries(extra)) headers.set(name, value);
+
   return new Request(ECHO_URL, { method: "POST", headers, body: payload });
 }
 
@@ -333,21 +345,26 @@ async function capped({ maxSize, incoming }: { maxSize: number; incoming: Reques
 }> {
   const context = { req: { raw: incoming } };
   let reachedRoute = false;
+
   const next = (() => {
     reachedRoute = true;
+
     return Promise.resolve();
   }) as Next;
 
   let status = 200;
+
   try {
     await bodyLimit({ maxSize })(context as unknown as Context, next);
   } catch (error) {
     if (!(error instanceof HTTPException)) throw error;
+
     status = error.status;
   }
 
   const handedOn = context.req.raw;
   const drained = handedOn !== incoming;
+
   return {
     status,
     reachedRoute,
@@ -390,6 +407,7 @@ describe("the size the request body cap is willing to trust", () => {
     describe("when the body fits under the cap", () => {
       it("measures it by draining and hands the route the bytes back", async () => {
         const payload = JSON.stringify({ resourceSpans: [] });
+
         const result = await capped({
           maxSize: 1024,
           incoming: cappedRequest({
@@ -410,6 +428,7 @@ describe("the size the request body cap is willing to trust", () => {
     describe("when the body fits under the cap", () => {
       it("drains it and hands the route the bytes back", async () => {
         const payload = JSON.stringify({ resourceSpans: [] });
+
         const result = await capped({
           maxSize: 1024,
           incoming: cappedRequest({ payload }),
@@ -439,6 +458,7 @@ describe("the size the request body cap is willing to trust", () => {
     describe("when the body fits under the cap", () => {
       it("believes the transfer encoding and measures the body itself", async () => {
         const payload = JSON.stringify({ resourceSpans: [] });
+
         const result = await capped({
           maxSize: 1024,
           incoming: cappedRequest({
@@ -532,10 +552,13 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
   readonly idempotencyReceipt = {
     create: async (input: { data: IdempotencyReceiptCreateInput; select: { id: true } }) => {
       const unique = `${input.data.scopeId}:${input.data.key}`;
+
       if (this.rows.has(unique)) {
         throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
       }
+
       const id = `receipt_${this.nextId++}`;
+
       this.rows.set(unique, {
         id,
         scopeId: input.data.scopeId,
@@ -547,6 +570,7 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
         responseStatus: null,
         responseBody: null,
       });
+
       return { id };
     },
 
@@ -559,24 +583,32 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
     }) => {
       const row = this.byId(input.where.id);
       if (!row) return { count: 0 };
+
       if (input.where.claimId !== undefined && row.claimId !== input.where.claimId) {
         return { count: 0 };
       }
+
       if (input.where.responseStatus === null && row.responseStatus !== null) {
         return { count: 0 };
       }
+
       Object.assign(row, input.data);
+
       return { count: 1 };
     },
 
     deleteMany: async (input: { where: { id: string; claimId?: string } }) => {
       const found = [...this.rows.entries()].find(([, row]) => row.id === input.where.id);
       if (!found) return { count: 0 };
+
       const [unique, row] = found;
+
       if (input.where.claimId !== undefined && row.claimId !== input.where.claimId) {
         return { count: 0 };
       }
+
       this.rows.delete(unique);
+
       return { count: 1 };
     },
   };
@@ -601,6 +633,7 @@ const cipher: IdempotencyResponseCipher = {
   encrypt: (value) => `enc:${value}`,
   decrypt: (value) => {
     if (!value.startsWith("enc:")) throw new Error("not written by this cipher");
+
     return value.slice("enc:".length);
   },
 };
@@ -624,18 +657,21 @@ async function refusalFrom(
   } catch (error) {
     return error as { code?: string; meta?: { reason?: string } };
   }
+
   throw new Error("the ledger accepted a run this scenario requires it to refuse");
 }
 
 /** A create that reports how many times it actually ran. */
 function countingHandler(body: unknown) {
   let runs = 0;
+
   return {
     get runs() {
       return runs;
     },
     handler: async () => {
       runs++;
+
       return Response.json(body, { status: 201 });
     },
   };
@@ -667,6 +703,7 @@ describe("the Idempotency-Key receipt ledger", () => {
       const receipts = new FakeReceiptStore();
       const ledger = ledgerOver(receipts);
       const first = countingHandler({ id: "budget_1", secret: "shown once" });
+
       const call = {
         operation: "gateway.v1.budgets.create",
         scopeId: SCOPE,
@@ -679,6 +716,7 @@ describe("the Idempotency-Key receipt ledger", () => {
       const replay = await ledger.run({ ...call, handler: second.handler });
 
       expect(original).toMatchObject({ isReplayed: false, status: 201 });
+
       expect(replay).toEqual({
         isReplayed: true,
         status: 201,
@@ -686,6 +724,7 @@ describe("the Idempotency-Key receipt ledger", () => {
         // secret it carries exists nowhere else in readable form.
         serializedBody: JSON.stringify({ id: "budget_1", secret: "shown once" }),
       });
+
       expect(second.runs).toBe(0);
     });
 
@@ -693,6 +732,7 @@ describe("the Idempotency-Key receipt ledger", () => {
     it("refuses the same key under a different body, naming the reason", async () => {
       const receipts = new FakeReceiptStore();
       const ledger = ledgerOver(receipts);
+
       const call = {
         operation: "gateway.v1.budgets.create",
         scopeId: SCOPE,
@@ -704,6 +744,7 @@ describe("the Idempotency-Key receipt ledger", () => {
         validatedBody: { limit: 10 },
         handler: countingHandler({ id: "budget_1" }).handler,
       });
+
       const changed = countingHandler({ id: "budget_2" });
 
       const refusal = await refusalFrom(
@@ -728,6 +769,7 @@ describe("the Idempotency-Key receipt ledger", () => {
         validatedBody: body,
         handler: countingHandler({ id: "vk_1" }).handler,
       });
+
       const cacheRule = countingHandler({ id: "cache_rule_1" });
 
       const refusal = await refusalFrom(
@@ -753,9 +795,11 @@ describe("the Idempotency-Key receipt ledger", () => {
       const ledger = ledgerOver(receipts);
       let runs = 0;
       let releaseFirst: (() => void) | undefined;
+
       const held = new Promise<void>((resolve) => {
         releaseFirst = resolve;
       });
+
       const call = {
         operation: "gateway.v1.budgets.create",
         scopeId: SCOPE,
@@ -768,14 +812,17 @@ describe("the Idempotency-Key receipt ledger", () => {
         handler: async () => {
           runs++;
           await held;
+
           return Response.json({ id: "budget_1" }, { status: 201 });
         },
       });
+
       const retry = refusalFrom(
         ledger.run({
           ...call,
           handler: async () => {
             runs++;
+
             return Response.json({ id: "budget_2" }, { status: 201 });
           },
         }),
@@ -799,6 +846,7 @@ describe("the Idempotency-Key receipt ledger", () => {
     it("frees the key rather than pinning the failure to it", async () => {
       const receipts = new FakeReceiptStore();
       const ledger = ledgerOver(receipts);
+
       const call = {
         operation: "gateway.v1.budgets.create",
         scopeId: SCOPE,
@@ -812,6 +860,7 @@ describe("the Idempotency-Key receipt ledger", () => {
           handler: () => Promise.reject(new Error("the database blinked")),
         }),
       ).rejects.toThrow("the database blinked");
+
       const retry = countingHandler({ id: "budget_1" });
       const outcome = await ledger.run({ ...call, handler: retry.handler });
 
@@ -829,7 +878,9 @@ describe("the Idempotency-Key receipt ledger", () => {
       expect(isClaimAbandoned({ heartbeatAt: now.subtract({ milliseconds: 1_000 }), now })).toBe(
         false,
       );
+
       expect(isClaimAbandoned({ heartbeatAt: longAfterAnyFixedWindow, now })).toBe(true);
+
       expect(
         isClaimAbandoned({
           heartbeatAt: now.subtract({ milliseconds: TAKEOVER_AFTER_MS + 1 }),
