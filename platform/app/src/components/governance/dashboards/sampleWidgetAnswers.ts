@@ -48,14 +48,37 @@ import type { ChartFrameExecuteQuery } from "~/features/custom-chart-playground/
 import type { GovernanceWidgetId } from "./governanceWidgets";
 
 /**
- * What the leading row of a ranked list spends over the window, in US dollars.
- * The same figure the Costs page tops its sample panels out at, so the two
- * pages describe one organization rather than two of different sizes.
+ * What the leading series spends in a MONTH, in US dollars. The same figure
+ * the Costs page scales its sample panels from, so the two pages describe one
+ * organization rather than two of different sizes.
  */
-const SAMPLE_TOP_VALUE = 7_400;
+const SAMPLE_MONTHLY_TOP = 7_400;
 
 /** Roughly how many days a bucket covers. Governance buckets are months. */
 const DAYS_PER_BUCKET = 30;
+
+/**
+ * How many month buckets the frame in view covers.
+ *
+ * Every answer is sized from this, because the widgets on this page are read
+ * side by side: a ranked panel scaled to a month under a time chart scaled to
+ * a year puts the same money an order of magnitude apart on one screen, and
+ * the reader learns the screen does not add up rather than what it spends.
+ * That is the incoherence the Costs page was already fixed for.
+ */
+function frameBucketCount(frame: TimeFrame): number {
+  return Math.max(1, Math.round(frameSpanDays({ frame }) / DAYS_PER_BUCKET));
+}
+
+/**
+ * What one series spends across the whole window — the monthly top carried
+ * over every bucket the frame holds. A ranked list has no series of its own to
+ * be totalled from, so it is scaled by hand the way the Costs page scales the
+ * two panels in the same position.
+ */
+function windowTopValue(frame: TimeFrame): number {
+  return SAMPLE_MONTHLY_TOP * frameBucketCount(frame);
+}
 
 /**
  * The providers the stacked spend chart splits by. Written the way each vendor
@@ -96,14 +119,10 @@ const costColumn = (): SampleColumn => ({ name: "cost_usd", type: "Float64" });
  * any chip on this page offers (see `timeControls.ts`).
  */
 function providerDayAnswer(frame: TimeFrame): SampleAnswer {
-  const bucketCount = Math.max(
-    1,
-    Math.round(frameSpanDays({ frame }) / DAYS_PER_BUCKET),
-  );
   const buckets = sampleDaily(
-    recentMonths(bucketCount),
+    recentMonths(frameBucketCount(frame)),
     SAMPLE_PROVIDERS,
-    SAMPLE_TOP_VALUE,
+    SAMPLE_MONTHLY_TOP,
   );
 
   return {
@@ -118,14 +137,23 @@ function providerDayAnswer(frame: TimeFrame): SampleAnswer {
   };
 }
 
-/** Spend per department, steeply ranked the way real spend falls away. */
-function departmentAnswer(): SampleAnswer {
+/**
+ * Spend per department over the window, steeply ranked the way real spend
+ * falls away.
+ *
+ * Ranked from the WINDOW total rather than from a month, so the bars beside
+ * the person chart are the same size of money and narrowing the frame shrinks
+ * them instead of relabelling a year of spend as a quarter of it.
+ */
+function departmentAnswer(frame: TimeFrame): SampleAnswer {
   return {
     columns: [stringColumn("department"), costColumn()],
-    rows: sampleRanked(SAMPLE_DEPARTMENTS, SAMPLE_TOP_VALUE).map((row) => ({
-      department: row.label,
-      cost_usd: row.value,
-    })),
+    rows: sampleRanked(SAMPLE_DEPARTMENTS, windowTopValue(frame)).map(
+      (row) => ({
+        department: row.label,
+        cost_usd: row.value,
+      }),
+    ),
   };
 }
 
@@ -168,9 +196,12 @@ function personAnswer(): SampleAnswer {
  * appear whatever the roster grows to. Agent names carry no environment suffix
  * — ADR-128 keys an agent on name AND environment, and gluing the two into one
  * string invents an agent the Agents screen has never heard of.
+ *
+ * Ranked from the window total for the same reason the department answer is:
+ * this chart sits directly under the provider chart of the same money.
  */
-function modelAgentAnswer(): SampleAnswer {
-  const ranked = sampleRanked(SAMPLE_AGENTS, SAMPLE_TOP_VALUE);
+function modelAgentAnswer(frame: TimeFrame): SampleAnswer {
+  const ranked = sampleRanked(SAMPLE_AGENTS, windowTopValue(frame));
 
   return {
     columns: [stringColumn("model"), stringColumn("agent"), costColumn()],

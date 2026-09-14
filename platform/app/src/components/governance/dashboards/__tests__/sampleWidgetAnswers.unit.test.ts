@@ -85,6 +85,10 @@ const columnValues = (
   column: string,
 ) => result.rows.map((row) => String(row[column]));
 
+/** What the leading row of an answer spends, in US dollars. */
+const topCost = (result: { rows: readonly Record<string, unknown>[] }) =>
+  Math.max(...result.rows.map((row) => Number(row.cost_usd)));
+
 describe("the sample answers behind the governance widgets", () => {
   describe("given a widget's query asks for a set of columns", () => {
     describe("when the sample answer for it is produced", () => {
@@ -177,6 +181,35 @@ describe("the sample answers behind the governance widgets", () => {
       for (const value of columnValues(modelAgent, "agent")) {
         expect(SAMPLE_AGENTS as readonly string[]).toContain(value);
       }
+    });
+  });
+
+  describe("given the four widgets describe one organization", () => {
+    describe("when each is answered over the same twelve-month frame", () => {
+      /** @scenario "Every widget invents money on one scale" */
+      it("ranks departments and agents on the scale the person chart uses", async () => {
+        const person = topCost(await answer("person"));
+
+        // A department panel reading a tenth of the person panel beside it is
+        // the incoherence the Costs page was already fixed for: the reader
+        // learns the screen does not add up rather than what it spends.
+        expect(topCost(await answer("department"))).toBeGreaterThan(person / 2);
+        expect(topCost(await answer("model_agent"))).toBeGreaterThan(
+          person / 2,
+        );
+      });
+    });
+
+    describe("when the frame is narrowed to a quarter", () => {
+      /** @scenario "Every widget invents money on one scale" */
+      it("shrinks the ranked figures with the window rather than holding them", async () => {
+        const year = topCost(await answer("department", "last_12_months"));
+        const quarter = topCost(await answer("department", "last_3_months"));
+
+        // Twelve buckets against three: a ranked total that ignored the frame
+        // would draw a year of spend under a quarter's heading.
+        expect(year / quarter).toBeCloseTo(4, 1);
+      });
     });
   });
 

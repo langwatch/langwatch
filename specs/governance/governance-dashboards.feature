@@ -133,6 +133,17 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     # the reader judges a layout the real figures will never produce.
 
   @unit
+  Scenario: Every widget invents money on one scale
+    Given the four widgets describe one organization
+    When each is answered over the same time frame
+    Then the ranked figures are the same size of money as the charted ones
+    And narrowing the frame shrinks them with it
+    # A department panel reading a tenth of the person panel beside it
+    # teaches a reader that the screen does not add up rather than what
+    # the organization spends. Every figure is therefore scaled from one
+    # monthly top carried across the buckets the frame holds.
+
+  @unit
   Scenario: A query with no sample answer is refused, not invented
     Given a query nothing has been written to answer
     When an answer for it is asked for
