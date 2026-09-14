@@ -28,7 +28,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createPiCapture } from "../pi-capture";
+import { createPiCapture, FS_CLOCK_SKEW_GRACE_MS } from "../pi-capture";
 
 const SESSION_ID = "44444444-4444-4444-8444-444444444444";
 
@@ -46,16 +46,19 @@ const LOGS_ENDPOINT = "https://app.langwatch.test/api/otel/v1/logs";
 
 let dir: string;
 
-function messageLine(rowId: string): string {
+/** When a row carries no time of its own. Most tests do not care which. */
+const ROW_TIME_ISO = "2026-09-14T10:00:05.000Z";
+
+function messageLine(rowId: string, timestampIso = ROW_TIME_ISO): string {
   return `${JSON.stringify({
     type: "message",
     id: rowId,
     parentId: null,
-    timestamp: "2026-09-14T10:00:05.000Z",
+    timestamp: timestampIso,
     message: {
       role: "assistant",
       content: [{ type: "text", text: "hi" }],
-      timestamp: Date.parse("2026-09-14T10:00:05.000Z"),
+      timestamp: Date.parse(timestampIso),
       model: "openai/gpt-5-mini",
     },
   })}\n`;
@@ -68,7 +71,10 @@ function sessionLines(...rowIds: string[]): string {
       id: SESSION_ID,
       version: 3,
       createdAt: "2026-09-14T10:00:00.000Z",
-    })}\n` + rowIds.map(messageLine).join("")
+    })}\n` +
+    // Called through a lambda on purpose: `map` passes the index as the second
+    // argument, which would land on `messageLine`'s timestamp parameter.
+    rowIds.map((rowId) => messageLine(rowId)).join("")
   );
 }
 
@@ -506,42 +512,63 @@ describe("given a session captured by an earlier run", () => {
   });
 });
 
+/**
+ * Both unbound on purpose: no scenario in the feature file describes the
+ * filesystem clock. The behaviour is still load-bearing, because when this
+ * filter is wrong the run captures nothing, exits 0, and prints nothing.
+ */
 describe("given a filesystem clock that runs behind the run's own", () => {
+  /** Records every posted body, the way the send tests above do. */
+  function recordingCapture(sinceMs: number): {
+    capture: ReturnType<typeof createPiCapture>;
+    bodies: string[];
+  } {
+    const bodies: string[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+      if (init?.body) bodies.push(init.body);
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+    return {
+      bodies,
+      capture: createPiCapture({
+        sinceMs,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      }),
+    };
+  }
+
   describe("when pi's file claims a modification time before the run started", () => {
     /**
      * The whole session is still captured.
      *
      * Not a hypothetical. The run's start is a `Date.now()`; a file's mtime is
-     * the kernel's, and on Linux the kernel's is behind — a file written right
-     * after the stamp carries an earlier mtime 98% of the time, by as much as
-     * 1.2ms. `pi-wrapper-capture.unit.test.ts` leaves roughly 1.5ms between
-     * the two, so the comparison decided that file's fate on a coin flip, and
-     * lost on CI: nothing captured, exit 0, nothing on stderr.
+     * the kernel's, and on Linux mtimes advance in one-millisecond steps while
+     * `Date.now()` does not, so a file written after the stamp can carry an
+     * mtime up to a millisecond before it. In the shape the wrapper has — a few
+     * awaited hops, then one async write — that happened in 373 of 400 Linux
+     * runs and 0 of 400 on macOS. It matches the CI-only failure of
+     * `pi-wrapper-capture.unit.test.ts`: nothing captured, exit 0, nothing on
+     * stderr. That failure was not reproduced here, so treat this as pinning
+     * the unsound comparison, not as proof the flake had no other cause.
      *
      * The skew is a property of the platform and cannot be provoked on macOS,
      * so this sets the modification time by hand instead. One millisecond of
-     * backdating is the real defect's real size; the grace covers a thousand.
+     * backdating is exactly one of those steps; the grace covers a thousand.
      */
     it("captures a file whose mtime predates the run, and its rows", async () => {
       const startedAtMs = Date.parse("2026-09-14T10:00:04.000Z");
       const file = join(dir, "skewed.jsonl");
       await writeFile(file, sessionLines("aaaaaaaa", "bbbbbbbb"), "utf8");
-      // One millisecond before the run began, which no honest clock would
-      // report for a file this run's child just wrote.
+      // One millisecond before the run began — one step of the granularity
+      // that causes this, and a time no honest clock would report for a file
+      // this run's child just wrote.
       const behind = new Date(startedAtMs - 1);
       await utimes(file, behind, behind);
 
-      const bodies: string[] = [];
-      const capture = createPiCapture({
-        sinceMs: startedAtMs,
-        sessionsDir: dir,
-        logsEndpoint: LOGS_ENDPOINT,
-        token: "sk-lw-test",
-        fetchImpl: vi.fn(async (_url: unknown, init?: { body?: string }) => {
-          if (init?.body) bodies.push(init.body);
-          return { ok: true, status: 200 } as Response;
-        }) as unknown as typeof fetch,
-      });
+      const { capture, bodies } = recordingCapture(startedAtMs);
 
       // The rows are stamped 10:00:05, one second INTO the run, so they are
       // this run's work by the only clock that decides that.
@@ -553,32 +580,42 @@ describe("given a filesystem clock that runs behind the run's own", () => {
      * The grace widens which files are read. It must not widen which turns are
      * sent, or a resumed session's earlier turns are billed twice — the exact
      * loss the row window exists to stop.
+     *
+     * The file holds one row from before the run and one from during it, and
+     * the count must come out at exactly one. A file of only-old rows would
+     * not do: that asserts zero, which is also what a grace too small to admit
+     * the file at all produces, so it would pass for the opposite reason. One
+     * of two can only happen if the file was read AND the row window judged it.
      */
-    it("still drops rows written before the run, from that same file", async () => {
-      // A second after the file's rows (10:00:05), so every row in it predates
-      // the run and none of them may be sent.
+    it("sends only the rows written after the run began, from that file", async () => {
+      // Between the two rows: 10:00:05 is before the run, 10:00:07 during it.
       const startedAtMs = Date.parse("2026-09-14T10:00:06.000Z");
+      const duringIso = "2026-09-14T10:00:07.000Z";
       const file = join(dir, "earlier.jsonl");
-      await writeFile(file, sessionLines("cccccccc", "dddddddd"), "utf8");
+      await writeFile(
+        file,
+        sessionLines() +
+          messageLine("cccccccc") +
+          messageLine("dddddddd", duringIso),
+        "utf8",
+      );
       // Inside the grace, so the file IS offered to the reader. Without the
-      // row window that alone would put its turns on the wire.
-      const behind = new Date(startedAtMs - 1);
+      // row window that alone would put both turns on the wire. A literal
+      // rather than a fraction of FS_CLOCK_SKEW_GRACE_MS: deriving it from the
+      // constant would shrink this fixture in step with the constant, and the
+      // test would survive the grace being narrowed to nothing.
+      const behind = new Date(startedAtMs - 500);
+      expect(500).toBeLessThan(FS_CLOCK_SKEW_GRACE_MS);
       await utimes(file, behind, behind);
 
-      const bodies: string[] = [];
-      const capture = createPiCapture({
-        sinceMs: startedAtMs,
-        sessionsDir: dir,
-        logsEndpoint: LOGS_ENDPOINT,
-        token: "sk-lw-test",
-        fetchImpl: vi.fn(async (_url: unknown, init?: { body?: string }) => {
-          if (init?.body) bodies.push(init.body);
-          return { ok: true, status: 200 } as Response;
-        }) as unknown as typeof fetch,
-      });
+      const { capture, bodies } = recordingCapture(startedAtMs);
 
-      expect(await capture.harvest()).toBe(0);
-      expect(bodies).toEqual([]);
+      expect(await capture.harvest()).toBe(1);
+      // Rows reach the wire as times, not ids, so the times are what identify
+      // which of the two was sent.
+      const wire = bodies.join("\n");
+      expect(wire).toContain(`${Date.parse(duringIso)}000000`);
+      expect(wire).not.toContain(`${Date.parse(ROW_TIME_ISO)}000000`);
     });
   });
 });
