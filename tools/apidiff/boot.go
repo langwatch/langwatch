@@ -111,6 +111,11 @@ type Booted struct {
 	B        Instance // main (base)
 	WorkRoot string
 	Teardown func()
+	// ActivateEntitlement, when non-nil, lets the entitled pass elevate the
+	// seeded organization to an Enterprise plan on both instances' own
+	// databases mid-run. nil on the haven path (see EntitlementActivator)
+	// and whenever the license it activates could not be read.
+	ActivateEntitlement EntitlementActivator
 }
 
 // DatabaseName names each instance's Postgres and ClickHouse database,
@@ -530,7 +535,31 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 	if err := state.bootInstances(ctx, booted); err != nil {
 		return booted, err
 	}
+	booted.ActivateEntitlement = state.buildEntitlementActivator()
 	return booted, nil
+}
+
+// buildEntitlementActivator reads the license the entitled pass activates
+// from this run's own branch checkout and, if that succeeds, returns a
+// closure that upserts it onto both instances' seeded organization. Reading
+// fails loudly to stderr and returns nil (skip, not crash) when the seed
+// source has moved or reshaped — a run should still finish and report
+// everything else it found rather than dying over one optional pass.
+func (state *bootState) buildEntitlementActivator() EntitlementActivator {
+	licenseKey, err := readLocalDevEnterpriseLicenseKey(state.cfg.BranchDir)
+	if err != nil {
+		state.logf("entitled pass: disabled (%v)", err)
+		return nil
+	}
+	sql := activateEntitlementSQL(licenseKey)
+	return func(ctx context.Context) error {
+		for _, name := range []string{"branch", "main"} {
+			if err := state.pgAdminDB(ctx, DatabaseName(state.runID, name), sql); err != nil {
+				return fmt.Errorf("activate entitlement %s: %w", name, err)
+			}
+		}
+		return nil
+	}
 }
 
 // bootHaven is the haven-path half of boot(): the branch instance runs from

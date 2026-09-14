@@ -220,6 +220,49 @@ the machine report with `-json` (optionally to `-report FILE`).
   project C — fixed IDs, plaintext legacy-format keys, `ON CONFLICT` safe)
   and defaults the keys; `probe` mode needs `-project-key-b`/`-project-key-c`.
 
+## Entitled pass
+
+Some operations answer with the handled-error code `enterprise_plan_required`
+before they do anything else — the plan gate refuses the request outright.
+Stopping the comparison there tests only whether the two sides AGREE on the
+gate, never what either side does BEHIND it. After the main pass (and its
+collection/permission follow-ups), every operation either side gated is
+re-probed with the seeded organization (`local-dev-organization`) entitled to
+an Enterprise plan, tagged with its own case, `entitled`, so the report can
+tell "the gate disagreed" apart from "behavior behind the gate disagreed".
+Detection reads the `error.code` field out of the body — never a hardcoded
+path list — so a gate on a surface added later (SCIM, the webhook endpoints
+that already check `assertEndpointsEntitled`) is caught the same way.
+
+Activation is a live, mid-run database write, not a boot-time flag: `run`
+mode `UPDATE`s the `Organization.license` column both layouts read fresh on
+every request (branch:
+`PrismaOrganizationLicenseRepository.tryReadLicense`; main:
+`LicenseHandler`'s `readStoredLicense`), for `local-dev-organization`, on
+BOTH instances' databases, with the same pre-signed ENTERPRISE license the
+local-dev seed itself writes
+(`LOCAL_DEV_ENTERPRISE_LICENSE_KEY`, read at runtime from
+`enterprise/modules/licensing/server/src/seeding.ts` in the branch checkout —
+never copied into Go source, so a rotation is caught by a failing read
+instead of silently entitling nothing). No restart, and nothing is skipped on
+the unentitled pass to make room for it: the original gate refusal stays its
+own finding, under the ordinary case.
+
+`probe` mode has no database and never activates anything; `run`'s haven path
+provisions no fixtures at all (same reason the SCIM and permission-probe
+fixtures are skipped there — a haven stack's database belongs to haven), so
+the entitled pass is skipped too, noted on stderr rather than silently doing
+nothing.
+
+**The activation attempt can genuinely do nothing, and the pass reports that
+honestly rather than papering over it.** Elevating the database row only
+changes an operation's answer if that process actually reads a license
+source at all. If a layout's plan resolution never composes one — the branch
+process opened no license source, say — the re-probe still runs and still
+answers the same gate refusal, and that shows up as its own `entitled`-case
+finding: real signal that the gap is architectural, not a probe that forgot
+to check.
+
 ## The ledger
 
 A run's `-report` is the evidence; the **ledger** is the worklist. Every
@@ -262,7 +305,12 @@ Cause slugs: `not-found-as-500:<pair>`, `handled-refusal-degraded:<pair>`,
 `permission-leak`, `permission-diff:<pair>`, `mutation-not-visible`,
 `body-shape-diff`, `body-value-diff`, `error-shape-diff`, `probe-failed`,
 `unresolvable-parameter`, `harness-symbol-table` (a harness artifact, not an
-API difference), `unverified-list-shape`, and `spec-<change kind>`.
+API difference), `unverified-list-shape`, and `spec-<change kind>`. A finding
+from the entitled pass (see "Entitled pass" above) gets the SAME slug an
+identical finding would get from the main pass, prefixed with its own
+namespace — `entitled:handled-refusal-degraded:402-200`, never bare
+`handled-refusal-degraded:402-200` — because "the gate disagrees" and
+"behavior behind the gate disagrees" are never the same fix.
 
 `-ledger-baseline FILE` takes a previous `ledger.json` (or a plain JSON array
 of slugs) and marks those causes **known**: they are still reported, still

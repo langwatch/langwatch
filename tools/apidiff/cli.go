@@ -62,6 +62,10 @@ type probeFlags struct {
 	// completes; nil for the plain `probe` subcommand, which has no run
 	// directory to stream into. Set by `run` after Boot succeeds.
 	onOperationDone func(Operation, []Finding)
+	// activateEntitlement powers the entitled pass; nil for the plain
+	// `probe` subcommand (no database) and for a haven-booted run. Set by
+	// `run` from Booted.ActivateEntitlement after Boot succeeds.
+	activateEntitlement EntitlementActivator
 }
 
 func (probe *probeFlags) filter() OpFilter {
@@ -176,6 +180,7 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
+	probe.activateEntitlement = booted.ActivateEntitlement
 	if boot.UseHaven {
 		// The SCIM token and the permission-probe projects are inserted with
 		// SQL, and the haven path runs none: a stack's database belongs to
@@ -314,18 +319,19 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 	selected := SelectOperations(operations, probe.filter())
 	fmt.Fprintf(out.stderr, "probing %d operations (lockstep)\n", len(selected))
 	result := ProbeAll(ctx, ProbeOptions{
-		A:               probe.a,
-		B:               probe.b,
-		Keys:            probe.keys,
-		Schemes:         SecuritySchemes(specs.a, specs.b),
-		Timeout:         probe.timeout,
-		Filter:          probe.filter(),
-		ExcludePrefixes: probe.excludePrefixes,
-		ExactStatus:     probe.exactStatus,
-		Client:          client,
-		Progress:        out.stderr,
-		SettleTimeout:   probe.settleTimeout,
-		OnOperationDone: probe.onOperationDone,
+		A:                   probe.a,
+		B:                   probe.b,
+		Keys:                probe.keys,
+		Schemes:             SecuritySchemes(specs.a, specs.b),
+		Timeout:             probe.timeout,
+		Filter:              probe.filter(),
+		ExcludePrefixes:     probe.excludePrefixes,
+		ExactStatus:         probe.exactStatus,
+		Client:              client,
+		Progress:            out.stderr,
+		SettleTimeout:       probe.settleTimeout,
+		OnOperationDone:     probe.onOperationDone,
+		ActivateEntitlement: probe.activateEntitlement,
 	}, operations)
 
 	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}

@@ -83,9 +83,16 @@ type ProbeOptions struct {
 
 	// OnOperationDone fires once per operation in the main pass, right after
 	// its own findings are final — never for an excluded operation, and
-	// never for the post-pass findings (collection/permission checks), which
-	// describe a different comparison than the one operation just probed.
+	// never for the post-pass findings (collection/permission/entitled
+	// checks), which describe a different comparison than the one operation
+	// just probed.
 	OnOperationDone func(Operation, []Finding)
+
+	// ActivateEntitlement, when non-nil, lets the entitled pass elevate the
+	// seeded organization to an Enterprise plan mid-run and re-probe whatever
+	// the main pass saw the Enterprise gate refuse. Only `apidiff run` can
+	// supply one — it alone owns the databases; see entitlement.go.
+	ActivateEntitlement EntitlementActivator
 }
 
 // SuppressedCounts tallies comparisons the default semantics filtered out,
@@ -145,6 +152,7 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	findings = append(findings, engine.verifyCollections(selected)...)
 	findings = append(findings, engine.permissionProbes(selected)...)
 	findings = append(findings, engine.markUnverifiedLists(selected)...)
+	findings = append(findings, engine.entitledPass()...)
 	return ProbeResult{Findings: findings, Transcripts: engine.transcripts, Probed: probed, Suppressed: engine.suppressed}
 }
 
@@ -180,6 +188,9 @@ type probeEngine struct {
 	ownerIDs    map[string]*sideIDs // per operation, IDs the owner key saw
 	statusDiffs map[string]bool     // operations already reported as differing
 	transcripts []Transcript
+	// gatedOps are the operations the main pass saw the Enterprise gate
+	// refuse on either side, keyed by operationKeyOf. See entitlement.go.
+	gatedOps map[string]Operation
 }
 
 // sideIDs holds one operation's owner-visible IDs, per side.
@@ -244,6 +255,7 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 			continue
 		}
 		findings = append(findings, engine.compareCase(operation, probeCase, transcript)...)
+		engine.recordGate(operation, transcript)
 	}
 	return findings
 }

@@ -311,7 +311,23 @@ func contains(values []string, want string) bool {
 // slug when fixing one plausibly fixes the other: the 14 webhook rows of the
 // 2026-09-05 run are one handled-refusal-degraded cause, and the five
 // not-found regressions are one not-found-as-500.
+//
+// Entitled-pass findings (Case == entitledCaseName) get the SAME slug an
+// identical finding would get from the main pass, prefixed with its own
+// namespace: "entitled:" + the ordinary slug. Two findings only share one
+// cause if fixing one plausibly fixes the other, and "the gate disagrees"
+// and "behavior BEHIND the gate disagrees" are never the same fix, even when
+// the underlying Kind and status pair are identical.
 func RootCause(finding Finding) string {
+	cause := rootCauseOf(finding)
+	if finding.Case == entitledCaseName {
+		return "entitled:" + cause
+	}
+	return cause
+}
+
+// rootCauseOf is RootCause without the entitled-pass namespace.
+func rootCauseOf(finding Finding) string {
 	before, after, hasStatus := statusPair(finding)
 	switch finding.Kind {
 	case FindingOperationMissing:
