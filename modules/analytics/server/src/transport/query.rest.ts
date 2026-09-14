@@ -23,7 +23,6 @@ import {
 import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
-import { LWQL_COLUMN_UNITS } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
@@ -72,8 +71,8 @@ const SCHEMA_DESCRIPTION =
 // the types; these describe them to a consumer reading the spec, and stay loose
 // where the payload genuinely is the caller's.
 export const lwqlResultSchema = z.object({
-  columns: z.array(z.object({ name: z.string(), type: z.string() })),
-  rows: z.array(z.record(z.string(), z.any())),
+  columns: z.array(z.object({ name: z.string(), type: z.string() })).readonly(),
+  rows: z.array(z.record(z.string(), z.any())).readonly(),
   statistics: z.object({
     elapsedMs: z.number(),
     rowsRead: z.number(),
@@ -93,44 +92,54 @@ export const lwqlResultSchema = z.object({
   followsGranularity: z.boolean(),
   granularitySeconds: z.number().optional(),
   coarsenedFromSeconds: z.number().optional(),
-  diagnostics: z.array(
-    z.object({
-      // Enumerated rather than a bare string: a consumer branches on the code,
-      // and a published spec that would not tell it which codes exist makes it
-      // guess from prose.
-      code: z.enum(LWQL_DIAGNOSTIC_CODES),
-      message: z.string(),
-      meta: z.record(z.string(), z.any()).optional(),
-    }),
-  ),
+  diagnostics: z
+    .array(
+      z.object({
+        // Enumerated rather than a bare string: a consumer branches on the code,
+        // and a published spec that would not tell it which codes exist makes it
+        // guess from prose.
+        code: z.enum(LWQL_DIAGNOSTIC_CODES),
+        message: z.string(),
+        meta: z.record(z.string(), z.any()).optional(),
+      }),
+    )
+    .readonly(),
 });
 
 export const lwqlSchemaSchema = z.object({
   database: z.string(),
-  datasets: z.array(
-    z.object({
-      name: z.string(),
-      description: z.string(),
-      grain: z.string(),
-      joinKeys: z.array(z.string()),
-      timeColumn: z.string(),
-      freshness: z.string(),
-      columns: z.array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-          description: z.string(),
-          // Nullable rather than optional: the response answers the unit
-          // question for every column, and `null` is the answer for one that is
-          // not measured in anything.
-          unit: z.enum(LWQL_COLUMN_UNITS).nullable(),
-          gates: z.array(z.enum(["input", "output", "costs"])),
-          available: z.boolean(),
-        }),
-      ),
-      exampleSql: z.string(),
-    }),
-  ),
+  datasets: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        grain: z.string(),
+        joinKeys: z.array(z.string()).readonly(),
+        timeColumn: z.string(),
+        freshness: z.string(),
+        columns: z
+          .array(
+            z.object({
+              name: z.string(),
+              type: z.string(),
+              description: z.string(),
+              // Nullable rather than optional: the response answers the unit
+              // question for every column, and `null` is the answer for one that is
+              // not measured in anything. A bare string, matching
+              // `LangWatchQLSchemaColumn` (`@langwatch/analytics-contract`) —
+              // the App's declared return type, not the narrower
+              // `LWQL_COLUMN_UNITS`/gate-name sets this door's own catalog
+              // happens to draw from today.
+              unit: z.string().nullable(),
+              gates: z.array(z.string()).readonly(),
+              available: z.boolean(),
+            }),
+          )
+          .readonly(),
+        exampleSql: z.string(),
+      }),
+    )
+    .readonly(),
 });
 
 export const queryRest = defineRestRouter(AnalyticsQueryApi)

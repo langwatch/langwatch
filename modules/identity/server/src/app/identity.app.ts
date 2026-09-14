@@ -7,6 +7,7 @@
 import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 import { buildIdentityInfrastructure } from "./identity-composition.build.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
@@ -17,7 +18,10 @@ import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import { IdentityEmailService } from "../services/identity-email.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
-import { IdentityNewbornReconciliationService } from "../services/identity-newborn-reconciliation.service.ts";
+import {
+  IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
+  IdentityNewbornReconciliationService,
+} from "../services/identity-newborn-reconciliation.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
@@ -29,6 +33,12 @@ import { SsoConnectionGuardsService } from "../services/sso-connection-guards.se
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
+/**
+ * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
+ * itself per pass the same way `IdentityNewbornReconciliationService`'s own
+ * internal reap of this exact repository call does.
+ */
+const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 /**
  * Config schema: `ADMIN_EMAILS`, the deployment's platform-operator list, for
  * the SSO connection guards' D05 tier-1 check. Defaults to none rather than
@@ -181,8 +191,28 @@ export class IdentityApp implements IdentityApi {
     return this.parts.mfaGuards;
   }
 
-  reservations(): IdentityRepositories["reservations"] {
-    return this.parts.reservations;
+  reservations() {
+    const reservations = this.parts.reservations;
+    return {
+      claim: (args: {
+        normalizedValue: string;
+        userId: string;
+        identifierId: string;
+        commandId: string;
+      }) => reservations.claim(args),
+      release: (args: { userId: string; holdingIdentifierIds: readonly string[] }) =>
+        reservations.release(args),
+      // The boundary member takes no args on purpose — the same reap-horizon and
+      // per-pass cap `IdentityNewbornReconciliationService` already uses for this
+      // exact repository call (`reapAddressLocks`), not a caller-chosen one.
+      reapOrphans: () =>
+        reservations.reapOrphans({
+          olderThan: Temporal.Instant.fromEpochMilliseconds(
+            nowInstant().epochMilliseconds - IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
+          ),
+          limit: RESERVATIONS_REAP_LIMIT_PER_PASS,
+        }),
+    };
   }
 
   identity(): IdentityService {

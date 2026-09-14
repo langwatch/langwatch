@@ -101,7 +101,7 @@ export class IdentityService
 
   private async commit(
     command: IdentityCommand,
-    facts: Awaited<ReturnType<IdentityGuardsService["attachIdentifier"]>>,
+    facts: Awaited<ReturnType<IdentityGuardsApi["attachIdentifier"]>>,
   ): Promise<IdentityFact[]> {
     if (facts.length === 0) {
       return [];

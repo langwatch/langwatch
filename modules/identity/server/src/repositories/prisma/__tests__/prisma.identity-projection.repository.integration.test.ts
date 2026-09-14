@@ -16,6 +16,7 @@ import { PrismaIdentityReservationRepository } from "../prisma.identity-reservat
 import type { IdentityFoldState } from "../../../projections/identity-state.projection.ts";
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { createTenantId } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const namespace = `idproj-${nanoid(8)}`;
@@ -62,6 +63,7 @@ const fact = (id: string, state: "ATTACHED" | "VERIFIED" | "DETACHED"): Identifi
 describe.skipIf(!DB_URL)("PrismaIdentityProjectionRepository", () => {
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger("langwatch:identity:test:identity-projection-repository"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const repository = new PrismaIdentityProjectionRepository(

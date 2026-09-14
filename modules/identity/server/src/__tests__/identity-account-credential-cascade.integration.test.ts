@@ -12,6 +12,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { createLogger } from "@langwatch/observability";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -21,6 +22,7 @@ describe.skipIf(!DB_URL)("AccountCredential cascade on User delete", () => {
 
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger("langwatch:identity:test:account-credential-cascade"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
 

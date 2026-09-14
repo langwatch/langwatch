@@ -88,7 +88,7 @@ export class SsoConnectionBackofficeService {
     };
   }
 
-  async tryGetById({
+  async findById({
     connectionId,
   }: {
     connectionId: string;

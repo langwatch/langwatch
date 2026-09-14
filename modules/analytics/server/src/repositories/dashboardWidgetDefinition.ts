@@ -121,12 +121,10 @@ const queryParameterDeclarationSchema = z
       // on a plain object would mutate the prototype (or a builtin) instead of
       // adding an own key, so the value is silently dropped. Refuse the name
       // at the schema rather than lose the value at bind time.
-      .refine(
-        (name) => !FORBIDDEN_PARAMETER_NAMES.has(name),
-        (name) => ({
-          message: `"${name}" is a reserved JavaScript property name — pick a different parameter name`,
-        }),
-      ),
+      .refine((name) => !FORBIDDEN_PARAMETER_NAMES.has(name), {
+        error: (payload) =>
+          `"${String(payload.value)}" is a reserved JavaScript property name — pick a different parameter name`,
+      }),
     type: queryParameterTypeSchema,
     /**
      * Fills the value a `LW.query` call omits for this parameter — the Run

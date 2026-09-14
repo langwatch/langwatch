@@ -377,7 +377,7 @@ export const savedWorkbenchChartRest = defineRestRouter(SavedWorkbenchChartApi)
     responses: {
       ...canonicalBaseResponses,
       ...chartNotFoundResponse,
-      204: { description: "The chart was deleted" },
+      204: { description: "The chart was deleted", content: {} },
     },
   })
   .handle(async ({ app, input, scope }) => {
@@ -431,7 +431,7 @@ export const savedWorkbenchChartRest = defineRestRouter(SavedWorkbenchChartApi)
     responses: {
       ...canonicalBaseResponses,
       ...chartNotFoundResponse,
-      204: { description: "The chart is no longer on any dashboard" },
+      204: { description: "The chart is no longer on any dashboard", content: {} },
     },
   })
   .handle(async ({ app, input, scope }) => {

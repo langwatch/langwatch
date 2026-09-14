@@ -51,17 +51,13 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { LWQL_VIEW_CATALOG } from "../__tests__/lwql-views.integration.test.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
-  columnExpression,
-  isPostgresResident,
+  LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
   type LangWatchQLViewColumn,
   type LangWatchQLViewDefinition,
-  lwqlGrainColumns,
-  lwqlPostgresViews,
-  lwqlViewSourceColumns,
-} from "../../../../web/src/model/filters/types.ts";
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
@@ -74,6 +70,8 @@ import {
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
 } from "./postgresMapping.ts";
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its
@@ -204,10 +202,10 @@ const TENANT_COLUMN = "TenantId";
 export function lwqlGrantedSourceColumns(
   view: LangWatchQLViewDefinition,
 ): readonly string[] {
-  if (isPostgresResident(view)) {
+  if (catalogShapes.isPostgresResident(view)) {
     return view.columns.map((column) => column.name);
   }
-  return lwqlViewSourceColumns(view);
+  return catalogShapes.viewSourceColumns(view);
 }
 
 /**
@@ -226,7 +224,7 @@ function sourceRelation({
   sourceDatabase: string;
   view: LangWatchQLViewDefinition;
 }): string {
-  const database = isPostgresResident(view) ? names.database : sourceDatabase;
+  const database = catalogShapes.isPostgresResident(view) ? names.database : sourceDatabase;
   return `${assertIdentifier(database, "sourceDatabase")}.${assertIdentifier(view.sourceTable, "sourceTable")}`;
 }
 
@@ -386,7 +384,7 @@ function dedupPredicate(
         : `LangWatchQL view ${view.name} deduplicates on a version column it does not declare`,
     );
   }
-  const grain = lwqlGrainColumns(view);
+  const grain = catalogShapes.grainColumns(view);
   const outerKeys = grain.map(sourceColumn);
   const innerKeys = grain.map(quotedColumn);
   const version = quotedColumn(versionColumn);
@@ -413,9 +411,9 @@ function groupedColumnExpression(
   view: LangWatchQLViewDefinition,
   column: LangWatchQLViewColumn,
 ): string {
-  const grain = lwqlGrainColumns(view);
+  const grain = catalogShapes.grainColumns(view);
   if (grain.includes(column.name)) {
-    return columnExpression({ column, source: sourceColumn });
+    return catalogShapes.columnExpression({ column, source: sourceColumn });
   }
   if (!column.summed) {
     throw new Error(
@@ -423,7 +421,7 @@ function groupedColumnExpression(
         `the grain nor a summed measure, so it would take an arbitrary value from its group`,
     );
   }
-  return columnExpression({ column, source: sourceColumn, isAggregated: true });
+  return catalogShapes.columnExpression({ column, source: sourceColumn, isAggregated: true });
 }
 
 /**
@@ -452,9 +450,9 @@ export function lwqlViewStatement({
   // A PostgreSQL-resident source keeps one row per key, so there is no version
   // to collapse and neither dedup shape applies; what it needs instead is the
   // predicate that keeps the read off the primary from being a whole-table one.
-  const postgres = isPostgresResident(view);
+  const postgres = catalogShapes.isPostgresResident(view);
   const strategy = dedupStrategyFor({ view, dedup });
-  const grain = lwqlGrainColumns(view);
+  const grain = catalogShapes.grainColumns(view);
   // An aggregating source whose published grain is narrower than the engine's
   // key cannot be served by `FINAL`: the merge collapses to the key, and the
   // surplus key columns would surface as extra rows per logical row. The view
@@ -475,7 +473,7 @@ export function lwqlViewStatement({
         ? sourceColumn(column.name)
         : grouped
           ? groupedColumnExpression(view, column)
-          : columnExpression({ column, source: sourceColumn });
+          : catalogShapes.columnExpression({ column, source: sourceColumn });
       return `  ${expression} AS ${quotedColumn(column.name)}`;
     })
     .join(",\n");
@@ -547,7 +545,7 @@ export function lwqlSourceTables({
   for (const view of views) {
     // A PostgreSQL-engine table lives in the LangWatchQL database, beside the
     // view over it, rather than in the application's.
-    const database = isPostgresResident(view) ? names.database : sourceDatabase;
+    const database = catalogShapes.isPostgresResident(view) ? names.database : sourceDatabase;
     // Keyed on the qualified name, not the bare table. Two catalog entries can
     // share a `sourceTable` while resolving to different databases — one
     // PostgreSQL-resident, one a fact table — and keying on the bare name
@@ -589,7 +587,7 @@ export function lwqlPostgresApprovedViewStatements({
   schema: string;
   views?: readonly LangWatchQLViewDefinition[];
 }): string[] {
-  return lwqlPostgresViews(views).map((view) =>
+  return catalogShapes.postgresViews(views).map((view) =>
     postgresApprovedViewStatement({
       schema,
       view: view.postgres.approvedView,
@@ -617,7 +615,7 @@ export function lwqlPostgresApprovedViewStatements({
 export function lwqlApprovedPostgresViewNames(
   views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG,
 ): string[] {
-  return lwqlPostgresViews(views).map((view) => view.postgres.approvedView);
+  return catalogShapes.postgresViews(views).map((view) => view.postgres.approvedView);
 }
 
 /**
@@ -658,7 +656,7 @@ export function lwqlPostgresReaderConnectionLimit({
   headroom?: number;
 } = {}): number {
   return (
-    lwqlPostgresViews(views).length * connectionPoolSize * concurrentCatalogs +
+    catalogShapes.postgresViews(views).length * connectionPoolSize * concurrentCatalogs +
     headroom
   );
 }
@@ -687,7 +685,7 @@ export function lwqlPostgresEngineTableStatements({
   collection: string;
   views?: readonly LangWatchQLViewDefinition[];
 }): string[] {
-  return lwqlPostgresViews(views).map((view) =>
+  return catalogShapes.postgresViews(views).map((view) =>
     postgresEngineTableStatement({
       names,
       table: view.sourceTable,
@@ -784,7 +782,7 @@ export function lwqlViewSetupStatements({
     // keeps `SHOW CREATE TABLE` answerable, the surface the credential-leak
     // assertion inspects.
     ...views.map((view) =>
-      isPostgresResident(view)
+      catalogShapes.isPostgresResident(view)
         ? lwqlGrantStatement({ names, table: view.sourceTable })
         : lwqlSourceColumnGrantStatement({ names, sourceDatabase, view }),
     ),

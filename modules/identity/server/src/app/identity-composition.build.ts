@@ -181,7 +181,7 @@ class RegisteredIdentityEventing implements IdentityEventing {
 }
 
 /** The four pipelines and the verbs each one is expected to publish. */
-const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map([
+const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
   [IDENTITY_PIPELINE_NAME, IDENTITY_COMMAND_NAMES],
   [JOIN_REQUEST_PIPELINE_NAME, JOIN_REQUEST_COMMAND_NAMES],
   [SSO_CONNECTION_PIPELINE_NAME, SSO_CONNECTION_COMMAND_NAMES],
