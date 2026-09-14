@@ -520,8 +520,9 @@ describe("the saved workbench chart router", () => {
             where: { id: PROJECT },
             select: { lwqlKey: true },
           });
-          expect(call.project.id).toBe(PROJECT);
-          expect(call.project.lwqlKey).toBe(project.lwqlKey);
+          expect(call.projects).toHaveLength(1);
+          expect(call.projects[0].id).toBe(PROJECT);
+          expect(call.projects[0].lwqlKey).toBe(project.lwqlKey);
         });
       });
     });

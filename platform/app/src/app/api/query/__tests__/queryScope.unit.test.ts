@@ -40,7 +40,10 @@ function fakePermissions(granted: Set<string>): ProjectCutsProvider {
   return {
     apiKeyProjectCuts: vi.fn(async ({ projects }) => {
       const byProject = new Map<string, boolean>(
-        projects.map((p) => [p.projectId, granted.has(p.projectId)]),
+        projects.map((p: { projectId: string }) => [
+          p.projectId,
+          granted.has(p.projectId),
+        ]),
       );
       return new Map([["analytics:view", byProject]]);
     }),
@@ -50,7 +53,11 @@ function fakePermissions(granted: Set<string>): ProjectCutsProvider {
 const projectPrincipal = (id: string): KeyPrincipal =>
   ({
     kind: "project",
-    project: { id, lwqlKey: `key-${id}`, team: { id: "t1", organizationId: "org" } },
+    project: {
+      id,
+      lwqlKey: `key-${id}`,
+      team: { id: "t1", organizationId: "org" },
+    },
   }) as KeyPrincipal;
 
 const apiKeyPrincipal: KeyPrincipal = {
@@ -142,8 +149,16 @@ describe("given projects with differing content protections", () => {
     { id: "B", lwqlKey: "key-B", teamId: "tB" },
   ];
   const perProject: Record<string, Protections> = {
-    A: { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true },
-    B: { canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: true },
+    A: {
+      canSeeCosts: true,
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: true,
+    },
+    B: {
+      canSeeCosts: true,
+      canSeeCapturedInput: false,
+      canSeeCapturedOutput: true,
+    },
   };
 
   describe("when the caller reads both", () => {
@@ -178,8 +193,16 @@ describe("strictestLwqlProtections", () => {
   describe("when one project withholds a flag", () => {
     it("ANDs the flag to false across the set", () => {
       const merged = strictestLwqlProtections([
-        { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true },
-        { canSeeCosts: false, canSeeCapturedInput: true, canSeeCapturedOutput: true },
+        {
+          canSeeCosts: true,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        },
+        {
+          canSeeCosts: false,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        },
       ]);
       expect(merged.canSeeCosts).toBe(false);
       expect(merged.canSeeCapturedInput).toBe(true);

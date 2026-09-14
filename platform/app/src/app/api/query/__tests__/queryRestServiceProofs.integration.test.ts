@@ -1484,8 +1484,9 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
 
   describe("when the result is larger than one response holds", () => {
     // The bound is lowered rather than seeding ten thousand rows: the mechanism
-    // is the same code either way.
-    const traceIds =
+    // is the same code either way. Built lazily: `database` is only bound in
+    // `beforeAll`, so a value captured at describe-eval time would be undefined.
+    const traceIds = () =>
       `SELECT TraceId FROM ${database}.traces ` +
       `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
       `ORDER BY TraceId`;
@@ -1506,14 +1507,14 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
 
     /** @scenario "A capped result comes back as one page, never silently cut" */
     it("caps a LIMIT-less statement at the row ceiling by appending it, with no diagnostic", async () => {
-      const full = await run(openProject, traceIds);
+      const full = await run(openProject, traceIds());
       expect(full.rows.length).toBeGreaterThan(2);
 
       setLangWatchQLService(
         serviceWithLimits({ maxRows: 2, maxResultBytes: 8_000_000 }),
       );
       try {
-        const capped = await run(openProject, traceIds);
+        const capped = await run(openProject, traceIds());
         expect(capped.rows).toHaveLength(2);
         expect(capped.rows).toEqual(full.rows.slice(0, 2));
         expect(capped.truncated).toBeUndefined();
@@ -1526,9 +1527,11 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     /** @scenario "Overflow throws and never silently truncates" */
     /** @scenario "A result past the byte ceiling is refused, never cut" */
     it("refuses a result past the byte ceiling with lwql_result_too_large, never a partial body", async () => {
-      setLangWatchQLService(serviceWithLimits({ maxRows: 10_000, maxResultBytes: 10 }));
+      setLangWatchQLService(
+        serviceWithLimits({ maxRows: 10_000, maxResultBytes: 10 }),
+      );
       try {
-        const error = await refuse(openProject, traceIds);
+        const error = await refuse(openProject, traceIds());
         expect(error.code).toBe("lwql_result_too_large");
         expect(error.meta).toMatchObject({ maxResultBytes: 10 });
       } finally {

@@ -19,7 +19,11 @@ import type { Protections } from "../../../traces/protections";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import type { LangWatchQLExecutor } from "../../lwql/executor";
 import { recordingExecutor } from "../../lwql/executor.testFakes";
-import { LangWatchQLService } from "../../lwql/lwql.service";
+import { LWQL_MAX_RESULT_ROWS } from "../../lwql/limits";
+import {
+  appendDefaultRowLimit,
+  LangWatchQLService,
+} from "../../lwql/lwql.service";
 import type {
   CreateSavedWorkbenchChartInput,
   PlaceSavedWorkbenchChartInput,
@@ -859,7 +863,11 @@ describe("running a saved workbench chart", () => {
         });
 
         expect(executor.calls).toHaveLength(1);
-        expect(executor.calls[0]!.sql).toBe(BUCKETED_SQL);
+        // The stored statement names no LIMIT, so the key-scoped door appends
+        // the default one before execution — the same edit every query path makes.
+        expect(executor.calls[0]!.sql).toBe(
+          appendDefaultRowLimit(BUCKETED_SQL, LWQL_MAX_RESULT_ROWS),
+        );
         expect(executor.calls[0]!.parameters).toEqual({
           // Saved alongside the query at save time.
           name: "checkout",

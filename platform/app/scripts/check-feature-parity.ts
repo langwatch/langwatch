@@ -482,6 +482,10 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/notification-coverage-gaps.feature",
   "specs/licensing/resource-limit-notifications.feature",
   "specs/licensing/usage-page-navigation.feature",
+  // Coding-agent dataset queries (#8085): the datasets exist in the catalog,
+  // but every scenario here is an end-to-end query a coding agent runs, marked
+  // @unimplemented until the e2e harness lands. Tracked gap, not silent.
+  "specs/lwql/coding-agent-datasets.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
   "specs/mcp-server/experiment-results-tool.feature",

@@ -171,9 +171,7 @@ describe("given the generated OpenAPI document", () => {
         const description: string = paths[path]?.[method]?.description ?? "";
 
         expect(description, `${label} ${path}`).toContain("analytics:view");
-        expect(description, `${label} ${path}`).toMatch(
-          /organization/i,
-        );
+        expect(description, `${label} ${path}`).toMatch(/organization/i);
       });
 
       /** @scenario "The OpenAPI descriptions for both query routes name the any-key scope rule" */

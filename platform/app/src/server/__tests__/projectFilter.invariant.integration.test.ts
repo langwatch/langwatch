@@ -38,6 +38,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resolveLwqlReadableProjects } from "~/server/analytics/lwql/readableProjects";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
@@ -246,6 +247,28 @@ const surfaces: ListingSurface[] = [
         select: { projectId: true },
       });
       return [...new Set(rows.map((r) => r.projectId))];
+    },
+  },
+  {
+    // The LangWatchQL query door fans a key out across the org's projects it
+    // can read. The candidate enumeration filters the governance home before
+    // the per-project `analytics:view` cut is even consulted, so a grant-all
+    // cut here is the strongest leak probe: anything the enumeration let
+    // through would show.
+    name: "the LangWatchQL readable-project fan-out",
+    module: "src/server/analytics/lwql/readableProjects.ts",
+    ids: async () => {
+      const projects = await resolveLwqlReadableProjects({
+        credential: { kind: "apiKey", organizationId },
+        viewableCut: async ({ candidates }) => {
+          const reachable = new Set(
+            candidates.map((candidate) => candidate.id),
+          );
+          return (projectId: string) => reachable.has(projectId);
+        },
+        prisma,
+      });
+      return projects.map((p) => p.id);
     },
   },
 ];

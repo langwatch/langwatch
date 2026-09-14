@@ -29,7 +29,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createLangWatchQLExecutor,
-  DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
 } from "../executor";
 import {
@@ -92,7 +91,6 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
     executor.execute({
       sql: SCANNING_QUERY(database),
       tenantCapability: harness.tenantA.keyHash,
-      limits: DEFAULT_LWQL_RESULT_LIMITS,
     });
 
   /** The `code` of whatever the executor threw, or why there is none. */

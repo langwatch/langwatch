@@ -9,7 +9,10 @@
 import { describe, expect, it } from "vitest";
 
 import { type LangWatchQLValidation, validateLangWatchQL } from "../validate";
-import { LWQL_VIOLATION_CODES, type LangWatchQLViolationCode } from "../violations";
+import {
+  type LangWatchQLViolationCode,
+  LWQL_VIOLATION_CODES,
+} from "../violations";
 
 /** A catalog with one restricted field, which is the interesting configuration. */
 const POLICY = {
@@ -615,10 +618,9 @@ describe("validateLangWatchQL", () => {
      * trigger comes back with a hint, not that the internal lookup table
      * happens to have every key (which the compiler already guarantees: it
      * types that table as `Record<LangWatchQLViolationCode, string>`).
-     *
-     * @scenario "Every violation carries a corrective hint"
      */
-    it.each<[LangWatchQLViolationCode, string]>([
+    /** @scenario "Every violation carries a corrective hint" */
+    it.each([
       ["EMPTY_QUERY", ""],
       ["PARSE_FAILED", "SELECT FROM WHERE (("],
       [
@@ -638,18 +640,18 @@ describe("validateLangWatchQL", () => {
       ["GATED_COLUMN", "SELECT body FROM traces"],
       ["WILDCARD_NOT_ALLOWED", "SELECT * FROM traces"],
       ["LIMIT_TOO_HIGH", "SELECT TraceId FROM traces LIMIT 10001"],
-      [
-        "NESTING_TOO_DEEP",
-        "SELECT ((((((TraceId)))))) FROM traces",
-      ],
-      [
-        "UNSUPPORTED_SYNTAX",
-        "SELECT TraceId FROM traces PASTE JOIN spans",
-      ],
-    ])("names a hint for %s", (code, sql) => {
+      ["NESTING_TOO_DEEP", "SELECT ((((((TraceId)))))) FROM traces"],
+      ["UNSUPPORTED_SYNTAX", "SELECT TraceId FROM traces PASTE JOIN spans"],
+    ] as [
+      LangWatchQLViolationCode,
+      string,
+    ][])("names a hint for %s", (code, sql) => {
       const policy =
         code === "NESTING_TOO_DEEP"
-          ? { ...UNGATED_POLICY, limits: { maxSubqueryDepth: 8, maxNodeDepth: 4 } }
+          ? {
+              ...UNGATED_POLICY,
+              limits: { maxSubqueryDepth: 8, maxNodeDepth: 4 },
+            }
           : POLICY;
       const result = validate(sql, policy);
 
@@ -890,10 +892,9 @@ describe("validateLangWatchQL", () => {
     it("refuses a LIMIT above the cap, naming the cap and how to page", () => {
       const result = validate("SELECT TraceId FROM traces LIMIT 10001");
       expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
-      const violation =
-        !result.ok
-          ? result.violations.find((v) => v.code === "LIMIT_TOO_HIGH")
-          : undefined;
+      const violation = !result.ok
+        ? result.violations.find((v) => v.code === "LIMIT_TOO_HIGH")
+        : undefined;
       expect(violation?.maxRows).toBe(10000);
       expect(violation?.clause).toBe("limit");
       expect(violation?.hint).toMatch(/LIMIT\/OFFSET/);

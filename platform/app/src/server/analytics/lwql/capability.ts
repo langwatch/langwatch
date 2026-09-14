@@ -67,6 +67,11 @@ export function lwqlTenantCapability({ secret }: { secret: string }): string {
       "LangWatchQL tenant capability requires a non-empty secret",
     );
   }
+  // Not a password. This is a database-generated key-map lookup token, and the
+  // digest MUST stay sha256-hex to match `lwql_api_key_tenant_map.KeyHash`
+  // (see ./provisioning/accessModel.ts). A slow KDF or a salt would break the
+  // lookup — the file header carries the full rationale.
+  // codeql[js/insufficient-password-hash]
   return createHash("sha256").update(secret).digest("hex");
 }
 
