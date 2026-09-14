@@ -118,7 +118,7 @@ function widgetResource(
   return {
     id: widget.id,
     name: widget.name,
-    definition: widget.definition,
+    definition: { ...widget.definition, queries: [...widget.definition.queries] },
     createdAt: widget.createdAt.toString(),
     updatedAt: widget.updatedAt.toString(),
     platformUrl,
@@ -150,10 +150,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
-      200: {
-        description: "The project's dashboard widgets",
-        content: { "application/json": { schema: resolver(dashboardWidgetListSchema) } },
-      },
+      200: { description: "The project's dashboard widgets" },
     },
   })
   .handle(async ({ app, scope }, platformUrl) => {
@@ -180,10 +177,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
-      201: {
-        description: "The widget was saved",
-        content: { "application/json": { schema: resolver(dashboardWidgetResourceSchema) } },
-      },
+      201: { description: "The widget was saved" },
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
@@ -214,10 +208,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
     responses: {
       ...canonicalBaseResponses,
       ...widgetNotFoundResponse,
-      200: {
-        description: "The dashboard widget",
-        content: { "application/json": { schema: resolver(dashboardWidgetResourceSchema) } },
-      },
+      200: { description: "The dashboard widget" },
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
@@ -244,10 +235,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
     responses: {
       ...canonicalBaseResponses,
       ...widgetNotFoundResponse,
-      200: {
-        description: "The updated widget",
-        content: { "application/json": { schema: resolver(dashboardWidgetResourceSchema) } },
-      },
+      200: { description: "The updated widget" },
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
@@ -281,10 +269,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
     responses: {
       ...canonicalBaseResponses,
       ...widgetNotFoundResponse,
-      200: {
-        description: "The widget was added to the dashboard",
-        content: { "application/json": { schema: resolver(dashboardWidgetResourceSchema) } },
-      },
+      200: { description: "The widget was added to the dashboard" },
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
@@ -312,7 +297,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
     responses: {
       ...canonicalBaseResponses,
       ...widgetNotFoundResponse,
-      204: { description: "The widget was deleted" },
+      204: { description: "The widget was deleted", content: {} },
     },
   })
   .handle(async ({ app, input, scope }) => {

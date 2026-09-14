@@ -26,7 +26,62 @@ function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
   };
 }
 
+/** An ordinary declared route: output schema stated once, via `withOutput`'s slot. */
+function declaredOutputRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
+  return {
+    method: "get",
+    path: "/widgets",
+    operation: "listWidgets",
+    version: "2026-09-09",
+    output: z.object({ id: z.string() }),
+    ...(docs ? { docs } : {}),
+    handler: () => undefined,
+  };
+}
+
 describe("restRouteDocumentation", () => {
+  describe("given a route that declared its output schema", () => {
+    describe("when its docs name the success status with a description alone", () => {
+      /** @scenario "A documented answer with only a description keeps the declared shape" */
+      it("publishes the docs' words over the declaration's content", () => {
+        const published = restRouteDocumentation({
+          route: declaredOutputRoute({
+            responses: { 200: { description: "The project's widgets" } },
+          }),
+        });
+
+        const derived = restRouteDocumentation({ route: declaredOutputRoute() });
+
+        const success = (published.responses as Record<string, { description: string; content: unknown }>)[
+          "200"
+        ];
+        const declaredSuccess = (derived.responses as Record<string, { content: unknown }>)["200"];
+        expect(success?.description).toBe("The project's widgets");
+        // The published document is JSON; the resolver's function members are
+        // not part of what a reader receives, so the JSON forms are compared.
+        expect(JSON.parse(JSON.stringify(success?.content))).toEqual(
+          JSON.parse(JSON.stringify(declaredSuccess?.content)),
+        );
+        expect(success?.content).toMatchObject({ "application/json": expect.anything() });
+      });
+    });
+
+    describe("when its docs restate the success status with their own content", () => {
+      /** @scenario "A documented answer that states content overrides the declared shape" */
+      it("publishes the docs' content", () => {
+        const statedContent = { "text/plain": {} };
+        const published = restRouteDocumentation({
+          route: declaredOutputRoute({
+            responses: { 200: { description: "Bytes", content: statedContent } },
+          }),
+        });
+
+        const success = (published.responses as Record<string, { content: unknown }>)["200"];
+        expect(success?.content).toEqual(statedContent);
+      });
+    });
+  });
+
   describe("given a route that reads its own body and wrote out the request it expects", () => {
     /** @scenario "A route that reads its own body publishes the shape a caller sends it" */
     it("publishes that shape, and its description, under the media type it reads", () => {

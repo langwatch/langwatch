@@ -25,6 +25,13 @@ import type { EndpointDocs, RouteResponse } from "./response.ts";
  * prose, the groups it is filed under, the answers beyond its declared success,
  * and the request shape of a route no validator speaks for.
  */
+/**
+ * One documented answer: whole, or words alone — an entry without `content`
+ * inherits it from what the declaration derived for the same status.
+ */
+export type DocumentedRouteResponse = Omit<RouteResponse, "content"> &
+  Partial<Pick<RouteResponse, "content">>;
+
 export type RestTransportDocs = Readonly<{
   readonly summary?: string;
   readonly description?: string;
@@ -34,9 +41,12 @@ export type RestTransportDocs = Readonly<{
   readonly hide?: boolean;
   /**
    * The answers the operation documents beyond its declared success, built by
-   * `documentedResponses`. Merged over the generated success block.
+   * `documentedResponses`. Merged over the generated success block, one
+   * status at a time — an entry that states only its description keeps the
+   * declared content, so a route never restates the schema `withOutput`
+   * already named.
    */
-  readonly responses?: Readonly<Record<number, RouteResponse>>;
+  readonly responses?: Readonly<Record<number, DocumentedRouteResponse>>;
   /**
    * The shape a caller sends a route that reads its own body: the bytes are
    * still evidence the handler parses itself, and a reader of the document
@@ -75,7 +85,7 @@ export function restRouteDocumentation({
   credential?: RestDoorCredential | undefined;
 }): DescribeRouteOptions {
   const options: DescribeRouteOptions = {
-    responses: { ...declaredAnswers(route), ...route.docs?.responses },
+    responses: documentedAnswers(route),
     operationId: operationIdOf({ operation: route.operation, suffix }),
   };
 
@@ -187,6 +197,22 @@ function multipartSchema(multipart: RestMultipart): Record<string, unknown> {
   }
 
   return { ...fields, type: "object", properties, ...(required.length > 0 ? { required } : {}) };
+}
+
+/**
+ * The declared answers with the docs' entries laid over them one status at a
+ * time. A docs entry that states no content keeps the declared one, so the
+ * schema `withOutput` named is never restated just to put words on a status.
+ */
+function documentedAnswers(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
+  const declared = declaredAnswers(route);
+  const published: Record<string, RouteResponse> = { ...declared };
+
+  for (const [status, stated] of Object.entries(route.docs?.responses ?? {})) {
+    published[status] = { ...stated, content: stated.content ?? declared[status]?.content ?? {} };
+  }
+
+  return published;
 }
 
 /**
