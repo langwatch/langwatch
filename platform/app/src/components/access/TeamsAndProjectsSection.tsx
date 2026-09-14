@@ -161,84 +161,17 @@ function AddToTeamDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const [userId, setUserId] = useState("");
-  const [role, setRole] = useState("MEMBER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
-  const queryClient = api.useUtils();
-
-  const orgMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId, includeDeactivated: false },
-      { enabled: open },
-    );
-  const customRoles = api.role.getAll.useQuery(
-    { organizationId },
-    { enabled: open },
-  );
-
-  const create = api.roleBinding.create.useMutation({
-    onSuccess: () => {
-      toaster.create({ title: "Member added", type: "success" });
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
-      onClose();
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
-  });
-
-  const userItems = useMemo(
-    () =>
-      (orgMembers.data?.members ?? [])
-        .filter((m) => !existingMemberIds.includes(m.userId))
-        .map((m) => ({
-          label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-          value: m.userId,
-        })),
-    [orgMembers.data, existingMemberIds],
-  );
-  const userCollection = useMemo(
-    () => createListCollection({ items: userItems }),
-    [userItems],
-  );
-
-  const selectedMemberRole = useMemo(
-    () =>
-      (orgMembers.data?.members ?? []).find((m) => m.userId === userId)?.role,
-    [orgMembers.data, userId],
-  );
-
-  const allRoleItems = useMemo(() => {
-    const items = [
-      ...BASE_ROLE_ITEMS,
-      ...(customRoles.data ?? []).map((r) => ({
-        label: r.name,
-        value: `CUSTOM:${r.id}`,
-      })),
-    ];
-    if (!selectedMemberRole) return items;
-    return items.filter((item) =>
-      isBindingRoleAllowedForOrganizationRole({
-        organizationRole: selectedMemberRole,
-        role: (item.value.startsWith("CUSTOM:")
-          ? `custom:${item.value.slice(7)}`
-          : item.value) as TeamRoleValue,
-      }),
-    );
-  }, [customRoles.data, selectedMemberRole]);
-  const allRoleCollection = useMemo(
-    () => createListCollection({ items: allRoleItems }),
-    [allRoleItems],
-  );
-
-  useEffect(() => {
-    if (selectedMemberRole !== OrganizationUserRole.EXTERNAL) return;
-    if (role !== "VIEWER" || customRoleId) {
-      setRole("VIEWER");
-      setCustomRoleId(undefined);
-    }
-  }, [selectedMemberRole, role, customRoleId]);
+  const {
+    userId,
+    setUserId,
+    role,
+    setRole,
+    customRoleId,
+    setCustomRoleId,
+    create,
+    userCollection,
+    allRoleCollection,
+  } = useAddToTeamForm({ organizationId, existingMemberIds, open, onClose });
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -347,47 +280,17 @@ function AddToProjectDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const [userId, setUserId] = useState("");
-  const [role, setRole] = useState("VIEWER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
-  const queryClient = api.useUtils();
-
-  const orgMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId, includeDeactivated: false },
-      { enabled: open },
-    );
-  const customRoles = api.role.getAll.useQuery(
-    { organizationId },
-    { enabled: open },
-  );
-
-  const create = api.roleBinding.create.useMutation({
-    onSuccess: () => {
-      toaster.create({ title: "Access added", type: "success" });
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
-      onClose();
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
-  });
-
-  const userItems = (orgMembers.data?.members ?? []).map((m) => ({
-    label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-    value: m.userId,
-  }));
-  const userCollection = createListCollection({ items: userItems });
-
-  const allRoleItems = [
-    ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({
-      label: r.name,
-      value: `CUSTOM:${r.id}`,
-    })),
-  ];
-  const allRoleCollection = createListCollection({ items: allRoleItems });
+  const {
+    userId,
+    setUserId,
+    role,
+    setRole,
+    customRoleId,
+    setCustomRoleId,
+    create,
+    userCollection,
+    allRoleCollection,
+  } = useAddToProjectForm({ organizationId, open, onClose });
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -529,161 +432,32 @@ function ProjectSection({
   return (
     <>
       <Box borderWidth="1px" borderRadius="md" mb={2} overflow="hidden">
-        <HStack
-          px={3}
-          py={2}
-          cursor="pointer"
-          onClick={() => setExpanded((v) => !v)}
-          transition="background 0.15s ease"
-          _hover={{ bg: "bg.muted" }}
-        >
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <HStack gap={1.5} color="fg.subtle">
-            <Folder size={14} />
-            <Text fontSize="sm" fontWeight="medium" color="fg">
-              {project.name}
-            </Text>
-          </HStack>
-          {hasOverrides && (
-            <Badge colorPalette="orange" size="sm">
-              has overrides
-            </Badge>
-          )}
-          <Spacer />
-          <Text fontSize="xs" color="fg.muted">
-            {access.length} with access
-          </Text>
-          {canManage && (
-            <Button
-              size="xs"
-              variant="ghost"
-              color="fg.subtle"
-              onClick={(e) => {
-                e.stopPropagation();
-                openDrawer("editProject", {
-                  projectId: project.id,
-                  projectName: project.name,
-                  currentTeamId: teamId,
-                });
-              }}
-            >
-              <Pencil size={13} />
-              Edit
-            </Button>
-          )}
-          {department.show && canManage && (
-            <InlineDepartment
-              organizationId={organizationId}
-              kind="project"
-              entityId={project.id}
-              value={department.byProject.get(project.id) ?? null}
-              departments={department.departments}
-              onAssigned={department.refetch}
-            />
-          )}
-        </HStack>
+        <ProjectSectionHeader
+          project={project}
+          teamId={teamId}
+          organizationId={organizationId}
+          canManage={canManage}
+          department={department}
+          expanded={expanded}
+          hasOverrides={hasOverrides}
+          accessCount={access.length}
+          onToggle={() => setExpanded((v) => !v)}
+          openDrawer={openDrawer}
+        />
 
         {expanded && (
           <Box px={3} pb={3} borderTopWidth="1px">
-            {/* Inherited from team */}
-            {inherited.length > 0 && (
-              <Box mt={3}>
-                <SectionEyebrow mb={2}>Inherited from team</SectionEyebrow>
-                {inherited.map((m, i) => (
-                  <HStack key={i} py={1} opacity={0.5} fontSize="sm">
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
-                    <Text flex={1}>{m.name}</Text>
-                    {/* Neutral, not the tier's tone: a red ADMIN pill is the
-                        danger dialect answering a question nobody asked — this
-                        row only says what the team role IS, and the dimming
-                        already carries "inherited". Explicit project-level
-                        grants below keep `roleTone`. */}
-                    <Badge colorPalette="gray" size="sm">
-                      {m.customRoleName ?? m.role}
-                    </Badge>
-                    {m.viaGroupName ? (
-                      <Link
-                        href="/settings/directory?tab=groups"
-                        fontSize="xs"
-                        colorPalette="purple"
-                        color="colorPalette.fg"
-                      >
-                        via {m.viaGroupName}
-                      </Link>
-                    ) : (
-                      <Text fontSize="xs" color="fg.subtle">
-                        from team
-                      </Text>
-                    )}
-                  </HStack>
-                ))}
-              </Box>
-            )}
+            {inherited.length > 0 && <InheritedFromTeam members={inherited} />}
 
-            {/* Project-level access */}
-            {projectLevel.length > 0 && (
-              <Box mt={3}>
-                <SectionEyebrow mb={2}>Project-level access</SectionEyebrow>
-                {projectLevel.map((m, i) => (
-                  <HStack key={i} py={1} fontSize="sm">
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
-                    <Box flex={1}>
-                      <Text display="inline">{m.name}</Text>
-                      {m.source === "override" && m.teamRole && (
-                        <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
-                          team role: {m.teamRole}
-                        </Text>
-                      )}
-                    </Box>
-                    {m.source === "override" && (
-                      <Badge colorPalette="orange" size="sm">
-                        override
-                      </Badge>
-                    )}
-                    <Badge colorPalette={roleTone(m.role)} size="sm">
-                      {m.role}
-                    </Badge>
-                    {canManage && m.bindingId && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        color={
-                          m.source === "override" ? "orange.fg" : "fg.subtle"
-                        }
-                        title={
-                          m.source === "override"
-                            ? "Remove override, revert to team role"
-                            : "Remove project access"
-                        }
-                        loading={deleteBinding.isPending}
-                        onClick={() =>
-                          deleteBinding.mutate({
-                            organizationId,
-                            bindingId: m.bindingId!,
-                          })
-                        }
-                      >
-                        {m.source === "override" ? (
-                          <HStack gap={1}>
-                            <RotateCcw size={12} />
-                            <Text>revert</Text>
-                          </HStack>
-                        ) : (
-                          <X size={14} />
-                        )}
-                      </Button>
-                    )}
-                  </HStack>
-                ))}
-              </Box>
+            {hasOverrides && (
+              <ProjectLevelAccess
+                members={projectLevel}
+                canManage={canManage}
+                onRemove={(bindingId) =>
+                  deleteBinding.mutate({ organizationId, bindingId })
+                }
+                removing={deleteBinding.isPending}
+              />
             )}
 
             {/* Empty state */}
@@ -782,27 +556,9 @@ function TeamCard({
   const [addingMember, setAddingMember] = useState(false);
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
-  const queryClient = api.useUtils();
   const department = useDepartmentColumn(organizationId);
 
-  const deleteBinding = api.roleBinding.delete.useMutation({
-    onSuccess: () => {
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
-    },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
-  });
-
-  const updateBinding = api.roleBinding.update.useMutation({
-    onSuccess: () => {
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
-    },
-    onError: (e) =>
-      showErrorToast({
-        error: e,
-        fallbackTitle: "Couldn't update the member's role",
-      }),
-  });
+  const { deleteBinding, updateBinding } = useTeamBindingActions();
 
   const existingMemberIds = team.directMembers.flatMap((m) =>
     m.userId ? [m.userId] : [],
@@ -811,194 +567,50 @@ function TeamCard({
   return (
     <>
       <Card.Root overflow="hidden">
-        {/* Team header */}
-        <HStack
-          px={4}
-          py={3}
-          cursor="pointer"
-          onClick={() => setExpanded((v) => !v)}
-          transition="background 0.15s ease"
-          _hover={{ bg: "bg.muted" }}
-        >
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <Text fontWeight="semibold">{team.name}</Text>
-          <Spacer />
-          <Text fontSize="sm" color="fg.muted">
-            {team.projects.length}{" "}
-            {team.projects.length === 1 ? "project" : "projects"}
-            {" · "}
-            {team.directMembers.length}{" "}
-            {team.directMembers.length === 1 ? "member" : "members"}
-            {team.projectOnlyAccess.length > 0 &&
-              ` · ${team.projectOnlyAccess.length} via projects`}
-          </Text>
-          {department.show && canManage && (
-            <InlineDepartment
-              organizationId={organizationId}
-              kind="team"
-              entityId={team.id}
-              value={department.byTeam.get(team.id) ?? null}
-              departments={department.departments}
-              onAssigned={department.refetch}
-            />
-          )}
-          {canManage && (
-            <Link
-              href={`/settings/teams/${team.slug}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Button size="xs" variant="ghost" color="fg.subtle">
-                <Pencil size={13} />
-                Edit
-              </Button>
-            </Link>
-          )}
-        </HStack>
+        <TeamCardHeader
+          team={team}
+          organizationId={organizationId}
+          canManage={canManage}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+          department={department}
+        />
 
         {expanded && (
           <Card.Body pt={0} borderTopWidth="1px">
-            {/* ── Team members (team-scoped bindings, editable) ── */}
-            <Box mt={4}>
-              <HStack mb={3}>
-                <SectionEyebrow>Team members</SectionEyebrow>
-                <Spacer />
-                {canManage && (
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAddingMember(true);
-                    }}
-                  >
-                    <Plus size={12} />
-                    Add to team
-                  </Button>
-                )}
-              </HStack>
+            <TeamMembersBlock
+              team={team}
+              organizationId={organizationId}
+              canManage={canManage}
+              onAddMember={() => setAddingMember(true)}
+              onChangeRole={(role, customRoleId, bindingId) =>
+                updateBinding.mutate({
+                  organizationId,
+                  bindingId,
+                  role: role as any,
+                  customRoleId,
+                })
+              }
+              onRemove={(bindingId) =>
+                deleteBinding.mutate({ organizationId, bindingId })
+              }
+              removing={deleteBinding.isPending}
+            />
 
-              {team.directMembers.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
-                  No members yet.
-                </Text>
-              ) : (
-                team.directMembers.map((m, i, arr) => (
-                  <TeamMemberRow
-                    key={i}
-                    member={m}
-                    organizationId={organizationId}
-                    canManage={canManage}
-                    isLast={i === arr.length - 1}
-                    onChangeRole={(role, customRoleId, bindingId) =>
-                      updateBinding.mutate({
-                        organizationId,
-                        bindingId,
-                        role: role as any,
-                        customRoleId,
-                      })
-                    }
-                    onRemove={(bindingId) =>
-                      deleteBinding.mutate({ organizationId, bindingId })
-                    }
-                    removing={deleteBinding.isPending}
-                  />
-                ))
-              )}
-              <Text fontSize="xs" color="fg.subtle" mt={2}>
-                Editing a role here changes their team-level access, inherited
-                by all projects below.
-              </Text>
-            </Box>
-
-            {/* ── Project-only access (read-only at team level) ── */}
             {team.projectOnlyAccess.length > 0 && (
-              <Box mt={5}>
-                <SectionEyebrow mb={3}>
-                  Also has access via projects
-                </SectionEyebrow>
-                {team.projectOnlyAccess.map((m, i) => (
-                  <HStack
-                    key={i}
-                    py={2}
-                    fontSize="sm"
-                    borderBottomWidth={
-                      i < team.projectOnlyAccess.length - 1 ? "1px" : "0"
-                    }
-                    borderColor="border.muted"
-                  >
-                    <RandomColorAvatar
-                      name={m.name}
-                      image={m.image}
-                      size="xs"
-                    />
-                    <Text flex={1}>{m.name}</Text>
-                    <Badge colorPalette={roleTone(m.role)} size="sm">
-                      {m.role}
-                    </Badge>
-                    <Text fontSize="xs" color="fg.subtle">
-                      on
-                    </Text>
-                    <Badge colorPalette="green" size="sm" gap={1}>
-                      <Folder size={14} />
-                      {m.projectName}
-                    </Badge>
-                    <Link
-                      fontSize="xs"
-                      colorPalette="purple"
-                      color="colorPalette.fg"
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setExpanded(true);
-                      }}
-                    >
-                      Edit in project →
-                    </Link>
-                  </HStack>
-                ))}
-              </Box>
+              <ProjectOnlyAccess
+                members={team.projectOnlyAccess}
+                onEditInProject={() => setExpanded(true)}
+              />
             )}
 
-            {/* ── Projects ── */}
-            <Box mt={5}>
-              <HStack mb={3}>
-                <SectionEyebrow>Projects</SectionEyebrow>
-                <Spacer />
-                {hasPermission("project:create") && (
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDrawer("createProject", {
-                        defaultTeamId: team.id,
-                      });
-                    }}
-                  >
-                    <Plus size={12} />
-                    Add project
-                  </Button>
-                )}
-              </HStack>
-              {team.projects.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
-                  No projects yet.
-                </Text>
-              ) : (
-                team.projects.map((proj) => (
-                  <ProjectSection
-                    key={proj.id}
-                    project={proj}
-                    teamId={team.id}
-                    access={team.projectAccess[proj.id] ?? []}
-                    organizationId={organizationId}
-                    canManage={canManage}
-                    department={department}
-                    defaultExpanded={team.projects.length < EXPAND_BELOW}
-                  />
-                ))
-              )}
-            </Box>
+            <TeamProjectsBlock
+              team={team}
+              canManage={canManage}
+              hasPermission={hasPermission}
+              openDrawer={openDrawer}
+              organizationId={organizationId}
+            />
           </Card.Body>
         )}
       </Card.Root>
@@ -1183,4 +795,690 @@ function TeamMemberRow({
       )}
     </HStack>
   );
+}
+
+/**
+ * The team's one-line summary, and the control that opens it.
+ *
+ * The whole strip toggles rather than only the chevron: a header that looks
+ * like a row people click is one. The two controls that are NOT the toggle —
+ * the department picker and Edit — stop the click themselves.
+ */
+function TeamCardHeader({
+  team,
+  organizationId,
+  canManage,
+  expanded,
+  onToggle,
+  department,
+}: {
+  team: TeamData;
+  organizationId: string;
+  canManage: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  department: ReturnType<typeof useDepartmentColumn>;
+}) {
+  return (
+    <HStack
+      px={4}
+      py={3}
+      cursor="pointer"
+      onClick={onToggle}
+      transition="background 0.15s ease"
+      _hover={{ bg: "bg.muted" }}
+    >
+      {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+      <Text fontWeight="semibold">{team.name}</Text>
+      <Spacer />
+      <Text fontSize="sm" color="fg.muted">
+        {team.projects.length}{" "}
+        {team.projects.length === 1 ? "project" : "projects"}
+        {" · "}
+        {team.directMembers.length}{" "}
+        {team.directMembers.length === 1 ? "member" : "members"}
+        {team.projectOnlyAccess.length > 0 &&
+          ` · ${team.projectOnlyAccess.length} via projects`}
+      </Text>
+      {department.show && canManage && (
+        <InlineDepartment
+          organizationId={organizationId}
+          kind="team"
+          entityId={team.id}
+          value={department.byTeam.get(team.id) ?? null}
+          departments={department.departments}
+          onAssigned={department.refetch}
+        />
+      )}
+      {canManage && (
+        <Link
+          href={`/settings/teams/${team.slug}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Button size="xs" variant="ghost" color="fg.subtle">
+            <Pencil size={13} />
+            Edit
+          </Button>
+        </Link>
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * The team's own members: the bindings held ON the team, and editable here.
+ *
+ * The note under the list is load-bearing — a role changed here is inherited
+ * by every project below, which a list showing only the team does not say.
+ */
+function TeamMembersBlock({
+  team,
+  organizationId,
+  canManage,
+  onAddMember,
+  onChangeRole,
+  onRemove,
+  removing,
+}: {
+  team: TeamData;
+  organizationId: string;
+  canManage: boolean;
+  onAddMember: () => void;
+  onChangeRole: (
+    role: string,
+    customRoleId: string | undefined,
+    bindingId: string,
+  ) => void;
+  onRemove: (bindingId: string) => void;
+  removing: boolean;
+}) {
+  return (
+    <Box mt={4}>
+      <HStack mb={3}>
+        <SectionEyebrow>Team members</SectionEyebrow>
+        <Spacer />
+        {canManage && (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              setAddingMember(true);
+            }}
+          >
+            <Plus size={12} />
+            Add to team
+          </Button>
+        )}
+      </HStack>
+
+      {team.directMembers.length === 0 ? (
+        <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
+          No members yet.
+        </Text>
+      ) : (
+        team.directMembers.map((m, i, arr) => (
+          <TeamMemberRow
+            key={i}
+            member={m}
+            organizationId={organizationId}
+            canManage={canManage}
+            isLast={i === arr.length - 1}
+            onChangeRole={onChangeRole}
+            onRemove={onRemove}
+            removing={removing}
+          />
+        ))
+      )}
+      <Text fontSize="xs" color="fg.subtle" mt={2}>
+        Editing a role here changes their team-level access, inherited by all
+        projects below.
+      </Text>
+    </Box>
+  );
+}
+
+/**
+ * People who reach this team's work through a project rather than the team.
+ *
+ * Read-only here on purpose: the access was granted on a project, so the
+ * project is where it can be changed. Showing it at team level anyway is the
+ * honest version — an administrator counting who can see this team's work
+ * needs these names and would otherwise miss them.
+ */
+function ProjectOnlyAccess({
+  members,
+  onEditInProject,
+}: {
+  members: TeamData["projectOnlyAccess"];
+  onEditInProject: () => void;
+}) {
+  return (
+    <Box mt={5}>
+      <SectionEyebrow mb={3}>Also has access via projects</SectionEyebrow>
+      {members.map((m, i) => (
+        <HStack
+          key={i}
+          py={2}
+          fontSize="sm"
+          borderBottomWidth={i < members.length - 1 ? "1px" : "0"}
+          borderColor="border.muted"
+        >
+          <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+          <Text flex={1}>{m.name}</Text>
+          <Badge colorPalette={roleTone(m.role)} size="sm">
+            {m.role}
+          </Badge>
+          <Text fontSize="xs" color="fg.subtle">
+            on
+          </Text>
+          <Badge colorPalette="green" size="sm" gap={1}>
+            <Folder size={14} />
+            {m.projectName}
+          </Badge>
+          <Link
+            fontSize="xs"
+            colorPalette="purple"
+            color="colorPalette.fg"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onEditInProject();
+            }}
+          >
+            Edit in project →
+          </Link>
+        </HStack>
+      ))}
+    </Box>
+  );
+}
+
+/** The projects this team owns, and the way into each one's access. */
+function TeamProjectsBlock({
+  team,
+  canManage,
+  hasPermission,
+  openDrawer,
+  organizationId,
+}: {
+  team: TeamData;
+  canManage: boolean;
+  hasPermission: ReturnType<typeof useOrganizationTeamProject>["hasPermission"];
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  organizationId: string;
+}) {
+  return (
+    <Box mt={5}>
+      <HStack mb={3}>
+        <SectionEyebrow>Projects</SectionEyebrow>
+        <Spacer />
+        {hasPermission("project:create") && (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              openDrawer("createProject", {
+                defaultTeamId: team.id,
+              });
+            }}
+          >
+            <Plus size={12} />
+            Add project
+          </Button>
+        )}
+      </HStack>
+      {team.projects.length === 0 ? (
+        <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
+          No projects yet.
+        </Text>
+      ) : (
+        team.projects.map((proj) => (
+          <ProjectSection
+            key={proj.id}
+            project={proj}
+            teamId={team.id}
+            access={team.projectAccess[proj.id] ?? []}
+            organizationId={organizationId}
+            canManage={canManage}
+            department={department}
+            defaultExpanded={team.projects.length < EXPAND_BELOW}
+          />
+        ))
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Changing and removing a team binding, with the invalidation both need.
+ *
+ * Both refetch `getTeamsWithRoleBindings`, because that query draws the row
+ * that just changed; leaving it stale shows a role the server no longer holds.
+ */
+function useTeamBindingActions() {
+  const queryClient = api.useUtils();
+  const deleteBinding = api.roleBinding.delete.useMutation({
+    onSuccess: () => {
+      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
+  });
+
+  const updateBinding = api.roleBinding.update.useMutation({
+    onSuccess: () => {
+      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the member's role",
+      }),
+  });
+
+  return { deleteBinding, updateBinding };
+}
+
+/** The project strip: its name, whether it overrides the team, and the toggle. */
+function ProjectSectionHeader({
+  project,
+  teamId,
+  organizationId,
+  canManage,
+  department,
+  expanded,
+  hasOverrides,
+  accessCount,
+  onToggle,
+  openDrawer,
+}: {
+  project: { id: string; name: string };
+  teamId: string;
+  organizationId: string;
+  canManage: boolean;
+  department: ReturnType<typeof useDepartmentColumn>;
+  expanded: boolean;
+  hasOverrides: boolean;
+  accessCount: number;
+  onToggle: () => void;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+}) {
+  return (
+    <HStack
+      px={3}
+      py={2}
+      cursor="pointer"
+      onClick={onToggle}
+      transition="background 0.15s ease"
+      _hover={{ bg: "bg.muted" }}
+    >
+      {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      <HStack gap={1.5} color="fg.subtle">
+        <Folder size={14} />
+        <Text fontSize="sm" fontWeight="medium" color="fg">
+          {project.name}
+        </Text>
+      </HStack>
+      {hasOverrides && (
+        <Badge colorPalette="orange" size="sm">
+          has overrides
+        </Badge>
+      )}
+      <Spacer />
+      <Text fontSize="xs" color="fg.muted">
+        {accessCount} with access
+      </Text>
+      {canManage && (
+        <Button
+          size="xs"
+          variant="ghost"
+          color="fg.subtle"
+          onClick={(e) => {
+            e.stopPropagation();
+            openDrawer("editProject", {
+              projectId: project.id,
+              projectName: project.name,
+              currentTeamId: teamId,
+            });
+          }}
+        >
+          <Pencil size={13} />
+          Edit
+        </Button>
+      )}
+      {department.show && canManage && (
+        <InlineDepartment
+          organizationId={organizationId}
+          kind="project"
+          entityId={project.id}
+          value={department.byProject.get(project.id) ?? null}
+          departments={department.departments}
+          onAssigned={department.refetch}
+        />
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * Access this project gets from the team, shown dimmed and not editable here.
+ *
+ * The role badge is NEUTRAL rather than the tier's tone: a red ADMIN pill is
+ * the danger dialect answering a question nobody asked. This row only says
+ * what the team role is, and the dimming already carries "inherited".
+ */
+function InheritedFromTeam({ members }: { members: ProjectAccessEntry[] }) {
+  return (
+    <Box mt={3}>
+      <SectionEyebrow mb={2}>Inherited from team</SectionEyebrow>
+      {members.map((m, i) => (
+        <HStack key={i} py={1} opacity={0.5} fontSize="sm">
+          <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+          <Text flex={1}>{m.name}</Text>
+          {/* Neutral, not the tier's tone: a red ADMIN pill is the
+            danger dialect answering a question nobody asked — this
+            row only says what the team role IS, and the dimming
+            already carries "inherited". Explicit project-level
+            grants below keep `roleTone`. */}
+          <Badge colorPalette="gray" size="sm">
+            {m.customRoleName ?? m.role}
+          </Badge>
+          {m.viaGroupName ? (
+            <Link
+              href="/settings/directory?tab=groups"
+              fontSize="xs"
+              colorPalette="purple"
+              color="colorPalette.fg"
+            >
+              via {m.viaGroupName}
+            </Link>
+          ) : (
+            <Text fontSize="xs" color="fg.subtle">
+              from team
+            </Text>
+          )}
+        </HStack>
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * Grants made ON the project, which override or add to what the team gives.
+ *
+ * These keep `roleTone` — unlike the inherited rows above — because an
+ * explicit project-level ADMIN is a decision somebody made here, and the tone
+ * is the fastest way to see it.
+ */
+function ProjectLevelAccess({
+  members,
+  canManage,
+  onRemove,
+  removing,
+}: {
+  members: ProjectAccessEntry[];
+  canManage: boolean;
+  onRemove: (bindingId: string) => void;
+  removing: boolean;
+}) {
+  return (
+    <Box mt={3}>
+      <SectionEyebrow mb={2}>Project-level access</SectionEyebrow>
+      {members.map((m, i) => (
+        <HStack key={i} py={1} fontSize="sm">
+          <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+          <Box flex={1}>
+            <Text display="inline">{m.name}</Text>
+            {m.source === "override" && m.teamRole && (
+              <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
+                team role: {m.teamRole}
+              </Text>
+            )}
+          </Box>
+          {m.source === "override" && (
+            <Badge colorPalette="orange" size="sm">
+              override
+            </Badge>
+          )}
+          <Badge colorPalette={roleTone(m.role)} size="sm">
+            {m.role}
+          </Badge>
+          {canManage && m.bindingId && (
+            <Button
+              size="xs"
+              variant="ghost"
+              color={m.source === "override" ? "orange.fg" : "fg.subtle"}
+              title={
+                m.source === "override"
+                  ? "Remove override, revert to team role"
+                  : "Remove project access"
+              }
+              loading={removing}
+              onClick={() => onRemove(m.bindingId!)}
+            >
+              {m.source === "override" ? (
+                <HStack gap={1}>
+                  <RotateCcw size={12} />
+                  <Text>revert</Text>
+                </HStack>
+              ) : (
+                <X size={14} />
+              )}
+            </Button>
+          )}
+        </HStack>
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * The state behind "add somebody to this team".
+ *
+ * The role list is narrowed by the person chosen, not merely validated after:
+ * an EXTERNAL member cannot hold most team roles, so offering them and
+ * refusing on submit would be asking a question we already know the answer to.
+ * The effect below is the same rule applied to a choice already made when the
+ * person changes underneath it.
+ */
+function useAddToTeamForm({
+  organizationId,
+  existingMemberIds,
+  open,
+  onClose,
+}: {
+  organizationId: string;
+  existingMemberIds: string[];
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [userId, setUserId] = useState("");
+  const [role, setRole] = useState("MEMBER");
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
+    undefined,
+  );
+  const queryClient = api.useUtils();
+
+  const orgMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId, includeDeactivated: false },
+      { enabled: open },
+    );
+
+  const create = api.roleBinding.create.useMutation({
+    onSuccess: () => {
+      toaster.create({ title: "Member added", type: "success" });
+      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      onClose();
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
+  });
+
+  const userItems = useMemo(
+    () =>
+      (orgMembers.data?.members ?? [])
+        .filter((m) => !existingMemberIds.includes(m.userId))
+        .map((m) => ({
+          label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+          value: m.userId,
+        })),
+    [orgMembers.data, existingMemberIds],
+  );
+  const userCollection = useMemo(
+    () => createListCollection({ items: userItems }),
+    [userItems],
+  );
+
+  const selectedMemberRole = useMemo(
+    () =>
+      (orgMembers.data?.members ?? []).find((m) => m.userId === userId)?.role,
+    [orgMembers.data, userId],
+  );
+
+  const allRoleCollection = useTeamRoleOptions({
+    organizationId,
+    open,
+    selectedMemberRole,
+  });
+
+  useEffect(() => {
+    if (selectedMemberRole !== OrganizationUserRole.EXTERNAL) return;
+    if (role !== "VIEWER" || customRoleId) {
+      setRole("VIEWER");
+      setCustomRoleId(undefined);
+    }
+  }, [selectedMemberRole, role, customRoleId]);
+
+  return {
+    userId,
+    setUserId,
+    role,
+    setRole,
+    customRoleId,
+    setCustomRoleId,
+    create,
+    userCollection,
+    allRoleCollection,
+    selectedMemberRole,
+  };
+}
+
+/**
+ * The team roles a chosen person may actually be given.
+ *
+ * Narrowed by the person's ORGANIZATION role rather than merely validated on
+ * submit: an EXTERNAL member can hold only the viewer grain, and offering the
+ * rest asks a question whose answer we already hold.
+ */
+function useTeamRoleOptions({
+  organizationId,
+  open,
+  selectedMemberRole,
+}: {
+  organizationId: string;
+  open: boolean;
+  selectedMemberRole: OrganizationUserRole | undefined;
+}) {
+  const customRoles = api.role.getAll.useQuery(
+    { organizationId },
+    { enabled: open },
+  );
+  const allRoleItems = useMemo(() => {
+    const items = [
+      ...BASE_ROLE_ITEMS,
+      ...(customRoles.data ?? []).map((r) => ({
+        label: r.name,
+        value: `CUSTOM:${r.id}`,
+      })),
+    ];
+    if (!selectedMemberRole) return items;
+    return items.filter((item) =>
+      isBindingRoleAllowedForOrganizationRole({
+        organizationRole: selectedMemberRole,
+        role: (item.value.startsWith("CUSTOM:")
+          ? `custom:${item.value.slice(7)}`
+          : item.value) as TeamRoleValue,
+      }),
+    );
+  }, [customRoles.data, selectedMemberRole]);
+  const allRoleCollection = useMemo(
+    () => createListCollection({ items: allRoleItems }),
+    [allRoleItems],
+  );
+
+  return allRoleCollection;
+}
+
+/**
+ * The state behind "add access to this project".
+ *
+ * Unlike the team form, the role list is NOT narrowed by the person's
+ * organization role: a project grant is the place an external collaborator is
+ * given something specific, which is the case that form exists for.
+ */
+function useAddToProjectForm({
+  organizationId,
+  open,
+  onClose,
+}: {
+  organizationId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [userId, setUserId] = useState("");
+  const [role, setRole] = useState("VIEWER");
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
+    undefined,
+  );
+  const queryClient = api.useUtils();
+
+  const orgMembers =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId, includeDeactivated: false },
+      { enabled: open },
+    );
+  const customRoles = api.role.getAll.useQuery(
+    { organizationId },
+    { enabled: open },
+  );
+
+  const create = api.roleBinding.create.useMutation({
+    onSuccess: () => {
+      toaster.create({ title: "Access added", type: "success" });
+      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      onClose();
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
+  });
+
+  const userItems = (orgMembers.data?.members ?? []).map((m) => ({
+    label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+    value: m.userId,
+  }));
+  const userCollection = createListCollection({ items: userItems });
+
+  const allRoleItems = [
+    ...BASE_ROLE_ITEMS,
+    ...(customRoles.data ?? []).map((r) => ({
+      label: r.name,
+      value: `CUSTOM:${r.id}`,
+    })),
+  ];
+  const allRoleCollection = createListCollection({ items: allRoleItems });
+
+  return {
+    userId,
+    setUserId,
+    role,
+    setRole,
+    customRoleId,
+    setCustomRoleId,
+    create,
+    userCollection,
+    allRoleCollection,
+  };
 }
