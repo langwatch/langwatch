@@ -1,6 +1,7 @@
 /**
  * @see #4888
- * TDD-red tests for opt-in full blob resolution on the trace-detail read path, targeting resolveOffloadedTraces, written BEFORE TraceService's full-flag wiring lands. ACs covered: AC1 full resolution (>64KB attribute byte-identical to event_log, across the four IO fields, UTF-8 boundary char); AC3 eventref resolves + reserved keys stripped; AC4 no-eventref fast path (0 CH calls); AC5 resolution failure degrades to preview, never throws, warns; AC6 partial/mixed resolution in one trace. AC2/AC7 are covered in trace-service-full-flag.unit.test.ts; AC8 is a git-diff review check.
+ * Full blob resolution tests: covers eventref resolution, degradation to
+ * preview, fast-path skip, and partial resolution across IO fields.
  */
 
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
@@ -134,9 +135,8 @@ function makeLargeValue(byteCount: number = LARGE_BYTE_COUNT): string {
   return "x".repeat(byteCount);
 }
 
-/**
- * AC1 UTF-8 multibyte boundary: a string whose boundary character straddles the 65536-byte split — the preview would cut before the char, losing it; full resolution returns it intact. Built as 65534 ASCII bytes + a 4-byte emoji straddling byte 65534-65537 (65538 total, just over threshold), so a 65536-cut preview MUST cut mid-emoji.
- */
+/** UTF-8 boundary: emoji straddles the preview cut at 65536 bytes, so
+ * preview loses the char but full resolution keeps it. */
 const MULTIBYTE_BOUNDARY_EMOJI = "🎉"; // 4 UTF-8 bytes
 const MULTIBYTE_BOUNDARY_VALUE = "a".repeat(IO_PREVIEW_BYTES - 2) + MULTIBYTE_BOUNDARY_EMOJI;
 
@@ -147,9 +147,8 @@ const MULTIBYTE_BOUNDARY_VALUE = "a".repeat(IO_PREVIEW_BYTES - 2) + MULTIBYTE_BO
 // AC1 — full resolution byte-identical to event_log (parameterized over IO attr keys)
 // ---------------------------------------------------------------------------
 
-/**
- * AC1: full=true on a detail surface resolves a >64KB offloaded field, byte-identical to event_log.EventPayload, across {langwatch.input, langwatch.output, gen_ai.input.messages, gen_ai.output.messages}.
- */
+/** Full resolution returns >64KB offloaded fields byte-identical to event_log
+ * across all IO attribute keys. */
 const IO_ATTR_KEYS = [
   "langwatch.input",
   "langwatch.output",

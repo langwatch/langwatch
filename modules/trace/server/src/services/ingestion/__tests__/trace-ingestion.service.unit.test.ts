@@ -1,17 +1,5 @@
-/**
- * What the OTLP receiver does with one export request.
- *
- * Two things here are worth guarding closely. The first is the tally: the
- * transport turns `rejectedSpans` into the customer's HTTP answer, and only
- * two of the five outcomes are a rejection. A span the coding-agent filter
- * dropped on purpose, or one dedup recognised as already seen, is a success
- * from the sender's point of view — counting either as rejected would tell a
- * healthy SDK it is failing.
- *
- * The second is that one bad span does not spoil the batch. A span that fails
- * validation, or arrived from too far in the past, is dropped and reported;
- * its neighbours in the same scope still reach the pipeline.
- */
+/** OTLP receiver imports spans: rejection tally carefully counts validation
+ * failures, and one bad span doesn't spoil the batch. */
 
 import type { OtlpSpan, PIIRedactionLevel, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";

@@ -167,26 +167,8 @@ export class ClaudeCodeResponseService {
   }
 
   /**
-   * Walk a claude_code.api_response_body JSON payload and pull out the
-   * concatenated assistant text from every `content[]` entry of
-   * `type === "text"`. Returns null if the body isn't parseable, has
-   * no text blocks, or all text blocks are empty.
-   *
-   * The body JSON shape per Anthropic's Messages API:
-   *   { "content": [
-   *       { "type": "text", "text": "..." },
-   *       { "type": "tool_use", "name": "...", "input": {...} },
-   *       { "type": "thinking", "thinking": "<REDACTED>" },
-   *       ...
-   *     ], ... }
-   *
-   * tool_use blocks are intentionally NOT folded into langwatch.output —
-   * they're tool invocations, not the assistant's reply. They surface
-   * separately via the `tool_decision` + `tool_result` events.
-   *
-   * thinking blocks come back redacted by Anthropic anyway, so there's
-   * nothing useful to lift.
-   *
+   * Extracts concatenated assistant text from response body text blocks only.
+   * Excludes tool_use (tool invocations, not replies) and thinking (redacted by Anthropic).
    * @internal exported for unit testing only
    */
   tryExtractAssistantTextFromResponseBody(raw: unknown): string | null {
@@ -199,16 +181,8 @@ export class ClaudeCodeResponseService {
   }
 
   /**
-   * The conversation title out of a `generate_session_title` response body.
-   *
-   * Claude generates the title with a haiku utility call whose reply is a
-   * `{"title": "..."}` JSON object inside the assistant text block. Any deviation
-   * answers null: an unparseable or truncated body, a reply that is not JSON, a
-   * shape without a string `title`, or an empty one. Never throws: the caller is
-   * on the ingest path, where one odd body must not cost a record.
-   *
-   * The CALLER decides which bodies are titles (the `query_source` gate); this
-   * only reads the shape.
+   * Extracts title from title-generation response body JSON.
+   * Never throws to avoid blocking ingest on malformed bodies.
    */
   tryExtractSessionTitleFromResponseBody(raw: string): string | null {
     const text = this.tryExtractAssistantTextFromResponseBody(raw);
@@ -260,16 +234,8 @@ export class ClaudeCodeResponseService {
   }
 
   /**
-   * The assistant's reply for a model call, rendered from its api_response_body.
-   * Unlike {@link tryExtractAssistantTextFromResponseBody} (the headline path, text
-   * only), this includes `tool_use` blocks so a model call whose reply IS a tool
-   * invocation still shows what it did: the call that decided to run Bash renders
-   * `[tool_use: Bash]` plus the command instead of an empty output. Text and
-   * tool_use blocks are concatenated in wire order.
-   *
-   * The trace headline keeps the text-only extractor so a tool-deciding turn's
-   * headline stays the final text reply, not a tool marker.
-   *
+   * Extracts assistant reply including tool_use blocks (unlike text-only extractor).
+   * Trace headline uses text-only to keep final text reply instead of tool marker.
    * @internal exported for unit testing
    */
   tryExtractAssistantOutputFromResponseBody(raw: unknown): string | null {

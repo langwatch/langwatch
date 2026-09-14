@@ -1,22 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for `origin-guarded.subscriber`, required by the
- * `eventing-subscriber-idempotency` architecture rule.
- *
- * This module mints no external effect of its own: it wraps a caller's handler
- * in the guard chain every origin-dependent trace subscriber shares. What has
- * to hold under redelivery is that the DECISION is a function of the event and
- * the committed fold state alone, so the second delivery of one event either
- * runs the body again with the same inputs or declines it — never a third
- * outcome. That is what makes the subscribers it wraps able to be idempotent at
- * all.
- *
- * The clock is the one input that is not carried on the event, and it is
- * one-way: the guards only ever become MORE restrictive as time passes (stale
- * events and old traces are dropped). A redelivery can therefore lose a side
- * effect it never had, but cannot gain one.
+ * Origin guard ensures decisions are deterministic from event+fold state.
+ * Clock only restricts (never relaxes), so redelivery is idempotent.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerContext } from "@langwatch/eventing";

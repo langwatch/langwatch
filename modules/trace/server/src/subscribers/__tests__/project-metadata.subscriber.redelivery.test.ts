@@ -1,26 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `projectMetadata` subscriber, required by the
- * `eventing-subscriber-idempotency` architecture rule.
- *
- * This subscriber is LEVEL-TRIGGERED rather than idempotent by key: it asserts
- * the project's metadata from whichever trace happens to carry it, so running
- * it twice asserts the same state twice. Two effects need pinning separately.
- *
- * The metadata write is a full assertion (`firstMessage`, `integrated`,
- * `language`), so a redelivery writes the same values. It is also skipped once
- * both flags are already set, so a redelivery against the project it just
- * updated does not write at all.
- *
- * The `first_trace_integrated` product event is NOT an assertion — it is a
- * milestone, and sending it twice would double-count integrations. It is
- * guarded on the project's PRE-write `firstMessage`, so the redelivery that
- * reads the updated project never fires it again.
- *
- * The clustering bootstrap is deliberately NOT guarded: it is the
- * reconciliation path, and the injected implementation is rate-limited.
+ * Metadata assertion (idempotent) + first-trace milestone (guarded) +
+ * unguarded bootstrap reconciliation.
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import {

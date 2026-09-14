@@ -1,7 +1,7 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
- * TraceService.tryGetById read-time Claude Code content enrichment, exercised at the real seam: the ClickHouse trace
- * read + the log-record store are mocked boundaries (no Docker), the enrichment adapter + pure join run for real.
+ * Claude Code content enrichment at read time: real enrichment adapter + join,
+ * mocked trace read and log-record store (no Docker).
  * @vitest-environment node
  */
 
@@ -258,11 +258,8 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
   });
 });
 
-/**
- * Enrichment must also reach the multi-trace read paths (evals, export, legacy thread reads), not just `tryGetById`.
- * Each of these methods returns whole spans that exports + evaluators read, so a coding-agent trace fetched
- * through them must be enriched the same way, and a non-coding-agent trace must never trigger a log read.
- */
+/** Enrichment on multi-trace reads (evals, export, threads) must match
+ * tryGetById behavior. */
 describe("TraceService — multi-trace read enrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();

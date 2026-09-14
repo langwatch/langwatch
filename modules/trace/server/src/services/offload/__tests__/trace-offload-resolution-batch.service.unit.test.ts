@@ -1,6 +1,7 @@
 /**
  * @see #4991, #4888
- * Unit tests for resolveOffloadedTracesBatch, the BULK read-path resolver. Where resolveOffloadedTraces resolves one trace's spans (detail reads), this resolves a WHOLE result set (export, thread, annotation, sample builders) with a single bounded-concurrency pass over event_log, so a large export never fires an unbounded N×M burst of CH reads. AC6: streamed, peak concurrency bounded by a constant regardless of result-set size, identical refs deduped. AC7: a failed resolution degrades to preview with a warn log, per-ref, without failing the rest of the batch.
+ * Bulk batch resolver: bounded-concurrency pass over event_log for exports,
+ * threads, and annotations. Degrades per-ref without failing the batch.
  */
 import { TraceOffloadResolutionBatchService } from "../trace-offload-resolution-batch.service.ts";
 import { describe, expect, it, vi } from "vitest";

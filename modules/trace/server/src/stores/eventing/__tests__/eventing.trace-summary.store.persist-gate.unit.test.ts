@@ -1,13 +1,5 @@
-/**
- * The persist gate on log-only traces: a summary row exists once the trace
- * says something. A span is always something; a log record is something when
- * it contributed content a reader can see (input, output, cost, tokens, a
- * model). Ambient process telemetry — an agent that started and died before
- * its first prompt — folds a log count and nothing else, and used to mint a
- * span-less row with a dash in every column, filed at the epoch.
- *
- * Feature: specs/traces/trace-summary-storage-anchor.feature
- */
+/** Persist gate for log-only traces: summary rows require visible content
+ * (not just log count). */
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

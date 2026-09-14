@@ -6,16 +6,7 @@ import {
 } from "@langwatch/trace-contract";
 import { traceNameChangedEventDataSchema } from "@langwatch/trace-contract";
 
-/**
- * Persists a user-driven trace rename.
- *
- * Idempotency keys off the new name itself — duplicate submissions of
- * the same value collapse, while genuinely changing the name a second
- * time produces a fresh event. The aggregate is the trace, so the fold
- * projection's `traceNameUserOverridden` latch keeps the rename
- * resilient against later root-span arrivals overwriting the user's
- * edit.
- */
+/** Persists user-driven rename with idempotency; resilient against later root-span arrivals. */
 const changeTraceNameDefinition = defineCommand({
   commandType: CHANGE_TRACE_NAME_COMMAND_TYPE,
   eventType: TRACE_NAME_CHANGED_EVENT_TYPE,

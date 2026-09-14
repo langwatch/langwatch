@@ -627,7 +627,8 @@ describe("when an export spans several batches", () => {
 
 /**
  * @see src/utils/csvFormulaGuard.ts
- * These files open in a spreadsheet, and a cell opening with = is a formula Excel/Sheets run on the reader's machine. RFC 4180 quoting protects the CSV grammar, not the reader, so the cell needs a leading apostrophe (stripped on display by both tools). Everything asserted here is a value somebody typed: input/output from the instrumented application, labels set on the trace, an evaluator's display name reaching the header row.
+ * Guards against formula injection in spreadsheet cells (= prefix executes
+ * formulas). Tests application-typed values in all columns.
  */
 describe("spreadsheet formula injection", () => {
   const FORMULA = "=cmd|' /c calc'!A1";

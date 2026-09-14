@@ -1,6 +1,7 @@
 /**
  * @see ADR-022
- * Unit tests for resolveOffloadedTraces — per-trace span-level eventref resolution and TraceIO recompute (the read-resolution half). Each test covers one assertion.
+ * Per-trace resolution: eventref resolution and TraceIO recomputation for
+ * read paths.
  */
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
 import { describe, expect, it, vi } from "vitest";

@@ -62,15 +62,8 @@ export class TraceViewerProtectionService {
     }
   }
 
-  /**
-   * The redactions an API-KEY caller reads a project's traces through: the
-   * anonymous resolution, then the CREDENTIAL's own cost grant on top.
-   * `resolve` with no user id takes the public branch of every content
-   * category, which is what a key must see. Costs are the key's own
-   * `cost:view`, asked through the same check the route chain enforces a
-   * declared permission with. A legacy project key predates RBAC and carries
-   * full project access by design, so for that class alone the answer stays yes.
-   */
+  /** API-KEY redactions: anonymous resolution + credential's cost grant.
+   * Legacy keys bypass RBAC for full access. */
   async resolveForApiKey(
     input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
   ): Promise<Protections> {

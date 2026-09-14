@@ -1,6 +1,7 @@
 /**
  * Feature: specs/traces/trace-summary-storage-anchor.feature
- * The time a trace row and its drawer header show for a log-only trace: the storage anchor, never the raw span baseline of 0, which rendered as "20684d ago" in the list and drawer while the single-trace read reported the honest time.
+ * Storage anchor provides the trace timestamp for log-only traces (not the
+ * raw span baseline of 0).
  */
 import { mapToTraceListItem } from "../../../rules/trace-list-row.rules.ts";
 import { describe, expect, it } from "vitest";

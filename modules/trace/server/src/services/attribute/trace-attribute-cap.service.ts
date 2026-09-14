@@ -1,56 +1,15 @@
 /**
- * capOversizedAttributes — bounds the byte-size of incoming span attribute
- * values at ingestion, before a span enters the event-sourcing fold state.
- *
- * Why this exists
- * ---------------
- * A small number of pathological traces carry multi-megabyte attribute values:
- * base64-encoded images (`data:image/...;base64,...` data URLs) embedded in
- * multimodal LLM messages on `langwatch.input` / `langwatch.output`, or simply
- * very large `langwatch.params`. The trace-processing pipeline is event
- * sourced: every span becomes a SpanReceivedEvent that is folded into a
- * per-trace fold STATE in Redis via a read-modify-write per event. When that
- * state grows to multiple megabytes, each Redis op saturates the single-
- * threaded command loop, folding throughput collapses, staging outpaces it,
- * and the backlog (and Redis memory) diverges.
- *
- * Capping oversized values here keeps the fold state small (KB, not MB) so
- * folding throughput stays high. This only needs to protect NEW traces.
- *
- * Relationship to edge media extraction
- * -------------------------------------
- * Inline media parts (base64 audio turns, data-URI images, file attachments)
- * are normally externalized BEFORE the command is staged, by
- * `maybeExtractSpanMedia` (src/server/app-layer/traces/edge-media-extraction.ts)
- * — media-marker gated, so only media-bearing payloads are ever JSON-parsed.
- * This cap is the backstop for whatever still arrives oversized: extraction
- * fail-open fallbacks, projects with the extraction flag off or content-drop
- * policies (which skip edge extraction), and genuinely huge non-media values
- * (giant params, embeddings). Capping by size stays bounded,
- * allocation-light, and never throwing.
- *
- * Behaviour
- * ---------
- * - Walks span / resource attribute values (recursively through arrayValue and
- *   kvlistValue) and replaces any `stringValue` or `bytesValue` whose byte size
- *   exceeds the threshold with a short placeholder describing what was cut.
- * - Normal traces are untouched: only values over the (generous) threshold are
- *   replaced. The walk is in place and degrades gracefully — a malformed value
- *   is left as-is rather than throwing.
+ * Caps oversized attribute values at ingestion to keep Redis fold state small
+ * and prevent throughput collapse. Acts as backstop for edge media extraction
+ * failures, projects with extraction disabled, and non-media oversized values.
  */
 import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules.ts";
 
 type AttributeList = OtlpSpan["attributes"];
 
-// ---------------------------------------------------------------------------
-// Read-only probe pair
-// ---------------------------------------------------------------------------
-// NOTE: `valueExceeds` and `hasOversizedAttribute` below form a read-only
-// probe pair whose traversal MUST stay identical to `capAnyValue` /
-// `capOversizedAttributes` above. Colocating them here makes that trivially
-// enforceable — any change to the mutating pair should be mirrored in the
-// probe pair, and vice versa.
+// Read-only probe pair: `valueExceeds` and `hasOversizedAttribute` must mirror
+// the mutating pair's traversal shape to stay enforceable when one changes.
 
 /**
  * The size ceiling an attribute is held to before it is stored.
@@ -275,14 +234,8 @@ export class TraceAttributeCapService {
   }
 
   /**
-   * Returns true iff any attribute value exceeds `maxBytes` across the SAME
-   * surfaces that `capOversizedAttributes` walks: `span.attributes`,
-   * `span.events[].attributes`, `span.links[].attributes`, and
-   * `resource?.attributes`.
-   *
-   * Use as the gate before a structuredClone / `capOversizedAttributes` call.
-   * Never throws (mirrors `capOversizedAttributes`' defensive try/catch).
-   * Short-circuits on the first over-limit value.
+   * Checks if any attribute exceeds maxBytes across span, events, links, and resource.
+   * Use as gate before clone; short-circuits on first over-limit value.
    */
   hasOversizedAttribute(
     span: OtlpSpan,
@@ -317,13 +270,8 @@ export class TraceAttributeCapService {
   }
 
   /**
-   * Walks a span (and its events, links, and the shared resource) and replaces
-   * any attribute value over `maxBytes` with a short placeholder, in place.
-   *
-   * Safe for the hot ingestion path: never throws, only touches values that
-   * exceed the threshold, and leaves normal spans byte-for-byte unchanged.
-   *
-   * Returns the number of values capped (for logging / tests).
+   * Walks span/events/links/resource and replaces oversized attribute values with
+   * placeholders. Safe for hot ingestion: never throws, returns count for logging.
    */
   capOversizedAttributes(
     span: OtlpSpan,

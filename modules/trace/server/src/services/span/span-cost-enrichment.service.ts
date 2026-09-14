@@ -10,12 +10,7 @@ import { SpanModelNameService } from "./span-model-name.service.ts";
 
 /**
  * Attribute keys that may contain model names (checked in priority order).
- *
- * The REQUEST model wins here, where token estimation takes the RESPONSE model
- * first. That is not an oversight in either: a provider that answers a request
- * for `gpt-5-mini` with `gpt-5-mini-2026-01-01` should be TOKENIZED as the
- * model that actually ran, and PRICED against the rule the customer wrote,
- * which they wrote against the name they asked for.
+ * REQUEST model wins; PRICED against what customer requested.
  */
 const MODEL_ATTRIBUTE_KEYS = [
   "gen_ai.request.model",
@@ -25,28 +20,14 @@ const MODEL_ATTRIBUTE_KEYS = [
 ] as const;
 
 /**
- * The same keys plus the bare `model`, used only for the spans named below.
- *
- * Enrichment runs on the raw OTLP span, before canonicalisation, and the
- * coding agents that export their own telemetry name the model under a bare
- * `model` and nothing else. Without it a custom cost rule silently does
- * nothing to exactly the traffic whose pricing a customer is most likely to
- * want to override.
- *
- * `model` is also a very common generic attribute key far outside coding-agent
- * telemetry, and what this service writes sits at priority 1 in the fold's
- * cost cascade, above even a reported cost. Reading it from every span would
- * let a customer's existing cost rule start pricing spans it never matched
- * before, at whatever rate they set, with no migration and no signal that a
- * dormant rule went live. So the loose key is scoped to the two spans that
- * need it.
+ * Same keys plus bare `model`, used only for coded spans. Scoped to avoid
+ * silently activating dormant cost rules on unrelated spans with generic `model`.
  */
 const CODING_AGENT_MODEL_ATTRIBUTE_KEYS = [...MODEL_ATTRIBUTE_KEYS, "model"] as const;
 
 /**
- * The coding-agent spans that carry their model under a bare `model`. Both
- * names come from the extractors that own them, so a rename cannot leave this
- * gate silently matching nothing.
+ * Coding-agent spans that carry model under bare `model`. Rename-safe
+ * because names come from extractors.
  */
 const CODING_AGENT_MODEL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,

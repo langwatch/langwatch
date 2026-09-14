@@ -1,16 +1,5 @@
-/**
- * How the deprecated `/api/trace/*` family resolves its own project credential.
- *
- * The family is declared `publicRoute` on purpose (see
- * `transport/trace-legacy.rest.ts`): its refusals predate the framework's
- * envelope and a released SDK parses them, so the door cannot be the framework's
- * and the sentences below are the contract. This service is the door, moved into
- * the module that owns the routes — it used to live in the process, as
- * `ApiHandlerManagedCredentials`, and was lost with the deleted mounts.
- *
- * ORDER IS THE CONTRACT: credential present (401), credential resolves (401),
- * then the API key's own ceiling for the permission the route asked for (403).
- */
+/** Legacy trace API credential resolution. Strict error ordering: present,
+ * resolves, then permission ceiling. */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";

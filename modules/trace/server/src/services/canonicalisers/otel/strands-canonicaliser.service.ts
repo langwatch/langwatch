@@ -54,7 +54,7 @@ const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => 
   return void 0;
 };
 
-/** One candidate attribute as content: a non-empty string, a non-empty array, or a wrapper's field. */
+/** Candidate attribute as content: string, array, or wrapper field. */
 const strandsContentOfCandidate = (candidate: unknown): unknown => {
   const parsed = safeJsonParse(candidate);
 

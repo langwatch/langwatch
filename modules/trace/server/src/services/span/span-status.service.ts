@@ -40,16 +40,8 @@ export class SpanStatusService {
     return { hasError, hasOK, errorMessage };
   }
 
-  // Priority (first hit wins) mirrors the span.mapper renderer fix
-  // for finding #78 — OTel exception events carry the actionable text
-  // (e.g. upstream gateway "provider X not bound, try Y") which span
-  // statusMessage often collapses to a short HTTP-status summary like
-  // "Bad Request". Without this ordering the trace-level errorMessage
-  // that the Thread tab reads (`trace.error.message`) loses every
-  // actionable detail Lane A attaches at the event level.
-  //
-  // 1. newest exception event's exception.message
-  // 2. span-level exception.message / error.message attribute
+  // Exception event message (actionable) before span statusMessage (summarized).
+  // Avoids losing detail at trace level. See span.mapper #78.
   private static reportedErrorMessage(span: NormalizedSpan): string | null {
     const exceptions = span.events?.filter((e) => e.name === "exception") ?? [];
     const latest = exceptions[exceptions.length - 1];

@@ -1,6 +1,5 @@
-/**
- * Unit tests proving the v2 read path (getSpansByTraceId, tryGetSpanById) resolves ADR-022 offloaded eventref pointers before returning spans. The fix: SpanStorageService now accepts optional SpanReadBlobResolutionDeps; when present, both calls route through getNormalizedSpansByTraceId -> resolveOffloadedTraces -> mapNormalizedSpansToSpans instead of delegating directly to the repository.
- */
+/** v2 read path resolves eventref pointers via optional blob resolution
+ * dependencies. */
 
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
@@ -81,9 +80,8 @@ function makeNormalizedSpan(
   };
 }
 
-/**
- * Builds a SpanStorageRepository stub whose getNormalizedSpansByTraceId returns the given spans, while getSpansByTraceId/tryGetSpanByIds delegate to NullSpanStorageRepository (empty/null) — so any resolved result must come from the resolution path, not the raw-Span path.
- */
+/** Stub with getNormalizedSpansByTraceId returning spans, others null (forces
+ * resolution path). */
 function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepository {
   const nullRepo = new NullSpanStorageRepository();
   return {

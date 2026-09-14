@@ -245,9 +245,7 @@ describe("TraceLegacySpanMappingService.mapNormalizedSpanToSpan", () => {
 
   describe("when langwatch.input is a deserialized {type, value} wrapper", () => {
     it("unwraps text wrapper to plain text type", () => {
-      // After ClickHouse round-trip: canonicalization unwraps text wrapper to just the value string,
-      // but deserializeAttributes may parse it back to an object if it looks like JSON.
-      // If the wrapper survives, the mapper should unwrap it.
+      // Text wrapper survives ClickHouse round-trip; mapper must unwrap it.
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "span",

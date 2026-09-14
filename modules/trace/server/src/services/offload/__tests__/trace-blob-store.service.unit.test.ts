@@ -1,6 +1,7 @@
 /**
  * @see ADR-022
- * Unit tests for TraceBlobStoreService spool operations. Covers putSpool/getSpool/deleteSpool across every storage destination, the v1 reference format retained for the rollout, and the property that a reference cannot steer a read (langwatch-saas#800). getFromEventLog is covered by blob-store.event-log.unit.test.ts.
+ * Tests TraceBlobStoreService spool operations: put/get/delete across storage
+ * destinations, v1 reference format rollout, and read safety (issue #800).
  */
 import { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -306,9 +307,8 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
 });
 
 describe("given Azure retention was confirmed at write time and is unconfirmed now", () => {
-  /**
-   * Flipping the assertion back off is the documented remediation, and a chart rollback does it silently — it must not strand objects already written: getSpool doesn't fail open and the edge already cleared attributes, so a refusal there loses the span outright, and a refusal in deleteSpool skips eager cleanup, manufacturing the exact orphan the gate exists to prevent.
-   */
+  /** Assertion flip is documented remediation; must not strand objects or
+   * manufacture orphans when the gate is toggled during rollback. */
   function storeAfterFlip(objectStore: ReturnType<typeof fakeObjectStore>) {
     return TraceBlobStoreService.create({
       resolveS3Client: forbiddenS3Resolver,

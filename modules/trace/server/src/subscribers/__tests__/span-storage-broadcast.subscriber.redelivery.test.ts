@@ -1,20 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `spanStorageBroadcast` subscriber, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * This subscriber's only external effect is a notification: it tells whoever is
- * watching the trace that something moved, carrying no state of its own. The
- * payload is built from the event's tenant and aggregate id and nothing else,
- * so a redelivery sends a byte-identical message, and the viewer refetches once
- * more rather than seeing a second span. That is what "one externally visible
- * result" means here — the visible result is the refetch, and it is
- * self-collapsing.
- *
- * The queue's 15-second dedup TTL is a debounce on top of that, not the reason
- * it is safe.
+ * Broadcast notification: byte-identical messages trigger viewer refetch.
+ * Queue 15s TTL is debounce, not safety mechanism.
  */
 import { describe, expect, it, vi } from "vitest";
 import { createSpanStorageBroadcastHandler } from "../span-storage-broadcast.subscriber.ts";

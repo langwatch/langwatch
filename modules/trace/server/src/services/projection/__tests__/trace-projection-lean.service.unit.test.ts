@@ -1,6 +1,8 @@
 /**
  * @see ADR-022 §"Interposition derives lean shapes"
- * Unit tests for leanForProjection. These tests FAIL at unit runtime (throws "not implemented") but pass typecheck — the TDD contract for Step 5 of the ADR-022 plan.
+ * Unit tests for leanForProjection. These tests FAIL at unit runtime (throws
+ * "not implemented") but pass typecheck — the TDD contract for Step 5 of the
+ * ADR-022 plan.
  */
 
 import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
@@ -150,7 +152,8 @@ function makeAnnotationAddedEvent(): Event {
   };
 }
 
-/** Extract span attributes as a Record from a SpanReceived event returned by TraceProjectionLeanService.leanForProjection. */
+/** Extract span attributes as a Record from a SpanReceived event returned by
+ * TraceProjectionLeanService.leanForProjection. */
 function extractSpanAttributes(event: Event): Record<string, string> {
   const data = event.data as {
     span: {
@@ -166,7 +169,8 @@ function extractSpanAttributes(event: Event): Record<string, string> {
   return result;
 }
 
-/** Extract log body from a LogRecordReceived event returned by TraceProjectionLeanService.leanForProjection. */
+/** Extract log body from a LogRecordReceived event returned by
+ * TraceProjectionLeanService.leanForProjection. */
 function extractLogBody(event: Event): string {
   const data = event.data as { body: string };
   return data.body;
@@ -177,7 +181,8 @@ function extractLogBody(event: Event): string {
 // ---------------------------------------------------------------------------
 
 /**
- * @scenario TraceProjectionLeanService.leanForProjection is the single source of truth for the lean shape
+ * @scenario TraceProjectionLeanService.leanForProjection is the single source
+ * of truth for the lean shape
  */
 describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
   describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
@@ -342,9 +347,10 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
 // Structure-preserving preview for JSON chat payloads
 // ---------------------------------------------------------------------------
 
-/**
- * The real Langy/opencode shape: a chat array whose FIRST message is a huge developer-role system prompt (alone over the 64 KB budget) and whose LAST message is the user's short text. A blind byte cut kept only unparseable developer-prompt JSON — the user's "hi" lives past the cut.
- */
+/** The real Langy/opencode shape: a chat array whose FIRST message is a huge
+ * developer-role system prompt (alone over the 64 KB budget) and whose LAST
+ * message is the user's short text. A blind byte cut kept only unparseable
+ * developer-prompt JSON — the user's "hi" lives past the cut. */
 function chatPayloadWithHugeDeveloperPrompt(): string {
   return JSON.stringify([
     {
@@ -584,8 +590,9 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
 });
 
 /**
- * @scenario IO attr (gen_ai.input.messages) with >64KB stringValue is still IO-previewed with eventref
- *           Regression guard: new non-IO capping must not break IO preview path.
+ * @scenario IO attr (gen_ai.input.messages) with >64KB stringValue is still
+ *           IO-previewed with eventref. Regression guard: new non-IO capping
+ *           must not break IO preview path.
  */
 describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PREVIEW_BYTES (regression guard for new capping)", () => {
   describe("when TraceProjectionLeanService.leanForProjection is applied", () => {

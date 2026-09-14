@@ -110,17 +110,9 @@ export class ClaudeCodeRequestService {
   }
 
   /**
-   * Harvest tool RESULT content out of an `api_request_body` payload.
-   *
-   * Claude's telemetry never ships tool stdout on the `tool_result` event (it
-   * carries sizes only) — the actual result text appears one turn LATER, as the
-   * `tool_result` content blocks of the NEXT model call's request body, keyed by
-   * `tool_use_id`. With `OTEL_LOG_RAW_API_BODIES=1` those bodies are in the
-   * trace's logs, so a read-time join can put the real output back on the tool
-   * span. Returns `tool_use_id` → flattened content text for every tool_result
-   * block found; empty map when the body is unparseable or has none.
-   *
-   * @internal exported for the read-time tool-span enrichment + unit testing
+   * Harvests tool result content from request body. Telemetry lacks tool stdout,
+   * which appears in the next request's tool_result blocks, keyed by tool_use_id.
+   * @internal exported for read-time tool-span enrichment + unit testing
    */
   extractToolResultsFromRequestBody(raw: unknown): Map<string, string> {
     const parsed = this.tryParseRequestBody(raw);
@@ -129,18 +121,9 @@ export class ClaudeCodeRequestService {
   }
 
   /**
-   * Parse a claude_code.api_request_body JSON payload (the Anthropic
-   * /v1/messages REQUEST) into the canonical `gen_ai.input.messages` chat array:
-   * the system prompt (when present) followed by every turn as `{ role, content }`
-   * with each message's content flattened to text via {@link contentToText}.
-   *
-   * This is what makes the trace detail render a real multi-turn conversation
-   * instead of a single user message holding the raw request JSON. Returns null
-   * when the body isn't parseable (claude truncates large bodies inline, so the
-   * caller falls back to the clean `user_prompt` text), has no `messages` array,
-   * or every turn flattened to empty.
-   *
-   * @internal exported for the ingest-time body derivation + unit testing
+   * Parses request body into canonical chat array with system prompt and turns.
+   * Returns null when unparseable, no messages array, or every turn empty.
+   * @internal exported for ingest-time body derivation + unit testing
    */
   tryBuildInputMessagesFromRequestBody(
     raw: unknown,

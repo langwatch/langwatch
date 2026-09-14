@@ -219,7 +219,9 @@ describe("computeClaudeSpanEnrichment", () => {
 
   describe("given two CONCURRENT sub-agents sharing one query_source (known-fragile positional input pairing)", () => {
     /**
-     * Residual limitation, characterized deliberately: input logs (api_request_body/user_prompt) carry no request_id, so input pairs positionally (Nth span to Nth body) — holds for ONE sequential agent, but two concurrent sub-agents sharing a query_source interleave in one group, so a disagreement between span-array order and body-time order mis-attributes input across agents. Accepted since output still joins EXACTLY by request_id, only input can cross, and real sub-agents each carry a distinct query_source isolating them into separate groups. Pins the behavior so a future fix has a red-to-green target.
+     * Input logs lack request_id so they pair positionally; concurrent sub-agents can
+     * mis-attribute input due to ordering mismatches. Output joins exactly by request_id.
+     * Pins behavior for future fix.
      */
     it("joins output exactly by request_id but can cross the positional input", () => {
       const REQ_A = "req_agentA";

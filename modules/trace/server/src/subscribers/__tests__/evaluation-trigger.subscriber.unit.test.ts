@@ -23,13 +23,8 @@ import {
 
 /**
  * Spec: modules/trace/specs/evaluation-trigger.feature
- *
- * The loop guard is the reason this file is careful. An evaluator's own spans
- * arrive on a trace of their own; if that trace triggers evaluation, the
- * evaluations evaluate evaluations, and the only thing that stops it is the
- * customer's bill. It fired for real on 2026-05-11. Every pin below is written
- * as a literal, because a guard that silently stops guarding looks exactly
- * like a quiet week.
+ * Causality loop guard prevents evaluation->evaluation cycles. Pins are
+ * literals to prevent silent failures.
  */
 
 function foldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {

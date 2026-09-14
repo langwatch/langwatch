@@ -9,7 +9,10 @@ import type { ExtractorContext, LogExtractorContext } from "../canonical-attribu
 export { parseJsonStringAttrs };
 
 /**
- * Creates a real ExtractorContext for extractor unit tests: real CanonicalAttributeStore/CanonicalEventStore/CanonicalSpanStore instances so extractors exercise production code paths, with recordRule/setAttr/setAttrIfAbsent wrapped in vi.fn() for assertion. JSON-looking string values auto-parse to match the pipeline's parseJsonStringValues() step; pass skipJsonParsing to feed raw strings, exercising an extractor's own defensive safeJsonParse path.
+ * Creates a real ExtractorContext for extractor unit tests: real stores so
+ * extractors exercise production code paths, with recordRule/setAttr/setAttrIfAbsent
+ * wrapped in vi.fn() for assertion. JSON strings auto-parse; pass skipJsonParsing
+ * to feed raw strings and exercise an extractor's defensive safeJsonParse path.
  */
 export function createExtractorContext(
   attrs: Record<string, unknown>,
@@ -53,7 +56,9 @@ export function createExtractorContext(
 }
 
 /**
- * Creates a real LogExtractorContext for extractor.applyLog unit tests. Builds a real CanonicalLogRecordStore so extractors exercise production code paths; recordRule/setAttr/setAttrIfAbsent are vi.fn() wrappers around an out bag mirroring production shape for easy assertion.
+ * Creates a real LogExtractorContext for extractor.applyLog unit tests. Real
+ * CanonicalLogRecordStore so extractors exercise production code paths; recordRule/
+ * setAttr/setAttrIfAbsent are vi.fn() wrappers around an out bag for assertion.
  */
 export function createLogExtractorContext(
   scopeName: string,

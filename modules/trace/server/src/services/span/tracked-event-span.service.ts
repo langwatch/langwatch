@@ -20,31 +20,8 @@ import { nowInstant } from "@langwatch/time";
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 
-/**
- * Turns a tracked event into the one synthetic span that carries it.
- *
- * WHY IT IS A SPAN AT ALL. `POST /api/events/track` and the live-feedback
- * reactor both record a customer's thumbs-up, score or flag against a trace,
- * and the only durable home for that is the trace's own span stream — so both
- * mint a span whose attributes ARE the event, and let the normal fold pick it
- * up. Which means the two paths must mint the SAME span: the span id is a
- * deterministic digest of `${trace_id}:${eventId}`, so a REST call retried by a
- * customer and a reactor redelivered by the queue collapse onto one row instead
- * of scoring the trace twice.
- *
- * WHAT MOVED AND WHY. The builder was in the application, and its one reason
- * for being there was the last line: it dispatched through `getApp()`, the
- * process-wide singleton a package may not have. The dispatch target underneath
- * that singleton was already this package's own span collection, so the harvest
- * is the BUILDER — the id digest, the attribute encoding and the event shape —
- * and the collaborator is named rather than looked up.
- *
- * THE ATTRIBUTE ENCODING IS A WIRE FORMAT between this and the fold that reads
- * it back, and it is duplicated deliberately: the same attribute list is set
- * both on the span AND on a span event named after the event type, because the
- * summary projection reads the span attributes and the event list is what a
- * customer sees on the trace's timeline.
- */
+/** Tracked events become synthetic spans with deterministic IDs to collapse
+ * retries. Attributes duplicated for summary projection and customer timeline. */
 export class TrackedEventSpanService {
   private constructor(private readonly collection: TraceSpanCollectionService) {}
 
@@ -113,16 +90,8 @@ export class TrackedEventSpanService {
     });
   }
 
-  /**
-   * The event as OTLP attributes.
-   *
-   * Metrics are always numbers and details may be anything the customer sent,
-   * so details are typed one value at a time and everything else is
-   * stringified rather than dropped — a detail we cannot type is still a
-   * detail the customer wanted to see. `null` and `undefined` are the one
-   * exception: an absent value carries nothing, and writing `"null"` onto the
-   * span would make it look like the customer sent that word.
-   */
+  /** OTLP attribute encoding: metrics as doubles, details stringified
+   * (null/undefined omitted to avoid ambiguity). */
   private static attributesFor(input: {
     body: TrackEventRESTParamsValidator;
     eventId: string;

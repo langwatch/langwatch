@@ -51,18 +51,8 @@ export interface EvaluationTriggerSubscriberDeps {
   metrics: TraceEvaluationLoopMetrics;
 }
 
-/**
- * Pure relevance guard, evaluated pre-enqueue via `when` (and again in the
- * handler, the fail-open path). Reads only the payload the handler receives,
- * so hoisting it out of the handler changes nothing but where the work is
- * skipped — before the queue serializes, gzips and blobs a payload it would
- * immediately dedup away, rather than after.
- *
- * Side-effect free, per the `ExtraGuard` contract: `when` is evaluated once
- * per event of a coalesced batch, so anything logged here is multiplied by
- * the batch size. The oversized-trace guard lives in the handler for exactly
- * that reason — see below.
- */
+/** Pure relevance guard: evaluated pre-enqueue via when(). Side-effect free
+ * per ExtraGuard contract. */
 function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
   // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
   // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
@@ -113,21 +103,8 @@ export function createEvaluationTriggerSubscriber(
   });
 }
 
-/**
- * Oversized-trace guard (2026-05-28 incident follow-up). Past the same
- * processing cap the fold uses to stop deriving the summary
- * (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
- * large to keep evaluating: re-running every ON_MESSAGE monitor per span
- * on a 26k-span trace is pure amplification for no added signal. Skip the
- * eval dispatch (lighter processing). The span itself is still stored and
- * the trace stays fully queryable: we drop the WORK, never the DATA.
- *
- * This stays in the handler, not in the pre-enqueue `when`, so the
- * once-per-crossing warn below fires once: `when` runs per event of a
- * coalesced batch, and would multiply the log by the batch size. The
- * enqueue it no longer skips is already collapsed to one job per batch by
- * the router's dedup-id collapse, so there is nothing left to save.
- */
+/** Oversized-trace guard: skips eval past MAX_PROCESSED_SPANS. Keeps data,
+ * drops work only. */
 function hasReachedProcessingCap({
   tenantId,
   traceId,
@@ -155,31 +132,8 @@ function hasReachedProcessingCap({
   return true;
 }
 
-/**
- * Infinite-loop prevention (post-2026-05-11 incident). See
- * specs/monitors/online-evaluator-loop-prevention.feature.
- *
- * Depth-only per-span check (origin remains a user-configurable
- * precondition, not a hardcoded subscriber rule): if the inbound
- * span's own `langwatch.reserved.causality_depth` attribute is
- * >= 1, it was emitted by an evaluator workflow (or downstream
- * of one). Skip dispatch.
- *
- * A fresh app-origin span on the same trace (depth 0) still
- * triggers normally — re-runs are allowed, only eval spans are
- * blocked.
- *
- * The primary guarantee that every eval-emitted span carries the
- * attribute is the nlpgo-side BaggageAttributeProcessor (stamps
- * every span at OnStart from a single baggage entry on context).
- *
- * Kill-switch: SYSTEM flag `ops_es_causality_loop_guard_disabled`
- * bypasses the check (emergency rollback without redeploy).
- * Resolved through the composed FeatureFlag service so operators can flip it
- * from the Ops UI without restarting pods; the legacy
- * `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1` env var still works
- * via the standard env-override path (uppercased flag key).
- */
+/** Causality loop guard: depth >= 1 (evaluator-emitted) skips dispatch. Depth
+ * 0 triggers normally. Kill-switch flag for rollback. */
 async function causalityLoopGuardFired({
   event,
   tenantId,

@@ -110,14 +110,8 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   }
 
   /**
-   * The reasoning effort setting rides the `effort` attr of api_request
-   * events (e.g. "low" | "high" | "max", Anthropic's adaptive-thinking
-   * knob). Only conversational turns set the trace-level value: utility
-   * calls (title generation, autosuggest) run at their own effort and must
-   * not override what the user's actual turns ran at. Log lifts merge
-   * last-write-wins into the trace attributes, so the trace shows the
-   * session's most recent conversational effort, same key the codex span
-   * path uses and the drawer header pill reads.
+   * Lifts reasoning effort from api_request event; only conversational turns update
+   * trace level to avoid overwriting with utility-call effort values.
    */
   private liftApiRequest(ctx: LogExtractorContext): void {
     const querySource = asString(ctx.bag.attrs.get("query_source"));

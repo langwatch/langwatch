@@ -1,20 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `traceUpdateBroadcast` subscriber, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * The subscriber's only external effect is a notification, built from the
- * context's tenant and trace id and nothing else — no clock, no fold contents.
- * A redelivery therefore sends a byte-identical message and the viewer
- * refetches once more; there is no second update to see. The 2-second
- * throttling window is a cost control on top of that, not the reason it is
- * safe.
- *
- * It fires on ALL trace event types, which is exactly why the payload has to
- * carry no state: a topic assignment and a span arrival must produce the same
- * "go and look again", or a redelivery of one would contradict the other.
+ * State-free notification: all event types, byte-identical message. 2s
+ * throttle is cost control.
  */
 import { describe, expect, it, vi } from "vitest";
 import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber.ts";

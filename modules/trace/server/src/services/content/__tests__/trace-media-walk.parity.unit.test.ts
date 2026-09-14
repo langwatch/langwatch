@@ -1,7 +1,9 @@
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
- * Parity pins between the three views of the media-part vocabulary: (1) isExtractableMediaPart (sync classifier the extraction walker stops on) agrees with processContentPart (store-side rewriter) for every canonical shape — disagreement means a part is twice-walked or silently skipped; (2) every extractable shape's serialized form trips containsMediaMarkers — a mismatch regresses extraction to passthrough with no failing test; (3) the render-side collector surfaces every shape pre- and post-extraction — unrendered stored bytes are invisible storage cost. The store-side dependency now takes a TraceMediaStore, not the platform's StoredObjectsService; this test fakes that port the way trace-content-extraction.service.unit.test.ts does.
+ * Parity pins three media-part views: classifier matches rewriter, extractable
+ * shapes trigger markers, render surfaces all shapes. Fakes TraceMediaStore like
+ * trace-content-extraction.service.unit.test.ts does.
  */
 import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
 import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
@@ -41,7 +43,9 @@ const PARAMS = {
 };
 
 /**
- * collectMediaParts is a documented, pinned subtraction from the render collector: it never wraps a raw, header-less realtime PCM turn in a playable WAV (isRawPcmFormat — "THE ONE DELIBERATE DIFFERENCE FROM THE TWIN"), since that needs Buffer/atob and this package stays environment-neutral. Only the trace web surface's own collector renders such a part (pinned in trace-media-ref.unit.test.ts). The one raw-PCM example is excluded from the two render-collector assertions below for that reason; every other assertion (classifier, rewriter, marker gate) still covers it.
+ * collectMediaParts doesn't wrap raw PCM to WAV (needs Buffer/atob). Raw-PCM
+ * example excluded from two render-collector assertions below; classifier,
+ * rewriter, and marker gate checks still cover it.
  */
 const RENDER_COLLECTOR_EXAMPLES = EXTRACTABLE_PART_EXAMPLES.filter(
   ({ name }) => name !== "AI-SDK audio file part",

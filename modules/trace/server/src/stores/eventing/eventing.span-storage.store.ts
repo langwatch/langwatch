@@ -48,14 +48,8 @@ function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData
   };
 }
 
-/**
- * Thin AppendStore adapter for span storage.
- * Converts pipeline NormalizedSpan → app-layer SpanInsertData and delegates to SpanStorageRepository.
- *
- * Content dropping is applied earlier, in EventingRecordSpanAdapter (see
- * applyOtlpSpanContentDrop), so it also covers the trace-summary fold that
- * derives ComputedInput/Output from the same event. The store just persists.
- */
+/** AppendStore adapter: converts NormalizedSpan to SpanInsertData. Content
+ * dropping applied earlier; store just persists. */
 export class SpanStorageStore implements AppendStore<NormalizedSpan> {
   private constructor(
     private readonly storage: TraceSpanStorageRepository,

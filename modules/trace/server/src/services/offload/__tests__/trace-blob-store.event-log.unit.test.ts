@@ -1,6 +1,6 @@
 /**
- * @see ADR-022
- * Unit tests for TraceBlobStoreService.getFromEventLog (event_log read path) and putSpool/deleteSpool (transient S3 spool). event_log is the single durable source; getFromEventLog SELECTs by (TenantId, AggregateType, AggregateId, EventId) with TenantId FIRST, structurally blocking cross-tenant reads. These tests FAIL at unit runtime (methods throw "not implemented") but pass typecheck, serving as the TDD contract.
+ * @see ADR-022: Unit tests for getFromEventLog (event_log) and putSpool/deleteSpool
+ * (S3). Tests FAIL at runtime but pass typecheck: TDD contract.
  */
 
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
@@ -443,7 +443,8 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * CONTRACT REGRESSION: read path must match the real write path. Bug: getFromEventLog read EventPayload.data.span.attributes but eventToRecord stores EventPayload=event.data, so the real path is EventPayload.span.attributes (no .data wrapper). This test derives the CH-mock EventPayload from the ACTUAL eventToRecord call rather than a hand-written fixture, so drift in either the write shape or the read shape fails it immediately — a data-wrapper regression on either side throws BlobFieldNotFoundError.
+ * CONTRACT REGRESSION: read path must match write path. Derives CH-mock EventPayload
+ * from ACTUAL eventToRecord call; any drift in write or read shape fails immediately.
  */
 describe("given a SpanReceivedEvent written through eventToRecord (real write path)", () => {
   describe("when getFromEventLog is called with matching ids and the oversize field name", () => {
@@ -565,7 +566,8 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
 // ---------------------------------------------------------------------------
 
 /**
- * FALSIFIABILITY (#4888): real OTLP spans carry mixed-type AnyValue attributes (stringValue|intValue|boolValue|doubleValue|arrayValue|kvlistValue|bytesValue). The offloaded IO field is a stringValue, but its non-string SIBLINGS (e.g. gen_ai.usage.input_tokens={intValue}) used to fail the strict whole-array parse, degrading every >64KB read to the 64KB preview. Feeds the REAL stored OTLP shape (derived from eventToRecord, like the contract test above) with mixed-type siblings, proving the FULL value comes back — fails on the pre-fix strict schema, which rejects those siblings and throws BlobFieldNotFoundError.
+ * FALSIFIABILITY (#4888): non-string sibling attributes used to mask >64KB offloaded
+ * IO fields; proves pre-fix strict schema fails, post-fix returns full value.
  */
 describe("given a real OTLP EventPayload whose span carries mixed-type sibling attributes alongside a >64KB offloaded IO field", () => {
   // >64 KB and includes a multibyte char so byte-identity is meaningfully asserted.
@@ -573,7 +575,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
   const BIG_OUTPUT = "y".repeat(100 * 1024) + "🧪out";
 
   /**
-   * Builds a SpanReceivedEvent whose span.attributes mix offloaded IO fields (stringValue) with non-string siblings the OLD schema rejected. Cast through unknown since this heterogeneous shape is the REAL stored OTLP payload, not the clean string-only shape.
+   * Builds SpanReceivedEvent with mixed-type siblings (real OTLP shape, not clean).
    */
   function makeMixedTypeSpanEvent() {
     return EventUtils.createEvent<SpanReceivedEvent>({
@@ -674,12 +676,13 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
 });
 
 // ---------------------------------------------------------------------------
-// TraceOffloadResolutionService.resolveOffloadedTraces — END-TO-END customer read path with a REAL TraceBlobStoreService
-// over a mixed-type EventPayload (#4888)
+// END-TO-END resolveOffloadedTraces with real TraceBlobStoreService and mixed-type
+// EventPayload (#4888)
 // ---------------------------------------------------------------------------
 
 /**
- * END-TO-END (#4888): drives resolveOffloadedTraces with a REAL TraceBlobStoreService (not a mocked getFromEventLog) whose CH client returns the REAL mixed-type EventPayload eventToRecord produces — the path that degraded in production: a leaned span with a reserved eventref pointer must resolve back to the FULL value with the reserved namespace stripped. Pre-fix, getFromEventLog rejects the mixed-type payload and the resolver degrades to preview, failing this test; post-fix the full value is restored.
+ * END-TO-END (#4888): resolveOffloadedTraces with real TraceBlobStoreService and
+ * mixed-type EventPayload; pre-fix degrades to preview, post-fix restores full value.
  */
 describe("given a leaned span pointing at a real mixed-type EventPayload offloaded to event_log", () => {
   const BIG = "z".repeat(120 * 1024) + "🧪e2e";

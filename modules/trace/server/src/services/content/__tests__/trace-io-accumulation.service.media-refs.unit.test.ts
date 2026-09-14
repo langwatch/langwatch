@@ -1,5 +1,7 @@
 /**
- * Accumulator's TEXT choice and MEDIA collection, driven through the real canonicalisation pass and media-reference adapter. Background (2026-05-14 prod regression): summaries showed the raw JSON wrapper instead of extracted text, since the accumulator stringified the raw payload instead of using the already-extracted text.
+ * Tests accumulator's text choice and media collection through canonicalisation and
+ * media-reference adapter. Regression: summaries showed raw JSON wrapper instead of
+ * extracted text when accumulator stringified raw payload.
  */
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";

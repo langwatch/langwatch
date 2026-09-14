@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * computeFacetValues routes dynamic attribute drilldowns by prefix: attribute.<key> reads trace_summaries.Attributes (legacy alias kept), event.attribute.<key> reads stored_spans.Events.Attributes, span.attribute.<key> reads stored_spans.SpanAttributes — each via its own repository method so values come from the store the filter actually queries. See specs/traces-v2/search.feature, Rule "Attribute sections list values from their own attribute store".
+ * Facet value routing by attribute prefix (attribute, event.attribute,
+ * span.attribute) to their respective stores.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

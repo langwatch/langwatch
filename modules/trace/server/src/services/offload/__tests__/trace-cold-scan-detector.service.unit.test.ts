@@ -4,11 +4,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
 
-/**
- * The cold-scan detector fails OPEN: `tryDetectColdScan` only inspects tables listed in {@link
- * TIME_PARTITIONED_TABLES}, so a partitioned table missing from that map is silently treated as un-partitioned and
- * never flagged, however expensively it is queried.
- */
+/** Detector fails open: only checks TIME_PARTITIONED_TABLES, missing
+ * partitions are silently skipped. */
 const migrationDir = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../../../../packages/clickhouse-client/migrations",

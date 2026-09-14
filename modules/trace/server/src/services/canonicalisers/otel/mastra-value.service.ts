@@ -17,13 +17,8 @@ const messageSchema = z.looseObject({
 });
 
 /**
- * Mastra's span attributes read into the canonical shape.
- *
- * Mastra names and nests things its own way — the model lives in metadata, the
- * body inside a model-step input, the output shape differs per span type — and
- * this is the whole of that translation. Every reader is total: an attribute
- * that is missing or shaped unexpectedly yields nothing rather than a throw,
- * because a span with an unreadable field is still a span worth keeping.
+ * Translates Mastra's custom span attributes into canonical shape.
+ * Every reader is total to preserve spans with unreadable fields.
  */
 export class MastraValuesService {
   private constructor() {}

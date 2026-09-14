@@ -1,24 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `trackedEventSync` subscriber, required by the
- * `eventing-subscriber-idempotency` architecture rule.
- *
- * What makes it hold: the tracked event's id is hashed from the trace id, the
- * span id, the event type and the event's ordinal WITHIN the span's own
- * `events` list. All four are fixed for a given span, so a second delivery asks
- * for the same tracked event. The recorded body's `timestamp` is the source
- * event's `occurredAt`, not a clock reading, so the recorded row is identical
- * too.
- *
- * The ordinal is the fragile half. It is the index in `span.events`, not a
- * counter over the events that happen to validate: a counter would shift
- * whenever a preceding event started or stopped passing reconstruction, and a
- * redelivery after such a change would mint a second id for one thumbs-up.
- *
- * The clock is pinned throughout, because `hasSyncableFeedback` drops any event
- * older than an hour — see the last case.
+ * Event ID hashed from trace, span, event type, ordinal. All deterministic,
+ * so redelivery records identical row.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrackedEventSync } from "../tracked-event-sync.subscriber.ts";
@@ -64,17 +48,8 @@ type FeedbackPayload = {
   event_details?: Record<string, string>;
 };
 
-/**
- * The attributes `recordTrackedEventSpan` actually emits for one feedback
- * event: a discrete `event.type`, and one attribute per metric and detail.
- *
- * NOT `json_encoded_event`. That is the EVALUATION channel's shape — what
- * `custom-evaluation-sync.subscriber` parses, and what the shared
- * `createOtlpSpan` helper builds. Handed a JSON blob, this subscriber's
- * `reconstructTrackedEvent` finds no `event.type`, returns undefined, and the
- * event is dropped before validation: the sink records nothing and every
- * assertion here reads zero. That is what these seven tests were doing.
- */
+/** Attributes: event.type + metric/detail (not JSON like eval channel).
+ * Missing event.type → dropped. */
 function feedbackAttributes(payload: FeedbackPayload) {
   return [
     { key: "event.type", value: { stringValue: payload.event_type } },

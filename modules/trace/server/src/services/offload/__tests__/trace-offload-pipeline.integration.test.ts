@@ -1,6 +1,7 @@
 /**
  * @see #4215, ADR-022
- * Integration test for the large-trace blob offload pipeline. In-process stubs only (no testcontainers, no real S3) — the goal is pipeline WIRING, not S3 fidelity or CH SQL correctness (covered separately in trace-blob-store.service.unit.test.ts, trace-offload-resolution.service.unit.test.ts). Exercises: leanForProjection on a synthetic SpanReceived event over IO_PREVIEW_BYTES; the lean event carrying the eventref pointer + preview; feeding lean attributes into resolveOffloadedTraces backed by a fake getFromEventLog returning the full value; and TraceIOExtractionService recomputing trace.output correctly — every production module in the pipeline, with assertions identical to the real read path.
+ * Offload pipeline wiring test: leanForProjection, eventref resolution, and
+ * output recomputation with in-process stubs (no external services).
  */
 import { TraceProjectionLeanService } from "../../projection/trace-projection-lean.service.ts";
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
@@ -137,10 +138,8 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
   } as unknown as Event;
 }
 
-/**
- * Extracts span attributes from a lean event (post-TraceProjectionLeanService.leanForProjection) into
- * the Record<string, string> format that NormalizedSpan.spanAttributes uses.
- */
+/** Extracts span attributes from a lean event into the Record<string, string>
+ * format that NormalizedSpan.spanAttributes uses. */
 function extractSpanAttrs(event: Event): Record<string, string> {
   const data = event.data as {
     span?: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
@@ -188,9 +187,8 @@ function makeNormalizedSpan(spanAttributes: Record<string, string>): NormalizedS
   };
 }
 
-// ---------------------------------------------------------------------------
-// TraceProjectionLeanService.leanForProjection + TraceOffloadResolutionService.resolveOffloadedTraces pipeline
-// ---------------------------------------------------------------------------
+// Lean projection + offload resolution pipeline
+// -----------------------------------------------
 
 describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYTES)", () => {
   let leanAttrs: Record<string, string>;
@@ -202,7 +200,8 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
   });
 
   describe("when TraceProjectionLeanService.leanForProjection is applied (simulating dispatch interposition)", () => {
-    /** @scenario event_log carries the full event content; projection queue carries the lean shape */
+    /** @scenario event_log carries full content; projection queue carries the
+     * lean shape */
     it("the lean event carries a preview within the IO_PREVIEW_BYTES budget for langwatch.output", () => {
       const previewValue = leanAttrs["langwatch.output"] ?? "";
       expect(Buffer.byteLength(previewValue, "utf-8")).toBeLessThanOrEqual(

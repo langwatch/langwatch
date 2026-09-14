@@ -1,13 +1,5 @@
-/**
- * Where a validated collector body goes: the age cutoff, the span fan-out through the ingestion
- * pipeline, and the evaluation fan-out through the evaluation pipeline. Both report what they
- * rejected so the door can answer with `partialSuccess`.
- *
- * A service rather than a package of functions: it HOLDS the two pipelines and the evaluator-id
- * rule the process composed, so a caller states them once at construction instead of threading
- * them through every call. The evaluation pipeline is optional, and a deployment that composed
- * none refuses evaluations by name rather than dropping them.
- */
+/** Dispatcher for validated collector bodies: age filtering, span/eval
+ * fan-out with rejection reporting. */
 import crypto from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";

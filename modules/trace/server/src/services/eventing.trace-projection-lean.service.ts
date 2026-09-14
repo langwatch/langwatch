@@ -8,8 +8,8 @@ export class TraceProjectionLeanEventingAdapter {
   }
 
   /**
-   * @see ADR-022
-   * The lean, shaped for EventingClickHouseReplayEventSource — a frozen twin of TraceProjectionLeanEventingAdapter.leanReplayEvent. Replay's event source lives in @langwatch/eventing, which this package depends on, so the substrate can't import the transform and takes it as a required dependency instead, composed here so the ReplayEvent/Event casts exist once and a replay wired anywhere leans exactly as live dispatch does.
+   * @see ADR-022: Frozen lean twin for EventingClickHouseReplayEventSource; casts live
+   * here so replay and live dispatch lean identically.
    */
   static leanReplayEvent: ReplayEventLean = (event) =>
     TraceProjectionLeanService.leanForProjection(

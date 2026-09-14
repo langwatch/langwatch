@@ -1,24 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for the `customEvaluationSync` subscriber, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * What makes it hold: the subscriber names nothing from the clock. An SDK
- * evaluation carrying no `evaluation_id` gets one hashed from the trace id and
- * the evaluation payload, and the report's `occurredAt` is copied from the
- * source event rather than read from `Date.now()`. The evaluation store keys on
- * `evaluationId`, so a second delivery of one span asks for the same evaluation
- * to be recorded again, not for a second one.
- *
- * Queue deduplication is NOT what makes this safe: the dedup id
- * (`tenantId:aggregateId:eventId`) carries a 30-second TTL, and a redelivery
- * after a worker crash routinely lands outside it.
- *
- * The clock is pinned throughout, because `hasSyncableEvaluations` drops any
- * event older than an hour — see the last case, which is the one place the
- * clock decides anything.
+ * Redelivery idempotency: evaluation_id hashed from trace+payload. Store keys
+ * on evaluationId; queue dedup insufficient (30s TTL).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";

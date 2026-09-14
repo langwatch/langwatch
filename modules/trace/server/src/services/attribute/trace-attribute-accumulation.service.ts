@@ -185,10 +185,8 @@ export class TraceAttributeAccumulationService {
     merged: Record<string, string>;
     spanAttrs: Record<string, string>;
   }): void {
-    // User-provided model metadata wins over an earlier fold's stamp. The existing-wins merge above keeps the
-    // STAMPED values when a later span carries user `metadata.model` / `metadata.models`, which would silently
-    // drop the user's value. Apply the incoming user keys and clear the marker so stamping stops for good. (Our
-    // own stamp never appears in spanAttrs: extractAttributes reads the span, the stamp lives on state.)
+    // User metadata wins over earlier stamp; apply incoming user keys and clear marker so
+    // stamping stops. (Stamp never appears in spanAttrs: it lives on state.)
     if (merged[MODEL_METADATA_STAMPED_MARKER] === "true") {
       const incomingModel = spanAttrs[STAMPED_MODEL_ATTRIBUTE];
       const incomingModels = spanAttrs[STAMPED_MODELS_ATTRIBUTE];

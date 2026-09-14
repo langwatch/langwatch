@@ -1,19 +1,6 @@
 /**
- * Canonical media content-part examples — one per shape branch of
- * `visitContentPart` that carries inline bytes the extractor externalizes.
- *
- * Was `platform/app/src/shared/content-parts/__tests__/canonical-media-parts.ts`.
- *
- * Consumed by the parity test to pin three couplings at once:
- *  - the ingestion-side classifier/extractor and the render-side collector
- *    reach the same shapes (divergence = stored bytes nothing renders);
- *  - every extractable shape's serialized form trips `containsMediaMarkers`
- *    (a shape added to the visitor without a matching marker silently
- *    regresses extraction to passthrough);
- *  - url-only variants of each shape stay untouched by both sides.
- *
- * Adding a shape to `visit-content-part.ts`? Add its example here and the
- * parity test enforces the rest.
+ * Canonical media shape fixtures; parity test pins ingestion/render couplings and
+ * containsMediaMarkers coverage. Add shapes to visit-content-part.ts then here.
  */
 
 const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAE=";

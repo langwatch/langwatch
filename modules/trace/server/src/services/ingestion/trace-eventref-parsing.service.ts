@@ -37,13 +37,8 @@ export class TraceEventRefParsingService {
   }
 
   /**
-   * Splits a span's flat attributes into preview attributes (reserved keys stripped) and
-   * well-formed eventref pointers. A reserved key with no `eventId` is recorded in
-   * `missingEventIdKeys` but never resolved; malformed JSON is dropped, the preview already there.
-   */
-  /**
-   * One eventref attribute: its pointer, or `null` when it names no event id, or `undefined`
-   * when the JSON is malformed and the preview already in `cleanedAttrs` is all we have.
+   * Splits attributes into preview (reserved stripped) and eventref pointers; returns
+   * pointer, null if no eventId, or undefined if malformed.
    */
   static #readEventRef(attrKey: string, value: unknown): EventRefEntry | null | undefined {
     let decoded: unknown;

@@ -372,14 +372,7 @@ const parseTraceFlags = (spanFlags: number | undefined | null): TraceFlagsInfo =
 };
 
 /**
- * Parses the trace state from the trace state string.
- *
- * We reply on the TraceState class from the @opentelemetry/core package to parse the
- * trace state, as it is the most complete and accurate implementation of the trace state.
- *
- * And I don't want to deal with all the messy edge cases.
- *
- * Reference: https://www.w3.org/TR/trace-context/#tracestate-header
+ * Parses W3C trace-context trace state via @opentelemetry/core TraceState.
  * @param traceState - The trace state string.
  * @returns The trace state info.
  */

@@ -1,14 +1,5 @@
-/**
- * The dedup port is a shape, not a base class to inherit.
- *
- * The app holds its own Redis-backed dedup service and hands it to the Trace
- * pipeline. That only works while `TraceSpanDedup` stays structurally
- * satisfiable — no private members, no constructor to call — so a plain
- * object with the three methods is assignable to it.
- *
- * If that stops being true, the app needs an adapter class again, and this is
- * where it says so rather than a composition file failing to compile.
- */
+/** Dedup port is structural only: assignable by shape, not by class
+ * inheritance. */
 
 import { describe, expect, it } from "vitest";
 import { TraceSpanDedup, type SpanDedupRef } from "../../ingestion/trace-ingestion.service.ts";

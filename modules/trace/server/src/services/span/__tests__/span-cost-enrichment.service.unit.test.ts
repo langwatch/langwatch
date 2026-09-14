@@ -6,7 +6,8 @@ import { OtlpSpanCostEnrichmentService } from "../span-cost-enrichment.service.t
 
 /**
  * Spec: modules/trace/specs/record-time-cost-enrichment.feature
- * Pins here are LITERALS, not reads of the application's source. Each fails silently toward billing risk: a span enriched from the wrong rule, or no rule at all, stores a cost attribute indistinguishable from a correct one.
+ * Pins are LITERALS, not application reads. Incorrect or missing rules create
+ * billing risk — these tests lock the enrichment behavior in place.
  */
 
 function span(
@@ -352,7 +353,8 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
 
       /**
-       * @scenario "The raw name is tried against every rule before any transformed name is tried against any rule"
+       * @scenario "Raw name is tried against every rule before any transformed
+       * name is tried against any rule"
        *
        * The rule that only matches the SUBTYPE-STRIPPED name is listed FIRST,
        * so a matcher that ran the passes in the other order — every candidate

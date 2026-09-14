@@ -32,22 +32,9 @@ export interface OtlpSpanTokenEstimationServiceDependencies {
   featureFlags: FeatureFlagApi;
 }
 
-/**
- * Service that estimates token counts for LLM spans that have input/output
- * content but no usage token counts.
- *
- * When token counts are missing, this service tokenizes the input/output text
- * using tiktoken and pushes `gen_ai.usage.input_tokens`,
- * `gen_ai.usage.output_tokens`, and `langwatch.tokens.estimated` attributes
- * onto the span.
- *
- * This service should be applied BEFORE creating immutable events
- * in the event sourcing pipeline (alongside PII redaction and cost enrichment).
- *
- * Kill switches:
- * - `token-estimation-killswitch`: disables globally when enabled
- * - `token-estimation-project-killswitch`: disables per-project when enabled
- */
+/** Estimates token counts for LLM spans with missing usage data. Tokenizes
+ * input/output, adds usage and estimated attributes. Kill switches disable
+ * globally or per-project. */
 export class OtlpSpanTokenEstimationService {
   /**
    * The application constructs this with `new`; `service-classes` requires a

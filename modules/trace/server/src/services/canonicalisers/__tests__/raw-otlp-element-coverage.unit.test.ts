@@ -8,17 +8,8 @@ import geminiBSpan from "./fixtures/gemini-b.llm-call.json";
 import opencodeBSpan from "./fixtures/opencode-b.do-stream.json";
 
 /**
- * Per-element canonicalization coverage, fed by the REAL Path B OTLP each coding
- * assistant sent on the wire (captured during the 2026-06-06 dogfood, dumps in
- * langwatch/.claude/dogfood-evidence/8cell-2026-06-06/<tool>-B/). Each tool's
- * raw span is pushed through the production TraceCanonicalisationService,
- * and every one of the nine telemetry elements is asserted PRESENT (a real
- * value was captured) or WIRE-ABSENT (the tool genuinely does not emit it —
- * cited per tool below).
- *
- * To validate a NEW element in future: add it to ELEMENTS plus each tool's
- * `expected` map here, and add the matching gateway-level row (Path A) — if a
- * tool stops emitting a GREEN element the matrix turns red.
+ * Per-element canonicalization coverage for Path B telemetry from real coding assistants.
+ * Asserts each of nine telemetry elements PRESENT or WIRE-ABSENT; add new elements to ELEMENTS.
  */
 
 const SPAN_CTX = (scopeName: string, spanName: string): ExtractorContext["span"] => ({

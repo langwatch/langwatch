@@ -14,9 +14,9 @@ export const OUTPUT_SOURCE = {
 } as const;
 
 /**
- * The attributes a side's media can ride on. Both are read for every span, because the two carry different things: the provider instrumentation writes the
- * request the customer sent to `langwatch.*`, while `gen_ai.*.messages` holds what that instrumentation chose to report, which is often the text alone.
- * Reading only whichever one named the trace loses the picture whenever the other one is the one holding it.
+ * Media attributes: read both sources (langwatch.* and gen_ai.*.messages) since they
+ * carry different things. Provider sends customer input to langwatch.*; instrumentation
+ * reports subset to gen_ai.*.messages. Reading only one loses the full picture.
  */
 const MEDIA_SOURCE_ATTRS = {
   input: [ATTR_KEYS.LANGWATCH_INPUT, ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
@@ -119,9 +119,8 @@ export class TraceIOAccumulationService {
   }
 
   /**
-   * Claude Code's utility model calls — autosuggest, session titles — are not the conversation. They are
-   * parentless like tool spans, so a title could otherwise win the headline on end time. Mirrors the log-path gate
-   * in `TraceLogRecordIOService` so both agree.
+   * Claude Code utility calls (autosuggest, titles) aren't conversation; parentless
+   * like tool spans, could win headline by end time. Mirrors log-path gate logic.
    */
   private isClaudeUtilityCall(span: NormalizedSpan): boolean {
     const querySource = span.spanAttributes["claude_code.query_source"];
@@ -275,11 +274,8 @@ export class TraceIOAccumulationService {
     endTime: number;
     currentEndTime: number;
   }): boolean {
-    // A parentless span is "root". A claude_code Path B turn synthesizes MANY parentless spans under one trace
-    // (one per model call), so "root" is not unique here: among roots the latest-finishing reply wins, so the
-    // trace output is deterministic by end time instead of last-folded-wins (the real reply often sits on a
-    // middle call, with utility calls finishing after it). A root still beats a non-root child that set the
-    // output. For a conventional single-root trace this is a no-op — there is only ever one root.
+    // Parentless spans are "roots"; Claude Code synthesizes many per trace.
+    // Latest-finishing root wins for determinism. Roots beat non-root children.
     if (isRoot) {
       return !outputFromRoot || endTime >= currentEndTime;
     }
@@ -352,9 +348,8 @@ export class TraceIOAccumulationService {
   }
 
   /**
-   * Prefer the extracted human-readable text over the raw payload. The IO extraction service runs messagesToText / extractTextFromPlainJson to unwrap common
-   * payload shapes (e.g. `{"output":"Hey"}` → `"Hey"`, gen_ai messages → joined content text). When that succeeds, use it for the trace summary. Fall back to
-   * stringifying the raw payload only when extraction returned no text — keeps NON-null guarantee for spans that have data but unknown shape.
+   * Prefer extracted text over raw payload; fall back to stringify only when extraction
+   * returns no text. Keeps NON-null guarantee for spans with data but unknown shape.
    */
   private static preferText(text: string | null | undefined, raw: unknown): string {
     if (typeof text === "string" && text.length > 0) {

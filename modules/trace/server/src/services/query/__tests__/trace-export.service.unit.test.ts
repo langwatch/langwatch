@@ -1,14 +1,6 @@
 import type { Protections } from "@langwatch/trace-contract";
-/**
- * #4991 ("2 of 2" of #4888) — AC1 call-site wiring for TraceExportService.
- *
- * A trace export consumes content: a truncated value is data loss in the CSV/
- * JSONL. Proves the process-owned TraceService is used directly and BOTH
- * export modes opt resolveBlobs into getAllTracesForProject — full mode because
- * it emits span IO, summary mode because it still emits trace-level input/output.
- *
- * BDD structure: given/when nested describes, action-based it() names.
- */
+/** AC1 export wiring: proves TraceService is used and both modes resolve
+ * blobs to prevent truncation data loss. */
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyReadService } from "../../read/trace-legacy-read.service.ts";

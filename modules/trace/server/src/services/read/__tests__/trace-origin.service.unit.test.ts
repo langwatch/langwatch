@@ -1,14 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Pins the origin fold's platform-origin precedence. A Langy turn's trace
- * carries BOTH explicit platform origins — the manager's relay stamps
- * "langy" on the turn span + relayed worker spans, while the AI gateway
- * stamps "gateway" on the gen_ai spans it retells into the same trace.
- * Under the old "explicit always wins" rule, whichever span folded last
- * decided the trace summary, so the same turn flipped between "langy" and
- * "gateway" depending on arrival order. Langy outranks the gateway, in
- * both fold orders.
+ * Platform-origin precedence: Langy outranks gateway regardless of fold order.
  */
 import { describe, expect, it } from "vitest";
 

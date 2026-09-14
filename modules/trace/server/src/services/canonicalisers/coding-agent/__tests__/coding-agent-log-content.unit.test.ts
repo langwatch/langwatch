@@ -1,13 +1,6 @@
 /**
- * The content-key table behind both the read-path enrichment and the API's log
- * redaction.
- *
- * The guard at the bottom is the point of the file: it reads the transcript
- * derivation's own source and fails if the derivation surfaces a log attribute
- * the table does not classify. That is exactly the drift that let namespaced
- * agents (codex, gemini) return restricted content to a session-less caller —
- * the derivation resolved their events through the canonical vocabulary while
- * the gate matched claude's bare wire spelling and so found nothing to hide.
+ * Content-key table for read-path enrichment and log redaction. Guard fails if
+ * transcript derivation surfaces unclassified log attributes, catching drift.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

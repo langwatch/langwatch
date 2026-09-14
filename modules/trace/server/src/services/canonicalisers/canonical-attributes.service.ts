@@ -204,13 +204,8 @@ export class CanonicalSpanStore {
 }
 
 /**
- * Mirror of CanonicalSpanStore for log records. Wraps the log record's
- * attribute map so the canonical extractor pipeline can claim
- * (`take`) keys the same way it does for spans. Log records don't
- * carry their own event array (their `body` is the only narrative
- * field, and `attributes` already carries everything an extractor
- * needs), so this bag is a thin CanonicalAttributeStore wrapper plus the
- * scope name + body, which extractors gate detection on.
+ * Log record wrapper for canonical extraction; includes scope and body for detector gating.
+ * Log records lack event arrays, so extractors gate on body and attributes alone.
  */
 export class CanonicalLogRecordStore {
   readonly attrs: CanonicalAttributeStore;

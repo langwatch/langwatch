@@ -86,17 +86,8 @@ class JsonScan {
 }
 
 /**
- * As much of a cut-off Claude Code request body as can be read back.
- *
- * The bodies are capped before storage, so a long conversation arrives as JSON
- * that simply stops mid-value. Parsing fails on all of it, which would leave
- * the span with no input at all — and the first messages, which are the ones a
- * person reads to see what was asked, are precisely the part that survived.
- *
- * The salvage walks the text with {@link JsonScan} rather than parsing it:
- * a linear pass over 60KB, with no tree to build for a body that cannot form
- * one. Everything here is a step of that walk; only the entry point is
- * anybody else's business.
+ * Recovers partial request messages from truncated bodies. Bodies stop mid-value,
+ * so parsing fails; JsonScan walks the text instead to recover first messages.
  */
 export class ClaudeCodeTruncatedRequestService {
   private constructor() {}
@@ -326,13 +317,8 @@ export class ClaudeCodeTruncatedRequestService {
   }
 
   /**
-   * Best-effort parse of a request body claude cut mid-JSON: a single scanner
-   * pass finds the complete leading `messages` elements and the `system` /
-   * `tools` values (whole or partial), and rebuilds the same message array the
-   * intact path produces. Partial system text is kept and marked, for a
-   * session past ~60KB of history the head of the system prompt is all that
-   * survives the cap, and it is still what identifies the session's context.
-   *
+   * Single-pass salvage of truncated JSON; recovers complete messages and
+   * system/tools values, keeps partial system text that identifies session context.
    * @internal exported for unit testing
    */
   trySalvage(raw: string): Array<{ role: string; content: string }> | null {

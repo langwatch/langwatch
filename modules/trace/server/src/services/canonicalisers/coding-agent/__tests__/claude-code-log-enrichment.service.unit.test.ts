@@ -1,5 +1,6 @@
 /**
- * The IO wrapper both read paths (traces-v2 drawer, legacy TraceService) share for Claude Code content enrichment. Real llm_request spans carry tokens + request_id but no message content, which lives in the trace's OTLP log records. Pins the three things the wrapper owns: the gate (nothing to join never touches the log store), the join, and best-effort degradation.
+ * Tests Claude Code log enrichment: joins llm_request spans (tokens + request_id) with
+ * message content from OTLP log records. Tests gate, join, and best-effort degradation.
  */
 import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
 import { describe, expect, it, vi } from "vitest";

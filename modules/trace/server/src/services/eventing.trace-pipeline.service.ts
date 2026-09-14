@@ -39,15 +39,7 @@ import { EventingTraceProcessingAdapter } from "./eventing.trace-processing.serv
 import { EventingTraceTopicAdapter } from "./eventing.trace-topic-assignment.service.ts";
 import { clampSpanShardCount, spanCommandGroupKey } from "../rules/trace-span-command-shard.rules.ts";
 
-/**
- * The one name every Trace registration carries.
- *
- * Both of Trace's registration shapes - this full definition and the
- * producer-only one over the same aggregate - are the SAME pipeline as far as
- * the runtime is concerned, so a process composes exactly one of them and a
- * process that composes neither resolves this name off the registration its
- * install phase made.
- */
+/** Trace pipeline name; shared by both full and producer-only registration shapes. */
 export const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";
 
 export type EventingTracePipelineAdapterOptions = {

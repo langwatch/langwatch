@@ -274,15 +274,9 @@ export class CustomEvaluationSync {
     return CustomEvaluationSync.spanHasEvaluationEvents(event.data.span);
   }
 
-  /**
-   * Subscriber handler that syncs custom SDK evaluations to the
-   * evaluation-processing pipeline.
-   *
-   * Reads `langwatch.evaluation.custom` events directly from each
-   * SpanReceivedEvent's OTLP span data, then dispatches a single
-   * reportEvaluation command that emits both started and completed events
-   * atomically. Uses deterministic IDs for idempotency on retries.
-   */
+  /** Syncs custom SDK evaluations to pipeline. Reads langwatch.evaluation.custom
+   * from OTLP spans, dispatches reportEvaluation atomically with deterministic
+   * IDs for idempotency. */
   static createCustomEvaluationSyncHandler(
     deps: CustomEvaluationSyncSubscriberDeps,
   ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {

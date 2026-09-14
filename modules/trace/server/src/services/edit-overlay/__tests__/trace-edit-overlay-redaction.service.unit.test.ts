@@ -1,7 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
- * Cutting a correction down to what a viewer may read, and putting back what was cut when that viewer saves. Runs before the correction reaches the drawer and before it applies to a trace on the dataset path — the one place deciding whether corrected content reaches a reader, and the one place stopping a reader from deleting what it hid from them.
+ * Redacts corrections by viewer permissions: hides on read, restores on save.
+ * Guards viewer access to corrected content.
  */
 import { TraceEditOverlayRestoreService } from "../trace-edit-overlay-restore.service.ts";
 import { TraceEditOverlayRedactionService } from "../trace-edit-overlay-redaction.service.ts";
@@ -147,7 +148,8 @@ describe("redacting a correction for its reader", () => {
       expect(redacted.trace).toBeUndefined();
     });
 
-    /** @scenario "A viewer who may not read captured content is handed only the structural edits" */
+    /** @scenario "A viewer who may not read captured content is handed only
+     * the structural edits" */
     it("hands over the structural edits and none of the corrected content", () => {
       const redacted = TraceEditOverlayRedactionService.redactPatchForViewer({
         patch: contentAndStructurePatch,

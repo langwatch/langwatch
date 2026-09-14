@@ -1,12 +1,6 @@
 /**
- * Characterization of `accumulateIO` — the rule that decides which span's text
- * becomes a trace's headline input and output.
- *
- * It runs once per span and carries its answer forward in `TraceSummaryData`,
- * so the behaviour worth pinning is which span WINS: a root beats a child, a
- * semantic match beats a stringified fallback, and some span kinds never
- * compete at all. Every collaborator is faked, so these are the accumulation
- * rules on their own, with no payload parsing in the way.
+ * Tests accumulateIO rule that picks headline input/output. Roots beat children,
+ * semantic matches beat fallbacks. No payload parsing, rules in isolation.
  */
 
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
