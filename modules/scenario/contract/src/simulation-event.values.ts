@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 
 /** Values written by the Simulation event pipeline. */
 export const SIMULATION_EVENT_RUN_STATUSES = [
@@ -31,5 +32,7 @@ export const simulationEventResultsSchema = z.object({
   metCriteria: z.array(z.string()).default([]),
   unmetCriteria: z.array(z.string()).default([]),
   error: z.string().optional(),
+  /** Code-triggered runs send their evaluations with the finished event. */
+  evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
 export type SimulationEventResults = z.infer<typeof simulationEventResultsSchema>;

@@ -61,10 +61,14 @@ export type FeatureApiWitness<Api> = ModuleApiToken<Api>;
 type SourceSchema = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
 type Missing = undefined;
 type RouteSource = SourceSchema | RestRawBodyDeclared | RestMultipartDeclared | Missing;
+/** `:id{.+?}` declares a Hono regex constraint; the parameter's name is the part before it. */
+type StripParamConstraint<Segment extends string> = Segment extends `${infer Bare}{${string}}`
+  ? Bare
+  : Segment;
 type PathParameterNames<Path extends string> = Path extends `${string}:${infer Tail}`
   ? Tail extends `${infer Name}/${infer Rest}`
-    ? Name | PathParameterNames<`/${Rest}`>
-    : Tail
+    ? StripParamConstraint<Name> | PathParameterNames<`/${Rest}`>
+    : StripParamConstraint<Tail>
   : never;
 type ExactPathSchema<Path extends string, Schema extends z.ZodObject> =
   Exclude<keyof Schema["shape"], PathParameterNames<Path>> extends never
