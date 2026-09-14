@@ -6,11 +6,10 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
-import { createLogger } from "@langwatch/observability";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
@@ -31,6 +30,48 @@ import { declined } from "../response.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
 import { getRoutePolicy } from "../security.ts";
+
+/**
+ * The runtime's loggers (`outputLogger`, `capabilityLogger`, and every
+ * family's `loggerMiddleware`) are created once, at module scope, so
+ * spying on a later `createLogger(name)` call never reaches the instance the
+ * runtime actually writes to — under vitest's silent default, `createLogger`
+ * hands back a throwaway `pino` per call rather than a cached one at all (see
+ * `resolveLoggerConfiguration`/`testLoggerLevel` in
+ * `packages/observability/src/logger.ts`). Recording by name here, instead of
+ * spying on an instance, is what makes these assertions observe the real call.
+ */
+const recordedLogs = new Map<
+  string,
+  { level: "debug" | "info" | "warn" | "error"; fields: unknown; message: string }[]
+>();
+
+function logsFor(name: string) {
+  return recordedLogs.get(name) ?? [];
+}
+
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
+  createLogger: (name: string) => {
+    const record =
+      (level: "debug" | "info" | "warn" | "error") => (fields: unknown, message: string) => {
+        const rows = recordedLogs.get(name) ?? [];
+        rows.push({ level, fields, message });
+        recordedLogs.set(name, rows);
+      };
+
+    return {
+      debug: record("debug"),
+      info: record("info"),
+      warn: record("warn"),
+      error: record("error"),
+    };
+  },
+}));
+
+afterEach(() => {
+  recordedLogs.clear();
+});
 
 const SPEC_OPTIONS = { excludeStaticFile: false } as const;
 const VERSION = "2026-09-08";
@@ -1223,24 +1264,18 @@ describe("a route that declares the several answers it may give", () => {
 
   /** @scenario "An endpoint declares the several answers it may give" */
   it("records the request as handled rather than as a server fault", async () => {
-    // The family's request logger, by the name the runtime builds it under and
-    // the factory caches it by: this IS the instance the middleware writes to.
-    const logger = createLogger("langwatch:api:platform-health");
-    const info = vi.spyOn(logger, "info");
-    const error = vi.spyOn(logger, "error");
+    await platformHealthApp({ status: "unhealthy" }).app.request("/api/v1/platform-health");
 
-    try {
-      await platformHealthApp({ status: "unhealthy" }).app.request("/api/v1/platform-health");
+    const rows = logsFor("langwatch:api:platform-health");
 
-      expect(info).toHaveBeenCalledWith(
-        expect.objectContaining({ statusCode: 503 }),
-        "request handled",
-      );
-      expect(error).not.toHaveBeenCalled();
-    } finally {
-      info.mockRestore();
-      error.mockRestore();
-    }
+    expect(rows).toContainEqual(
+      expect.objectContaining({
+        level: "info",
+        message: "request handled",
+        fields: expect.objectContaining({ statusCode: 503 }),
+      }),
+    );
+    expect(rows.some((row) => row.level === "error")).toBe(false);
   });
 
   /** @scenario "An endpoint that declares several answers may not also declare one" */
@@ -1715,8 +1750,6 @@ async function createUpload(app: Hono, name: string): Promise<Response> {
 describe("a route whose answer takes one of several shapes", () => {
   /** @scenario "A route answers one of several shapes, told apart by a field" */
   it("serves each declared shape and diagnoses one it never declared", async () => {
-    const logger = createLogger("langwatch:api:output-validation");
-    const diagnosed = vi.spyOn(logger, "error").mockImplementation(() => {});
     const app = uploadsApp();
 
     await expect((await createUpload(app, "known")).json()).resolves.toEqual({
@@ -1730,8 +1763,9 @@ describe("a route whose answer takes one of several shapes", () => {
 
     await createUpload(app, "off-contract");
 
-    expect(diagnosed).toHaveBeenCalledTimes(1);
-    diagnosed.mockRestore();
+    expect(
+      logsFor("langwatch:api:output-validation").filter((row) => row.level === "error"),
+    ).toHaveLength(1);
   });
 
   /** @scenario "A route answers one of several shapes, told apart by a field" */
@@ -2500,9 +2534,6 @@ describe("a route whose answer stands for a while", () => {
 
   /** @scenario "A cache failure degrades to a handler call" */
   it("runs the handler and serves the caller when the store cannot be read", async () => {
-    const reported = vi
-      .spyOn(createLogger("langwatch:api:endpoint-capabilities"), "warn")
-      .mockImplementation(() => {});
     const { app } = catalogueApp();
     const runtime = createRestRuntime({
       identity: {
@@ -2525,8 +2556,9 @@ describe("a route whose answer stands for a while", () => {
 
     expect((await app.request("/api/v1/catalogue/one")).status).toBe(200);
     expect((await degraded.request("/api/v1/catalogue/one")).status).toBe(200);
-    expect(reported).toHaveBeenCalled();
-    reported.mockRestore();
+    expect(logsFor("langwatch:api:endpoint-capabilities").some((row) => row.level === "warn")).toBe(
+      true,
+    );
   });
 
   /** @scenario "An endpoint without output is never cached" */
