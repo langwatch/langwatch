@@ -1,5 +1,6 @@
 /**
- * The Workflows family: TWO SCREENS, TWO ADDRESSES. `/:project/studio/:workflow` stays in `platform/app`, blocked on its COPY set size - see dev/docs/plans/ui-family-move-manifests.md. WHY THIS PACKAGE: every call here is `workflow.*`/`optimization.*`, both mounted from `@langwatch/workflow-server`.
+ * Screens mounted from `@langwatch/workflow-server`: `workflow.*` and
+ * `optimization.*` calls. The studio route stays in platform/app.
  */
 
 import type { ComponentType } from "react";

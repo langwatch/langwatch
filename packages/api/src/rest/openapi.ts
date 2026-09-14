@@ -21,11 +21,6 @@ import type { EndpointDocs, RouteResponse } from "./response.ts";
 // that metadata). Routes that read their own bytes (no validator) have their body written here.
 
 /**
- * What a declaration adds to the operation its route already publishes: the
- * prose, the groups it is filed under, the answers beyond its declared success,
- * and the request shape of a route no validator speaks for.
- */
-/**
  * One documented answer: whole, or words alone — an entry without `content`
  * inherits it from what the declaration derived for the same status.
  */

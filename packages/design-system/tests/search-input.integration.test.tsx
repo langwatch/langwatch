@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * Integration tests for SearchInput component.
- *
- * @see specs/components/search-input.feature - "SearchInput renders with a search icon and placeholder"
+ * @see specs/components/search-input.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -57,8 +57,9 @@ export const designSystemConfig = defineConfig({
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
     "*::selection": {
-      // Chakra by default overrides browser selection color, I really don't like things overriding defaults
-      // @ts-expect-error Chakra types `bg` as a token string; `null` is what unsets the property, and it types no null.
+      // Undo Chakra's selection color override
+      // @ts-expect-error Chakra types `bg` as a token string; `null` unsets
+      // the property, and it types no null.
       bg: null,
     },
     // Chakra's `CodeBlock` paints highlighted lines via an absolutely
@@ -75,18 +76,8 @@ export const designSystemConfig = defineConfig({
       background:
         "color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important",
     },
-    // GraphicsQualityProvider sets this attribute when a background FPS
-    // probe finds the device can't sustain a smooth frame rate. Recipes
-    // below reference `var(--lw-backdrop-blur, blur(Npx))` instead of a
-    // literal blur value, so this one variable turns off decorative blur
-    // everywhere at once — including static recipes, which can't read
-    // React state directly.
-    //
-    // --lw-panel-alpha goes with it: these surfaces are semi-transparent
-    // specifically because the blur diffuses whatever shows through. Turn
-    // off the blur alone and the same transparency reads as a plain
-    // see-through tint instead of frosted glass — so reduced-graphics mode
-    // also pushes every paired background to fully opaque.
+    // Low FPS: turn off decorative blur and adjust transparency to opaque so
+    // frosted-glass surfaces don't appear as plain tints.
     'html[data-reduced-graphics="true"]': {
       "--lw-backdrop-blur": "none",
       "--lw-panel-alpha": "100%",
@@ -814,7 +805,8 @@ export const designSystemConfig = defineConfig({
           },
         },
         defaultVariants: {
-          // @ts-expect-error This recipe declares only a `variant` variant, so `size` is not a key of its generated variant map. Chakra still forwards it to the underlying Ark component.
+          // @ts-expect-error Recipe declares only `variant`, not `size`. Chakra
+          // forwards it to Ark anyway.
           size: "sm",
         },
       }),
@@ -1196,19 +1188,8 @@ export const designSystemConfig = defineConfig({
       }),
       drawer: drawerSlotRecipe,
       /**
-       * Light mode keeps Chakra's own filled toast: a solid status colour with
-       * contrast text. On a light page a white card reads as dead, and the
-       * status then has nowhere to show but a hairline nobody sees.
-       *
-       * Dark mode keeps the panel material instead, where a saturated slab is
-       * heavy against a dark page: one hairline carries the tone and the status
-       * colour is spent on the small icon.
-       *
-       * The dark rules have to live here rather than as props on
-       * `<Toast.Root>`: Chakra's fills are attribute selectors
-       * (`&[data-type=error]`), which a style prop cannot outrank, so each one
-       * is answered with the same selector under `_dark`.
-       * `components/ui/toaster.tsx` renders the icon and the close button.
+       * Dark mode uses panel material; light mode uses Chakra's filled style.
+       * Dark rules here (not props) because attribute selectors outrank styles.
        */
       toast: defineSlotRecipe({
         slots: ["root", "title", "description"],

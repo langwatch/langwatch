@@ -1,15 +1,7 @@
 // @vitest-environment jsdom
 /**
- * A tooltip wrapped around a TriggerAnchor has to actually open.
- *
- * TriggerAnchor exists to give nested asChild clones their own DOM node, and
- * `asChild` delivers the trigger's id, data attributes, handlers and ref as
- * ordinary props. A version that accepted only `children` dropped all of it
- * and the tooltip never opened, with no error and no warning to show for it,
- * so every disabled control explaining itself through a tooltip was mute.
- *
- * This renders the real Tooltip against the real TriggerAnchor. Mocking the
- * Tooltip here would hide exactly the defect the test exists to catch.
+ * TriggerAnchor + Tooltip: verify tooltip opens when wrapped. Uses real
+ * components to catch asChild prop-passing failures.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";

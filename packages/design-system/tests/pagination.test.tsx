@@ -1,13 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * The shared pagination bar: what it says about the page, what it lets the
- * reader jump to, and what it refuses when the data source can only be walked
- * in order.
- *
- * The numbered pager is driven by a state machine that dispatches on a
- * microtask, so every interaction here is awaited rather than fired and
- * asserted in the same tick.
+ * Pagination bar: page display, navigation, and restrictions for sequential
+ * sources. Interactions await microtask-driven state updates.
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

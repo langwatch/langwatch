@@ -1,11 +1,6 @@
 /**
- * Unit tests for shikiAdapter — split helpers.
- *
- * Verifies:
- *  - getSharedHighlighter() resolves to a usable Highlighter instance
- *  - ensureDisposeNeutered() monkey-patches dispose() to a no-op
- *  - calling h.dispose() after patching leaves the highlighter usable
- *  - ensureDisposeNeutered() is idempotent — calling it twice is safe
+ * Unit tests for shikiAdapter: getSharedHighlighter, ensureDisposeNeutered,
+ * and normalizeShikiLang.
  */
 
 import { describe, expect, it } from "vitest";

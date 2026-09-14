@@ -1,13 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * The (i) beside a field label: the label says what the setting is, the
- * popover behind the (i) carries the paragraph explaining why you would want
- * it, plus a link into the published docs.
- *
- * The docs link is the part with a history — earlier iterations passed bare
- * relative paths, which resolved against the app domain and 404'd — so every
- * href shape is asserted here.
+ * Field info tooltip: (i) icon opens a popover with explanation + docs link.
+ * Test verifies all href shapes to prevent past 404 regressions.
  */
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

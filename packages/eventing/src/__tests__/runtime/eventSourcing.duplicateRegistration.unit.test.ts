@@ -1,17 +1,8 @@
 /**
  * @vitest-environment node
- *
- * One runtime holds one registration per pipeline name, and a second one is a
- * boot failure rather than a log line.
- *
- * A guard that handed the second registrant the FIRST registration read like
- * idempotency and was not: two registrations of a name differ - that is why
- * something registered twice - so whichever ran first silently decided what
- * the whole process could do. On the worker that meant a producer-only
- * `trace_processing` definition winning the name and draining every recorded
- * span into stand-ins that refuse by design, with one info line to say so.
- *
- * Spec: modules/trace/specs/trace-processing-registration-ownership.feature
+ * Duplicate pipeline registration must fail at boot. Regression guard for
+ * silent wrong-definition wins. {@link
+ * modules/trace/specs/trace-processing-registration-ownership.feature}
  */
 import { describe, expect, it } from "vitest";
 import type { Event } from "../../domain/event.ts";

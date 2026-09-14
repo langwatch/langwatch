@@ -1,15 +1,6 @@
 /**
- * The drawer recipe of the product: the panel material every drawer is drawn
- * with, and the widths a drawer can ask for by name.
- *
- * A drawer sets its width with `size`, never with a maxWidth of its own, so the
- * widths of the product stay a short list a reader can hold in mind. Add a step
- * here when a surface needs one; do not override the width at the call site.
- *
- * The steps this file does not name fall through to Chakra's own drawer recipe,
- * which is where `sm`, `md` and `lg` come from.
- *
- * @see dev/docs/best_practices/drawers.md
+ * Drawer recipe with product-wide widths via `size` prop. Unlisted sizes fall
+ * through to Chakra's own recipe. {@link dev/docs/best_practices/drawers.md}
  */
 
 import { defineSlotRecipe } from "@chakra-ui/react";

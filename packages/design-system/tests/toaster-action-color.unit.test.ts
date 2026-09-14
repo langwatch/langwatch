@@ -2,14 +2,8 @@ import { describe, expect, it } from "vitest";
 import { toastActionColor } from "../src/components/toaster.tsx";
 
 /**
- * A toast's action carries the accent. On a toast that already reads as good
- * news, the warm accent reads as a warning about it: the confirmation for
- * traces sent to an annotation queue offered "View queue" in the same colour a
- * failure would use.
- *
- * Light mode fills the three status toasts with a solid colour, and there the
- * action inherits the contrast colour the fill sets — an accent has nothing to
- * sit on. The accent is what dark mode's panel uses.
+ * Toast action color: light mode uses the status color's contrast, dark mode
+ * uses the accent color.
  */
 describe("given a toast carrying an action", () => {
   describe("when the toast says something went right", () => {

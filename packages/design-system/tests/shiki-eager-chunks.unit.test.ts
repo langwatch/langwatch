@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Drift guard: exercises the REAL `shikiManualChunk()` that vite.config's
- * `manualChunks` delegates to. Every canonical base language / theme
- * (SHIKI_BASE_LANGS / SHIKI_THEMES, owned by shikiAdapter.ts) must be
- * force-kept in the eager "shiki" chunk; EVERY other bundled grammar must be
- * left lazy; and every Shiki core/engine package must stay eager. If the eager
- * allow-list in shikiChunking.ts drifts or its regexes over-broaden, this fails
- * loudly — without depending on the config's source formatting.
+ * Drift guard: verify base languages/themes stay eager, others lazy, in the
+ * Shiki chunking config.
  */
 import { bundledLanguagesInfo } from "shiki";
 import { describe, expect, it } from "vitest";

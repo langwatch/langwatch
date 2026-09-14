@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The initials rule the shared avatar replaces the component library's with.
- *
- * It has to match the old one exactly for every name that already worked —
- * this runs on every member list, comment and presence dot in the app — and
- * differ only where the old one returned half a character.
+ * Avatar initials must match the old rule exactly for all existing names.
  */
 import { describe, expect, it } from "vitest";
 import { initialsFromName } from "../src/components/avatar.tsx";

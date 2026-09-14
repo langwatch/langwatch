@@ -1,13 +1,6 @@
 /**
- * The shared queue's wrappers must forward the delivery to the registry entry.
- *
- * Dropping it is silent and catastrophic in slow motion: every entry downstream
- * forwards `delivery.attempt` as `deliveryAttempt`, the fold executor keys its
- * applied-id merge on it, and the queue passes it in — so this wrapper is the
- * single point where losing the argument pins every delivery at attempt 1 and
- * disables retry dedup for the whole system (#6578). The fold idempotency suite
- * cannot catch that, because its harness wires its own queue definition and
- * forwards the delivery itself. This test pins the wrapper.
+ * Queue wrapper must forward delivery to registry: losing it disables retry
+ * dedup. Regression guard for #6578.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventSourcing } from "../../eventSourcing.ts";

@@ -9,20 +9,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export const COPY_FEEDBACK_MS = 1500;
 
 /**
- * The "copy to clipboard, then flash a ✓ for a beat" pattern, extracted from
- * the ~9 hand-rolled `useState(false)` + `setTimeout` copies that used to
- * live across the trace drawer / toolbar.
- *
- * `copy(text)` writes to the clipboard and — only once the write actually
- * resolves — flips `copied` true for {@link COPY_FEEDBACK_MS}, then back.
- * Awaiting the promise keeps the confirmation honest: on permission-denied
- * (Safari private mode, non-secure contexts) nothing reached the clipboard,
- * so we must not claim success. Rejections are swallowed: the surfaces are
- * tiny buttons with no slot for an error string, and the user can retry.
- *
- * Rapid repeat copies coalesce onto a single timer (each call re-arms it),
- * and the timer is cleared on unmount so a pending reset can't fire into an
- * unmounted component.
+ * Copy text to clipboard and flash `copied: true` for {@link COPY_FEEDBACK_MS}.
+ * Rapid repeats coalesce onto one timer; cleared on unmount.
  */
 export function useCopyToClipboard(): {
   copied: boolean;

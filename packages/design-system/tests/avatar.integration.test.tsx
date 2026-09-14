@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The shared avatar as it renders.
- *
- * The initials rule has its own unit coverage; what this adds is that the
- * rule is what actually reaches the DOM. That is the half that broke before:
- * the component library re-derives initials from `name` whenever it is handed
- * one, so a correct helper whose result is passed through the wrong prop
- * changes nothing on screen.
+ * Verify initials computed by the unit tests actually reach the DOM.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
