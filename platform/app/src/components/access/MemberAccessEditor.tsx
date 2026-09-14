@@ -19,7 +19,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import {
   BindingInputRow,
   type BindingInputRowHandle,
@@ -175,7 +175,7 @@ export function MemberAccessEditor({
         />
       )}
 
-      <MemberGroups memberGroups={memberGroups} />
+      <MemberGroups memberGroups={memberGroups} pendingRole={pendingRole} />
 
       {canManage && (
         <HStack justifyContent="flex-end" gap={2}>
@@ -204,6 +204,26 @@ export function MemberAccessEditor({
  * order the two saves go in, and what is re-read afterwards — and the markup
  * below is what it looks like.
  */
+/** One assignment the member holds directly, as the list reads it. */
+type HeldBinding = RouterOutputs["roleBinding"]["listForUser"][number];
+
+/** One group the member is in, with whatever bindings it carries. */
+type MemberGroup = RouterOutputs["group"]["listForMember"][number];
+
+/**
+ * The part of a tRPC query result these components actually read.
+ *
+ * Narrower than the query's own type on purpose: they render a loading state,
+ * an error and the data, and nothing here should be able to reach for a
+ * refetch or a status the panel does not handle.
+ */
+type UseQueryLike<T> = {
+  data: T | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+};
+
 type SeatMirrorCandidate = {
   role: string;
   customRoleId?: string | null;
@@ -326,10 +346,8 @@ function DirectAssignments({
   organizationId: string;
   userId: string;
   pendingRole: OrganizationUserRole;
-  directBindings: ReturnType<typeof api.roleBinding.listForUser.useQuery>;
-  userDirectBindings: NonNullable<
-    ReturnType<typeof api.roleBinding.listForUser.useQuery>["data"]
-  >;
+  directBindings: UseQueryLike<HeldBinding[]>;
+  userDirectBindings: HeldBinding[];
   mirrorsTheSeat: (binding: {
     role: string;
     customRoleId?: string | null;
@@ -444,8 +462,10 @@ function DirectAssignments({
  */
 function MemberGroups({
   memberGroups,
+  pendingRole,
 }: {
-  memberGroups: ReturnType<typeof api.group.listForMember.useQuery>;
+  memberGroups: UseQueryLike<MemberGroup[]>;
+  pendingRole: OrganizationUserRole;
 }) {
   return (
     <Box>
@@ -466,7 +486,11 @@ function MemberGroups({
       ) : (
         <VStack gap={2} align="stretch">
           {memberGroups.data.map((group) => (
-            <MemberGroupRow key={group.id} group={group} />
+            <MemberGroupRow
+              key={group.id}
+              group={group}
+              pendingRole={pendingRole}
+            />
           ))}
         </VStack>
       )}
@@ -492,9 +516,7 @@ function HeldAssignmentRow({
   removable,
   onToggleRemoval,
 }: {
-  binding: NonNullable<
-    ReturnType<typeof api.roleBinding.listForUser.useQuery>["data"]
-  >[number];
+  binding: HeldBinding;
   markedForRemoval: boolean;
   removable: boolean;
   onToggleRemoval: () => void;
@@ -526,7 +548,7 @@ function HeldAssignmentRow({
         {scopeLabel(b)}
       </Badge>
       <Spacer />
-      {b.scopeType !== RoleBindingScopeType.PROJECT && !mirrorsTheSeat(b) && (
+      {removable && (
         <Button
           size="xs"
           variant="ghost"
@@ -552,10 +574,10 @@ function HeldAssignmentRow({
  */
 function MemberGroupRow({
   group,
+  pendingRole,
 }: {
-  group: NonNullable<
-    ReturnType<typeof api.group.listForMember.useQuery>["data"]
-  >[number];
+  group: MemberGroup;
+  pendingRole: OrganizationUserRole;
 }) {
   return (
     <>
@@ -665,7 +687,7 @@ type MemberAccessSaveInput = {
   roleChanged: boolean;
   pendingBindingRemovals: Set<string>;
   pendingBindingAdditions: PendingBinding[];
-  directBindings: ReturnType<typeof api.roleBinding.listForUser.useQuery>;
+  directBindings: UseQueryLike<HeldBinding[]>;
   bindingInputRef: React.RefObject<BindingInputRowHandle | null>;
   onSaved?: () => void;
 };
@@ -761,7 +783,7 @@ function useMemberAccessSave({
       // The role change lands before the batch, so a failure here can sit on
       // top of a half-applied save. Re-read rather than keep showing rows the
       // server already rewrote.
-      void refreshAccessQueries();
+      void refreshAccessQueries(queryClient);
       showErrorToast({
         error: e,
         fallbackTitle: "Couldn't update this member",
@@ -798,7 +820,7 @@ function useSeatConstrainedStaging({
   setPendingBindingAdditions: React.Dispatch<
     React.SetStateAction<PendingBinding[]>
   >;
-  directBindings: ReturnType<typeof api.roleBinding.listForUser.useQuery>;
+  directBindings: UseQueryLike<HeldBinding[]>;
 }) {
   // A Lite Member seat allows Viewer only, so anything staged above it snaps
   // down before it is listed or saved. The input row already restricts what

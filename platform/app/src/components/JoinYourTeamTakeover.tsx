@@ -1,4 +1,5 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import type { JoinLookupDecision } from "@langwatch/identity";
 import { Dialog } from "~/components/ui/dialog";
 import { AuthPrimaryButton } from "~/features/auth/components/AuthPrimaryButton";
 import { showErrorToast } from "~/features/errors";
@@ -237,12 +238,7 @@ function organizationNameFor({
   decision,
   waiting,
 }: {
-  decision:
-    | {
-        outcome: string;
-        organizations?: { organizationId: string; name: string }[];
-      }
-    | undefined;
+  decision: JoinLookupDecision | undefined;
   waiting: { organizationId: string };
 }): string | null {
   if (decision?.outcome !== "ask") return null;

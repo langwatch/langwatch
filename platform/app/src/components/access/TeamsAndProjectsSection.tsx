@@ -194,7 +194,7 @@ function AddToTeamDialog({
                   <Select.ValueText placeholder="Select person..." />
                 </Select.Trigger>
                 <Select.Content>
-                  {userItems.map((item) => (
+                  {userCollection.items.map((item) => (
                     <Select.Item key={item.value} item={item}>
                       {item.label}
                     </Select.Item>
@@ -224,7 +224,7 @@ function AddToTeamDialog({
                   <Select.ValueText />
                 </Select.Trigger>
                 <Select.Content>
-                  {allRoleItems.map((item) => (
+                  {allRoleCollection.items.map((item) => (
                     <Select.Item key={item.value} item={item}>
                       {item.label}
                     </Select.Item>
@@ -313,7 +313,7 @@ function AddToProjectDialog({
                   <Select.ValueText placeholder="Select person..." />
                 </Select.Trigger>
                 <Select.Content>
-                  {userItems.map((item) => (
+                  {userCollection.items.map((item) => (
                     <Select.Item key={item.value} item={item}>
                       {item.label}
                     </Select.Item>
@@ -343,7 +343,7 @@ function AddToProjectDialog({
                   <Select.ValueText />
                 </Select.Trigger>
                 <Select.Content>
-                  {allRoleItems.map((item) => (
+                  {allRoleCollection.items.map((item) => (
                     <Select.Item key={item.value} item={item}>
                       {item.label}
                     </Select.Item>
@@ -610,6 +610,7 @@ function TeamCard({
               hasPermission={hasPermission}
               openDrawer={openDrawer}
               organizationId={organizationId}
+              department={department}
             />
           </Card.Body>
         )}
@@ -903,7 +904,7 @@ function TeamMembersBlock({
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
-              setAddingMember(true);
+              onAddMember();
             }}
           >
             <Plus size={12} />
@@ -1001,12 +1002,14 @@ function TeamProjectsBlock({
   hasPermission,
   openDrawer,
   organizationId,
+  department,
 }: {
   team: TeamData;
   canManage: boolean;
   hasPermission: ReturnType<typeof useOrganizationTeamProject>["hasPermission"];
   openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
   organizationId: string;
+  department: ReturnType<typeof useDepartmentColumn>;
 }) {
   return (
     <Box mt={5}>
