@@ -32,15 +32,7 @@ export interface ProcessWakeWorkerOptions {
   now?: () => number;
 }
 
-/**
- * Polling loop for due process wake-ups (ADR-051; the first production
- * caller of `findDueWakes`). No leader election is needed: `handleWake`
- * commits with the revision the wake was scheduled at, so when two workers
- * race the same wake exactly one commit wins — the loser observes
- * `staleWake`/`revisionConflict` and stands down. This class only owns local
- * lifecycle, recovery polling, and single-flight execution; composition owns
- * deciding which process roles call start().
- */
+/** Polling loop for process wake-ups; no leader election needed with revision conflicts. */
 export class ProcessWakeWorker {
   private readonly store: Pick<ProcessStore, "findDueWakes">;
   private readonly managers: Record<string, ProcessWakeHandler>;

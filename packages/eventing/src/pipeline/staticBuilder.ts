@@ -49,23 +49,7 @@ export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
 export type CommandNamesFromPipeline<P extends StaticPipelineDefinition<any, any, any>> =
   keyof CommandsUnionToRegistry<P extends StaticPipelineDefinition<any, any, infer C> ? C : never>;
 
-/**
- * Builder for creating static pipeline definitions without runtime dependencies.
- *
- * @example
- * ```typescript
- * const pipeline = definePipeline<MyEvent>({
- *   name: "my-pipeline",
- *   aggregate: defineAggregate({
- *     type: "entity",
- *     events: defineEvents(MY_EVENT_TYPES),
- *   }),
- * })
- *   .withClickHouseFoldProjection(summaryProjection)
- *   .withClickHouseMapProjection(spanStorageProjection)
- *   .build();
- * ```
- */
+/** Builder for creating static pipeline definitions without runtime dependencies. */
 export class PipelineBuilder<
   EventType extends Event = Event,
   RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
@@ -393,16 +377,7 @@ export class PipelineBuilder<
     }
   }
 
-  /**
-   * Mount a process manager (ADR-049/052) on this pipeline — the promised
-   * reaction primitive. Author it with the staged callback builder:
-   *
-   *   .withProcessManager("triggerSettlement", triggerSettlementPM(deps))
-   *
-   * where the domain exports `(deps) => (pm) => pm.state(…).intent(…)…`.
-   * The runtime owns its manager, the shared process-outbox and wake
-   * workers, and the trigger adapters generated from its triggers.
-   */
+  /** Mount a process manager (ADR-049/052) on this pipeline. */
   withProcessManager(name: string, applier: ProcessManagerApplier<EventType>): this;
   withProcessManager(definition: ProcessManagerDefinition<any, any, any>): this;
   withProcessManager(
@@ -425,15 +400,7 @@ export class PipelineBuilder<
     return this;
   }
 
-  /**
-   * Register a command handler class (zero-arg constructor).
-   * The framework will instantiate the handler via `new handlerClass()`.
-   *
-   * @param name - Unique name for this command handler within the pipeline
-   * @param handlerClass - The command handler class to register
-   * @param options - Optional configuration
-   * @returns Builder instance for method chaining
-   */
+  /** Register a command handler class with zero-arg constructor instantiation. */
   withCommand<handlerClass extends CommandHandlerClass<any, any, any>, Name extends string>(
     name: Name,
     handlerClass: handlerClass,
@@ -465,18 +432,7 @@ export class PipelineBuilder<
     >;
   }
 
-  /**
-   * Register a pre-constructed command handler instance.
-   * Use this for complex commands that require constructor DI (dependencies injected
-   * at construction time). The class is still needed for its static properties
-   * (schema, getAggregateId, etc.), but the instance is used instead of `new handlerClass()`.
-   *
-   * @param name - Unique name for this command handler within the pipeline
-   * @param handlerClass - The command handler class (provides static properties)
-   * @param instance - Pre-constructed handler instance
-   * @param options - Optional configuration
-   * @returns Builder instance for method chaining
-   */
+  /** Register a pre-constructed command handler instance with constructor DI. */
   withCommandInstance<TStatic extends CommandHandlerClassStatic<any, any>, Name extends string>(
     name: Name,
     handlerClass: TStatic,
@@ -516,12 +472,7 @@ export class PipelineBuilder<
     >;
   }
 
-  /**
-   * Build the static pipeline definition.
-   * This creates metadata and stores projection definitions but does not connect to runtime infrastructure.
-   *
-   * @returns Static pipeline definition that can be registered at runtime
-   */
+  /** Build the static pipeline definition. */
   build(): StaticPipelineDefinition<EventType, RegisteredProjections, RegisteredCommands> {
     // Build metadata for tooling and introspection
     const metadata: PipelineMetadata = {
@@ -573,24 +524,7 @@ export class PipelineBuilder<
   }
 }
 
-/**
- * Creates a new static pipeline builder.
- * Use this to define pipelines without triggering runtime initialization.
- *
- * @example
- * ```typescript
- * export const myPipeline = definePipeline<MyEvent>({
- *   name: "my-pipeline",
- *   aggregate: defineAggregate({
- *     type: "entity",
- *     events: defineEvents(MY_EVENT_TYPES),
- *   }),
- * })
- *   .withClickHouseFoldProjection(summaryProjection)
- *   .withClickHouseMapProjection(spanStorageProjection)
- *   .build();
- * ```
- */
+/** Creates a new static pipeline builder. */
 export function definePipeline<
   EventType extends Event,
   const Aggregate extends AggregateDefinition = AggregateDefinition,

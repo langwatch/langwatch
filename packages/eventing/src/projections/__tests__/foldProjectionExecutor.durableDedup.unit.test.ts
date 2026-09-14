@@ -10,16 +10,7 @@ import type { FoldProjectionStore } from "../foldProjection.types.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
-/**
- * Durable dedup watermark (ADR-066, sequencing step 4).
- *
- * A store that exposes `getWithApplied` persists the applied-event-id set next
- * to its state row, so a retry that reaches a cold cache still learns which
- * events an earlier attempt committed. The executor prefers that set over a
- * blind re-apply, and — critically — records the UNION of the loaded set and
- * the fresh ids at commit, so a retry chain that keeps losing its cache cannot
- * lose track of a batch it already folded in.
- */
+/** Tests durable dedup: persists applied-event-id set across retries and cache evictions. */
 describe("FoldProjectionExecutor durable dedup", () => {
   const tenantId = createTestTenantId();
 

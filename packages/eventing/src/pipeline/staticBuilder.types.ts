@@ -32,19 +32,7 @@ export interface CommandSerializationOptions<Payload = any> {
    * for that aggregate while allowing other aggregates to run concurrently.
    */
   serializeByAggregate?: boolean;
-  /**
-   * Coalesce this producer's appends (ADR-066 pillar 2). When one aggregate can
-   * mint events faster than they drain — a hot trigger recording every match —
-   * set the max number of same-command jobs (including the dispatched one) to
-   * fold into a single multi-row insert. Leave unset (or ≤ 1) for a low-fan-in
-   * producer where one aggregate appends at most one event per human action:
-   * those append immediately, with the per-job path unchanged.
-   *
-   * Pass a resolver when the bound depends on the individual payload. The
-   * drain's byte budget weighs each job by its QUEUED size, so a payload that
-   * expands after dequeue — one carrying a reference whose content is fetched
-   * during handling — is invisible to that budget and must cap itself at 1.
-   */
+  /** Coalesce appends when aggregate produces events faster than they drain; see ADR-066. */
   coalesceMaxBatch?: number | ((payload: Payload) => number);
   /**
    * Optional byte cap for a coalesced batch (ADR-066 pillar 2). The drain stops
@@ -88,23 +76,7 @@ export type RegisteredCommand = {
  */
 export type NoCommands = never;
 
-/**
- * Static pipeline definition that can be imported without runtime dependencies.
- * Contains metadata and projection/handler definitions but no connection to infrastructure.
- *
- * @example
- * ```typescript
- * const definition = definePipeline<MyEvent>({
- *   name: "my-pipeline",
- *   aggregate: defineAggregate({
- *     type: "entity",
- *     events: defineEvents(MY_EVENT_TYPES),
- *   }),
- * })
- *   .withClickHouseFoldProjection(summaryProjection)
- *   .build();
- * ```
- */
+/** Static pipeline definition importable without runtime dependencies. */
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
   _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
@@ -148,7 +120,7 @@ export interface StaticPipelineDefinition<
   commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
-    /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
+    /** Pre-constructed handler instance for DI; used instead of `new handlerClass()`. */
     handlerInstance?: import("../commands/command.ts").CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
   }>;

@@ -1,15 +1,6 @@
 import type { JsonValue } from "./json.ts";
 
-/**
- * Generic process-manager domain contracts for ADR-049's Langy pilot.
- *
- * A process is identified by (processName, projectId, processKey) — the
- * ADR-049 uniqueness contract. Its definition is a single pure function:
- * evolve(previousState, input) -> { state, nextWakeAt, intents }. All
- * persistence, idempotency, revision, and dispatch concerns live behind the
- * ProcessStore port; the definition never touches infrastructure and never
- * reads a query projection.
- */
+/** Process-manager domain contracts; identified by (processName, projectId, processKey). */
 export interface ProcessRef {
   processName: string;
   projectId: string;
@@ -33,19 +24,7 @@ export interface ProcessEventEnvelope {
   payload: JsonValue;
 }
 
-/**
- * A synchronous command sent directly to one existing process instance.
- *
- * `signalId` is the caller-stable idempotency identity within one process
- * name and project. Include the domain/process identity when one caller can
- * signal several process keys. A response may be lost after the store
- * commits, so a retry with the same identity must converge on the
- * already-committed process state instead of evolving it a second time.
- * Signals do not create process instances by default. A process definition
- * that models an admission gate or another signal-owned lifecycle may opt in
- * explicitly at the runtime call site; its initial signal then competes under
- * the same revision-0 compare-and-swap as every other transition.
- */
+/** Synchronous command to a process instance; signals don't create instances by default. */
 export interface ProcessSignalEnvelope {
   signalId: string;
   signalType: string;
@@ -57,17 +36,7 @@ export interface ProcessSignalEnvelope {
   payload: JsonValue;
 }
 
-/**
- * What a process consumes: a committed event, or its own due wake-up.
- *
- * BOTH variants carry `now`, the instant the input is actually being handled,
- * alongside the instant it refers to (`scheduledFor` for a wake, the
- * envelope's `occurredAt` for an event). They diverge whenever the fleet was
- * down or the subscriber backed up. A definition that schedules purely from
- * the referenced instant either replays every missed slot one commit at a
- * time (wakes) or writes a `nextWakeAt` that is already in the past (events).
- * Handing `now` in as data keeps `evolve` pure while letting it clamp.
- */
+/** Process input: committed event or due wake-up; both carry handling time (now). */
 export type ProcessInput =
   | { kind: "event"; event: ProcessEventEnvelope; now: number }
   | { kind: "wake"; scheduledFor: number; now: number };

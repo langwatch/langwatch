@@ -38,22 +38,7 @@ export interface TriggerOptions<E extends Event = Event> {
   runIn?: ExecutionTarget[];
   /** Statically disable the subscriber (e.g. a transport dependency is absent). */
   disabled?: boolean;
-  /**
-   * Domain key for the subscriber's GroupQueue group. Default is
-   * per-aggregate (`<aggregateType>:<aggregateId>`), which maximizes
-   * parallelism — and means dedup bounds how fast jobs are BORN, not how many
-   * run at once: jobs staged across successive dedup windows land in
-   * different groups and dispatch concurrently. A subscriber whose handler is
-   * expensive and idempotent per tenant (a sweep that evaluates current
-   * state) should key by tenant so queued deliveries serialize in one lane
-   * instead of stacking into a parallel storm (2026-07-31: ~85 concurrent
-   * trigger sweeps for one tenant where the 5s debounce intended 0.2/s).
-   * The queue prefixes a tenant-scoped lane around this key, so tenant scoping
-   * holds regardless. Which lane depends on where the subscriber is attached:
-   * a pipeline-level one gets `<tenantId>/subscriber/<name>/`, while one
-   * attached to a projection gets
-   * `<tenantId>/<fold|map>/<projection>/reactor/<name>/`.
-   */
+  /** Domain key for the subscriber's GroupQueue group; key by tenant for expensive handlers. */
   groupKeyFn?: (event: E, state?: unknown) => string;
 }
 
@@ -159,34 +144,10 @@ export interface ProcessManagerConfig<
   /** Named, schema-validated synchronous signals accepted by this process. */
   signals?: Record<string, SignalSpec<ZodTypeAny, State, Intents>>;
   onWake?: WakeHandler<State, Intents>;
-  /**
-   * Narrows a committed event to the payload the process is allowed to see.
-   * Defaults to the raw `event.data`.
-   *
-   * Any domain whose events carry customer content MUST supply this. The
-   * payload is persisted verbatim into process state and outbox rows, so the
-   * default is only safe for events that are already identities-and-flags.
-   * Building the narrowed view here is the boundary — the process never sees
-   * prompts, parts, tool output, titles, or tokens at all.
-   */
+  /** Narrows event to payload the process sees; required for events carrying customer content. */
   toPayload?: (event: E) => ProcessEventEnvelope["payload"];
   intents: Intents;
-  /**
-   * Opt in to the transient path: an event whose evolution keeps the initial
-   * state and arms no wake commits its intents alone — no
-   * `ProcessManagerInstance` row, no inbox row, and no transaction (see
-   * `AppendIntentsResult`).
-   *
-   * It is a property of the EVOLUTION, not of the process manager, so a
-   * process may be transient for the keys that hold nothing and still durable
-   * for the keys that hold a buffer or a deadline. `webhookDelivery` is
-   * exactly that shape: per-request keys write nothing, per-endpoint streams
-   * keep their state and their wake.
-   *
-   * Declaring it asserts that every `messageKey` this process mints is a pure
-   * function of the event. That is the contract the absent transaction rests
-   * on, and it is enforced by test rather than by comment.
-   */
+  /** Opt in to transient path: events with no state/wake skip durable storage. */
   transient?: boolean;
   outbox?: {
     maxAttempts?: number;

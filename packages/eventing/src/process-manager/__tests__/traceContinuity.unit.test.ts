@@ -1,15 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Proves the OTel correctness requirements of the process-manager core with a
- * REAL TracerProvider (no logging assertions):
- *
- * - committing an intent captures the full active W3C carrier
- *   (traceparent + baggage) onto the persisted outbox message via
- *   propagation.inject; and
- * - dispatching later, in a fresh context, restores that carrier via
- *   propagation.extract so the consumer span continues the original trace as
- *   a child of the persisted span context — including across retries.
+ * Tests OTel W3C carrier propagation and trace continuity across dispatch.
  */
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";

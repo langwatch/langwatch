@@ -10,21 +10,7 @@ import type { FoldProjectionStore } from "../foldProjection.types.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
-/**
- * A commit must record every id it RECOGNISED, not only the ids it folded
- * fresh (#6578).
- *
- * The applied-event-id set answers one question: "has this aggregate already
- * absorbed this event?" An id that arrives in a batch and is correctly dropped
- * as already-applied is still an id the committed state absorbs — so dropping
- * it from the set on the way out is a lie the next delivery believes.
- *
- * A first-attempt commit replaces the set (bounded garbage collection), so
- * recording only the fresh ids EVICTS any redelivered id that rode along.
- * Whoever sees that id next treats it as new and folds it a second time.
- * Batch coalescing and bisection both make an already-applied id riding along
- * with fresh ones ordinary rather than exotic.
- */
+/** Tests applied-set eviction: commit records every recognized id, not just fresh ones. */
 describe("FoldProjectionExecutor applied-set eviction", () => {
   const tenantId = createTestTenantId();
 

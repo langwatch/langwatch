@@ -88,17 +88,7 @@ export interface ProcessManagerServiceOptions<State> {
   signalRevisionRetries?: number;
 }
 
-/**
- * Generic process-manager core (ADR-049 §4–5). Consumes committed queue
- * events and due wake-ups, runs the pure process definition, and commits the
- * transition together with its intents through the ProcessStore port.
- *
- * Idempotency contracts:
- * - a duplicate sourceEventId is a no-op (inbox);
- * - a duplicate signalId returns durable state without re-running evolution;
- * - a duplicate messageKey is skipped, never re-inserted (outbox);
- * - a wake-up whose scheduling revision no longer matches is a no-op.
- */
+/** Generic process-manager core with idempotency contracts for events, signals, and wake-ups. */
 export class ProcessManagerService<State> {
   private readonly definition: ProcessDefinition<State>;
   private readonly store: ProcessStore;
@@ -156,19 +146,7 @@ export class ProcessManagerService<State> {
           ref,
         });
 
-        // The transient path is decided AFTER the evolution has run against
-        // the real previous state, never speculated on the initial one.
-        //
-        // Speculating looked cheaper — it skips this read — but it is not
-        // sound: a handler may preserve its state while deriving its INTENT
-        // from that state, which comes back looking initial-and-wakeless
-        // while producing the wrong intents. Whether that shape exists today
-        // is not the point; nothing stops the next author writing it, and it
-        // would fail silently by dropping work.
-        //
-        // Reading first costs one indexed lookup. The savings that motivated
-        // this path — no transaction, no advisory lock, no compare-and-swap,
-        // no instance row, no inbox row — are all still here.
+        // Transient path is decided after evolution runs, not speculated on initial state.
         if (
           this.definition.transient &&
           existing === null &&
@@ -242,15 +220,7 @@ export class ProcessManagerService<State> {
     });
   }
 
-  /**
-   * Advances an existing process synchronously through the same atomic
-   * state/wake/inbox/outbox commit used by event and wake delivery.
-   *
-   * A signal CAS loss is retried against the winning revision. This is what
-   * lets, for example, a request and a due wake compete for one transition:
-   * the loser reloads and lets the pure domain handler decide whether the
-   * new state permits, joins, or rejects the requested transition.
-   */
+  /** Advances process synchronously; signal CAS loss is retried against winning revision. */
   async handleSignal(params: {
     signal: ProcessSignalEnvelope;
     now: number;

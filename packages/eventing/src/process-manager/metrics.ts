@@ -1,26 +1,7 @@
 import { observableGauge } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
 
-/**
- * Fleet-level process-manager gauges (phase 3 of
- * dev/docs/plans/ops-process-manager-visibility-plan.md): the same trouble counts
- * the /ops/processes page shows, exported so alerting can watch them without
- * a human on the page.
- *
- * Every value is a GLOBAL table count reported by every pod — the same shape
- * as gq_blocked_groups — so dashboards and alerts must aggregate with max()
- * across pods, never sum().
- *
- * These are observable gauges: they are read on the exporter's interval
- * rather than written when something changes. Two differences from the
- * `prom-client` `collect()` they replace, both improvements:
- *
- *   - The read cadence is now fixed and known, instead of being whatever the
- *     scrapers were configured with multiplied by how many were watching.
- *   - A series that is not observed in an interval is simply absent. Under
- *     `collect()` a stale label combination lingered until something called
- *     `reset()`, which is why the old implementation had to.
- */
+/** Fleet-level gauges for process-manager visibility and alerting. */
 
 const metricNames = [
   "pm_instances",
@@ -143,15 +124,7 @@ fleetGauge(
   (r) => r.deadMessages,
 );
 
-/**
- * Whether the latest fleet read succeeded, and when one last did.
- *
- * Not observing is how "no source bound" is said here: an observable gauge
- * that skips an interval is simply absent, which is what the `remove()` of the
- * `collect()` shape these replace meant. The freshness stamp is separate from
- * the success flag on purpose — a read that has failed for an hour still
- * reports success=0, and only the timestamp says how long it has been wrong.
- */
+/** Fleet read success and freshness; observable gauges report absence when no source bound. */
 observableGauge(
   {
     name: "pm_fleet_collection_success",

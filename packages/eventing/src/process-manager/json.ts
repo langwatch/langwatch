@@ -87,15 +87,7 @@ export function ensureJsonSafe(value: unknown): JsonValue {
   return value as JsonValue;
 }
 
-/**
- * Structural equality over process state, which is JSON by contract.
- *
- * Key ORDER must not decide this: handlers build their result by spreading
- * the previous state, and a spread that reaches the same values by a
- * different insertion order is the same state. A serialise-and-compare would
- * call those different and quietly write an instance row per event, which is
- * the exact cost the transient path exists to avoid.
- */
+/** Structural equality over JSON process state, ignoring key insertion order. */
 export function isDeepJsonEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b || a === null || b === null) return false;

@@ -62,17 +62,7 @@ export interface OutboxDispatcherServiceOptions {
    * them for lack of a handler. Omitted means unfiltered.
    */
   processNames?: readonly string[];
-  /**
-   * How many leased messages this dispatcher may have in flight at once.
-   * Default 1 (strictly sequential), which is what every caller got before
-   * this option existed. Raise it only for a domain whose effect is slow and
-   * genuinely parallel-safe. The lease fences each message individually, but
-   * NOTHING serializes two pending messages for the same processKey within a
-   * batch — they dispatch concurrently and in no guaranteed order — so above
-   * 1 the domain must also guarantee at most one in-flight intent per key by
-   * construction (as topic clustering's in-flight guard and one-page-at-a-
-   * time chaining do), or tolerate reordering.
-   */
+  /** Max in-flight leased messages; default 1 (sequential), else serialize by key. */
   concurrency?: number;
   /**
    * Wall clock for measuring elapsed time inside one drain (the lease
@@ -139,23 +129,7 @@ function isTerminalError(error: unknown): boolean {
   return Reflect.get(error, "retryable") === false;
 }
 
-/**
- * What the attempt log records (specs/ops/dead-letter-recovery.feature).
- *
- * `toSafeFailureDiagnostic` redacts every message, because an arbitrary
- * thrown error can carry payload. A DispatchError's message is different: it
- * is the delivery diagnostic our own dispatch endpoints assembled on purpose
- * (ADR-027), and the attempt log is the admin-gated ops surface such a
- * diagnostic exists for — redacting it there would leave the operator with
- * "Operation failed" eight times over.
- *
- * The gate is the stable `name`, not the `retryable` field alone. Anything can
- * carry a boolean `retryable`; only our own class stamps `DispatchError` in
- * its constructor. Checked by name rather than `instanceof` because the error
- * may have crossed a worker or serialisation boundary that stripped the
- * prototype, which is the same reason the house rule prefers a code to a
- * class check.
- */
+/** Attempt log records DispatchError diagnostics; check by name not instanceof. */
 function toAttemptDiagnostic(error: unknown): {
   errorType: string;
   errorMessage: string;
@@ -254,21 +228,7 @@ export class OutboxDispatcherService {
     return report;
   }
 
-  /**
-   * The two checks that keep a slow batch honest, applied before each
-   * delivery starts (issue #7016):
-   *
-   * Retirement — leasing increments `attempts`, so a message whose earlier
-   * deliveries never acknowledged (lease lapsed every time) eventually
-   * arrives here past `maxAttempts` and retires as dead WITHOUT running the
-   * handler again. Before this check such a message redelivered forever.
-   *
-   * Lease budget — the batch was leased up front, so a message deep in a
-   * slow batch may reach its turn with the shared lease nearly spent.
-   * Starting it would guarantee its acknowledgement is fenced and the
-   * effect runs twice; releasing it un-attempted keeps every delivery
-   * inside its lease.
-   */
+  /** Pre-delivery checks: retirement for exceeded max attempts, lease budget for slow batches. */
   private async dispatchOrShed(params: {
     message: LeasedOutboxMessageRecord;
     now: number;

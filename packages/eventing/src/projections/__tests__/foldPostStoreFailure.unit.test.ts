@@ -26,15 +26,7 @@ import {
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
 
-/**
- * A fold's state is written durably before its subscribers are dispatched, so a
- * subscriber failure fails the job without un-writing it and the queue redelivers
- * events the store already holds. Folds accumulate (trace summary does
- * `spanCount + 1` and sums cost), so the re-apply double-counts.
- *
- * These pin the signal that separates that failure from one thrown *before* the
- * write, which is harmless to retry and otherwise looks identical.
- */
+/** Tests fold failures after state is stored; distinguishes from failures before the write. */
 describe("fold failures after the state was stored", () => {
   const tenantId = createTestTenantId();
 

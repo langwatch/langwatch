@@ -1,25 +1,4 @@
-/**
- * The fleet gauges, read through the pipeline that actually carries them.
- *
- * These used to be scraped off `prom-client`'s default registry. 4610a8dc7f
- * ("Push metrics over OTLP instead of serving a Prometheus registry") moved
- * every instrument onto the OpenTelemetry facade and this file did not move
- * with it, so it went on asserting against a registry nothing writes to any
- * more: `register.metrics()` answered `"\n"` and every assertion failed on a
- * pipeline that no longer existed.
- *
- * `createRecordingMeterProvider` is the facade's own harness — the SDK's
- * aggregation and export are OpenTelemetry's to get right, and what fails
- * silently in production is a gauge that observes nothing, or observes without
- * the `process_name` an alert groups by.
- *
- * Installed ONCE for the file, not per test. `../metrics` declares its gauges
- * at module scope, so they queue in the facade's `pendingObservations` and are
- * spliced out on the first `activateMetrics()`; a `uninstall()` between tests
- * would empty that queue and leave every later test collecting nothing —
- * passing, and measuring an empty pipeline. Each test therefore reads only
- * what its own `collect()` appended.
- */
+/** Tests fleet gauges through the OpenTelemetry metrics pipeline. */
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { bindProcessFleetMetricsSource } from "../metrics.ts";

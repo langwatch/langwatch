@@ -28,17 +28,7 @@ export interface ProcessOutboxWorkerOptions {
   name?: string;
   intervalMs?: number;
   batchSize?: number;
-  /**
-   * How long one drain may run before the worker declares it stuck,
-   * abandons it, and resumes polling. Generous by design — legitimately
-   * slow domains must never trip it — because the alternative was worse:
-   * a single never-settling delivery held `inFlight` for the life of the
-   * pod and silently wedged this process manager until the next rollout
-   * (issue #7016). The abandoned drain's late acknowledgements are fenced
-   * by their lapsed leases, so abandonment is correct; it does not cancel
-   * the drain, which is why `MAX_ABANDONED_DRAINS` bounds how many may be
-   * retained at once.
-   */
+  /** Stuck drain timeout; generous to avoid false positives that wedge processing. */
   stuckDrainTimeoutMs?: number;
   /**
    * Fraction of one interval, in [0, 1), by which this worker's recovery poll

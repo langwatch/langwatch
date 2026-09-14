@@ -1,13 +1,4 @@
-/**
- * The transient commit path: an evolution that keeps the initial state and
- * arms no wake writes its intents and nothing else — no instance row, no
- * inbox row, no transaction — while the same process still commits durably
- * for the keys that hold something.
- *
- * These are the properties the absent transaction rests on, so they are
- * asserted through the real builder, service and store rather than by
- * reading the flag back.
- */
+/** Tests transient commit path: evolutions write intents only, skipping durability. */
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";

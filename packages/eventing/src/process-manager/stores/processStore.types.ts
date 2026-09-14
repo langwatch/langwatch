@@ -1,17 +1,7 @@
 import type { JsonValue } from "../json.ts";
 import type { ProcessRef } from "../processManager.types.ts";
 
-/**
- * Persistence port for process-manager state, inbox, and outbox
- * (ADR-049 §5: ProcessManagerInbox / ProcessManagerInstance /
- * ProcessManagerOutbox). The port owns the atomic-commit semantics: one
- * `commit` call must apply the inbox marker, the state transition, the
- * wake-up, and the outbox inserts together, or not at all. Durable adapters
- * also own exclusive leasing; the in-memory test adapter is atomic per call.
- *
- * No infrastructure types (Prisma or otherwise) may appear in these
- * contracts.
- */
+/** Persistence port for process-manager state, inbox, and outbox with atomic-commit semantics. */
 export interface PersistedProcessInstance<State = unknown> {
   ref: ProcessRef;
   tenantId: string;
@@ -94,16 +84,7 @@ export interface ProcessCommit<State = unknown> {
   ref: ProcessRef;
   tenantId: string;
   userId?: string;
-  /**
-   * Inbox identity: (processName, projectId, sourceEventId) is consumed at
-   * most once. Null for wake-driven commits, which are guarded by
-   * `expectedRevision` instead.
-   *
-   * Any length is accepted. A store that enforces the uniqueness in an index
-   * derives a fixed-width key from this value rather than indexing it
-   * (`stores/inboxKey.ts`), so a caller's idempotency key can be as long as its
-   * own domain needs.
-   */
+  /** Inbox identity for idempotency; null for wake-driven commits guarded by expectedRevision. */
   sourceEventId: string | null;
   /** 0 when the process has never been committed. */
   expectedRevision: number;
@@ -124,31 +105,7 @@ export type CommitResult =
   | { outcome: "duplicateEvent" }
   | { outcome: "revisionConflict"; actualRevision: number };
 
-/**
- * The transient append: intents only, no instance row, no inbox row, and no
- * transaction.
- *
- * `commit` is transactional because it has something to lose. It writes an
- * inbox marker AND outbox messages, and the damaging interleaving is real: a
- * marker that lands without its messages says the event was consumed while
- * nothing was ever enqueued, which is silent loss. The other order is
- * harmless — messages without a marker are redelivered, re-derive the same
- * keys, and are suppressed.
- *
- * An evolution that keeps no state has nothing to lose in the first place.
- * Its outbox `messageKey` is already a pure function of the event (the
- * builder qualifies every key with the process key), so the outbox's own
- * uniqueness IS the consumption record, and a second marker for the same fact
- * buys nothing. What is left is a set of idempotent inserts, which need no
- * lock, no compare-and-swap, and no transaction to be correct under crash,
- * redelivery, or two workers racing the same event.
- *
- * The contract that replaces the transaction: every `messageKey` handed here
- * MUST be derivable from the event alone. A key built from a clock or a
- * random value cannot be re-derived by a redelivery, which turns the
- * suppression into a duplicate side effect. `processTransientKeys` in the
- * pipeline test suite holds definitions to that rule.
- */
+/** Transient append: intents only; deterministic messageKeys required. */
 export interface AppendIntentsResult {
   insertedMessageKeys: string[];
   duplicateMessageKeys: string[];
@@ -181,7 +138,7 @@ export interface ProcessStore {
    */
   hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean>;
 
-  /** Atomically: consume inbox row, bump revision, persist state + wake, insert deduped messages. */
+  /** Atomically consume inbox, bump revision, persist state + wake, and insert messages. */
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
   /**
@@ -285,20 +242,7 @@ export interface ProcessStore {
    */
   deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number>;
 
-  /**
-   * Retention sweep, dispatched family: delete at most `limit` DISPATCHED
-   * outbox rows whose dispatch finished before `before`, ACROSS EVERY
-   * processName and project. Returns the deleted count.
-   *
-   * The absent processName predicate is the point. `deleteDispatchedBefore`
-   * above reaps one named process, so a process manager is only covered if
-   * somebody remembered to register a prune for it, and half of them never
-   * were. Reaping by predicate covers every process manager that exists and
-   * every one added later, with no registration step to forget.
-   *
-   * A returned count below `limit` means the family is drained, which is how
-   * a caller's drain loop knows to stop.
-   */
+  /** Retention sweep: delete dispatched rows across all processes. */
   deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
@@ -309,15 +253,7 @@ export interface ProcessStore {
    */
   deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 
-  /**
-   * Retention sweep, inbox family: delete at most `limit` inbox rows consumed
-   * before `before`, across every processName and project.
-   *
-   * An inbox row is an idempotency marker, so the window only has to outlive
-   * the horizon in which the same source event can be redelivered. See
-   * packages/eventing/specs/process-manager-retention.feature for why that
-   * horizon is about 25 hours.
-   */
+  /** Retention sweep: delete consumed inbox rows within the redelivery horizon. */
   deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
