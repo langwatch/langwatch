@@ -54,10 +54,15 @@ export { testSuiteTrpcTransport } from "./transport/test-suite.trpc.ts";
 export {
   OrganizationNotFoundForProjectError,
   SuiteApp,
+  type SuiteAppConfig,
   type SuiteAppDependencies,
-  type SuiteAppInfrastructure,
   type SuiteOrTestSuite,
 } from "./app/suite.app.ts";
+export {
+  SuiteExecutionUnavailableError,
+  buildSuiteInfrastructure,
+  type SuiteAppInfrastructure,
+} from "./app/suite-composition.build.ts";
 export { suiteServer } from "./suite.server.ts";
 
 /**

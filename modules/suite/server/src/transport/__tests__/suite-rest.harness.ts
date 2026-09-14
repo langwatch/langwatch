@@ -443,7 +443,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   const commands = new RecordingCommands();
   const scenarios = memoryScenarioApi(world);
 
-  const app = SuiteApp.create({
+  const app = SuiteApp.createForTesting({
     repositories: { suites: MemorySuiteRepository.create({ database }) },
     dependencies: {
       scenarios,
@@ -456,19 +456,15 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
         findOrganizationId: async () => TEST_PROJECT.organizationId,
       }),
     },
-    members: {
+    infrastructure: {
       execution: SuiteExecutionService.create({
         commands,
         ids: new SequentialRunIds(),
         scenarios,
       }),
-      resolveClickHouseClient: null,
-      defaultRetentionDays: 30,
-      generateId: () => world.nextId("suite"),
       publicBaseUrl: "https://app.langwatch.test",
     },
-    config: void 0,
-    resources: new ResourceScope(),
+    generateId: () => world.nextId("suite"),
   });
 
   const runtime = createRestRuntime({

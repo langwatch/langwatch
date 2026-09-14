@@ -101,6 +101,10 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       processName: config.serviceName,
       isSaas: config.infrastructure.modelProvider.isSaas,
     },
+    /** Suite deep links build under the same public origin. */
+    ...(config.infrastructure.execution.publicBaseUrl
+      ? { suite: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }
+      : {}),
     /** The address a dataset deep link is built under: this deployment's public one. */
     ...(config.infrastructure.execution.publicBaseUrl
       ? { dataset: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }

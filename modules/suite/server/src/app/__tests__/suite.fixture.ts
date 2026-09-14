@@ -8,7 +8,6 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { SuiteExecution } from "../suite.app.ts";
@@ -38,6 +37,12 @@ export function createSuiteTestRepositories(database?: MemorySuiteDatabase): Sui
   return { suites: MemorySuiteRepository.create({ database: database ?? MemorySuiteDatabase.create() }) };
 }
 
+/**
+ * `SuiteApp` now builds `execution` for itself in production
+ * (`suite-composition.build.ts`) rather than taking one as a member; this
+ * fixture goes through `createForTesting` instead, which still takes an
+ * `execution` override for a test that wants to observe a scheduled run.
+ */
 export function createSuiteTestApp(
   input: Readonly<{
     repositories?: SuiteRepositories;
@@ -50,7 +55,7 @@ export function createSuiteTestApp(
     }>;
   }> = {},
 ): SuiteApp {
-  return SuiteApp.create({
+  return SuiteApp.createForTesting({
     repositories: input.repositories ?? createSuiteTestRepositories(),
     dependencies: {
       scenarios: input.dependencies?.scenarios ?? createApiFixture<ScenarioApi>({}),
@@ -62,12 +67,6 @@ export function createSuiteTestApp(
           findOrganizationId: async () => "organization-1",
         }),
     },
-    members: {
-      execution: input.execution ?? new RecordingSuiteExecution(),
-      resolveClickHouseClient: null,
-      defaultRetentionDays: 30,
-    },
-    config: void 0,
-    resources: new ResourceScope(),
+    infrastructure: { execution: input.execution ?? new RecordingSuiteExecution() },
   });
 }

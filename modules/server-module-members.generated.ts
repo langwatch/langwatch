@@ -33,7 +33,7 @@ export const serverModuleMembers = {
   langy: ["eventing", "prisma", "redis"],
   log: [],
   metric: [],
-  "model-provider": [],
+  "model-provider": ["redis"],
   monitor: [],
   notification: [],
   ops: ["clickhouse", "eventing", "logger", "prisma", "redis"],

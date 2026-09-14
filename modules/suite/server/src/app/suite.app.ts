@@ -19,11 +19,14 @@ import type {
 import { SuiteApi, SuiteNotFoundError, type SuiteRunParameters, type SuiteRunResult, SuiteScopeNotAllowedError, type SuiteTarget, type CreateSuiteCommand, type StartSuiteRunCommandData, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { z } from "zod";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
+import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
+import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
-import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
+import { buildSuiteInfrastructure } from "./suite-composition.build.ts";
 import type { Instant } from "@langwatch/time";
 
 /**
@@ -50,25 +53,21 @@ export type SuiteOrTestSuite =
   | Readonly<{ kind: "suite"; suite: Suite }>
   | Readonly<{ kind: "test_suite"; testSuite: ScenarioTestSuite }>;
 
-/** What the process root supplies. Peer features arrive as API tokens. */
-export interface SuiteAppInfrastructure {
-  execution: SuiteExecution;
-  connectedPresence?: ConnectedPresenceReader;
-  defaultRetentionDays: number;
-  generateId?: () => string;
-  now?: () => Instant;
-  suiteRunCommands: SuiteRunCommands;
-  suiteRunId: SuiteRunId;
-  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
-  publicBaseUrl?: string;
-}
-
 export interface SuiteAppDependencies {
   scenarios: ScenarioApiType;
   agents: AgentApiType;
   prompts: PromptApiType;
   projects: ProjectApiType;
 }
+
+/**
+ * This App's own config: the deployment's public origin, for `platformUrl`.
+ * Optional — not every install serves REST — and defaulted to `{}` so a
+ * deployment that names no `suite` slice in its process config still boots
+ * rather than failing to parse an absent object.
+ */
+const suiteAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
+export type SuiteAppConfig = z.infer<typeof suiteAppConfigSchema>;
 
 /**
  * The run projection is read from ClickHouse and from nowhere else, so this
@@ -78,8 +77,8 @@ export interface SuiteAppDependencies {
  */
 type SuiteSetup = FeatureSetup<
   typeof SuiteApp.dependencies,
-  SuiteAppInfrastructure & MembersRead<typeof SuiteApp.reads>,
-  undefined,
+  MembersRead<typeof SuiteApp.reads>,
+  SuiteAppConfig,
   SuiteRepositories
 >;
 
@@ -92,12 +91,14 @@ export class SuiteApp implements SuiteApi {
     projects: ProjectApi,
   };
   static readonly reads = reads("clickhouse");
+  static readonly configSchema = suiteAppConfigSchema;
 
   static create(setup: SuiteSetup): SuiteApp {
-    const { members, dependencies, repositories } = setup;
+    const { members, dependencies, repositories, config } = setup;
+    const infrastructure = buildSuiteInfrastructure({ agents: dependencies.agents, config });
     const runRepository = ClickHouseSuiteRunRepository.create({
       clickhouse: members.clickhouse,
-      defaultRetentionDays: members.defaultRetentionDays,
+      defaultRetentionDays: infrastructure.defaultRetentionDays,
     });
 
     const suites = SuiteService.create({
@@ -106,15 +107,55 @@ export class SuiteApp implements SuiteApi {
       scenarios: dependencies.scenarios,
       agents: dependencies.agents,
       prompts: dependencies.prompts,
-      execution: members.execution,
-      ...(members.connectedPresence
-        ? { connectedPresence: members.connectedPresence }
-        : {}),
-      generateId: members.generateId,
-      now: members.now,
+      execution: infrastructure.execution,
+      connectedPresence: infrastructure.connectedPresence,
     });
 
-    return new SuiteApp({ ...dependencies, suites, publicBaseUrl: members.publicBaseUrl });
+    return new SuiteApp({
+      ...dependencies,
+      suites,
+      publicBaseUrl: infrastructure.publicBaseUrl,
+    });
+  }
+
+  /**
+   * Test-only construction: `create`'s own collaborators
+   * ({@link buildSuiteInfrastructure}), with any of them a suite naming to
+   * observe (most often `execution`, since production has none to compose
+   * yet) overridden directly — no `clickhouse` member and no config parse
+   * required. The run projection defaults to the in-memory repository rather
+   * than a real ClickHouse read, since a test that wants ClickHouse asks for
+   * it through `create` instead.
+   */
+  static createForTesting(setup: {
+    repositories: SuiteRepositories;
+    dependencies: SuiteAppDependencies;
+    runRepository?: SuiteRunReadRepository;
+    infrastructure?: Partial<ReturnType<typeof buildSuiteInfrastructure>>;
+    /** A suite that wants deterministic ids or a fixed clock names them here — {@link SuiteService}'s own seams, not production infrastructure. */
+    generateId?: () => string;
+    now?: () => Instant;
+  }): SuiteApp {
+    const defaults = buildSuiteInfrastructure({ agents: setup.dependencies.agents, config: {} });
+    const infrastructure = { ...defaults, ...setup.infrastructure };
+
+    const suites = SuiteService.create({
+      repository: setup.repositories.suites,
+      runRepository: setup.runRepository ?? MemorySuiteRunRepository.create(),
+      scenarios: setup.dependencies.scenarios,
+      agents: setup.dependencies.agents,
+      prompts: setup.dependencies.prompts,
+      execution: infrastructure.execution,
+      connectedPresence: infrastructure.connectedPresence,
+      ...(setup.generateId ? { generateId: setup.generateId } : {}),
+      ...(setup.now ? { now: setup.now } : {}),
+    });
+
+    return new SuiteApp({
+      ...setup.dependencies,
+      suites,
+      publicBaseUrl: infrastructure.publicBaseUrl,
+    });
   }
 
   #dependencies: SuiteAppDependencies & { suites: SuiteService };
