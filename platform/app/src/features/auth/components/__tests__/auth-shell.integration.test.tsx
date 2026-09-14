@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * The shell around the card: what a hosted deployment says beside the door,
- * and what a company's own installation does not say at all. The card is the
- * same component either way — everything here is composed around it.
+ * The shell around the card: one room, whoever runs the installation. The
+ * ground and the value panel used to be hosted-only; now the deployment flag
+ * changes nothing about the shell, and these tests hold both flag values to
+ * the same rendering.
  *
  * Spec: specs/identity/signin-signup-screens.feature
  */
@@ -38,15 +39,18 @@ const renderShell = (props: Record<string, unknown> = {}) =>
     </ChakraProvider>,
   );
 
-describe("given a hosted deployment", () => {
+describe.each([
+  ["a hosted deployment", true],
+  ["a company's own installation", false],
+])("given %s", (_label, isSaas) => {
   beforeEach(() => {
-    publicEnvRef.current = { IS_SAAS: true };
+    publicEnvRef.current = { IS_SAAS: isSaas };
   });
 
   afterEach(() => cleanup());
 
   describe("when the auth screens renders", () => {
-    /** @scenario The hosted auth screens makes its case beside the card, never inside it */
+    /** @scenario The auth screens make their case beside the card, never inside it */
     it("puts the case in its own panel, with the card beside it", () => {
       renderShell();
 
@@ -64,7 +68,7 @@ describe("given a hosted deployment", () => {
       expect(screen.getByTestId("auth-screen-ambient")).toBeTruthy();
     });
 
-    /** @scenario The hosted auth screens makes its case beside the card, never inside it */
+    /** @scenario The auth screens make their case beside the card, never inside it */
     it("carries the gradient on one word and the tagline under it", () => {
       renderShell();
 
@@ -97,30 +101,13 @@ describe("given a hosted deployment", () => {
       }
     });
 
-    it("renders the plain card when there is no case to make", () => {
+    it("keeps the field and centres the card when there is no case to make", () => {
       renderShell({ headline: undefined, tagline: undefined });
 
       expect(screen.queryByTestId("auth-screen-value-panel")).toBeNull();
-      expect(screen.getByText("the card")).toBeTruthy();
-    });
-  });
-});
-
-describe("given a company's own installation", () => {
-  beforeEach(() => {
-    publicEnvRef.current = { IS_SAAS: false };
-  });
-
-  afterEach(() => cleanup());
-
-  describe("when the auth screens renders", () => {
-    /** @scenario The hosted auth screens makes its case beside the card, never inside it */
-    it("shows the card alone, with nothing sold beside it", () => {
-      renderShell();
-
-      expect(screen.queryByTestId("auth-screen-value-panel")).toBeNull();
-      expect(screen.queryByTestId("auth-screen-headline")).toBeNull();
-      expect(screen.queryByTestId("auth-screen-ambient")).toBeNull();
+      // The ground stays: a headline-less screen is a centred card on the
+      // same field, never a bare page.
+      expect(screen.getByTestId("auth-screen-ambient")).toBeTruthy();
       expect(screen.getByText("the card")).toBeTruthy();
     });
   });

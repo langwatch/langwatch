@@ -1,6 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import "../auth.css";
 import { AuthGround } from "./AuthGround";
 import { AuthValuePanel } from "./AuthValuePanel";
@@ -11,20 +10,19 @@ import { LogoHandoff } from "./LogoHandoff";
  * The ground the auth screens stands on.
  *
  * The card itself is the same on every installation, byte for byte: nothing
- * inside it asks which deployment it is running on. What differs is what
- * surrounds it, and that is composed here — a hosted signup has a case to
- * make, and a company's own installation does not.
+ * inside it asks which deployment it is running on. Neither, any more, does
+ * the room around it: the ground and the panel used to be hosted-only, and a
+ * company's own installation got a plain centred card on plain paper — which
+ * read as an unstyled page rather than as restraint. One door, one design,
+ * whoever runs it.
  *
- * On a hosted deployment the whole viewport is ONE field — the site's light
- * mesh or its dark warp, depending on the colour mode — and everything sits
- * over it: the headline reads off the ground's protected side, and the card
- * is glass with the same ground moving through it. There is no border and no
- * change of surface between the two halves, because there are no two
- * surfaces; a seam down the middle of one field was the old layout's bug.
- *
- * Self-hosted is the plain centred card on plain paper, with nothing sold
- * beside it and nothing breathing behind it: an operator's door, not a
- * funnel.
+ * The whole viewport is ONE field — the site's light mesh or its dark warp,
+ * depending on the colour mode — and everything sits over it: the headline
+ * reads off the ground's protected side, and the card is glass with the same
+ * ground moving through it. There is no border and no change of surface
+ * between the two halves, because there are no two surfaces; a seam down the
+ * middle of one field was the old layout's bug. A screen with no headline —
+ * an error page, a reset form — keeps the field and centres the card on it.
  */
 export function AuthShell({
   headline,
@@ -44,15 +42,12 @@ export function AuthShell({
   trustStrip?: ReactNode;
   children: ReactNode;
 }) {
-  const publicEnv = usePublicEnv();
-  const isHosted = publicEnv.data?.IS_SAAS === true;
-
   return (
     <Box
       // The modifier says the value panel is on screen, which is the one thing
       // the card needs to know without being told: it drops its own wordmark
       // so the page says it once, above the headline.
-      className={isHosted && headline ? "lw-auth lw-auth--split" : "lw-auth"}
+      className={headline ? "lw-auth lw-auth--split" : "lw-auth"}
       position="relative"
       backgroundColor="auth.ground"
       minHeight="100vh"
@@ -64,8 +59,8 @@ export function AuthShell({
           so it exists exactly where the auth screens exists — same flag, same
           screens — and nowhere else. */}
       <CastleSnake />
-      {isHosted ? <AuthGround protect={headline ? "left" : "center"} /> : null}
-      {isHosted && headline ? (
+      <AuthGround protect={headline ? "left" : "center"} />
+      {headline ? (
         // Capped at the site's content width and centred, so a big monitor
         // widens the field around the conversation rather than flinging the
         // headline and the card to opposite edges of it. Both doors keep the

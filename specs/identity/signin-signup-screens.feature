@@ -372,6 +372,18 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then the page becomes the log-in step with my address already in it
     And no notice, banner or refusal about an existing account is shown
 
+  # The refusal that sent somebody to the log-in step belongs to the address
+  # that produced it. Going back to change the address is starting over, and a
+  # rejection from before it asked the server anything is not a fact about the
+  # new attempt.
+  @integration
+  Scenario: Returning to the address step clears the refusal that sent me to log-in
+    Given I start signing up with an address that already has an account
+    And the address step resolves to the log-in step
+    When I ask to use a different email
+    Then I am back on the address step
+    And the refusal about the previous address is gone
+
   @integration
   Scenario: Signing in without an account creates it through verification
     Given I enter an address nobody holds an account for
@@ -422,6 +434,25 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When the picker renders
     Then nothing is promoted and nothing is badged
     And the methods stay in the order the decision named
+
+  # Every button on the rail is live, or it is not there. A screen that drew a
+  # provider the deployment never mounted would be offering a door that opens
+  # onto an error, and the person pressing it has no way to know that before
+  # they press it. A development build is not an exception: an offer that
+  # exists only where nobody can complete it is the surest way to ship a rail
+  # that nobody ever saw fail.
+  @integration
+  Scenario: The rail beside the address offers exactly what the deployment configured
+    Given the deployment offers one social provider and a passkey
+    When the log-in door renders the methods beside the address field
+    Then those two are the only methods on the rail
+    And no other provider is drawn, whatever kind of build this is
+
+  @integration
+  Scenario: With nothing to offer beside the address, no divider is drawn
+    Given the deployment offers no method but the address and password
+    When the log-in door renders
+    Then there is no rail and no "or" above an empty space
 
   # ── The address decides which journey this is ──────────────────────────
 
@@ -510,18 +541,21 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I follow the "Forgot password?" link
     Then the address travels with it, in the URL fragment rather than the query
 
-  # The surrounding panel is the hosted product's case, and it is composed
-  # AROUND the card rather than into it: the component that authenticates a
-  # person is the same one on every installation, and an installation with
-  # nothing to sell renders none of it. Below the split it collapses to the
-  # headline, because a tagline and a logo row above a log-in form on a phone
-  # are two screens of scrolling in front of the thing the person came to do.
+  # The surrounding panel is the product's case, and it is composed AROUND
+  # the card rather than into it: the component that authenticates a person
+  # is the same one on every installation — and so, now, is the room it
+  # stands in. The ground and the panel used to be hosted-only, which left an
+  # operator's own installation on bare paper that read as unstyled rather
+  # than as restraint; one door, one design, whoever runs it. Below the split
+  # the panel collapses to the headline, because a tagline and a logo row
+  # above a log-in form on a phone are two screens of scrolling in front of
+  # the thing the person came to do.
   @integration
-  Scenario: The hosted auth screens makes its case beside the card, never inside it
-    Given a hosted deployment
+  Scenario: The auth screens make their case beside the card, never inside it
+    Given any deployment, hosted or a company's own
     When the auth screens renders
     Then the headline and its tagline stand in their own panel beside the card
-    And a company's own installation shows the card with nothing beside it
+    And the card carries none of the pitch
 
   # The slot under the tagline stays EMPTY, deliberately. The thing that
   # belongs there is a customer — a quote or a logo row — and both are
