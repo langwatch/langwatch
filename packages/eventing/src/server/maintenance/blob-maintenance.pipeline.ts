@@ -16,18 +16,8 @@ export interface BlobMaintenancePipelineDeps {
 }
 
 /**
- * Queue-infrastructure maintenance, kept in its own pipeline rather than bolted
- * onto a domain one: reclaiming blobs is not an automations or trace concern,
- * and mounting it where it does not belong is how ownership blurs.
- *
- * The pipeline carries no events and no commands. A process manager with no
- * event handlers registers no subscriber, so this costs nothing beyond the
- * scheduled wake it exists for.
- *
- * Exactly-once per tick is inherited, not implemented here: the wake commits at
- * the revision it was scheduled at, so when several workers race the same tick
- * one commit wins and the losers stand down. There is deliberately no Redis
- * leader lock.
+ * Isolated blob-reclamation maintenance with no domain events or commands.
+ * Exactly-once is inherited: only the worker with the tick's winning commit proceeds.
  */
 export function createBlobMaintenancePipeline(deps: BlobMaintenancePipelineDeps) {
   return definePipeline<Event>({

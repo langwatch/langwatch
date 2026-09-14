@@ -387,7 +387,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const aggregateId2 = "aggregate-2";
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
 
-      // Create events for different aggregates (will have different IDs due to different aggregate IDs)
+      // Create events for different aggregates with different aggregate IDs.
       const event1_agg1 = createTestEvent(
         aggregateId1,
         TEST_CONSTANTS.AGGREGATE_TYPE,

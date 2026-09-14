@@ -1,17 +1,8 @@
 import type { SchedulerHandler } from "./scheduler.types.ts";
 
 /**
- * ADR-044 §4 "Consumer registration": maps `targetType → handler`, the
- * calendar analog of the outbox heartbeat registry
- * (`heartbeat.registry.ts`). A report registers
- * `"reportTrigger" → renderAndDispatchReport`; adding a second scheduled
- * feature later is one row-type + one registered handler — no new loop,
- * lock, or cron parser.
- *
- * A second `register` under the same `targetType` THROWS so an accidental
- * double-registration is loud rather than silently shadowing the first.
- * Registration is passive data — safe from any process role; only
- * `SchedulerService.start()` (worker-only) acts on the registrations.
+ * Maps targetType to handler; double-registration throws to catch shadowing.
+ * Registration is passive data; only SchedulerService.start() acts on it.
  */
 export class SchedulerRegistry {
   private readonly handlers = new Map<string, SchedulerHandler>();

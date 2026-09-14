@@ -7,14 +7,8 @@ import { PrismaScheduledJobStore } from "../../adapters/postgres/prisma-schedule
 const toPg = (d: Date): string => d.toISOString().slice(0, 23).replace("T", " ");
 
 /**
- * Unit-level proof of the conditional lease + settle logic with a mocked Prisma.
- * Both MUST be single raw `$executeRaw` UPDATEs (prisma.updateMany drops the
- * `nextRunAt` guard when the where contains the @id, and a JS Date binds as
- * timestamptz so the equality never matches under a non-UTC session tz — see
- * the repository comments). We assert they route through `$executeRaw`,
- * interpolate the conditional guard values as naive-UTC `::timestamp` literals,
- * and map affected-rows → won/lost. (The real Postgres race is exercised
- * end-to-end in the integration suite.)
+ * Unit proof of conditional lease logic: must use raw $executeRaw (not
+ * updateMany) and map affected rows to won/lost.
  */
 describe("PrismaScheduledJobStore.claim (lease)", () => {
   describe("given the row still carries the expected nextRunAt", () => {

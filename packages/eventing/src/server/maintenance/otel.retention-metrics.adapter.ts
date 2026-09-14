@@ -2,13 +2,8 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import { ProcessRetentionMetrics, type RetentionFamily } from "./retention-metrics.port.ts";
 
 /**
- * The two series names, pinned because two processes write them.
- *
- * The App writes them through its own `prom-client` registry; a worker
- * composed from packages writes them over OTLP. They are the same sweep
- * counters and they carry the same `family` label on purpose — an operator
- * asking "did retention run for the inbox" must not have to know which
- * process ran it.
+ * Two series names pinned because both App and worker processes write them.
+ * Same label ensures operators need not know which process ran retention.
  */
 export const PROCESS_RETENTION_SWEPT_ROWS_METRIC_NAME =
   "process_manager_retention_swept_rows_total";

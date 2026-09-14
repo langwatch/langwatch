@@ -1,15 +1,8 @@
 import { Cron } from "croner";
 
 /**
- * ADR-044 §4 "Representation & nextRunAt computation": compute the next fire
- * from a cron expression evaluated in its IANA timezone, strictly after
- * `after`. Cron + timezone (not a relative window) is what makes "09:00 their
- * Monday" a wall-clock instant that tracks DST automatically — a spring-forward
- * or fall-back is resolved by evaluating the cron IN the zone, not as a fixed
- * offset. `croner` is the zero-dep, tz-native evaluator.
- *
- * Pure function (no I/O) so the loop can persist the result as an indexed
- * comparison instead of re-parsing every entry on every tick.
+ * Compute next fire from cron in its IANA timezone so wall-clock instants track
+ * DST automatically. Pure function so results persist as indexed comparisons.
  */
 export function computeNextRunAt({
   cron,
@@ -41,26 +34,8 @@ export function computeNextRunAt({
 const MAX_CATCH_UP_STEPS = 10_000;
 
 /**
- * ADR-044 §4 "Missed-run / catch-up policy" (`runLatest`, the recommended
- * default and the only policy this scheduler ships). After an outage a job's
- * `nextRunAt` is the OLDEST un-fired slot. Firing that and advancing one cron
- * step at a time would replay EVERY missed slot — a week-long outage of a daily
- * report would send seven stale reports, a 15-minute report hundreds. That is
- * exactly the stampede the ADR forbids ("the scheduler never replays every
- * missed slot").
- *
- * Given the slot a fresh fire came due for (`slot`) and the current time,
- * compute the `runLatest` outcome:
- *  - `catchUpSlot` — the MOST RECENT missed slot (the newest cron instant at or
- *    before `now`), so the single catch-up covers the latest window rather than
- *    a week-old one. On an on-time fire (no backlog) this collapses back to
- *    `slot`, so the fast path is unchanged.
- *  - `nextRunAt` — the first cron instant strictly AFTER `now`, so once the one
- *    catch-up fires the calendar resumes in the future and the row is never
- *    re-served for a past slot.
- *
- * Pure (no I/O): one `Cron` is built and walked forward, so the whole
- * recovery costs a single parse regardless of backlog depth.
+ * Compute the runLatest catch-up outcome: fire only the most recent missed slot
+ * to avoid replaying outages. Pure function costing a single parse.
  */
 export function computeCatchUp({
   cron,

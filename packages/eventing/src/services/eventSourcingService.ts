@@ -382,7 +382,7 @@ export class EventSourcingService<
    *
    * **Execution Flow:**
    * 1. Events are stored in the event store (must succeed)
-   * 3. Events are dispatched to all projections via ProjectionRouter - errors are logged but don't fail
+   * 2. Events are dispatched to projections; errors logged but don't fail.
    */
   async storeEvents(
     events: readonly EventType[],

@@ -1,12 +1,6 @@
 /**
- * Unit tests for the projection-payload interposition in EventSourcingService.
- *
- * ADR-022: Between `eventStore.storeEvents()` and `router.dispatch()`, every
- * event is transformed via the application-supplied function. Dispatch always
- * sees the lean shape; the event store always sees the full content.
- *
- * BDD structure: describe("given X") → describe("when Y") → it("…").
- * No "should" in it() names (project convention).
+ * Tests for projection-payload interposition (ADR-022): events transform
+ * between storeEvents and dispatch using app-supplied function.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

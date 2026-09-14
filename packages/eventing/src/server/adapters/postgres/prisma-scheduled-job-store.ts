@@ -1,19 +1,13 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories
+// implement the interface as intentional no-ops.
 
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toPgTimestampUtc } from "./pg-timestamp.ts";
 import type { ScheduledJobRecord, ScheduledJobStore } from "../../schedule/scheduler.types.ts";
 
 /**
- * Prisma-backed `ScheduledJob` repository (ADR-044 §4). The durable Postgres
- * row is the source of truth; the service layer (SchedulerService) depends on
- * the `ScheduledJobStore` interface, never on Prisma directly.
- *
- * The two READS are cross-tenant global scans (one scheduler serves every
- * project), so they use `$queryRaw` with the guard's sanctioned
- * `-- @tenancy:` opt-out (see `dbMultiTenancyProtection.ts`). The WRITES are
- * project-scoped — each carries `projectId` — so the multitenancy guard
- * accepts them and no write can cross tenants.
+ * Prisma-backed `ScheduledJob` repository. Reads use `$queryRaw` for cross-tenant
+ * global scans; writes are project-scoped and checked by the multitenancy guard.
  */
 export class PrismaScheduledJobStore implements ScheduledJobStore {
   constructor(private readonly prisma: PrismaClient) {}
@@ -65,42 +59,9 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     slot: Date;
     leaseUntil: Date;
   }): Promise<boolean> {
-    // The correctness core (ADR-044 §4): a CONDITIONAL update guarded on the
-    // exact `nextRunAt` we read during the due-scan. N workers racing the same
-    // due row all issue this UPDATE; Postgres row-locks serialise them, the
-    // first moves `nextRunAt` so every other WHERE no longer matches (0 rows
-    // affected). Exactly one worker wins the slot — the whole exactly-once
-    // guarantee, no Redis required.
-    //
-    // This is a LEASE, not an advance: `nextRunAt` jumps to a near-future
-    // `leaseUntil` and NOTHING else changes (`lastSlot`/`attempts`/`lastError`
-    // stay put — the slot is not delivered yet). Because `findDue` selects
-    // `nextRunAt <= now`, the leased row is invisible until the lease elapses,
-    // so the calendar is only advanced later by `settleClaim` after a delivered
-    // fire, and a crash before settle just re-fires the slot when the lease
-    // expires. The service owns lease duration + retry policy.
-    //
-    // MUST be a single raw UPDATE, NOT prisma.updateMany, for TWO reasons:
-    //   1. When the where contains the `@id`, Prisma collapses the compound
-    //      filter to `WHERE id IN (...) AND 1=1`, silently DROPPING the
-    //      `nextRunAt = expected` guard — making the claim unconditional so
-    //      every racer "wins" (verified: concurrent updateMany claims all
-    //      returned count=1). Even keyed on the (targetType,targetId) unique,
-    //      Prisma applies the extra predicate in a SEPARATE pre-SELECT — a
-    //      non-atomic read-then-write that races to multiple winners.
-    //   2. Timezone safety — see `toPgTimestampUtc`. A raw JS Date binds as
-    //      timestamptz and the equality never matches under a non-UTC session
-    //      timezone; the naive-UTC `::timestamp` literals compare correctly.
-    // Keeping the guard in ONE atomic UPDATE lets Postgres row-lock +
-    // EvalPlanQual pick exactly one winner (verified: 3 concurrent claims →
-    // 1 winner). The `"projectId"` predicate also satisfies the multitenancy
-    // guard's raw-query tenancy check; it always equals the row's own project.
-    // `currentSlot` is stamped with COALESCE from the caller-supplied `slot`:
-    // the FIRST claim of a slot pins the calendar instant being fired (which on
-    // a `runLatest` catch-up is the newest missed slot, NOT the `expectedNextRunAt`
-    // WHERE guard = the oldest missed slot the row still carries); a retry wake
-    // (whose `nextRunAt` is a backoff instant) or a crash-refire (lease instant)
-    // re-claims WITHOUT overwriting the pinned slot. Settle clears it.
+    // Conditional UPDATE on exact nextRunAt ensures exactly-once execution via
+    // Postgres row-locking. Must be raw (not updateMany) for atomic multi-predicate
+    // safety and timezone correctness; COALESCE preserves pinned slot on retry/refire.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(leaseUntil)}::timestamp,
@@ -309,17 +270,8 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     projectId: string;
     active: boolean;
   }): Promise<boolean> {
-    // Unconditional on `nextRunAt` on purpose: pausing is about whether the
-    // due-scan may pick the row up in future, and it must work regardless of
-    // what the row is doing right now. An in-flight slot is left alone — the
-    // confirmation copy says so, because a pause that silently killed a live
-    // run would be a different and much larger promise.
-    //
-    // `updatedAt` is deliberately NOT bumped. While a slot is held it is the
-    // only evidence the scheduler has that the worker is still alive, and the
-    // stale-slot guard reads it as exactly that. Pausing is the first thing an
-    // operator does to a wedged schedule, so bumping it here would make the
-    // pause itself withdraw the repair for another full staleness window.
+    // Unconditional on nextRunAt: pause is about future scans, not current state.
+    // Don't bump updatedAt; it's the heartbeat the stale-slot guard relies on.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "active" = ${active}
@@ -367,21 +319,8 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     expectedNextRunAt: Date;
     now: Date;
   }): Promise<boolean> {
-    // Only `nextRunAt` moves. Everything that makes a fire correct — claiming
-    // the slot, running the handler, retrying, settling the calendar — stays
-    // with the loop, so a manual run is the same event as a scheduled one with
-    // a different reason for being due.
-    //
-    // `currentSlot IS NULL` is the guard that stops a DOUBLE DELIVERY, and it
-    // has to live here rather than only in the service. Once `claim()` leases a
-    // slot, `nextRunAt` holds the lease instant — a perfectly ordinary-looking
-    // future timestamp. An operator reading the row sees it, run-now's
-    // `nextRunAt = expected` guard matches, and the row becomes due again while
-    // its worker is still executing. `claim()` guards only on `nextRunAt` too,
-    // and its `COALESCE("currentSlot", …)` preserves the pinned slot rather
-    // than refusing, so a second worker takes the same slot and the target
-    // fires twice. That COALESCE is right for a retry wake or a crash-refire,
-    // where the first worker is gone; it is not a defence against this.
+    // Only nextRunAt moves; manual runs use the same slot mechanics as scheduled
+    // ones. currentSlot IS NULL guard here prevents double-delivery during leases.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(now)}::timestamp,

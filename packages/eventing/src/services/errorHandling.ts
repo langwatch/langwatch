@@ -299,14 +299,7 @@ export class ProjectionError extends NonCriticalError {
 }
 
 /**
- * Handles an error according to its category.
- * If the error is a BaseEventSourcingError, uses its category and context.
- * Otherwise, uses the provided category and context.
- *
- * @param error - The error to handle
- * @param category - The error category (used if error is not a BaseEventSourcingError)
- * @param logger - Optional logger for non-critical errors
- * @param context - Additional context for logging (merged with error context if available)
+ * Handle error by category; uses error's own category if BaseEventSourcingError.
  * @throws {Error} If category is CRITICAL
  */
 export function handleError(
@@ -397,27 +390,8 @@ export function categorizeError(error: unknown): ErrorCategory {
 }
 
 /**
- * ClickHouse error codes that indicate transient/overload conditions
- * (server still healthy, just busy) OR cluster-recovery conditions
- * (server going through ZooKeeper reconnect / replica failover / graceful
- * shutdown). Both should be retried by the group queue.
- *
- * Overload / connectivity:
- * - 159: TIMEOUT_EXCEEDED
- * - 160: TOO_SLOW
- * - 202: TOO_MANY_SIMULTANEOUS_QUERIES
- * - 203: NO_FREE_CONNECTION
- * - 209: SOCKET_TIMEOUT
- * - 210: NETWORK_ERROR
- * - 241: MEMORY_LIMIT_EXCEEDED
- * - 252: TOO_MANY_PARTS
- *
- * Cluster-recovery (replica shutting down, ZK session lost, table readonly):
- * - 33:  CANNOT_READ_ALL_DATA (truncated read during socket close)
- * - 236: ABORTED (write buffer cancelled mid-flush)
- * - 242: TABLE_IS_READ_ONLY (ZK lost, replica cannot accept writes)
- * - 394: QUERY_WAS_CANCELLED (server cancelled query, e.g. during shutdown)
- * - 999: KEEPER_EXCEPTION (ZooKeeper / ClickHouse Keeper coordination error)
+ * ClickHouse transient/overload (159, 160, 202, 203, 209, 210, 241, 252) and
+ * cluster-recovery codes (33, 236, 242, 394, 999); all are retryable.
  */
 const CLICKHOUSE_TRANSIENT_CODES = new Set([
   "33",
@@ -486,15 +460,8 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
  * errors are CRITICAL.
  */
 export function classifyClickHouseError(error: unknown): ErrorCategory {
-  // Some handled codes ARE the verdict, and unwrapping them loses it. The
-  // platform raises `clickhouse_overloaded` when it sheds a statement rather
-  // than queue it without limit — deliberately, before the statement reaches
-  // the server — and wraps the shed signal (`QueueFullError`, or an expired
-  // wait) in `reasons`. Neither of those carries a ClickHouse code or matches a
-  // transient fragment, so classifying by reasons alone made every shed
-  // statement CRITICAL: a job refused precisely BECAUSE the platform was busy
-  // was then dropped rather than re-staged, which is the one outcome shedding
-  // exists to avoid.
+  // Handled codes like clickhouse_overloaded ARE the verdict; classifying only
+  // by reasons would wrongly mark shed statements CRITICAL.
   if (HandledError.isHandled(error) && TRANSIENT_HANDLED_CODES.has(error.code)) {
     return ErrorCategory.RECOVERABLE;
   }

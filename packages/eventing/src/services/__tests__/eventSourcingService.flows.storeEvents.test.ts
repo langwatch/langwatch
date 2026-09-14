@@ -156,7 +156,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const events = [
         createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         createTestEvent(aggregate2, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
-        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId), // Same aggregate again
+        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId), // Repeat
       ];
 
       await service.storeEvents(events, context);

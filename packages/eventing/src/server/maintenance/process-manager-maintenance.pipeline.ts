@@ -20,32 +20,8 @@ export interface ProcessManagerMaintenancePipelineDeps {
 }
 
 /**
- * Retention for the process-manager substrate's own tables, in its own
- * pipeline for the same reason blob_maintenance and langy_maintenance are:
- * reaping the inbox and outbox belongs to no single domain, and hanging it off
- * one domain's schedule is how it ends up covering only that domain.
- *
- * WHICH IS EXACTLY WHAT HAPPENED. Retention used to be per-process opt-in:
- * each process manager that cared called `deleteDispatchedBefore` with its own
- * name from its own wake. Six of twelve process names never did, the inbox had
- * no deletion path at all, and the highest-volume process manager got its
- * retention by piggybacking on an unrelated pipeline's daily prune — where an
- * unguarded await meant a failure in that prune silently took the retention
- * with it. Production reached 2.8M inbox rows and 473k outbox rows in twenty
- * days on a database with storage autoscaling off.
- *
- * This sweep reaps by PREDICATE across every processName instead, so it covers
- * the processes nobody registered and every process added later, with no
- * registration step to forget. Per-process self-prunes are left in place as
- * harmless backstops; they now delete rows this would have deleted anyway.
- *
- * The pipeline carries no events and no commands. A process manager with no
- * event handlers registers no subscriber, so this costs nothing beyond the
- * scheduled wake it exists for.
- *
- * Exactly-once per tick is inherited, not implemented here: the wake commits at
- * the revision it was scheduled at, so when several workers race the same tick
- * one commit wins and the losers stand down.
+ * Isolated process-manager retention: reaps inbox/outbox across all processes
+ * by predicate, covering both registered and future processes without opt-in.
  */
 export function createProcessManagerMaintenancePipeline(
   deps: ProcessManagerMaintenancePipelineDeps,

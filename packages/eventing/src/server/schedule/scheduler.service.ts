@@ -36,14 +36,8 @@ const SHUTDOWN_MAX_WAIT_MS = 10_000;
 const LOOP_ERROR_BACKOFF_MS = 1_000;
 
 /**
- * Lease window a winning claim buys before it has to settle. Chosen comfortably
- * larger than any plausible handler runtime (a report render + email/Slack send
- * is seconds to low-minutes even under provider slowness / a ClickHouse stall),
- * so the leased row stays hidden from `findDue` (`nextRunAt <= now`) for the
- * whole handler run — which both stops a second worker double-claiming the slot
- * AND is the retry backoff if this worker crashes mid-fire (the lease simply
- * expires and the slot re-fires). Short enough that a crashed lease is retried
- * within ~10 min rather than parked for a cron period.
+ * Lease window covering handler runtime; hides the slot from findDue to prevent
+ * double-claiming, and serves as retry backoff if the worker crashes.
  */
 const LEASE_MS = 10 * 60_000;
 
@@ -83,36 +77,8 @@ export interface SchedulerServiceDeps {
 }
 
 /**
- * ADR-044 §4 — the in-process calendar scheduler loop. POSTGRES-ONLY: no
- * Redis, no cron infrastructure. A long-lived, worker-only loop that sleeps
- * until the soonest due job (intelligent sleep, backstopped by `maxSleepMs`),
- * scans due rows, atomically LEASES each (conditional `nextRunAt` update), runs
- * its registered handler, and only THEN advances the calendar.
- *
- * Correctness + scale rest on ONE Postgres mechanism: the per-slot CONDITIONAL
- * lease (`repo.claim`). Because that lease guarantees exactly one worker owns a
- * slot no matter how many observe it, there is NO leader-lock and NO single
- * authoritative pod — EVERY worker runs this loop, scans, and races the lease,
- * so firing load is shared across the fleet while each slot fires from exactly
- * one worker. A lease pushes `nextRunAt` a near-future window ahead WITHOUT
- * marking the slot delivered (`lastSlot` untouched); the calendar advances only
- * via `repo.settleClaim` after the handler returns. So a handler failure retries
- * the SAME slot (bounded backoff, up to `MAX_ATTEMPTS`, then abandon-with-alert)
- * and a crash mid-fire re-fires the slot when the lease expires — a failed slot
- * is never silently lost. Durability is the durable `ScheduledJob` row.
- *
- * Worker-stack-only: `start()` no-ops unless the composition says this process
- * runs the worker stack (`runsWorkers`), so it is safe to wire into shared
- * bootstrap without role gating (the same boundary used by process-manager
- * wake workers).
- *
- * Cross-pod early-wake is BEST-EFFORT via Redis pub/sub (optional `redis` dep):
- * a producer calls `SchedulerService.publishWake(redis)` after creating/editing
- * a job, every pod's loop subscribes to `scheduler:wake` and re-scans on the
- * signal. This is a pure latency optimization layered on the Postgres core — a
- * dropped signal or absent Redis just means the job waits for the poll backstop
- * (`maxSleepMs`), never a correctness change. Without `redis`, the scheduler is
- * 100% Postgres and `wake()` only interrupts THIS process's sleep.
+ * Postgres-only calendar scheduler: every worker races conditional leases to
+ * fire slots exactly once; optional Redis pub/sub for cross-pod early-wake.
  */
 export class SchedulerService {
   private readonly repo: ScheduledJobStore;
@@ -323,19 +289,8 @@ export class SchedulerService {
     // is what `findDue` read and what a racing worker would also condition on.
     const claimAt = job.nextRunAt;
 
-    // Derive the slot to fire and the next calendar marker (both DST-correct in
-    // the job's own zone). Computed up front so a poison cron/tz deactivates the
-    // row *before* leasing (a bad row can't wedge the loop).
-    //
-    //  - RETRY / crash-refire (`currentSlot` pinned): re-fire that EXACT slot —
-    //    catch-up must not move a slot already in flight. Advance honestly to
-    //    the next instant after it, only fast-forwarding past `now` if a long
-    //    retry sequence outran a whole cron period (so a completed retry never
-    //    re-arms in the past).
-    //  - FRESH fire: apply the ADR-044 `runLatest` catch-up. On time this is a
-    //    no-op (fire `nextRunAt`, advance to the next instant); after an outage
-    //    it fires ONE catch-up for the newest missed slot and fast-forwards to
-    //    the first future instant, instead of replaying every missed slot.
+    // Compute slot and nextRunAt upfront to deactivate bad cron/tz before
+    // leasing. RETRY: re-fire the pinned slot. FRESH: apply runLatest catch-up.
     let slot: Date;
     let nextSlot: Date;
     try {
@@ -431,15 +386,8 @@ export class SchedulerService {
       return;
     }
 
-    // Run the handler. On SUCCESS, advance the calendar and stamp `lastSlot =
-    // slot` (the "delivered" marker), clearing retry state. On FAILURE, hand to
-    // the retry policy — the slot is retried, never silently lost.
-    //
-    // Report delivery is therefore AT-LEAST-ONCE: a crash AFTER the handler's
-    // provider send but BEFORE this settle re-leases the slot on lease expiry
-    // and re-fires it, so a duplicate report can go out. That is an accepted
-    // ADR-044 tradeoff — vastly better than the previous silent zero-delivery —
-    // and a distributed dedup ledger is deliberately OUT OF SCOPE here.
+    // Run the handler. On success, advance calendar and clear retry state.
+    // On failure, retry per policy; crashes before settle cause at-least-once.
     try {
       await handler({
         projectId: job.projectId,

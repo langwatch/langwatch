@@ -388,30 +388,8 @@ function emitBatchMetrics<EventType extends Event>(args: {
 }
 
 /**
- * Batched sibling of {@link processCommand} (ADR-066 pillar 2).
- *
- * The GroupQueue drains a hot aggregate's queued same-command jobs and hands
- * them here as one ordered batch. Each payload is validated and handled in
- * dispatch order, then every resulting event is persisted in ONE
- * `storeEventsFn` call — collapsing N tiny single-row appends into one multi-row
- * insert so a high-fan-in producer stays off the per-item event-log write path.
- *
- * Contract — this is NOT the single path applied N times. All handlers run
- * BEFORE the single end-of-batch store, so a handler CANNOT read back its own (or
- * an earlier same-batch payload's) just-appended events — unlike the single path,
- * which stores between dispatches. Handlers coalesced here must therefore be
- * stateless per item: each derives its events from its own command alone, not
- * from same-batch appends. A command opting into `coalesceMaxBatch` must satisfy
- * this; one that needs read-your-writes within the batch must not coalesce.
- *
- * Because the drain only coalesces siblings sharing a `__jobName`, every payload
- * is the SAME command type: one schema and one handler serve the whole batch.
- *
- * Failure semantics mirror the single path:
- *  - a schema validation failure throws, failing the whole batch — the events
- *    carry idempotency keys, so the retry is de-duplicated downstream;
- *  - a handler error or malformed event fails the batch;
- *  - an empty event set skips the store call.
+ * Batched sibling of processCommand: collapses N single-row appends into one
+ * multi-row insert. Handlers must be stateless per item (no read-your-writes).
  */
 export async function processCommandBatch<EventType extends Event>(
   params: ProcessCommandBatchParams<EventType>,

@@ -342,14 +342,8 @@ describe("categorizeError", () => {
 
 describe("classifyClickHouseError", () => {
   /**
-   * Shedding exists so a busy platform refuses work instead of queueing it
-   * without limit. That only holds if the refusal is retryable: a job turned
-   * away BECAUSE ClickHouse was busy has to come back, not be dropped.
-   *
-   * The shed signal underneath — a full wait queue, or a wait that expired —
-   * carries no ClickHouse code and matches no transient message fragment, so
-   * classifying by the wrapped reasons alone made every shed statement
-   * CRITICAL. The verdict is on the handled shell, and has to be read there.
+   * Shedding must be retryable so jobs turn away instead of queue indefinitely.
+   * Shed signals carry no ClickHouse code; verdict is on the handled shell.
    */
   describe("when the platform shed the statement rather than queue it", () => {
     /** @scenario a statement that waits too long is refused, not left waiting */

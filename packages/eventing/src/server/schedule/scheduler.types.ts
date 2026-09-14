@@ -1,11 +1,6 @@
 /**
- * ADR-044 Phase 1 — the generic calendar-scheduling primitive's shared types.
- *
- * The scheduler is deliberately consumer-agnostic: it owns durable cron
- * entries (`ScheduledJob` rows) and firing; it knows nothing about reports,
- * dashboards, or graphs. A due job hands its registered handler only a tiny
- * identity trigger (`ScheduledJobFire`) — never a rendered payload — so the
- * handler re-derives everything fresh at fire time.
+ * Generic calendar-scheduling types (ADR-044 Phase 1). The scheduler owns
+ * durable cron entries and firing; handlers receive only identity triggers.
  */
 
 /**
@@ -68,15 +63,8 @@ export interface ScheduledJobFire {
 export type SchedulerHandler = (fire: ScheduledJobFire) => Promise<void>;
 
 /**
- * Persistence seam for the scheduler (service → repository layering). A
- * Prisma-backed implementation lives in `scheduled-job.repository.ts`; the
- * loop depends only on this interface.
- *
- * The two reads (`findDue`, `earliestActiveNextRunAt`) are intentionally
- * CROSS-TENANT global scans — a single calendar scheduler serves every
- * project. The writes stay project-scoped (each carries `projectId`) so the
- * multitenancy guard (`dbMultiTenancyProtection`) is satisfied and no write
- * can touch the wrong tenant's row.
+ * Persistence seam for the scheduler. Reads are cross-tenant global scans;
+ * writes stay project-scoped and checked by the multitenancy guard.
  */
 export interface ScheduledJobStore {
   /** Due-scan: active rows whose `nextRunAt <= now`, soonest first. */
@@ -89,25 +77,8 @@ export interface ScheduledJobStore {
   earliestActiveNextRunAt(): Promise<Date | null>;
 
   /**
-   * Atomically LEASE a due slot: a CONDITIONAL update
-   * `WHERE id = :id AND projectId = :projectId AND nextRunAt = :expectedNextRunAt`
-   * that pushes `nextRunAt` to `leaseUntil` (a near-future instant) and touches
-   * NOTHING else — `lastSlot`, `attempts`, `lastError` are left as-is because
-   * the slot is not yet delivered. Returns `true` iff this call won the lease —
-   * exactly one of N racing workers can, because Postgres serialises the update
-   * and the loser's WHERE no longer matches once the winner moves `nextRunAt`.
-   *
-   * Leasing (not advancing to the next cron slot) is what makes a failed fire
-   * retryable: `findDue` selects `nextRunAt <= now`, so the leased row is
-   * invisible to every worker — including this one — until the lease elapses.
-   * That both stops a second worker double-claiming AND is the natural backoff
-   * if this worker crashes before settling (the lease expires and the slot is
-   * re-fired). The service advances the calendar only via `settleClaim` after a
-   * delivered fire. This DB-level lease is the SOLE exactly-once mechanism (no
-   * Redis leader-lock), which is what lets multiple workers scan and fire
-   * concurrently to share load (ADR-044 §4 "No double-firing"). `projectId` is
-   * included purely to satisfy the multitenancy guard; it is always the row's
-   * own project, so it does not weaken the claim.
+   * Atomically lease a due slot via conditional WHERE update; returns true iff
+   * this worker won. Lease hides the slot until expiry, preventing double-claims.
    */
   claim(params: {
     id: string;
@@ -129,20 +100,8 @@ export interface ScheduledJobStore {
   // `expectedNextRunAt` is a backoff or lease instant — preserve it.)
 
   /**
-   * Resolve a lease this worker holds: a CONDITIONAL update
-   * `WHERE id = :id AND projectId = :projectId AND nextRunAt = :expectedLease`
-   * that writes the next schedule + retry bookkeeping in one atomic step. The
-   * guard is the lease value `claim` set, so only the lease-holder can settle
-   * (a lease that expired and got re-claimed by another worker → 0 rows, this
-   * call returns `false`). The SERVICE decides the values — this is a dumb
-   * conditional writer that carries no retry policy:
-   *   - delivered: `nextRunAt` = next cron instant, `lastSlot` = the slot,
-   *     `currentSlot` = null, `attempts` = 0, `lastError` = null.
-   *   - retry: `nextRunAt` = now + backoff, `lastSlot` unchanged (pass the
-   *     row's existing value), `currentSlot` = the in-flight slot, `attempts`
-   *     bumped, `lastError` = message.
-   *   - abandoned / released: `nextRunAt` = next cron instant, `lastSlot`
-   *     unchanged, `currentSlot` = null, `attempts` = 0.
+   * Resolve a lease via conditional update on the lease value; only the
+   * lease-holder can settle. Service provides values for delivered/retry/abandoned.
    */
   settleClaim(params: {
     id: string;
@@ -188,19 +147,8 @@ export interface ScheduledJobStore {
     targetType: string;
   }): Promise<ScheduledJobRecord[]>;
 
-  // ── Operator control (ADR-091) ──────────────────────────────────────
-  //
-  // Cross-tenant, like `listForOps`, and gated at the router on `ops:manage`.
-  // Every mutation carries `projectId` alongside the id: these are the only
-  // writes in the codebase that reach a project-level row without a tenant in
-  // scope, so the predicate is what keeps a stale or guessed id from touching
-  // another project's schedule.
-  //
-  // `releaseSlotForOps` and `requestImmediateRunForOps` are additionally
-  // CONDITIONAL on `expectedNextRunAt` for the same reason `claim` is: it is
-  // the row's fencing token. An operator acting on a row the loop has since
-  // claimed affects zero rows and is told so, rather than overwriting a live
-  // lease. `setActiveForOps` is not fenced that way — see its own note.
+  // Operator control (ADR-091): cross-tenant, gated on ops:manage, mutations
+  // carry projectId as a fencing token to prevent stale operator actions.
 
   /** One schedule by id, across projects. Null when it no longer exists. */
   tryFindByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
@@ -224,14 +172,8 @@ export interface ScheduledJobStore {
   }): Promise<boolean>;
 
   /**
-   * Make a schedule due immediately.
-   *
-   * Deliberately does NOT claim or execute: pulling `nextRunAt` to now hands
-   * the slot to the ordinary due-scan, so the calendar loop claims it through
-   * `claim` and runs it through the same path a scheduled fire takes —
-   * inheriting its exactly-once lease, retry ladder and settlement. Racing the
-   * loop is therefore safe: whichever of the two conditional updates lands
-   * first wins, and the loser affects zero rows.
+   * Make a schedule due immediately; doesn't claim or execute. Racing the loop
+   * is safe: conditional updates race and one wins.
    */
   requestImmediateRunForOps(params: {
     id: string;
@@ -253,14 +195,8 @@ export interface ScheduledJobStore {
   listForOps(params: { limit: number }): Promise<ScheduledJobRecord[]>;
 
   /**
-   * Cross-tenant read of the schedules that are switched OFF, with the total
-   * so a bounded page can say what it left out.
-   *
-   * Deliberately not a filter over `listForOps`: that read orders
-   * `active DESC`, which sorts inactive rows to the very end, so any caller
-   * filtering its bounded page client-side finds zero paused schedules the
-   * moment the fleet has more schedules than the page holds — while appearing
-   * to report on all of them.
+   * Cross-tenant read of paused schedules with total for bounded pages.
+   * Separate from listForOps to avoid sorting inactive rows to the end.
    */
   listPausedForOps(params: {
     limit: number;
