@@ -125,16 +125,27 @@ function headerLine({
   });
 }
 
+/**
+ * A turn stamped when it is written, which is while the run is in progress.
+ *
+ * These rows are written by the fake child during `launchPi()`, so their clock
+ * has to be the run's clock. Capture keeps only turns at or after the run's
+ * start — that row-level window is what stops a resumed session from being
+ * billed twice — so a row frozen at a fixed past instant would be correctly
+ * discarded as another run's work and these tests would assert on an empty
+ * wire.
+ */
 function assistantRow(id: string): string {
+  const now = new Date().toISOString();
   return JSON.stringify({
     type: "message",
     id,
     parentId: null,
-    timestamp: "2026-09-14T10:00:05.000Z",
+    timestamp: now,
     message: {
       role: "assistant",
       content: [{ type: "text", text: "hello" }],
-      timestamp: Date.parse("2026-09-14T10:00:05.000Z"),
+      timestamp: Date.parse(now),
       model: "openai/gpt-5-mini",
     },
   });
@@ -259,8 +270,13 @@ describe("given a pi session launched through the wrapper", () => {
      * call it directly. This one cannot: the only lineage in it comes from
      * whatever `runWrapped` chose to hand the reader.
      *
-     * @scenario "A session split off another records where it came from"
-     */
+     * The annotation closes this comment on purpose. `isFollowedByTestCall`
+     * (check-feature-parity.ts:1151) walks forward from the end of the match
+     * and cannot leave a comment it starts inside: left on its own line, the
+     * walk meets the `*` of the closing delimiter, fails the test-call match
+     * and binds nothing, with no diagnostic.
+     *
+     * @scenario "A session split off another records where it came from" */
     it("stamps the parent that only the wrapper could have resolved", async () => {
       const parentPath = join(dir, "parent.jsonl");
       // The parent predates the run, as a real parent always does — it is read

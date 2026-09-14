@@ -158,6 +158,10 @@ describe("given a user who holds a personal virtual key", () => {
     /** @scenario "A virtual key does not switch pi to server-side capture" */
     it("reads the session file and posts its turns, with the key in neither the wire nor pi's environment", async () => {
       child.state.writes = async () => {
+        // Stamped when written, which is mid-run: capture keeps only turns at
+        // or after the run's start, so a fixed past instant would be discarded
+        // as another run's work and nothing would reach the wire.
+        const turnAt = new Date().toISOString();
         await writeFile(
           join(dir, "own.jsonl"),
           `${JSON.stringify({
@@ -169,11 +173,11 @@ describe("given a user who holds a personal virtual key", () => {
             type: "message",
             id: "aaaaaaaa",
             parentId: null,
-            timestamp: "2026-09-14T10:00:05.000Z",
+            timestamp: turnAt,
             message: {
               role: "assistant",
               content: [{ type: "text", text: "hello" }],
-              timestamp: Date.parse("2026-09-14T10:00:05.000Z"),
+              timestamp: Date.parse(turnAt),
               model: "openai/gpt-5-mini",
             },
           })}\n`,
