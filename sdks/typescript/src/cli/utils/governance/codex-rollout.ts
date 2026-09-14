@@ -1,34 +1,6 @@
 /**
  * Codex rollout transcript -> per-turn chat-message request body + reply.
- *
- * Codex's native OTLP spans (scope `codex_cli_rs`) carry tokens, model, and
- * timing but never the prompt, the system instructions, the tool calls, or the
- * assistant reply. Codex DOES persist the whole conversation to disk as a JSONL
- * "rollout" at `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sessionid>.jsonl`,
- * and crucially each turn's `task_started` event records the exact OTLP
- * `trace_id` codex used for that turn's spans. That lets the wrapper recover the
- * FULL request body codex sent to the model AFTER the session and emit it on
- * codex's own trace_id, so it joins the token-spans on the same trace with no
- * receiver-side join.
- *
- * The rollout is the running conversation state (the OpenAI Responses API
- * `input` array), append-only. We replay it into an accumulating chat history
- * and, at each turn boundary, snapshot that history as the turn's `input` (the
- * request actually sent to the model: system prompt + every prior message + the
- * current user prompt + any mid-turn tool calls/results) with the turn's final
- * assistant answer as `output`. This mirrors how the claude log-to-span fold
- * turns a `/v1/messages` body into `gen_ai.input.messages`, so a codex trace
- * renders the same full conversation a claude trace does.
- *
- * Rollout line shapes this parser relies on (codex 0.137; `git` since 0.14x):
- * - `{"type":"session_meta","payload":{"id":"<threadId>","base_instructions":"...","cwd":"...","git":{"branch":"...","repository_url":"..."}}}`
- * - `{"type":"turn_context","payload":{"model":"gpt-5.5"}}`
- * - `{"type":"event_msg","payload":{"type":"task_started","turn_id":"...","trace_id":"<hex32>"}}`
- * - `{"type":"event_msg","payload":{"type":"user_message","message":"..."}}` (the typed prompt)
- * - `{"type":"response_item","payload":{"type":"message","role":"developer|user|assistant","content":[{"type":"input_text|output_text","text":"..."}]}}`
- * - `{"type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{...}","call_id":"..."}}`
- * - `{"type":"response_item","payload":{"type":"function_call_output","call_id":"...","output":"..."}}`
- * - `{"type":"event_msg","payload":{"type":"agent_message","message":"...","phase":"final_answer"}}`
+ * Parse JSONL rollout to reconstruct request body with each turn's trace_id.
  */
 
 /** Per-message content cap so a single huge tool output can't dominate the span. */
@@ -109,18 +81,7 @@ const INJECTED_CONTEXT_BLOCK = /^<[A-Za-z_][\w-]*>/;
 
 /**
  * Whether a user-role message is context codex injected.
- *
- * Codex bundles a whole injection into ONE message carrying several content
- * parts, and only some of them open with a tag. A real session on the agents
- * box opens part one with the markdown heading `# AGENTS.md instructions` and
- * part two with `<environment_context>`. Flattening the parts first would put
- * that heading at the front, hide the tag behind it, and let the heading name
- * the session, so each part is tested on its own and any tagged part condemns
- * the message.
- *
- * Which part carries the tag is not a signal: the parts of a bundle share a
- * turn id and land hundredths of a second apart, so there is no order to lean
- * on and nothing is reordered here.
+ * Any content part with a tag condemns the message.
  */
 function isInjectedContent(content: unknown): boolean {
   if (!Array.isArray(content)) return false;
@@ -177,15 +138,7 @@ function outputToText(output: unknown): string {
 }
 
 /**
- * One message's capped form and the number of bytes it costs in the serialized
- * array, remembered against the message it came from.
- *
- * Every turn caps the conversation SO FAR, so the same early messages are
- * measured again on every later turn, and a session that runs for weeks
- * measures its first message thousands of times. The messages never change
- * once the accumulator pushes them, so each one is capped and measured once
- * and the answer is kept here. A WeakMap, so a parsed rollout costs nothing
- * once its messages are unreachable.
+ * Cache per-message capped form and byte cost to avoid repeated measurement.
  */
 const cappedMessages = new WeakMap<
   CodexChatMessage,
@@ -208,15 +161,8 @@ function capOneMessage(message: CodexChatMessage): {
 }
 
 /**
- * Bound the serialized input: cap each message's content, then drop the oldest
- * NON-system messages until the whole array is under the total cap. System
- * messages (the prompt the user actually asked to see) are always preserved.
- *
- * The total is tracked as the messages are dropped rather than measured again
- * after each one. Measuring again read the whole conversation per dropped
- * message, which on a long session took minutes per turn: codex runs the
- * harvest after every completed turn, so the next harvest started before the
- * last one finished and the conversation never reached the server.
+ * Cap each message, then drop oldest non-system messages until under cap.
+ * Track total as messages drop to avoid remeasuring on each iteration.
  */
 function capInputMessages(messages: CodexChatMessage[]): CodexChatMessage[] {
   const entries = messages.map(capOneMessage);
@@ -358,24 +304,8 @@ class CodexTurnAccumulator {
   }
 
   /**
-   * The first thing the person typed, from whichever place records it.
-   *
-   * Both places reach this. The `user_message` event carries it in a TUI
-   * session; the conversation carries it in a `codex exec` session, which
-   * emits no such event at all and so reached the sessions screen unnamed.
-   * The event still wins whenever there is one, because it is read before a
-   * turn opens while a conversation message is only read inside one, and a
-   * turn opens at `task_started`, after the submission that emits the event.
-   *
-   * Codex also speaks to itself in both places, injecting its context as
-   * user-role text wrapped in a tag of its own (`<environment_context>`,
-   * `<recommended_plugins>`, ...). Only what the person typed arrives
-   * untagged, and a 10k-character plugin catalogue makes a poor session
-   * title. The test below covers the event, which only ever carries a plain
-   * string; a conversation message is screened by `isInjectedContent` at the
-   * call site instead, because it can carry several content parts and the tag
-   * may sit in any of them. Screening both is what keeps an injected block
-   * from claiming the name and locking out the real prompt beside it.
+   * Cache the first untagged user message (the actual prompt).
+   * Screened in two places since injected blocks have several content parts.
    */
   private rememberTypedPrompt(text: string): void {
     if (this.firstUserMessage !== null) return;

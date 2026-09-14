@@ -1,15 +1,8 @@
 import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// A dynamic `import(...)` hides a dependency the reader expects to find as a
-// top-level import, and everywhere but three seams it buys nothing a static
-// import doesn't already give for free. The CLI startup path is the one
-// place it is load-bearing: lazy `import()` there is what keeps commander,
-// chalk, zod, js-yaml, the command modules and the command catalogue off the
-// boot graph, pinned at ~30ms cold start by its own boot-graph test. The
-// other two are the lazy-loading seams a browser app is built around: a web
-// package's own top-level entry file, and the UI application, which is a
-// Vite SPA whose routes and drawers are code-split by design.
+// Dynamic import() hides dependencies. Allowed only: CLI startup path (~30ms
+// cold start), web package entry files, and UI routes/drawers (code-split).
 
 const GENERATED = /(?:^|\/)(?:dist|node_modules|generated)\/|\.generated\.[cm]?tsx?$/;
 const CLI_STARTUP = /^sdks\/typescript\/src\/cli\//;

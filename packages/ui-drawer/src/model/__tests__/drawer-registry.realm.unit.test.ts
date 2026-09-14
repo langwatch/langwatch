@@ -4,21 +4,8 @@ import { describe, expect, it } from "vitest";
 import { preloadDrawer, primeLazyComponent } from "../drawer-registry.ts";
 
 /**
- * Binds specs/navigation/drawer-chunk-warmup.feature.
- *
- * A drawer that is not ready reports that by THROWING the promise it is waiting
- * on, so the warm-up has to recognise a promise to know it must wait. It
- * recognised one with `instanceof Promise`, which asks which realm made the
- * value rather than whether it behaves like a promise. A browser has one realm,
- * so that held everywhere it was ever run — until the suite moved to a pool
- * that gives each test file its own VM context, where a promise from the other
- * realm failed the check and the warm-up returned WITHOUT waiting. The drawer
- * was reported ready while still loading and rendered its spinner anyway.
- *
- * These drive `primeLazyComponent` itself with a wrapper that behaves like a
- * not-yet-ready `lazy()`. Asserting on a bare foreign promise instead would
- * pass whatever the warm-up does with it, which is the trap this file exists to
- * avoid.
+ * Specs: specs/navigation/drawer-chunk-warmup.feature. Tests the cross-realm
+ * promise detection: `instanceof Promise` fails across VM contexts.
  */
 describe("drawer warm-up", () => {
   /** A `lazy()` wrapper that is still loading: `_init` throws `pending`. */

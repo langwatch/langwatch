@@ -30,15 +30,8 @@ const SGR_PATTERN = /\u001B\[[0-9;]*m/g;
 const PARTIAL_SGR_AT_END = /\u001B(?:\[[0-9;]*)?$/;
 
 /**
- * Thrown by the patched `process.exit` to unwind the command's stack.
- *
- * It cannot be an ordinary Error that callers meaningfully catch, but the CLI's
- * command actions are full of `try { … } catch (e) { console.error(e); process.exit(1) }`,
- * and a `catch` catches everything. That is fine, and is exactly why
- * `ExecutionContext` finalises on the FIRST exit and drops every write after
- * it: in a real process, `process.exit(1)` inside `resolveCredentials()` terminates
- * immediately and the enclosing catch block never gets to print anything. We
- * reproduce that by discarding whatever the unwinding stack emits.
+ * Thrown by patched `process.exit` to unwind the stack. ExecutionContext
+ * finalizes on FIRST exit and drops all subsequent writes.
  */
 export class DaemonExitSignal extends Error {
   readonly isDaemonExitSignal = true;
@@ -169,16 +162,8 @@ export function withExecutionContext<T>(context: ExecutionContext, fn: () => T):
 let installed = false;
 
 /**
- * Patch the process globals that a command writes to, routing them to whichever
- * request is currently executing.
- *
- * AsyncLocalStorage is what makes this safe under concurrency: `console.log`
- * ends up in `process.stdout.write`, and the store lookup there resolves to the
- * request whose async context we are running in — not to whichever request
- * happened to start last. Writes made outside any request (the daemon's own
- * logging) pass straight through to the real streams.
- *
- * Idempotent; returns an uninstall function for tests.
+ * Route process stdout/stderr writes to the current async request context.
+ * Idempotent; returns an uninstall function.
  */
 export function installProcessInterceptors(): () => void {
   if (installed) return () => undefined;
@@ -257,27 +242,8 @@ interface Waiter {
 }
 
 /**
- * The concurrency model.
- *
- * `process.cwd()`, `process.env` and `chalk.level` are process-global, and
- * requests can disagree about all three. Node offers no per-async-context
- * working directory (`process.chdir` is not even available in worker threads),
- * so the only correct options are (a) serialise everything, or (b) let requests
- * that AGREE on the globals run together and make requests that disagree wait.
- *
- * (a) would be a regression: an agent that fans out five commands would get
- * them run back-to-back, which is slower than five cold processes running in
- * parallel. So this is (b), an "execution window":
- *
- *   - All requests currently executing share one (cwd, env, colorLevel) tuple.
- *   - A request matching the active tuple joins immediately — unbounded
- *     concurrency, which is the realistic case (one agent, one repo, fanning
- *     out reads).
- *   - A request with a different tuple queues, and the globals are re-applied
- *     for it once the current window drains.
- *   - Queued requests are FIFO, and a matching request will NOT jump an
- *     already-waiting non-matching one, so a busy same-cwd stream cannot starve
- *     a different-cwd caller.
+ * Concurrency model: batch requests by (cwd, env, colorLevel) tuple; matching
+ * requests join immediately, non-matching queue. Prioritizes parallelism.
  */
 export class ExecutionWindow {
   private activeKey: string | null = null;

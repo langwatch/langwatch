@@ -3,13 +3,8 @@ import { describe, expect, it } from "vitest";
 import { assertWebhookUrlAllowed, inspectWebhookUrl } from "../url-policy.ts";
 
 /**
+ * Admission matrix tested under both escape-hatch states to catch silent drift.
  * Spec: packages/egress/specs/webhook-egress.feature
- *
- * The admission matrix both webhook channels share, pinned as a table of
- * literals. Every row is asserted under BOTH escape-hatch states, because
- * "which rules the hatch relaxes" is the part that silently drifts — and a rule
- * that quietly widened does not fail anything, it delivers to an address it
- * should have refused.
  */
 
 const inspect = (url: string, allowInsecureLocal = false) =>

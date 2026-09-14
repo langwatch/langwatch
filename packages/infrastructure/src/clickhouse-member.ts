@@ -1,15 +1,5 @@
-/**
- * ClickHouse as ONE client that routes itself.
- *
- * A module is handed a {@link ClickHouseQueryClient} and nothing else. It never
- * resolves an endpoint, never holds a per-organization client and cannot ask
- * for an unscoped one, because there is no method that would answer: every
- * statement carries its own `tenantId`, and this driver places it. That is what
- * turns "every ClickHouse query filters TenantId first" from a rule a reader
- * has to remember into the shape of the only object they can reach.
- *
- * `@clickhouse/client` is named in exactly this one file.
- */
+/** One ClickHouse client that routes itself. Modules never resolve endpoints
+ * because every statement carries tenantId filtering, enforced by this driver. */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   ClickHouseClientFactory,

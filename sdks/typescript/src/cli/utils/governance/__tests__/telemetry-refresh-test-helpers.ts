@@ -1,11 +1,6 @@
 /**
- * Shared fixtures for the latest-login-wins (#6202) suite, split across
- * five files by the unit each exercises: authorship detection, the two
- * per-run refresh functions, the claude project-pin pair, and the
- * login-time orchestrator. Not named `*.test.ts` on purpose — vitest's
- * `include` is `src/**\/*.test.ts`, so this module is imported by the
- * suites rather than collected as one (same convention as
- * `utils/__tests__/output-harness.ts`).
+ * Shared test fixtures for the latest-login-wins suite.
+ * Not named `*.test.ts` so vitest imports this module rather than collecting it.
  */
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -42,13 +37,8 @@ export interface TempHomeAndCwd {
 }
 
 /**
- * Registers a fresh temp $HOME + $CWD before every test in the CALLING
- * suite, and restores the real environment after. Restoration uses the
- * check-then-delete-or-assign pattern throughout: a direct assignment of a
- * possibly-undefined value coerces to the literal string "undefined" (Node
- * stringifies every env write), which would leak a polluted HOME /
- * USERPROFILE into every later test in the same worker when the var was
- * genuinely unset beforehand.
+ * Registers a fresh temp $HOME + $CWD before every test and restores after.
+ * Uses check-then-delete-or-assign to avoid coercing undefined to the string "undefined".
  */
 export function installTempHomeAndCwd(): TempHomeAndCwd {
   const state: TempHomeAndCwd = { home: "", cwd: "" };

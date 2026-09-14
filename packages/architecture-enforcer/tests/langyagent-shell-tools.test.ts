@@ -1,13 +1,5 @@
-/**
- * The shell tools the worker box has to carry.
- *
- * The agent works through a shell and calls these by name. A production
- * session read a 40 row result and then lost three commands in a row trying to
- * narrow it: the CLI's `--jq` outside its supported subset, then `jq`, then
- * `python`. Only `python3` was installed, under a name the agent did not try.
- *
- * @see specs/langy/langy-worker-shell-tools.feature
- */
+// Shell tools for the worker box. Agent calls by name. Real incident: three
+// commands failed to narrow results (jq unsupported/missing, python missing).
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

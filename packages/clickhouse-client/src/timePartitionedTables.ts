@@ -1,29 +1,6 @@
 /**
- * Tables partitioned by a time expression, mapped to the column names that, when
- * used in a WHERE/PREWHERE comparison, let ClickHouse prune partitions.
- *
- * Several of our largest tables tier old partitions to S3 (see the
- * clickhouse-serverless storage policy), so a query against one of these
- * WITHOUT a predicate on its partition time column cannot prune and walks
- * every partition including the cold ones — the dominant driver of our S3
- * request bill. Two callers read this same fact from two different angles:
- * the trace-server cold-scan detector flags a query missing the predicate
- * entirely, and the analytics-server JOIN guard checks that a range bound
- * names one of these columns rather than a column the bounded table hasn't
- * got (which ClickHouse resolves against the enclosing scope instead of
- * failing). One map, so the two can't drift.
- *
- * Kept in sync with the migrations in `../migrations` by
- * `trace-cold-scan-detector.service.unit.test.ts`, which parses every
- * `PARTITION BY` out of the migration files and fails when one is missing
- * here. That test exists because the failure mode is SILENT: a table absent
- * from this map is treated as not time-partitioned and is never flagged, so a
- * new table gets no cold-scan detection at all and nobody finds out.
- *
- * Not hypothetical — this map covered 11 of 35 partitioned tables until the
- * coverage test was added, and the 24 missing ones included `trace_analytics`
- * and `trace_summaries`, whose unwindowed reads were running as UNDETECTED cold
- * scans at ~350/min in production.
+ * Partition columns enabling ClickHouse pruning for time-partitioned tables.
+ * Kept in sync by trace-cold-scan-detector.service.unit.test.ts.
  */
 export const TIME_PARTITIONED_TABLES = {
   stored_spans: ["StartTime"],

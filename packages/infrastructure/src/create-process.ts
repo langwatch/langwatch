@@ -1,20 +1,6 @@
-/**
- * One statement for what a process is: its role, the config it parsed, and the
- * members it hands its modules.
- *
- * ```ts
- * await createProcess({ role: "api", config }).withModules(serverModules).boot();
- * await createProcess({ role: "api", config, members: { clock: frozenAt(...) } })
- *   .withModules([...]).boot();
- * ```
- *
- * A root that reads this way has nowhere to build a second client: the members
- * come from `createProcessMembers`, which builds each exactly once, in order,
- * and closes them in reverse. A member the caller passes is used as it stands;
- * a member handed in as an own property whose value is `undefined` is a boot
- * refusal naming it, because `exactOptionalPropertyTypes` is off and a
- * misspelt override would otherwise become the real client.
- */
+// One statement for what a process is: role, config, members passed to modules.
+// Members come from createProcessMembers (each created once in order, closed in
+// reverse). Caller can override; undefined in a member property is a boot refusal.
 import { createApp, type ApplicationBuilder, type ServerRole } from "@langwatch/runtime-composition";
 import { createProcessMembers } from "./create-members.ts";
 import type { ProcessConfig } from "./config.ts";

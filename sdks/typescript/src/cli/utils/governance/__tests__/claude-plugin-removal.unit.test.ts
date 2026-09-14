@@ -1,11 +1,6 @@
 /**
- * Taking the LangWatch Claude Code plugin back off a machine, and deregistering
- * the marketplace it came from, which is what `langwatch logout` does.
- *
- * `node:child_process` is the only thing mocked. The settings file and the
- * plugin state files are real files under a temp HOME.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ * Tests removing the LangWatch Claude Code plugin and deregistering its marketplace.
+ * Only child_process is mocked; settings and plugin state files are real temp files.
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -1,17 +1,6 @@
 /**
- * The address, as the drawer navigator reads and writes it.
- *
- * `platform/app` drove every drawer navigation through
- * `~/utils/compat/next-router` — a Next.js router faked over React Router, with
- * a `push(url, as, { shallow, flushSync })` signature and a `query` that merges
- * route params with the search string. That module is the application's and has
- * no package export, so this is the one seam of the drawer half that is
- * redesigned rather than moved: the same three facts (`query`, `asPath`, a
- * push/replace of one address) read straight off `react-router`.
- *
- * WHAT SURVIVES THE NARROWING. `shallow` was always true and means nothing
- * outside Next; a client router never leaves the page. `flushSync` was
- * load-bearing for a different reason and is kept below.
+ * Drawer navigator address abstraction over react-router.
+ * Provides query/asPath interface from the Next.js faked router.
  */
 
 import { useEffect, useMemo } from "react";

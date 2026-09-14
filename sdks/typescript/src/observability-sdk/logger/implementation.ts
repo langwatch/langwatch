@@ -14,15 +14,8 @@ import * as intSemconv from "../semconv";
 import { type SemConvLogRecordAttributes } from "../semconv";
 import { context } from "@opentelemetry/api";
 
-/**
- * Internal implementation of {@link LangWatchLogger}.
- *
- * @remarks
- * This class wraps an OpenTelemetry logger and adds LangWatch-specific functionality for
- * structured logging and event emission.
- * Not intended for direct use; use {@link getLangWatchLogger} or
- * {@link createLangWatchLogger} instead.
- */
+/** Internal implementation of {@link LangWatchLogger}. Wraps OpenTelemetry
+ * logger with LangWatch functionality. Use {@link getLangWatchLogger} instead. */
 export class LangWatchLoggerInternal implements LangWatchLogger {
   constructor(private logger: Logger) {}
 

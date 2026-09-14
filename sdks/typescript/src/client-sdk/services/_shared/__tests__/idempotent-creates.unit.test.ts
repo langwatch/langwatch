@@ -1,15 +1,4 @@
-/**
- * Retrying a create is the one retry a caller cannot make safe alone: a
- * dropped connection after the write looks exactly like a dropped request, and
- * sending it again mints a second key, budget or endpoint. `idempotencyKey` is
- * how the caller says "these two are the same request", and it is worth
- * nothing unless the SDK actually puts it on the wire.
- *
- * All three creates are exercised here rather than once per service, because
- * the failure this guards against is one surface quietly not sending it.
- *
- * Spec: specs/ai-gateway/idempotency.feature
- */
+/** Idempotency keys prevent duplicate creates on retry. */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { GatewayBudgetsApiService } from "../../gateway-budgets/gateway-budgets-api.service";

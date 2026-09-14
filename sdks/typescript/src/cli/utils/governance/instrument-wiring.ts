@@ -1,18 +1,6 @@
 /**
- * Persistent telemetry-wiring installer, shared by `langwatch instrument
- * <tool>` and the project-scope flows. Unlike the per-run refresh in
- * telemetry-refresh.ts (which only re-syncs wiring that is already
- * there), this INSTALLS the wiring whether or not it exists, using the
- * same per-tool targets the wrappers manage:
- *
- *   - claude  -> the `env` block in ~/.claude/settings.json
- *   - codex   -> the [otel] marker block in ~/.codex/config.toml,
- *                Authorization header inline (0600 file)
- *   - gemini / opencode / copilot / code -> a scoped `<tool>()` function
- *                in the shell rc, so the OTel env applies to that tool's
- *                invocations only
- *
- * `langwatch logout` removes every one of these targets.
+ * Telemetry-wiring installer: installs to tool configs or shell rc.
+ * `langwatch logout` removes all targets.
  */
 
 import * as os from "node:os";

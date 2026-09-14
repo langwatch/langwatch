@@ -35,14 +35,8 @@ export class GooseClickHouseMigrationExecutor {
 }
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * clickhouse-migrate`. Runs schema work once per physical endpoint without an
- * App runtime dependency.
- *
- * `source` is resolved to a {@link ClickHouseMigrationTaskConfig} at
- * `create()` — the catalogue's own construction time — rather than read from
- * `process.env` inside `run()`, so the task's environment dependency is
- * visible at the one call site that builds it.
+ * Task-launcher entry for ClickHouse schema migration.
+ * Config is resolved at catalogue construction time, not in run().
  */
 export class ClickHouseMigrateTask extends Task {
   readonly name = "clickhouse-migrate";
@@ -63,7 +57,8 @@ export class ClickHouseMigrateTask extends Task {
   }: {
     source: Record<string, string | undefined>;
     executor?: GooseClickHouseMigrationExecutor;
-    /** The schema mutex this run takes. Constructed here so the file it contends for is a decision of this task, not of the shared client. */
+    /** The schema mutex this run takes. Constructed here to make the file
+     * it contends for a task decision, not a shared client one. */
     lock?: ClickHouseSchemaLock;
   }): ClickHouseMigrateTask {
     return new ClickHouseMigrateTask(resolveClickHouseMigrationTaskConfig(source), executor, lock);
@@ -151,15 +146,8 @@ export class ClickHouseMigrateTask extends Task {
 }
 
 /**
- * Parses task-owned endpoint input at the executable boundary.
- *
- * The private routes are read through the shared client's own
- * `parseRoutingTable`, so a migration reaches exactly the endpoints this
- * process would route a tenant to. That parser is total for a malformed name
- * — it collects those rather than throwing — and it is the one that refuses a
- * duplicate organisation, which is what this task needs: two URLs for one
- * organisation is not a migration to run twice, it is a configuration nobody
- * can safely guess at.
+ * Parses task-owned endpoint input, using parseRoutingTable to reach
+ * exactly the endpoints this process would route a tenant to.
  */
 export function resolveClickHouseMigrationTaskConfig(
   source: Record<string, string | undefined>,

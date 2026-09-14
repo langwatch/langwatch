@@ -1,12 +1,5 @@
-// Ambient platform globals for this package's own compilation.
-//
-// This package is deliberately platform-agnostic: it compiles with an empty
-// `types` list and models the host runtimes (browser, Node, Bun, Deno) itself.
-// These declarations MUST stay in a non-module .d.ts — an ambient file is part
-// of the program but never emitted to dist/, so consumers' global scope stays
-// clean. The previous shape (`declare global` inside node.ts/platform.ts)
-// leaked `require` and `Buffer` typings into every consumer of the published
-// d.ts, which the monorepo carried a pnpm patch to strip.
+// Ambient platform globals for package compilation.
+// Ambient .d.ts is part of the program but never emitted to dist/.
 
 interface Window {
   crypto: { getRandomValues: (array: Uint8Array) => Uint8Array };

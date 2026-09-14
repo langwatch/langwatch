@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The registry mechanism this exercises moved out of
- * `platform/app/src/components/drawerRegistry.ts` into this package's own
- * `lazyDrawer`/`preloadDrawer` (see drawer-registry.ts) — a feature package's
- * concrete drawers are composition now, so this ports as a test of the
- * mechanism itself with two throwaway lazy components rather than
- * ScenarioFormDrawer/PromptListDrawer.
- *
+ * Tests lazyDrawer/preloadDrawer mechanics in isolation.
  * @see specs/navigation/drawer-chunk-warmup.feature
  */
 import { render, screen, waitFor } from "@testing-library/react";

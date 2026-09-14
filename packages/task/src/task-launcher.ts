@@ -17,18 +17,8 @@ export type RunTaskInput = {
 };
 
 /**
- * Resolves a task by name from argv, runs it, and returns the process exit
- * code — never calls `process.exit` itself, so a caller can decide when to
- * actually leave. SIGINT/SIGTERM abort the signal handed to the task rather
- * than killing the process out from under it.
- *
- * Contract:
- * - no name, or an unknown name: lists the catalogue's names, exit 1, does
- *   not run anything.
- * - a known name: logs `{ task }` at start, runs it, logs
- *   `{ task, durationMs }` at finish, exit 0.
- * - the task throws: exactly one `error` log line, exit 1.
- * - `close()` always runs, whichever of the above happened.
+ * Runs a task by name, returning exit code. Handles signals gracefully.
+ * Always calls close(), logs at start and finish.
  */
 export async function runTask({ catalogue, argv, close, logger }: RunTaskInput): Promise<number> {
   const [name, ...args] = argv;

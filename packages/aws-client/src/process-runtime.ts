@@ -7,12 +7,7 @@ import {
 
 /**
  * The AWS transport owner for one executable process.
- *
- * SDK clients are deliberately not retained here. They borrow request
- * handlers from the one configuration and remain owned by their feature
- * adapter; this owner is responsible only for the shared handler pools.
- * Configuration is supplied by the process root so this class never reads
- * environment state or constructs clients in a request/job handler.
+ * Manages shared handler pools; clients borrow from here and own themselves.
  */
 export class AwsClientProcessRuntime {
   static create(options: { outboundProxy: OutboundProxyResolver }): AwsClientProcessRuntime {

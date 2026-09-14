@@ -1,28 +1,6 @@
 /**
- * Enumerate every place `langwatch <tool>` persists telemetry wiring, so
- * `langwatch logout` can discover and remove all of it. Each target knows
- * whether it is currently present on disk and how to remove itself, and
- * every remover only ever touches the langwatch-authored region (a
- * marker-bracketed block or a known key set), never surrounding user
- * config.
- *
- * This is the inverse of the install surface:
- *   - claude   → OTEL keys in ~/.claude/settings.json's `env`, the session
- *                context hooks in the same file, plus the project-level pin in
- *                $CWD/.claude/settings.local.json (current directory only -
- *                other directories' pins are re-synced or removed by the next
- *                wrapper run there)
- *   - codex    → the [otel] + gateway marker blocks in ~/.codex/config.toml,
- *                the sibling langwatch profile file, and the session context
- *                hooks in ~/.codex/hooks.json
- *   - opencode → the session context plugin file in the plugins directory
- *   - gemini / opencode → a scoped shell function under the tool's marker
- *                pair in the shell rc
- *   - the global gateway export block in the shell rc (legacy installs)
- *
- * Shell rc files are scanned for ALL supported shells (zsh/bash/fish), not
- * just $SHELL, so a block written to ~/.zshrc is still found from a bash
- * session — the user asked it to "go and find it".
+ * Enumerate telemetry persistence targets for logout discovery.
+ * Each target knows if present and how to remove itself (langwatch-authored regions only).
  */
 
 import * as os from "node:os";
@@ -155,16 +133,7 @@ export function scanTelemetryTargets({
     });
   }
 
-  // claude, the LangWatch plugin and the marketplace it came from. The
-  // plugin carries the same session context hooks the entries above declare,
-  // so a device that took the plugin has nothing in the settings file to find
-  // and this is the only target that speaks for it.
-  //
-  // Both removers read their own state before they spawn anything, so a
-  // machine that never installed the plugin pays no subprocess to discover
-  // that, and `present` matches the gate `remove()` applies (an absent plugin
-  // and a marketplace somebody else registered both refuse) so the confirm
-  // list can never offer a target whose removal silently no-ops.
+  // claude plugin and marketplace (read state before spawning anything to avoid no-ops)
   const pluginState = readClaudePluginState();
   targets.push({
     label: `claude langwatch plugin (${CLAUDE_PLUGIN_REF})`,

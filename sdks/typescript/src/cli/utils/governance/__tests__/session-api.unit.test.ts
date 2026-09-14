@@ -1,10 +1,5 @@
 /**
- * The session-authenticated exchange calls are on every command's credential
- * path, so their failure modes are pinned here: a black-holed control plane
- * must time out (so the resolver can fall back to the cached key) and a
- * malformed 200 must fail loudly instead of handing `undefined` to the .env
- * writer.
- *
+ * Tests session-authenticated exchange calls: timeouts and malformed responses.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

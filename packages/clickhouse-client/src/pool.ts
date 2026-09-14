@@ -1,90 +1,18 @@
-/**
- * Connection-pool sizing.
- *
- * A pool is per client INSTANCE, so the server's budget has to cover every pool
- * on every pod, and the only safe way to pick a size is from the server's own
- * `max_concurrent_queries` divided by the fleet - never a fixed number chosen
- * against an assumed replica count.
- *
- * On 2026-07-31 a fixed default of 64, reasoned about as "4 pods x 1 client",
- * met a fleet of 10 worker pods and 3 app pods each holding 2 clients. The
- * server rejected ~37k queries with TOO_MANY_SIMULTANEOUS_QUERIES, and the
- * retry path drove every rejection straight back into the same wall.
- *
- * Read the sizing here for what it is: a ceiling on sockets, and a backstop
- * rather than the working limit. Production says so plainly - ClickHouse holds
- * one connection per statement actually in flight and closes idle ones within
- * `idle_socket_ttl`, so its connection count tracks its query count 1:1 and
- * never approaches the pool cap. What a process needs bounded is the number of
- * statements it will TRY to run, which is set by whatever queue feeds it, not
- * by this number. That bound lives in `./rateLimit`, and it is the one that
- * should bind first; this only stops a runaway from opening sockets without
- * limit.
- *
- * Nothing here reads `process.env`: the caller passes the numbers in, so the
- * rules are the same in every process and testable without mocking the
- * environment.
- */
+/** Pool sizing derived from server budget; divide max_concurrent_queries by replica count. */
 
-/**
- * ClickHouse's own `max_concurrent_queries` when the deployment says nothing.
- *
- * This is a PER-NODE allowance — it is what one ClickHouse server admits, not
- * what the cluster admits. Multiply by {@link PoolSizingInput.serverNodes} for
- * the fleet's real budget.
- */
+/** Default max_concurrent_queries per ClickHouse node. */
 export const DEFAULT_SERVER_MAX_CONCURRENT_QUERIES = 300;
 
-/**
- * Nodes in the ClickHouse cluster when the deployment says nothing.
- *
- * One, because that is what the derivation assumed before it could be told
- * otherwise: a deployment that says nothing keeps the sizing it already had.
- *
- * It matters because `max_concurrent_queries` is enforced per server while a
- * fleet's statements spread across every replica. Reading the per-node number
- * as the whole cluster's budget understates the real capacity by the node
- * count, and the platform then throttles itself — queueing for seconds and
- * shedding statements — against a cluster that is mostly idle and rejecting
- * nothing. Measured on prod 2026-08-18: three nodes at 74/60/70 concurrent
- * queries against 300 each, zero `TOO_MANY_SIMULTANEOUS_QUERIES`, while the
- * client-side limiter shed ~1,057 statements an hour.
- */
+/** Default ClickHouse cluster nodes (1 = per-node budget, not per-cluster). */
 export const DEFAULT_SERVER_NODES = 1;
 
-/**
- * Headroom left for everything the derivation cannot see: ad-hoc queries, ops
- * tooling, migrations, and the burst a retry storm adds on top of steady state.
- *
- * It also absorbs the per-user shares carved out of the server budget — on prod
- * the platform user holds 270 of the 300, so 0.7 stays inside the platform's
- * own allowance without needing a separate knob for it.
- */
+/** Safety headroom for ad-hoc queries and ops tooling; absorbs per-user shares. */
 export const FLEET_SAFETY_FACTOR = 0.7;
 
-/**
- * One, because a process now has exactly one construction site for a client
- * against a given server (`~/server/clickhouse/managedClient.ts`).
- *
- * It was 2 while the app-layer factory existed alongside the raw client. That
- * factory turned out to have no callers at all, so the 2 was halving every
- * derived ceiling to pay for a pool nobody opened. Both are gone; a per-tenant
- * private instance still gets its own client, but that is a different server
- * with its own budget, not a second pool against this one.
- */
+/** One client per process per server; factory was removed for lack of use. */
 export const DEFAULT_CLIENTS_PER_PROCESS = 1;
 
-/**
- * Used only when the fleet size is unknown, which is the case for any process
- * that has not been told its replica count. Preserves the historical value so
- * adopting this package changes nothing until the deployment opts in.
- *
- * A MAXIMUM, not a floor: when the deployment states the server's own
- * `max_concurrent_queries` without a replica count, the fallback still clamps
- * to what one process alone may safely claim of that budget — a single pod
- * holding 64 sockets against a server that admits 32 queries needs no sibling
- * pods to melt it.
- */
+/** Fallback pool size when fleet size is unknown; preserves historical value. */
 export const FALLBACK_POOL_SIZE = 64;
 
 /** A typo must not be able to melt the server or re-choke the client. */
@@ -176,17 +104,7 @@ function rawFleetPoolCeiling(input: PoolSizingInput): number | null {
   return Math.floor((serverMax * nodes * FLEET_SAFETY_FACTOR) / (replicas * clients));
 }
 
-/**
- * What one process alone may claim of a server budget the deployment has
- * actually stated. Null when the deployment said nothing about the cap — the
- * built-in default must not masquerade as knowledge, or every deployment
- * would suddenly "know" a budget nobody measured.
- *
- * Used when the fleet size is unknown - to clamp the fallback, and to judge
- * an override: it cannot keep the whole fleet inside the budget (that needs
- * the replica count), but it does catch a single process set up to exceed
- * the server on its own.
- */
+/** Single-process budget from stated server max; null when unspecified. */
 function singleProcessBudget(input: PoolSizingInput): number | null {
   const serverMax = input.serverMaxConcurrentQueries;
   if (serverMax === undefined || !Number.isInteger(serverMax) || serverMax <= 0) {

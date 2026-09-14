@@ -1,12 +1,5 @@
-/**
- * Stamps every span with the session it belongs to.
- *
- * A processor rather than a resource attribute because the session rotates
- * while the page is open — a resource is fixed for the lifetime of the
- * provider, so a long-lived tab would report its first session forever.
- *
- * See ADR-058.
- */
+// Stamps every span with its session. Uses a processor (not resource
+// attribute) because the session rotates while the page is open. See ADR-058.
 
 import type { Context } from "@opentelemetry/api";
 import type { ReadableSpan, Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";

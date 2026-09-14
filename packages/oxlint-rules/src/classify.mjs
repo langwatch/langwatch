@@ -6,18 +6,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 // question with their own regex: `normalizedFilename`, `isStrictServiceModule`,
 // `classifyFile`, `strictFeatureSource` and `prismaPackageOf`.
 
-/**
- * @typedef {"contract" | "server" | "web" | "config" | "design-system" | "framework" | "other"} FeatureRole
- * The role a file plays in the feature-package grammar. `other` is everything
- * outside a feature package, which the boundary rules read as "an importer we
- * do not police the inside of".
- */
-
-/**
- * @typedef {"contract" | "server" | "web" | "application" | "enterprise-composition" | "config" | "design-system"} PackageKind
- * The workspace package a file belongs to, for the rules that ask what kind of
- * package they stand in rather than what feature role it plays.
- */
+// @typedef {string} FeatureRole See grammar/feature-layout-policy for roles.
+// @typedef {string} PackageKind See grammar/feature-layout-policy for kinds.
 
 /**
  * @typedef {object} StrictFeatureSource
@@ -28,23 +18,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
  * @property {string} name Basename, e.g. `agent.service.ts`.
  */
 
-/**
- * @typedef {object} FileClassification
- * @property {string} filename Absolute path of the linted file.
- * @property {string} workspacePath Forward-slash path relative to the workspace root.
- * @property {FeatureRole} role
- * @property {PackageKind | undefined} kind
- * @property {string | undefined} feature
- * @property {boolean} enterprise
- * @property {number | undefined} layoutVersion
- * @property {string | undefined} relative Path below the package root, e.g. `src/x.ts`.
- * @property {string | undefined} sourcePath Path below `src/`, undefined outside `src/`.
- * @property {boolean} isTest
- * @property {boolean} isProduction
- * @property {boolean} isServiceModule
- * @property {boolean} isPrismaSeam
- * @property {StrictFeatureSource | undefined} strictSource
- */
+/** @typedef {object} FileClassification - File metadata for the feature-layout classifier. */
 
 const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/(.+)$/;
 const APPLICATION_SOURCE = /^apps\/([^/]+)\/src\/(.+)$/;

@@ -25,15 +25,7 @@ export const DEMO_PLATFORM_IDS = {
   experiment: "demo-experiment-support-quality",
 } as const;
 
-/**
- * Config for the demo HTTP agent. httpbin.org's /anything endpoint echoes the
- * request back as JSON, so a scenario run against this agent completes a real
- * network round-trip with no API key: the adapter POSTs `{ messages }` by
- * default, and the JSONPath output picks the echoed last message's content
- * back out as the "reply". Must parse against `httpComponentSchema` — the
- * agent repository re-validates config on every read, so an invalid seed
- * would make the agent unloadable (pinned by a unit test).
- */
+/** Demo HTTP agent using httpbin.org. Validates on every read. */
 export const DEMO_HTTP_AGENT_CONFIG = {
   description: "Echoes the conversation back through httpbin.org.",
   url: "https://httpbin.org/anything/support-copilot",

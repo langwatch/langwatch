@@ -1,13 +1,4 @@
-/**
- * Putting the LangWatch Claude Code plugin on a machine: what it asks the
- * `claude` binary to do, what it does when any of that fails, and how long a
- * failure keeps it from trying again.
- *
- * `node:child_process` is the only thing mocked. The settings file, the plugin
- * state files and the CLI config are real files under a temp HOME.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
- */
+/** Claude plugin installation: behavior on success and failure. */
 
 import * as fs from "node:fs";
 

@@ -1,17 +1,4 @@
-/**
- * The TypeScript verifier, held to the sender's own arithmetic.
- *
- * The cases are not written here. They are read from
- * `specs/webhooks/signature-vectors.json`, which is generated from the
- * server's signing code by
- * `packages/egress/src/webhook/signature-vectors.ts` and asserted
- * against that code by a suite on the platform side. Three implementations
- * agreeing with their own local idea of the algorithm is not agreement, so
- * this suite and the Python one read the SAME file and neither can be made
- * green by editing it.
- *
- * Spec: specs/webhooks/sdk-signature-verification.feature
- */
+/** Signature verification using shared test vectors. */
 import { readFileSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";

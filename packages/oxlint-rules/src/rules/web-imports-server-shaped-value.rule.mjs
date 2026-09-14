@@ -1,16 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
-/**
- * Browser code may not VALUE-import a package whose declarations are the
- * server's. A type import is free — types are erased and, more to the point,
- * the browser program never loads the graph behind them.
- *
- * The measured cost is not hypothetical. `better-auth/react` in one browser
- * module put 576 declaration files into `apps/ui`, 251 of them kysely: a SQL
- * query builder, in the program for a page. The trimmed contract in
- * `packages/browser-types/` is why the two client entrypoints below stay allowed —
- * everything else on this list has no browser half at all.
- */
+// Browser code may not VALUE-import server-shaped packages; type imports
+// are free. Measured cost: better-auth/react added 576 declaration files to apps/ui.
 
 const SERVER_SHAPED = [
   "kysely",

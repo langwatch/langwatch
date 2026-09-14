@@ -1,20 +1,6 @@
 /**
- * Persist Path B (ingestion) telemetry env vars into a tool's own
- * settings file, rather than the profile-root shell rc.
- *
- * Motivation: `langwatch claude` used to offer to write its
- * OTEL_EXPORTER_OTLP_* block to `~/.zshrc`. That works, but it
- * leaks the vars into every other shell child (git, ripgrep,
- * unrelated services) and pollutes the profile root. Claude Code
- * has a native, per-app `env` block in `~/.claude/settings.json`
- * that it loads on every invocation — writing there scopes the
- * telemetry to `claude` runs only.
- *
- * For scope: `claude` is the only tool with a supported target
- * today. Other wrappers (codex, cursor, gemini, opencode) still
- * fall back to the shell rc path. Adding a new tool means adding
- * an entry to `TARGETS` below and (if the format isn't JSON with
- * a top-level `env` map) extending the read/write helpers.
+ * Persist telemetry env vars to tool's own settings file (e.g. ~/.claude/settings.json)
+ * instead of profile rc, scoping them to that tool's runs only.
  */
 
 import * as fs from "node:fs";
@@ -106,13 +92,8 @@ export function appEnvHasAnyVar(target: AppSettingsTarget, keys: string[]): bool
 }
 
 /**
- * Merge `vars` into the target's top-level `env` map, creating
- * parent directories and the file itself when missing. Preserves
- * every other user-authored top-level key verbatim. Values in
- * `vars` win over pre-existing entries under the same key.
- *
- * Throws when the existing file cannot be read as a JSON object, rather than
- * replacing it. Every caller treats that as best-effort and says so.
+ * Merge vars into target env map, creating directories/file if missing.
+ * Throws on malformed JSON; every caller treats it as best-effort.
  */
 export function installAppEnv(target: AppSettingsTarget, vars: Record<string, string>): void {
   const settings = readAppSettingsFileForUpdate(target.path);
@@ -129,14 +110,8 @@ export function installAppEnv(target: AppSettingsTarget, vars: Record<string, st
 }
 
 /**
- * Remove `keys` from the target's top-level `env` map. Every other env
- * entry and every other top-level settings key is preserved verbatim.
- * When `env` becomes empty as a result, the `env` key is dropped entirely
- * (no `"env": {}` residue). Returns true when the file changed, false when
- * the file was absent, malformed, or carried none of the keys — so it is
- * safe to call unconditionally (idempotent). A malformed file is left
- * untouched rather than rewritten, so we never clobber user config we
- * can't parse.
+ * Remove keys from target's env map. Returns true if file changed.
+ * Idempotent: safe on absent, malformed, or unchanged files.
  */
 export function removeAppEnvVars(target: AppSettingsTarget, keys: string[]): boolean {
   let raw: string;
@@ -176,17 +151,8 @@ export function removeAppEnvVars(target: AppSettingsTarget, keys: string[]): boo
 }
 
 /**
- * The settings file's top-level object, as a mutable copy, for a caller about
- * to write it back.
- *
- * A missing file reads as `{}`: there is nothing there to lose. Every other
- * failure throws, because the write path replaces the file WHOLESALE. The file
- * belongs to the user, not to us, and it is where they keep everything else
- * their agent does; trading all of it for a stray comma is not a recovery. The
- * removal helpers already refuse the same way, by reporting no change.
- *
- * Shared with session-context-hooks.ts, which merges a different region of the same
- * file and must read and write it exactly the way the env block does.
+ * Settings file as mutable copy. Missing files return {}; other failures throw
+ * (write path replaces wholesale). Shared with session-context-hooks.ts.
  */
 export function readAppSettingsFileForUpdate(filePath: string): Record<string, unknown> {
   let raw: string;

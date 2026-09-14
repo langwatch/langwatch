@@ -1,35 +1,4 @@
-/**
- * Native, lightweight secrets redaction.
- *
- * Scrubs credentials (cloud + provider API keys, JWTs, private-key blocks,
- * database-URL passwords, bearer tokens) out of free text, plus a key-name pass
- * for obviously-sensitive attribute names. Runs in-process: no external
- * service, all patterns precompiled and linear-time. Detected secrets are
- * replaced with the typed `[SECRET]` marker, which the trace view reads back
- * and which keeps the secrets evaluator able to flag a credential that was
- * already scrubbed at ingestion.
- *
- * Matching works in three layers, because a list of known vendors alone cannot
- * keep up with the number of services that mint API keys:
- *
- *  1. Known shapes. Exact prefixes for cloud and developer-service credentials,
- *     the highest-precision layer and the one that names the vendor.
- *  2. Shape alone. A vendor-style prefix followed by a high-entropy body catches
- *     a key from a service nobody has ever added to the list.
- *  3. Context. A credential named in prose and then given a value is redacted
- *     even when the value has no recognisable shape at all.
- *
- * Layers 2 and 3 are gated on Shannon entropy and character-class mix, because
- * over-redaction is a bug of the same severity as a leak: the terminal replay
- * and the trace explorer are worth nothing if identifiers, hashes and model
- * names come back as placeholders. `__tests__/secrets.unit.test.ts` carries an
- * adversarial negative corpus that pins that limit.
- *
- * Shared across the platform: the ingestion pipeline redacts every span with
- * these rules, and the `langwatch` CLI ships a verbatim mirror (see
- * `sessionReport.ts`) so issue reports are scrubbed with the exact same rules
- * before leaving the user's machine.
- */
+/** In-process credential redaction: scrubs API keys, JWTs, tokens from free text. */
 import { SECRET_MARKER } from "./markers.ts";
 
 /** The placeholder a redacted secret is replaced with. */
@@ -43,40 +12,17 @@ interface ValueRule {
   id: string;
   description: string;
   regex: RegExp;
-  /** Builds the replacement for one match; defaults to the full marker. Groups
-   *  let a rule keep the non-secret context (scheme/user/host, the `Bearer `
-   *  prefix). */
+  /** Builds replacement for one match; defaults to full marker. Groups preserve context. */
   render?: (...groups: string[]) => string;
-  /**
-   * Second-stage test for rules whose regex is deliberately loose, taking the
-   * match and its capture groups. A match that fails it is left verbatim and
-   * not counted, which is what lets the entropy and context rules describe a
-   * broad shape in the pattern and then decide on the candidate itself.
-   */
+  /** Second-stage test: accepts or rejects a candidate after regex match. */
   accept?: (groups: string[]) => boolean;
-  /**
-   * Cheap whole-string guard run before the regex. Skips the scan entirely when
-   * the input cannot contain a match, which keeps the broad rules off the bill
-   * for the many strings that are ordinary prose.
-   */
+  /** Cheap guard to skip scan if input cannot contain a match. */
   precondition?: (text: string) => boolean;
-  /**
-   * Text the rule requires in front of the match but leaves out of it, written
-   * to end at the match. A rule anchors on its own literal for speed and reads
-   * what precedes it in a lookbehind; the credential still begins where that
-   * lookbehind begins, so the reported span has to start there too. Applied to
-   * the text before the match, and only by the detection path: redaction never
-   * rewrites what the match does not cover.
-   */
+  /** Pattern that must precede the match but is left out of the reported span. */
   precededBy?: RegExp;
 }
 
-/**
- * Entropy is measured over at most this many leading characters. A greedy match
- * can span a whole log line, and scoring the sample rather than the line keeps
- * the cost per candidate constant without changing the verdict: key material is
- * uniformly random, so its first 256 characters score like all of it.
- */
+/** Entropy sample size: score leading chars, not full greedy match. */
 const ENTROPY_SAMPLE_LENGTH = 256;
 
 /** Shannon entropy of `value` in bits per character, over a bounded sample. */

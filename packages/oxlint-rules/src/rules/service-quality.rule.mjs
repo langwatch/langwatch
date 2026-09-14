@@ -1,14 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
-// Duplicate members and keys, and a `static create` factory whose constructor
-// stayed public so callers could bypass it.
-//
-// This used to also re-scan the raw class source for a duplicate method oxc
-// silently dropped while parser-recovering. It no longer does either: a `.ts`
-// file with a duplicate class member now fails to parse at all (verified
-// against the pinned oxlint), and a `.js` file keeps both members in the AST.
-// The native per-member check below already reports both cases; the O(n*m)
-// source rescan was reporting a condition that can no longer occur.
+// Duplicate members and keys. Per-member check below handles both TS parse
+// failures and JS AST duplicates; the old O(n*m) source rescan is obsolete.
 
 function memberName(member) {
   if (!member.key) return undefined;

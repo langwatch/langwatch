@@ -1,13 +1,7 @@
 import type { MemberSource } from "../src/module-members.ts";
 
 /**
- * A member source over a plain record, for a test that names its own members.
- *
- * It is the same seam `@langwatch/infrastructure` implements: `order` is every
- * member this source can build, and a name outside it is a member this process
- * cannot supply, which is what boot refuses on. A key present with the value
- * `undefined` is the other failure - a member that was meant to be built and
- * is not - and it throws where it is read.
+ * A member source over a plain record, for tests that name their own members.
  */
 export function memberSourceOf<Members extends object>(members: Members): MemberSource<Members> {
   const order = Object.keys(members) as (keyof Members & string)[];

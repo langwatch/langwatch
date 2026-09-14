@@ -1,23 +1,6 @@
 /**
- * Canonical SSRF address-classification rules (`@langwatch/egress`, `src/ssrf/address.ts`).
- *
- * This is the TypeScript half of a two-language contract. The Go half lives in
- * `pkg/ssrf` (package ssrf); both are held to the identical behavior by the
- * shared conformance corpus in `pkg/ssrf/testdata/address_vectors.json`. Before
- * this package the same "is this IP safe to egress to?" decision was
- * re-implemented independently in the AI gateway, the Langy egress proxy, this
- * app's utils/ssrfProtection.ts and the Python NLP service — and they drifted.
- * A tenant who controls DNS can steer a request into whichever gap a given
- * service left open, so the rule set must be one thing, expressed once.
- *
- * The prefix set is the union of the two IANA Special-Purpose Address
- * Registries. Every entry is named with its RFC at the point of declaration.
- *   - IPv4: https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
- *   - IPv6: https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
- *   - AWS EKS "Restrict host networking and block access to the instance
- *     metadata service" (block egress to 169.254.0.0/16; IMDSv2 hop limit 1):
- *     https://docs.aws.amazon.com/whitepapers/latest/security-practices-multi-tenant-saas-applications-eks/restrict-the-use-of-host-networking-and-block-access-to-instance-metadata-service.html
- *
+ * Canonical SSRF address-classification rules (shared with Go pkg/ssrf).
+ * See dev/docs/adr/###-ssrf-rules for the rationale and the two-language contract.
  */
 
 /**

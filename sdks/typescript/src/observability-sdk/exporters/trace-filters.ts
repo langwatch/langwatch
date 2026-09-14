@@ -18,23 +18,9 @@ export type TraceFilter =
   | { exclude: Criteria };
 
 /**
- * Applies a sequence of filters to an array of spans using AND semantics.
- * Each filter in the sequence is applied to the result of the previous filter,
- * progressively narrowing down the set of spans.
- *
- * @param filters - Array of filter rules to apply sequentially
+ * Applies filters to spans sequentially (AND semantics).
+ * @param filters - Filter rules to apply in sequence
  * @param spans - Array of spans to filter
- * @returns Filtered array of spans that match all filter criteria
- *
- * @example
- * ```typescript
- * const filters: TraceFilter[] = [
- *   { include: { instrumentationScopeName: [{ equals: 'ai' }] } },
- *   { preset: 'excludeHttpRequests' }
- * ];
- * const filtered = applyFilters(filters, spans);
- * // Returns only AI spans that are not HTTP requests
- * ```
  */
 export function applyFilters(
   filters: TraceFilter[] | undefined,
@@ -45,30 +31,9 @@ export function applyFilters(
 }
 
 /**
- * Applies a single filter rule to an array of spans.
- * Handles three types of filters: presets, include rules, and exclude rules.
- *
- * @param rule - Single filter rule (preset, include, or exclude)
+ * Applies a single filter rule (preset, include, or exclude).
+ * @param rule - Filter rule to apply
  * @param spans - Array of spans to filter
- * @returns Filtered array of spans based on the rule
- *
- * @example
- * ```typescript
- * // Using preset
- * const filtered1 = applyFilterRule({ preset: 'vercelAIOnly' }, spans);
- *
- * // Using include
- * const filtered2 = applyFilterRule(
- *   { include: { name: [{ startsWith: 'llm.' }] } },
- *   spans
- * );
- *
- * // Using exclude
- * const filtered3 = applyFilterRule(
- *   { exclude: { instrumentationScopeName: [{ equals: 'http' }] } },
- *   spans
- * );
- * ```
  */
 export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
   if ("preset" in rule && rule.preset) {
@@ -92,26 +57,9 @@ export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): Reada
 }
 
 /**
- * Applies a preset filter to an array of spans.
- * Presets are predefined common filtering patterns.
- *
- * Available presets:
- * - `vercelAIOnly`: Keeps only spans from the Vercel AI SDK (instrumentationScope.name === 'ai')
- * - `excludeHttpRequests`: Removes spans emitted by HTTP instrumentations (identified by scope,
- *   method attribute, or an uppercase-verb span name)
- *
- * @param preset - Name of the preset filter to apply
+ * Applies a preset filter: vercelAIOnly or excludeHttpRequests.
+ * @param preset - Preset filter name
  * @param spans - Array of spans to filter
- * @returns Filtered array of spans based on the preset
- *
- * @example
- * ```typescript
- * // Keep only Vercel AI spans
- * const aiSpans = applyPreset('vercelAIOnly', spans);
- *
- * // Remove HTTP request spans
- * const noHttpSpans = applyPreset('excludeHttpRequests', spans);
- * ```
  */
 export function applyPreset(
   preset: "vercelAIOnly" | "excludeHttpRequests",
@@ -124,23 +72,9 @@ export function applyPreset(
 }
 
 /**
- * Checks if a span matches the given criteria.
- * All specified criteria fields must match (AND semantics within a criteria object).
- * Within each field, matchers are evaluated with OR semantics (any matcher can match).
- *
+ * Checks if a span matches criteria (AND within fields, OR within each field).
  * @param span - Span to evaluate
- * @param criteria - Criteria to match against (instrumentationScopeName and/or name)
- * @returns True if the span matches all specified criteria, false otherwise
- *
- * @example
- * ```typescript
- * const criteria: Criteria = {
- *   instrumentationScopeName: [{ equals: 'ai' }],
- *   name: [{ startsWith: 'llm.' }, { startsWith: 'chat.' }]
- * };
- * const matches = matchesCriteria(span, criteria);
- * // Returns true if scope is 'ai' AND name starts with 'llm.' OR 'chat.'
- * ```
+ * @param criteria - Criteria to match against
  */
 export function matchesCriteria(span: ReadableSpan, criteria: Criteria): boolean {
   if (criteria.instrumentationScopeName !== void 0) {
@@ -158,33 +92,10 @@ export function matchesCriteria(span: ReadableSpan, criteria: Criteria): boolean
 }
 
 /**
- * Evaluates if a string value matches a given match rule.
- * Supports three types of matching: exact equality, prefix matching, and regex matching.
- * All matching is case-sensitive by default unless `ignoreCase` is explicitly set to true.
- *
- * @param value - String value to evaluate
- * @param rule - Match rule specifying the matching criteria
- * @returns True if the value matches the rule, false otherwise
- *
- * @example
- * ```typescript
- * // Exact match (case-sensitive by default)
- * valueMatches('GET /api/users', { equals: 'GET /api/users' }); // true
- * valueMatches('get /api/users', { equals: 'GET /api/users' }); // false
- *
- * // Case-insensitive exact match
- * valueMatches('get /api/users', { equals: 'GET /api/users', ignoreCase: true }); // true
- *
- * // Prefix match
- * valueMatches('GET /api/users', { startsWith: 'GET' }); // true
- * valueMatches('POST /api/users', { startsWith: 'GET' }); // false
- *
- * // Regex match
- * valueMatches('GET /api/users', { matches: /^(GET|POST)\b/ }); // true
- *
- * // Case-insensitive regex
- * valueMatches('get /api/users', { matches: /^GET\b/, ignoreCase: true }); // true
- * ```
+ * Evaluates if a string matches a rule (equals, startsWith, or regex).
+ * Case-sensitive by default unless ignoreCase is true.
+ * @param value - String to evaluate
+ * @param rule - Match rule
  */
 export function valueMatches(value: string, rule: Match): boolean {
   const raw = value ?? "";
@@ -214,18 +125,8 @@ export function valueMatches(value: string, rule: Match): boolean {
 }
 
 /**
- * Checks if a span is from the Vercel AI SDK.
- * A span is considered a Vercel AI span if its instrumentation scope name is 'ai' (case-insensitive).
- *
+ * Checks if a span is from the Vercel AI SDK (scope name === 'ai', case-insensitive).
  * @param span - Span to check
- * @returns True if the span is from the Vercel AI SDK, false otherwise
- *
- * @example
- * ```typescript
- * if (isVercelAiSpan(span)) {
- *   console.log('This is a Vercel AI operation');
- * }
- * ```
  */
 export function isVercelAiSpan(span: ReadableSpan): boolean {
   const scope = span.instrumentationScope?.name?.toLowerCase?.() ?? "";
@@ -245,31 +146,8 @@ const HTTP_INSTRUMENTATION_SCOPES = new Set([
 
 /**
  * Checks if a span is an HTTP instrumentation span.
- *
- * The exact signals come first: the emitting instrumentation scope, or the
- * semantic-convention method attribute. Only when neither is present does the
- * name heuristic apply, and it matches only the shape OpenTelemetry's HTTP
- * instrumentations actually emit — an uppercase verb alone or followed by a
- * space. User spans like "post-publish-smoke" or "get-user-profile" never
- * match it.
- *
+ * Checks scope, then http.request.method attribute, then name heuristic.
  * @param span - Span to check
- * @returns True if the span is an HTTP request span, false otherwise
- *
- * @example
- * ```typescript
- * // These return true:
- * // scope "@opentelemetry/instrumentation-http", name "GET /api/users"
- * // attributes { "http.request.method": "POST" }, any name
- * // unknown scope, name "POST /v1/traces" (uppercase-verb fallback)
- * //
- * // These return false:
- * // name "post-publish-smoke", "get-user-profile", "postgres-query"
- *
- * if (isHttpRequestSpan(span)) {
- *   console.log('This is an HTTP request span');
- * }
- * ```
  */
 export function isHttpRequestSpan(span: ReadableSpan): boolean {
   const scopeName = span.instrumentationScope?.name ?? "";

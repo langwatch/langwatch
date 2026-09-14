@@ -1,14 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Tests for dev/scripts/ensure-langy-dev-env.sh, the launcher step that fills
- * in the Langy settings a developer used to paste out of the dogfood doctor.
- *
- * See specs/setup/dev-langy-agent-lane.feature.
- *
- * The script is run against a fixture tree shaped like dev/scripts, because it
- * resolves the env file two directories above itself, and the assertions read
- * that file back rather than the script's own output.
+ * Tests ensure-langy-dev-env.sh: launcher that fills Langy settings. Run
+ * against fixture tree; assertions read env file, not script output.
  */
 
 import { execFileSync } from "node:child_process";

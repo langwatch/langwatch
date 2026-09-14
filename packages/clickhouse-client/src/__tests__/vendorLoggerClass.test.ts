@@ -1,13 +1,5 @@
-/**
- * The class the driver is handed, and what reaches the process's logger
- * through it.
- *
- * The policy that decides what a vendor record means was already written and
- * already tested; what was missing was anything passing a class to the driver,
- * so `@clickhouse/client` went on writing its own bracketed console lines.
- *
- * Corresponds to specs/setup/dev-stack-log-format.feature.
- */
+// Logger class handed to the ClickHouse driver. Policy was tested; missing
+// was driver integration instead of vendor's bracketed console lines.
 
 import { describe, expect, it } from "vitest";
 

@@ -6,17 +6,8 @@ import { fetchValidatedDestination, RedirectRefusedError } from "../../ssrf/fenc
 import { createSsrfUrlValidator } from "../../ssrf/url-validator.ts";
 import { sendHttpDestination } from "../http-destination.ts";
 
-/**
- * Spec: packages/egress/specs/webhook-egress.feature
- *
- * Executed regressions, against a REAL local server through the REAL fence, no
- * mocks: a redirect refusal that only ever existed as a string assertion would
- * pass just as happily while the hop was being taken.
- *
- * The address policy here is deliberately permissive so the test can reach
- * 127.0.0.1 at all. Redirect refusal is orthogonal to the private-address rules,
- * which `url-policy.unit.test.ts` and `url-validator.unit.test.ts` pin.
- */
+// Webhook-egress spec. Real server through real fence (no mocks) to catch
+// redirect refusals. Permissive address policy for 127.0.0.1; private-address rules elsewhere.
 
 const validateUrl = createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] });
 const tls = { rejectUnauthorized: false };

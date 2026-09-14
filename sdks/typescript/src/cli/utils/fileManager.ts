@@ -15,15 +15,8 @@ export class FileManager {
   private static readonly MATERIALIZED_DIR = ".materialized";
 
   private static _projectRoot: string | undefined;
-  /**
-   * The cwd `_projectRoot` was derived from.
-   *
-   * The cache MUST be keyed by it. Memoising a cwd-derived path without that key
-   * is correct only in a process that serves exactly one command and then dies;
-   * in a process that serves many from different directories (the CLI daemon, a
-   * test runner, an embedding host), the second caller silently inherits the
-   * first caller's project root and reads or writes the wrong prompts.json.
-   */
+  /** The cwd `_projectRoot` was derived from. Cache must be keyed by it or
+   * multi-directory processes like daemons will use the wrong root. */
   private static _projectRootCwd: string | undefined;
 
   /** Reset the cached project root. Tests use this to exercise different cwds. */

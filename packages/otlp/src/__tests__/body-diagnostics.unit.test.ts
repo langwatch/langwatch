@@ -1,16 +1,4 @@
-/**
- * What a decode failure is allowed to say about the body that caused it.
- *
- * Nothing in `parseOtlpBody.ts` logs the request body. It logs the parser's
- * error, and V8's `JSON.parse` SyntaxError quotes roughly ten characters of its
- * input inside that message — so the customer's bytes reached the log sink with
- * no line of ours putting them there. Because those bytes are arbitrary they
- * were frequently not valid UTF-8, which made the resulting log field
- * unparseable to consumers downstream.
- *
- * Spec: specs/observability/ingest-validation-diagnostics.feature
- * ("Before the schema: decoding the body")
- */
+/** Decode failures must not leak customer bytes to logs. */
 
 import { describe, expect, it } from "vitest";
 

@@ -25,24 +25,13 @@ import { ExecutionWindow, installProcessInterceptors } from "./execution";
 import { createCommandExecutor, type CommandExecutor } from "./runner";
 import { noopTelemetry, type DaemonTelemetry } from "./telemetry";
 
-/** 10 minutes: long enough to span an agent's think-time, short enough to never feel like a leak. */
+/** 10 minutes: long enough for agent think-time, short enough to never feel
+ * like a leak. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
-/**
- * How long `stop()` waits for in-flight requests before tearing the execution
- * window down underneath them.
- *
- * Shutdown restores the daemon's own cwd and environment (ExecutionWindow.reset),
- * so a request still running when that happens would finish against the WRONG
- * globals — and version-skew eviction makes shutdown-while-serving a routine
- * dev-loop event, not an exotic one. 5s covers any command close enough to
- * finishing to be worth waiting for; past that the client is told to fall back
- * and the connection is cut.
- *
- * For a client that has not committed output — everything under the client's
- * buffer cap, which is very nearly everything — that is a clean in-process
- * re-run. For one that HAS committed, it is not: see the note in `stop()`.
- */
+/** Shutdown waits for in-flight requests before tearing down the execution
+ * window. 5s covers close-to-finishing commands; past that, client falls back
+ * and connection cuts. See stop() for committed output handling. */
 export const DEFAULT_SHUTDOWN_GRACE_MS = 5_000;
 
 export interface DaemonServerOptions {

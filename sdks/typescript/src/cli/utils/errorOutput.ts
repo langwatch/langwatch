@@ -1,28 +1,6 @@
 /**
- * How a failed command SAYS it failed — once, for every command.
- *
- * A command that fails has two audiences and they want opposite things. A person
- * wants a sentence, and then the details that let them fix it. A machine — Langy
- * runs this CLI in a shell and parses its stdout — wants the structure, and prose
- * is actively in its way: it cannot tell a transient failure from a terminal one
- * by reading English, so it retries both, or neither.
- *
- * So the same failure is rendered twice, by output format, from one reading of
- * the error:
- *
- *   default        a gcx-style block on STDERR — `Error: <sentence>`, then
- *                  `Details:` (code, status, trace id/url, meta, reason chain),
- *                  `Suggestions:` and `Docs:` when there is advice to give.
- *                  Nothing on stdout.
- *   --format json  the structured document on STDOUT — `{ ok: false, error:
- *                  { code, kind, message, httpStatus, meta, traceId, traceUrl,
- *                  reasons, suggestions, docUrl } }` — and the one-line human
- *                  summary still on stderr, where it cannot corrupt what the
- *                  parser reads.
- *
- * Both paths run every string through `redactSecrets` first. An API key echoed
- * back inside a 404 message is a real thing servers do, and it must not reach a
- * terminal, a log, or an agent's context.
+ * Error output: prose for humans, JSON for machines.
+ * Both paths scrub messages through `redactSecrets` first; meta/reasons/kind are not scrubbed.
  */
 import chalk from "chalk";
 import {
@@ -35,11 +13,7 @@ import { withFallbackSuggestions } from "./errorSuggestions";
 import { currentOutputScope, getOutputFormat, resolveOutputFormat } from "./outputScope";
 
 /**
- * The output-context machinery (format + colour scope) lives in
- * `./outputScope`, a chalk-free module, so that `program.ts` can reach it via
- * `utils/output.ts` without putting chalk's ~4ms load on the cold-start path
- * of every in-process invocation. Re-exported here so the existing consumers
- * (spinner.ts, apiKey.ts, daemon/execution.ts, tests) keep their imports.
+ * Re-exported from ./outputScope (chalk-free) to avoid cold-start impact.
  */
 export {
   currentOutputScope,
@@ -51,21 +25,8 @@ export {
 } from "./outputScope";
 
 /**
- * Turn colour off for the rest of this command (agent mode).
- *
- * `chalk.level` is a process global that chalk reads at RENDER time, so
- * AsyncLocalStorage cannot scope it: mutating it mid-request would bleed into
- * every other request sharing the daemon's execution window (an agent request
- * would leave a concurrent human caller colourless, and vice versa). Inside a
- * request scope the mutation is therefore replaced by a flag the daemon's
- * output sink honours — daemon/execution.ts strips SGR sequences from that
- * request's bytes, and `chalk.level` is never touched. Outside a scope — a
- * plain in-process run — exactly one command is in flight and setting
- * `chalk.level` directly is both faithful and free.
- *
- * Because this is the one context operation that needs chalk, it stays in
- * this module and `applyOutputContext` (utils/output.ts) reaches it through a
- * lazy import that only runs when agent mode is actually requested.
+ * Turn colour off for agent mode. Inside a daemon scope, uses a flag;
+ * outside, mutates chalk.level directly (only one command in flight).
  */
 export const disableOutputColor = (): void => {
   const scope = currentOutputScope();
@@ -74,25 +35,8 @@ export const disableOutputColor = (): void => {
 };
 
 /**
- * Read any thrown value into the platform's structure, with the MESSAGE scrubbed.
- *
- * The message is scrubbed and `meta` / `kind` / `reasons` are not, and the
- * asymmetry is deliberate.
- *
- * A message is prose, and prose is where a server echoes your INPUT back at you
- * ("no project for key sk-live-…"). That is the real leak vector, so it goes
- * through `redactSecrets` — the same scrub the telemetry path applies, so a
- * failure reads identically wherever it surfaces.
- *
- * `meta`, `kind` and `reasons` are the opposite: they are a CURATED payload the
- * platform composes for a user, an agent or the UI to act on, and the handled-error
- * contract is that nothing internal or secret goes in them (see the content rule
- * on the package-owned Langy error adapter). Scrubbing them would not add safety —
- * it would destroy the actionable data this whole feature exists to surface,
- * because the credential patterns match legitimate identifiers too: a `vk-…`
- * virtual-key id or an `lw-…` handle in `meta` would come out as `[redacted]`
- * and the user would be left staring at the redaction instead of the id they
- * needed.
+ * Message scrubbed only (via redactSecrets); meta/kind/reasons are curated platform payload.
+ * Asymmetry is deliberate: credentials leak via message prose, not via structured fields.
  */
 export const readCommandError = (error: unknown): CliHandledError => {
   const domain = handledErrorFromThrown(error);
@@ -147,25 +91,8 @@ const detailLines = (domain: CliHandledError): string[] => {
 };
 
 /**
- * The human rendering: the sentence, then everything else that was on the error.
- *
- *   Error: <sentence>
- *   Details:
- *     code       dataset_not_found
- *     status     404
- *     trace id   …
- *   Suggestions:
- *     - <next step>
- *   Docs: <docUrl>
- *
- * The Suggestions/Docs sections appear only when there is advice to give —
- * server-sent when the platform sent it, the code-keyed fallback table (see
- * `errorSuggestions.ts`) otherwise.
- *
- * An INFRASTRUCTURE failure prints the sentence alone. Its "code" is a label the
- * CLI invented for a failure the platform never named (`internal_error`,
- * `network_error`), and dressing that up as though the platform had said it
- * would be inventing precision that does not exist.
+ * Human rendering: Error sentence, Details, Suggestions (platform or fallback), Docs.
+ * Infrastructure failures print sentence only (no invented precision).
  */
 export const renderErrorForHumans = (domain: CliHandledError): string => {
   if (!domain.isHandled) return domain.message;
@@ -184,19 +111,8 @@ export const renderErrorForHumans = (domain: CliHandledError): string => {
 };
 
 /**
- * The machine rendering: one JSON document, and nothing else, on stdout.
- * Suggestions/docUrl are filled from the fallback table when the platform sent
- * none, so an agent gets the same way forward a person does.
- *
- * The fallback applies here even for INFRASTRUCTURE errors (`isHandled: false`),
- * and that asymmetry with the human rendering is deliberate. A person gets the
- * bare sentence because dressing a failure the platform never named in
- * CLI-invented detail would fake precision; a machine gets the fallback advice
- * anyway, because the status-derived codes (`network_error`, `internal_error`)
- * are exactly the codes the fallback table has honest, generic guidance for
- * (check connectivity; retry and quote the trace id), and the document still
- * carries `isHandled: false` so the reader knows the code is ours, not the
- * platform's.
+ * Machine rendering: JSON on stdout. Fallback suggestions filled even for unhandled errors
+ * (isHandled: false signals code source); human gets sentence only (no invented precision).
  */
 export const renderErrorAsJson = (domain: CliHandledError): string =>
   JSON.stringify(
@@ -208,11 +124,7 @@ export const renderErrorAsJson = (domain: CliHandledError): string =>
   );
 
 /**
- * A local argument/precondition failure, pre-shaped so the error path reports
- * it as the `validation_error` it is rather than guessing `network_error` from
- * a bare `Error`. Carries the SDK's `isLangWatchHandledError` brand, which is
- * how `handledErrorFromThrown` recognises an error that has already been read
- * into the domain structure.
+ * Local validation error with SDK brand so handledErrorFromThrown recognizes it as already read.
  */
 export const commandValidationError = (
   message: string,
@@ -229,15 +141,8 @@ export const commandValidationError = (
 });
 
 /**
- * Report a failure from a command path that has no spinner — argument
- * validation, missing credentials, filesystem preconditions. The same two
- * renderings `failSpinner` produces, minus the spinner:
- *
- *   default        the human block on stderr.
- *   --format json  the `{ ok: false, error: … }` document on stdout, and a
- *                  single human line on stderr.
- *
- * Does NOT exit — the caller owns its exit code.
+ * Report failure from no-spinner path (validation, credentials, preconditions).
+ * Human block or JSON + single line, depending on format. Does not exit.
  */
 export const reportCommandError = ({
   error,

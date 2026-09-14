@@ -215,13 +215,8 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
 }
 
 /**
- * Processes input/output values for span storage with soft Zod validation.
- * Never throws errors, always returns a valid SpanInputOutput.
- * When a type is explicitly provided, it will be preferred over auto-detection.
- *
- * @param typeOrValue - Either the explicit type string or the value to auto-detect
- * @param value - The value when explicit type is provided
- * @returns A valid SpanInputOutput object ready for span storage
+ * Processes input/output values for span storage; never throws.
+ * Prefers explicit type over auto-detection when provided.
  */
 export function processSpanInputOutput(typeOrValue: unknown, value?: unknown): SpanInputOutput {
   try {

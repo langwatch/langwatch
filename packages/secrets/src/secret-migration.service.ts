@@ -19,15 +19,8 @@ function statedValue(raw: string): string {
   return (quoted?.[2] ?? trimmed).trim();
 }
 
-/**
- * Moves the credentials already sitting in a `.env` into the profile's
- * 1Password item and rewrites those lines to `op://` references, leaving every
- * configuration line exactly as it was.
- *
- * Explicit by construction: this runs when someone asks for it. It takes the
- * file's text and returns the replacement rather than touching the disk, so
- * the caller owns the write and the diff stays reviewable.
- */
+/** Moves .env credentials to 1Password profile item and rewrites lines to
+ * `op://` references. Returns replacement text; caller owns the disk write. */
 export class SecretMigrationService {
   static create({
     item,

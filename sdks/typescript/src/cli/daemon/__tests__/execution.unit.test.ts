@@ -78,15 +78,7 @@ describe("ExecutionContext", () => {
 
 describe("process interceptors", () => {
   let uninstall: () => void;
-  /**
-   * Node's global `console` writes through `process.stdout.write`, which is
-   * exactly the seam the daemon patches. Vitest, however, swaps `globalThis
-   * .console` for its own reporter-bound Console, so calling `console.log` here
-   * would test vitest rather than the daemon. A Console constructed over
-   * process.stdout/stderr is what the CLI actually has at runtime, so that is
-   * what these tests drive. The end-to-end fidelity of the real global console
-   * is covered by daemon-cli.integration.test.ts, which runs the real binary.
-   */
+  /** Uses process.stdout/stderr to test the daemon console, not vitest's. */
   let cliConsole: Console;
 
   beforeEach(() => {

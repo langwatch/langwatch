@@ -1,16 +1,4 @@
-/**
- * What to DO about a failure, keyed on the platform's error code.
- *
- * The backend will grow `suggestions`/`docUrl` on `HandledError` (backend
- * owners — see dev/docs/research/lw-cli-compat-matrix.md §6), and the moment a route
- * sends them they win. Until then the CLI would render a perfectly structured
- * error with no way forward in it, so this table fills the gap client-side for
- * the handful of codes a CLI user hits most — the same code-keyed pattern the
- * app already uses in `modules/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts`.
- *
- * Keys are EXACT codes, never prefix matches: an unknown code gets no invented
- * advice, and a new backend code lands nowhere rather than in the wrong bucket.
- */
+/** Error suggestions by code, filling the gap until backend sends them. */
 import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
 
 /** The fallback advice for one code. */

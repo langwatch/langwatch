@@ -9,16 +9,8 @@ function generateOne(): string {
   return randomBytes(32).toString("hex");
 }
 
-/**
- * First launch with a vault configured: the four values the two
- * generate-on-first-run scripts would have written into `.env` are minted here
- * and written into the 1Password item instead, so a fresh checkout ends with
- * no credential on disk at all.
- *
- * It never invents a provider key — only the keys the registry marks
- * `generate`, which are values that exist because we made them up in the first
- * place. Everything else is a miss and falls through to the refusal.
- */
+// On first launch with vault: mints the four generate-marked values to 1Password
+// instead of .env, leaving no credential on disk. Other lookups fall through to refusal.
 export class DevGeneratedSecretSource extends SecretSource {
   static create({
     item,

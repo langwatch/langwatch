@@ -1,19 +1,4 @@
-/**
- * Turns a `--project <idOrSlug>` value into the project id a command targets.
- *
- * The user-scoped login key (`cli_api_key`) reaches every project the user
- * selected while approving the login, but it carries no project identity of
- * its own: the server resolves the role binding from the project the REQUEST
- * names. So a command that runs against another project needs an id, and the
- * user is entitled to type the slug they see in the URL bar instead.
- *
- * One resolver for every command group. `--project` starts on the `trace`
- * commands and `session events`; anything that adopts the flag later passes
- * the value to `resolveCredentials({ project })` and gets the same lookup, the
- * same errors and the same wiring for free.
- *
- * Spec: specs/typescript-sdk/cli-cross-project-access.feature
- */
+/** Resolves a --project id/slug to the project id; spec in cli-cross-project-access.feature. */
 
 import {
   ProjectsApiService,
@@ -21,16 +6,7 @@ import {
 } from "@/client-sdk/services/projects/projects-api.service";
 import type { GovernanceConfig } from "./governance/config";
 
-/**
- * A `--project` value the CLI could not turn into a project it may use.
- *
- * `code` is the contract; the message is copy. `project_not_accessible` covers
- * both shapes of that answer — a name nothing matches, and a name the login
- * key is not allowed to see — because the platform answers them identically:
- * a credential that cannot view a project does not get it in the listing.
- * `project_lookup_failed` is the different case, where the listing itself did
- * not come back and we know nothing about the project either way.
- */
+/** Error on --project resolution: code is not_accessible or lookup_failed. */
 export class ProjectScopeError extends Error {
   constructor(
     public readonly code: "project_not_accessible" | "project_lookup_failed",
@@ -84,19 +60,7 @@ const listAccessibleProjects = async (service: ProjectsApiService): Promise<Proj
   return collected;
 };
 
-/**
- * Resolve a `--project` value to a project id.
- *
- * The stored personal project answers without a round trip, since it is the
- * one project the CLI already knows by both id and slug. Everything else goes
- * through the listing, matching on id FIRST: ids and slugs live in one
- * namespace here, and an id is the exact reference, so a slug that happens to
- * read like another project's id can never steal the request.
- *
- * Throws `ProjectScopeError` rather than exiting, so the caller decides how to
- * render it (prose or the structured document) and the resolution stays
- * testable on its own.
- */
+/** Resolves a --project selector to id; checks personal first, then listing. */
 export const resolveProjectSelector = async ({
   selector,
   cfg,

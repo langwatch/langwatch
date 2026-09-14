@@ -15,15 +15,8 @@ function report(code) {
 }
 
 describe("given a strict feature service module", () => {
-  // `duplicateMember`'s native ClassBody check is exercised at the unit level
-  // by construction, not through a passing `.service.ts` fixture: oxc's
-  // parser now hard-fails the whole file ("Parsing failed") on two method
-  // definitions sharing a name, instead of silently dropping one the way it
-  // used to — verified empirically against the pinned oxlint. That is *more*
-  // than the old source-rescan workaround needed to recover from, so the
-  // workaround (and its O(n*m) rescan) is deleted rather than kept: there is
-  // no longer a parseable `.service.ts` file for it to catch that the native
-  // per-member check would miss.
+  // oxc's parser hard-fails on duplicate member definitions, so the old
+  // workaround and its rescan are deleted.
   describe("when two members with different static-ness share a name", () => {
     /** @scenario "A static and an instance member of the same name do not collide" */
     it("reports nothing", () => {

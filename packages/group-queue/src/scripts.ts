@@ -15,57 +15,19 @@ import { nowInstant } from "@langwatch/time";
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
-/**
- * Safety-net TTL (ms) refreshed on the per-group jobs/data keys every time they
- * are written or dispatched. A live group is touched far more often than this
- * (max gap between touches is one retry backoff, ~10 min), so the TTL never
- * fires on real work. A group that falls out of the dispatch graph without
- * draining (e.g. the ready set is cleared during incident mitigation) keeps its
- * keys today forever; with the TTL they self-expire instead of accumulating.
- * Interpolated into the Lua source so there is a single source of truth.
- */
+/** Safety-net TTL (ms) for group keys, auto-refreshed on writes/dispatch. */
 export const GROUP_KEY_TTL_MS = 6 * 60 * 60 * 1000;
 
-/**
- * Max groups any single unpark moves in one Lua eval. The cap=0 kill switch
- * drains a tenant's entire parked set; without a bound, flipping the cap off
- * while a tenant has a huge parked backlog (the May 27 incident parked ~442K)
- * would do one ZRANGE + per-group ZREM/ZADD over the whole set in a single eval
- * and block the single Redis thread — recreating the stall the kill switch
- * exists to stop. Bounding the per-eval work lets the 2s-gated reconcile drain
- * gradually instead. Interpolated into the Lua for a single source of truth.
- */
+/** Max groups per unpark eval; bounds Redis thread load during reconcile. */
 export const PARK_RECONCILE_MAX_DRAIN = 1000;
 
-/**
- * Cadence (ms) of the dispatch-tail reconcile pass (parked-group restore + the
- * dynamic-cap recompute), gated single-pod via the reconcile-ts marker. The
- * dynamic-cap TTL and the claimant window are both defined as multiples of this,
- * so it is a named const rather than a bare literal in the dispatch scripts —
- * retuning it keeps those relationships intact. Interpolated into the Lua.
- */
+/** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
 
-/**
- * TTL (ms) on the dynamic water-level cap key (= 5x RECONCILE_INTERVAL_MS). The
- * recompute refreshes this key on every reconcile pass; the TTL spans several
- * intervals so a brief miss does not drop the cap. If the recompute stalls
- * entirely (every pod dead or wedged) the key lapses and dispatch falls back to
- * the static operator cap — fail PROTECTIVE (the low side), never permissive.
- * Interpolated into the Lua so there is a single source of truth.
- */
+/** Dynamic cap TTL (5x RECONCILE_INTERVAL_MS); fails safe to static cap if stale. */
 export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
 
-/**
- * Hard bound on how many tenants the dynamic-cap recompute processes in one
- * pass. The recompute does O(1) Redis calls per tenant (active ZCARD + parked
- * ZCARD) inside a single eval on the single-threaded Redis; bounding it to the
- * most-recently-active N keeps the worst case at ~3N calls every
- * RECONCILE_INTERVAL_MS (sub-millisecond at N=1000) even if a pathological
- * fan-out leaves thousands of tenants in the demand registry. The N most-recent
- * claimants are the current contention set; older ones have aged out of the
- * window and their in-flight is still enforced directly via tenant_active_z.
- */
+/** Max tenants in dynamic-cap recompute; bounds per-eval Redis calls O(3N). */
 export const MAX_DEMANDING_TENANTS = 1000;
 
 // Lua helper, prepended to every script that writes group keys. Refreshes the
@@ -85,22 +47,7 @@ local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
 end
 `;
 
-// Lua helper for the per-tenant in-flight count that backs the soft cap.
-//
-// Modeled as a ZSET per tenant (member = groupId, score = the slot's expiry in
-// ms) instead of a scalar INCR/DECR counter. A scalar counter leaks UP when a
-// worker dies UNGRACEFULLY (no COMPLETE to decrement) and never self-heals,
-// because dispatch keeps refreshing its TTL — the 2026-05-28 incident, where an
-// ElastiCache node replacement dropped every worker's Redis connection mid-job,
-// stranding a live tenant permanently at cap with thousands of groups parked.
-//
-// Each in-flight slot instead carries the SAME expiry as its activeKey heartbeat
-// (renewed by REFRESH while the worker lives). A slot whose heartbeat lapses has
-// a past score, so it stops counting against the cap once its expiry passes: an
-// ungraceful mass death self-heals within the active TTL with no operator reset.
-// The live count GCs lapsed members first so dead-worker entries can't grow the
-// ZSET unbounded. Keys share the keyPrefix hash tag so they stay in one slot.
-// See packages/group-queue/specs/tenant-soft-cap.feature (self-heal scenario).
+// Lua helper: per-tenant in-flight count ZSET (self-heals on worker death).
 const TENANT_ACTIVE_HELPER_LUA = `
 local function tenantActiveAdd(taPrefix, tenantId, groupId, expiryMs)
   redis.call("ZADD", taPrefix .. tenantId, expiryMs, groupId)
@@ -121,21 +68,9 @@ local function tenantActiveCount(taPrefix, tenantId, nowMs)
 end
 `;
 
-// Lua helper for the tenant soft-cap "parking" model, prepended to every script
-// that writes the ready set. Over-cap groups are moved OUT of ready into a
-// per-tenant parked zset ONCE (not re-scored every poll), so the dispatch scan
-// never re-sees them and the write volume no longer scales with backlog size.
-// They are restored when the tenant's in-flight count drops below the cap.
-//
-// Invariant: a group is in exactly one of {ready, parked, blocked, active}.
-// Every ready-writer routes through addToReadyOrParked so a stage/unblock/retry/
-// complete-restage can never clobber a parked group back into the dispatch scan
-// (which is what re-creates the over-cap ZADD storm). The parked set and the
-// parked-tenants registry share the same hash tag as ready (keyPrefix carries
-// it), so all keys stay in one Redis Cluster slot.
-//
-// Prepends TENANT_ACTIVE_HELPER_LUA so reconcileParked can read the self-healing
-// in-flight count; every script that includes PARK_HELPER_LUA gets both.
+// Lua helper: tenant soft-cap "parking" model. Over-cap groups move to parked
+// zset (not ready), preserving score for priority restoration. Includes
+// TENANT_ACTIVE_HELPER_LUA for self-healing in-flight count.
 export const PARK_HELPER_LUA =
   TENANT_ACTIVE_HELPER_LUA +
   `
