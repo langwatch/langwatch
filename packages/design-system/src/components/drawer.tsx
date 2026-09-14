@@ -43,15 +43,7 @@ export const DrawerCloseTrigger = React.forwardRef<
   );
 });
 
-/**
- * The width steps this product adds on top of Chakra's own, named in
- * `system/drawer.recipe.ts`.
- *
- * Chakra generates the type of `size` from its OWN recipe, so a step the
- * product adds is unknown to it however the recipe is registered. The wrapper
- * carries the product's list and hands the name down, which is why a drawer
- * sets a width by name here and never with a maxWidth of its own.
- */
+/** Product adds custom sizes to Chakra's drawer recipe. */
 export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
 
 export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {

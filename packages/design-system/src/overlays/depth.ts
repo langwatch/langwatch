@@ -1,12 +1,4 @@
-/**
- * Depth-aware z-index system for portalled overlay components.
- *
- * Each overlay (popover, select, menu, tooltip) increments the depth counter
- * so nested overlays always render above their parents. The base value (2000)
- * is higher than Chakra UI's modal z-index (1400).
- *
- * See: https://github.com/langwatch/langwatch/issues/2519
- */
+/** Depth-aware z-index for nested overlays. Base (2000) exceeds Chakra modal (1400). */
 import { createContext, useContext } from "react";
 
 export const BASE_OVERLAY_Z_INDEX = 2000;

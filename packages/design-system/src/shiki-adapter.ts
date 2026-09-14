@@ -96,20 +96,7 @@ export async function ensureShikiLangLoaded(canonicalLang: string): Promise<void
   return load;
 }
 
-/**
- * Loads the singleton Shiki highlighter (eager base set) — all call sites
- * resolve to the same `Highlighter` instance via `getSingletonHighlighter`,
- * and `ensureShikiLangLoaded` adds further grammars to it on demand.
- *
- * Without the singleton, every `useShikiAdapter` consumer (RenderedMarkdown,
- * ShikiCodeBlock, …) spun up its own Oniguruma engine and re-loaded the same
- * theme/language JSON. With virtualized chunked markdown views mounting 5–7
- * RenderedMarkdown instances at once, that was N copies of a multi-MB
- * highlighter.
- *
- * Call `ensureDisposeNeutered(h)` after loading when the highlighter must be
- * kept alive app-wide (i.e. in `useShikiAdapter` and `codeToHtml`).
- */
+/** Singleton Shiki highlighter shared by all consumers; must be neutered to stay alive app-wide. */
 export async function getSharedHighlighter(): Promise<Highlighter> {
   return getSingletonHighlighter({
     langs: [...SHIKI_BASE_LANGS],
@@ -117,19 +104,7 @@ export async function getSharedHighlighter(): Promise<Highlighter> {
   });
 }
 
-/**
- * Idempotently monkey-patches `dispose()` to a no-op on the shared singleton
- * highlighter.
- *
- * Chakra's shiki adapter calls `ctx.dispose()` in its `unloadContext` on
- * every CodeBlock unmount and color-mode change. Because every CodeBlock
- * resolves to this one shared instance, the first unmount would dispose the
- * highlighter the still-mounted blocks depend on, and their next
- * `codeToHtml`/`loadTheme` throws "Shiki instance has been disposed". The
- * singleton is app-lifetime by design, so we neuter `dispose` once.
- *
- * The `__lwDisposeNeutered` marker makes the patch idempotent.
- */
+/** Neuter dispose() on shared singleton to prevent destruction on unmount. */
 export function ensureDisposeNeutered(h: Highlighter): void {
   const h2 = h as Highlighter & {
     dispose: () => void;

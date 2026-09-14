@@ -41,7 +41,7 @@ export function extractErrorMessages(error: unknown): string[] {
   return messages;
 }
 
-/** Renders a form error from any shape: element, string/number, or nested {message} object(s)/array. */
+/** Renders form errors from various shapes (elements, strings, numbers, nested objects). */
 export function FormErrorDisplay({ error }: FormErrorDisplayProps) {
   // If it's a React element, render it directly
   if (isValidElement(error)) {

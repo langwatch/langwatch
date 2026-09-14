@@ -1,20 +1,7 @@
 import { Box, type BoxProps, Table } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
 
-/**
- * Standard list table for index pages (datasets, settings lists, and future
- * list pages). Wraps Chakra's Table in the shared look:
- *
- *  - a rounded container with an emphasized outer border,
- *  - a taller header row,
- *  - light gray borders between every cell (a quiet grid),
- *  - comfortable left padding on the first column so content does not hug the
- *    border.
- *
- * Compose it with the normal Table.Header / Table.Body / Table.Row /
- * Table.Cell / Table.ColumnHeader parts as children. See
- * dev/docs/best_practices/list-table.md.
- */
+/** List table with rounded border, tall header, and grid borders. Compose with Table parts. */
 export function ListTable({
   children,
   containerProps,

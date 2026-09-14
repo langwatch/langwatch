@@ -39,26 +39,10 @@ export function displayOptionalValue(value: unknown): string {
   return value === void 0 ? "" : displayValue(value);
 }
 
-/**
- * The value types a caller can DECLARE for an editable scalar.
- *
- * Structural on purpose: the declaration itself belongs to whichever feature
- * owns the parameter (scenario parameters are the first), and this package sits
- * underneath every one of them. Spelling the three names here rather than
- * importing a feature's union is what keeps the arrow pointing the right way —
- * and a feature's own union is assignable to this one, so nothing casts.
- */
+/** Types caller can declare for editable scalars; structural to avoid coupling with features. */
 export type TypedScalarValueType = "string" | "number" | "boolean";
 
-/**
- * Parse the text in a value input as the type its parameter declares.
- *
- * A declared type settles what the JSON rule has to guess: "007" stays the
- * text "007" for a string parameter, "5" becomes the number 5 for a number
- * parameter, and "true" becomes a boolean for a boolean one. Text that cannot
- * be read as the declared type stays text, and the server refuses it by name.
- * Without a declared type the JSON rule of {@link serializeScalarValue} runs.
- */
+/** Parse input as declared type: strings, numbers, booleans. Invalid text stays text. */
 export function serializeTypedScalarValue({
   raw,
   type,

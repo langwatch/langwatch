@@ -21,18 +21,7 @@ type FieldInfoTooltipProps = {
   trigger?: "click" | "hover";
 };
 
-/**
- * Published docs site root. `docHref` values that start with "/" are
- * resolved against this base (e.g. `/ai-gateway/virtual-keys#format`
- * → `https://langwatch.ai/docs/ai-gateway/virtual-keys#format`).
- * Absolute `http(s)://…` hrefs pass through unchanged so the few
- * off-site deep links (blog posts, vendor docs) still work.
- *
- * Tracking to preserve: previous iters passed bare relative paths
- * here which resolved against the app domain (localhost:5560,
- * app.langwatch.ai) — all those links 404'd. rchaves's dogfood pass
- * in iter 64 caught it.
- */
+/** Docs URL base: "/" and relative paths resolve here; absolute URLs pass through. */
 const DOCS_BASE = "https://langwatch.ai/docs";
 
 function resolveDocHref(href: string): string {
@@ -42,30 +31,9 @@ function resolveDocHref(href: string): string {
 }
 
 /**
- * (i) tooltip next to a field label, per rchaves's dogfood feedback:
- * 'every single item should have a little (i) icon with a tooltip
- * explanation, AND a link to read more docs in that tooltip'.
- *
- * Keeps a form scannable: the label says what the setting is, the tooltip
- * carries the paragraph explaining why you'd want it. See
- * `dev/docs/best_practices/copywriting.md` — descriptions stay short, the
- * long form goes behind the (i).
- *
- * Default (`trigger="click"`) is a plain click-to-toggle popover — the
- * original behavior every existing caller (gateway forms, routing policies)
- * still gets unchanged.
- *
- * `trigger="hover"` opens while the pointer is over the (i), and closes when
- * it leaves. It also stays open while the pointer is over the popover
- * itself, so the doc link inside stays clickable — a plain hover Tooltip
- * closes the moment the pointer leaves the icon, putting the link out of
- * reach. Crossing the gap between the two gets a short grace period. Click
- * still opens it too, for touch. Only the Comparison form opts into this —
- * several (i)s sit close together there and click-only felt slow to scan.
- *
- * In hover mode, `autoFocus` is off: Chakra focuses the popover body when it
- * opens, which blurs the trigger. With an onBlur that closes, that produced
- * a visible open/close flicker on every hover.
+ * Label says what, tooltip explains why and links to docs. Default trigger="click"
+ * (plain toggle). trigger="hover" opens on pointer over icon/popover with grace period
+ * to keep links clickable; autoFocus off to prevent flicker.
  */
 
 /** Grace period before a hover-out closes, so crossing the gap doesn't. */

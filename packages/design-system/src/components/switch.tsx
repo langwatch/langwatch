@@ -1,18 +1,7 @@
 import { Switch as ChakraSwitch } from "@chakra-ui/react";
 import * as React from "react";
 
-/**
- * Chakra v3 Switch wrapper.
- *
- * N.B. `onChange` is deliberately NOT accepted here — Chakra v3's `Root`
- * exposes state via `onCheckedChange({ checked })`, not a DOM ChangeEvent.
- * A previous version of this file declared an `onChange` prop that only
- * spread into `...rest` and was silently discarded by `ChakraSwitch.Root`,
- * so callers who wrote `<Switch onChange={…}>` got a compile-clean but
- * runtime-dead toggle. Callers MUST use `onCheckedChange` — leaving
- * `onChange` off the type surface forces TypeScript to catch mis-wired
- * consumers instead of silently no-op'ing them.
- */
+/** Chakra v3 Switch: use onCheckedChange, not onChange. Omitted from type to catch errors. */
 export interface SwitchProps extends Omit<ChakraSwitch.RootProps, "onChange"> {
   /** The hidden input carries checked state and is the element tests address. */
   inputProps?: React.InputHTMLAttributes<HTMLInputElement> & {

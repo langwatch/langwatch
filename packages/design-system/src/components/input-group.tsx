@@ -36,10 +36,12 @@ export const InputGroup = React.forwardRef<HTMLDivElement, InputGroupProps>(
         )}
         {React.cloneElement(child, {
           ...(startElement && {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string,
+            // @typescript-eslint/restrict-template-expressions
             ps: `calc(var(--input-height) - ${startOffset})`,
           }),
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string,
+          // @typescript-eslint/restrict-template-expressions
           ...(endElement && { pe: `calc(var(--input-height) - ${endOffset})` }),
           ...children.props,
         })}

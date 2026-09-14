@@ -2,26 +2,7 @@ import { Box, chakra, HStack } from "@chakra-ui/react";
 import type React from "react";
 import { LuChevronDown } from "react-icons/lu";
 
-/**
- * The hero's one ACTION control: a pill that opens a menu of routes, its
- * glyph tiles counting those routes left to right in the order the menu
- * offers them, and a caret stating that it opens rather than fires.
- *
- * The two presentations, side by side.
- *
- * `lead` is the filled control a surface with no data needs; `quiet` is the
- * outline one that sits at the end of a row once there is data. A DIFFERENT
- * SHADE from the asks around it in both cases: those are borrowable
- * questions on the panel's translucent chip surface, and this is the one
- * control that goes and does something. The solid raised surface, a step
- * darker than the chips, is what says "not one of those" before the caret
- * confirms it.
- *
- * A menu opens it through `asChild`, which clones this element with the
- * handlers and the ref it needs, so everything but its own props goes
- * straight through to the button. Swallow them and the pill stops opening
- * anything.
- */
+/** Menu pill: lead for empty, quiet for data. Opens via asChild; pass through props. */
 const PILL_STYLES = {
   lead: {
     borderColor: "orange.emphasized",

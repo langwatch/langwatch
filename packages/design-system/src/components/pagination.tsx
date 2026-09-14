@@ -9,18 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-/**
- * Prop-driven pagination bar: a plain-language description of the page on the
- * left, a numbered pager in the middle, and a deliberately empty right column
- * (the assistant's floating button lives in that corner and used to cover the
- * navigation).
- *
- * The page count is derived from `totalCount / pageSize`, the single source of
- * truth, so it stays correct the instant `pageSize` changes, before any
- * refetch. Cursor-only data sources, which cannot open an arbitrary page, say
- * so through `isPageReachable` and `canGoNext` rather than through a different
- * component.
- */
+/** Pagination bar: description left, pager middle, empty right. Supports cursor-only sources. */
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
