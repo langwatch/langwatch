@@ -10,6 +10,12 @@
  * `@langwatch/identity-server`.
  */
 export {
+  type Auth0UpstreamIdentity,
+  derivedAccountId,
+  sourceOfDerivedAccountId,
+  upstreamOfAuth0Subject,
+} from "./auth0-upstream";
+export {
   type BackfillDiff,
   type BackfillIdentifierRow,
   backfillParityDiffs,

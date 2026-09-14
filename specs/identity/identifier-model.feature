@@ -332,6 +332,21 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the email identifier, which has no account row, is left alone
     And a further pass detaches nothing
 
+  # D09: the Auth0 broker's subject is a compound — `google-oauth2|<sub>`
+  # states the person's identity AT GOOGLE, wrapped in the broker's
+  # namespace. Unfolding it at adoption is what lets the native provider's
+  # callback resolve a user who has only ever signed in through the broker:
+  # no linking ceremony, no second account, sign-in works on the first day
+  # the native provider is mounted.
+  @unit
+  Scenario: An Auth0-brokered social account is adopted under its own provider too
+    Given "sam" has an Auth0 Account row whose subject names a Google identity
+    When the identity backfill migrates "sam"
+    Then a Google identifier is adopted beside the Auth0 one, carrying the upstream subject
+    And it carries the issuer Google itself asserts, so the native callback resolves "sam"
+    And an Auth0 subject naming no known upstream derives nothing
+    And deleting the Auth0 Account row detaches the derived identifier with it
+
   # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
   # question identity now owns, so a finalized user's email comes from their
   # identifiers and the column is a stale copy. One switch forks both

@@ -1,9 +1,12 @@
 import {
   arrivalStateForProvider,
+  derivedAccountId,
   type ExpectedIdentifier,
   identifierProviderFor,
   normalizeIdentifierValue,
+  upstreamOfAuth0Subject,
 } from "@langwatch/identity";
+import { nativeSocialIssuerFor } from "./better-auth/account-queries";
 import { deriveIdentifierId } from "./crypto/identifier-identity";
 import type {
   BackfillAccountRow,
@@ -11,6 +14,7 @@ import type {
 } from "./identity-backfill.repository";
 import {
   adoptAccountCommandId,
+  adoptDerivedAccountCommandId,
   adoptUserEmailCommandId,
 } from "./identity-command-id";
 
@@ -49,8 +53,10 @@ export type PlannedIdentifier = ExpectedIdentifier & {
 /**
  * The email identifier from `User.email` (VERIFIED when `emailVerified`),
  * plus one identifier per `Account` row in the state its provider arrives
- * in (R8). Business time is each row's own `createdAt`, so live emission of
- * the same fact derives the same identifier id.
+ * in (R8) — and, for an Auth0-brokered row whose subject names a native
+ * upstream, the native identifier that same row implies (D09, see
+ * `derivedNativeIdentifier`). Business time is each row's own `createdAt`,
+ * so live emission of the same fact derives the same identifier id.
  */
 export function planIdentifiers({
   user,
@@ -74,9 +80,9 @@ export function planIdentifiers({
         ? ("VERIFIED" as const)
         : ("ATTACHED" as const),
     },
-    ...accounts.map((account) => {
+    ...accounts.flatMap((account) => {
       const provider = identifierProviderFor(account.provider);
-      return {
+      const adopted = {
         provider,
         providerId: account.provider,
         // The row's own issuer, adopted rather than re-derived. Deriving it
@@ -90,6 +96,8 @@ export function planIdentifiers({
         value: normalizedValue,
         expectedState: arrivalStateForProvider(provider),
       };
+      const derived = derivedNativeIdentifier({ account, normalizedValue });
+      return derived === null ? [adopted] : [adopted, derived];
     }),
   ];
   return planned.map((plan) => ({
@@ -102,4 +110,46 @@ export function planIdentifiers({
       occurredAtMs: plan.occurredAtMs,
     }),
   }));
+}
+
+/**
+ * The native identifier an Auth0-brokered row ALSO implies (D09), or null
+ * where it implies none — the broker's own database users, enterprise
+ * connections, and Microsoft, whose issuer only a real token can name.
+ *
+ * Everything is derived from the source row, so the pass stays restatable:
+ * the same business time, an account id parseable back to the source
+ * (`derivedAccountId` — the orphan compensation follows the source row's
+ * liveness through it), and the issuer the native callback will actually ask
+ * for. A user this has run for signs in with the native provider on day one
+ * of it being mounted, with no linking ceremony and no second account.
+ */
+function derivedNativeIdentifier({
+  account,
+  normalizedValue,
+}: {
+  account: BackfillAccountRow;
+  normalizedValue: string;
+}): Omit<PlannedIdentifier, "identifierId"> | null {
+  if (account.provider !== "auth0") return null;
+  const upstream = upstreamOfAuth0Subject(account.providerAccountId);
+  if (upstream === null) return null;
+  const provider = identifierProviderFor(upstream.providerId);
+  return {
+    provider,
+    providerId: upstream.providerId,
+    issuer: nativeSocialIssuerFor(upstream.providerId),
+    providerAccountId: upstream.providerAccountId,
+    accountId: derivedAccountId({
+      sourceAccountId: account.id,
+      providerId: upstream.providerId,
+    }),
+    occurredAtMs: account.createdAtMs,
+    commandId: adoptDerivedAccountCommandId({
+      accountId: account.id,
+      providerId: upstream.providerId,
+    }),
+    value: normalizedValue,
+    expectedState: arrivalStateForProvider(provider),
+  };
 }
