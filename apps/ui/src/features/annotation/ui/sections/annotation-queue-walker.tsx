@@ -632,23 +632,7 @@ const QueueWalkerContent = ({
             />
           ) : (
             <CodeBlock.AdapterProvider value={shikiAdapter}>
-              {/*
-                While the step in hand is the item the reviewer has left, the
-                controls inside the thread — annotate, suggest, the per-turn
-                dataset tick, Edit trace, opening a turn — would act on that
-                item rather than the one asked for, and annotating writes. The
-                hold sits on the subtree rather than on each control: the
-                controls belong to ConversationView, which the trace drawer
-                renders too, so gating them one at a time leaves whatever is
-                added there next ungated.
-
-                Held the way the table holds a subtree over stale rows
-                (TraceTableLayout): dimmed, pointer-inert, and announced as
-                busy. Scrolling goes with it, as it does there. `inert` is what
-                covers the keyboard, which pointer-events does not; React 19
-                reads it as a boolean, so the empty string other call sites
-                pass is read as false.
-              */}
+              {/* Prevents thread controls from acting on the wrong item. */}
               <Box
                 flex="1"
                 minHeight={0}
@@ -864,15 +848,7 @@ const AnnotationQueuePicker = ({
   isTraceAvailable: boolean;
   /** Whether an item is being recorded as done right now. */
   isFinishing: boolean;
-  /**
-   * Whether the item above is the one the reviewer has left, with the one they
-   * asked for still being read.
-   *
-   * Everything that acts on the item waits for this to clear. Releasing on a
-   * timer instead let the bar act on the item behind: pressing the primary
-   * action finished the item the reviewer had already stepped away from, and
-   * "Edit trace" opened the trace they had left.
-   */
+  /** Whether the current item is stale; blocks actions until the requested one loads. */
   stepIsStale: boolean;
   /** How many traces the sitting counts right now. */
   sessionCount: number;

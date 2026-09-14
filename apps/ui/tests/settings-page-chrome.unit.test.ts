@@ -1,6 +1,5 @@
 /**
- * Every page registered under `/settings` renders inside the settings chrome — the top bar, the settings sidebar and the page frame — `platform/app`'s `SettingsLayout` is not, so a page that opens outside a matched apps/ui route renders on an
- * empty background with no menu and no way back, which is how the email suppressions page shipped: it named the layout as `withPermissionGuard`'s `layoutComponent`, which frames only the refusal a reader without the permission sees.
+ * Verifies settings pages render with proper chrome.
  * Spec: specs/settings/settings-page-chrome.feature
  */
 

@@ -1,20 +1,6 @@
 /**
- * The one Prisma client this process opens, as a composition-time double.
- *
- * WHY EVERY MODEL IS NAMED. Since the trace conversion, `WorkerProductionComposition`
- * builds the four capability services, the feature-flag store, the dataset
- * content repository, the trace-trigger catalogue and the BYOC storage lookup
- * during `create()` — and several of those repositories check at CONSTRUCTION
- * that the object they were handed is a Prisma client for the models they read,
- * rather than failing on the first query. That check is deliberate: a graph
- * composed against the wrong client should refuse at boot, not at 3am on the
- * first span.
- *
- * So the list below is not padding. It is the answer to "which tables does one
- * worker process touch", and a composition test that could pass with fewer
- * would be a test that stopped noticing when a feature reached for a new one.
- * Nothing here executes: every entry is an empty delegate, because these tests
- * assert what was COMPOSED, never what it reads.
+ * Validates which Prisma models the composition accesses at construction.
+ * Each entry is an empty delegate; tests assert what was composed, not what it reads.
  */
 export function createWorkerProcessDatabase(overrides: object = {}) {
   return {

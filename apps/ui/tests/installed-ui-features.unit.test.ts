@@ -61,13 +61,13 @@ const API_KEY_PAGE_KEYS = [
 ];
 
 const AUTHORIZE_PAGE_KEYS = [
-  // Screens of `@langwatch/api-key-web`, not a package of their own — both read the same procedure. Neither carries a page-level grant.
+  // Authorization pages from @langwatch/api-key-web.
   "pages/authorize",
   "pages/mcp/authorize",
 ];
 
 const ONBOARDING_PAGE_KEYS = [
-  // The four `/onboarding/*` addresses sit outside the chrome (no project yet, no grant); `/:project/setup` is inside it, guarded by `project:view`.
+  // Onboarding pages outside chrome; setup inside with project:view guard.
   "pages/onboarding",
   "pages/onboarding/welcome",
   "pages/onboarding/product/index",
@@ -207,7 +207,7 @@ const GITHUB_PAGE_KEYS = [
 ];
 
 const ORGANIZATION_PAGE_KEYS = [
-  // A key belongs to the family that owns its transport — all five read the `organization`, `team` or `group` routers.
+  // Organization, team, and group settings pages.
   "pages/settings/audit-log",
   "pages/settings/groups",
   "pages/settings/members",
@@ -299,10 +299,10 @@ const WORKFLOW_PAGE_KEYS = [
   "pages/[project]/studio/[workflow]",
 ];
 
-/** The Langy dock's layout key: a key, not a page, so the dock stays mounted while pages below it swap. */
+/** Langy dock layout (stays mounted while pages swap). */
 const LANGY_PAGE_KEYS = ["features/langy/ProjectLangyLayout"];
 
-/** One board key answers three route-table rows: a catch-all page serves All Runs, a run plan and an external set. */
+/** Simulation board pages (all runs, plans, external sets). */
 const SIMULATION_PAGE_KEYS = [
   "pages/[project]/simulations/[[...path]]",
   "pages/[project]/simulations/scenarios/index",
@@ -357,7 +357,7 @@ const GOVERNANCE_PAGE_KEYS = [
   "pages/governance/users/[id]",
 ];
 
-/** The project home, `/[project]`: the last legacy loader `platform/app` held. No page-level grant — scope resolution already decided reachability. */
+/** Project home (legacy loader, scope resolution handles access). */
 const HOME_PAGE_KEYS = ["pages/[project]/index"];
 
 describe("given what apps/ui serves itself", () => {

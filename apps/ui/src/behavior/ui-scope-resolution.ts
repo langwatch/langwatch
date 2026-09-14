@@ -290,8 +290,7 @@ export function uiScopeSelectionWrites({
 }
 
 /**
- * The one-shot `?org=<slug>` switch, as selection writes: an organization the caller belongs to is selected, and the remembered team and
- * project are cleared so the new organization's own defaults resolve rather than the previous organization's pinning the page.
+ * The `?org=<slug>` switch clears remembered team/project so the new org's defaults apply.
  * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
  */
 export function uiOrgQueryParamWrites({

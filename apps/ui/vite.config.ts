@@ -22,16 +22,7 @@ import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 // and `__dirname` does not exist. `import.meta.dirname` is the same directory.
 const here = import.meta.dirname;
 
-// Load `.env` into the Vite config's process environment. Vite normally
-// only exposes `VITE_*` vars to client code — but this config itself
-// runs in Node and needs access to flags like `LANGWATCH_DEV_HTTP2`.
-// The API process loads its own copy the same way; doing it here keeps both
-// processes reading from one source of truth.
-//
-// Under haven there is no second file to load: haven hands this process the
-// resolved app port and API hostname in its environment directly, and dotenv
-// does not override a variable the process already has, so `.env` fills the
-// gaps without ever clobbering the stack haven actually started.
+// Load .env for Vite config (matches API config source); dotenv won't override haven's vars.
 const rootEnvPath = path.resolve(here, "../../.env");
 
 dotenv.config({ path: rootEnvPath, quiet: true });
@@ -294,9 +285,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
-        // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the /mcp/authorize frontend page route, sending it to the API server, which has
-        // no dev-mode page fallback. server.proxy regexes test against the full req.url (path + query), so the optional "(?:\?.*)?" is required or a
-        // query-bearing request like "/mcp?sessionId=..." falls through to the frontend instead.
+        // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
         "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,

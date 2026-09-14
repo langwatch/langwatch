@@ -1,5 +1,5 @@
 /**
- * What the thirteen settings addresses are actually behind, proved by mounting them under the real chrome.
+ * Verifies settings page addresses with real chrome.
  * @vitest-environment jsdom
  * Spec: specs/settings/settings-page-chrome.feature
  */

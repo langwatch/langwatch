@@ -1,6 +1,6 @@
 /**
- * `useUiOrganizationFacts` reads `limits.getUsage`'s Enterprise flag and its own `isLoading` as two fields (specs/rbac/custom-role-permission-editing.feature) — a
- * still-arriving plan must never collapse into "not Enterprise", or a paying customer flashes the sales pitch for one round trip.
+ * Prevents a loading plan from being read as "not Enterprise", which would show the sales
+ * pitch to paying customers (specs/rbac/custom-role-permission-editing.feature).
  * @vitest-environment jsdom
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

@@ -1,5 +1,5 @@
 /**
- * What the two identity settings addresses this application now serves are actually behind, proved by mounting them.
+ * Verifies organization identity settings pages.
  * @vitest-environment jsdom
  * Spec: specs/audit-log/audit-log.feature
  */

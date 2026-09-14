@@ -189,11 +189,7 @@ describe("given a page behind a flag and a permission", () => {
 
   describe("when the flag is on and the viewer lacks the grant", () => {
     /**
-     * Carried from `platform/app/src/pages/governance/__tests__/delegatedViewer.integration.test.tsx`,
-     * which drove the refusal through the page because the page carried the
-     * guard. The page no longer does, and the two grants stay disjoint: an
-     * organization manager without `governance:view` is refused here exactly
-     * as the governance routers refuse them.
+     * Org manager without governance:view grant is refused by router (not page).
      *
      * @scenario "A principal who manages the organization but cannot read governance is refused"
      */

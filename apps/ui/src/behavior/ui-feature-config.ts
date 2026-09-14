@@ -8,15 +8,7 @@ import { notificationWebConfigSchema } from "@langwatch/notification-contract";
 import { opsWebConfigSchema } from "@langwatch/ops-contract";
 import { workflowWebConfigSchema } from "@langwatch/workflow-contract";
 
-/**
- * Each feature's own reading of the public application configuration.
- *
- * The wire contract is one document, injected into the HTML shell by the API
- * and parsed back out by the browser. What is per feature is the slice each
- * one acts on, and every slice is checked here — at boot, before the first
- * render — so a browser never draws a screen over a value its feature would
- * have refused.
- */
+/** Each feature's validated config slice, checked at boot to prevent rendering rejected values. */
 export type UiFeatureConfig = Readonly<{
   auth: ReturnType<typeof authWebConfigSchema.parse>;
   billing: ReturnType<typeof billingWebConfigSchema.parse>;

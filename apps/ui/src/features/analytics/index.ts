@@ -1,4 +1,4 @@
-/** Analytics: eight screens, the chart renderer, the filter rail and the LangWatchQL workbench, all in `@langwatch/analytics-web`. */
+/** Analytics feature: screens, chart renderer, filter rail, and LangWatchQL workbench. */
 
 import { analyticsApi } from "@langwatch/analytics-web/analytics";
 import { uiFeature } from "../../behavior/ui-feature";

@@ -1,7 +1,5 @@
 /**
- * The remembered scope is shared state with the application still serving most of the product from the same origin, so the key names AND
- * the encoding are a contract rather than an implementation detail: a slug written unquoted here reads as "nothing remembered" over there,
- * and the two halves of one product then disagree about which project the reader is in.
+ * Scope storage is a shared contract: key names and encoding must match backend.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

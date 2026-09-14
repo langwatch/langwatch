@@ -1,7 +1,5 @@
 /**
- * The session capability as a screen meets it: mounted in the shell, reading a real router, real storage and a
- * real React Query cache, with only the two things a browser cannot supply in a test stubbed — the transport the
- * four reads travel on, and the auth client that answers who is signed in.
+ * Tests session with real UI but mocked transport and auth.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

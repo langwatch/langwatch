@@ -1,5 +1,5 @@
 /**
- * `ApiKeyHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the API key screens with no scope and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * Tests that `ApiKeyHost` shows an error when `organization.getAll` fails (regression).
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

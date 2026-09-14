@@ -1,5 +1,5 @@
 /**
- * `AutomationsHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the automations screen with no placement and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * Tests that `AutomationsHost` shows an error when `organization.getAll` fails (regression).
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

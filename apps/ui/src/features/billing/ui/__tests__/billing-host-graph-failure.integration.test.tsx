@@ -1,5 +1,5 @@
 /**
- * `BillingHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the billing screens with no organization and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * Tests that `BillingHost` shows an error when `organization.getAll` fails (regression).
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

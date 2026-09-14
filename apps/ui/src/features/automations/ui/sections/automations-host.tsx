@@ -48,7 +48,7 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
     fallbackTitle: "Couldn't load your automations",
   });
 
-  /** The organization, team and project the address is about, resolved from the one graph read rather than three. */
+  /** Organization, team, and project from one graph read (not three separate queries). */
   const placement = useMemo(() => {
     const organization = (organizations.data ?? []).find(
       (candidate) => candidate.id === scope.organizationId,

@@ -45,15 +45,8 @@ export interface DevLogRecord {
 }
 
 /**
- * One record, in the shape every lane writes - a multi-line message (Vite's
- * startup banner, a stack) becomes ONE object rather than one per line: for
- * an ordinary message the lines rejoin with `\n` inside `msg`; for an error
- * the first line is the message and the rest becomes `stack`, the same split
- * a Node/Go lane reports an error with.
- *
- * `null` for a message that is blank once Vite's own tag and colour are
- * stripped - Vite logs empty strings purely for terminal spacing, and a
- * blank line carries nothing a structured record can hold.
+ * Normalizes multi-line messages to one record (msg and optional stack).
+ * Returns null for blank lines that Vite uses for spacing.
  */
 export function devLogRecord({
   level,

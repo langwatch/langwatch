@@ -1,8 +1,4 @@
-/**
- * What the three billing screens are mounted inside: the tRPC Provider their
- * hooks run on, and the host port for organization, active team, deployment,
- * address and Stripe checkout departure. Team is derived from the active project, not carried on scope.
- */
+/** Billing screen host: tRPC provider and scope. Team from active project (not scope). */
 
 import {
   billingApi,

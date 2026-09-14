@@ -13,7 +13,7 @@ import { useDrawer } from "@langwatch/ui-drawer";
 import { withHost } from "../../../../ui/sections/ui-page";
 import { AutomationsHost } from "./automations-host";
 
-/** What the address can carry. `source` is the email link's marker, read to draw a one-line "arrived from an inbox" banner. */
+/** Address data; `source` from email link draws an "arrived from inbox" banner. */
 type AutomationAddress = {
   automationId?: string;
   source?: string;

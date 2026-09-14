@@ -14,7 +14,7 @@ import { ApiKeyHost } from "./api-key-host";
 /** What `/cli/auth` calls itself in the browser tab. */
 export const CLI_AUTH_DOCUMENT_TITLE = "Authorize CLI · LangWatch";
 
-/** The browser tab's title: a screen may not reach the document, so this writes it via the capability and restores the previous one on unmount. */
+/** Sets browser tab title via capability; restores previous on unmount. */
 function withDocumentTitle<P extends object>(
   title: string,
   Page: ComponentType<P>,

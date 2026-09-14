@@ -1,5 +1,5 @@
 /**
- * What the nine analytics addresses are actually behind, proved by mounting them — and which SCREEN each of them is.
+ * Verifies analytics page addresses and their screens.
  * @vitest-environment jsdom
  * Spec: specs/analytics/analytics-pages.feature
  */

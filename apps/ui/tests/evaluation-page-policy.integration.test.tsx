@@ -1,5 +1,5 @@
 /**
- * What the two evaluation addresses are actually behind, proved by mounting them — and what the application does with the overlay a screen asks for.
+ * Verifies evaluation page addresses and overlay handling.
  * @vitest-environment jsdom
  * Spec: specs/evaluations/evaluation-pages.feature
  */

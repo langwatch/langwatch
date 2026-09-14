@@ -1,4 +1,4 @@
-/** The project an analytics address is about, resolved from the organization graph rather than a second query. */
+/** The project for an analytics address, resolved from the organization graph (no extra query). */
 
 import type { AnalyticsHostProject } from "@langwatch/analytics-web/analytics";
 

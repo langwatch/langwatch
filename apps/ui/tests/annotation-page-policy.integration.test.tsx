@@ -1,5 +1,5 @@
 /**
- * What the four annotations addresses are actually behind, proved by mounting them — and which VIEW each of them is.
+ * Verifies annotation page addresses and their views.
  * @vitest-environment jsdom
  * Spec: modules/annotation/specs/annotations-list-selection.feature
  */

@@ -1,5 +1,5 @@
 /**
- * The one-shot `?org=<slug>` switch, driven through the real router and the real remembered selection: what the address carries decides which organization the page is about, and the parameter never survives the visit.
+ * Tests ?org=<slug> query param switches organization scope (via real router).
  * @vitest-environment jsdom
  * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
  */

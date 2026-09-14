@@ -1,4 +1,4 @@
-/** The success notice only goes out once the clipboard write actually resolved — a refused write would send the reader to a terminal with an empty paste. */
+/** Shows success only after clipboard write succeeds (avoids empty paste errors). */
 import type { AuthorizeSuccessNotice } from "@langwatch/api-key-web/authorize";
 
 export async function copyProjectApiKeyToClipboard({

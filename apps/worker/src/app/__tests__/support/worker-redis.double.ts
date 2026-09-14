@@ -1,15 +1,6 @@
 /**
- * The one Redis this process opens, as a composition-time double.
- *
- * WHY IT IS SHAPED RATHER THAN EMPTY. Several features check at CONSTRUCTION
- * that the connection they were handed can actually do what they need — the
- * GitHub branch cache wants `get`/`set`/`del`, the fold caches want `setex`,
- * the tenant broadcast wants `publish` — and refuse a graph composed against
- * something else. That check is deliberate: a worker wired to a non-Redis
- * should fail at boot, not on the first sweep.
- *
- * Nothing here executes anything real. Every method answers the empty result,
- * because these tests assert what was COMPOSED, never what it stored.
+ * Validates which Redis methods the composition accesses at construction.
+ * Empty results for test assertions; nothing executes.
  */
 export function createWorkerProcessRedis(overrides: object = {}) {
   return {

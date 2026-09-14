@@ -14,7 +14,7 @@ export function isDrawerOpenFromAddress(open: unknown): boolean {
   return open !== false && open !== void 0;
 }
 
-/** A drawer, with the address's `open` turned into the boolean it wants; every other prop passes through untouched. */
+/** Converts drawer's address `open` to boolean; other props pass through. */
 export function fromDrawerAddress<P extends { open?: boolean }>(
   Drawer: ComponentType<P>,
 ): ComponentType<Omit<P, "open"> & { open?: unknown }> {
