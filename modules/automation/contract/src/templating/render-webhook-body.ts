@@ -34,14 +34,8 @@ async function renderJsonBody({
 }
 
 /**
- * Renders a webhook automation's JSON body (ADR-040 §2) — the same Liquid
- * engine and contexts Slack/email render against, with the Block Kit
- * fall-back discipline: the output must `JSON.parse`, and a render throw or
- * parse failure on the customer's template falls back to the framework
- * default body, with the error captured for the operator. If even the
- * default fails (it shouldn't — it is ours), a minimal static envelope is
- * sent rather than nothing, so a delivery is never silently dropped over a
- * template.
+ * Renders webhook JSON body (ADR-040 §2) with the same Liquid engine; failures
+ * fall back to default or minimal static envelope so delivery is never silently dropped.
  */
 export async function renderWebhookBody({
   template,

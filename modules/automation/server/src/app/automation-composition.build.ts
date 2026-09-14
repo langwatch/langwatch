@@ -1,37 +1,6 @@
 /**
- * Builds the {@link AutomationInfrastructure} the deleted
- * `apps/api/src/app/api-automation.composition.ts` and
- * `apps/api/src/features/automation/automation.composition.ts` (both removed
- * by b383462d96) hand-composed for the api process.
- *
- * A project's triggers are rows: what fires them, what they deliver to, how
- * many times a day they may persist, and who asked to stop receiving them. The
- * API process READS and WRITES those rows. It does not RUN them — no trigger
- * is evaluated here, no email or Slack message is delivered here, no schedule
- * is woken here. That work is the worker's, so the six capabilities below that
- * belong to the running half are named absences rather than second
- * implementations, refusing BY NAME at the one call that reaches them —
- * verbatim from the deleted code:
- *
- *   graph notifier          a graph alert is dispatched by the worker.
- *   runaway containment     the daily ceiling is enforced where the fires
- *                           happen.
- *   test fire               a test delivery goes out over the worker's
- *                           transports.
- *   heartbeat ClickHouse    the graph heartbeat's recency query.
- *   dispatch errors         retryable-versus-terminal is a delivery
- *                           distinction, and nothing here delivers.
- *   Slack channel listing   reading a workspace's channels needs the bot's
- *                           own HTTP call, which this process does not make.
- *
- * Two more capabilities have no implementation ANYWHERE in the tree yet —
- * they were added to {@link AutomationInfrastructure} after the deleted
- * composition was written, so it never wired them either. Both refuse by name
- * for the same reason as the six above, and are named in the handoff as a gap
- * rather than a parity loss: `traceFilters` (ADR-043's filter-query dry run —
- * a save with a non-empty `filterQuery` fails until a real compiler exists)
- * and `slackChannels` above, which happens to already have the deleted
- * composition's TRPC-layer refusal to port.
+ * Builds AutomationInfrastructure for the API process; implements reads/writes to trigger
+ * rows, not evaluation/delivery/scheduling (those are the worker's responsibilities).
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { SlackActionParams, SlackChannelListing } from "@langwatch/automation-contract";

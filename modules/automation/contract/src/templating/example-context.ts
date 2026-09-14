@@ -25,17 +25,8 @@ export const EXAMPLE_MATCH: TemplateMatchInput = {
 export const EXAMPLE_MATCHES: TemplateMatchInput[] = [EXAMPLE_MATCH];
 
 /**
- * Rich variable information surfaced to the editor: dotted path + TypeScript-ish
- * type signature + optional human description. The same array drives Monaco
- * autocomplete (`detail` + `documentation`), the unknown-variable detector
- * (roots = `path.split(".")[0]`), and the Variable Reference panel.
- *
- * Both `match.*` (singular handle for immediate dispatches) and `matches[]`
- * (iterable for both immediate and digest) are surfaced in the variable
- * panel. ADR-036 picks the digest-friendly default — authors writing
- * `{% for m in matches %}` get correct behavior in both modes from one
- * template, while `{{ match.field }}` stays a convenient shortcut for
- * single-match cases.
+ * Variable information (path, type, description) for the editor; drives Monaco autocomplete
+ * and Variable Reference panel; ADR-036 picks digest-friendly defaults for mixed modes.
  */
 export interface VariableInfo {
   /** Dotted path the template author writes, e.g. `match.trace.input`. */

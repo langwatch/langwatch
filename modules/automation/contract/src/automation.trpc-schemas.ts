@@ -11,13 +11,8 @@ import {
 } from "./trigger.ts";
 
 /**
- * The transport inputs the automation authoring and activity surface
- * publishes.
- *
- * They live in the contract rather than beside the router because the input an
- * author has to send is part of what this feature promises. The command shapes
- * in `trigger.commands.ts` are a different contract: those describe what
- * `AutomationService` accepts, these describe what a client sends.
+ * Transport input schemas for the automation authoring and activity surfaces; separate
+ * from `trigger.commands.ts` command shapes that describe what AutomationService accepts.
  */
 
 /** The project an automation call is about, and the whole input of five reads. */

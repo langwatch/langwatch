@@ -74,13 +74,8 @@ function defaultSlackText({
 }
 
 /**
- * Renders a trigger Slack message. `templateType` (not the presence of
- * `template`) decides which renderer runs — a null template paired with
- * `templateType: "block_kit"` is "use the block_kit framework default",
- * not "fall back to plain text." Block Kit templates are parsed as JSON
- * and passed through the allowlist; any failure (render throw, invalid
- * JSON, or no surviving blocks) falls back to the plain-text default. A
- * test fire prepends a non-suppressible banner.
+ * Renders Slack message; `templateType` selects renderer (not template presence);
+ * Block Kit templates are parsed, filtered, and fall back to plain text on failure.
  */
 export async function renderTriggerSlack({
   templateType,

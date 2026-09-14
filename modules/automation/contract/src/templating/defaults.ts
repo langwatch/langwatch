@@ -1,19 +1,6 @@
 /**
- * Framework default templates. A NULL template column on a Trigger means
- * "render with these". The email body intentionally does NOT carry the
- * "Sent with ♥ from LangWatch · Edit automation" line — that footer sits in
- * the email chrome (`emailLayout.ts`) so every email keeps it consistently,
- * regardless of what a customer template prints.
- *
- * ADR-034 Phase 5: a SECOND default family targets custom-graph threshold
- * ALERTS (`alertDefaults` below). The shape of an alert is "metric X
- * crossed threshold Y" — not "this trace happened matching filters" —
- * so the default subject + body + Slack mrkdwn all read in metric-
- * crossed-threshold terms instead of trace terms. Callers pick the set
- * directly — graph-alert dispatch passes `ALERT_TRIGGER_DEFAULTS` as the
- * `defaults` override on `renderTriggerEmail` / `renderTriggerSlack`,
- * trace dispatch relies on the renderers' built-in trace defaults —
- * and per-trigger custom Liquid still overrides whichever default applies.
+ * Framework defaults for triggers (NULL template column); separate alert and trace
+ * defaults; footer is in emailLayout.ts, not templates.
  */
 
 export const DEFAULT_EMAIL_SUBJECT_TEMPLATE =
@@ -37,14 +24,8 @@ This automation fired against {% if matches.size == 1 %}a matching trace{% else 
 {% endfor %}`;
 
 /**
- * User-controlled trace content (`m.trace.input` / `m.trace.output`) and
- * evaluation labels flow into Slack mrkdwn, where `&`, `<`, `>` are control
- * characters. We pass them through `| mrkdwn_escape` (registered in `engine.ts`)
- * before any literal formatting so authored content can't forge mrkdwn links
- * (`<https://evil|click>`) or broadcasts (`<!channel>`) — the Slack-mrkdwn-
- * injection finding. `trigger.name` / `evaluatorName` are operator-controlled
- * and left unescaped. Truncation runs first so the budget counts visible
- * characters and never splits an `&amp;`/`&lt;`/`&gt;` entity.
+ * User content (trace input/output) is escaped via mrkdwn_escape to prevent Slack
+ * injection; operator content (trigger.name, evaluatorName) is not escaped.
  */
 export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'WARNING' %}⚠️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🔔{% endif %} *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
 {% for m in matches %}*Input:* {{ m.trace.input | truncate: 200 | mrkdwn_escape }}
@@ -54,32 +35,12 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
 {% endunless %}{% endfor %}`;
 
 /**
- * Block Kit starter — a valid Block Kit JSON document with Liquid variables
- * inside string values. Authors edit this as JSON and Liquid renders before
- * `JSON.parse` in `renderSlack`, so variables expand into the final blocks.
- *
- * Uses unicode emoji (🔔 / ⚠️ / 🔴 / ℹ️) rather than `:bell:` shortcodes so the
- * preview pane renders the same way Slack will — the preview does not run
- * Slack's emoji shortcode substitution. Long input/output are truncated; the
- * footer context block carries the edit link.
- *
- * User-controlled fields (`m.trace.input` / `m.trace.output`, evaluation label)
- * land in `mrkdwn`-typed text objects, so they pass through `| mrkdwn_escape`
- * before `| json` — see the Slack-mrkdwn-injection finding and the
- * DEFAULT_SLACK_TEMPLATE comment above.
+ * Block Kit JSON with Liquid variables; uses unicode emoji for preview consistency;
+ * user content is mrkdwn_escaped before JSON rendering.
  */
 /**
- * ADR-034 Phase 5/8.1: alert-default templates for custom-graph threshold
- * alerts. Render in metric-crossed-threshold language against
- * `GraphAlertTemplateContext` — `trigger`, `graph`, `metric`,
- * `condition`, `currentValue`, `occurredAt`, `reason`, `project`.
- *
- * Phase 8.1 wires the graph-trigger evaluator through the same Liquid
- * pipeline trace triggers use, so these defaults must read those
- * fields directly instead of the trace-iteration shape Phase 5 used as
- * a placeholder. Graph-alert dispatch passes `ALERT_TRIGGER_DEFAULTS`
- * explicitly as the renderers' `defaults`; per-trigger custom Liquid
- * (the four Trigger columns) still overrides it.
+ * Alert defaults for custom-graph threshold alerts in metric-crossed-threshold
+ * language; graph-alert dispatch passes ALERT_TRIGGER_DEFAULTS.
  */
 export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
   "[Alert] {{ trigger.name }} — {{ metric.label }} {{ condition.operatorLabel }} {{ condition.threshold }}";
@@ -290,15 +251,8 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
 };
 
 /**
- * ADR-044: default templates for a SCHEDULED REPORT. Reads as "here is your
- * {source} for {period}" — `report.sourceLabel`, `report.scheduleLabel`,
- * `viewUrl`, plus the report's data: `traces` for a trace-query report,
- * `charts` for a graph or dashboard one. Rendered through the same Liquid
- * pipeline; per-trigger custom templates still override.
- *
- * These are the FALLBACK, so they must say something useful for any source —
- * hence both branches. The gallery layouts (`templates/report_*.liquid`) are
- * what a report normally renders with, and those are source-specific.
+ * Scheduled report defaults (ADR-044) — fallback templates for any source; gallery
+ * layouts in templates/report_*.liquid are source-specific.
  */
 export const DEFAULT_REPORT_EMAIL_SUBJECT_TEMPLATE =
   "[Report] {{ trigger.name }} — {{ report.scheduleLabel }}";

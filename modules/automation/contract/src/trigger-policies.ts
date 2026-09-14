@@ -64,15 +64,8 @@ export function isMatchEverythingTrigger(trigger: {
 }
 
 /**
- * The filter fields that can only be answered once an EVALUATION has run.
- *
- * They are a set rather than a naming convention because the split decides
- * WHEN an automation is allowed to fire: a trigger carrying one of these is
- * matched by the evaluation pipeline after its result lands, and the trace
- * pipeline must skip it. A field missing from this set would be matched at
- * trace time against a result that does not exist yet, which fails closed —
- * the automation never fires — and a field wrongly IN it would move a
- * trace-time condition to a pipeline that may never run for that trace.
+ * Filters that require evaluation results; split determines automation fire timing:
+ * evaluation pipeline matches after results, trace pipeline skips.
  */
 const EVALUATION_TRIGGER_FILTER_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.evaluator_id",

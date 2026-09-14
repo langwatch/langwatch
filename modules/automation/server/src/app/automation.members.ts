@@ -79,13 +79,8 @@ export interface AutomationTriggerMatchRecorder {
 }
 
 /**
- * The ONE trace read the evaluation alert subscriber makes.
- *
- * A trace summary, to address the alert with the trace it is about. Narrower
- * than `TraceService`, which that read used to be named through: the full
- * capability carries the list, span, media and protection paths a background
- * subscriber never touches, and `TraceService` satisfies this port
- * structurally so an application composition is unchanged.
+ * Trace summary read by evaluation alert subscriber; narrower than full TraceService
+ * which carries unused paths.
  */
 export interface AutomationEvaluationTraceSummary {
   findSummary(input: {
@@ -106,28 +101,8 @@ export interface AutomationEvaluationQueryClassification {
 }
 
 /**
- * The two questions the real-time graph-alert path asks Automation.
- *
- * Trace's `graphTriggerActivity` subscriber runs on every trace that lands: it
- * asks which of a project's automations watch a custom graph, and then asks for
- * each of them to be re-evaluated. Those two calls are the ENTIRE dependency
- * that pipeline has on this feature — no writes, no schedules, no test fires,
- * no cap accounting.
- *
- * Narrowing them to a port is what breaks a cycle. The subscriber used to name
- * `AutomationService`, the whole capability, which drags report scheduling,
- * template test fires and the persist-cap ledger behind it; a process that
- * wanted only the two methods had to compose all of it or none. The published
- * `AutomationService` satisfies this port structurally, so the application
- * keeps passing exactly what it passed before, while a background process can
- * compose the graph half alone (`PostgresAutomationGraphActivityAdapter`).
- *
- * Deliberately NOT here: `decideGraphTriggerHeartbeat` and
- * `handlePersistCapBreach`. Both are graph-shaped and both look like they
- * belong, and neither is on this path — the heartbeat is the sweep process's
- * question and needs a ClickHouse recency read, containment is the persist
- * ledger's and needs a runaway notifier. Adding either would make every
- * implementer supply a collaborator the caller never reaches.
+ * Two-method port for graph-alert real-time subscriber to avoid circular dependency on
+ * full AutomationService; excludes heartbeat and persist-cap methods.
  */
 export interface AutomationGraphActivity {
   /**
@@ -154,16 +129,8 @@ export interface AutomationGraphActivity {
 }
 
 /**
- * The project read a graph alert is addressed with.
- *
- * A dispatched alert names the project it is about — its name in the subject
- * line, its slug in every link back to the deployment — and that is the entire
- * project question the graph path asks. Naming it here rather than taking a
- * whole `ProjectApi` is the same narrowing this file already does for
- * Automation itself: the write graph behind `ProjectApi` drags a
- * credentials port, an organization service and, through it, an authz service
- * into a process that only sends an alert. `ProjectApi` and
- * `ProjectMetadataService` both satisfy this.
+ * Project read for graph alerts; narrowing to avoid dragging credentials and authz
+ * services into processes that only send alerts.
  */
 export interface AutomationProjectIdentityPort {
   findById(projectId: string): Promise<{
@@ -319,18 +286,8 @@ export interface TestFireWebhook {
 
 
 /**
- * The one automation listing the trace-alert path reads.
- *
- * NOT the whole `AutomationService`, for the reason `AutomationProjectIdentityPort`
- * gives one file over: constructing that service means twelve collaborators —
- * report schedules, unsubscribe verification, webhook deliveries, persist caps,
- * the whole graph half — because its WRITE half needs them. Asking which of a
- * project's automations watch traces is a single cached repository read, and a
- * process that only ingests should not have to compose an authoring surface to
- * make it.
- *
- * `AutomationService` satisfies this, so the application's own composition is
- * unchanged and both graphs answer from the same implementation.
+ * Automation listing for trace-alert path; narrows AutomationService to avoid 12
+ * collaborators needed for authoring surface.
  */
 
 

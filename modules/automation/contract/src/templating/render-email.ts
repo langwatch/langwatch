@@ -28,18 +28,8 @@ function clipSubject(subject: string): string {
 }
 
 /**
- * Renders a trigger email from optional customer templates, falling back to the
- * framework default per part. Body is Liquid → Markdown → sanitized HTML →
- * LangWatch frame. On a test fire, a non-suppressible banner is injected by the
- * backend (subject prefix + body callout) above the customer content.
- *
- * `defaults` (optional) overrides the framework subject/body templates the
- * renderer falls back to. ADR-034 Phase 8.1 uses this to render
- * `GraphAlertTemplateContext` against the alert-default templates without
- * forking the engine; trace callers omit it and keep the trace defaults.
- * Both `TemplateContext` and `GraphAlertTemplateContext` carry the
- * `project.url` + `trigger.editUrl` the chrome footer needs, so the
- * non-template chrome wrap works for either.
+ * Renders trigger email from optional customer templates with framework defaults; body:
+ * Liquid → Markdown → HTML → frame; `defaults` parameter switches alert vs trace templates.
  */
 export async function renderTriggerEmail({
   subjectTemplate,

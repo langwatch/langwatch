@@ -106,16 +106,8 @@ function matchUrl({
 }
 
 /**
- * Template-variable contract for custom-graph THRESHOLD ALERTS (ADR-034
- * Phase 8.1). Distinct from `TemplateContext` (the trace-iteration shape)
- * because an alert reads as "metric X crossed threshold Y", not "these
- * traces happened" — there is no `matches` array, just one metric value
- * compared against a condition.
- *
- * Carried into both alert-default templates and any per-trigger custom
- * Liquid templates (the four Trigger columns). Renders through the same
- * `renderTriggerEmail` / `renderTriggerSlack` engine; only the variable
- * surface differs.
+ * Template contract for custom-graph threshold alerts (ADR-034 Phase 8.1); renders
+ * through the same engine as trace-iteration shapes with a different variable surface.
  */
 export interface GraphAlertTemplateContext {
   trigger: GraphAlertTriggerVars;
@@ -273,13 +265,8 @@ function buildAutomationEditUrl({
 }
 
 /**
- * Pure builder for the alert template context (ADR-034 Phase 8.1).
- * `baseHost` is injected (not read from env) so the renderer stays pure
- * and testable. The graph URL points at the canonical custom-graph page
- * — same path `matchUrl` produces for graph-shaped trace matches, kept
- * in sync here so chrome / template URLs agree — and carries the incident
- * window as `startDate`/`endDate` query params (the shape
- * `usePeriodSelector` parses) so the link lands on the spike, not "now".
+ * Builds alert template context (ADR-034 Phase 8.1); graph URL carries incident window
+ * as query params so the link lands on the spike, not "now".
  */
 export function buildGraphAlertTemplateContext({
   trigger,
@@ -568,14 +555,8 @@ export interface ReportChart {
 }
 
 /**
- * Template-variable contract for a SCHEDULED REPORT (ADR-044). A report is
- * schedule-triggered — it reads as "here is your {source} for {period}",
- * distinct from both the trace-iteration shape and the alert-threshold shape.
- *
- * The report's DATA is structured (`traces`, `charts`), not pre-rendered, so a
- * template can build a real table or chart block from it. `rows` is the older
- * pre-formatted line-per-trace surface, kept because saved custom templates
- * iterate it; it is derived from `traces`, never a separate fetch.
+ * Template contract for scheduled reports (ADR-044); data is structured (traces,
+ * charts), not pre-rendered; rows derived from traces for template compatibility.
  */
 export interface ReportTemplateContext {
   trigger: { id: string; name: string; editUrl: string };

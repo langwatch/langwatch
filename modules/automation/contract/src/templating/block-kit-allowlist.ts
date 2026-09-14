@@ -23,13 +23,8 @@ export const ALLOWED_BLOCK_TYPES = [
 export type AllowedBlockType = (typeof ALLOWED_BLOCK_TYPES)[number];
 
 /**
- * Blocks with sanitisers below but that a real incoming webhook REJECTS with
- * `400 invalid_blocks` (probed 2026-07): `alert` is documented modal-only;
- * `data_visualization` and `data_table` have no message-surface support yet.
- * `filterBlockKit` DROPS them unless `allowGatedBlocks` is set (a future
- * delivery path — e.g. the Web API — confirms rendering). Every template that
- * uses one carries an allowlisted fallback so stripping it never yields an
- * empty message.
+ * Blocks rejected by incoming webhooks; dropped by filterBlockKit unless
+ * allowGatedBlocks is set.
  */
 export const GATED_BLOCK_TYPES = ["alert", "data_visualization", "data_table"] as const;
 
@@ -79,13 +74,8 @@ const MAX_TABLE_COLUMNS = 20;
 const MAX_TABLE_CHARS = 10_000;
 
 /**
- * Slack rejects the whole message with `invalid_blocks` when a `section` text
- * runs past 3000 characters, a section field past 2000, or a block carries more
- * than 10 fields / 10 context elements. `invalid_blocks` is NOT retryable, so
- * one over-long block costs the entire notification rather than degrading it.
- * A template that packs N rows into one section (a report with a high row
- * count, a hand-written layout) trips this, so the caps are enforced here —
- * over-long text is cut with a visible marker, never silently.
+ * Slack rejects entire messages on invalid_blocks (non-retryable); limits are enforced
+ * here to degrade gracefully rather than fail silently.
  */
 export const MAX_SECTION_TEXT_CHARS = 3000;
 const MAX_SECTION_FIELDS = 10;
@@ -241,13 +231,8 @@ function escapeMrkdwnControlChars(text: string): string {
 }
 
 /**
- * `markdown` — a raw-markdown block whose `text` is a plain string Slack renders
- * directly (no text object, so nothing upstream escaped it). A block without a
- * string `text` is unusable and dropped (→ fallback delivers). The text is
- * escaped so a `<!channel>` broadcast or `<url|text>` link cannot ride in on
- * customer content, then capped to Slack's documented maximum (past which
- * `invalid_blocks` fails the whole message). Escaping before capping keeps the
- * final length under the cap.
+ * Raw markdown block; text is escaped to prevent injection, then capped to
+ * Slack's maximum; blocks without string text are dropped.
  */
 function findSanitizedMarkdown(block: Record<string, unknown>): Record<string, unknown> | null {
   if (typeof block.text !== "string" || block.text.length === 0) return null;
@@ -519,21 +504,8 @@ function findSanitizedGatedBlock(
 }
 
 /**
- * Filters arbitrary parsed Block Kit JSON down to the safe, presentational
- * allowlist. Non-array input or non-object entries yield an empty list.
- *
- * Gated blocks (`alert`, `data_visualization`, `data_table`) are DROPPED unless
- * `allowGatedBlocks` is set — a delivery path that renders them is confirmed.
- * When allowed, each is run through its defensive sanitiser (callback actions
- * stripped, nested cells recursively sanitised, sizes capped). `card` is
- * delivery-verified and lives in the allowed tier, sanitised in-line.
- *
- * Every sanitiser returns null for a block Slack would REJECT — an empty
- * `elements` array, a section with no text left, sizes past the documented
- * maxima — and the block is dropped here. That matters because `invalid_blocks`
- * fails the WHOLE message (and is not retryable): emitting one invalid block
- * loses the notification entirely, whereas dropping it lets the message deliver
- * with what survived, or fall back to plain text when nothing does.
+ * Filters Block Kit JSON to the safe allowlist; gated blocks are dropped unless
+ * allowGatedBlocks is set; sanitisers reject invalid blocks to prevent message loss.
  */
 export function filterBlockKit(
   blocks: unknown,

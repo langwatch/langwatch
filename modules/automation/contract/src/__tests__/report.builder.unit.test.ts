@@ -108,7 +108,7 @@ describe("reportSourceSchema", () => {
           customGraphId: "g1",
         }).success,
       ).toBe(true);
-      expect(reportSourceSchema.safeParse({ kind: "traceQuery" }).success).toBe(true); // filters/topN default
+      expect(reportSourceSchema.safeParse({ kind: "traceQuery" }).success).toBe(true);
       expect(reportSourceSchema.safeParse({ kind: "spreadsheet" }).success).toBe(false);
     });
 

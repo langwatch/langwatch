@@ -12,7 +12,7 @@ export interface AutomationPlan {
   type: string;
   free: boolean;
   maxTriggerPersistDispatchesPerDay?: number;
-  /** The daily ceiling this plan's tier carries, ahead of the free/paid/enterprise bucket fallback. */
+  /** Plan tier's daily ceiling; overrides the free/paid/enterprise fallback. */
   automationDailyDispatchCeiling?: number;
 }
 

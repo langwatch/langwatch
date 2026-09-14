@@ -33,13 +33,8 @@ export class TriggerFiltersRequiredError extends HandledError {
 }
 
 /**
- * A graph alert or a scheduled report was asked to do something it cannot.
- *
- * Both kinds are notifications: they deliver by email, Slack or webhook and
- * have nowhere to put a row. `ADD_TO_DATASET` and `ADD_TO_ANNOTATION_QUEUE`
- * belong to a trace-filter automation, which has traces to add. The two
- * builders have always said so in their types; nothing refused it at the
- * door, so such a trigger was stored and then never delivered.
+ * Graph alerts and reports are notifications without row destinations, so
+ * ADD_TO_DATASET and ADD_TO_ANNOTATION_QUEUE are unsupported.
  */
 export class TriggerActionUnsupportedError extends HandledError {
   declare readonly code: "trigger_action_unsupported";
@@ -370,13 +365,8 @@ export class UnsubscribeRateLimitedError extends HandledError {
 }
 
 /**
- * The token in an unsubscribe link is invalid, tampered with, or names a
- * project that no longer exists.
- *
- * The status is the caller's, not the cause's: resolving a link that resolves
- * to nothing has always been a 404, and confirming with a token that does not
- * verify has always been a 400. One code, because it is one cause and one
- * remedy - ask for the link again.
+ * Unsubscribe token is invalid, tampered, or missing; one code covers both 404 and 400
+ * errors with the same remedy.
  */
 export class UnsubscribeLinkInvalidError extends HandledError {
   declare readonly code: "unsubscribe_link_invalid";

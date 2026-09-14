@@ -206,14 +206,8 @@ const UNSUBSCRIBE_RESOLVE_MAX = 30;
 const UNSUBSCRIBE_CONFIRM_MAX = 10;
 
 /**
- * The persist-daily ceilings the contract already defines, plus the two
- * api-config values the deleted composition (`options.baseHost`,
- * `options.unsubscribeSecret`) used to receive as constructor arguments
- * instead of through this module's own schema. Both default to that
- * composition's own absent-config answer: an empty public origin (every link
- * built from it is then a relative path, and `platformUrl` refuses by name)
- * and no signing secret, which {@link HmacUnsubscribeTokenAdapter} already
- * reads as "refuse to verify".
+ * Persist-daily ceilings from contract plus baseHost and unsubscribeSecret config;
+ * defaults are empty origin (relative paths) and no secret.
  */
 const automationAppExtraConfigSchema = z.object({
   baseHost: z.string().default(""),

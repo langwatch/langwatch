@@ -4,16 +4,8 @@ import { z } from "zod";
 const positiveCount = z.coerce.number().int().positive();
 
 /**
- * The ceilings an automation runs under.
- *
- * The key its stored credentials are read with is not here: that is the
- * stored-secret cipher key, and the secret feature owns it, so an automation
- * cannot end up decrypting with a different key than the one that wrote.
- *
- * All three persistence caps travel together even though a project uses one:
- * the tier is resolved per project at run time, and the automations screen
- * reports the customer's own cap back to them, so a process that carried only
- * the tier it thought it needed would show the wrong number.
+ * Ceilings an automation runs under; all persistence caps are included for display even
+ * though only one is used per project.
  */
 export const automationServerConfigDefinition = RuntimeConfig.define({
   emailHourlyCap: Config.value(positiveCount.default(100), { env: "TRIGGER_EMAIL_HOURLY_CAP" }),
