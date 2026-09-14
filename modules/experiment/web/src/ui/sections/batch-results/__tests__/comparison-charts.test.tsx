@@ -216,9 +216,8 @@ describe("ComparisonCharts", () => {
         wrapper: Wrapper,
       });
 
-      // Recharts legend elements should not be present
-      const _charts = screen.queryAllByRole("img"); // Recharts uses role="img" for some legend items
-      // This is a basic check - the key thing is that we removed <Legend> component
+      // Verify the Legend component was removed
+      const _charts = screen.queryAllByRole("img");
       expect(screen.queryByText("legend")).not.toBeInTheDocument();
     });
   });
@@ -948,10 +947,10 @@ describe("ComparisonCharts", () => {
         expect(gpt4Score).not.toEqual(globalScore);
         expect(claude3Score).not.toEqual(globalScore);
 
-        // The per-target scores span a much wider range than just the global average
-        expect(gpt4Score - claude3Score).toBeGreaterThan(0.4); // Range is 0.475
-        expect(Math.abs(gpt4Score - globalScore)).toBeGreaterThan(0.2); // GPT-4 is 0.25 above global
-        expect(Math.abs(claude3Score - globalScore)).toBeGreaterThan(0.2); // Claude is 0.225 below global
+        // Per-target scores span a wider range than the global average
+        expect(gpt4Score - claude3Score).toBeGreaterThan(0.4);
+        expect(Math.abs(gpt4Score - globalScore)).toBeGreaterThan(0.2);
+        expect(Math.abs(claude3Score - globalScore)).toBeGreaterThan(0.2);
       });
     });
 

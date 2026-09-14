@@ -1,12 +1,6 @@
 /**
+ * SuiteContextMenu with Edit, Duplicate, and Archive actions.
  * @vitest-environment jsdom
- *
- * Integration tests for SuiteContextMenu component.
- *
- * Tests that the context menu renders Edit, Duplicate, and Archive actions,
- * fires the correct callbacks, and closes after action selection.
- *
- * @see specs/suites/suite-archiving.feature - "Archive a suite via the context menu"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

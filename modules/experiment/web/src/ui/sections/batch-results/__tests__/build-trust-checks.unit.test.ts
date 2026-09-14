@@ -480,11 +480,7 @@ describe("buildTrustChecks — the sample-size threshold the product actually sh
   });
 });
 
-/**
- * The step-2 badge is derived from these checks rather than re-listing their conditions, because the parallel
- * boolean it replaced had drifted from the panel TWICE — it knew about neither a graph broken into groups nor a
- * bootstrap whose resamples failed to settle.
- */
+// The step badge is derived from these checks, not re-listing conditions.
 describe("the step badge, derived from the checks", () => {
   const hasProblem = (overrides: Partial<LeaderboardTrustPanelProps> = {}) =>
     build(overrides).some((check) => check.tone === "warn");

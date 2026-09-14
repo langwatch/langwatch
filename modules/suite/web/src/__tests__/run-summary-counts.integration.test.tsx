@@ -1,12 +1,6 @@
 /**
+ * RunSummaryCounts component with icon-based status display.
  * @vitest-environment jsdom
- *
- * Integration tests for RunSummaryCounts component.
- *
- * Tests compact icon-based display of status counts.
- * Only non-zero statuses are rendered.
- *
- * @see specs/features/suites/footer-to-header-migration.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

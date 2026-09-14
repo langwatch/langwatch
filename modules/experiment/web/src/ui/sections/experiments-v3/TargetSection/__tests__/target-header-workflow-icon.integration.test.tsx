@@ -107,11 +107,7 @@ describe("given an experiment target that is a code agent", () => {
   });
 });
 
-/**
- * A connected agent runs in the customer's own process, so the column has to
- * say something other than "code" — that icon reads as a Studio code node.
- * Ported from `platform/app/src/experiments-v3/components/TargetSection/__tests__/TargetHeader.integration.test.tsx` (#7763).
- */
+// Connected agents need a different icon since "code" would be confusing.
 describe("given an experiment target that is a connected agent", () => {
   afterEach(() => {
     cleanup();

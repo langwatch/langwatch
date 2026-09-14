@@ -179,9 +179,8 @@ export const useAutosaveEvaluationsV3 = () => {
 
   const routerSlug = router.query.slug as string | undefined;
 
-  // Detect if the store was reset while component stayed mounted
-  // This happens when user navigates away and back - reset() is called but component might not remount
-  // If we previously loaded this slug but experimentSlug is now different (or undefined), reset the ref
+  // Detect if the store was reset while component stayed mounted. This happens
+  // when user navigates away and back; reset the ref if experimentSlug changed.
   if (loadedSlugRef.current === routerSlug && experimentSlug !== routerSlug) {
     loadedSlugRef.current = null;
   }
@@ -277,8 +276,7 @@ export const useAutosaveEvaluationsV3 = () => {
       // Invalidate the query cache for this experiment so that when
       // user navigates back, it fetches fresh data instead of stale cache
       if (routerSlug) {
-        // Use a predicate to match the query key pattern for tRPC queries
-        // tRPC query keys are arrays like [["experiments", "getEvaluationsV3BySlug"], { input: {...}, type: "query" }]
+        // Match tRPC query keys like [["experiments", "getEvaluationsV3BySlug"], ...]
         void queryClient.invalidateQueries({
           predicate: (query) => {
             const key = query.queryKey;

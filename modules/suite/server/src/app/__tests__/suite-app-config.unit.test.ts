@@ -1,12 +1,6 @@
 /**
+ * SuiteApp config includes publicBaseUrl for platform URLs.
  * @vitest-environment node
- * The regression this lane fixes: `SuiteApp.create` used to receive
- * `publicBaseUrl` on a `SuiteAppInfrastructure` bag nothing supplied since
- * b383462d96, so `platformUrl` — the deep link every listed suite and test
- * suite is rendered with — refused naming a public base URL even on a
- * deployment that configured one. `SuiteApp` now reads `publicBaseUrl` off
- * its own config (`suiteAppConfigSchema`), which the boot path parses
- * BEFORE `create` runs and which this test parses the same way.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AgentApi } from "@langwatch/agent-contract";

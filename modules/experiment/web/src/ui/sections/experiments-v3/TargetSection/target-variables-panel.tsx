@@ -1,13 +1,4 @@
-/**
- * A target's input variables and where each one reads its value from.
- *
- * Sources are scoped to the ACTIVE dataset — mappings are stored per dataset —
- * plus the outputs of the other targets, which is how one target chains into
- * another. Only inputs the prompt actually uses count as missing when unmapped:
- * a variable declared and never referenced needs no source.
- *
- * Spec: specs/experiments-v3/mapping-validation.feature
- */
+// Target input variables and their sources (datasets and chained target outputs).
 
 import { Text, VStack } from "@chakra-ui/react";
 import type { Field } from "@langwatch/workflow-contract";

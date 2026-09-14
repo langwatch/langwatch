@@ -1,25 +1,4 @@
-/**
- * Where the testing surfaces open in the platform.
- *
- * Two interfaces address the same rows. Agent Testing keeps the run plans and
- * the run sets under `/agent-testing/results`, the test suites under
- * `/agent-testing/suites` and the scenarios on `/agent-testing`; the
- * Simulations pages it replaces keep them all under `/simulations`. Which one a
- * link points at is decided per project by the release flag, so a customer who
- * has the new interface never gets a link into the old one, and a customer who
- * does not never gets a link they cannot open.
- *
- * Every address the platform hands out to the outside (the REST APIs, the
- * scenario library, the CLI, the MCP server, the Langy navigate fallback) is
- * built here, so the two interfaces are written in one file.
- *
- * Reading WHICH interface a project has is a process capability, not a pure
- * function: it reads the release flag and the project's organization. It
- * arrives as {@link TestingInterfaceReader}, and the paths below take the
- * answer rather than fetching it, so this module stays free of I/O.
- *
- * @see specs/features/agent-testing/page-structure.feature
- */
+// Testing surfaces paths for Agent Testing and Simulations interfaces.
 
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
 import type { SuiteKind } from "./suite.kind.ts";

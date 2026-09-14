@@ -74,8 +74,7 @@ export function EvaluatorChip({
   // later onClick's stopPropagation has a chance to run.
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
-  // If result already exists, it overrides isRunning (evaluator completed)
+  // Use isRunning state, overridden if result already exists.
   const status = isRunning && parsed.status === "pending" ? "running" : parsed.status;
   const { score, label, details } = parsed;
 

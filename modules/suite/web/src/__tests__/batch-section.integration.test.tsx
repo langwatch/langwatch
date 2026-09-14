@@ -1,11 +1,6 @@
 /**
+ * BatchSection component with mocked children.
  * @vitest-environment jsdom
- *
- * Integration tests for BatchSection component.
- *
- * Tests that batch sub-header renders with pass rate,
- * and that ScenarioRunContent receives batch scenario runs.
- * ScenarioRunContent and SummaryStatusIcon are mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

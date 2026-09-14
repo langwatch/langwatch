@@ -427,11 +427,7 @@ export const ComparisonCharts = ({
   showComparisonLeaderboard = false,
   onOpenLeaderboard,
 }: ComparisonChartsProps) => {
-  /**
-   * The comparison evaluators on this page, which are excluded from the candidate-oriented charts in two ways: -
-   * no `<name> (Score)` chart, because a comparison's 0/1 label reads as a misleading "score 0" for the
-   * non-scored prompts on the same axis; - no bar on Cost / Latency, because a judge is not a candidate.
-   */
+  // Comparison evaluators are excluded from candidate-oriented charts.
   const comparisonEvaluatorIds = useMemo(
     () => new Set((comparisonColumns ?? []).map((c) => c.evaluatorId)),
     [comparisonColumns],

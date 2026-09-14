@@ -26,11 +26,7 @@ const MAX_DISPLAY_CHARS = 10000;
 type BatchTargetCellProps = {
   /** Target output data for this row */
   targetOutput: BatchTargetOutput;
-  /**
-   * Evaluator ids we shouldn't render generic score chips for — comparison evaluators surface via the dedicated
-   * Winner column (#5100 follow-up), so their raw `label`+`score` chip (e.g. `target_XYZ 1.00`) reads as
-   * duplicate noise and confused users during dogfooding.
-   */
+  // Evaluator ids to skip (comparison evaluators show in Winner column)
   suppressedEvaluatorIds?: Set<string>;
   /** Whether to render the target's output (default true) */
   showOutput?: boolean;

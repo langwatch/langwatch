@@ -1,11 +1,6 @@
 /**
+ * Connected badge for SDK-opened tabs.
  * @vitest-environment jsdom
- *
- * Covers specs/scenarios/scenario-tab-handoff.feature — the connected badge.
- *
- * The badge is the only trace the tab-reuse feature leaves in the UI: runs are
- * followed silently, so this marker is how a user tells the SDK-opened tab
- * apart from one they opened themselves.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

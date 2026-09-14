@@ -306,9 +306,7 @@ export function ComparisonLeaderboardDrawer({
   rows,
   ...rest
 }: ComparisonLeaderboardDrawerProps) {
-  // The chart's expand button is the only affordance that opens this, and it is already gone when the flag is
-  // off — but a drawer is addressable by URL, so a link shared out of an enabled organization would otherwise
-  // render the whole leaderboard for one that has not been given it.
+  // Drawer is URL-addressable, so guard against sharing links across organizations.
   const showLeaderboard = useShowComparisonLeaderboard();
   if (!showLeaderboard) return null;
   if (!column || !rows) {

@@ -1,17 +1,4 @@
-/**
- * What a run plan covers.
- *
- * One zod union is the only definition of the shape: the database column, the
- * tRPC input, the REST body and the form all read it from here, so a mode
- * cannot be added on one side and missed on another.
- *
- * A plan stored before scopes carries null, which reads as
- * {@link SCENARIOS_SCOPE} and runs the `scenarioIds` it already held. A
- * `kind: "test_suite"` suite carries no scope at all: its members come from
- * `Scenario.testSuiteId`.
- *
- * @see specs/suites/run-plan-dynamic-scopes.feature
- */
+// Run plan scope: what a run covers (all, test suites, labels, or scenarios).
 
 import { z } from "zod";
 

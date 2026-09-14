@@ -542,7 +542,7 @@ describe("Validation edge cases", () => {
       ...createTestTarget("r1", [{ identifier: "question", type: "str" }]),
       localPromptConfig: {
         llm: { model: "gpt-4" },
-        messages: [{ role: "user", content: "Hello {{question}} and {{foo}}" }], // foo used but not in inputs
+        messages: [{ role: "user", content: "Hello {{question}} and {{foo}}" }], // foo undefined
         inputs: [{ identifier: "question", type: "str" }], // foo not listed
         outputs: [{ identifier: "output", type: "str" }],
       },
@@ -550,8 +550,7 @@ describe("Validation edge cases", () => {
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
-    // Only "question" should be detected as missing (it's both used AND in inputs)
-    // "foo" is used but NOT in inputs - this is fine ("Undefined variables" warning, not mapping error)
+    // Only missing mappings for variables in both message and inputs.
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(1);
     expect(result.missingMappings.map((m) => m.fieldId)).toContain("question");

@@ -1,11 +1,6 @@
-// @vitest-environment jsdom
 /**
- * A target's variables panel: what each input reads from, and what is still
- * unmapped.
- *
- * @see specs/experiments-v3/mapping-validation.feature
- * @see specs/experiments-v3/mapping-source-types.feature
- * @see specs/experiments-v3/mapping-source-display.feature
+ * Target variables panel: input mappings and validation.
+ * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
 

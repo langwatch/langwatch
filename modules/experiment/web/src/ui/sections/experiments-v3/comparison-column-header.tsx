@@ -68,9 +68,7 @@ export function ComparisonColumnHeader({
 
   const openComparisonEditor = useOpenComparisonEditor();
 
-  // Unlike a per-target chip, this is the ONLY surface that can carry a missing-config cue for a chip-style comparison — it has no column
-  // of its own elsewhere, and Run's validation redirect only surfaces the problem after the user already hit Run. targetId is unused by
-  // the comparison branch of getEvaluatorMissingMappings (it validates comparison.variants directly), so "" is fine here.
+  // This is the only surface showing missing config for chip-style comparisons.
   const hasMissingMappings =
     !!evaluator && !getEvaluatorMissingMappings(evaluator, activeDatasetId, "").isValid;
 

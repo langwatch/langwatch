@@ -306,9 +306,7 @@ function resolveComparison({
   if (comparison.winner === null) return null;
 
   const wIdx = idx.get(comparison.winner);
-  // The winner must have been ON the row. types.ts assembles variantIds from every label the column ever produced, while `candidates` is
-  // the per-row set the judge actually saw — so a winner naming a variant that was dropped from this row (no output) resolves fine
-  // against the global index and then beats opponents it never faced.
+  // The winner must have been in this row's candidates.
   if (wIdx === void 0 || !candIdxs.includes(wIdx)) return null;
   return { candIdxs, winner: wIdx };
 }

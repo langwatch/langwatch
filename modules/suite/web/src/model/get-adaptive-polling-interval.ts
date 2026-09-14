@@ -15,15 +15,7 @@ const ACTIVE_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set<ScenarioRunStatu
   ScenarioRunStatus.PENDING_EVALUATION,
 ]);
 
-/**
- * Computes an adaptive polling interval based on run statuses.
- *
- * Returns a fast interval (2-3s) when any run is PENDING or IN_PROGRESS,
- * and a slow interval (15-30s) when all runs are settled.
- *
- * @param options.runs - Array of scenario run data to inspect
- * @returns Polling interval in milliseconds
- */
+// Adaptive polling interval: fast when active, slow when settled.
 export function getAdaptivePollingInterval({
   runs,
 }: {

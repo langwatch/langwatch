@@ -205,8 +205,7 @@ export function BatchEvaluationResults({
     if (timeUntilGraceExpires <= 0) return;
 
     const timer = setTimeout(() => {
-      // Force re-render by setting finishedAt to a new value (same time but new reference won't work since it's a number)
-      // Instead, we set it to -1 to indicate grace period has expired
+      // Set finishedAt to -1 to indicate the grace period has expired.
       setFinishedAt(-1);
     }, timeUntilGraceExpires);
 

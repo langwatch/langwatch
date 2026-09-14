@@ -1,12 +1,6 @@
 /**
+ * SuiteArchiveDialog confirmation modal.
  * @vitest-environment jsdom
- *
- * Integration tests for SuiteArchiveDialog component.
- *
- * Tests that the archive confirmation modal displays suite name,
- * explanation text, Cancel and Archive buttons, and fires correct callbacks.
- *
- * @see specs/suites/suite-archiving.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

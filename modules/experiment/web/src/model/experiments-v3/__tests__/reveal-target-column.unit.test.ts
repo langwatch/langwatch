@@ -1,6 +1,5 @@
 /**
- * A column Langy adds lands past the right edge of a wide workbench, so without this the reader watched a saved,
- * real change happen off screen and read the whole step as nothing happening.
+ * Ensure newly added columns scroll into view so the reader sees the change.
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1053,7 +1053,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const pendingChanges = { ...currentState.pendingSavedChanges };
 
         if (dbDatasetId && recordsToDelete.length > 0) {
-          // Mark records for deletion using nested structure: datasetId -> recordId -> { _delete: true }
+          // Mark records for deletion: datasetId -> recordId -> { _delete: true }
           if (!pendingChanges[dbDatasetId]) {
             pendingChanges[dbDatasetId] = {};
           }

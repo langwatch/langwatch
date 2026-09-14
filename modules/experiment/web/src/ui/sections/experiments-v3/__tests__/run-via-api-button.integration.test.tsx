@@ -1,12 +1,6 @@
 /**
+ * Run via API dialog: language and data-source pickers with copyable snippets.
  * @vitest-environment jsdom
- *
- * The evaluations-v3 workbench's Run via API dialog shows copyable snippets that
- * trigger this experiment through the unified evaluations-v3 backend and read
- * the per-row results back. It offers a language picker (Python default, then
- * TypeScript, then Shell) and a data-source picker (attached dataset, inline
- * data, dataset id). The dialog is opened from the workbench "Run Options" menu,
- * so it is rendered controlled by its caller.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

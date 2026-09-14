@@ -1,11 +1,6 @@
 /**
+ * useSuiteForm agent type filtering for available targets.
  * @vitest-environment jsdom
- *
- * Tests for agent type filtering in useSuiteForm.availableTargets.
- *
- * HTTP, code, and workflow agents are supported as suite targets.
- * Signature agents are excluded — they're sub-components of workflows,
- * not stand-alone scenario targets.
  */
 
 import { renderHook } from "@testing-library/react";

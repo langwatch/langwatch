@@ -1,5 +1,5 @@
 /**
- * Offset-mode lists must return to the first page whenever the result set they are counting into changes.
+ * Offset-mode lists must return to the first page when the result set changes.
  * @vitest-environment jsdom
  * @see specs/traces/pagination-controls.feature
  */

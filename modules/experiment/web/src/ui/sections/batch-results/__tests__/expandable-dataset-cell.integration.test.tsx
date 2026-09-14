@@ -1,9 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 
-// @vitest-environment jsdom
 /**
- * A dataset value too long for its row collapses behind a fade overlay and expands over the page on click, the
- * same affordance the target and Winner cells offer in the same table.
+ * Dataset values collapse behind a fade and expand on click, like other cells.
+ * @vitest-environment jsdom
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

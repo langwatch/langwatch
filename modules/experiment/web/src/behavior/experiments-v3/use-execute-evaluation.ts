@@ -231,9 +231,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "error": {
-          // Every `error` frame is built by `mapThrownErrorEvent`: a handled failure carries its code on
-          // `domainError`, an unhandled one carries the unnamed-failure marker and a trace id, and neither
-          // carries the thrown error's own words.
+          // Error frames carry either a handled error code or the unnamed-failure marker.
           const envelope = asHandledEnvelope(event);
           const detail = describeError({
             error: envelope,

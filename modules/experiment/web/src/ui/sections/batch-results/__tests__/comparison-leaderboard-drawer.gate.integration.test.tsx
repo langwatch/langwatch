@@ -2,7 +2,8 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * The expanded leaderboard is addressable: `CurrentDrawer` renders it from a URL, so it is reachable without ever passing the chart's expand affordance.
+ * The expanded leaderboard is addressable via URL, reachable without the
+ * chart's expand affordance.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

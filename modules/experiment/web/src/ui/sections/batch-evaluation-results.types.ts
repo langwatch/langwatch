@@ -225,9 +225,7 @@ export type BatchEvaluationData = {
   rows: BatchResultRow[];
 };
 
-/**
- * Transforms raw ExperimentRunWithItems data into the row-based format needed for TanStack Table display.
- */
+// Transform ExperimentRunWithItems data into row-based format for TanStack Table.
 const resolveV2OutputTargetPredicted = (
   predicted: Record<string, unknown>,
   targetId: string,
@@ -588,9 +586,7 @@ const detectComparisonColumns = (
   const resolveToTargetId = (identifier: string): string | undefined =>
     targetIdByAnyKey.get(identifier);
 
-  // Every target column with `type: "evaluator"` is treated as a comparison column-target — the synthetic
-  // evaluator generated for it stores evaluator id == target id, and no scalar evaluator ever ends up as a
-  // top-level target column in this UI.
+  // Target columns with type "evaluator" are treated as comparison columns.
   const forcedComparisonEvaluatorIds = new Set(
     targetColumns.filter((t) => t.type === "evaluator").map((t) => t.id),
   );

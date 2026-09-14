@@ -1,11 +1,6 @@
 /**
+ * GroupRow integration tests.
  * @vitest-environment jsdom
- *
- * Integration tests for GroupRow component.
- *
- * Tests that summary metrics appear in header and no footer is rendered.
- *
- * @see specs/features/suites/footer-to-header-migration.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

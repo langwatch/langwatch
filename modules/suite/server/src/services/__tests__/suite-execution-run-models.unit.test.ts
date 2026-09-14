@@ -1,11 +1,6 @@
 /**
+ * Queued suite run model recording via SuiteExecutionService.
  * @vitest-environment node
- *
- * What a queued suite run records about the models it will run on. The
- * queued command is the only place the stamp happens, so this reads it
- * straight off the command the service dispatches.
- *
- * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 import { describe, expect, it } from "vitest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";

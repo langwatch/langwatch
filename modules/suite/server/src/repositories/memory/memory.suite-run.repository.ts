@@ -7,16 +7,7 @@ import type {
 } from "@langwatch/suite-contract";
 import { SuiteRunReadRepository } from "../suite-run.repository.ts";
 
-/**
- * The run projection, held in this process.
- *
- * It is a real twin, not a null object: what it is written it answers back,
- * scoped to the tenant that wrote it, so a test can assert on a suite run's
- * progress without a ClickHouse server, and the two reads below tell the same
- * story the live store does. Answering `null` and `[]` regardless of what was
- * written is what let a deployment with no ClickHouse serve an empty run
- * history and look healthy.
- */
+// In-memory run projection for testing without ClickHouse.
 export class MemorySuiteRunRepository
   extends BaseMemoryProjectionStore<Projection<SuiteRunStateData>>
   implements SuiteRunReadRepository

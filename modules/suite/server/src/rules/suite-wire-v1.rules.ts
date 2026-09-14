@@ -392,15 +392,7 @@ export function toRunItemsWire(
   }));
 }
 
-/**
- * The stored targets column, as the wire shape.
- *
- * The column is JSON, and rows written before the current shape may hold a
- * string, so it is read defensively rather than parsed strictly: a plan whose
- * targets cannot be read still lists, it just lists with none. Each entry is
- * parsed on its own, so one bad entry costs its own row and not the rest.
- * Casting instead would publish `type` and `referenceId` as undefined.
- */
+// Read targets column defensively from JSON, skipping unparseable entries.
 function readTargets(raw: unknown): SuiteTargetWire[] {
   const value = typeof raw === "string" ? parseJson(raw) : raw;
   if (!Array.isArray(value)) return [];

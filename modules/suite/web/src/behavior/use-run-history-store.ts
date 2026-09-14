@@ -1,12 +1,4 @@
-/**
- * Zustand store for suite run history view state.
- *
- * Manages groupBy mode and filter state, with URL synchronization
- * so that view state persists across page reloads.
- *
- * The store is the single source of truth. Components read from the store,
- * and the URL is a serialized view of the store state.
- */
+// Run history view state with groupBy and filters, synced to URL.
 
 import { create } from "zustand";
 import { RUN_GROUP_TYPES, type RunGroupType } from "../model/run-history-transforms.ts";

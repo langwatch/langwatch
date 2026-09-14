@@ -23,11 +23,7 @@ type DatasetTabsProps = {
   onSaveAsDataset: (dataset: DatasetReference) => void;
 };
 
-/**
- * Dataset tabs component for switching between multiple datasets. - Clicking a tab switches to that dataset -
- * Dropdown menu only appears on the active/selected tab, offering Switch Dataset (the picker), Save as dataset
- * (inline only) and Remove from workbench - Shows "Datasets" label with database icon
- */
+// Dataset tabs for switching between datasets with a context menu on the active tab.
 export function DatasetTabs({
   onSelectExisting,
   onUploadCSV,

@@ -1,19 +1,4 @@
-/**
- * A target is an agent and its parameters.
- *
- * A run plan may point one agent at itself twice with different parameter
- * overrides, "prod-agent on gpt-5 vs prod-agent on gpt-5-mini". Each of those
- * is its own target, so a target needs an identity wider than its reference
- * id. This module is that identity: the key a target folds under, the way a
- * key splits back apart, and the one label rule the run dialog, the plan name
- * and the results page all read.
- *
- * Framework-free and dependency-free on purpose: the browser bundle imports
- * it, so nothing here may reach for node's crypto, the database or a request.
- * The hash is a small SHA-1 written out below for the same reason.
- *
- * @see specs/suites/run-plan-identity-by-name.feature
- */
+// Target identity: agent plus its parameter overrides.
 
 import type {
   RunParameterValues,
@@ -177,16 +162,7 @@ export function targetSortKey({
   return `${type}:${referenceId}|${parameterPairs({ runParameters }).join(",")}`;
 }
 
-/**
- * The string that tells two targets apart.
- *
- * {@link targetSortKey} writes the overrides as `k=v,k2=v2`, which a value
- * holding a comma and an `=` can forge: `{ a: "b,c=d" }` and
- * `{ a: "b", c: "d" }` write the same pairs, and the two targets would then
- * read as one. Identity reads the canonical JSON instead, where every value is
- * quoted and no value can be read as another pair. The readable key stays for
- * ordering alone.
- */
+// Target identity as canonical JSON (not comma-separated pairs).
 export function targetIdentityKey({
   type,
   referenceId,
@@ -256,20 +232,7 @@ function namesThatDiffer(sets: readonly RunParameterValues[]): Set<string> {
   return names;
 }
 
-/**
- * What a target is called.
- *
- * Its name, or `name · k=v` over the names in `differingNames` the target
- * carries: the parameters that tell it from the other targets of the same
- * agent, and none of the ones they share. A target that carries none of them
- * keeps its bare name.
- *
- * A connected agent reads with its environment, `name · production`, and a
- * personal one with its owner's name after it, `name · development (Ana)`,
- * since one name can be several agents and the environment and the owner are
- * what tell them apart. The caller passes the owner's display name: this
- * module reads no user record.
- */
+// Target label: name, parameters, environment, or owner name as applicable.
 export function targetLabelOf({
   name,
   environment,
@@ -295,13 +258,7 @@ export function targetLabelOf({
   return parameters === "" ? agent : `${agent}${TARGET_LABEL_SEPARATOR}${parameters}`;
 }
 
-/**
- * The labels of a list of targets, in the order given.
- *
- * The one rule the run dialog, the plan name and the run detail share: an
- * agent that appears once reads as its name, and an agent that appears more
- * than once reads with the parameters that differ between its targets.
- */
+// Labels for a list of targets, applying the shared run naming rule.
 export function targetLabels<T extends LabelledTarget>({
   targets,
   nameOf,

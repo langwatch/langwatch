@@ -1,11 +1,6 @@
 /**
+ * MessagePreview component message format tests.
  * @vitest-environment jsdom
- *
- * Unit tests for MessagePreview component.
- *
- * Tests content extraction from various message formats:
- * string, array with text objects, tool calls, tool results,
- * and message alignment based on role.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

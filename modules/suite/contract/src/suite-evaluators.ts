@@ -1,15 +1,4 @@
-/**
- * The domain rules over a suite's fields and evaluator attachments: what a
- * write must satisfy, which attachments a run carries, and which of them
- * still miss a required mapping.
- *
- * The shapes and the mapping grammar live in `server/scenarios/suite-fields`
- * and `server/scenarios/evaluator-attachments`; this module turns their
- * refusals into handled errors and reads them against the project.
- *
- * @see specs/suites/test-suites.feature
- * @see specs/scenarios/scenario-fields.feature
- */
+// Suite fields and evaluator attachments domain rules.
 
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import {

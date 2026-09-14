@@ -1,13 +1,6 @@
 /**
+ * Unified run view layout with group-by and view toggle.
  * @vitest-environment jsdom
- *
- * Integration tests for unified group-by and list/grid view across all run views.
- *
- * Tests that RunHistoryFilters renders the correct group-by options based on
- * the view context, and that external set and all-runs views use the shared
- * filter bar with group-by and view toggle.
- *
- * @see specs/features/suites/unified-run-view-layout.feature - @integration scenarios
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

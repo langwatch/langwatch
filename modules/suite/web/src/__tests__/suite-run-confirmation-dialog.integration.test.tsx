@@ -1,12 +1,6 @@
 /**
+ * SuiteRunConfirmationDialog with scenario/target breakdown.
  * @vitest-environment jsdom
- *
- * Integration tests for SuiteRunConfirmationDialog component.
- *
- * Tests that the run confirmation modal displays suite name,
- * scenario/target breakdown, job count in title and button, and fires correct callbacks.
- *
- * @see specs/features/suites/suite-run-confirmation-modal.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

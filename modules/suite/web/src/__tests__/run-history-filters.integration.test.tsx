@@ -1,11 +1,6 @@
 /**
+ * RunHistoryFilters component integration tests.
  * @vitest-environment jsdom
- *
- * Integration tests for RunHistoryFilters component.
- *
- * Tests filter dropdown interactions for scenario and pass/fail status filtering.
- *
- * @see specs/suites/suite-workflow.feature - "Run History -- Filters"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

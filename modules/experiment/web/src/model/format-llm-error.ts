@@ -1,4 +1,5 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: empty blocks are
+// deliberate no-ops.
 
 export type LLMErrorType =
   | "not_found"

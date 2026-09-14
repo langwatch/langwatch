@@ -200,9 +200,8 @@ export const useOpenTargetEditor = () => {
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             setFlowCallbacks("agentWorkflowTargetEditor", {
-              // Capture activeDatasetId (and isDatasetSource, which already derives from this render's datasets) rather than re-reading the store live
-              // at edit time — this drawer isn't modal, so the user can switch the active dataset while it's still open, and a live read would then
-              // write the mapping into the wrong dataset's bucket instead of the one this drawer opened against.
+              // Capture activeDatasetId at open time, not edit time, since this drawer
+              // isn't modal and the user may switch datasets while it's open.
               onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
                   setTargetMapping(

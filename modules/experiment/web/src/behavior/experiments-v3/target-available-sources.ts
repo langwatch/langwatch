@@ -1,12 +1,5 @@
-/**
- * Where a target's input variables can read their values from.
- *
- * The ACTIVE dataset only — mappings are stored per dataset, so offering
- * another dataset's columns would write a mapping nothing reads — plus the
- * other targets, whose outputs are how one target chains into another. A
- * target source is labelled with its resolved name rather than its internal
- * id, which is what makes a chained mapping readable.
- */
+// Where a target's input variables can read their values from: the active
+// dataset and other targets' outputs.
 
 import type { AvailableSource, FieldType } from "@langwatch/prompt-web/surfaces/variables";
 import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";

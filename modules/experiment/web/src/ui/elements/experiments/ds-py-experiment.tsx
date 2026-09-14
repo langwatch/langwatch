@@ -688,9 +688,11 @@ export const RunDetails = React.memo(
             ) : dspyStep.data ? (
               <Table.Root
                 height="fit-content"
-                // @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom size tokens
+                // @ts-expect-error: Chakra Table.Root prop types don't include
+                // custom theme tokens
                 size={size === "sm" ? "xs" : "sm"}
-                // @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom variant tokens
+                // @ts-expect-error: Chakra Table.Root prop types don't include
+                // custom theme tokens
                 variant="grid"
               >
                 <Table.Header>
@@ -796,9 +798,11 @@ export const RunDetails = React.memo(
             {tabIndex === 1 && (
               <Table.Root
                 height="fit-content"
-                // @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom size tokens
+                // @ts-expect-error: Chakra Table.Root prop types don't include
+                // custom theme tokens
                 size={size === "sm" ? "xs" : "sm"}
-                // @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom variant tokens
+                // @ts-expect-error: Chakra Table.Root prop types don't include
+                // custom theme tokens
                 variant="grid"
               >
                 <Table.Header>
@@ -896,9 +900,11 @@ export const RunDetails = React.memo(
           >
             <Table.Root
               height="fit-content"
-              // @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom size tokens
+              // @ts-expect-error: Chakra Table.Root prop types don't include
+              // custom theme tokens
               size={size === "sm" ? "xs" : "sm"}
-              // @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom variant tokens
+              // @ts-expect-error: Chakra Table.Root prop types don't include
+              // custom theme tokens
               variant="grid"
             >
               <Table.Header>

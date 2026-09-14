@@ -1,31 +1,9 @@
-/**
- * The name a run plan takes, and how long it may be.
- *
- * A run plan is identified by its NAME, so a caller that sends none still
- * needs one. The rule is the run dialog's: what the run covers, then the
- * targets it goes against, "Refunds dev-agent vs prod-agent". A run started
- * from the command line and one started from the dialog over the same scope
- * and targets therefore land on one plan.
- *
- * Framework-free on purpose: the dialog builds the same string in the
- * browser, so nothing here may reach for the database or the request.
- *
- * @see specs/suites/run-plan-identity-by-name.feature
- */
+// Run plan name: derived from scope and targets.
 
-/**
- * How long a run plan name may be. Long enough for a derived
- * `<scope> <target> vs <target>` name, short enough to stay a name.
- */
+// Maximum length for run plan names.
 export const MAX_PLAN_NAME_LENGTH = 200;
 
-/**
- * The derived run name: the scope, then the targets it goes against.
- *
- * A run with no target chosen yet is named after its scope alone. The result
- * is cut to {@link MAX_PLAN_NAME_LENGTH}, which is what the API accepts, so a
- * run against many targets is never refused for a name it did not type.
- */
+// Derive run name from scope and targets, capped at MAX_PLAN_NAME_LENGTH.
 export function derivePlanName({
   scopeLabel,
   targetLabels,

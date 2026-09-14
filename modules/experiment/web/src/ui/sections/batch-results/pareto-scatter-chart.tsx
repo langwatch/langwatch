@@ -170,15 +170,7 @@ export const buildParetoPoints = ({
   dominance: ParetoDominance;
 }): ParetoPoint[] =>
   entries
-    // Degenerate variants are excluded here for the same reason
-    // `computeParetoDominance` excludes them and the trust panel says they are
-    // excluded: a variant that never won or never lost has no maximum-
-    // likelihood score, so the number it carries is a smoothing artifact.
-    // Plotting it anyway put a variant that swept every matchup at the TOP of
-    // the quality axis, and because `dominatedBy` is built over ranked
-    // variants only it got no entry there, so it drew solid — the styling
-    // that means "still in contention" — while the table beside it said the
-    // score was not a measurement.
+    // Exclude degenerate variants (those with no maximum-likelihood score).
     .filter((entry) => !entry.isDegenerate)
     .map((entry, index): ParetoPoint | null => {
       const metrics = variantMetrics[entry.variantId];

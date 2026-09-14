@@ -93,7 +93,10 @@ describe("Evaluation wizard redirect", () => {
   });
 
   describe("when the experiment predates the workbench", () => {
-    /** @scenario Legacy wizard URLs for experiments that predate the workbench redirect to their workflow */
+    /**
+     * @scenario Legacy wizard URLs for experiments that predate the workbench
+     * redirect to their workflow
+     */
     it("redirects to the experiment's workflow exactly once", () => {
       routerState.query = { slug: "saved-2" };
       experimentState.data = {

@@ -110,9 +110,7 @@ export const TargetHeader = memo(function TargetHeader({
     (target.type === "prompt" && !!target.localPromptConfig) ||
     (target.type === "evaluator" && !!target.localEvaluatorConfig);
 
-  // Subscribe directly to just this target's unpublished state from store
-  // This is used when the table passes targets without localPromptConfig/localEvaluatorConfig in props
-  // (e.g., when using useShallow which doesn't deep-compare)
+  // Subscribe to this target's unpublished state from store.
   const storeHasUnpublished = useEvaluationsV3Store((state) => {
     const currentTarget = state.targets.find((r) => r.id === target.id);
     if (!currentTarget) return false;
@@ -276,9 +274,7 @@ export const TargetHeader = memo(function TargetHeader({
     target.type === "prompt" &&
     (target.promptVersionNumber === undefined || target.promptVersionNumber === latestVersion);
 
-  // Show version badge if: - Has version number defined AND is NOT at latest version Simple rule: if you're
-  // pinned to an older version, show the version badge (gray, no upgrade arrow) This helps users see they're
-  // working with an older version at a glance Note: We intentionally don't show drift/upgrade on the table.
+  // Show version badge if pinned to an older version.
   const showVersionBadge =
     target.type === "prompt" && target.promptVersionNumber !== undefined && !isAtLatestVersion;
 
@@ -368,9 +364,7 @@ export const TargetHeader = memo(function TargetHeader({
     <HStack
       gap={2}
       width="full"
-      // A flex item defaults to min-width:auto, so the name and the "<winner> wins" summary refuse to shrink below their text and the
-      // row grows past the column — pushing the play button under the next column. minWidth=0 here (and on the name button) lets the
-      // name truncate first, while the play button stays pinned via flexShrink={0}.
+      // minWidth=0 allows name to truncate while keeping play button pinned.
       minWidth={0}
       marginY={-2}
       // Glow lives on the <th> itself (evaluations-v3-table.tsx) so the whole
@@ -410,7 +404,7 @@ export const TargetHeader = memo(function TargetHeader({
               color={getTargetColor()}
               size="xs"
               icon={getTargetIcon()}
-              // For some reason this -2px adjustment is needed to align the icon with the text here for evaluators
+              // Align icon with text for evaluators.
               marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />
             <Text fontSize="13px" fontWeight="medium" truncate>

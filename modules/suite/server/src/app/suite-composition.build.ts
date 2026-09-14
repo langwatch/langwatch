@@ -1,30 +1,4 @@
-/**
- * Builds the collaborators `SuiteApp.create` used to receive as a hand-fed
- * `SuiteAppInfrastructure` bag, over the deleted composition
- * (`apps/api/src/features/suite/suite.composition.ts`, deleted by
- * b383462d96). `suite.server.ts` declares no members supplier at all any
- * more, so every field that bag used to carry has to come from somewhere
- * else: a member this App reads, its own config, a peer it already depends
- * on, or a deliberate refusal.
- *
- * `execution` is the one field this file refuses rather than builds.
- * Queuing a suite run's scenarios was, before b383462d96, a raw write onto
- * the SAME `simulation_processing` eventing pipeline `ScenarioApp` now
- * fronts with `queueSimulationRun(QueueSimulationRunInput)` — but that door
- * reconstructs its own event metadata from structured fields
- * (`actor`, `resolvedModels`, `scenarioVersion`, `parameters`), not from the
- * flat, already-encoded blob {@link SuiteExecutionService} builds, and no
- * module may reach a peer's eventing pipeline directly (only an app may
- * cross that boundary; `apps/tasks` still does for its backfill, and
- * `apps/api` used to for this exact one). Deciding whether `SuiteExecutionService`
- * should build a `QueueSimulationRunInput` instead, or whether `ScenarioApi`
- * should grow a lower-level command, is left to whoever settles it.
- *
- * Refusing by name here changes nothing about what a deployment gets today:
- * nothing has supplied `execution` since b383462d96, so `run`, `runAll` and
- * `runPlan` already answer `undefined is not a function`. This turns that
- * into a named, handled 503 instead.
- */
+// Build SuiteApp collaborators; `execution` field is deliberately refused.
 import type { AgentApi } from "@langwatch/agent-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";

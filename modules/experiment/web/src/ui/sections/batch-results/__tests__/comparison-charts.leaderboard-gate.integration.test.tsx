@@ -2,7 +2,8 @@ import "@testing-library/jest-dom/vitest";
 
 // @vitest-environment jsdom
 /**
- * The two gates that decide whether the Bradley-Terry leaderboard (#5103) appears at all — the per-organization rollout flag, and the 3+ variant product rule.
+ * Test the gates controlling whether the Bradley-Terry leaderboard appears:
+ * rollout flag and 3+ variant product rule.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 

@@ -1,12 +1,6 @@
 /**
+ * RunRow component integration tests.
  * @vitest-environment jsdom
- *
- * Integration tests for RunRow component.
- *
- * Tests the collapsible run row behavior: expand/collapse,
- * display of status counts, timestamp, and scenario x target rows.
- *
- * @see specs/suites/suite-workflow.feature - "Run History List"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

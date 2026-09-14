@@ -1,18 +1,4 @@
-/**
- * Auto-expansion logic for run history rows.
- *
- * Expands only the most recent row on first load for a given panel (mounting
- * every batch's card grid at once made large sets laggy), auto-expands new
- * arrivals, and resets when groupBy changes.
- *
- * Expansion state is keyed by `panelKey` (e.g., scenarioSetId or "all-runs")
- * so that switching between panels preserves which rows were manually
- * collapsed. "Seen" ids are tracked separately from expanded ids so that
- * rows present-but-collapsed on first load are not mistaken for new arrivals
- * on the next refresh.
- *
- * @see specs/suites/simulations-performance.feature
- */
+// Auto-expand most recent row per panel, reset on groupBy change.
 
 import { readUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { useCallback, useEffect, useRef, useState } from "react";
