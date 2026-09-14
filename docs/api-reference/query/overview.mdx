@@ -24,19 +24,19 @@ Send your LangWatch API key in any one of these forms:
 | Bearer | `Authorization: Bearer <token>` |
 | Basic | `Authorization: Basic base64(projectId:token)` |
 
-Any LangWatch API key works here — project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
+Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
 
 A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
 ## Errors
 
-Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors). Where a failure has a fix, the envelope's `meta` carries the corrective fields for it — for example `FUNCTION_NOT_ALLOWED` lists `allowedFunctions`.
+Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors). Where a failure has a fix, the envelope's `meta` carries the corrective fields for it. For example, `FUNCTION_NOT_ALLOWED` lists `allowedFunctions`.
 
 | Status | `code` | When |
 |--------|--------|------|
 | `400` | `validation_error` | The request body failed validation. |
 | `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
-| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds — for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH`). |
+| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH`). |
 | `401` | `missing_credentials` | No supported authentication credential was sent. |
 | `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
 | `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
@@ -84,4 +84,6 @@ A query may call only the functions on the allowlist below. `GET /api/v1/query/s
 
 ## Response ceilings
 
-A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs, so a large answer comes back as one page rather than a stream. To read the rest, page with `LIMIT`/`OFFSET` and an `ORDER BY`. A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LIMIT_TOO_HIGH` before it runs. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut short — select fewer columns, or a smaller `LIMIT`, to bring it under the cap.
+A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs, so a large answer comes back as one page rather than a stream. To read the rest, page with `LIMIT`/`OFFSET` and an `ORDER BY`.
+
+A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LIMIT_TOO_HIGH` before it runs. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`. Select fewer columns or a smaller `LIMIT` to bring it under the cap.

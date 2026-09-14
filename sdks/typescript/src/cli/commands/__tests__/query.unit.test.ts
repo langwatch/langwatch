@@ -12,13 +12,12 @@ import { QueryApiError } from "@/client-sdk/services/query/query-api.service";
 
 const queryMock = vi.fn();
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
+  const actual = await importOriginal();
+  return Object.assign({}, actual, {
     QueryApiService: vi.fn().mockImplementation(function () {
       return { query: queryMock };
     }),
-  };
+  });
 });
 
 vi.mock("../../utils/apiKey", () => ({

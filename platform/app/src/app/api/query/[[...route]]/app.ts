@@ -19,8 +19,8 @@
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 
-import type { KeyAuthVariables } from "~/server/api-key/auth-middleware";
 import { createProjectApp } from "~/server/api/security";
+import type { KeyAuthVariables } from "~/server/api-key/auth-middleware";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerQueryRoutes } from "./app.v1";
 

@@ -27,15 +27,15 @@
 import type { AuthzPermission } from "@langwatch/authz";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { KeyPrincipal } from "~/server/api-key/auth-middleware";
 import {
   type LwqlCallerCredential,
   type LwqlReadableProject,
   type LwqlViewableCut,
   resolveLwqlReadableProjects,
 } from "~/server/analytics/lwql/readableProjects";
-import type { App } from "~/server/app-layer/app";
 import { getProtectionsForProject } from "~/server/api/utils";
+import type { KeyPrincipal } from "~/server/api-key/auth-middleware";
+import type { App } from "~/server/app-layer/app";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/traces/protections";
 
@@ -75,7 +75,9 @@ export function strictestLwqlProtections(
   }
   return {
     canSeeCosts: perProject.every((p) => p.canSeeCosts === true),
-    canSeeCapturedInput: perProject.every((p) => p.canSeeCapturedInput === true),
+    canSeeCapturedInput: perProject.every(
+      (p) => p.canSeeCapturedInput === true,
+    ),
     canSeeCapturedOutput: perProject.every(
       (p) => p.canSeeCapturedOutput === true,
     ),
