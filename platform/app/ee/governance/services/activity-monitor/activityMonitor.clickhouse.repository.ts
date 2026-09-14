@@ -57,7 +57,8 @@ export class ActivityMonitorClickHouseRepository {
 
   findActiveUserCount(params: {
     tenantIds: string[];
-    windowStart: number;
+    thisStart: number;
+    prevStart: number;
     windowEnd: number;
   }): Promise<ActiveUserCountChRow> {
     return this.spend.findActiveUserCount(params);

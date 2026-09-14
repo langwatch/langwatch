@@ -23,6 +23,7 @@
  *       specs/ai-governance/dashboard/governance-ui-controls.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { GovernanceCostDayDto } from "@ee/governance/services/governanceCost.service";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -108,7 +109,10 @@ vi.mock("~/utils/api", () => {
                     currencyTotals: [],
                   },
                   seats: { status: "awaiting_data" },
-                  series: [],
+                  // No days at all here, and the annotation keeps it honest:
+                  // a day added later has to carry every field the panels
+                  // fold, `gatewayTokens` included, or it charts NaN.
+                  series: [] as GovernanceCostDayDto[],
                   staleSources: null,
                   unpricedWindow: null,
                   azureBilling: null,
@@ -301,7 +305,7 @@ describe("the cost screen in sample mode", () => {
         "Metered spend forecast · by agent",
         "Seats · bought against assigned",
         "Cost over time",
-        "Cost by department",
+        "Tokens by department · trace store",
         "Cost by model",
         "Tokens by person · trace store",
         "Conversations over time",
@@ -389,7 +393,7 @@ describe("the cost screen in sample mode", () => {
       ).toBeInTheDocument();
       await user.click(screen.getByRole("menuitem", { name: "Engineering" }));
 
-      const panel = panelFor("Cost by department");
+      const panel = panelFor("Tokens by department · trace store");
       expect(panel.textContent).toContain("Engineering");
       expect(panel.textContent).not.toContain("Marketing");
     });

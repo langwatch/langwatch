@@ -15,6 +15,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { GovernanceCostDayDto } from "@ee/governance/services/governanceCost.service";
 import {
   cleanup,
   fireEvent,
@@ -25,6 +26,7 @@ import {
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { costDay } from "./costFixtures";
 
 const harness = vi.hoisted(() => ({
   /** What each activity read answers. `undefined` means it has not answered. */
@@ -83,11 +85,14 @@ const harness = vi.hoisted(() => ({
   /**
    * The cost summary's per-day series, when a test needs one of its own.
    *
-   * `undefined` leaves the dollars-only default below in place. Set it when a
-   * test needs days that carry a token figure as well as a dollar one: the
-   * token panels have no read of their own and fold this same series.
+   * `undefined` leaves the single default day below in place. Set it when a
+   * test needs a particular window: the token panels have no read of their own
+   * and fold this same series, so the days are what they draw.
+   *
+   * Typed as the DTO rather than `unknown`, so a day that leaves out a field
+   * the panels fold is a type error here instead of a NaN on a chart.
    */
-  series: undefined as unknown,
+  series: undefined as GovernanceCostDayDto[] | undefined,
   /**
    * Whether the cost summary read has answered at all.
    *
@@ -212,11 +217,16 @@ vi.mock("~/utils/api", () => ({
                   harness.series ??
                   (harness.lanesReport
                     ? [
-                        {
+                        costDay({
                           day: "2026-08-01",
                           billedUsd: 123.45,
                           gatewayUsd: 67.89,
-                        },
+                          // A real day that reported dollars metered tokens
+                          // too. Left out, the token chart folds `undefined`
+                          // and draws NaN while still passing every "not
+                          // empty" assertion in this file.
+                          gatewayTokens: 1_200_000,
+                        }),
                       ]
                     : []),
                 windowDays: 30,
@@ -425,7 +435,7 @@ describe("the cost breakdown panels", () => {
       // is actually about.
       for (const title of [
         "Cost over time",
-        "Cost by department",
+        "Tokens by department · trace store",
         "Cost by model",
         "Tokens by person · trace store",
       ]) {
@@ -888,7 +898,7 @@ describe("the cost breakdown panels", () => {
    * Money answers "what did this cost", which is the wrong question for an
    * organization buying assistants on subscription: the per-request cost of a
    * bundled seat is zero, so a department of heavy subscription users reads as
-   * nearly free. ADR-128 v3.17 ruling 7, narrowed by v3.18, moves these panels
+   * nearly free. ADR-128 v3.18 ruling 7, narrowed by v3.19, moves these panels
    * onto tokens and keeps the dollar figure beside them rather than dropping
    * it.
    *
@@ -949,24 +959,24 @@ describe("the cost breakdown panels", () => {
 
     /** A window of days that each carry a token count as well as dollars. */
     const TOKEN_SERIES = [
-      {
+      costDay({
         day: "2026-08-01",
         billedUsd: 12.5,
         gatewayUsd: 4.5,
         gatewayTokens: 900_000,
-      },
-      {
+      }),
+      costDay({
         day: "2026-08-02",
         billedUsd: 31.0,
         gatewayUsd: 9.25,
         gatewayTokens: 2_400_000,
-      },
-      {
+      }),
+      costDay({
         day: "2026-08-03",
         billedUsd: 8.75,
         gatewayUsd: 1.75,
         gatewayTokens: 310_000,
-      },
+      }),
     ];
 
     describe("given the gateway metered tokens across the window", () => {
@@ -1024,21 +1034,21 @@ describe("the cost breakdown panels", () => {
     describe("given a window whose every request was metered in audio duration alone", () => {
       beforeEach(() => {
         // Speech is billed by duration, not by tokens. `AudioMS` is one of the
-        // three metering columns that are not tokens at all (ADR-128 v3.18),
+        // three metering columns that are not tokens at all (ADR-128 v3.19),
         // so these days carry real dollars and a true token count of zero.
         harness.series = [
-          {
+          costDay({
             day: "2026-08-01",
             billedUsd: 0,
             gatewayUsd: 21.5,
             gatewayTokens: 0,
-          },
-          {
+          }),
+          costDay({
             day: "2026-08-02",
             billedUsd: 0,
             gatewayUsd: 46.39,
             gatewayTokens: 0,
-          },
+          }),
         ];
       });
 
@@ -1113,7 +1123,7 @@ describe("the cost breakdown panels", () => {
       it("names a store on the face of every token panel, and never one figure for both", () => {
         // The two stores measure different things for the same call — the
         // gateway's own customer span publishes the cache-subtracted figure
-        // and never carries audio or image counts at all (ADR-128 v3.18,
+        // and never carries audio or image counts at all (ADR-128 v3.19,
         // striking "the two stores then agree by construction"). They will
         // disagree, and the label is what stops that reading as a defect.
         renderScreen();
@@ -1222,7 +1232,7 @@ describe("the cost breakdown panels", () => {
       it("says a department with no token rows was not measured rather than printing a zero", () => {
         // The Copilot Studio mapper carries no token field at all, and
         // `TotalPromptTokenCount` is `Nullable(UInt32)` that stays null for
-        // these rows (ADR-128 v3.18, narrowing ruling 7). A zero here would
+        // these rows (ADR-128 v3.19, narrowing ruling 7). A zero here would
         // be a number the screen never measured — the same rule the adoption
         // headcount above is held to.
         harness.activity.spendByDepartment = [

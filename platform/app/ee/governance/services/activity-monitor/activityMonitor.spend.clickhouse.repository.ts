@@ -111,7 +111,8 @@ export class ActivityMonitorSpendClickHouseRepository {
   }
 
   /**
-   * Distinct people active in one window, across every project handed in.
+   * Distinct people active in this window and in the one before it, across
+   * every project handed in.
    *
    * Adoption is an organization question, so this takes a tenant list where
    * `findSummarySpend` takes one tenant - assistant traffic lands in the
@@ -120,14 +121,21 @@ export class ActivityMonitorSpendClickHouseRepository {
    * assistant traffic this headcount is meant to count. Kept separate from
    * the summary read so that widening the headcount cannot move a money
    * figure with it (ADR-128 ruling 6).
+   *
+   * Both windows come back from one read, the way `findSummarySpend` answers
+   * its own pair: the dedup subquery is the expensive half of this read, and
+   * asking the two windows separately would run it twice over ranges that
+   * sit next to each other.
    */
   async findActiveUserCount({
     tenantIds,
-    windowStart,
+    thisStart,
+    prevStart,
     windowEnd,
   }: {
     tenantIds: string[];
-    windowStart: number;
+    thisStart: number;
+    prevStart: number;
     windowEnd: number;
   }): Promise<ActiveUserCountChRow> {
     // Multi-tenant read across the org's projects; the shared client serves
@@ -136,10 +144,17 @@ export class ActivityMonitorSpendClickHouseRepository {
     const result = await ch.query({
       query: `
         SELECT
-          uniqExact(ts.Attributes[{userKey:String}]) AS thisUsers
+          uniqExactIf(
+            ts.Attributes[{userKey:String}],
+            ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})
+          ) AS thisUsers,
+          uniqExactIf(
+            ts.Attributes[{userKey:String}],
+            ts.OccurredAt < fromUnixTimestamp64Milli({thisStart:UInt64})
+          ) AS prevUsers
         FROM trace_summaries ts
         WHERE ts.TenantId IN ({tenantIds:Array(String)})
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
           AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND ts.Attributes[{originKey:String}] = {originValue:String}
           AND ts.Attributes[{userKey:String}] != ''
@@ -147,14 +162,15 @@ export class ActivityMonitorSpendClickHouseRepository {
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId IN ({tenantIds:Array(String)})
-              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
               AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
       `,
       query_params: {
         tenantIds,
-        windowStart,
+        thisStart,
+        prevStart,
         windowEnd,
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,

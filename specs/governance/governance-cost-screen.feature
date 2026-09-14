@@ -1847,3 +1847,48 @@ Feature: One cost screen, three honest lanes
       Given a person whose assistant traffic ran under a project of the organization other than the governance one
       When a permitted viewer opens the cost screen
       Then that person is counted among the people using AI tools
+
+    # The count of people who are NEW is a stand-in until the per-user
+    # first-seen record exists: everybody active counts as new when the
+    # organization had nobody active before. That "before" has to be asked of
+    # the same people the count describes. Asked of the hidden governance
+    # project's bill instead, an organization whose teams were busy all along
+    # is told every one of its people arrived this month, the first month its
+    # governance project happens to bill nothing.
+    @unit
+    Scenario: An organization active before this window reports nobody as new
+      Given people were active across the organization in the window before this one
+      And the hidden governance project billed nothing in that earlier window
+      When a permitted viewer opens the cost screen
+      Then nobody is reported as new
+
+    @unit
+    Scenario: An organization with no prior activity reports everybody as new
+      Given nobody in the organization was active in the window before this one
+      When a permitted viewer opens the cost screen
+      Then everybody active is reported as new
+
+    # Both windows come back from one read, so the scenarios above hold only
+    # if that read is correct against a real store. The ones below execute it:
+    # a query that splits the windows at the wrong instant, loses the second
+    # project, or counts a superseded row's attribution answers plausibly and
+    # wrongly, and no assertion on the query text can tell.
+    @integration
+    Scenario: Each window counts its own people across every project of the organization
+      Given people active in this window, in the window before it, and in both
+      And one of them worked only in a second project of the organization
+      When the adoption headcount is read
+      Then each window reports its own people
+      And somebody active in both windows is one person in each figure
+
+    @integration
+    Scenario: A superseded version of a trace does not add a person
+      Given a trace whose current version attributes it to a different person than an earlier version did
+      When the adoption headcount is read
+      Then only the person on the current version is counted
+
+    @integration
+    Scenario: An organization with no traffic reports nobody in either window
+      Given projects holding no assistant traffic at all
+      When the adoption headcount is read
+      Then both windows report nobody

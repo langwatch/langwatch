@@ -405,7 +405,7 @@ describe("GovernanceGatewaySpendClickHouseRepository", () => {
    * SUBSETS of quantities already in the sum and would double-count; three are
    * not tokens at all.
    *
-   * ADR-128 v3.18, "Supersedes Ruling 1".
+   * ADR-128 v3.19, "Supersedes Ruling 1".
    */
   describe("when reporting the metered token figure", () => {
     /** @scenario "The metered token count counts what the model read, cache included" */

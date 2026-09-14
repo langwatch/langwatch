@@ -105,17 +105,22 @@ export const EMPTY_SUMMARY_SPEND: SummarySpendChRow = {
 // -- 1b. Active people, org-wide --
 
 /**
- * Headcount only. Adoption is an organization question, so this row comes
- * from a read scoped to every project of the org, while the money fields
- * above keep the governance project's scope.
+ * Headcount only, for both windows. Adoption is an organization question, so
+ * this row comes from a read scoped to every project of the org, while the
+ * money fields above keep the governance project's scope. The previous
+ * window rides along because the "is anybody new" question has to be asked
+ * of the same population the headcount describes, and asking it of the money
+ * row would answer it for one project's spend instead.
  */
 export const activeUserCountRowSchema = z.object({
   thisUsers: chNumeric,
+  prevUsers: chNumeric,
 });
 export type ActiveUserCountChRow = z.infer<typeof activeUserCountRowSchema>;
 
 export const EMPTY_ACTIVE_USER_COUNT: ActiveUserCountChRow = {
   thisUsers: 0,
+  prevUsers: 0,
 };
 
 // -- 2. Spend by user --

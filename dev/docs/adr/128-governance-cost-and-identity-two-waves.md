@@ -2070,19 +2070,19 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
-- **v3.18 (2026-09-13, captain: Sergio Esteban).** Corrects three rulings in
-  v3.17 that a red-team round disproved before any code was written. Two of
+- **v3.19 (2026-09-13, captain: Sergio Esteban).** Corrects three rulings in
+  v3.18 that a red-team round disproved before any code was written. Two of
   them rested on premises this document asserted without checking, and each
   would have put a wrong number on a customer's screen. No schema change; the
-  scope, the out-list and the one-PR plan of v3.17 stand.
-  - **Why this is a revision and not a quiet edit.** v3.17 closed a parc-fermé
+  scope, the out-list and the one-PR plan of v3.18 stand.
+  - **Why this is a revision and not a quiet edit.** v3.18 closed a parc-fermé
     round. Its rulings were attacked on the way into implementation and three
     did not survive. Rewriting them in place would erase the evidence that the
     original reasoning was wrong, which is the part a later reader needs most —
     the mistakes below are easy to make twice.
 
   - **Supersedes Ruling 1 — cache tokens are counted, and two `Tokens*`
-    columns are subsets that must never be added.** v3.17 adopted the
+    columns are subsets that must never be added.** v3.18 adopted the
     `performance.total_tokens` shape — prompt + completion, cache excluded — on
     the unstated belief that `TokensInput` on `gateway_spend` is a full prompt
     count, the way `TotalPromptTokenCount` is on `trace_summaries`. It is not.
@@ -2107,7 +2107,7 @@ money tables, only the identity tables and read paths.
 
     which is the `performance.total_processed_tokens` shape
     (`platform/app/src/server/analytics/clickhouse/metric-translator.ts:554-564`),
-    not the `total_tokens` shape v3.17 named.
+    not the `total_tokens` shape v3.18 named.
 
     **Two `Tokens*` columns are deliberately absent, and both would
     double-count.** `TokensReasoning` is a subset of the output count —
@@ -2117,7 +2117,7 @@ money tables, only the identity tables and read paths.
     `CacheCreationTokens` when a provider reports them inconsistently (`:213-214`).
     Eight of the thirteen metering columns are in the sum; two are subsets of
     columns already in it; three (`CharsInput`, `AudioMS`, `ImageCount`) are not
-    tokens. The audio and image reasoning from v3.17 is unchanged and still
+    tokens. The audio and image reasoning from v3.18 is unchanged and still
     holds: those counts arrive already subtracted from `TokensInput` and
     `TokensOutput` (`00078:27-28`, `00089:24-26`), so they are added back.
 
@@ -2133,7 +2133,7 @@ money tables, only the identity tables and read paths.
     are equal.
 
   - **Supersedes Ruling 4 — the per-SKU defect is in the mapper, not the fold,
-    and honouring it changes a spec line already adopted.** v3.17 named
+    and honouring it changes a spec line already adopted.** v3.18 named
     `aggregateSeatCounts` (`platform/app/src/components/governance/costs/costsWindow.ts:317-331`)
     as the place one row per SKU would be restored. It cannot be: pool identity
     is already gone before that function runs. `DailyPoint` is
@@ -2142,7 +2142,7 @@ money tables, only the identity tables and read paths.
     exactly two points, `bought` and `assigned`, through `total(...)`. The read
     is per-pool and already correct — `GovernanceSeatPoolDto[]`
     (`platform/app/ee/governance/services/governanceCost.service.ts:163-184`).
-    The flattening is the client's, one layer earlier than v3.17 said.
+    The flattening is the client's, one layer earlier than v3.18 said.
 
     **The fold's real hazard is day skew, not same-day collision.**
     `aggregateSeatCounts` replaces a bucket's whole points array with the latest
@@ -2188,12 +2188,12 @@ money tables, only the identity tables and read paths.
     measured correctly today and the panel is already wrong for them).
 
   - **What did not change.** Rulings 2, 3, 5, 6, 8 and 9 stand as written in
-    v3.17, as does the out-of-scope list and the correction record against
-    langwatch-saas #1230. The blast-radius finding in v3.17 — that
+    v3.18, as does the out-of-scope list and the correction record against
+    langwatch-saas #1230. The blast-radius finding in v3.18 — that
     `spendByUser` and `spendByDepartment` have consumers beyond this screen, so
     the unit changes at the render layer — is unaffected by anything above.
 
-- **v3.17 (2026-09-13, captain: Sergio Esteban).** Wires the cost screen's
+- **v3.18 (2026-09-13, captain: Sergio Esteban).** Wires the cost screen's
   unmeasured panels to the lanes that already hold their data, and moves the
   cost screen's two people-facing panels off money onto tokens. Nine rulings
   from a parc-fermé round; no schema migration; one PR. Tracking issue
@@ -2223,7 +2223,7 @@ money tables, only the identity tables and read paths.
   - **Ruling 1 — "tokens" means every token, input plus output, cache and
     reasoning excluded.**
 
-    > **[SUPERSEDED — see revision v3.18.]** Cache is counted, not excluded.
+    > **[SUPERSEDED — see revision v3.19.]** Cache is counted, not excluded.
     > The expression below and the sentence "the two stores then agree by
     > construction" are both wrong and must not be implemented from. The
     > reasoning is kept because the mistake is easy to make twice.
@@ -2328,7 +2328,7 @@ money tables, only the identity tables and read paths.
   - **Ruling 4 — the seats panel shows one row per SKU, never one summed
     pair.**
 
-    > **[SUPERSEDED in part — see revision v3.18.]** The ruling itself stands;
+    > **[SUPERSEDED in part — see revision v3.19.]** The ruling itself stands;
     > the repair site named below is wrong. Pool identity is already gone
     > before `aggregateSeatCounts` runs, so the mapper and the point shape
     > change too, and an adopted spec line is rewritten.
@@ -2390,7 +2390,7 @@ money tables, only the identity tables and read paths.
   - **Ruling 7 — the department panel measures tokens, not dollars, and stays
     org-wide.**
 
-    > **[NARROWED — see revision v3.18.]** A department buying on subscription
+    > **[NARROWED — see revision v3.19.]** A department buying on subscription
     > has no measured tokens. Rows say "not measured" or carry an estimated
     > label; they never print a zero.
 

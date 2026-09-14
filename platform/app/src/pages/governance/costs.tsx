@@ -1574,30 +1574,27 @@ function BreakdownGrid({
         interval={interval}
         showSample={showSample}
       />
-      <CostPanel title="Cost by department" sample={showSample}>
+      {/* Titled for the unit it ranks AND the store it read, the way the
+          people panel beside it is: this list is ordered by tokens, so a title
+          saying "cost" over a column of tokens misreads twice over. The store
+          rides in the title rather than in a line of body copy beneath it —
+          two stores count tokens for the same call and do not agree, and a
+          label that only shows while rows exist stops naming the store the
+          moment the panel is empty. The person panel names it the same way. */}
+      <CostPanel title="Tokens by department · trace store" sample={showSample}>
         {unrefreshed("byDepartment") ? (
           <CostPanelUnrefreshed />
         ) : (
-          /* The store is named on the panel's own face, as the token lane
-             above names the gateway: two stores count tokens for the same
-             call and they do not agree, so an unlabelled figure invites a
-             reader to read the difference as a defect. This panel reads the
-             traces, and it says so whether or not any row has arrived. */
-          <VStack align="stretch" gap={2}>
-            <Text fontSize="xs" color="fg.muted">
-              Tokens each department ran, counted from their traces.
-            </Text>
-            <CostRankList
-              rows={orSample(rows.byDepartment, sample.departments)}
-              format={fmtTokens}
-              empty={costPanelEmpty({
-                what: "Tokens run by the departments people belong to, with what they cost per request beneath.",
-                source:
-                  "Fills once people who are spending are assigned to a department.",
-                action: MANAGE_DEPARTMENTS,
-              })}
-            />
-          </VStack>
+          <CostRankList
+            rows={orSample(rows.byDepartment, sample.departments)}
+            format={fmtTokens}
+            empty={costPanelEmpty({
+              what: "Tokens run by the departments people belong to, with what they cost per request beneath.",
+              source:
+                "Fills once people who are spending are assigned to a department.",
+              action: MANAGE_DEPARTMENTS,
+            })}
+          />
         )}
       </CostPanel>
 

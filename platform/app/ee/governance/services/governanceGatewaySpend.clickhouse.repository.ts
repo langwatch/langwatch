@@ -154,13 +154,13 @@ const LATEST_REQUEST_SUBQUERY = `
  * `AudioMS` and `ImageCount` are not tokens at all and would put the figure
  * in no unit.
  *
- * ADR-128 v3.18, "Supersedes Ruling 1".
+ * ADR-128 v3.19, "Supersedes Ruling 1".
  */
-const METERED_TOKEN_SUM = `
+const METERED_TOKEN_SUM = `(
             RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
             + RequestTokensCacheWrite + RequestTokensInputAudio
             + RequestTokensOutputAudio + RequestTokensInputImage
-            + RequestTokensOutputImage`;
+            + RequestTokensOutputImage)`;
 
 const METERED_FIGURE_COLUMNS = `
           toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,

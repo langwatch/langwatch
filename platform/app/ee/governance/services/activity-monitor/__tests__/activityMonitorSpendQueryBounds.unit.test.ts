@@ -104,7 +104,8 @@ const READS: Array<{
     run: (repo) =>
       repo.findActiveUserCount({
         tenantIds: ["tenant-a", "tenant-b"],
-        windowStart: WINDOW_START,
+        thisStart: WINDOW_START,
+        prevStart: WINDOW_START,
         windowEnd: WINDOW_END,
       }),
   },

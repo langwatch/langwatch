@@ -23,6 +23,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { costDay } from "./costFixtures";
 
 const harness = vi.hoisted(() => ({
   // The headline summary is part of the decision under test: a pulled bill
@@ -157,7 +158,16 @@ const costSummary = ({ billedUsd }: { billedUsd: number | null }) => ({
   series:
     billedUsd === null
       ? []
-      : [{ day: "2026-08-01", billedUsd, gatewayUsd: null }],
+      : [
+          costDay({
+            day: "2026-08-01",
+            billedUsd,
+            gatewayUsd: null,
+            // This lane's dollars are unreported here, but its tokens are
+            // counted all the same — that is the pair the sample mode replaces.
+            gatewayTokens: 1_200_000,
+          }),
+        ],
   windowDays: 30,
 });
 

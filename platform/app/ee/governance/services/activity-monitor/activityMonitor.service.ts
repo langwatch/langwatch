@@ -65,6 +65,7 @@ import type {
   SpendSortField,
   WindowCountChRow,
 } from "./activityMonitor.clickhouse.schemas";
+import { EMPTY_ACTIVE_USER_COUNT } from "./activityMonitor.clickhouse.schemas";
 
 // ---------------------------------------------------------------------------
 // Public interfaces — the service's API contract
@@ -540,28 +541,30 @@ export class ActivityMonitorService {
     const projectIds = (
       await this.organizationProjects(input.organizationId)
     ).map((p) => p.id);
-    const activeUsers =
+    const userCounts =
       projectIds.length === 0
-        ? 0
-        : (
-            await this.repository.findActiveUserCount({
-              tenantIds: projectIds,
-              windowStart: thisWindowStart,
-              windowEnd: now,
-            })
-          ).thisUsers;
+        ? EMPTY_ACTIVE_USER_COUNT
+        : await this.repository.findActiveUserCount({
+            tenantIds: projectIds,
+            thisStart: thisWindowStart,
+            prevStart: previousWindowStart,
+            windowEnd: now,
+          });
 
     return {
       spentThisWindowUsd: row.thisSpend,
       windowOverPreviousPct: pctChange(row.thisSpend, row.prevSpend),
       hasPriorBaseline: row.prevSpend > 0,
-      activeUsersThisWindow: activeUsers,
-      // newUsers requires a baseline-window comparison query which is a
-      // follow-up (3b: governance_kpis fold materialises the per-user
-      // first-seen). For now the dashboard renders the field but the value
-      // is conservative - treat all active as new only when prev=0. It is a
-      // headcount, so it follows the org-wide count.
-      newUsersThisWindow: row.prevSpend === 0 ? activeUsers : 0,
+      activeUsersThisWindow: userCounts.thisUsers,
+      // Naming the people who are actually new requires the per-user
+      // first-seen fold, which is a follow-up (3b: governance_kpis
+      // materialises it). Until then the field is a conservative proxy:
+      // everybody active counts as new only when the organization had
+      // nobody active in the window before. The baseline question is asked
+      // of the same org-wide population the number describes - asking it of
+      // the governance project's spend would report every person as new
+      // whenever that one hidden project happened to bill nothing.
+      newUsersThisWindow: userCounts.prevUsers === 0 ? userCounts.thisUsers : 0,
       openAnomalyCount,
       anomalyBreakdown,
     };

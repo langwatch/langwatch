@@ -13,6 +13,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { GovernanceCostDayDto } from "@ee/governance/services/governanceCost.service";
 import {
   cleanup,
   fireEvent,
@@ -23,11 +24,11 @@ import {
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import {
   getOrganizationRolePermissions,
   hasPermissionWithHierarchy,
 } from "~/server/api/rbac";
+import { costDay } from "./costFixtures";
 
 const harness = vi.hoisted(() => ({
   /** The grants the viewer under test holds. */
@@ -155,7 +156,12 @@ const renderScreen = () =>
 /** The real org-admin bag, not a hand-written list that could drift from it. */
 const ORG_ADMIN_PERMISSIONS = getOrganizationRolePermissions("ADMIN").slice();
 
-function summaryFixture(overrides: Record<string, unknown> = {}) {
+function summaryFixture(
+  // The series slot is typed even though the rest of the fixture is not: the
+  // token panels fold these days, and a day missing a field they fold charts
+  // NaN while every "not empty" assertion still passes.
+  overrides: Record<string, unknown> & { series?: GovernanceCostDayDto[] } = {},
+) {
   return {
     unavailableReason: null,
     // Deliberately DIFFERENT figures: with the two equal, an implementation
@@ -181,13 +187,13 @@ function summaryFixture(overrides: Record<string, unknown> = {}) {
     },
     seats: { status: "awaiting_data" },
     series: [
-      {
+      costDay({
         day: "2026-08-01",
         billedUsd: 123.45,
         gatewayUsd: 67.89,
-        billedCellsWithoutAmount: 0,
-        gatewayCellsWithoutAmount: 0,
-      },
+        // A day that reported dollars metered tokens too.
+        gatewayTokens: 1_200_000,
+      }),
     ],
     windowDays: 30,
     // Every source still pulling, so the figures need no caveat.
@@ -467,13 +473,12 @@ describe("the governance cost screen", () => {
             ],
           },
           series: [
-            {
+            costDay({
               day: "2026-08-01",
               billedUsd: -42.5,
               gatewayUsd: 67.89,
-              billedCellsWithoutAmount: 0,
-              gatewayCellsWithoutAmount: 0,
-            },
+              gatewayTokens: 1_200_000,
+            }),
           ],
         }),
         isLoading: false,
@@ -496,13 +501,14 @@ describe("the governance cost screen", () => {
       // a part-month at each end, quarters of 90 to 92 days. Measured on those
       // buckets the card reported a large rise, on spending that never moved.
       const start = Date.UTC(2026, 0, 15);
-      const series = Array.from({ length: 365 }, (_, index) => ({
-        day: new Date(start + index * 86_400_000).toISOString().slice(0, 10),
-        billedUsd: 1000,
-        gatewayUsd: 500,
-        billedCellsWithoutAmount: 0,
-        gatewayCellsWithoutAmount: 0,
-      }));
+      const series = Array.from({ length: 365 }, (_, index) =>
+        costDay({
+          day: new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+          billedUsd: 1000,
+          gatewayUsd: 500,
+          gatewayTokens: 2_000_000,
+        }),
+      );
       harness.query = {
         data: summaryFixture({
           billed: {
@@ -554,13 +560,15 @@ describe("the governance cost screen", () => {
             ],
           },
           series: [
-            {
+            costDay({
               day: "2026-08-01",
               billedUsd: null,
               gatewayUsd: 67.89,
+              gatewayTokens: 1_200_000,
+              // The billed lane reported cells it could not price; the metered
+              // lane beside it answered in full.
               billedCellsWithoutAmount: 4,
-              gatewayCellsWithoutAmount: 0,
-            },
+            }),
           ],
         }),
         isLoading: false,

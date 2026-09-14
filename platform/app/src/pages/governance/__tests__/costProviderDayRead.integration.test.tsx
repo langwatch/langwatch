@@ -24,6 +24,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { costDay } from "./costFixtures";
 
 const harness = vi.hoisted(() => ({
   /**
@@ -122,7 +123,14 @@ vi.mock("~/utils/api", () => ({
               ],
             },
             seats: { status: "awaiting_data" },
-            series: [{ day: "2026-01-15", billedUsd: 90, gatewayUsd: 67.89 }],
+            series: [
+              costDay({
+                day: "2026-01-15",
+                billedUsd: 90,
+                gatewayUsd: 67.89,
+                gatewayTokens: 1_200_000,
+              }),
+            ],
             windowDays: 30,
           },
           isLoading: false,
