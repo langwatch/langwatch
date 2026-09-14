@@ -1,31 +1,11 @@
 import { createRequire } from "node:module";
 
-// Continuous profiling for the Node process, pushed to Pyroscope.
-//
-// Two profilers run, both started by Pyroscope.start(): the wall-time profiler
-// (carrying CPU time too — see the init call below) and the heap profiler. Heap
-// samples flush on a slower cadence than wall ones, so a short-lived process may
-// push wall profiles and never get as far as a heap one; that is the SDK's
-// cadence, not a missing configuration.
-//
-// Dependency-free at module scope by design — this is imported from
-// instrumentation.node.ts, which runs before the app graph exists. The profiler
-// and its native pprof bindings load inside startProfiling(), and only when an
-// endpoint is configured, so a self-hosted install that has never heard of
-// Pyroscope does not pay for it at boot.
-//
-// The gating is the same bargain the OTLP exporters strike a few lines up in
-// that file: a profiler with nowhere to push to still samples on a timer and
-// still fails every upload, so "off" has to mean off, not "on and failing".
+// Continuous profiling for the Node process: dependency-free at module scope,
+// loaded only when an endpoint is configured.
 
 /**
- * Pyroscope label names follow the Prometheus grammar, which rejects the dot in
- * an OpenTelemetry attribute name. A key copied across verbatim does not error —
- * the push succeeds and the label is simply absent when someone goes looking for
- * it — so the substitution has to happen here.
- *
- * Underscore matches what Loki's structured metadata already does to the same
- * attribute (langwatch_worktree), so one spelling works across the signals.
+ * Normalize tag keys to the Prometheus grammar: dots become underscores to work
+ * across signals.
  */
 export const normaliseTagKey = (key: string): string =>
   key
@@ -70,16 +50,7 @@ export interface ProfilingOptions {
   appName: string;
   environment: string | undefined;
   resourceAttributes: string | undefined;
-  /**
-   * How the profiler module is loaded. Injected only by tests.
-   *
-   * The failure path below — "the native binding is unavailable on this
-   * platform" — is the one branch that cannot be reached by passing different
-   * options, and mocking a module that a *already-imported* module `require`s
-   * depends on the test runner's interception timing. A test that quietly stops
-   * exercising the branch it names still passes, which is the worst kind of
-   * green. A seam makes it deterministic.
-   */
+  /** How the profiler module is loaded: injected only by tests for the native binding path. */
   loadProfiler?: () => PyroscopeModule;
 }
 
@@ -119,17 +90,7 @@ export const startProfiling = ({
       serverAddress: address,
       appName,
       tags,
-      // The Node profiler samples WALL time, where the Go one samples CPU — a
-      // difference that matters when reading the two side by side, and one
-      // worth keeping rather than papering over. This server spends most of its
-      // life waiting on Postgres, ClickHouse and model providers, and wall time
-      // is the only signal that shows that waiting at all; a pure CPU profile of
-      // a request that took four seconds and burned forty milliseconds is
-      // technically accurate and answers the wrong question.
-      //
-      // collectCpuTime adds the CPU dimension to the same samples, so one push
-      // answers both "where did the time go" and "where did the CPU go" without
-      // running a second profiler.
+      // Wall time shows I/O waiting; collectCpuTime adds the CPU dimension too.
       wall: { collectCpuTime: true },
     });
     Pyroscope.start();

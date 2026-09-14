@@ -47,21 +47,9 @@ export type OtlpMetricsExportOptions = Readonly<{
 }>;
 
 /**
- * Starts the process's OTLP metrics push, or reports that it did not.
- *
- * Metrics are their own MeterProvider rather than a reader inside the traces
- * SDK: the instruments in `@langwatch/observability/metrics` resolve a meter at
- * module scope, and `metrics.getMeter()` — unlike `trace.getTracer()` — has no
- * upgrading proxy, so they hold a no-op meter until a provider is installed
- * globally and `activateMetrics()` drains the observable gauges that had
- * nowhere to register. That ordering is the whole reason this is a function a
- * process calls at boot rather than a module side effect.
- *
- * Returns a flusher so the export is drained as a phase of the process's own
- * shutdown sequence. It must never install a signal handler of its own: Node
- * runs every listener for a signal, so a handler here would race the drain
- * rather than participate in it, and the last periodic export would be lost
- * whenever the exit won.
+ * Starts the process's OTLP metrics push: returns a flusher for shutdown
+ * draining. Metrics are their own MeterProvider, so `activateMetrics()` must be
+ * called after the provider is installed.
  */
 export function startOtlpMetricsExport(
   options: OtlpMetricsExportOptions,
@@ -128,13 +116,8 @@ export function startOtlpMetricsExport(
 }
 
 /**
- * The telemetry leaves a metrics export is projected from.
- *
- * Structural rather than an import of `@langwatch/config`'s `TelemetryConfig`:
- * observability is below configuration, and a package that named the config
- * type would invert that. Every field here is one a process has already
- * parsed, so the shape is satisfied by passing the resolved telemetry value
- * straight in.
+ * The telemetry a metrics export is projected from: structural, not imported
+ * from config to keep observability below configuration.
  */
 export type OtlpMetricsTelemetryInputs = Readonly<{
   otlpEndpoint: string | undefined;
@@ -146,13 +129,8 @@ export type OtlpMetricsTelemetryInputs = Readonly<{
 }>;
 
 /**
- * Folds a process's resolved telemetry into the export's options.
- *
- * One place, so a new leaf lands once instead of drifting between the API and
- * the worker. The signal-specific headers win over the shared ones exactly as
- * the OTLP specification orders them, and `serviceName` comes from the
- * process's own identity rather than from `OTEL_SERVICE_NAME`, because that is
- * the name its logs and traces already carry.
+ * Folds a process's resolved telemetry into the export's options: one place so
+ * new fields land once, not drifting between processes.
  */
 export function otlpMetricsExportOptionsFrom({
   telemetry,

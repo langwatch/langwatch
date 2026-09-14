@@ -1,14 +1,4 @@
-/**
- * Whether a log line can say which build produced it.
- *
- * The configuration root supplies the version from the same OTel resource
- * identity used for traces, but that resource only reaches telemetry we
- * export. These logs go to stdout and are read back off the pod's log file.
- * Measured against prod on 2026-08-07, `service_version` appeared on no record
- * in the entire fleet, so no log line could be tied to a build.
- *
- * One semantic configuration value prevents trace and log identities drifting.
- */
+/** Whether a log line can say which build produced it. */
 
 import { describe, expect, it } from "vitest";
 import { resolveLoggerConfiguration } from "../logger-config.ts";

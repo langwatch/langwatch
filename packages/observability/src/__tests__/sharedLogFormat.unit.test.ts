@@ -1,13 +1,4 @@
-/**
- * Every LangWatch process writes the same structured JSON on stdout, in every
- * environment — dev/docs/best_practices/dev-log-format.md. The api and worker
- * processes both get their logger from this package, so this is where that
- * contract is pinned for them: `time` (RFC 3339 with milliseconds), `level`
- * (lowercase word), `msg`, `service`.
- *
- * The terminal rendering lives in tools/thuishaven/domain/logfmt and
- * dev/scripts/log-render.mjs, and both parse exactly these fields.
- */
+/** Pins the structured JSON log format contract (dev/docs/best_practices/dev-log-format.md). */
 import { describe, expect, it, vi } from "vitest";
 import { createLoggerFactory } from "../logger.ts";
 import { resolveLoggerConfiguration } from "../logger-config.ts";

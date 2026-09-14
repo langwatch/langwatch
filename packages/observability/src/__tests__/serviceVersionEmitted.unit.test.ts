@@ -1,16 +1,4 @@
-/**
- * The version as it appears on a record `createLogger` actually wrote.
- *
- * `serviceVersion.unit.test.ts` tests configured identity in isolation, and
- * that test passes perfectly well while the emitted record carries nothing —
- * the field only reaches a log line if the value is wired into pino's `bindings`
- * formatter, and nothing in a direct call proves that it is. So this goes
- * through `createLogger` and reads what lands on the stream.
- *
- * `createLogger` writes to `process.stdout` when there is no transport, which is
- * the case under injected test configuration, so intercepting the write is
- * enough to see the real record.
- */
+/** The version as it appears on a record `createLogger` actually wrote. */
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { configureLogger, createLogger, resetLoggerCache } from "../logger.ts";

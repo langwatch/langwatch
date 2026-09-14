@@ -1,37 +1,6 @@
 /**
- * The process's metric instruments, recorded through the OpenTelemetry API and
- * pushed to a collector — no scrape endpoint, no `prom-client` registry.
- *
- * ## Why a facade rather than `meter.createCounter` at each call site
- *
- * Three properties are easy to get wrong once and then never notice, because
- * every one of them fails by producing *no* data rather than an error:
- *
- * 1. **The meter must be resolved late.** `metrics.getMeter()` has no proxy
- *    that upgrades: unlike `trace.getTracer()`, a meter obtained before
- *    `setGlobalMeterProvider` is a no-op meter *forever*. Instruments are
- *    declared at module scope all over this repo, which is frequently before
- *    boot has registered the provider. So a handle here holds only its
- *    definition, and creates the real instrument on first record.
- * 2. **Histogram boundaries live on the provider, not the instrument.** They
- *    come from `HISTOGRAM_BOUNDARIES`, and a histogram with no entry throws
- *    on declaration rather than silently taking OTel's generic 0…10000
- *    buckets.
- * 3. **Names must survive the transport change.** They are the Prometheus
- *    names these metrics have always had, and dashboards and alerts read them
- *    by name. Nothing here appends a suffix, and no instrument declares a
- *    `unit` — the unit is already the last word of the name (`_milliseconds`,
- *    `_bytes`, `_seconds`), and an OTel unit would be appended a second time
- *    by a collector exporting to Prometheus with `add_metric_suffixes` on.
- *
- * ## Deployment requirement
- *
- * The collector's Prometheus exporter must run with `add_metric_suffixes:
- * false`. With it on, every counter gains a `_total` it does not have today
- * (`job_processing_counter` becomes `job_processing_counter_total`) and every
- * dashboard panel and alert that names one goes empty — the same silent
- * "everything is fine" failure as the missing-`_total` incident. This is the
- * one setting the migration depends on and it lives outside this repo.
+ * Metric instruments recorded through OpenTelemetry API: a facade that resolves
+ * the meter late and enforces histogram boundaries.
  */
 import {
   metrics,
@@ -71,17 +40,8 @@ function currentMeter(): Meter {
 }
 
 /**
- * Point the facade at the MeterProvider that was just registered globally.
- *
- * Call this immediately after `metrics.setGlobalMeterProvider(...)` in a
- * process's boot path. It installs every observable gauge that was declared
- * while no provider existed, and invalidates any instrument that was created
- * against the no-op meter.
- *
- * Recording works without it — a synchronous instrument resolves its meter on
- * first use, which is normally well after boot. Observable gauges do not: they
- * are pull-based, have no first use, and must be registered with a real meter
- * to ever be collected. That is what this call exists for.
+ * Point the facade at the MeterProvider registered globally: installs
+ * observable gauges declared before boot.
  */
 export function activateMetrics(): void {
   generation += 1;
@@ -198,17 +158,8 @@ export function gauge(definition: MetricDefinition): GaugeHandle {
 }
 
 /**
- * A gauge read on the export interval rather than written when it changes.
- *
- * This replaces `prom-client`'s `collect()`, with one difference worth
- * knowing: `collect()` ran per scrape, so its cost scaled with the number of
- * scrapers and its cadence was whatever Prometheus was configured with.
- * `observe` runs once per export interval regardless of who is watching, so a
- * read that queries a database now happens on a fixed, known schedule.
- *
- * `observe` may be async; the SDK awaits it before exporting the batch. It
- * must report every series it wants present in that interval — a series it
- * skips is simply absent, not carried forward.
+ * A gauge read on the export interval: `observe` may be async and must report
+ * every series for that interval.
  */
 export function observableGauge(
   definition: MetricDefinition,

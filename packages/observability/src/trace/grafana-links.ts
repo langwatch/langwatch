@@ -1,20 +1,6 @@
 /**
- * Builders for Grafana Explore deep links, so a trace/span id can become a URL a
- * developer clicks to land straight on the failing trace (Tempo) or its logs
- * (Loki) — in HTTP error bodies, the Langy "view trace" link, anywhere an id is
- * surfaced.
- *
- * Pure and isomorphic where it counts: the builders take id + config → URL and
- * read nothing. The server reads GRAFANA_BASE_URL and calls them; the result
- * travels to the client as a ready-made href, so the base URL never has to leak
- * to the browser. The two `…FromEnv` helpers at the bottom are the exception
- * and are SERVER-ONLY for exactly that reason — a browser bundle that reaches
- * one gets `process is not defined`, which is why this module is a subpath
- * export rather than part of the package root.
- *
- * The default datasource uids (`tempo`/`loki`) are the fixed uids the local
- * grafana/otel-lgtm bundle provisions, so links work out of the box under haven.
- * A different Grafana (production) overrides them via config.
+ * Grafana Explore deep links: pure builders that take id + config → URL.
+ * Server-only `…FromEnv` helpers read GRAFANA_BASE_URL.
  */
 
 export const DEFAULT_TEMPO_DATASOURCE_UID = "tempo";
@@ -37,13 +23,8 @@ const DEFAULT_FROM = "now-1h";
 const DEFAULT_TO = "now";
 
 /**
- * Wrap a single Explore query pane in the `panes`/`schemaVersion=1` URL shape
- * Grafana has used since 10.1 (current through 13.x). The pane key is arbitrary.
- *
- * Fails closed: a malformed `GRAFANA_BASE_URL` (a bare host with no scheme, an
- * empty string, anything `new URL` rejects) returns null rather than throwing.
- * These builders run on the error path (serialized domain errors, HTTP error
- * bodies), so a bad env value must never turn a handled error into a second throw.
+ * Wrap a single Explore query pane: fails closed (returns null, never throws) so
+ * a bad base URL doesn't turn a handled error into a second throw.
  */
 function buildExploreUrl(baseUrl: string, pane: Record<string, unknown>): string | null {
   let url: URL;
@@ -206,14 +187,8 @@ export function grafanaConfigFromEnv(): {
 }
 
 /**
- * The Grafana trace link for a REAL trace id (pass the actual trace id, not a
- * display/span id), resolved from the environment. Returns undefined when no
- * Grafana is configured (no GRAFANA_BASE_URL) or there is no trace id — so it is
- * safe to spread into any serialized error.
- *
- * Safe in production too: Grafana is access-controlled (behind AWS auth, not
- * public), so surfacing the URL leaks nothing — a client without access just
- * can't follow it.
+ * Grafana trace link resolved from environment: safe to spread into errors since
+ * Grafana is access-controlled.
  */
 export function grafanaTraceUrlFromEnv(traceId: string | undefined): string | undefined {
   if (!traceId) return undefined;

@@ -1,17 +1,6 @@
 /**
- * The browser-legal `createLogger`. Reached only through the
- * `@langwatch/observability/browser` export map entry, and importing nothing
- * from the rest of this package: the root entry's graph reaches
- * `node:async_hooks` (context) and `node:process` (the boot guard) through
- * files client code never needed, and a client bundler that cannot tree-shake
- * an unused re-export (no `sideEffects: false` here) ships those node builtins
- * into the browser anyway. This file is the guaranteed-clean side of that
- * split — no import from `../logger.ts`, `../context/*`, `../boot-guard.ts` or
- * pino itself, so there is nothing here for a bundler to get wrong.
- *
- * Call surface matches the pino logger client code already uses: a level
- * method takes either a message string, a merge object, or an `Error`, plus an
- * optional message when the first argument was not a string.
+ * Browser-safe createLogger: no Node builtins, matches the pino logger call
+ * surface client code already uses.
  */
 
 export type BrowserLogLevel = "fatal" | "error" | "warn" | "info" | "debug" | "trace";

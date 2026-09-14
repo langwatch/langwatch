@@ -1,25 +1,6 @@
 /**
- * Structured metadata describing why a payload failed validation, built so it
- * can be logged and aggregated without carrying any of the payload.
- *
- * The question this exists to answer is "is the sender wrong, or is our schema
- * too strict?". Answering it needs the shape of the failure — which field, and
- * what we demanded of it — and never needs the value. So the split this module
- * enforces is by authorship: a path, an issue code, a bound and a list of
- * allowed options are our own schema's vocabulary and are safe to emit; the
- * value that arrived is the customer's and is not.
- *
- * That split is why fields are copied by an allow-list per issue code rather
- * than spread. Two of Zod's own fields would otherwise leak content:
- *
- *   - `message` embeds the received value for several codes ("Invalid enum
- *     value. Expected 'a' | 'b', received '<their value>'").
- *   - `received` is a type name for `invalid_type` and the literal value for
- *     `invalid_literal` / `invalid_enum_value`.
- *
- * Duck-typed on purpose: this package does not depend on zod, the same way
- * `handledFaultOf` does not depend on the HandledError class. Anything with an
- * `issues` array of the documented shape works.
+ * Structured metadata for validation failures: schema details without customer
+ * values, logged and aggregated to diagnose sender vs schema strictness.
  */
 
 /** The most issues one record carries before it is truncated. */
@@ -185,13 +166,8 @@ function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta
 }
 
 /**
- * The per-arm issues of a union failure, under either Zod spelling.
- *
- * Zod 3 hangs a whole `ZodError` off `unionErrors`; Zod 4 hangs the arms'
- * issue arrays off `errors`. Reading only the older one leaves every union
- * rejection recorded as a bare `invalid_union` at the union's own node — no
- * field, no rule — which is precisely the diagnostic this metadata exists to
- * provide.
+ * The per-arm issues of a union failure: handles both Zod 3 `unionErrors` and
+ * Zod 4 `errors` spellings.
  */
 function unionBranches(issue: RawIssue): RawIssue[][] {
   if (Array.isArray(issue.unionErrors)) {
@@ -204,15 +180,8 @@ function unionBranches(issue: RawIssue): RawIssue[][] {
 }
 
 /**
- * Flatten a Zod error into issues, following `invalid_union` into the branch
- * errors it nests. A union failure whose branches are hidden reports only that
- * "something did not match", which is the least useful thing it could say.
- *
- * Counts every issue but only builds the ones that will be kept. The input here
- * is an untrusted body - up to 10 MiB and a couple of hundred spans, each
- * checked against union schemas that fan out a branch of issues per arm - so
- * the difference between counting a large tree and materialising one is worth
- * having on a path that runs per rejected request.
+ * Flatten a Zod error into issues: follows invalid_union branches and counts
+ * all issues but only materializes kept ones.
  */
 function collectIssues(
   issues: RawIssue[],

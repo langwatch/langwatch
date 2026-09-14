@@ -1,27 +1,6 @@
 /**
- * Explicit histogram bucket boundaries, by instrument name.
- *
- * OpenTelemetry configures bucket boundaries on the MeterProvider through a
- * View, not on the instrument — and the provider is constructed at boot, long
- * before any module that declares an instrument is evaluated. So the
- * boundaries cannot live at the declaration site the way prom-client's
- * `buckets` did. They live here, and boot reads this map to build one View per
- * histogram (see `metricHistogramViews`).
- *
- * A histogram with no entry here is a programming error, not a default:
- * `histogram()` throws on declaration rather than letting the instrument fall
- * back to OTel's generic boundaries (0…10000), which would silently produce
- * wrong `histogram_quantile` results for anything measured in bytes, spans or
- * multi-minute durations.
- *
- * The names are the Prometheus names these metrics have always had, preserved
- * byte-for-byte so existing dashboards and alerts keep working across the
- * transport change. See `docs/langwatch-dashboard.json`, which reads
- * `payload_size_bytes_bucket`, `trace_span_count_bucket`,
- * `evaluation_duration_milliseconds_bucket`,
- * `job_processing_duration_milliseconds_bucket`,
- * `collector_index_delay_milliseconds_*` and `http_request_duration_seconds_*`
- * directly.
+ * Explicit histogram bucket boundaries, by instrument name. OTel requires
+ * boundaries at boot time, not at declaration; `histogram()` throws if no entry.
  */
 
 /** Milliseconds, sub-second work: cache reads, small writes. */
@@ -120,22 +99,8 @@ export interface HistogramViewDescriptor {
 }
 
 /**
- * The views a MeterProvider must be constructed with for histograms to keep
- * the boundaries above.
- *
- * Returns neutral data rather than the SDK's `ViewOptions` so this package
- * keeps depending only on `@opentelemetry/api`, never on
- * `@opentelemetry/sdk-metrics`. Each boot path maps it:
- *
- * ```ts
- * views: metricHistogramViews().map(({ instrumentName, boundaries }) => ({
- *   instrumentName,
- *   aggregation: {
- *     type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
- *     options: { boundaries: [...boundaries], recordMinMax: true },
- *   },
- * })),
- * ```
+ * The views a MeterProvider must be constructed with: returns neutral data so
+ * this package depends only on `@opentelemetry/api`, not the SDK.
  */
 export function metricHistogramViews(): HistogramViewDescriptor[] {
   return Object.entries(HISTOGRAM_BOUNDARIES).map(([instrumentName, boundaries]) => ({

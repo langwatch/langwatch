@@ -1,20 +1,6 @@
 /**
- * A MeterProvider that records what instruments write, for tests.
- *
- * Stands in for the metrics SDK rather than wrapping it: aggregation and
- * export are OpenTelemetry's to get right, and what a test of our code needs
- * to know is "which instrument was written, with what value and which
- * attributes". Reading that from a real `PeriodicExportingMetricReader` means
- * awaiting a collection cycle and walking a `ResourceMetrics` tree to assert
- * one number.
- *
- * ```ts
- * const metrics = createRecordingMeterProvider();
- * metrics.install();
- * // …exercise the code…
- * expect(metrics.valueOf("coding_agent_cost_reported_usd_total")).toBe(1);
- * metrics.uninstall();
- * ```
+ * A MeterProvider that records what instruments write: captures instrument
+ * name, value, and attributes for test assertions.
  */
 import { metrics as metricsApi, type Attributes } from "@opentelemetry/api";
 import { activateMetrics, resetMetricsForTests } from "./instruments.ts";

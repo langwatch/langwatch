@@ -1,17 +1,6 @@
 /**
- * The top-level runner every one-shot Node script boots through — the seed,
- * the task runner, the codegen scripts haven runs as its own lanes.
- *
- * A script that dies without one prints Node's own multi-line stack, and a
- * supervisor that renders structured lines can only indent it, so a failed
- * lane looks nothing like a failed service. This prints the single structured
- * line every service prints for the same failure: level, message, the error's
- * name, its message, and its `code` when the error carries one — a Node
- * resolution failure's ERR_MODULE_NOT_FOUND is the one worth reading.
- *
- * The line is written synchronously, not through a logger transport: this runs
- * as the process is on its way out, and a worker-thread transport is exactly
- * how a last line gets lost.
+ * The top-level runner every one-shot Node script boots through: prints one
+ * structured error line synchronously if the script fails.
  */
 
 /** The shape of one written record, matching the shared dev log format. */

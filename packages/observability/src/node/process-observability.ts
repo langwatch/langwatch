@@ -101,15 +101,7 @@ export function createProcessObservability(
   return { logger, tracer, shutdown };
 }
 
-/**
- * Whether this process has been configured to record spans and send them
- * nowhere — the shape of every local `pnpm dev` lane, which has no LangWatch
- * credentials and no exporter of its own.
- *
- * Told to the SDK rather than left to it, because the SDK cannot tell that
- * shape apart from a deployment whose exporter was forgotten and used to write
- * a nine-line ERROR on every boot of every lane on the strength of it.
- */
+/** Whether spans are recorded but not exported (local dev mode). */
 function recordsSpansAndExportsNothing(setup: SetupOptions | undefined): boolean {
   return (
     setup?.langwatch === "disabled" &&
