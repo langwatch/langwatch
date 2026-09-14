@@ -1,19 +1,5 @@
-/**
- * Runs the Sessions lens rollup (specs/traces-v2/sessions-lens.feature)
- * against real ClickHouse: GROUP BY conversation id over `trace_summaries`
- * with IN-tuple dedup, transcript content search through `log_records`, and
- * the keyset pagination the lens pages with.
- *
- * Was
- * `platform/app/src/server/app-layer/traces/repositories/__tests__/session-groups.clickhouse.repository.integration.test.ts`.
- * `SessionGroupsClickHouseRepository` now lives beside this file, over the
- * production connection this package's other ClickHouse suites already use
- * (`startMigratedTraceClickHouse` / `testClickHouseConfigured`) rather than the
- * monolith's testcontainers harness. The log fixture is written as a raw
- * `log_records` row rather than through the deleted OTLP canonicaliser —
- * `SessionGroupsClickHouseRepository` reads the table directly and does not
- * care how a row got there.
- */
+// Sessions lens rollup (specs/traces-v2/sessions-lens.feature): GROUP BY conversation id
+// over trace_summaries with IN-tuple dedup, transcript search via log_records
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

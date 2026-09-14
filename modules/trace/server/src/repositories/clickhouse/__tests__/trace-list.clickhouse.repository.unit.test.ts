@@ -1,22 +1,6 @@
-/**
- * Unit tests for the SQL `findAll` emits.
- *
- * The list is paged in two stages: an inner stage picks the page's traces
- * (cheap, key + sort columns only), an outer stage reads the heavy payload
- * columns for that page alone. Both stages, plus the total count, have to
- * agree on which version of a trace is current.
- *
- * The version dedup is a full-window aggregate — it groups every row the
- * tenant has in the time range. Emitting it more than once per read makes
- * ClickHouse build that aggregate more than once, which is the dominant cost
- * of this list on large tenants. The outer stage does not need it: the inner
- * stage already resolved which exact row won, so it can hand the row's
- * identity over instead of re-deriving it.
- *
- * These assertions are on the emitted SQL because that is where the defect
- * lives; the companion integration test proves the dedup semantics and the
- * read-rows reduction against a real ClickHouse.
- */
+// Unit tests for SQL `findAll` emits. List pages in two stages: inner picks
+// page traces (keys only), outer reads payload. Dedup is full-window aggregate.
+// Assertions on emitted SQL; companion integration test proves semantics
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";

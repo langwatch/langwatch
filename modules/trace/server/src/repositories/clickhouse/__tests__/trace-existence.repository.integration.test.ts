@@ -1,12 +1,5 @@
-/**
- * Feature: specs/traces-v2/bulk-actions.feature
- *
- * `findExistingTraceIds` filters a bulk-action's candidate trace ids down to
- * the ones ClickHouse actually has, tenant-scoped. A bulk send (e.g. queueing
- * traces for annotation) must skip ids that resolve to no trace or belong to
- * another project, and must not round-trip to ClickHouse at all when there is
- * nothing to check.
- */
+// Feature: specs/traces-v2/bulk-actions.feature
+// findExistingTraceIds filters bulk-action candidates to tenant-owned traces
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

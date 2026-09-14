@@ -1,16 +1,5 @@
-/**
- * Integration tests for `tryFindByTraceId` partition pruning against the migrated
- * ClickHouse the running job supplies (production `trace_summaries` schema:
- * `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYearWeek(OccurredAt)`,
- * `ORDER BY (TenantId, TraceId)`).
- *
- * The heavy single-trace read (ComputedInput / ComputedOutput / Attributes)
- * only prunes partitions when an OccurredAt predicate is present. Callers that
- * don't thread an `occurredAtMs` hint used to fall back to scanning every
- * weekly partition incl. cold S3; the reader now resolves OccurredAt from a
- * cheap sort-key seek and bounds the read — and skips the heavy read entirely
- * for a trace that doesn't exist.
- */
+// Integration tests for `tryFindByTraceId` partition pruning
+// (production schema: ReplacingMergeTree, partitioned by week, ordered by TenantId/TraceId)
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

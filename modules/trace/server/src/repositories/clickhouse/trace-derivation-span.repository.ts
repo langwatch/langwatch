@@ -9,16 +9,8 @@ const logger = createLogger("langwatch:trace:derivation-span-repository");
 
 const TABLE_NAME = "stored_spans" as const;
 
-/**
- * The columns a derivation reads, and no nested group.
- *
- * Narrower than the single-span fetch's projection on purpose: a whole trace's
- * worth of rows is what makes this read expensive, and `Events.*` / `Links.*`
- * are both the largest columns and the ones production throws
- * `Attempt to read after eof (while reading column Links.Attributes)` on.
- * {@link mapChRowToNormalized} defaults both to `[]`, which is why a span read
- * this way must never be rendered.
- */
+// Derivation reads narrow columns only: Events.* and Links.* excluded
+// (mapChRowToNormalized defaults them to [] — these spans must never render)
 const DERIVATION_TRACE_SPAN_SELECT = `
   SpanId,
   TraceId,
@@ -42,25 +34,10 @@ const DERIVATION_TRACE_SPAN_SELECT = `
   NonBilledCost
 `;
 
-/**
- * How many spans one derivation will read.
- *
- * A trace is a customer's own shape and has no upper bound; a derivation over
- * one is a per-role sum, so the cap costs accuracy on a pathological trace and
- * bounds the memory every other trace pays for it. The same number the
- * projection path caps its own span processing at.
- */
+// Derivation span limit caps memory per-role sum (matches projection path cap)
 const DERIVATION_SPAN_LIMIT = 10_000;
 
-/**
- * How many span events one derivation will read.
- *
- * A span carries an unbounded number of events and a trace an unbounded number
- * of spans, so the product is what has to be capped rather than either factor.
- * The number matches the light-span ceiling the application's own events read
- * uses, so a filter evaluated in this process sees the same prefix it saw in
- * the application.
- */
+// Event limit caps the product (spans × events per span); matches app's own ceiling
 const DERIVATION_EVENT_LIMIT = 10_000;
 
 /**
@@ -75,15 +52,8 @@ const DERIVATION_FETCH_SETTINGS = {
   max_execution_time: "30",
 } as const;
 
-/**
- * Every stored span of one trace, for the scenario role derivation.
- *
- * The dedup is `argMax(..., UpdatedAt)` grouped by `SpanId` rather than
- * `LIMIT 1 BY`: the table is a `ReplacingMergeTree` and a re-exported span sits
- * as two physical rows until a merge, so a read that returned both would double
- * that span's cost and latency into its role's total. `LIMIT 1 BY` would
- * materialise every selected column for whole granules to do the same job.
- */
+// Every stored span of one trace for scenario role derivation; uses argMax with
+// UpdatedAt (not LIMIT 1 BY which materializes columns for whole granules)
 export class TraceDerivationSpanClickHouseRepository {
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
@@ -126,16 +96,8 @@ export class TraceDerivationSpanClickHouseRepository {
     }
   }
 
-  /**
-   * Every span event of one trace, flattened.
-   *
-   * `ARRAY JOIN` runs OUTSIDE the dedup subquery on purpose: the expansion
-   * multiplies each surviving row by its event count, so deduplicating after it
-   * would do the same tuple comparison `events_per_span` times over. The inner
-   * query therefore reads only the three nested `Events.*` columns — never
-   * `SpanAttributes` or `Links.*`, which is what makes an events read cheap
-   * where a whole-span read is not.
-   */
+  // Every span event of one trace, flattened. ARRAY JOIN outside dedup subquery
+  // to avoid multiplying tuple comparisons by event count
   async findDerivedEventsByTraceId(input: {
     tenantId: string;
     traceId: string;

@@ -1,12 +1,6 @@
 /**
- * Static metadata about the queryable trace fields. No liqe dependency,
- * no AST work — just the registry the rest of the query language reads.
- *
- * Adding a new field happens here and propagates everywhere:
- *   - SearchBar suggestions (FIELD_NAMES, FIELD_VALUES)
- *   - Sidebar facets / range controls (SEARCH_FIELDS.facetField, valueType)
- *   - Docs drawer + AI-mode prompt (composeQuerySyntaxDoc reads SEARCH_FIELDS)
- *   - Token highlight accent (SCENARIO_FIELDS)
+ * Static metadata about queryable trace fields. Registry for query language;
+ * adding field updates search bar, sidebar, docs, and highlights.
  */
 
 export type SearchFieldGroup =
@@ -384,15 +378,8 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
 };
 
 /**
- * Namespaced dynamic prefixes — the user types one of these and then a
- * key (`trace.attribute.langwatch.user.id`) and the autocomplete drops
- * into key-discovery mode. Surfaced in the dropdown alongside the static
- * fields so users see them as first-class options.
- *
- * Keeping these as separate entries (not in `SEARCH_FIELDS`) because
- * they're not real fields — they're prefixes that expand to a concrete
- * field name once the user picks a key. The grammar's `isKnownField`
- * check accepts the expanded form.
+ * Namespaced dynamic prefixes for key-discovery mode. Separate from SEARCH_FIELDS
+ * because they're prefixes that expand to concrete field names, not real fields.
  */
 export interface DynamicPrefixDef {
   prefix: string;

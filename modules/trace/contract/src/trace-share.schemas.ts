@@ -19,30 +19,9 @@ import {
 import { spanTreeNodeSchema } from "./trace.ts";
 
 /**
- * The share-safe output contract for `sharedTrace.get` — the ONLY payload an
- * anonymous viewer can obtain. See ADR-057.
- *
- * Every section is an explicit `.pick()` from the internal read schema rather
- * than the internal schema itself. That is the whole point: tRPC runs this as
- * the procedure's `.output()` parser server-side, and Zod strips keys the
- * schema does not name. So a column added to `traceHeaderSchema` /
- * `spanDetailSchema` / `evaluationSchema` tomorrow is dropped at the share
- * boundary by default, and only reaches a share viewer once someone adds it to
- * a pick list here — a small, reviewable diff on a file that exists solely to
- * be reviewed.
- *
- * Fields the share surface must NEVER carry are omitted from the pick (they are
- * then stripped silently, which fails closed) or pinned to their redacted value
- * where an omission would be indistinguishable from "absent because old client"
- * — `userId` and evaluator stacktraces below. A pinned field turns a redaction
- * regression into a loud parse failure instead of a quiet leak; both are covered
- * by `sharedTrace.shareSafe.unit.test.ts`.
- *
- * Note this is defence in depth, not the only gate: the router still applies
- * `gateHeaderCost` / `gateTreeCost` / `gateResources` / `gateEvaluations` /
- * `applyDerivedTraceEventProtections`, which redact per-viewer (cost, captured
- * content, restricted attributes). The schema bounds the *shape*; the gates
- * decide the *values*.
+ * Share-safe contract via explicit `.pick()` from internal schemas. Columns
+ * added to internal schemas are dropped by default; only reviewed additions
+ * reach viewers. Defense in depth: router gates also redact per-viewer. See ADR-057.
  */
 
 /**

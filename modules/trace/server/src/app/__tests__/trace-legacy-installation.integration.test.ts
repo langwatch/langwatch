@@ -1,16 +1,8 @@
 /**
  * @vitest-environment node
  *
- * The deprecated `/api/trace/*` family, mounted over the application that
- * installs it rather than over a hand-written stand-in.
- *
- * The family is declared `publicRoute`, so the framework resolves nothing and
- * every one of its five addresses reads six members off the application:
- * `credential`, `traces()`, `shares()`, `getProtections`, `searchBodySchema()`
- * and `describeValidationError`. When those members did not exist, the first
- * line of every handler threw a `TypeError` and an anonymous caller received a
- * 500 where its refusal belonged. This boots the real declaration against fakes
- * and asserts the refusal answers.
+ * Legacy `/api/trace/*` routes mounted over real application. Tests that all
+ * required members are read and refusals answer correctly.
  */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";

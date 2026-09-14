@@ -1,22 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Which process registers the `trace_processing` pipeline, and what the other
- * one does instead.
- *
- * Trace has two registration shapes over one pipeline name: the producer-only
- * definition a process that merely stages commands composes, and the complete
- * definition - subscribers, fold projections, the real ClickHouse stores - a
- * process that DRAINS the pipeline installs. One runtime holds one
- * registration per name, so a process composes exactly one of them.
- *
- * The draining process composes Trace's read graph before its install phase
- * runs, so it registers nothing here and resolves its senders off its own
- * registration at the first send. Registering the producer definition there as
- * well is how the worker once drained every recorded span into stand-ins that
- * refuse by design.
- *
- * Spec: modules/trace/specs/trace-processing-registration-ownership.feature
+ * Which process registers trace_processing: producer-only vs. draining with
+ * subscribers/folds. See trace-processing-registration-ownership.feature.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";

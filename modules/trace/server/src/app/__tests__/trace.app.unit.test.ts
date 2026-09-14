@@ -4,25 +4,8 @@ import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  *
- * The trace application's own rules — the ones a door would otherwise have to
- * know, and which several doors used to spell out for themselves.
- *
- * Three of them are pinned here for the first time:
- *
- *   - **Full resolution on a read that CONSUMES content (#4991).** The drawer
- *     read and the single-trace read both show the content they fetch, so they
- *     never serve the 64 KB stored preview. `traces-trpc-api.unit.test.ts`
- *     pins the thread, sample and download reads; this pins the by-id read
- *     that `/api/v1/traces/:traceId` has always relied on.
- *   - **The partition-pruning hint.** `occurredAtMs` is passed present or
- *     absent, never present and `undefined`. A key with no value turns a
- *     bounded read into a scan of every weekly partition, cold S3 storage
- *     included.
- *   - **The visibility-window verdict, fail-closed.** A correction quotes
- *     captured content, so a trace whose age cannot be established must not
- *     open it.
- *
- * @see specs/traces — #4991 full resolution
+ * Trace application rules: full resolution on content-consuming reads,
+ * partition-pruning hints, visibility-window verdicts. See specs/traces #4991.
  */
 import type {
   Evaluation,

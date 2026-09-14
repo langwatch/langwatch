@@ -2,14 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The span pipeline's lane count, and where the tokenizer finds its
- * vocabulary.
- *
- * `processingShards` is carried as written because the producing and
- * consuming processes must clamp it identically, and the pipeline owns that
- * clamp. `fetchTimeoutMs` is carried as a string or a number on purpose: the
- * tokenizer accepts `10s` and reads it as ten, and a numeric leaf here would
- * refuse a value the deployment has been running with.
+ * Span pipeline config: lane count and tokenizer settings. Kept in original
+ * types so producer/consumer clamp identically and deployments can use existing values.
  */
 export const traceServerConfigDefinition = RuntimeConfig.define({
   spanProcessingShards: Config.value(z.string().optional(), {

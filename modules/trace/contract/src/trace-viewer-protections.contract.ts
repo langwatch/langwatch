@@ -8,7 +8,8 @@ export interface CategoryVisibility {
   /** Whether the viewer may read this category's content. */
   canSee: boolean;
   /**
-   * Human audience label for a `restrict` rule on this category ("Admins, Security group" or "no one"), set whether or not the viewer can see it: it names the audience on a hidden placeholder AND tells an in-audience viewer the content is restricted (rather than ordinary). Null for plain capture.
+   * Audience label for `restrict` rules ("Admins" or "no one"), shown on
+   * placeholders and in-audience viewers. Null for plain capture.
    */
   restrictVisibleTo: string | null;
 }

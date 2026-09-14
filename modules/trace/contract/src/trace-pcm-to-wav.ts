@@ -1,25 +1,7 @@
 /**
- * pcmToWav — wrap raw, header-less realtime audio into a minimal WAV
- * (RIFF/WAVE) container so a browser `<audio>` element can actually decode
- * and play it.
- *
- * Raw `pcm16` carries no container, so a `data:audio/wav;base64,<raw-pcm>`
- * URI is silently unplayable — every browser rejects it because there is no
- * RIFF header describing sample rate / channels / bit depth. Prepending a WAV
- * header makes the exact same samples playable, with no re-encode.
- *
- * React-free and isomorphic (base64 via `Buffer` on the server, `atob`/`btoa`
- * in the browser): the client wraps inline base64 turns before playback, and
- * the stored-objects content extractor wraps raw-PCM bytes at store time so
- * externalized references are served as playable `audio/wav` from day one.
- *
- * Formats: `pcm16` (24 kHz mono 16-bit little-endian, the OpenAI Realtime
- * capture default) is wrapped as linear PCM as-is. The companded G.711
- * formats (`g711_ulaw` / `g711_alaw`, 8 kHz telephony) are DECODED to linear
- * PCM16 first: browser <audio> WAV decoders are PCM-only, so a WAV carrying
- * fmt codes 6/7 would be a silently-dead player. The G.711 expansion is the
- * standard table-free CCITT decode — lossless with respect to what the codec
- * carries.
+ * Wrap raw, header-less realtime audio into a minimal WAV container for browser
+ * playback (browsers need RIFF headers to decode). Decodes companded G.711 to
+ * linear PCM16; wraps pcm16 as-is.
  */
 
 export type RawPcmFormat = "pcm16" | "g711_ulaw" | "g711_alaw";

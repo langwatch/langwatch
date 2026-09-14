@@ -1,17 +1,7 @@
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 /**
- * Projection DSL — public contract for Track 1 of the API Export Traces RFC
- * (EPIC/Q2/api-export). Extends `POST /api/traces/search` with two optional
- * request fields, `from` + `select`, letting a caller declare exactly which
- * columns (and nested child collections) to project — one paginated loop
- * replaces per-trace fan-out.
- *
- * This module is the boundary between the SURFACE (app.v1.ts: request schema,
- * response envelope) and the ENGINE (the schema compiler + the ClickHouse /
- * Postgres plan execution). Both sides depend only on the types here.
- *
- * `from` and `select` are OPTIONAL. Absent → the endpoint behaves exactly as
- * before (backwards compatible).
+ * Projection DSL: public contract for declaring which trace columns to fetch in
+ * one query instead of per-trace fan-out. Optional fields `from` + `select`.
  */
 
 import { z } from "zod";
@@ -87,15 +77,9 @@ export interface ResolvedSchema {
 export type ProjectionCollection = "events" | "annotations" | "evaluations";
 
 /**
- * What the ENGINE must fetch to satisfy a projection. Produced by the compiler,
- * consumed by `getAllTracesForProject` (passed verbatim as `options.projection`)
- * and by the bounded events / Postgres-annotations readers. Opaque to the
- * SURFACE — app.v1.ts just forwards it.
- *
- * The plan is the lever for the perf win: input and output are pruned
- * independently, so an output-only select (the common "grab completions"
- * ETL shape) never materializes the heavy ComputedInput column, and vice
- * versa.
+ * What the ENGINE must fetch to satisfy a projection. Inputs and outputs are
+ * pruned independently for perf, so output-only selects avoid materializing
+ * the heavy ComputedInput column.
  */
 export interface ProjectionPlan {
   from: ProjectionFrom;

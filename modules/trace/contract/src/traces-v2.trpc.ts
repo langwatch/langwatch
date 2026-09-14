@@ -1,22 +1,7 @@
 /**
- * Every `tracesV2.*` procedure the trace explorer's grid, sidebar, drawer,
- * span and detail panes call, declared once. Every read takes `traces:view`;
- * `changeName` takes `traces:update`.
- *
- * `changeMetadata` is NOT declared here: its input's `metadata` field is
- * parsed today by `traceMetadataUpdateSchema`
- * (`modules/trace/server/src/services/support/trace-metadata-write.service.ts`),
- * a SERVER-owned schema this contract package cannot import without inverting
- * the contract/server dependency direction. See the porting handoff
- * (`.claude/handoffs/traces-v2-trpc-contract.md`) for the exact fix once a
- * copy or a move is decided.
- *
- * `codingAgentSession` and `codingAgentTranscript` are likewise NOT declared
- * here yet: their schemas (`codingAgentSessionSchema`,
- * `codingAgentTranscriptSchema`) live in `@langwatch/coding-agent-contract`,
- * which this package does not yet depend on — adding the dependency needs a
- * `pnpm install` (touches the workspace lockfile), left to the next lane
- * rather than done inline here.
+ * TracesV2 procedures for trace explorer UI. Some fields (changeMetadata,
+ * coding agent schemas) are NOT declared here due to dependency issues; see
+ * `.claude/handoffs/traces-v2-trpc-contract.md` for the fix.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";

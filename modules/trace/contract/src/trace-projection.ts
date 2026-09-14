@@ -103,7 +103,7 @@ export const traceSummaryDataSchema = z.object({
   sizeBytes: z.number().optional(),
   attributes: z.record(z.string(), z.string()),
   traceName: z.string(),
-  /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
+  /** Root span start time for deterministic tie-breaking across multiple spans. */
   rootSpanStartTimeMs: z.number().optional(),
   /**
    * When true the user has explicitly renamed the trace via
@@ -114,51 +114,18 @@ export const traceSummaryDataSchema = z.object({
    */
   traceNameUserOverridden: z.boolean().optional(),
   /**
-   * True when `traceName` came from the "no real root, fall back to
-   * earliest span" path rather than a span with `parentSpanId === null`.
-   * Customers occasionally emit the first span with a bogus
-   * `parent_span_id` that points to no span in the trace, so no real
-   * root ever exists and the trace would otherwise stay unnamed. The
-   * fallback lets it pick up a sensible name immediately; if a real
-   * root span arrives later the projection prefers it and clears this
-   * flag, since fold updates are incremental.
-   *
-   * Cleared by a user rename (TraceNameChanged event) — the rename is
-   * itself a higher-precedence source of the name, so the "is this
-   * still fallback-sourced?" question is meaningfully no.
-   * `rootMetadataFromFallback` continues to track the metadata
-   * provenance independently in that case.
+   * True when traceName came from fallback (no real root found yet).
+   * Cleared by user rename; rootMetadataFromFallback tracks metadata separately.
    */
   traceNameFromFallback: z.boolean().optional(),
   /**
-   * True when `rootSpanStartTimeMs` / `rootSpanType` were claimed via
-   * the fallback path (a non-root span used as a stand-in because no
-   * real root has arrived yet). Pairs with `traceNameFromFallback` but
-   * outlives a user rename — a user-supplied name disowns the fallback
-   * for *naming purposes* but the metadata itself is still a stand-in,
-   * so a real root arriving later must still be allowed to take it
-   * over.
+   * True when metadata came from fallback (non-root span stand-in).
+   * Outlives user rename, unlike traceNameFromFallback.
    */
   rootMetadataFromFallback: z.boolean().optional(),
   /**
-   * The trace's STORAGE ANCHOR, epoch ms (0 / absent = nothing observed yet).
-   *
-   * Written to `trace_summaries.OccurredAt`, which is the table's weekly
-   * partition key and its TTL anchor (00002). Frozen on the FIRST contribution
-   * that carries a usable business time - a span, a log record, a metric
-   * correlation, an annotation, a topic assignment, an origin resolution, a
-   * rename - and never moved afterwards (ADR-071's rule, applied to this table
-   * by ADR-087).
-   *
-   * Deliberately separate from `occurredAt` below. That one is span-seeded and
-   * is the timing baseline; only spans may touch it, because `SpanTimingService`
-   * reads `occurredAt > 0` as "a span has seeded the baseline" and measures
-   * `totalDurationMs` from it. Sharing one field between the two jobs is what
-   * put log-only traces (Claude Code / Codex "Path B") in partition 196952 with
-   * a TTL deadline of `1970 + retention`, already past.
-   *
-   * Optional because the list reads build this shape straight from query rows
-   * and every pre-ADR-087 caller predates the field; treat absent as 0.
+   * Storage anchor (partition key and TTL), frozen on first contribution;
+   * separate from occurredAt (span-seeded timing baseline). See ADR-071/087.
    */
   storageAnchorMs: z.number().optional(),
   occurredAt: z.number(),

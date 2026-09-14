@@ -7,15 +7,8 @@ import type {
 import { TraceSpanStorageRepository } from "../../span-storage-write.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
-/**
- * Spec: modules/trace/specs/span-storage-write.feature
- *
- * The adapter is the seam a process composes, so what it has to prove is that
- * it IS the port the span-storage store consumes and that the batch survives
- * the crossing. An adapter that fanned a batch out into one call per span
- * would satisfy every type in sight and quietly multiply the ingestion path's
- * round trips by the batch size.
- */
+// Adapter seam: verify it matches the port and batch survives crossing
+// (see modules/trace/specs/span-storage-write.feature)
 type Insert = Parameters<TraceClickHouseWriteClient["insert"]>[0];
 
 function adapter(defaultRetentionDays = 49) {

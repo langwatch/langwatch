@@ -1,27 +1,7 @@
 /**
- * The claim-check contract for trace payloads too large to carry inline
- * (ADR-022).
- *
- * Two things are offloaded and both leave a pointer behind. A span whose whole
- * serialised command exceeds `COMMAND_INLINE_THRESHOLD` is spooled at the
- * collector edge and the command carries a `spoolRef`. An individual
- * input/output attribute over the projection's preview budget is replaced with
- * a preview and gains a `langwatch.reserved.eventref.<attrKey>` attribute
- * naming the event log row that still holds the whole value.
- *
- * THE PREFIX AND THE POINTER SHAPE LIVE IN THE CONTRACT, NOT BESIDE THE
- * TRANSFORM THAT WRITES THEM, for the same reason the media-reference shape
- * does: they have more readers than writers, and every reader must strip and
- * decode exactly what the writer wrote. The write side is the projection lean
- * (`@langwatch/trace-server`); the read side is the full-record repository, its
- * mapper, the event-payload repository and the trace read path's offloaded
- * resolvers. Those four each carried their own copy of the string. A prefix one
- * reader spells differently is an offloaded value that resolves to nothing —
- * the customer sees the 64 KB preview and is told nothing was truncated.
- *
- * Nothing here is a policy: the preview BUDGET, which attribute keys earn it
- * and how a preview is shaped are the lean transform's business and stay with
- * it. What is here is only what both sides have to agree on.
+ * Claim-check contract for trace payloads too large to carry inline (ADR-022).
+ * Prefix and pointer shapes live here so multiple readers decode what writers
+ * encode; policies (preview budget, attribute keys) stay with the writer.
  */
 
 /**

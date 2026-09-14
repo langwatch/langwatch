@@ -1,25 +1,7 @@
 /**
- * Evaluator-scoped group mutations. The sidebar's evaluator drilldown lets a
- * user pin verdict / score / label sub-conditions onto a single
- * `evaluator:<id>` filter. Those sub-conditions must stay scoped to that one
- * evaluation — `evaluator:X AND evaluatorVerdict:pass` as two flat top-level
- * clauses mis-binds the moment another OR/AND filter joins the query. So the
- * drilldown emits them as one parenthesised AND group:
- *
- *   (evaluator:X AND evaluatorVerdict:pass AND evaluatorScore:[0 TO 0.5])
- *
- * Every mutation here reads the evaluator's current group out of the AST,
- * applies the requested change, removes the whole group, then re-appends the
- * canonical form. Rebuilding (rather than splicing) keeps the group shape
- * stable and the toggle/clear semantics simple: clicking a sub-condition again
- * removes just that one; removing the evaluator removes the whole group.
- *
- * Scope note: sub-condition state is keyed by `(evaluatorId, field, value)`
- * within the located group, so multiple active evaluators each keep their own
- * verdict/score/label set. The one carried-over limitation from the previous
- * flat implementation is that two evaluators are still disambiguated purely by
- * the `evaluator:<id>` anchor inside their group — a hand-typed query that puts
- * two evaluators in the *same* parens will be treated as a single group.
+ * Evaluator-scoped group mutations. Sub-conditions must stay scoped to one
+ * evaluator via parentheses: (evaluator:X AND evaluatorVerdict:pass AND
+ * evaluatorScore:[0 TO 0.5]). Rebuilds groups for stable toggle/clear semantics.
  */
 
 import type { LiqeQuery, TagToken } from "liqe";
@@ -171,14 +153,8 @@ function readSubConditions(node: LiqeQuery, group: EvaluatorGroup): void {
 }
 
 /**
- * Read the current state of an evaluator's group directly from a parsed AST.
- * When the evaluator anchor sits outside any group (e.g. a bare top-level
- * `evaluator:X`), `present` is still true but sub-conditions are empty.
- *
- * Exposed so the sidebar drilldown can render verdict / label / score active
- * state scoped to one evaluation without re-serialising — the global readers
- * (`getFacetValueState`, `getRangeValue`) would alias two active evaluators
- * that share a verdict value.
+ * Read evaluator group state from AST. Scopes verdict/label/score to one
+ * evaluation without re-serialising (avoiding aliases across evaluators).
  */
 export function readEvaluatorGroupFromAst(ast: LiqeQuery, evaluatorId: string): EvaluatorGroup {
   const group: EvaluatorGroup = {

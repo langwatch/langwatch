@@ -15,48 +15,16 @@ const logger = createLogger("langwatch:trace:span-storage-repository");
 
 const TABLE_NAME = "stored_spans" as const;
 
-/**
- * Settings for every `stored_spans` insert.
- *
- * `input_format_json_throw_on_bad_escape_sequence: 0` is load-bearing.
- * Span strings originate as JS UTF-16 and can carry a lone (unpaired) surrogate
- * half (`\uD800`–`\uDFFF`) — a value truncated mid-emoji, or binary/garbage text
- * an SDK captured as a string. `JSONEachRow` serializes such a half as a bare
- * `\uD800`-style escape with no second part, which ClickHouse's JSON parser
- * rejects by default ("missing second part of surrogate pair"), failing the
- * whole insert. The pipeline then retries and dead-letters, and the span is lost
- * forever (13 groups dead-lettered for one project in prod).
- *
- * With the setting at 0, ClickHouse keeps the bad escape sequence as-is instead
- * of throwing — exactly what its own error message recommends. This is done at
- * the insert boundary, per-batch and O(1), rather than walking and rewriting
- * every string of every span (attribute keys/values, names, statuses, event
- * names — unbounded per-span payload) on the hot ingest path just to pre-empt
- * the parser. The rare malformed string is stored verbatim; every valid string
- * is untouched.
- */
+// Span insert settings: input_format_json_throw_on_bad_escape_sequence=0
+// tolerates lone surrogates from truncated emoji/garbage text; filters 13+ prod dead-letters
 const SPAN_INSERT_SETTINGS = {
   async_insert: 1,
   wait_for_async_insert: 1,
   input_format_json_throw_on_bad_escape_sequence: 0,
 } as const;
 
-/**
- * The column projection the derivation read takes: every scalar span and
- * resource column, and neither nested group.
- *
- * Not a micro-optimisation. `Events.*` and `Links.*` are what production throws
- * `Attempt to read after eof (while reading column Links.Attributes)` on — the
- * failure ran to thousands of lines an hour, and because this read backs a
- * queue handler, every one of them re-staged the job and re-ran the read on
- * backoff. Dropping columns the consumer never reads removes the error class
- * and the retry load it generated in one move.
- *
- * {@link mapChRowToNormalized} already tolerates their absence — it defaults
- * both nested groups to `[]` — so a span mapped from this projection carries
- * empty `events` and `links`. That is why this select must never back a read
- * that RENDERS a span.
- */
+// Derivation projection: scalar columns only (drops Events/Links which cause read errors);
+// mapChRowToNormalized defaults to []. Never backs spans that render
 const DERIVATION_SPAN_SELECT = `
   SpanId,
   TraceId,
@@ -80,17 +48,8 @@ const DERIVATION_SPAN_SELECT = `
   NonBilledCost
 `;
 
-/**
- * Per-query ceiling and optimiser lock for the single-span fetch.
- *
- * `max_memory_usage` keeps a pathological span's attribute map failing on its
- * own rather than against the server's total limit, where the OvercommitTracker
- * resolves the pressure by killing whichever query is allocating.
- * `query_plan_optimize_lazy_materialization` is locked ON per query so
- * `ORDER BY UpdatedAt DESC LIMIT 1` keeps deferring heavy columns past the
- * LIMIT even if a cluster profile flips the default off — measured at 15 KB
- * read with it and 9.7 MB without, on the same span.
- */
+// Single-span fetch settings: max_memory_usage caps pathological spans;
+// lazy_materialization keeps 15 KB vs 9.7 MB on deferred heavy columns
 const SINGLE_SPAN_FETCH_SETTINGS = {
   max_memory_usage: String(2 * 1024 * 1024 * 1024),
   query_plan_optimize_lazy_materialization: "1",
@@ -119,18 +78,8 @@ type ClickHouseSpanWriteRecord = WithDateWrites<
   "StartTime" | "EndTime" | "Events.Timestamp" | "CreatedAt" | "UpdatedAt"
 >;
 
-/**
- * One `stored_spans` row, in the table's own column order.
- *
- * `stored_spans` is `ReplacingMergeTree(StartTime)` keyed on
- * `(TenantId, TraceId, SpanId)` and partitioned by `toYearWeek(StartTime)`, so
- * three of these columns are structural rather than payload: the key triple
- * decides which rows collapse into one, and `StartTime` is simultaneously the
- * version that decides WHICH of them survives and the value every read prunes
- * partitions on. A span written with the wrong `StartTime` is not merely
- * mis-stamped — it deduplicates against the wrong neighbour and lands in the
- * wrong weekly partition.
- */
+// stored_spans row: ReplacingMergeTree keyed on (TenantId, TraceId, SpanId),
+// partitioned by toYearWeek(StartTime). Wrong StartTime breaks dedup and partitioning
 interface ClickHouseSpanRecord {
   ProjectionId: string;
   TenantId: string;
@@ -168,18 +117,8 @@ interface ClickHouseSpanRecord {
   _retention_days: number;
 }
 
-/**
- * The `stored_spans` write path, harvested from the application's
- * `SpanStorageClickHouseRepository` so a background process can persist spans
- * without the application's read half — the blob-offload resolver, the
- * visibility gate and the windowed readers — coming with it.
- *
- * The one deliberate difference from the frozen twin: the retention fallback is
- * injected rather than read from the platform's constant, because a package
- * cannot read the deployment's environment. The number the worker passes is the
- * same one the event store already stamps its own rows with, so producer and
- * consumer cannot disagree about it.
- */
+// stored_spans write path harvested from application (no read half needed).
+// Retention fallback injected (package cannot read deployment environment)
 export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageRepository {
   private constructor(
     private readonly options: {
@@ -281,27 +220,8 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
     }
   }
 
-  /**
-   * The ONE read this write repository carries: a single stored span, by its
-   * own identity, for a derivation consumer that was handed a reference rather
-   * than a payload.
-   *
-   * THE HINT IS REQUIRED, not optional, and it must be the SPAN'S OWN start.
-   * `stored_spans` is partitioned by `toYearWeek(StartTime)`, so a window
-   * centred on the ingest time of the event that referenced the span excludes
-   * any span whose duration plus export lag exceeded it — and spans export on
-   * END. Such a span would sit outside every retry's window forever. A hintless
-   * call would instead fall through to an unbounded scan across every
-   * partition, cold S3 tier included, once per redelivery — precisely what this
-   * read exists not to do.
-   *
-   * `fallback: "none"` follows from the same fact: a miss inside the window is
-   * answered as a miss, so the caller throws into the queue's backoff and pays
-   * one cheap windowed probe per retry instead of an unbounded scan.
-   *
-   * RETURNS A SPAN WITH EMPTY `events` AND `links`: it reads
-   * {@link DERIVATION_SPAN_SELECT}. Do not reach for it to render a span.
-   */
+  // One read: single stored span by identity for derivation consumer. HINT REQUIRED
+  // (span's own start, not ingest time). Returns empty events/links. Do not render
   async tryFindNormalizedSpanById(input: {
     tenantId: string;
     traceId: string;
@@ -336,18 +256,8 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
     }
   }
 
-  /**
-   * WHERE pins (TenantId, TraceId, SpanId) — the primary key prefix — so the
-   * read hits a tiny granule range, and `ORDER BY UpdatedAt DESC LIMIT 1`
-   * deliberately picks up the LazilyRead optimiser locked on in
-   * {@link SINGLE_SPAN_FETCH_SETTINGS}.
-   *
-   * KNOWN MISMATCH, carried across from the twin rather than corrected here:
-   * the engine's version column is `StartTime`
-   * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. A span re-exported with
-   * a CHANGED StartTime therefore answers last-written-wins before a merge and
-   * largest-StartTime-wins after one.
-   */
+  // WHERE pins primary key prefix (tiny granule range); ORDER BY UpdatedAt DESC LIMIT 1
+  // uses LazilyRead optimizer. Note: engine version is StartTime, not UpdatedAt
   private async fetchNormalizedSpanRow(
     input: { tenantId: string; traceId: string; spanId: string },
     window: { fromMs: number; toMs: number } | null,

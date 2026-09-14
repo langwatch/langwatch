@@ -63,17 +63,8 @@ export const MAX_PROCESSED_SPANS = 512;
  */
 export const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Reserved trace-summary attribute keys holding cache / reasoning token
- * SUMS across the whole trace. The per-span `gen_ai.usage.cache_*` numbers
- * never reach the trace-level attribute map (the accumulation allowlist
- * only carries identity/metadata keys), so the drawer popover had nothing
- * to read and "Cache write" stayed permanently hidden. We fold the sums in
- * here under reserved keys — same transport the log/output bookkeeping
- * already uses — instead of adding three CH columns for what is display
- * detail. The drawer reads these first and falls back to the raw per-span
- * key for traces folded before this landed.
- */
+// Reserved keys for cache/reasoning token sums (per-span numbers don't reach
+// the attribute allowlist, so we fold sums here instead of adding CH columns)
 export const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
 export const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation_tokens";
 export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
@@ -126,13 +117,8 @@ const traceSummaryEvents = [
   traceNameChangedEventSchema,
 ] as const;
 
-/**
- * Type-safe fold projection for trace summary state.
- *
- * - `implements FoldEventHandlers` enforces a handler exists for every event schema
- * - Handler names derived from event type strings (e.g. `"lw.obs.trace.span_received"` -> `handleTraceSpanReceived`)
- * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
- */
+// Type-safe fold projection with handlers derived from event type strings
+// (e.g. "lw.obs.trace.span_received" -> handleTraceSpanReceived)
 export class TraceSummaryFoldProjection
   extends AbstractFoldProjection<
     TraceSummaryData,
@@ -150,63 +136,9 @@ export class TraceSummaryFoldProjection
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceSummaryData>;
 
-  /**
-   * A span is folded whenever it arrives; an out-of-order span never replays the
-   * trace's history. Nearly every field is order-free: spanCount and the
-   * token/cost totals are sums, timing is min/max, status is an OR, the semantic
-   * output override compares span end times (`shouldOverrideOutput`), and trace
-   * naming compares root-span start times.
-   *
-   * Three fields ARE resolved in fold order, and we accept that:
-   *   - `models` — `mergeModelsMostRecentFirst` puts the last-folded model first,
-   *     so `models[0]` is the trace's primary model.
-   *   - `computedInput` — among several parentless "root" spans the last-folded
-   *     one wins; among non-root spans the first-folded one wins
-   *     (`trace-io-accumulation.service.ts`, the `isRoot || computedInput === null`
-   *     branch). There is no timestamp tiebreak.
-   *   - `computedOutput` when only a *fallback* (non-semantic) extraction exists —
-   *     the first-folded fallback wins. A later semantic match still overrides it.
-   *
-   * This costs less than it reads. `occurredAt` on a span event is the INGEST
-   * wall-clock (`trace-request-collection.service.ts` stamps `Date.now()`), not
-   * the span's own start time — so the replay never restored span-time order
-   * either, only global ingest order. `executeBatch` folds each batch in
-   * occurredAt order, so within a batch nothing changes; across batches these
-   * three fields may resolve differently than a full replay would, on
-   * multi-root traces. That is a display-level difference in fields whose
-   * selection was already ingest-order dependent, not a lost invariant.
-   *
-   * Leaving the replay on was ruinous once recordSpan sharded across GroupQueue
-   * lanes, because a hot trace's spans then arrive out of order constantly: one
-   * trace re-folded 730 times in two hours, re-reading 5.66M event rows, and
-   * never caught up (2026-07-09 —
-   * specs/trace-processing/hot-trace-fold-amplification.feature).
-   */
-  /**
-   * `readWindow` bounds the read-back to a partition-pruned window around the
-   * folded event's business time. ±7 days, matching the other analytics folds
-   * — NOT the platform's shared ±2-day partition window this fold used to
-   * declare. That width's rationale ("drift from the folded event's occurredAt
-   * is clock skew, not aggregate lifetime") measured FALSE in production:
-   * 138,654 unwindowed fallback recoveries in 30 days, i.e. ~4.6k times a DAY
-   * a live summary row sat 2-7 days from the incoming event — evaluations and
-   * annotations land on traces days after their anchor, and a span event's
-   * occurredAt is INGEST wall-clock besides. Beyond 7 days the drift measures
-   * zero: the 7-day-windowed folds' fallback `recovered` count over the same
-   * 30 days is 0 across 230k+ misses.
-   *
-   * `trustAbsentMiss: true` — an absent windowed read is final; no unwindowed
-   * retry. This fold's stake in that retry is narrower than the read-back
-   * folds': it declares no `refoldOnStoreMiss`, so an absent miss always
-   * folded from `init()` — the retry only decided whether a row EXISTED
-   * outside the window. At ±7 days that is measured-never (above), and the
-   * one state the retry could not have found anyway is one the store's own
-   * persistability gate never wrote — a dimension-only summary, which lives
-   * in the Redis tier alone today, trusted or not. So the retry was proving
-   * non-existence at ~100 unpruned scans/min; the flag stops paying for the
-   * proof. Watch `es_fold_read_window_fallback_total{outcome="recovered"}`
-   * on the OTHER folds for the width contract, as ever.
-   */
+  // Spans fold in arrival order; three fields resolve by fold-order
+  // (models, computedInput, computedOutput); readWindow=±7 days; see ADR-087
+  // and specs/trace-processing/hot-trace-fold-amplification.feature for details
   readonly options = {
     refoldOnOutOfOrder: false,
     trustAbsentMiss: true,
@@ -282,42 +214,15 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
       rootMetadataFromFallback: false,
       attributes: {},
-      // Sentinel: 0 means "nothing observed yet". `apply` freezes it on the
-      // first contribution carrying a usable business time, and it is what the
-      // repository writes into the `OccurredAt` partition/TTL column (ADR-087).
+      // storageAnchorMs frozen on first contribution (ADR-087)
       storageAnchorMs: 0,
-      // events, scenarioRoleCosts/Latencies/Spans and spanCosts are no longer
-      // accumulated in the fold state: they scaled O(span-count) and made each
-      // fold step O(n) (copy + re-serialize the whole growing blob), so a
-      // single long-lived trace turned folding into O(n^2). The trace-level
-      // events list and scenario role cost/latency are now derived from
-      // stored_spans at read time (events on the trace-detail read, scenario
-      // metrics when simulation metrics are computed), keeping all
-      // span-count-scaling collections off the hot path entirely.
-      // Sentinel: 0 means "no spans received yet". The timing function uses
-      // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
-      // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.
+      // events/costs removed (O(n^2) perf); occurredAt used for first-span detection
       occurredAt: 0,
     };
   }
 
-  /**
-   * Dispatch as the base class does, then freeze the storage anchor if this is
-   * the first contribution that carried a usable business time (ADR-087,
-   * {@link anchorStorageTime}).
-   *
-   * Here rather than in the ten handlers because the anchor's rule is about
-   * CONTRIBUTIONS, not about spans: a trace whose only signal is a log record, a
-   * metric correlation or a topic assignment must still get a real partition and
-   * a real TTL deadline. One seam also means a new event type cannot silently
-   * arrive un-anchored — the way `state.occurredAt` left every non-span
-   * contribution anchored at the epoch.
-   *
-   * After `super.apply`, so a span's own start time (which the handler has by
-   * then put on `state.occurredAt`) is preferred over the envelope's ingest
-   * stamp, and so an unhandled event type — which `super.apply` returns
-   * untouched — anchors nothing.
-   */
+  // Freeze storage anchor on first contribution (ADR-087); one seam prevents
+  // new event types from arriving un-anchored; see anchorStorageTime
   override apply(state: TraceSummaryData, event: { type: string }): TraceSummaryData {
     const folded = super.apply(state, event);
     if (folded === state) return state;
@@ -511,32 +416,15 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  /** Add a positive per-span delta onto a reserved running-sum attribute. */
-  /**
-   * Add to a reserved token counter held as a STRING attribute.
-   *
-   * Public because the analytics projection accumulates the same counters from
-   * the same spans, and a parity test asserts the two agree. Two copies of an
-   * accumulator that must agree is a disagreement waiting for one of them to
-   * be fixed.
-   */
+  // Add delta to reserved token counter (public for analytics parity testing)
   static addReservedTokenSum(attributes: Record<string, string>, key: string, delta: number): void {
     if (delta <= 0) return;
     const prior = Number(attributes[key] ?? "0");
     attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
   }
 
-  /**
-   * How full the context window already was when this trace started working:
-   * the cached-plus-freshly-written input of its EARLIEST model call. Unlike
-   * every other token number on a trace this is deliberately NOT a sum, and the
-   * difference matters: a coding-agent turn re-sends its whole conversation on
-   * every call, so summed cache reads run to millions while the thing a reader
-   * actually wants ("how much was I already carrying") is a single call's worth.
-   *
-   * Earliest by span start time rather than fold order: spans arrive in whatever
-   * order their exporter batched them.
-   */
+  // Record earliest model call's context window (NOT a sum; agents re-send
+  // whole conversation, so context matters more than summed cache reads)
   private static recordContextSize({
     attributes,
     span,
@@ -684,23 +572,8 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  /**
-   * Fold one log contribution into the summary: bump the reserved log
-   * count, apply the input/output override semantics, merge the lifted
-   * canonical langwatch.* attributes, and mirror them onto the top-level
-   * TraceSummary columns the v2 drawer + /traces list read directly
-   * (Models / TotalCost / TotalPromptTokenCount /
-   * TotalCompletionTokenCount). Without this mirror a Path B log-only
-   * trace ends up with the right strings on state.attributes but
-   * trace.totalCost still NULL, so the drawer chip and the cost column
-   * on /traces both render empty even though the data is sitting in CH.
-   *
-   * Each api_request event is its OWN turn. Cost + tokens are additive
-   * across turns; models are a deduped set. Reading from
-   * contribution.liftedAttributes (this event's contribution) rather
-   * than mergedAttributes (the cumulative latest snapshot) is critical
-   * for cost so we don't double-count across replays.
-   */
+  // Fold log contribution: bump count, apply I/O semantics, merge attributes,
+  // mirror to top-level columns. Read from liftedAttributes to avoid double-count
   private static applyLogContribution({
     state,
     contribution,
@@ -734,15 +607,7 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  /**
-   * Merge the models seen on one span (or log turn) into the running list,
-   * most-recently-used FIRST. `models[0]` is therefore always the last model
-   * the trace actually used — the conversational/primary model — rather than
-   * an alphabetical pick (which surfaced the title-generation haiku call over
-   * the opus turn it belonged to) or the first-touched model. Every consumer
-   * that reads `models[0]` as "the model" gets the right one, and the surplus
-   * spills into the "+N" badge in encounter-recency order.
-   */
+  // Merge models most-recently-used first (models[0] = primary model the trace used)
   static mergeModelsMostRecentFirst(existing: string[], incoming: string[]): string[] {
     const fresh = [...new Set(incoming)].filter((m) => m.length > 0);
     if (fresh.length === 0) return existing;

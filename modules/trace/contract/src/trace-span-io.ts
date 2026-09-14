@@ -45,14 +45,8 @@ function systemInstructionsText(value: unknown): string | null {
 }
 
 /**
- * The OTel gen_ai semconv (and our canonicaliser, see `_extraction.ts`) split
- * the system prompt out of `gen_ai.input.messages` into the separate
- * `gen_ai.system_instructions` attribute. Reads it back, tolerating both the
- * flat-dotted (`"gen_ai.system_instructions"`) and nested
- * (`{ gen_ai: { system_instructions } }`) param shapes.
- *
- * Shared with the drawer's editor seed so the prompt rendered into the input is
- * the exact string taken back out before a reviewer saves a correction.
+ * Read system instructions from OTel split `gen_ai.system_instructions`,
+ * tolerating both flat-dotted and nested shapes. Matches drawable prompt.
  */
 export function readSystemInstructions(
   params: Record<string, unknown> | null | undefined,
@@ -68,15 +62,9 @@ export function readSystemInstructions(
 }
 
 /**
- * Build the display string for a span's input. The canonicaliser strips the
- * system prompt out of the chat transcript into `gen_ai.system_instructions`,
- * so a faithfully-rendered Input panel would silently drop it: the
- * conversation reads as if nothing steered the model. For display we
- * recombine them: when the input is a chat transcript with no system message
- * of its own and the span carries system instructions, prepend them as a
- * leading `system` message. Doing it here (not in the canonicaliser) keeps
- * the stored attribute split semconv-correct while every view mode (pretty /
- * text / json / copy) stays consistent. All other shapes fall through.
+ * Build display input by recombining system instructions with the chat
+ * transcript, keeping stored attributes semconv-correct while all view modes
+ * stay consistent.
  */
 export function buildDisplayInput(span: Pick<Span, "input" | "params">): string | null {
   const io = span.input;

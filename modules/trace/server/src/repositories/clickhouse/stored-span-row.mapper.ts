@@ -1,23 +1,6 @@
 /**
- * The `stored_spans` row codec: how a normalized span becomes ClickHouse
- * columns and how those columns become a normalized span again.
- *
- * Extracted from `span-storage.clickhouse.repository.ts` in `platform/app`,
- * where it sat beside the repository that uses it and could therefore be
- * reached only from the application. Nothing here touches a client, a
- * connection or a query — it is a pure mapping over row shapes — so it belongs
- * next to the trace contract it maps onto rather than behind a repository.
- *
- * The immediate reason it moved: `@langwatch/coding-agent-server`'s span-facts
- * redelivery test needs `mapChRowToNormalized` and `serializeAttributes`, and
- * was importing them through `~/server/app-layer/...` — the APP's path alias,
- * from inside a package, which resolves to nothing and left the whole file
- * uncompilable.
- *
- * The WRITE record types (`ClickHouseSpanRecord`,
- * `ClickHouseSpanWriteRecord`) deliberately stayed behind: they are shaped by
- * the application's `WithDateWrites`, which is a property of how that
- * repository writes rather than of the row itself.
+ * Stored_spans row codec: normalize span↔ClickHouse columns. Pure mapping,
+ * moved here from app so coding-agent-server can import without path aliases.
  */
 import { createLogger } from "@langwatch/observability";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";

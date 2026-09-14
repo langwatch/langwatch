@@ -1,16 +1,7 @@
 /**
- * Every `traces.*` procedure, declared once. `traces:view` reads throughout.
- * Anonymous shared reads are NOT here - see `sharedTrace.get` (ADR-057).
- *
- * The filter/list input shapes are trace's own: the same shapes back the v1
- * REST search body and the analytics read input, so they are built once here
- * from `sharedFiltersInputSchema` rather than three times.
- *
- * `getSampleTraces` (the evaluator wizard's precondition-filtered sample) is
- * NOT declared here yet: it needs Evaluation's precondition engine
- * (`EvaluationPreconditionService`, evaluator-contract's field definitions),
- * which is not reachable from Trace without a new `EvaluationApi` capability.
- * Left on `transport/api-trpc/traces.api.ts` until Evaluation exposes one.
+ * Traces procedures, declared once. Anonymous reads are in sharedTrace (ADR-057).
+ * Filter/list shapes back v1 REST and analytics; getSampleTraces stays on the API
+ * until Evaluation exposes a precondition engine.
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { defineTrpcContract } from "@langwatch/api/contract";

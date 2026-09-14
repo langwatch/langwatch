@@ -1,25 +1,6 @@
 /**
- * Query-language parsing primitives. Wraps `liqe` with:
- *   - `@`-sigil + NBSP normalisation so the editor's UI affordances don't
- *     leak into the parser.
- *   - LRU cache so the SearchBar's two parse callsites (filterStore +
- *     filterHighlight) collapse into one liqe pass per keystroke.
- *   - `serialize` post-processing because liqe's own serializer occasionally
- *     emits strings its own parser then rejects.
- *
- * Syntax examples:
- *   status:error                    — exact match
- *   status:error AND model:gpt-4o   — boolean AND
- *   status:error OR model:gpt-4o    — boolean OR
- *   NOT status:error                — negation
- *   -status:error                   — negation (shorthand)
- *   (status:error OR status:warning) AND model:gpt-4o — grouping
- *   model:gpt*                      — wildcard
- *   cost:>0.01                      — comparison
- *   cost:[0.01 TO 1.00]             — range
- *   spans:>5                        — span count comparison
- *   "refund policy"                 — free-text search
- *   refund                          — unquoted free-text
+ * Query-language parsing: wraps liqe with normalisation, LRU caching, and
+ * post-processing fixes (liqe's serializer occasionally emits unparseable output).
  */
 
 import {
@@ -43,27 +24,9 @@ export function parseTraceQuerySyntax(query: string): LiqeQuery {
 }
 
 /**
- * `liqe`'s serializer occasionally emits queries that its own parser then
- * rejects — most reliably the range form: `cost:[0.01 TO 1]AND foo:bar` (no
- * space between `]` and the next boolean operator). It also leaves runs of
- * whitespace intact when inner clauses are removed — e.g. dropping the last
- * member of a parenthesised OR group leaves `(a OR b )` with a stray space
- * before the close paren. Both round-trip into the same `Invalid filter
- * syntax` 422 from the backend (or, in the paren case, an ugly chip in the
- * search bar).
- *
- * Normalise post-serialisation: insert a space between `]` / `)` and a
- * following `AND` / `OR` / `NOT`, drop whitespace hugging the inside of
- * parens, and collapse adjacent whitespace.
- */
-/**
- * Split a serialized query into alternating unquoted / quoted segments so
- * normalisation only ever touches structure — never the inside of a `"…"` /
- * `'…'` literal. Values can legitimately contain parens, brackets, boolean
- * words, and runs of whitespace that must survive verbatim (e.g.
- * `user:"name ( test )"`, which the structural passes below would otherwise
- * rewrite to `user:"name (test)"`). The quote chars stay attached to their
- * quoted segment; a backslash-escaped quote does not close the string.
+ * Fix liqe serializer output that its own parser rejects (missing space after
+ * `]`/`)` before boolean ops, stray whitespace in parens). Normalise
+ * post-serialisation while preserving quoted strings.
  */
 function splitOnQuotes(s: string): Array<{ text: string; quoted: boolean }> {
   const segments: Array<{ text: string; quoted: boolean }> = [];
@@ -134,18 +97,8 @@ export class ParseError extends Error {
 const TOKEN_START_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 
 /**
- * Strip the `@` autocomplete trigger sigil before parsing AND normalise
- * U+00A0 NBSP → regular space. Both are silent failure modes:
- *   - `@` is the dropdown sigil; liqe doesn't accept it as a field-name
- *     prefix, so any stray `@` (e.g. typed before the interceptor caught
- *     up, or pasted in) would 422 the backend.
- *   - NBSP can leak in via clipboard pastes, IME, or rich-text auto-format
- *     of suggestion replacements. Liqe doesn't treat NBSP as whitespace,
- *     so `field:value\u00A0AND` parses as one Tag with value
- *     `value\u00A0AND` — silently fusing two clauses.
- *
- * Only strip `@` at token-start positions and outside quoted strings, so a
- * literal `@` inside a value like `"user@example.com"` is preserved.
+ * Strip @ sigil and normalise NBSP. Both are silent failures: liqe rejects @
+ * in field positions, treats NBSP as non-whitespace. Preserve quoted strings.
  */
 export function stripAtSigils(text: string): string {
   // Replace any NBSP with regular space first — uniform treatment from

@@ -1,14 +1,5 @@
-/**
- * Memory safety regression tests for ClickHouse analytics queries.
- *
- * Validates structural invariants that prevent OOM in production:
- * - No bare SpanAttributes in outermost SELECT
- * - LIMIT clauses on discovery queries
- * - Memory spill-to-disk settings on all query paths
- * - Column-pruning test coverage for all metric prefixes
- *
- * @see specs/analytics/clickhouse-memory-safety.feature (Layer 1: @unit scenarios)
- */
+// Memory safety regression tests for ClickHouse analytics queries.
+// Validates invariants preventing OOM: see specs/analytics/clickhouse-memory-safety.feature
 
 import * as fs from "node:fs";
 import * as path from "node:path";

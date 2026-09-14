@@ -85,7 +85,7 @@ export const traceLogRecordDtoSchema = z.object({
   resourceAttributes: z.record(z.string(), z.string()),
   scopeName: z.string(),
   scopeVersion: z.string().nullable(),
-  /** True when content was withheld (body + content attrs); mirrors span `inputRedacted`/`outputRedacted`. */
+  /** True when content was withheld; mirrors span redaction flags. */
   bodyRedacted: z.boolean().optional(),
   /** Audience label naming who CAN see the withheld content, when restricted. */
   bodyVisibleTo: z.string().nullable().optional(),

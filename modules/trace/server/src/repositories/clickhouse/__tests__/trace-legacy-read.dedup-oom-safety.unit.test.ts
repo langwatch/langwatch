@@ -1,19 +1,5 @@
-/**
- * Structural regression tests for LIMIT 1 BY deduplication patterns.
- *
- * ClickHouse LIMIT 1 BY reads all selected columns (including heavy blobs
- * like ComputedInput, ComputedOutput, SpanAttributes) for every row in a
- * granule before deduplicating. On parts with large payloads this causes OOM.
- *
- * The safe alternative is an IN-tuple subquery:
- *   WHERE (key, UpdatedAt) IN (SELECT key, max(UpdatedAt) ... GROUP BY key)
- * which resolves dedup using only lightweight columns.
- *
- * These tests verify that the affected query methods no longer use LIMIT 1 BY
- * and instead use the max(UpdatedAt) GROUP BY pattern.
- *
- * @regression
- */
+// Regression tests for LIMIT 1 BY deduplication: ClickHouse materializes heavy
+// columns before dedup, causing OOM. Use IN-tuple with max(UpdatedAt) instead
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -46,15 +32,7 @@ function extractFunctionBody(source: string, functionName: string): string {
   return withoutComments(match[0]);
 }
 
-/**
- * Comments are stripped before any of these assertions read the source,
- * because every one of them is a substring check and comments talk about the
- * very patterns being checked. A note explaining why the dedup uses
- * `max(UpdatedAt)` satisfied `toContain("max(UpdatedAt)")` on its own — the
- * SQL could drop the aggregate and the guard would still pass — and a comment
- * mentioning `LIMIT 1 BY` would fail the opposite assertion while the query
- * was fine.
- */
+// Strip comments before assertions: substring checks are fragile to comment examples
 function withoutComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
 }

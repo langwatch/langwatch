@@ -54,7 +54,7 @@ export type TraceReaderCompositionOptions = {
   defaultRetentionDays?: number | undefined;
   canonicalisation: TraceCanonicalisationService;
   blobStore: TraceBlobStoreService;
-  /** Absent on a process that folds no trace projections; the summary read then has no fold to ask. */
+  /** Absent when no trace projections are folded; summary read has no fold to query. */
   summaryStore?: FoldProjectionStore<TraceSummaryData> | undefined;
   projects: ProjectApi;
   topics: TopicApi;

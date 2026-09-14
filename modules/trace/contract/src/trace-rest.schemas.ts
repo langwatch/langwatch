@@ -93,7 +93,7 @@ export const traceSearchBodySchema = z.object({
   ...traceSearchBodyExtensions,
 });
 
-/** What a caller may send to `POST /search`. Everything else is the deployment's filter vocabulary. */
+/** Shape of a caller's `POST /search` request; deployment provides filter vocabulary. */
 export type TraceSearchBody = ProjectionRequest &
   Readonly<{
     startDate: string | number;
