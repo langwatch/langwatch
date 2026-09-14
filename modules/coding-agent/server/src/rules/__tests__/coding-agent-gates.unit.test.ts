@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * What a reader of the coding-agent surfaces gets to see: the generated title
- * follows content visibility, spend follows cost:view, and both are decided at
- * the read boundary rather than in the services that produce the rows.
- *
+ * Title follows content visibility, cost follows cost:view; both gated at read
+ * boundary, not in producing services.
  * @see specs/coding-agent/sessions-screen.feature
  * @see specs/coding-agent/pull-request-linkage.feature
  */

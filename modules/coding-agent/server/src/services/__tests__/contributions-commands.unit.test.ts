@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for the three contribution commands (ADR-056 §2).
- *
- * Covers schema parsing, the session-keyed aggregate id, and the
- * idempotency keys that keep re-delivered telemetry from inflating a
- * session.
- *
+ * Three contribution commands (ADR-056 §2): schema parsing, session-keyed
+ * aggregate id, idempotency keys for re-delivered telemetry.
  * @see specs/coding-agent/session-aggregate.feature
  */
 

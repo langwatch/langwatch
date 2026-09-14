@@ -8,16 +8,8 @@ export type KnownAssistantKind =
   | "cursor"
   | "github_copilot";
 
-/**
- * The product an agent slug names.
- *
- * A stored session's `agent` is a coding-agent registry id, detected from the
- * wire's own scope and event names. The icons and labels a reader sees are
- * keyed on assistant kinds, the vocabulary the coding-assistant tiles use. The
- * two agree on most names and differ on two: the registry says `gemini_cli`
- * where the tile says `gemini`, and `copilot` where the tile says
- * `github_copilot`.
- */
+// Maps agent registry ids (detected from wire) to tile assistant kinds;
+// most agree except gemini_cli→gemini and copilot→github_copilot.
 const ASSISTANT_KIND_BY_AGENT: Readonly<Record<string, KnownAssistantKind>> = {
   claude_code: "claude_code",
   claude_cowork: "claude_cowork",

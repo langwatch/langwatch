@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The no-Redis memo's own housekeeping. The Redis memo hands expiry to Redis;
- * this one has to do it itself, or a process that never restarts keeps one
- * entry per session it ever saw.
- *
+ * Memory memo housekeeping: no-Redis memo must handle its own expiry to avoid
+ * accumulating entries on long-running processes.
  * @see specs/coding-agent/session-git-context.feature
  */
 import { describe, expect, it } from "vitest";

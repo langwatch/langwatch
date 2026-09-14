@@ -1,13 +1,5 @@
-/**
- * Catalog of supported coding-assistant kinds + their preset icon shapes.
- * Used by the Tool Catalog admin drawer (fixed-list picker + preview) and
- * the user-facing CodingAssistantTile (icon resolution).
- *
- * Mirrors the CLI wrapper list (specs/ai-gateway/governance/cli-wrappers.feature):
- * Claude Code, Codex, Gemini, Open Code, Cursor — anything outside this
- * list goes through the `custom` slot which accepts an admin-uploaded
- * SVG/PNG (stored as base64 on AiToolEntry.iconAsset).
- */
+// Catalog of supported coding-assistant kinds and preset icon shapes;
+// mirrors CLI wrapper list; others use custom icon slot.
 export const ASSISTANT_KINDS = [
   "claude_code",
   "claude_cowork",

@@ -1,21 +1,6 @@
-/**
- * The organization's projects split by what one caller may do with each: read
- * traces, and price them, plus how each one is named to a reader.
- *
- * Two separate cuts on purpose. `traces:view` decides whether a project's work
- * appears at all; `cost:view` decides whether that work carries money. A
- * project the caller may read but not price still contributes its tokens with
- * a null cost, because the work happened and hiding it would understate the
- * answer.
- *
- * The project list is enumerated from the ORGANIZATION and never taken from
- * the request: a caller that could name the projects to count could count one
- * it may not read. Both cuts are resolved through the same batched permission
- * probe the in-app surfaces use, in a fixed number of queries rather than one
- * per project, so the REST answer and the page's answer cannot drift.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
- */
+// Organization's projects split by caller's traces:view and cost:view
+// permissions; projects enumerated from org, never from request; both cuts
+// through batched probe to prevent REST/page drift.
 import type {
   CodingAgentCallerScopeDirectory,
   CodingAgentScopeCaller,

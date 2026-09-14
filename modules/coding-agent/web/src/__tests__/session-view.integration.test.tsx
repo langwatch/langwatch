@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The session overview against a REAL folded session — a tidy fixture would hide that real numbers need compacting and that an MCP tool shows up at all.
+ * Session overview against real folded session; tidy fixture would hide
+ * that real numbers need compacting and that MCP tools show up at all.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";

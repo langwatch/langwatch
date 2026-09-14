@@ -1,14 +1,4 @@
-/**
- * The system prompt is recorded once per transcript, whatever walks it.
- *
- * Every transcript builder emits it at the first span that carries one, and
- * the accumulator's flag is the only thing making "once" hold across a walk
- * that visits many spans — a conversation's system prompt appears on every
- * model call, so without the flag it would be recorded once per call.
- *
- * This lived in two builders byte for byte, and neither copy was covered:
- * removing the flag check left every test green in both.
- */
+// System prompt recorded once per transcript; flag prevents duplication across model calls.
 
 import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "@langwatch/trace-contract";

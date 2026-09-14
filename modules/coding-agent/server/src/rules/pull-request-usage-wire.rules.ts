@@ -1,13 +1,5 @@
-/**
- * The pull-request usage wire, shared by both doors that answer it.
- *
- * Two doors ask the same question and must not answer it in two shapes: the
- * project-scoped `/api/coding-agent/pull-request-usage`, which recovers a
- * calling person through their personal workspace, and the organization-keyed
- * `/api/v1/coding-agent/pull-request-usage`, which needs no project at all.
- * Declared once so a field added for one is on the other, and so the published
- * document describes one response rather than two that happen to agree.
- */
+// Shared schema for both pull-request-usage endpoints (project-scoped and
+// org-keyed) so schema changes apply to both.
 import { z } from "zod";
 
 // The three cost numbers each row and the totals carry: what a bundled plan

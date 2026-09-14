@@ -1,32 +1,9 @@
 import { normalizeEventName } from "./telemetry/coding-agent-normalization.ts";
 
-/**
- * Which log attribute carries captured content, and which content category it
- * belongs to, for every coding agent.
- *
- * This is the one mapping behind BOTH sides of the log-record contract: the
- * read-path enrichment surfaces these keys as span content, and the API's log
- * redaction withholds them from a viewer the data-privacy policy hides that
- * category from. A key surfaced by one and missed by the other is a policy
- * bypass, so they read from the same table.
- *
- * ## Keyed on the CANONICAL event, not the wire name
- *
- * Only Claude Code emits bare event names (`user_prompt`, `tool_result`).
- * codex and gemini namespace theirs (`codex.tool_result`,
- * `gemini_cli.api_response`), and `normalizeEventName` is what the transcript
- * derivation resolves them with. Matching the wire spelling instead means a
- * namespaced record matches nothing, carries no known content key, and leaves
- * the gate untouched with its payload intact.
- *
- * ## Per KEY, not per record
- *
- * A codex `tool_result` carries the call's arguments AND its output on one
- * record: `arguments` is what the agent was asked to run (input), `output` is
- * what came back (output). Classifying the record as a whole can only be
- * correct in one direction, so each key carries its own category and is gated
- * on its own.
- */
+// Mapping of log attributes to content categories, shared between read-path
+// enrichment and API redaction to prevent policy bypass; keyed on canonical
+// event names (normalized) and per-key because different fields have different
+// privacy categories.
 
 /** The category a content key is gated behind. */
 export type LogContentCategory = "input" | "output" | "both";
@@ -112,19 +89,8 @@ const CONTENT_KEYS_BY_EVENT: Readonly<Record<string, readonly LogContentKey[]>> 
   ],
 };
 
-/**
- * Wire names with no canonical alias, so `normalizeEventName` cannot place
- * them. `api_request_body` is claude's raw request payload: the request side
- * of a model call, gated on input like the `api_request` it belongs to.
- *
- * Looked up on the RAW name, deliberately: these spellings exist precisely
- * because the canonical vocabulary has no entry for them. A namespaced
- * variant (`claude_code.api_request_body`) therefore misses this table and
- * falls to {@link UNKNOWN_EVENT_CONTENT_KEYS}, which over-hides rather than
- * under-hides. Keep it that way: an entry here with an `output` or `input`
- * category is only reachable by exact wire spelling, so anything that needs
- * to survive a namespace belongs in the canonical table above.
- */
+// Raw wire names not in canonical table; looked up by exact spelling to
+// prevent namespace variants from bypassing the redaction policy.
 const CONTENT_KEYS_BY_RAW_EVENT: Readonly<Record<string, readonly LogContentKey[]>> = {
   api_request_body: [{ key: BODY_ATTR, category: "input" }],
 };

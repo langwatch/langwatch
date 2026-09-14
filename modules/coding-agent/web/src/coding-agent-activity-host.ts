@@ -1,20 +1,5 @@
-/**
- * What the coding-agent activity tables ask of the application they are
- * mounted in.
- *
- * The sessions and pull-request tables read their own data and act on it —
- * they open a terminal replay, send a reader to the trace explorer, and offer
- * a GitHub install to whoever may accept it. None of those may reach a router,
- * a toast singleton or a session client from a feature-web package, so they
- * ask this port and the composing surface answers it.
- *
- * DELIBERATELY NARROWER than `PersonalWorkspaceHostPort`, `GatewayHostPort` and
- * `GovernanceHostPort`, which are the ports of whole page families. This is the
- * port of two tables: one permission question, the address, and the two
- * notices. A table mounted on a project page and the same table mounted on a
- * personal page are answering to different scopes, and neither scope is
- * anything this port has to know.
- */
+// Host port for activity tables: replay, trace, GitHub install; narrower
+// than full-family ports; scope-agnostic.
 
 import { createContext, useContext } from "react";
 

@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The pull request detail drawer: what it puts in front of a reader, and the
- * one thing it must never carry.
- *
- * The tRPC surface is a proxy that answers every query empty unless a test
- * pins it, so the drawer's single read is the only wiring under test.
- *
+ * Pull-request detail drawer: what it shows a reader and what it must never
+ * carry; tRPC proxy wiring under test.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

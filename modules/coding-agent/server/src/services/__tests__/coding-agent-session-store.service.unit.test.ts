@@ -1,12 +1,6 @@
-/**
- * The store adapter's half of the durable dedup watermark (ADR-066): it
- * threads `context.appliedEventIds` into the persistence write, and reads
- * the set back through `getWithApplied` so a retry with a cold cache can
- * recognise a batch it already committed. `get()` delegates to
- * `getWithApplied` so the two read paths cannot diverge.
- *
- * @see specs/coding-agent/session-aggregate.feature
- */
+// Store adapter's durable dedup (ADR-066); threads appliedEventIds into
+// writes and reads back through getWithApplied for cold-cache retry dedup.
+// @see specs/coding-agent/session-aggregate.feature
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import type {
   CodingAgentProjectionPersistence,

@@ -1,19 +1,5 @@
-/**
- * ADR-066 pillar 2 for the coding-agent contributions.
- *
- * Every contribution is keyed on its session, so one session is one queue group
- * and a long run drains its transcript one tiny insert at a time. Coalescing
- * folds the group's queued contributions into a single multi-row append.
- *
- * The property that makes this safe — and that sharding the session key would
- * destroy — is that coalescing does not reorder. A logs-only agent's model calls
- * fold through `foldModelCall`, which derives its cache-rebuild comparison, its
- * final request id and its stop reason from the ORDER the calls arrive in, so
- * these tests pin the order through the batch and out the other side.
- *
- * See specs/coding-agent/session-aggregate.feature and
- * packages/eventing/specs/producer-append-coalescing.feature.
- */
+// ADR-066 pillar 2: coalescing does not reorder contributions; model calls
+// derive order-dependent fields from call arrival order; see specs.
 
 import type { Event } from "@langwatch/eventing";
 import { processCommandBatch } from "@langwatch/eventing/testing";

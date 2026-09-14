@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The p95 a table row is compared against: what counts toward it, and when
- * there is not enough of a page to compare anything at all.
- *
+ * P95 comparison: what counts toward it and when too few rows to compare.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it } from "vitest";

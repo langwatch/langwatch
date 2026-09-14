@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The Sessions table's order: what it opens on, what each column does with the
- * first, second and third click, and where a row a column does not apply to
- * ends up.
- *
+ * Sessions table order: initial state, column click behavior, and row
+ * placement for inapplicable columns.
  * @see specs/coding-agent/sessions-screen.feature
  */
 import { describe, expect, it } from "vitest";

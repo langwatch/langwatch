@@ -1,16 +1,5 @@
-/**
- * Claude Code (and similar agents) prepend large `<system-reminder>`,
- * MCP-instruction and skills-list XML blocks ABOVE the actual human text in
- * the first user message. That boilerplate drowns the real message in the
- * trace list preview and the pretty conversation view.
- *
- * `splitLeadingContextBlocks` separates those leading tag blocks from the
- * human text that follows so each surface can decide what to do: the list
- * shows the human text, the pretty view collapses the context behind a
- * disclosure.
- *
- * Display-only — callers never persist the result back onto the span.
- */
+// Separate leading XML context blocks from human text for display-only
+// purposes; list shows text, pretty view collapses context blocks.
 
 export interface LeadingContextSplit {
   /** The leading `<tag>…</tag>` blocks, joined (empty when there are none). */

@@ -9,17 +9,8 @@ import { MissingValue } from "./missing-value.tsx";
 /** How many pull requests a row names before the rest go behind a hover. */
 const MAX_LISTED_PULL_REQUESTS = 4;
 
-/**
- * What the session shipped. A session that lands a change, moves to the next
- * branch and opens a second pull request is one session with two, so the row
- * names each of them; past a handful the rest go behind a hover rather than
- * pushing every other column off the page.
- *
- * A number opens the pull request's own detail, the same drawer the pull
- * requests screen opens, because what a reader wants from this column is what
- * the change cost across every session that worked on it. GitHub is one more
- * click from there, in the drawer's own header.
- */
+// Session's shipped PRs; past MAX_LISTED, rest behind hover; number opens
+// detail drawer showing cost across all sessions on the PR.
 export const PullRequestsCell: React.FC<{
   pullRequests: readonly SessionPullRequest[];
   onOpenDetail: (pullRequest: SessionPullRequest) => void;

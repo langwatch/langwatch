@@ -9,19 +9,8 @@ import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.codin
 import { CodingAgentTraceSessionClickHouseRepository } from "./clickhouse.coding-agent-trace-session.repository.ts";
 import { SessionMetricSeriesClickHouseRepository } from "./clickhouse.session-metric-series.repository.ts";
 
-/**
- * The retention horizon a row keeps when its writer names none.
- *
- * It is the 308 days the tables' own `_retention_days` column defaults to
- * (migration 00051), so a row written without one keeps the horizon the schema
- * already states rather than a second number this module invented.
- *
- * It is a constant rather than a member because `requires` may only name
- * process members and retention is not one, and nothing on the fold path
- * reaches it: `CodingAgentProjectionPersistenceService` names the tenant's own
- * retention on every write. A test that needs a different horizon says so
- * through {@link ClickHouseCodingAgentRepositories.createWith}.
- */
+// Default retention (308 days) mirrors schema defaults; not a process member
+// so tests override via createWith().
 const DEFAULT_RETENTION_DAYS = 308;
 
 /** What a process hands the live tier: the one client it routes through. */

@@ -1,17 +1,5 @@
-/**
- * A link, inside a package that may not import a router.
- *
- * `platform/app`'s `~/components/ui/link` renders its internal href through
- * `react-router`'s Link, which is an import ADR-004 seals off from a
- * feature-web package. So this one keeps the anchor, which is what makes a link
- * a link (open in a new tab, copy the address, middle-click), and hands an
- * ordinary left-click to the host's navigate so the page still changes without
- * a full reload.
- *
- * The prop shape is the platform component's, so no call site changed. The
- * gateway and governance families carry the same element; it is a dozen lines
- * of policy rather than a component worth a shared package of its own.
- */
+// Link without router import (ADR-004 sealed); uses anchor with host navigate
+// for left-clicks to avoid full reload while keeping browser link behavior.
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";

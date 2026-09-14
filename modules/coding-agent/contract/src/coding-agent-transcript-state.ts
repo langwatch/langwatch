@@ -77,15 +77,8 @@ export function indexCodexToolLogsByCallId(
   return byCallId;
 }
 
-/**
- * Record the conversation's system prompt, once.
- *
- * Every transcript builder wants it emitted at the first span that carries
- * one, and none of them wants it emitted twice — the accumulator's flag is
- * what makes "once" hold across a walk that visits many spans. It lives here,
- * with the accumulator whose flag it sets, because it existed in two builders
- * byte for byte and a third would have copied it again.
- */
+// Record system prompt once per transcript; flag prevents duplication across
+// spans visiting the accumulator.
 export function emitSystemPrompt(span: SpanDetail, accumulator: SpanEntryAccumulator): void {
   if (accumulator.hasEmittedSystemPrompt) return;
 

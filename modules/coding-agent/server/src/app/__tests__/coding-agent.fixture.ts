@@ -1,17 +1,8 @@
 import type { CodingAgentSessionState } from "../../projections/coding-agent-session.projection.ts";
 import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection.ts";
 
-/**
- * One folded session, initialised the way the fold itself initialises it.
- *
- * Built from the projection's own initial state rather than spelled out, so a
- * composition test outside this package can drive a real store call without
- * restating thirty counters — and without silently dropping the one a mapper
- * added last week, which is a crash rather than a stale expectation.
- *
- * The default carries a model call because the store drops a session with no
- * persistable signal at all, by design.
- */
+// Folded session initialized from projection's init state to prevent
+// composition tests from restating counters or silently dropping mapper changes.
 export function codingAgentSessionFoldState(
   overrides: Partial<CodingAgentSessionState> = {},
 ): CodingAgentSessionState {

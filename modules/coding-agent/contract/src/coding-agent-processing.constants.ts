@@ -10,29 +10,8 @@ export const SPAN_FACTS_CONTRIBUTED_EVENT_TYPE =
   "lw.obs.coding_agent_session.span_facts_contributed";
 export const SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-21";
 
-/**
- * The staged twin of a matched `span_received` for `codingAgentSpanFactsDispatch`
- * — the span's facts, already lifted, carried ON the job (ADR-069's bounded
- * derivation amendment). It replaces the `span_referenced` claim-check once R2
- * flips the producer — this build reads it and stages nothing new — because that
- * claim-check's read-back raced the sibling spanStorage write and parked 22
- * groups in `:blocked` on 2026-08-05.
- *
- * The derivation is bounded: `data` is `spanFactsContributionSchema`, whose
- * facts come from the closed `CODING_AGENT_CONTRIBUTION_KEYS` list and hold
- * scalars only, so the staged size is bounded by that list rather than by the
- * span it came from. Content stays in `stored_spans`.
- *
- * This is a plain versioned JOB PAYLOAD, not an event: it exists only between
- * the routing seam and the subscriber's queue and is NEVER appended to the
- * event log — which is why it appears in no event-type registry
- * (CODING_AGENT_PROCESSING_EVENT_TYPES or otherwise). The durable record of
- * the contribution is `span_facts_contributed`.
- *
- * The versions array is load-bearing: a version this build does not know fails
- * loudly into the queue's retry rather than half-parsing. Bump and append on any
- * incompatible change to the lifted shape.
- */
+// Job payload staging for span facts contributions (ADR-069); content is
+// bounded by CODING_AGENT_CONTRIBUTION_KEYS and versions are load-bearing.
 export const SPAN_FACTS_LIFTED_PAYLOAD_TYPE = "lw.obs.coding_agent_session.span_facts_lifted";
 export const SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST = "2026-08-05";
 
@@ -66,21 +45,8 @@ export const CODING_AGENT_PROCESSING_COMMAND_TYPES = [
   CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE,
 ] as const;
 
-/**
- * How many same-group events the pipeline's map projections persist through
- * one `bulkAppend` call when a group is backed up. MAP projections default
- * to 1 — one append per queued event (unlike folds, which the router
- * coalesces at 500 by default) — a linear per-item drain cost whose
- * constant is a full queue job, the drain floor these maps showed during
- * the 2026-07-31 backlog (one-event-per-job at ~90 busy fleet slots). 256
- * matches the log/metric map ceilings
- * (`LOG_MAP_COALESCE_MAX_BATCH`, `METRIC_MAP_COALESCE_MAX_BATCH`): both
- * stores append into ClickHouse via `insertMany`, so the batch lands as one
- * insert either way — the ceiling only bounds payload size per dispatch.
- * Unlike `CODING_AGENT_SESSION_COALESCE_MAX_BATCH` (128), no per-row
- * watermark is persisted by these maps, so the session fold's tighter bound
- * does not apply.
- */
+// Coalesce batch for map projections; matches log/metric map ceilings for
+// one ClickHouse insert per dispatch.
 export const CODING_AGENT_MAP_COALESCE_MAX_BATCH = 256;
 
 /**

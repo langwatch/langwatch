@@ -144,18 +144,8 @@ export class EventingCodingAgentProcessingAdapter {
           traceCanonicalisation: deps.traceCanonicalisation,
         }),
       )
-      // ADR-066 pillar 2: every contribution is keyed on its session, so one
-      // session is one queue group and a long run drains its transcript one tiny
-      // insert at a time. Fold the group's queued contributions into a single
-      // multi-row append instead.
-      //
-      // Safe to fold, and safe ONLY as a fold: coalescing preserves the group's
-      // order (the drain takes the head in score order and the batch is handled,
-      // appended and dispatched in that order), which this pipeline needs.
-      // Sharding the session key would not preserve it; see the note above
-      // `CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH` and the derivation's
-      // model-call chain. Each handler derives its event from its own command
-      // alone and never reads back a same-batch append.
+      // ADR-066 pillar 2: coalesce contributions preserving order; sharding
+      // would break order-dependent model-call derivations.
       .withCommand("contributeSpanFacts", EventingContributeSpanFactsAdapter, {
         coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
       })

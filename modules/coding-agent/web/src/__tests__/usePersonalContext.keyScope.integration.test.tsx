@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Whose keys the personal-credentials card asks for.
- *
- * `personalVirtualKeys.list` widens with the caller: omitting `targetUserId`
- * means "every personal key in this organization" for anyone holding
- * `virtualKeys:viewOtherPersonal`, which the org ADMIN role template grants.
- * That mode exists for the off-boarding sweep and is correct where it is
- * used. It is wrong on /me, which is a first-person surface — an admin was
- * shown other members' keys as their own, and revoking one then failed
- * because `revokePersonal` scopes to the caller.
- *
- * The scope therefore cannot be left to the server's default here: the hook
- * has to name the principal, and it has to withhold the request until it
- * knows who that is.
+ * Personal-credentials card key scope: must name principal on /me (first-person
+ * surface) to prevent admin from seeing other members' keys as their own.
  */
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

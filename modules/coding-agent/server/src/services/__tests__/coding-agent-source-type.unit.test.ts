@@ -1,15 +1,9 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The two vocabularies that meet at the bundled-plan policy: a detected agent
- * id on one side, the `assistantKind` an admin's tile carries on the other.
- * Where they disagree the mapper renames; where they agree it must not.
- *
- * Cowork is the case with money on it. It reuses the Claude Code runtime and
- * carries the same brand mark, so folding it into `claude_code` looks like a
- * tidy-up; it would make unticking bundled subscription on the Claude Code
- * tile silently rebill every Cowork session. That fold is what this pins.
+ * Two vocabularies meet at bundled-plan policy: agent id vs tile assistantKind;
+ * mapper renames when they disagree; Cowork must not fold into claude_code or
+ * unticking bundled subscription would rebill Cowork.
  */
 import { describe, expect, it } from "vitest";
 

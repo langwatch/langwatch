@@ -1,18 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The personal Sessions table: what a row says about a session's context
- * economics, what a workspace with nothing in it is told, and how the list
- * narrows by search, period, sort and page. Then the replay: choosing a row
- * opens the session's terminal view over the table, and leaving it puts the
- * reader back on the table exactly as they left it.
- *
- * The tRPC surface is a proxy that answers every query empty unless a test
- * pins it, so the table's one read and its one lookup are the only wiring
- * under test. The drawer is somebody else's component, so its store and its
- * opener are mocked and the assertions are about what this table asks them
- * for.
- *
+ * Personal Sessions table: rows, empty state, search/period/sort/page filtering,
+ * and replay with terminal view; tRPC proxy and drawer mocked.
  * @see specs/coding-agent/sessions-screen.feature
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

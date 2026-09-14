@@ -4,18 +4,8 @@ import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-/**
- * What the session was called, over where it ran.
- *
- * A session whose agent never named it, and one whose title this reader may
- * not see, both read as untitled: the row is still worth listing for what it
- * consumed, and the branch under it says which piece of work it was.
- *
- * The name is the row's own control. The whole row opens the replay for a
- * pointer, but a row is not focusable and cannot be activated from a keyboard,
- * so the name carries the same action as a real button: it is what a keyboard
- * reaches, and it is the part of the row a reader is already aiming at.
- */
+// Session name and branch; untitled sessions show branch (work identifier);
+// name is keyboard-focusable control for replay.
 export const SessionNameCell: React.FC<{
   row: SessionListRow;
   isOpening: boolean;

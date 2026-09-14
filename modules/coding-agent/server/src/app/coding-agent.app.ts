@@ -108,7 +108,9 @@ export type CodingAgentViewerVisibility = Readonly<{
   canSeeCosts: boolean;
 }>;
 
-/** Resolves one viewer's protections over one project; throws when the policy cannot be resolved. */
+/** Resolves one viewer's protections over one project; throws when the
+ * policy cannot be resolved.
+ */
 export interface CodingAgentViewerVisibilityReader {
   readVisibility(input: { userId: string; projectId: string }): Promise<CodingAgentViewerVisibility>;
 }

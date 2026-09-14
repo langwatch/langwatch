@@ -7,17 +7,8 @@ import type { SessionListRow } from "../session-list-row.ts";
 import { ComparisonBar } from "./comparison-bar.tsx";
 import { MissingValue } from "./missing-value.tsx";
 
-/**
- * The two token figures that answer different questions, and a bar comparing
- * the first against the heaviest session on the page.
- *
- * The total is what the session consumed over its whole life, and it leads:
- * it is what the column sorts by, and it is the number that keeps growing, so
- * it is the one worth ranking. Peak context, how much the session was carrying
- * when it was heaviest, sits under it: it decides whether a session was about
- * to compact, but it saturates against the context window rather than ranking.
- * The bar compares the total against the heaviest session on the page.
- */
+// Total tokens (sorts column) with bar comparing to heaviest session; peak
+// context shows but doesn't sort (saturates at context window).
 export const ContextCell: React.FC<{
   row: SessionListRow;
   largestTotal: number;

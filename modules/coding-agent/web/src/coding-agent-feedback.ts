@@ -1,14 +1,5 @@
-/**
- * How an activity table tells the reader how something turned out.
- *
- * `platform/app`'s `~/components/ui/toaster` and `~/features/errors`'s
- * `showErrorToast` are application singletons a feature-web package may not
- * reach, so the two names the tables already call are re-bound to the host
- * port. The call SHAPES are carried over unchanged on purpose —
- * `toaster.create({ title, type })` and `showErrorToast({ error, fallbackTitle })`
- * — so the move touches the two lines that acquire them and none of the call
- * sites that use them.
- */
+// Feedback port for activity tables; re-binds app toaster/error singletons
+// with unchanged call shapes for seamless porting.
 
 import { useCallback, useMemo } from "react";
 import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
