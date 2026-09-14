@@ -33,7 +33,6 @@ import {
 } from "../executor";
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
-  LWQL_MAX_RESULT_ROWS,
   type LangWatchQLResourceLimits,
 } from "../limits";
 import { lwqlClickHouseSetupStatements } from "../provisioning/accessModel";
