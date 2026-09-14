@@ -241,22 +241,30 @@ async function runPi({
   // an empty wire. Rebasing the entry clock onto this run is what makes the
   // fixture mean "pi wrote this while we were watching", which is the thing
   // being tested; the row contents are untouched.
-  const rebased = join(runDir, "session-now.jsonl");
-  const rebaseFrom = Date.now();
+  // Stamped by the fake pi as it runs, not from here. The wrapper records the
+  // run's start after this function returns and immediately before it spawns
+  // pi, so a clock read taken here sits on the wrong side of that stamp: any
+  // delay between the two - a loaded machine, a slow spawn - pushes the
+  // earliest rows below the window and they are dropped as another run's
+  // work. The two runs then capture different row counts and the equality
+  // assertion fails on timing alone. Minting the stamps inside the child puts
+  // every row after the run start by construction, with no window to lose.
+  const rebaser = join(runDir, "rebase.cjs");
   writeFileSync(
-    rebased,
-    readFileSync(FIXTURE, "utf8")
-      .split("\n")
-      .map((line, index) => {
-        if (line.trim() === "") return line;
-        const row = JSON.parse(line) as { timestamp?: string };
-        if (typeof row.timestamp !== "string") return line;
-        return JSON.stringify({
-          ...row,
-          timestamp: new Date(rebaseFrom + index).toISOString(),
-        });
-      })
-      .join("\n"),
+    rebaser,
+    [
+      `const { readFileSync, writeFileSync } = require("node:fs");`,
+      `const from = Date.now();`,
+      `writeFileSync(process.argv[3], readFileSync(process.argv[2], "utf8")`,
+      `  .split("\\n")`,
+      `  .map((line, index) => {`,
+      `    if (line.trim() === "") return line;`,
+      `    const row = JSON.parse(line);`,
+      `    if (typeof row.timestamp !== "string") return line;`,
+      `    return JSON.stringify({ ...row, timestamp: new Date(from + index).toISOString() });`,
+      `  })`,
+      `  .join("\\n"), "utf8");`,
+    ].join("\n"),
     "utf8",
   );
 
@@ -264,7 +272,7 @@ async function runPi({
   // file lands between the run's start stamp and the final sweep.
   writeFileSync(
     join(binDir, "pi"),
-    `#!/bin/sh\ncp '${rebased}' '${join(sessionsDir, "session.jsonl")}'\nprintf 'ran\\n' > '${marker}'\nexit ${piExitCode}\n`,
+    `#!/bin/sh\n'${process.execPath}' '${rebaser}' '${FIXTURE}' '${join(sessionsDir, "session.jsonl")}'\nprintf 'ran\\n' > '${marker}'\nexit ${piExitCode}\n`,
     { mode: 0o755 },
   );
   process.env.PATH = `${binDir}:${originalPath ?? ""}`;

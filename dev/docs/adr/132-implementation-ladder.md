@@ -121,7 +121,7 @@ Five files in one commit by necessity: two source-scanning tests parse
 - **Proves it** — `pnpm --filter langwatch test:unit src/cli/utils/governance/__tests__/codex-` and `pnpm typecheck:all`
 - **Depends on** — nothing
 
-Pure rename, no behaviour change. Doing this *after* the pi reader exists is
+Pure rename, no behavior change. Doing this *after* the pi reader exists is
 exactly how the duplicated reader the ADR warns about gets shipped.
 
 ### 7. Resolve pi's session directory three ways, in precedence order
