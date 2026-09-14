@@ -1,12 +1,5 @@
-/**
- * Bulk upload (D3 React wrapper, + D5/D7/D8 wiring): owns the per-file rows and
- * drives the orchestration core.
- *
- * The orchestrator is fire-and-forget — `start()` kicks `runWithConcurrency` as a
- * detached promise chain, NOT a React effect — so closing the drawer (unmounting
- * the hook) does not abort in-flight or queued files: they keep preparing and
- * surface in the datasets list (the "close keeps preparing" behaviour). Status
- * setters that fire after unmount are harmless no-ops.
+/** Fire-and-forget orchestrator (not a React effect): closing drawer doesn't
+ * abort in-flight files.
  */
 import { nanoid } from "nanoid";
 import { useCallback, useRef, useState } from "react";

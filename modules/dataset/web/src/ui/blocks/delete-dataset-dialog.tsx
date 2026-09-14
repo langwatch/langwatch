@@ -1,15 +1,5 @@
-/**
- * Confirms archiving a dataset, by typing the word.
- *
- * A family-local copy of `platform/app/src/components/ui/delete-confirmation-dialog`,
- * which the annotation-score settings still render. Deletes-only forbids
- * repointing it, so the platform copy stays for that surface and this one
- * travels with the datasets list.
- *
- * `useDeleteDatasetConfirmation` — the platform hook this replaces — RETURNED A
- * COMPONENT, which the house rules forbid: a hook returns state and callbacks,
- * and the consumer renders. The dataset being deleted is the list screen's own
- * state now, and this is only the dialog.
+/** Confirm archive by typing 'delete'. Replaces platform hook that returned
+ * JSX (forbidden); dialog only now.
  */
 
 import { Button, Input, Text, VStack } from "@chakra-ui/react";

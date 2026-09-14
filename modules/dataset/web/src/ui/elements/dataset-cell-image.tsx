@@ -1,16 +1,5 @@
-/**
- * A picture in a dataset cell, expandable in place.
- *
- * A NARROWED family-local copy of `platform/app/src/components/ExternalImage`:
- * the editor only ever renders the expandable variant, so the "open in a new
- * tab" and `dontLinkify` modes did not travel. The platform component keeps
- * them for the trace media strip and the results panels, which deletes-only
- * forbids repointing.
- *
- * Escape closes the expanded picture. The listener exists only while it is
- * open: the backdrop is a full-viewport click catcher, and an overlay that
- * swallows pointer events while ignoring the key a reader reaches for first is
- * worse than merely unresponsive.
+/** Picture in dataset cell, expandable in place (narrowed copy). Escape
+ * closes expanded view.
  */
 
 import { Box, Image, Portal, Text } from "@chakra-ui/react";

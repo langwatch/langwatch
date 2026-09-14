@@ -1,18 +1,8 @@
-/**
- * Bulk upload (D5): make the proposed dataset names within ONE batch distinct
- * before any upload starts.
- *
- * The server's `findNextName` checks the DB, not the not-yet-created siblings in
- * the same drop, so dropping two `data.csv` would propose "data" for both and the
- * second `requestDirectUpload` would 409 on the slug. We dedupe within the batch
- * up front ("data", "data (1)", …); a DB collision that survives this (a name
- * already taken by an existing dataset, or a concurrent create) is handled
- * separately by retrying the create with the next suffix (the orchestrator's
- * 409 auto-retry).
+/** Dedup names within batch (server only sees DB, not siblings).
+ * Orchestrator retries on post-dedup collisions.
  */
 
-/** Strip the extension from a filename to seed the dataset name (matches the
- *  single-upload flow's `proposeValidName`). Falls back to the whole name. */
+/** Strip extension from filename for dataset name (fallback: whole name). */
 export const baseNameFromFilename = (filename: string): string => {
   const dot = filename.lastIndexOf(".");
   // dot > 0 → strip the extension; dot === 0 → a dotfile (no stem) → empty;

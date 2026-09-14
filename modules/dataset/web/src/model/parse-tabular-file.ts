@@ -1,16 +1,5 @@
-/**
- * A dropped CSV, JSON or JSONL file, as header-plus-body rows.
- *
- * A family-local copy of `parseFileToRows` / `jsonFileTextToCSV` /`jsonToCSV`
- * from `platform/app/src/components/datasets/UploadCSVDrawer`, which the upload
- * drawer's no-storage fallback still calls. Deletes-only forbids repointing it,
- * so the platform copies stay for that flow and this one travels with the CSV
- * append modal.
- *
- * PapaParse does the CSV work in both directions, so JSON and JSONL are handled
- * by turning them into CSV text first rather than by a second row builder: one
- * reader means one answer for quoting, embedded newlines and empty trailing
- * lines.
+/** Parse dropped CSV/JSON/JSONL as header+body rows. Convert JSON/JSONL to
+ * CSV first so one reader handles all.
  */
 
 import Papa from "papaparse";

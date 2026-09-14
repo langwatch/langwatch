@@ -1,15 +1,5 @@
-/**
- * The records an execution is handed, and how many of them.
- *
- * `getDatasetWithRecords` is what a run reads before it starts, so two things
- * have to hold. The selection has to give back exactly the entry that was
- * asked for — "first" is not "all", and an out-of-range index is a clamp
- * rather than a crash. And the result has to be BOUNDED: it is pulled fully
- * into memory 200 rows at a time and handed on, so a dataset nobody capped
- * would be read whole.
- *
- * When the cap bites, the caller is told. Truncating quietly would hand a run
- * a slice of a dataset and let it report a complete result.
+/** Dataset reads must be exact (first ≠ all, out-of-range clamps) and
+ * bounded (200 rows at a time). Caller told when capped.
  */
 
 import { describe, expect, it } from "vitest";

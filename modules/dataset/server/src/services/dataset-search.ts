@@ -1,15 +1,5 @@
-/**
- * Row search for the dataset editor.
- *
- * A dataset of a few hundred rows is ~14 pages at the editor's page size, and
- * paging is a poor way to find one row. Search narrows the dataset to the rows
- * whose cell VALUES contain the text, and the pager then pages the matches.
- *
- * The predicate lives here rather than in the service because both storage
- * layouts have to agree on it: s3_jsonl content is scanned chunk-by-chunk in
- * the app, and postgres-backed content is filtered from the record rows. If the
- * two disagreed, the same search would return different rows depending on where
- * the dataset happens to be stored — a difference the user cannot see or explain.
+/** Row search by cell content value (not columns). Predicate shared to keep
+ * same rows across storage layouts (s3_jsonl vs postgres).
  */
 
 /**
@@ -21,31 +11,8 @@
  */
 export const DATASET_SEARCH_MAX_ROWS = 50_000;
 
-/**
- * How many bytes of dataset content one search will fetch and parse.
- *
- * A row count is not a measure of what a scan costs. A row is whatever columns
- * it was given: an id and a status is ~100 bytes, a stored model response is
- * tens of kilobytes, and both count as one row. Bounding rows alone therefore
- * refuses narrow datasets while waving through datasets far more expensive to
- * read — a 54,000-row dataset of 5 MB is refused while a 9,800-row dataset of
- * 18 MB is allowed, though the second is more than three times the fetching and
- * parsing.
- *
- * The number matches `DATASET_FULL_EXPORT_MAX_BYTES`, the ceiling the platform
- * already applies to reading a dataset in one request. It is written out rather
- * than imported because that constant sits in the router layer and this is the
- * domain. Search holds one chunk at a time so it is not bounded by heap the way
- * an export is, but it fetches and parses the same bytes, and there was no
- * measurement arguing for a second, different number — matching the one already
- * in use beats inventing one. If they are ever meant to move together, the
- * export constant is the one to move down here.
- *
- * Both limits apply, and neither subsumes the other: the row limit cannot see
- * how wide a row is, and this one cannot see how many rows a budget buys. It is
- * held against bytes the scan measures as it reads, not against the sizes
- * recorded on the dataset — those only decide how early a doomed scan can be
- * refused, and they are missing on the very rows most likely to need the bound.
+/** Row cost isn't measured by count; byte limit necessary. Measured during
+ * scan, not from dataset metadata (which can be missing/stale).
  */
 export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
 
@@ -58,29 +25,8 @@ export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
  */
 export const DATASET_SEARCH_SCAN_BATCH = 1_000;
 
-/**
- * How many bytes a chunk's rows occupied, measured from the rows themselves
- * rather than read off a field.
- *
- * The sizes in `chunkOffsets` are numbers a writer wrote down. They are absent
- * on rows written before sizes were recorded and on offsets an interrupted
- * migration left half-written, and nothing keeps them true afterwards. A byte
- * bound that trusts them therefore holds everywhere except on the datasets with
- * damaged or missing metadata — the only datasets where an unbounded scan is
- * reachable in the first place.
- *
- * Serialised once per chunk rather than once per row. That is not free: on a
- * 16 MB chunk it measures at roughly the parse and match it rides along with
- * put together, and it holds a second copy of the chunk as a string while it
- * runs. Both are worth paying — tens of milliseconds and one chunk of heap,
- * against fetching that chunk over the network — but the cheaper measure is a
- * real one: `readChunk` already holds the raw JSONL it parsed, so returning its
- * byte length would be exact and cost nothing. That is a change to the storage
- * interface and all three of its implementations, so it is not made here.
- *
- * The number is the JSON encoding's byte length, not the JSONL file's — array
- * punctuation stands in for the newlines. That is a byte or two per row against
- * a hundred-megabyte ceiling.
+/** Chunk byte size measured from rows (metadata unreliable). Serialized once
+ * per chunk; JSON encoding, not JSONL file bytes.
  */
 export const measureRowsBytes = (rows: unknown[]): number => {
   try {
@@ -106,16 +52,8 @@ export const normalizeDatasetSearch = (
   return trimmed ? trimmed : undefined;
 };
 
-/**
- * True when one of the entry's values contains `search`, case-insensitively.
- *
- * Values only, never the column names: a dataset with a `conversation_id`
- * column would otherwise return every one of its rows for the search "id", and
- * nothing on screen would explain why. Non-string values are stringified so a
- * search for "4" finds a numeric cell; null and undefined never match, so
- * searching "null" does not select every row with an empty cell.
- *
- * `search` is expected to have been through `normalizeDatasetSearch`.
+/** Search matches cell values only (not columns), case-insensitive. Non-string
+ * values stringified; null/undefined never match.
  */
 export const matchesDatasetSearch = ({
   entry,

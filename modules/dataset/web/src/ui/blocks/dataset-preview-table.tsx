@@ -1,13 +1,5 @@
-/**
- * Dataset preview grid built on the SAME shared cells as the evaluations
- * workbench and the dataset editor (TableCell/EditableCell over
- * DatasetTableContext + datasetTableCss), so previews match their heights,
- * JSON formatting, fade/expand and double-click behaviors exactly.
- *
- * Used by the dataset preview cards and the add-to-dataset mapping preview.
- * The data stays owned by the caller: edits (when `onCellEdit` is passed),
- * checkbox selection (`isSelectable`) and row picking (`onRowClick`) all
- * propagate up instead of being copied into an internal store.
+/** Dataset preview grid on shared cells with evaluations workbench/editor.
+ * Data caller-owned; edits/selection/row-pick propagate up.
  */
 import { Box, Checkbox, HStack, Text } from "@chakra-ui/react";
 import {

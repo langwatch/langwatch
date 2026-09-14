@@ -132,20 +132,8 @@ export function renameReservedColumns(columns: string[]): string[] {
   });
 }
 
-/**
- * Make column names unique by suffixing repeats `_1`, `_2`, … — the same scheme
- * papaparse's `header:true` dedup uses, but applied ONCE to the header row.
- *
- * Lives here (not in the normalize job) so the browser confirm step
- * (`parseHeaderColumns`) canonicalises the header EXACTLY as the server-side
- * normalize job does — the confirmed `columnTypes` are then positionally 1:1
- * with the headers normalize parses, which is what lets normalize honour them
- * by index (ADR-032 v19). The CSV normalize path parses with `header:false` and
- * maps rows by index precisely to AVOID papaparse re-running its dedup against
- * each data row under pause/resume backpressure (which corrupted equal-cell
- * rows with a `_1` suffix); deduping the header ourselves keeps the legitimate
- * "two columns named the same" rename without ever touching row values.
- */
+/** Dedup headers identically browser-side (ADR-032): confirmed columnTypes
+ * stay in sync by index with server parsing. */
 export function dedupeHeaders(headers: string[]): string[] {
   const seen = new Map<string, number>();
   // Track the names actually emitted, not just the raw inputs: a suffixed
@@ -166,16 +154,8 @@ export function dedupeHeaders(headers: string[]): string[] {
   });
 }
 
-/**
- * Convert one raw cell value to its declared column type (ADR-032 v19). The
- * single-value core of `convertRowsToColumnTypes` / the frontend
- * `tryToConvertRowsToAppropriateType`, factored out so the streaming normalize
- * job can apply a confirmed type per record without buffering rows.
- *
- * Mirrors the legacy semantics exactly: empty number → null; the same
- * truthy/falsy boolean token sets; date → ISO `YYYY-MM-DD`; image kept as a
- * string (URL); every other non-string type (list/json/spans/…) is JSON-parsed,
- * keeping the original string if the parse fails.
+/** Convert one cell to its declared type. Factored from
+ * convertRowsToColumnTypes so streaming normalize can apply confirmed types.
  */
 export function convertValueToColumnType(
   value: unknown,
@@ -240,14 +220,8 @@ export function convertRowsToColumnTypes(
   });
 }
 
-/**
- * Parses file content based on the detected format.
- * Returns headers (column names) and rows.
- *
- * Raw null bytes are scrubbed before parsing so JSON.parse does not throw
- * on uploads where customers accidentally embed a U+0000 (PDF copy-paste,
- * broken CSV exports). The dataset-record sanitiser still runs later to
- * catch null bytes that appear via JSON escape sequences.
+/** Parse file content by format, scrubbing raw nulls before parse so
+ * JSON.parse doesn't throw on customer U+0000 embeds (PDF copy-paste, etc).
  */
 export function parseFileContent(params: { content: string; format: FileFormat }): {
   headers: string[];

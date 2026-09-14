@@ -1,15 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for DatasetPreviewTable, the grid behind the
- * add-to-dataset mapping preview.
- *
- * The preview renders with the SAME shared cells as the evaluations workbench
- * (TableCell/EditableCell over DatasetTableContext), so JSON values format
- * across multiple lines, heavy values stay bounded, and double-click opens
- * the floating editor with the full value. These tests render the real
- * component tree and assert those behaviours plus the selection and
- * row-picking wiring.
+ * Integration tests for DatasetPreviewTable (mapping preview). Shared cells
+ * with evaluations workbench; tests rendering + selection behaviors.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

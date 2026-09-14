@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the Bulk upload drawer: render the drawer with the
- * direct-upload transport, the header parser and the per-row poller's tRPC query
- * mocked, and the project supplied by a stub host. Asserts the user-visible
- * behaviour of the spec scenarios (rows, inline confirm, independent prep,
- * failure/retry, cancel).
- *
- * Moved with the drawer from
- * `platform/app/src/components/datasets/bulkUpload/__tests__`. What changed is
- * which modules are mocked, not what is asserted.
- *
- * Spec: specs/datasets/bulk-dataset-upload.feature.
+ * Integration tests for bulk upload drawer. User-visible behavior of spec
+ * scenarios (rows, confirm, prep, failure/retry, cancel).
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

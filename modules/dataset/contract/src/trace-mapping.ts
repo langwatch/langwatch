@@ -873,10 +873,10 @@ export type TraceMapping = Record<
   }
 >;
 
-/**
- * Additional mapping source keys that are only executed server-side (e.g. in the evaluations worker).
- * They appear in the UI and schema but their implementations live outside this shared module
- * to avoid pulling Node.js-only dependencies into the frontend bundle.
+/** Additional mapping source keys executed server-side (e.g. in the
+ * evaluations worker). They appear in the UI and schema but their
+ * implementations live outside this module to avoid pulling Node.js-only
+ * dependencies into the frontend bundle.
  */
 export const SERVER_ONLY_TRACE_SOURCES = ["formatted_trace"] as const;
 export const SERVER_ONLY_THREAD_SOURCES = ["formatted_traces"] as const;
@@ -1123,7 +1123,8 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   type: T,
 ): StringTypeToType[T] | undefined => {
   // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.
-  // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators need bare values. (#3875)
+  // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators
+  // need bare values. (#3875)
   const unwrapped = unwrapTypedObject(value);
   const subject: any = unwrapped === undefined ? value : unwrapped;
   if (subject === null || subject === undefined) {

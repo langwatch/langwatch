@@ -1,16 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The dataset repository contract, stated once and run against both backends:
- * the memory twin always, and the Postgres one when a test database is named
- * at `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
- *
- * The rows are keyed by project, so the isolation case here is the project: a
- * dataset another project wrote is never answered with, and its entries are
- * never counted into this project's list.
- *
- * @see modules/dataset/specs/dataset-service.feature
+ * Dataset repository contract against memory and Postgres backends.
+ * Isolation by project: rows never leak between projects.
  */
 import {
   PrismaConfigService,

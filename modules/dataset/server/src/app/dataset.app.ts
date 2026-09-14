@@ -1,20 +1,5 @@
-/**
- * The dataset feature's application: what all four of its doors call.
- *
- * Most operations are the service's own and are reached straight through. What
- * lives here as behaviour is what a door would otherwise have to know: how an
- * INCOMPLETE upsert is completed, and whose reach a copy out of a SECOND
- * project is checked against. Both doors had a fill of their own for the first
- * — the tRPC door borrowed the name of the experiment the caller named, the
- * REST patch borrowed the name and columns of the dataset it was replacing —
- * so "what a partial upsert means" was decided in two places and could answer
- * differently the first time one moved.
- *
- * What is NOT here: the wire mapping each door owns. Each door also keeps its
- * own read ceiling, because a byte budget is what a door ASKS for, not what
- * the dataset is.
- *
- * Spec: modules/dataset/specs/dataset-service.feature.
+/** Application: completes incomplete upserts and checks cross-project copy
+ * reach. Wire mapping and read ceiling live in the doors.
  */
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import { DatasetApi, type DatasetNormalizePayload, type AbortPendingUploadInput, type BatchEvaluationRecord, type BatchEvaluationSummary, type CopyDatasetInput, type CreateDatasetFromUploadInput, type CreateDatasetFromUploadResult, type CreateDatasetRecordsInput, type Dataset, type DatasetColumns, type DatasetEntrySelection, type DatasetHead, type DatasetListResult, type DatasetLookupInput, type DatasetNameInput, type DatasetNameResult, type DatasetPage, type DatasetPageInput, type DatasetRecord, type DatasetRecordMutationResult, type DatasetRecordPage, type DatasetWithRecords, type DeleteDatasetRecordsInput, type FinalizeUploadInput, type ListDatasetsInput, type PendingUploadInput, type PendingUploadResult, type RetryNormalizeInput, type StagedUploadInput, type UpdateDatasetRecordInput, type UploadExistingDatasetInput, type UpsertDatasetInput } from "@langwatch/dataset-contract";
@@ -37,23 +22,8 @@ import type { Readable } from "node:stream";
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
-/**
- * What the composing process owns and this feature may not build for itself.
- *
- * Every member is optional because a single-node self-hosted deployment has no
- * object storage at all (ADR-032): with no resolver the feature still serves
- * every relational dataset and refuses the direct-upload doors by name. Each
- * field is typed by an `abstract class` rather than a plain `interface` — the
- * idiom langy landed in `a24a63479f`
- * (`modules/langy/server/src/app/langy.members.ts`): a structural interface
- * erases at runtime and cannot itself be handed to a composition as a named
- * value, where an abstract class can be `implements`ed exactly as an
- * interface is today, and is already the shape a real provided dependency
- * token needs the day a process wants to wire one through
- * `.withProvided(...)`. Absence of any of these is never a boot refusal —
- * the reading code path (inside {@link DatasetService}) refuses BY NAME, at
- * the moment a caller asks for the one operation only that collaborator can
- * do.
+/** Composition-owned members, all optional. Absence never causes boot refusal;
+ * code refuses BY NAME when an operation needs one.
  */
 export interface DatasetInfrastructure {
   /** Where a project's dataset content is stored, when the deployment has any. */
@@ -193,20 +163,8 @@ export class DatasetApp implements DatasetApi {
 
   // ── Datasets ─────────────────────────────────────────────────────────────
 
-  /**
-   * Creates a dataset, or replaces an existing one's columns and entries.
-   *
-   * The completion is here rather than in each door because what a partial
-   * upsert MEANS is a fact about the dataset, not about the transport it
-   * arrived over. Three rules, in this order:
-   *
-   *  - a `slugOrId` names the row being replaced, and that row is what an
-   *    absent `name` or `columnTypes` falls back to, so a patch that sends one
-   *    field does not blank the other;
-   *  - an `experimentId` with no `name` borrows the experiment's name, which is
-   *    how the experiment pages create the dataset a run writes into;
-   *  - with neither, there is nothing to call the dataset and the write is
-   *    refused before the service is touched.
+  /** Partial upsert completion (dataset fact, not transport-specific): patch
+   * backs up to existing row, borrow name from experimentId, or refuse.
    */
   async upsertDataset(input: DatasetUpsertInput): Promise<Dataset> {
     const replacing = input.slugOrId
@@ -648,14 +606,8 @@ export abstract class DatasetNormalizeQueue {
   abstract enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
 }
 
-/**
- * Content-layout operations that cannot be served by the relational record
- * repositories.  The Dataset service chooses this seam only for
- * `contentLayout: "s3_jsonl"`; the application supplies the concrete object
- * storage implementation at process composition time.  Keeping this seam
- * explicit is important: routes must never decide whether a dataset is in
- * Postgres or object storage, and the service must not reach for a provider
- * or a process-global database client.
+/** Content-layout operations for s3_jsonl datasets. Keeps storage decisions
+ * out of routes and process-globals out of service.
  */
 export abstract class DatasetContent {
   abstract listRecords(input: {

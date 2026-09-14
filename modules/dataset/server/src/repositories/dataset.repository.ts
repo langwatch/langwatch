@@ -1,14 +1,8 @@
 import type { Dataset, DatasetColumns, DatasetSummary } from "@langwatch/dataset-contract";
 import type { Instant } from "@langwatch/time";
 
-/**
- * A dataset row as its storage returns it.
- *
- * The scalar columns only - deliberately not the parsed `Dataset` the contract
- * publishes, because the upload path reads `columnTypes` raw in some places and
- * parses it in others, and moving that parse into the repository would newly
- * throw on the retry and cancel paths for a row those paths never look inside.
- * This states the shape without changing when anything is validated.
+/** Raw storage row (scalar columns only), not parsed Dataset. Keeps
+ * columnTypes read raw in some paths, parsed in others.
  */
 export type DatasetRow = Pick<Dataset, "createdAt" | "updatedAt" | "archivedAt"> & {
   id: string;

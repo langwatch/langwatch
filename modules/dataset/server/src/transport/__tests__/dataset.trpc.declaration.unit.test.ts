@@ -1,13 +1,5 @@
-/**
- * The dataset tRPC wire, pinned: every procedure name, its kind, and the
- * permission the server binds to it. A rename here is a cache-key change in
- * every browser that calls it.
- *
- * The handlers are driven through the same seam a process mounts them on, so
- * the byte budgets and the null-for-missing reads each door owns are proven
- * here rather than inferred from the declaration alone.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+/** tRPC wire pinned: procedure names, kinds, permissions. Handlers driven
+ * through same seam, proving byte budgets and null-for-missing behavior.
  */
 
 import type { AuthzPermission } from "@langwatch/authz-contract";

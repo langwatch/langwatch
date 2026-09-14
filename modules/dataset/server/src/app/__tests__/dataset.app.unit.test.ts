@@ -1,18 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The dataset application: the rules that moved off its four doors onto it.
- *
- * A create-or-replace can arrive INCOMPLETE — naming the dataset by slug
- * rather than id, naming an experiment instead of a name, or naming neither a
- * name nor the columns because it is patching what already exists. Both doors
- * had a fill of their own for that hole, so "what a partial upsert means" was
- * decided in two places and could answer differently the first time one moved.
- *
- * A copy reads a SECOND project, which a door's declared check never covers,
- * so the caller's reach into it is probed here, where the read is made.
- *
- * The services are stubbed. Nothing here speaks HTTP or tRPC.
+ * Incomplete upserts can arrive, copy reads a second project (authorization
+ * gap), services stubbed. HTTP/tRPC testing is elsewhere.
  */
 import type { Dataset } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";

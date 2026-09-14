@@ -1,11 +1,5 @@
-/**
- * Postgres text/jsonb cannot store the U+0000 null byte (Postgres error 22P05).
- * User-supplied uploads (PDF copy-paste, broken CSV exports, JSONL with binary
- * artefacts) regularly carry stray null bytes; the upload pipeline must scrub
- * them silently so customers never see a Postgres error.
- *
- * This util walks JSON-shaped values recursively and removes null bytes from
- * every string. Anything else passes through untouched.
+/** Postgres cannot store U+0000 null bytes. User uploads (PDF, broken CSV,
+ * JSONL) carry stray nulls; recursively scrub them.
  */
 
 const NULL_BYTE = "\u0000";

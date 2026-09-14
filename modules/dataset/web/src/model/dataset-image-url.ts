@@ -1,15 +1,4 @@
-/**
- * Whether a cell value is an image, and where the browser should fetch it.
- *
- * A family-local copy of `getImageUrl` / `getProxiedImageUrl` from
- * `platform/app/src/components/ExternalImage`, which the trace media strip, the
- * batch-evaluation results and the studio results panel still import.
- * Deletes-only forbids repointing them, so the platform copy stays for those
- * consumers and this one travels with the dataset editor.
- *
- * Pure — it decides a string, so it lives in `model` and the element that
- * renders the picture imports it rather than owning it.
- */
+/** Decide if cell value is an image and fetch URL. Pure function for model layer. */
 
 /** Image hosts that serve pictures without a file extension. */
 function isGoogleImageHost(host: string): boolean {

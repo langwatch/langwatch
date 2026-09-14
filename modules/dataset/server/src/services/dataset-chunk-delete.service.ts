@@ -334,15 +334,7 @@ export class DatasetChunkDeleteService {
     return { deleted };
   }
 
-  /**
-   * I-COUNT repair: re-derive the counters from S3 truth, then write them back
-   * under the lock. `chunkCount` is trusted as the boundary: a missing chunk
-   * throws `MissingChunkError` rather than silently masking data loss.
-   */
-  /**
-   * Write the recomputed counters for a delete: a full offset recompute plus
-   * trailing-empty compaction. Shared by the fast and full-scan delete paths.
-   */
+  /** Re-derive counters from S3 truth; recompute delete offset and write. */
   private async commitDeleteCounts({
     tx,
     datasetId,

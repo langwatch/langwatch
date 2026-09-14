@@ -15,18 +15,8 @@ const recordCountFormatter = new Intl.NumberFormat("en-US");
 /** Format a record count with the editor's fixed thousands separator. */
 export const formatRecordCount = (count: number): string => recordCountFormatter.format(count);
 
-/**
- * The count chip while a search is in effect.
- *
- * Both numbers, because either alone misleads: the match count on its own reads
- * as the dataset having shrunk, and the dataset total on its own hides the
- * result of the search that was just run.
- *
- * `total` is omitted when no unsearched read has settled yet, so the dataset's
- * own size genuinely is not known. Reusing the match count for both halves
- * would render "1 of 1 records" for a dataset of 120 — the exact misreading the
- * pair exists to prevent — so the chip says less instead of saying something
- * false.
+/** Show both match count and total so neither alone misleads. Omit total when
+ * unsearched read hasn't settled.
  */
 export const formatSearchRecordCount = ({
   matched,

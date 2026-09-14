@@ -1,13 +1,5 @@
-/**
- * `/api/dataset`, driven as a mounted family: real requests through the REST
- * runtime, a stubbed application behind it. The declaration test beside this
- * one pins the addresses; this one pins what each door answers — the statuses,
- * the bodies and the refusals `specs/features/dataset-rest-api.feature`
- * promises integrators.
- *
- * The file-upload doors are absent on purpose: they need a multipart body the
- * runtime cannot declare yet, so `dataset-file-upload-api.feature`'s upload
- * scenarios stay unbound until it grows that door.
+/** REST endpoints mounted with real requests, stubbed application. File-upload
+ * doors absent (runtime can't declare multipart yet).
  */
 
 import {

@@ -1,18 +1,5 @@
-/**
- * The slug a dataset name would get, and whether another dataset already holds it.
- *
- * A family-local copy of `platform/app/src/components/datasets/useDatasetSlugValidation`,
- * which the upload confirm drawer still calls. Deletes-only forbids repointing
- * it, so the platform copy stays for that flow and this one travels with the
- * add-or-edit drawer.
- *
- * ONE SUBSTITUTION, deliberate: the platform hook debounced through
- * `use-debounce`, which this package does not depend on and which a page move is
- * not the place to add. The scheduling below states the same three rules that
- * hook configured — check on the FIRST keystroke of a run so a fresh name shows
- * its slug immediately, again once typing settles for 500ms, and never leave
- * more than 1000ms between checks while typing continues — and it cancels on
- * unmount, so a settled check never lands in a torn-down form.
+/** Validate dataset slug. Check on first keystroke, after 500ms settle, and
+ * every 1000ms while typing continues.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

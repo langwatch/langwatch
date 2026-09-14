@@ -1,22 +1,5 @@
-/**
- * Debounced sync of locally-edited dataset records to the database.
- *
- * Owners of dataset state (the evaluations workbench store, the standalone
- * dataset editor) accumulate pending changes keyed by database dataset id and
- * record id; this hook drains them: updates go through datasetRecord.update
- * with the FULL record (the backend replaces the whole entry), deletions are
- * marked with `_delete: true` and go through datasetRecord.deleteMany.
- *
- * Save status is reported through onStatus so each surface can render its own
- * autosave indicator. A failed sync keeps the pending change around, so a
- * retry happens on the next edit; it must always be VISIBLE; never report
- * silent success on error.
- *
- * A family-local copy of
- * `platform/app/src/components/datasets/editor/useDatasetRecordSync`, which the
- * evaluations workbench still calls. Deletes-only forbids repointing it, so the
- * platform copy stays for that surface and this one travels with the dataset
- * editor; the only change is which client the two mutations run on.
+/** Debounced sync of edited records: full replace + delete-marked deletions.
+ * Save status via onStatus callback for autosave indicator.
  */
 import { useCallback, useEffect, useRef } from "react";
 import type { AutosaveState } from "../model/dataset-table-context.tsx";

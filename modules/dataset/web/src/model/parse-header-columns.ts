@@ -1,20 +1,5 @@
-/**
- * Header-only parse for the upload confirm step (ADR-032 v19).
- *
- * The direct-upload happy path never parses the whole file in the browser (a
- * multi-GB file would OOM the tab — the exact failure the direct upload avoids).
- * To still let the user confirm column names + types BEFORE uploading, we read
- * only a bounded leading slice of the file and extract the header row (CSV) or
- * the first object's keys (JSON / JSONL). The slice is canonicalised through the
- * SAME `dedupeHeaders` + `renameReservedColumns` the normalize job applies, so
- * the returned columns are positionally 1:1 with the headers normalize will
- * parse server-side — which is what lets normalize honour the confirmed
- * `columnTypes` by index.
- *
- * Returns `null` when the header can't be determined (empty file, unsupported
- * extension, or a `.json` array whose first object doesn't fit the slice). The
- * caller then uploads without a confirm step and normalize derives all-`string`
- * columns, exactly as before — a graceful degradation, never an error.
+/** Parse only header (avoid OOM on multi-GB files). Canonicalise with
+ * dedupeHeaders + renameReservedColumns so normalize honors columnTypes by index.
  */
 
 import Papa from "papaparse";

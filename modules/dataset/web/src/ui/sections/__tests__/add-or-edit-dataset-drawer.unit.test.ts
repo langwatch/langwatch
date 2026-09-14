@@ -1,12 +1,5 @@
-/**
- * What the dataset form refuses to submit.
- *
- * The platform drawer stated these three rules inside a `react-hook-form`
- * resolver, where they were only observable through the form's side effects.
- * This package drives the form with plain state, so the rules are one function
- * and the assertion is on its answer.
- *
- * Spec: specs/datasets/datasets-list-page.feature.
+/** Form validation rules extracted from platform drawer's resolver. Asserted
+ * as pure function, not side effects.
  */
 
 import { describe, expect, it } from "vitest";

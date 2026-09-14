@@ -7,19 +7,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 const logger = createLogger("langwatch:api:dataset:errors");
 
-/**
- * Framework-agnostic dataset domain errors (see `@langwatch/dataset-contract`) →
- * their HTTP status + wire `error` code. The service layer throws typed domain
- * errors with no knowledge of HTTP; the route layer owns this mapping. Routes
- * that let these propagate to `onError` (the direct-upload family) get one
- * consistent translation here instead of repeating `error.name === "X"` ladders
- * inline. `message` is always carried through from the thrown error.
- *
- * Handled errors are NOT listed here. They already know their own status, code,
- * fault and remediation, and the boundary handler at the bottom of this file
- * answers with all of it; a domain entry would flatten that back into a bare
- * `{ error, message }`. `StorageNotWritableError` is the one that used to be
- * here and is now handled (`storage_not_writable`).
+/** Domain errors → HTTP status/code mapping. Handled errors not listed
+ * (they know their own status, code, fault, remediation).
  */
 const DOMAIN_ERROR_HTTP: Record<string, { status: ContentfulStatusCode; code: string }> = {
   DatasetNotFoundError: { status: 404, code: "NotFound" },
@@ -62,15 +51,7 @@ const DOMAIN_ERROR_HTTP: Record<string, { status: ContentfulStatusCode; code: st
   },
 };
 
-/**
- * `onError` for the dataset family, layered over the process's own boundary.
- *
- * The boundary handler is supplied rather than imported: it renders handled
- * errors, Prisma refusals and the trace block out of the application's error
- * taxonomy, which does not belong in a transport package. This handler adds the
- * family's domain mapping on top of it and delegates everything it has not
- * specifically claimed.
- */
+/** Dataset onError handler: family domain mapping layered over boundary. */
 export function createDatasetErrorHandler(options: {
   boundaryErrorHandler: ErrorHandler;
 }): ErrorHandler {
@@ -81,16 +62,8 @@ export function createDatasetErrorHandler(options: {
     const path = c.req.path;
     const method = c.req.method;
     const routeParams = c.req.param();
-    // Resolve the domain mapping first so the logged status matches the response
-    // status: domain errors are plain `Error`s with no `.status`, so computing
-    // status from `HttpError`/`.status` alone would log [500] while actually
-    // returning 404/409/422.
-    //
-    // KNOWN GAP, carried over unchanged: a handled error names its status
-    // `httpStatus`, which this expression does not read, so a handled 404 is
-    // logged as a 500 incident while the caller is correctly told 404. Changing
-    // it here would alter the log level of every handled dataset failure, which
-    // is not a transport move's business.
+    // Resolve domain mapping first for logging consistency (known gap: handled
+    // errors log at wrong level; see KNOWN GAP below).
     const domain = DOMAIN_ERROR_HTTP[error.name];
     const status =
       domain?.status ?? (error instanceof HttpError ? error.status : (error.status ?? 500));

@@ -1,12 +1,5 @@
-/**
- * The reorder reducer for the bulk-upload column-confirm step.
- *
- * Drag-reorder is bound by each column's immutable `sourceHeader` (not array
- * position), so the normalize job can still map file values to the right column
- * after a reorder + rename. Keeping the reducer pure and standalone makes the
- * reorder→payload contract testable without simulating a real DnD gesture
- * (jsdom can't measure layout rects, so a faithful pointer/keyboard drag can't
- * be driven there).
+/** Drag-reorder by sourceHeader (not position) so normalize maps correctly.
+ * Pure reducer, testable without DnD.
  */
 import { arrayMove } from "@dnd-kit/sortable";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";

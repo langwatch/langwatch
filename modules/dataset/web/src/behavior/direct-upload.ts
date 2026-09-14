@@ -1,20 +1,5 @@
-/**
- * Browser-side client for the presigned direct-upload flow (ADR-032 D4).
- *
- * One upload path for all sizes: the browser sends the raw file straight to
- * object storage via a presigned PUT, then asks the backend to finalize and
- * normalize it. Mirrors the raw-`fetch` style of `scenarioGeneration.ts`
- * (same-origin, NextAuth session-cookie auth, no auth header; throw on `!ok`).
- *
- * Auth: the three control-plane routes (`/direct-upload`, `/finalize`,
- * `/retry`) authenticate the logged-in user by the NextAuth session cookie
- * (sent automatically on same-origin requests) and read `projectId` from the
- * request to scope the permission check. We do NOT send an Authorization /
- * X-Auth-Token header.
- *
- * The one cross-origin call is the PUT to the storage URL — that one carries
- * NO credentials (S3 rejects cookies on a presigned URL) and NO Content-Type
- * (see `putFileToPresignedUrl`).
+/** Presigned direct-upload: browser → S3 via presigned PUT, backend
+ * finalizes/normalizes. Session-cookie auth on control plane; NO credentials on S3.
  */
 
 import type { DatasetColumns, DatasetConfirmColumns } from "@langwatch/dataset-contract";
@@ -41,15 +26,7 @@ export class DatasetNameConflictError extends Error {
   }
 }
 
-/**
- * Thrown when the presigned PUT to object storage fails — a non-ok response, or
- * a network / CORS failure (a missing bucket CORS rule surfaces as an opaque
- * `fetch` rejection / `TypeError`, never a status code). Distinct from
- * `DirectUploadUnavailableError` (which means the backend never minted a presign
- * at all): both signal the caller to fall back to the backend upload path, so a
- * misconfigured bucket isn't a dead end for small files (the size-guard handles
- * large ones). Carries the underlying cause for diagnostics.
- */
+/** Presigned PUT failure (network/CORS/non-ok). Caller falls back to backend upload path. */
 export class PresignedUploadFailedError extends Error {
   constructor(message = "Failed to upload the file to object storage", cause?: unknown) {
     super(message, cause === undefined ? undefined : { cause });
@@ -77,15 +54,8 @@ export async function requestDirectUpload({
   projectId: string;
   name: string;
   filename: string;
-  /**
-   * Confirmed columns from the upload confirm step (ADR-032 v19), sent as JSON
-   * so the normalize job binds each file header to its column and renames +
-   * type-converts each record to match. The bulk drawer sends the richer shape
-   * (each column carries an immutable `sourceHeader`) so the confirm UI can
-   * rename + drag-reorder without breaking the binding; the legacy single-file
-   * drawer locks column order and sends the bare name+type shape (normalize then
-   * binds positionally). Omitted when the header couldn't be parsed (then
-   * normalize derives all-`string`).
+  /** Confirmed columns (ADR-032 v19): bulk drawer sends sourceHeader for
+   * rename/reorder; legacy drawer sends bare name+type (positional binding).
    */
   columnTypes?: DatasetConfirmColumns | DatasetColumns;
 }): Promise<DirectUploadHandle> {
@@ -116,20 +86,8 @@ export async function requestDirectUpload({
   return (await response.json()) as DirectUploadHandle;
 }
 
-/**
- * PUT the raw file to the upload URL. Two URL shapes, two credential modes:
- *
- *  - Absolute (cross-origin S3): NO credentials — a presigned request must not
- *    carry our session cookie — and NO Content-Type: `createPresignedUpload`
- *    signs the `PutObjectCommand` WITHOUT a `ContentType`, so the signature
- *    doesn't cover a `Content-Type` header; setting one adds an unsigned header
- *    some S3 impls fold into the canonical request, breaking the signature.
- *  - Relative `/...` (same-origin): the no-S3 local-FS path — the file streams
- *    through our own API to local-FS staging, so we DO send the session cookie
- *    (`credentials: "include"`); the route is session-authed and there is no
- *    signature to keep intact.
- *
- * A leading "/" is the discriminator: relative ⇒ same-origin local route.
+/** Two URL shapes: S3 (cross-origin, no credentials/Content-Type) vs local-FS
+ * (same-origin, include session cookie). "/" is the discriminator.
  */
 export async function putFileToPresignedUrl(
   uploadUrl: string,
@@ -184,18 +142,8 @@ export async function putFileToPresignedUrl(
   }
 }
 
-/**
- * Best-effort cleanup of the just-created pending (`uploading`) dataset after a
- * presigned-PUT failure, so a CORS-failed attempt doesn't leave a stuck
- * `uploading` row behind. Authenticated by the same session cookie the other
- * direct-upload routes use.
- *
- * A non-2xx DELETE (DB timeout, pod restart) THROWS rather than resolving
- * silently: every caller already wraps this in a `.catch`/try-catch that logs,
- * so the failure becomes observable (an orphaned `uploading` row pins its slug
- * and counts against project quota until reaped). Callers still proceed with the
- * fallback regardless — the reject is for visibility, not control flow. A
- * server-side TTL sweep of stale `uploading` rows is the durable backstop.
+/** Cleanup stuck uploading row after PUT failure. Throws on non-2xx for
+ * observability; TTL sweep is the durable backstop.
  */
 export async function abortPendingUpload({
   projectId,

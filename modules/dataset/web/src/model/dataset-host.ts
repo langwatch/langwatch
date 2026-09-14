@@ -1,36 +1,5 @@
-/**
- * What the Datasets screens ask of the application they are mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make these screens
- * untestable outside a running application. They ask this port instead, and the
- * frontend feature that owns them — `apps/ui/src/features/dataset` — answers it
- * by adapting the browser capabilities the application already resolves.
- *
- * It lives in `model` because it is a package-wide portable value: types plus
- * the React context they travel in, depending on nothing but React.
- *
- * THE SIXTH FAMILY TO DECLARE THIS SHAPE, after `GovernanceHostPort`,
- * `GatewayHostPort`, `PersonalWorkspaceHostPort`, `AutomationHost`,
- * `OpsHostApi` and `AgentManagementHostPort`. Each of those recorded that a
- * repeat is the signal to promote the shape into one place, and each left it,
- * for the same reason: promotion changes packages a page-family move does not
- * own, and doing it inside one would hide it. Recorded again in
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * TWO THINGS THIS FAMILY ASKS THAT THE OTHERS DID NOT:
- *
- * - `isLiteMember()`. The lite `EXTERNAL` membership role is not a permission —
- *   it is a column on the reader's organization membership — so it cannot come
- *   off `hasPermission`, and `apps/ui` already reads it once for the settings
- *   menu (`behavior/ui-organization-facts.ts`). The list page hides Edit and
- *   Delete behind it, which is the scenario
- *   `specs/rbac/lite-member-restrictions.feature` binds.
- * - `copyTargets()`. Replicating a dataset offers every project the reader may
- *   create a dataset in, which is a per-TEAM answer rather than a per-scope one,
- *   so the page-level `hasPermission` is the wrong question. The application
- *   computes the list; the dialog only renders it.
+/** Datasets screens port (sealed from UI/router/toast). Special asks:
+ * isLiteMember() and copyTargets() (team-level, not scope-level).
  */
 
 import { createContext, useContext } from "react";

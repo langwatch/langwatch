@@ -1,16 +1,5 @@
-/**
- * Bulk upload (D3): the storage-agnostic orchestration core, decoupled from
- * React so the hard parts are unit-testable.
- *
- *  - `runWithConcurrency` runs N items through at most `cap` workers at once; the
- *    rest queue and start as slots free (the "queues the rest" behaviour).
- *  - `uploadSingleFile` is one file's pipeline: requestDirectUpload → PUT →
- *    finalize, reusing the single-upload primitives so S3-vs-local-vs-no-storage
- *    stays abstracted by URL shape. It retries the CREATE under a fresh name on a
- *    slug conflict (the batch-name race), and reaps the `uploading` row on any
- *    post-create failure or cancel (single-flow parity — nothing half-created).
- *
- * Both take their collaborators as injected deps so tests drive them with fakes.
+/** Bulk upload orchestration core: concurrent workers + single-file pipeline
+ * (create/put/finalize). Injected deps for testability.
  */
 
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";

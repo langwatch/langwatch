@@ -1,13 +1,5 @@
-/**
- * One labelled row of the dataset form: the label and its helper on the left,
- * the control on the right, an error under the control.
- *
- * A NARROWED family-local copy of
- * `platform/app/src/components/HorizontalFormControl`, which ~90 non-Datasets
- * surfaces still render. Deletes-only forbids repointing them; what travelled is
- * the three props the dataset drawer passes (`label`, `helper`, `invalid`) and
- * the layout, without the tooltip, the size and direction variants or the
- * react-hook-form error rendering, none of which this family uses.
+/** Labelled form row (label/helper/control/error). Narrowed copy with only
+ * dataset-needed props and layout.
  */
 
 import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";

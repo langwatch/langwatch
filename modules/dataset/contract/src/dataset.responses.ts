@@ -1,11 +1,5 @@
-/**
- * What the dataset feature's tRPC transports answer, stated once.
- *
- * The chain declares each procedure's `withOutput` from here, so the shape a
- * client reads is written down in the contract rather than implied by
- * whatever a handler happened to return. The schemas are checked against
- * real answers in development and test; production returns the handler's
- * own value.
+/** tRPC transport answers stated once in the contract's `withOutput`;
+ * schemas checked against real answers in development and test.
  */
 import { z } from "zod";
 import { datasetRecordSchema, datasetSchema } from "./dataset.ts";

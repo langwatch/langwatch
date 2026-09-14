@@ -1,19 +1,5 @@
-/**
- * The Datasets family, as the browser application mounts it.
- *
- * ADR-004 makes a screen an owner-only export named after the frontend feature
- * that composes it, so the whole family is one entry. What it exposes for each
- * page is a LOADER rather than a component, because between them the two screens
- * drag four overlays, a spreadsheet grid and a CSV parser behind them, and none
- * of that belongs in the chunk that renders the rest of the application.
- *
- * TWO SCREENS, TWO ADDRESSES: `/:project/datasets` and
- * `/:project/datasets/:id`.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is two things: the tRPC
- * Provider this package's hooks run on, and the host port that answers for the
- * project, the reader's grants and membership, the replication targets, the
- * address and the two notices.
+/** Datasets family with two screens. Frontend mounts tRPC Provider and host
+ * port (project/grants/replication/addresses).
  */
 
 import type { ComponentType } from "react";

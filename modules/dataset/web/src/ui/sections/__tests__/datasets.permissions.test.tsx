@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The row menu's write actions, against the reader's membership.
- *
- * Moved with the screen from
- * `platform/app/src/pages/[project]/__tests__/datasets.lite-member.integration.test.tsx`.
- * The lite `EXTERNAL` role reads every page and writes none of them, so Edit and
- * Delete are not offered to it — the server refuses them either way, and an
- * action that cannot succeed should not be on the menu.
- *
- * The menu is stubbed to plain elements, exactly as the platform suite did, so
- * the assertion is about which items the screen RENDERS rather than about
- * driving an overlay open.
- *
- * Spec: specs/rbac/lite-member-restrictions.feature.
+ * Row menu actions against reader's membership. Lite members get no write
+ * actions.
  */
 
 import type { DatasetSummary } from "@langwatch/dataset-contract";

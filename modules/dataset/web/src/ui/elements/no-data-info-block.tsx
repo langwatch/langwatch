@@ -1,13 +1,4 @@
-/**
- * The empty state a project with no datasets sees.
- *
- * A family-local copy of `platform/app/src/components/NoDataInfoBlock`, which
- * seven non-Datasets surfaces still render (evaluations, online evaluations,
- * workflows, annotation scores and the annotations table among them). Deletes-only
- * forbids repointing those, so the platform copy stays for them and this one
- * travels with the screen — the same call the Agents family made for its three
- * dialogs, and `@langwatch/coding-agent-web` already carries its own.
- */
+/** Empty state for no datasets. Family-local copy (travels with screen). */
 
 import { Center, EmptyState, Icon, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";

@@ -1,10 +1,5 @@
 import { nowInstant } from "@langwatch/time";
-/**
- * Reserved column names that cannot be used in datasets because they conflict
- * with system-generated fields or UI functionality.
- *
- * Single Responsibility: Centralize the definition of reserved column names to ensure consistency across dataset operations.
- */
+/** Reserved column names (id, selected) conflict with system fields or UI. */
 export const RESERVED_COLUMN_NAMES = [
   "id", // Used as the primary key for dataset records
   "selected", // Used for row selection in the dataset grid UI

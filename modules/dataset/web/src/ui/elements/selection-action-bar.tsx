@@ -1,16 +1,5 @@
-/**
- * Floating selection action bar: pinned to the bottom-center of the viewport
- * while rows are selected, holding the selection count, the actions for that
- * selection, and a clear-selection button.
- *
- * A family-local copy of `platform/app/src/components/ui/SelectionActionBar`,
- * which the traces surfaces still render. Deletes-only forbids repointing them,
- * so the platform copy stays for its other consumers and this one travels with
- * the dataset editor. Byte-for-byte the same markup, including the
- * `data-bottom-floating-bar` attribute Langy's armed-mode hint reads to stack
- * above the bar instead of landing on top of it.
- *
- * UX contract: dev/docs/best_practices/selection-action-bar.md.
+/** Floating selection action bar (bottom-center). Family-local copy,
+ * byte-for-byte match.
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";

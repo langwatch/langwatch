@@ -1,14 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The dataset detail screen's read gate and its chrome.
- *
- * Moved with the screen from
- * `platform/app/src/pages/[project]/datasets/__tests__/dataset-edit-run-experiment.integration.test.tsx`,
- * and widened: the platform suite covered only the Run experiment hand-off, and
- * the I-READY gate the page exists to enforce (ADR-032) was unbound.
- *
- * Spec: specs/datasets/dataset-editor.feature.
+ * Dataset detail screen's read gate and chrome (I-READY enforcement, ADR-032).
+ * Moved from platform, widened scope.
  */
 
 import { screen } from "@testing-library/react";

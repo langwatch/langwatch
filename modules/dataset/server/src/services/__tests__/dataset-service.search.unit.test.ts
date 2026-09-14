@@ -293,17 +293,7 @@ describe("dataset search (s3_jsonl)", () => {
     describe("when the scan counts what it has really read", () => {
       /** @scenario A scan that outgrows the limit while it runs is stopped part-way */
       it("refuses when the chunks it reads outweigh the size the dataset recorded", async () => {
-        // `sizeBytes` is a field on the dataset row, not a measurement taken at
-        // read time. Appends land in new chunks and the field does not always move
-        // with them, so a stale one passes the up-front fence and the scan then
-        // fetches and parses however much is really there, with nothing bounding
-        // it. The row backstop immediately above still stops the scan eventually,
-        // which is why this is the smaller of the two holes — but it stops it on
-        // the wrong dimension: 50,000 rows of stored model responses is exactly the
-        // read the byte limit exists to refuse.
-        //
-        // Two of the three chunks are enough to pass the limit, so a scan that
-        // counts what it reads stops on reaching the second.
+        // sizeBytes is stale; scan counts real bytes to stop on right dimension.
         const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
         const { readChunk } = mockChunks();
         const service = makeService({});
@@ -476,18 +466,8 @@ describe("dataset search (s3_jsonl)", () => {
 
       /** @scenario A dataset that records no size is still bounded by the bytes the scan reads */
       it("refuses on the bytes it reads when nothing recorded a size to judge", async () => {
-        // The case every other byte test here leaves open. `sizeBytes` is null,
-        // no offset carries a `byteSize`, and the rows are few — so the up-front
-        // fence sees nothing to refuse, the row limit is nowhere near, and the
-        // recorded total stays at zero however many chunks are read. A bound
-        // built only from what the offsets claim is not a bound at all here: it
-        // is absent on exactly the legacy and half-migrated rows the fallback
-        // path below exists to serve, which is where an unbounded scan is
-        // reachable in the first place.
-        //
-        // Rows this wide are the point — 50,000 rows of stored model responses
-        // is the read the byte limit exists to refuse, and it is a small row
-        // count.
+        // sizeBytes null, offsets lack byteSize, recorded total stuck at zero;
+        // bound by bytes actually scanned.
         const wideRow = { text: `escalation ${"x".repeat(30 * 1024 * 1024)}` };
         const { readChunk } = mockChunks({
           0: [wideRow],
@@ -714,15 +694,8 @@ describe("dataset search (postgres-backed)", () => {
       });
 
       it("refuses when the walk reads past the cap the count said it would not", async () => {
-        // The up-front check reads a count taken before the walk starts. Records
-        // keep arriving during it, so a dataset sitting just under the cap can be
-        // carried past it by a busy writer — the case a count taken beforehand
-        // cannot see. With nothing bounding the rows actually read, the walk goes
-        // as far as the writer takes it: the unbounded scan the cap exists to
-        // prevent. The chunk branch already holds this backstop; this one did not.
-        //
-        // Twice the cap's worth of batches: enough that a walk bounded by the cap
-        // stops well inside it, and a walk bounded by nothing runs off the end.
+        // Up-front count taken before walk; records arrive so count becomes stale.
+        // Chunk branch has backstop; this needs one too.
         const MAX_BATCHES_BEFORE_GIVING_UP =
           (DATASET_SEARCH_MAX_ROWS / DATASET_SEARCH_SCAN_BATCH) * 2;
         let batchesServed = 0;

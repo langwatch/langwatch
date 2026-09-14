@@ -1,19 +1,5 @@
-/**
- * What a Datasets test mounts instead of an application.
- *
- * Every screen and overlay in this package reads its project, its grants, its
- * replication targets, the address and the two notices off `DatasetHostApi`.
- * A test that renders one therefore needs a host, and building a real one means
- * building a browser application; this is the double, plus the Chakra provider
- * the components need to render at all.
- *
- * The notices are RECORDED rather than rendered, so a test asserts on what the
- * screen said rather than on a toast's DOM — which is the point of the port.
- *
- * `testing.tsx` sits at the package root by the same rule `index.ts` does: it is
- * a package entry, not private implementation, and the governed layout names
- * both as root exceptions. It is deliberately not a package export — nothing
- * outside this package's own suites should mount a fake host.
+/** Test host double for Datasets screens. Notices recorded (not rendered) for
+ * assertion on screen output, not toast DOM.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

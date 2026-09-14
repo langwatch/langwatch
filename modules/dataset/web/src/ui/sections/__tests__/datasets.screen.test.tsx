@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the Datasets list screen: listing with key facts,
- * search, navigation, the loading state and the empty state.
- *
- * Moved with the screen from
- * `platform/app/src/pages/[project]/__tests__/datasets-list.integration.test.tsx`
- * and `platform/app/src/pages/__tests__/datasets-list-loading.integration.test.tsx`.
- * What changed is which modules are mocked, not what is asserted — with one
- * exception, recorded here because it is a real behaviour change: the platform
- * fixtures carried `_count.datasetRecords`, a shape `dataset.getAll` does not
- * actually return. The rows below carry `recordCount`, which is what the
- * procedure hands the screen, and `datasetDisplayRecordCount` now reads it.
- *
- * Spec: specs/datasets/datasets-list-page.feature.
+ * Datasets list screen (listing, search, navigation, states). Moved from
+ * platform; fixtures use recordCount.
  */
 
 import type { DatasetSummary } from "@langwatch/dataset-contract";
