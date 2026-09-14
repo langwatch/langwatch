@@ -9,11 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
+import { DashboardAutoRefreshMenu } from "../DashboardAutoRefreshMenu.tsx";
 import {
   DashboardRefreshedAtContext,
   useDashboardAutoRefresh,
-} from "~/components/analytics/useDashboardAutoRefresh";
+} from "../useDashboardAutoRefresh.ts";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
