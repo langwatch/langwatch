@@ -560,15 +560,8 @@ describe("IngestionSourceService", () => {
 
   describe("given a destination on a team this admin is not a member of", () => {
     describe("when the drawer asks which destinations are still live", () => {
-      /**
-       * The drawer says an unresolvable destination is archived, and the spec
-       * promises the reverse case is never mislabelled: a project the admin
-       * simply cannot see is not gone. That promise rests entirely on this
-       * query scoping liveness to the ORGANIZATION rather than to the
-       * reader's team memberships — narrow it to the reader and every
-       * cross-team destination starts reporting as archived, sending admins
-       * to restore projects that were never archived.
-       */
+      // Liveness scoped to organization, not reader's team (avoids false
+      // 'archived' for cross-team destinations).
       it("scopes liveness to the organization, not to what this admin can see", async () => {
         const { service, projects } = harness();
         projects.listActiveByScopes = vi.fn(async () => ({

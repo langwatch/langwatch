@@ -1,15 +1,5 @@
-/**
- * Unit tests for the post-OTTL canonical cost extractor.
- *
- * After the aigateway runs OTTL set/where statements over the OTLP
- * payload, the receiver reads ONLY `langwatch.*` attributes via this
- * extractor. The resource→record merge invariant must hold (resource
- * attrs flow through to per-record events) so admin-set
- * OTEL_RESOURCE_ATTRIBUTES (team.id, user.email overrides) reach the
- * ledger row.
- *
- * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
- */
+// Unit tests for post-OTTL canonical cost extractor.
+// Resource→record merge must preserve admin OTEL_RESOURCE_ATTRIBUTES in ledger.
 
 import { describe, expect, it } from "vitest";
 import {

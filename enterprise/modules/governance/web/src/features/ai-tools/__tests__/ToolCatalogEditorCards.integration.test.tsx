@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Covers specs/ai-governance/personal-portal/admin-catalog-editor.feature,
- * "the catalog renders cards with only the fields a tile has": the tile
- * editor lays each section out as a card grid, and a card shows what the
- * entry stores — name, icon, type, scope, the CLI path policy or the link —
- * and nothing invented. The real editor renders here; only the tRPC
- * boundary is mocked.
+ * Tile cards display stored fields only (name, icon, type, scope, CLI path/link).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

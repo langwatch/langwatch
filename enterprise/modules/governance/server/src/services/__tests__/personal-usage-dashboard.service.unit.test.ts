@@ -1,12 +1,5 @@
-/**
- * Which tenants one member's own usage is read from, and what they are told
- * before they have one.
- *
- * The three reads themselves belong to the analytics store; what is pinned
- * here is the resolution around them — the personal workspace, the hidden
- * governance project an ingestion source's rows land in, and the empty answer
- * a member gets on the day they sign up.
- */
+// Personal usage dashboard: resolves which tenants a member sees (personal
+// workspace, governance project), returns empty on signup.
 import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,

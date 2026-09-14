@@ -1,15 +1,5 @@
-/**
- * The address, as the governance screens read and write it.
- *
- * They arrived using `~/utils/compat/next-router`'s `useRouter` (path
- * parameters and the query string merged into one `query` bag) and, in one
- * place, `react-router`'s `useSearchParams`. Both are router imports a
- * feature-web package may not make, so both are re-bound to the host's route
- * capability with the shapes the call sites already expect.
- *
- * `push` and `replace` take the same strings the pages pass today: an absolute
- * path navigates, and a bare `"?a=b"` rewrites the query of the current page.
- */
+// Governance router: re-binds next-router and react-router to host capability.
+// push/replace expect absolute paths or query rewrites.
 
 import { useCallback, useMemo } from "react";
 import { useGovernanceHost } from "../model/governance-host.ts";

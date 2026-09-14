@@ -90,15 +90,8 @@ export class IngestionKeyService {
     });
   }
 
-  /**
-   * Issues a personal-workspace key WITHOUT touching the keys other machines
-   * hold for the same tool: the create-only shape, held to
-   * `PERSONAL_INGEST_KEYS_PER_TOOL_CAP` live keys per (workspace, sourceType,
-   * template). Past the cap the least recently used key is revoked.
-   *
-   * This is the CLI device-session mint: every device that signs in gets its
-   * own key, and no device's mint can break another device's telemetry.
-   */
+  // Issues personal-workspace key per device (no impact on others); enforces
+  // per-tool cap and revokes LRU key on overflow.
   async issueForPersonalProject(input: {
     userId: string;
     organizationId: string;
@@ -140,16 +133,8 @@ export class IngestionKeyService {
     return issued;
   }
 
-  /**
-   * The cap behind {@link issueForPersonalProject}: revoke live keys for the
-   * same (project, sourceType, template) beyond the cap, least recently used
-   * first. A key never used ranks by its creation time.
-   *
-   * Best-effort by design, and it runs after the new key exists: two devices
-   * minting at once can pick the same key to retire, and the loser is not a
-   * reason to fail a mint whose token is already in the caller's hands. The
-   * bound is recounted on every mint, so the next one trims what a race left.
-   */
+  // Revokes past-cap keys (LRU first). Best-effort post-mint: races don't fail
+  // token delivery; next mint recounts and trims.
   private async revokePastCap(input: {
     callerUserId: string;
     organizationId: string;

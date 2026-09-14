@@ -1,30 +1,5 @@
-/**
- * Governance MCP toolset — Ask B-MCP per umbrella spec
- * (specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature).
- *
- * Mirrors the Hono /api/governance/* resource×verb shape (sergey 0bb951160 +
- * 5275e7e11 + 8fffad4ad) but dispatches IN-PROCESS through the same shared
- * service-layer functions, passing `surface: 'mcp'` per the GovernanceCallSurface
- * contract (sergey fc6d54100). No HTTP round-trip, no auth-token mismatch with
- * the human-caller PAT path. Service-layer-shared invariant from umbrella spec
- * @service-layer is satisfied: tRPC + Hono + CLI + MCP all funnel through the
- * same IngestionTemplateService.
- *
- * RBAC enforcement at the tool layer (per @governance-mcp @rbac): each tool
- * checks the caller's organization permissions BEFORE the service call and
- * returns FORBIDDEN otherwise. Mirrors `probeOrganizationPermission` from
- * src/server/api/rbac.ts. Services trust the surface for audit attribution
- * but DO NOT gate access — gating is the entrypoint's job.
- *
- * Caller identity: governance write tools require an OAuth-authenticated MCP
- * session (the userId is captured at /api/mcp/authorize and threaded through
- * to the SessionState here). Project-apiKey-only sessions get read tools but
- * are rejected on writes with a clear error message pointing them at the
- * OAuth flow.
- *
- * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
- * Docs: docs/ai-governance/mcp.mdx
- */
+// MCP governance toolset: mirrors Hono API shape, dispatches in-process through
+// shared services. RBAC at tool layer; OAuth for writes, project-apiKey for reads.
 
 import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";

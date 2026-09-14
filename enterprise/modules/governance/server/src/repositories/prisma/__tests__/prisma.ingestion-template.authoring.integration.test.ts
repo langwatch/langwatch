@@ -1,20 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Integration coverage for IngestionTemplateService admin authoring
- * methods (Ask A — admin OTTL authoring on this PR per rchaves's
- * no-v2-defer directive). Pins the two-tier trust contract:
- *
- *   - Platform-published rows (organizationId IS NULL) reject mutate
- *     calls with PlatformTemplateImmutableError — admins must clone.
- *   - Org-authored rows (organizationId = caller's org) accept
- *     create / updateOttlRules / archive.
- *   - cloneFromPlatform copies the canonical OTTL into a new org row
- *     so the admin can edit without touching the platform default.
- *   - Audit log rows land for every mutation.
- *
- * Spec: specs/ai-gateway/governance/template-ottl-authoring.feature
- *       specs/ai-gateway/governance/template-ottl-principal-guard.feature
+ * Ingestion template authoring: platform rows immutable, org rows mutable,
+ * cloneFromPlatform creates editable copies, audit log all mutations.
  */
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";

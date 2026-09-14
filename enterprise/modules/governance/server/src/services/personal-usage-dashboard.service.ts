@@ -1,17 +1,5 @@
-/**
- * One member's own usage, as the /me dashboard reads it.
- *
- * The rollup itself is three reads the analytics store answers; what this
- * owns is which tenants they are asked about. A member's traffic lands in two
- * places — their personal project, and (for ingestion sources such as the
- * Claude Code OTLP exporter) the organization's hidden governance project,
- * under a PRINCIPAL-scope budget keyed on the user id. Resolving both is what
- * makes the screen's totals the member's whole spend rather than the half of
- * it that arrived through the gateway.
- *
- * A member with no personal workspace yet is answered with zeros rather than
- * a refusal: the page renders before their first request ever lands.
- */
+// Personal usage dashboard: resolves two tenants (personal project, org
+// governance with PRINCIPAL-scope); returns zeros for new members.
 import type {
   GovernanceApi,
   PersonalUsageBreakdown,

@@ -1,31 +1,5 @@
-/**
- * The governance procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `trace-api.ts` says
- * of its own map: the procedures live in `@langwatch/enterprise-governance-server`,
- * which a web package may not import even for a type, and the router type does
- * not exist until a process instantiates it. Emitting this file from the mounted
- * router is the fix; writing it by hand is the interim, and it is honest only
- * because the payload types below are the contract's — the same ones the
- * procedure parses and returns.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `aiTools`, `ingestionSources` and the
- * rest are mount points on the root router, and tRPC hashes that path into the
- * React Query cache key; spell one differently and these hooks quietly stop
- * sharing a cache with the `api.aiTools.*` call sites that have not moved.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/api/web`, and the
- * import below is the only one in the package. It buys a content-faithful move:
- * every `api.x.y.useQuery(...)` call site in the eleven screens is the line it
- * was in `platform/app`. Replacing it means a port per procedure and a rewrite
- * of eight thousand lines, which is a different change from a move. Recorded
- * here so the finding it raises is a decision rather than a surprise.
- *
- * ADD A PROCEDURE when a hook in this package needs one. Do not add one
- * speculatively: every entry is a promise that the router still mounts it under
- * that name, and nothing checks that promise until the generator exists.
- */
+// Hand-written governance procedures (meant to be generated).
+// Segment names load-bearing (mount points, cache keys); only ADR-004 exception.
 
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
@@ -57,33 +31,11 @@ import type {
   SpendSortField,
 } from "@langwatch/enterprise-governance-contract";
 
-/**
- * An acknowledgement, for the writes whose only answer is that they happened.
- *
- * `departments.archive`, `aiTools.reorder` and `sessionPolicy.setMaxDuration`
- * return `{ ok: true }` after awaiting a void service call;
- * `ingestionTemplates.archive` returns `{ ok: true as const }` and so types the
- * field as the literal. One name covers all four because `.ok` is the only
- * thing anything reads, and the literal is assignable to the boolean.
- */
+// Acknowledgement for writes that return void; `.ok` is the only field read.
 export type GovernanceAcknowledgement = { ok: boolean };
 
-/**
- * An IngestionSource as the wire carries it, which is not the row the server
- * holds.
- *
- * `toIngestionSourceDto` drops `ingestSecretHash`, `errorCount` and the raw
- * `pollerCursor`, strips every underscore-prefixed slot and the sealed
- * `credentials` envelope out of `parserConfig`, and adds two fields the column
- * set has no equivalent for: `hasPollerCursor`, the predicate the edit form
- * asks before offering a backfill start, and `traceProjectArchived`, which is
- * true when the destination this source points at is no longer live in the
- * organization.
- *
- * DELIBERATELY NOT NAMED `GovernanceIngestionSource`. The contract already
- * exports that name for the server-side row, and a consumer holding both would
- * have two different shapes under one word.
- */
+// Wire DTO: adds hasPollerCursor and traceProjectArchived.
+// Named View not Source to avoid confusion with server row.
 export type GovernanceIngestionSourceView = {
   id: string;
   organizationId: string;
@@ -114,31 +66,14 @@ export type GovernanceIngestionSourceCreated = {
   ingestSecret: string;
 };
 
-/**
- * The canonical OTTL starter set for a source type, plus whether the editor is
- * offered for it at all.
- *
- * `enabledSourceTypes` is typed `string[]` rather than the contract's
- * `OttlEnabledSourceType[]`. The wire value is a spread of a `readonly` tuple,
- * so the narrow type is true, but a union-typed array refuses
- * `.includes(someString)` — which is the one thing a caller holding a source
- * type wants to do with it.
- */
+// OTTL starter: enabledSourceTypes typed string[] (unions break .includes() checks).
 export type GovernanceOttlStarter = {
   enabled: boolean;
   statements: string[];
   enabledSourceTypes: string[];
 };
 
-/**
- * Where an actor's own workspace lives, for the admin drill-in link on the
- * bird's-eye user page.
- *
- * Declared here rather than imported because it belongs to
- * `@langwatch/enterprise-governance-server`, which a web package may not name.
- * `displayName` is never blank: the resolver falls back through name, email and
- * id so the admin reading the link always gets a person.
- */
+// Actor's workspace link: displayName always filled (falls back through name, email, id).
 export type GovernanceActorWorkspace = {
   userId: string;
   displayName: string;
@@ -229,55 +164,9 @@ export type GovernanceUsageStats = {
   usageUnit: "traces" | "events";
 };
 
-/**
- * The governance procedures this package calls, nested exactly as the process's
- * root router mounts them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED. The procedures live across four
- * server packages a web package may not import — `@langwatch/enterprise-
- * governance-server` for eight of these ten families, the same package for
- * `routingPolicy` despite the gateway composition mounting it, and
- * `@langwatch/entitlement-server` for `limits`. ADR-101 forbids the dependency,
- * and `oxlint-plugin.mjs` rejects the `@trpc/server` import such a type would
- * need without exempting `import type`. Even with the lint relaxed there is
- * nothing to import: every `*TrpcApi.create` is generic over the process's
- * context and root, so the router type does not exist until `apps/api`
- * instantiates it. Emitting this file from the mounted router is the fix;
- * writing it by hand is the interim, and it is honest only to the extent that
- * the payload types below are the contract's — the same ones the procedures
- * parse and return.
- *
- * The segment names are load-bearing. Each leading segment is a mount point on
- * the root router, and tRPC hashes that path into the React Query cache key;
- * spell one differently and these hooks quietly stop sharing a cache with the
- * `api.activityMonitor.*` call sites that have not moved yet. `governance` in
- * particular is a merge of the application's own router with the enterprise
- * one, so the two procedures named here sit beside procedures this map does not
- * describe.
- *
- * INPUTS ARE `z.input`, not the parsed shape. A field carrying `.default()` or
- * `.optional()` in the router's schema is optional here, which is why
- * `windowDays`, every pagination knob, and both quarantine thresholds are
- * written with a `?` even though the resolver always sees a value.
- *
- * DATES ARE STRINGS. Nothing transforms the wire, so a `Date` the server
- * returns arrives as an ISO 8601 string; parse it at the use site. The many
- * `*Iso` fields were always strings, named for what they hold.
- *
- * ADD A PROCEDURE when a hook in this package needs it. Do not add one
- * speculatively: every entry is a promise that the router still mounts it under
- * that name, and nothing checks that promise until the generator exists.
- */
-/**
- * The organization graph, as the governance section reads it.
- *
- * `organization.getAll` hands back fully loaded rows with dozens of columns;
- * this names the seven fields the section uses — the organization it is scoped
- * to, the teams a page lists, and the projects a trace destination is picked
- * from. It is a view of the wire, not the whole of it, and it is deliberately
- * the same procedure and the same input the application shell already asks
- * with, so the two share one cache entry and one request.
- */
+// Procedures: hand-written (meant to be generated from mounted router).
+// Segment names load-bearing (mount points, cache keys); inputs are z.input, dates are ISO strings.
+// Organization graph view: org, teams, projects (shares cache with app shell).
 export type GovernanceOrganizationGraph = {
   id: string;
   name: string;
@@ -726,28 +615,10 @@ export type GovernanceApiMap = {
   };
 };
 
-/**
- * Governance's typed tRPC hooks. Same machinery, same transport and same React
- * Query cache as the application's `api` proxy — see `createModuleApi` for why
- * separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: hooks here call it, and other
- * packages call the hooks. It is exported from `src/index.ts` only so the
- * process shell can mount `governanceApi.Provider`.
- */
+// Governance tRPC hooks (shares cache with app proxy via createModuleApi).
 export const governanceApi = createModuleApi<GovernanceApiMap>();
 
-/**
- * Every procedure's output, addressed the way the screens already address it.
- *
- * The application's `~/utils/api` exported `RouterOutputs` off the real
- * `AppRouter`, and the screens wrote `RouterOutputs["ingestionSources"]["list"][number]`.
- * Deriving the same shape from the map above keeps those type aliases exactly
- * as they were written, and keeps them honest: an output that changes here
- * changes at every alias, which is what a generated map will do too. It is
- * derived through the built router so the wire's own shape shows: dates are
- * ISO strings here, not `Date`.
- */
+// RouterOutputs: same shape as screens use, so type aliases stay unchanged.
 export type RouterOutputs = OutputsFromMap<GovernanceApiMap>;
 
 /**

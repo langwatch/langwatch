@@ -1,22 +1,5 @@
-/**
- * Worker-dispatch coverage for the PullerAdapter framework. Exercises
- * the full path:
- *   IngestionSource (mock Prisma) →
- *   adapter resolution (real registry) →
- *   adapter.runOnce (real adapter, stubbed fetch) →
- *   OCSF row composition (real mapToOcsfRow) →
- *   governance_ocsf_events insert (mock App-provided repository)
- *
- * Mocks Prisma + the App's OCSF repository at the module boundary so the test
- * runs without Docker. The dispatch logic, adapter dispatch, OCSF
- * mapping, and cursor-persistence semantics are all covered with
- * real code; only the storage edges are stubbed.
- *
- * The full integration test against real PG + CH would replace the
- * Prisma + CH mocks with testContainers — same test shape otherwise.
- *
- * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
- */
+// Tests PullerAdapter worker dispatch: full path from source through adapter
+// resolution and OCSF composition (mocks storage edges only; real dispatch logic).
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";

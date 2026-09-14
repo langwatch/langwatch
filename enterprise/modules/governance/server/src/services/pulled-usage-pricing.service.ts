@@ -61,25 +61,8 @@ export type PulledUsagePrice = {
   costStatus: PulledUsageCostStatus;
 };
 
-/**
- * A provider's decimal string as the integer of minor units the event stores.
- *
- * The scaling is done in `bigint` — that is the whole reason the exact string
- * is carried this far — and only the final, already-rounded integer becomes a
- * `number`. It cannot stay a bigint past this point: the event data is JSON on
- * a durable log, the ledger row's amount is a `number`, and the computed path
- * goes through the shared rate reader, which returns one.
- *
- * What that narrowing can cost is bounded and checked rather than assumed.
- * float64 holds integers exactly to 2^53, which is about 9,007,199 units in a
- * single usage bucket. Beyond that the conversion would round — so it throws
- * instead. A figure too large to represent is a number we cannot publish, and
- * publishing a quietly rounded one is the failure this path exists to prevent.
- *
- * The name says nano-USD because the scale is nine decimal places, which is the
- * same scale whatever the currency; `usdToNanoUsd` is a decimal shift and holds
- * no rate.
- */
+// Scales decimal string to nano-minor units in bigint, converts to number
+// (prevents quiet rounding). Throws if exceeds 2^53 (float64 max safe integer).
 function providerCostToNanoMinor(amount: string): number {
   const exact = usdToNanoUsd(amount);
   if (exact > BigInt(Number.MAX_SAFE_INTEGER) || exact < -BigInt(Number.MAX_SAFE_INTEGER)) {

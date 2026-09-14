@@ -1,18 +1,5 @@
-/**
- * Unit coverage for the puller framework's NormalizedPullEvent → OCSF row
- * mapping. The full effect shape (Prisma + CH + process outbox) is exercised
- * by the integration tier; this file covers the pure mapping the worker calls
- * (eventId composition, raw_event preservation, time-coercion fallback, and
- * which actor field a provider's actor string lands in).
- *
- * The real `mapToOcsfRow` is imported, not re-implemented: an earlier version
- * of this file kept a hand-copied "semantic contract" beside the worker's
- * mapper, which passed happily while the mapper itself put opaque ids in the
- * email column.
- *
- * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
- * Spec: specs/governance/pulled-usage-cost-reporting.feature
- */
+// Tests NormalizedPullEvent→OCSF mapping (eventId, raw_event, time-coercion, actor field).
+// Real mapper imported to catch bugs (hand-copied contracts missed them).
 import { describe, expect, it } from "vitest";
 
 import {
@@ -132,17 +119,8 @@ describe("given a provider that names the actor by an address", () => {
 describe("given a provider that names the actor by an opaque id", () => {
   describe("when the row is mapped", () => {
     it("routes the id to the actor id field, not the email field", () => {
-      // What is pinned here is the placement rule, not a permanently empty
-      // column: the mapper places the actor string by what that string IS, and
-      // an opaque id is not an address. The SIEM export ships the email column
-      // to a customer's own tooling, which reads it as an address.
-      //
-      // The OpenAI cost report does send a `user_email` beside the `user-…`
-      // id — every one of the 2,720 captured rows carries both — but the
-      // adapter deliberately puts the id in `actor`, so an address is not what
-      // this mapping is handed. Whether the column should instead be filled
-      // from the payload's address is an open question about the adapter, and
-      // this case does not settle it either way.
+      // Actor placement rule: mapper routes strings by type (IDs to actor field,
+      // not email—SIEM export assumption).
       const row = mapEvent({ ...baseEvent, actor: "user-A1b2C3d4E5" });
 
       expect(row.actorEmail).toBe("");
@@ -206,18 +184,8 @@ describe("given the actor-field placement rule on its own", () => {
   });
 });
 
-/**
- * What the SIEM export says about money.
- *
- * The extension's amount key is read here rather than the whole extension,
- * because the two rules below are about the SHAPE of that pair: an amount and
- * the currency it is denominated in, side by side, neither of them buried in
- * the adapter's own bag of hint fields.
- *
- * The names asserted (`cost_amount`, `cost_currency`) are this binding's
- * choice; the settlement fixes the rule and not the spelling. Change them
- * together with the mapper if the implementer prefers others.
- */
+// SIEM export money shape: amount and currency side by side (update names with
+// mapper if needed).
 function moneyOf(rawOcsfJson: string): Record<string, unknown> {
   return (
     JSON.parse(rawOcsfJson) as {
