@@ -139,7 +139,7 @@ describe("the say tool", () => {
     it("answers a line already said in the turn with the pushback, whitespace aside, and draws nothing", async () => {
       const tool = withCalls([said(BLOCK)]);
       await expect(tool.execute("call_9", { text: BLOCK })).rejects.toThrow(REPEATED_LINE_PUSHBACK);
-      await expect(tool.execute("call_10", { text: `  ${BLOCK.replace("\n", "\n\n")}\n` })).rejects.toThrow(
+      await expect(tool.execute("call_10", { text: `  ${BLOCK.replaceAll("\n", "\n\n")}\n` })).rejects.toThrow(
         REPEATED_LINE_PUSHBACK,
       );
       expect(REPEATED_LINE_PUSHBACK).toBe("Already said; do not repeat it. Go on with the step.");
