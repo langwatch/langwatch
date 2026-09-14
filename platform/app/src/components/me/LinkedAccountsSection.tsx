@@ -35,20 +35,6 @@ import {
   useSignInMethodRemoval,
 } from "./useSignInMethodRemoval";
 
-/**
- * A development stack rarely has social credentials mounted, so it offers none
- * of them — which would hide the whole surface from exactly the people
- * iterating on it. In dev the section offers the cloud's full social set,
- * wired to the real linking call; everywhere else it offers what the
- * deployment actually mounted. The same gate the auth screens' method picker
- * uses, for the same reason.
- */
-const DEV_SHOWS_ALL_SOCIAL = import.meta.env.DEV;
-
-/** The cloud's social set. Ids are the real provider ids, so a click dials the
- *  real provider and the marks and labels are the real ones. */
-const SOCIAL_PROVIDER_IDS: readonly string[] = ["google", "github", "azure-ad"];
-
 const asMethod = (id: string): SignInMethod => ({
   id,
   kind: "federated",
@@ -151,29 +137,29 @@ function LinkedAccountRow({
 }
 
 /**
- * The providers this deployment can still link: what it mounted, plus the
- * cloud's social set in development, less whatever is already connected — a
- * row for a provider is the answer to "can I use this one".
+ * The providers this deployment can still link: exactly what it offers on the
+ * sign-in rail, less whatever is already connected — a row for a provider is
+ * the answer to "can I use this one". The list is the method policy's own
+ * answer, carried over `publicEnv.SIGNIN_FEDERATED_PROVIDERS`, so this offer
+ * and the sign-in screen can never disagree about what exists.
  *
  * An organization that enforces single sign-on can link nothing, which is the
  * deployment's rule rather than this screen's.
  */
 function connectableProviders({
-  configuredProvider,
+  federatedProviders,
   linkedMethodIds,
   organizationEnforcesSso,
 }: {
-  configuredProvider: string;
+  federatedProviders: readonly string[];
   linkedMethodIds: ReadonlySet<string>;
   organizationEnforcesSso: boolean;
 }): string[] {
   if (organizationEnforcesSso) return [];
 
-  const offered = [
-    ...(configuredProvider === "email" ? [] : [configuredProvider]),
-    ...(DEV_SHOWS_ALL_SOCIAL ? SOCIAL_PROVIDER_IDS : []),
-  ];
-  return Array.from(new Set(offered)).filter((id) => !linkedMethodIds.has(id));
+  return Array.from(new Set(federatedProviders)).filter(
+    (id) => !linkedMethodIds.has(id),
+  );
 }
 
 /**
@@ -232,14 +218,14 @@ export function useConnectableProviders(): string[] {
   const { organization } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
 
-  const configuredProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  if (!configuredProvider) return [];
+  const federatedProviders = publicEnv.data?.SIGNIN_FEDERATED_PROVIDERS;
+  if (!federatedProviders) return [];
 
   const linked = (accounts ?? []).filter(
     (account) => !isCredentialAccount(account),
   );
   return connectableProviders({
-    configuredProvider,
+    federatedProviders,
     linkedMethodIds: new Set(linked.map(linkedAccountMethodId)),
     organizationEnforcesSso: !!organization?.ssoProvider,
   });

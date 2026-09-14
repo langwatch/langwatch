@@ -2,7 +2,11 @@ import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
-import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
+import {
+  deploymentOffersPasskeys,
+  deploymentOffersTwoStepVerification,
+  resolveSignInMethodPolicy,
+} from "~/server/app-layer/identity/signin-method-policy";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
 import { publicProcedure } from "../trpc";
@@ -37,6 +41,20 @@ export const publicEnvRouter = publicProcedure
       // offering a setup where the plugin was never registered is an offer we
       // cannot honour. Same read the plugin registration makes.
       MFA_ENROLLMENT_OPEN: deploymentOffersTwoStepVerification(),
+      // Whether this deployment mounted the passkey plugin at boot. Same
+      // contract as MFA_ENROLLMENT_OPEN: a browser only acts on "is there an
+      // endpoint behind the button", and this is the same read the plugin
+      // registration and the method policy make.
+      PASSKEYS_ENABLED: deploymentOffersPasskeys(),
+      // The federated providers this deployment actually offers — mounted AND
+      // licensed — as the sign-in method policy's own answer, so the
+      // linked-accounts offer and the sign-in rail can never disagree. Ids
+      // only: the policy's method objects carry nothing else a browser needs.
+      SIGNIN_FEDERATED_PROVIDERS: (
+        await resolveSignInMethodPolicy()
+      ).defaultMethods
+        .filter((method) => method.kind === "federated")
+        .map((method) => method.id),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 

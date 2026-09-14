@@ -1,3 +1,4 @@
+import { configuredSocialProviderIds } from "@ee/sso/providers";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
@@ -54,9 +55,7 @@ export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
 /**
  * Whether this deployment offers two-step verification at all (D06). The
  * two-factor plugin's server half is registered off this value, so a screen
- * that offers a setup can never call an endpoint nobody mounted. Passkeys
- * used to have a matching read; they no longer do, because they are no longer
- * a setting — the plugin is mounted everywhere.
+ * that offers a setup can never call an endpoint nobody mounted.
  *
  * It is NOT part of any method set. Two-step verification is a second factor
  * answered after a first one, never a way in on its own, so nothing about it
@@ -64,6 +63,26 @@ export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
  */
 export function deploymentOffersTwoStepVerification(): boolean {
   return env.MFA_ENROLLMENT_OPEN === "on";
+}
+
+/**
+ * Whether this deployment offers passkeys at all (D07) — read here and by the
+ * plugin list, so the method set and the endpoints behind it can never
+ * disagree. A deployment where the button exists and the ceremony route does
+ * not is the state the single switch exists to make unreachable.
+ *
+ * Default-on, which is the opposite way round from two-step verification and
+ * deliberately so: passkeys are the shortest and strongest way in, and the
+ * setting exists for the operator who must refuse them (a fleet with no
+ * authenticators, a policy that only recognises the corporate identity
+ * provider), not as a staged rollout. The schema defaults the value to `on`,
+ * so anything that is not an explicit `off` offers them.
+ *
+ * Turning it off offers nothing and deletes nothing: the `Passkey` rows
+ * survive, nobody is signed out, and turning it back on finds them all.
+ */
+export function deploymentOffersPasskeys(): boolean {
+  return env.PASSKEYS_ENABLED !== "off";
 }
 
 /**
@@ -88,6 +107,56 @@ export async function resolveFederatedMethod(): Promise<SignInMethod | null> {
     : { id: provider, kind: "federated", connectionId: null };
 }
 
+const federatedMethod = (id: string): SignInMethod => ({
+  id,
+  kind: "federated",
+  connectionId: null,
+});
+
+/**
+ * The social identity providers this deployment offers, as methods.
+ *
+ * Which ones EXIST is `configuredSocialProviderIds`, read off what better-auth
+ * was actually handed — so the door cannot offer Google to a deployment that
+ * mounted no Google. Whether they may be offered AT ALL is ADR-027's gate,
+ * applied here.
+ *
+ * ── Why the gate applies to social providers too ──────────────────────────
+ *
+ * better-auth's `socialProviders` map is built and passed at construction, so
+ * the PLUGIN side is mounted without consulting the license; the gate is
+ * enforced a layer up, by the request hook that refuses the SSO paths when it
+ * denies (ADR-027 Decision 3). Read narrowly, "what better-auth mounts" would
+ * therefore say these methods are ungated — and offering them here would put
+ * a live-looking Google button on an unlicensed install whose very next hop
+ * the hook refuses.
+ *
+ * ADR-027 Decision 2 settles it the other way, by name: "every non-email
+ * provider is gated — `google`, `github`, `gitlab`, `azure-ad`, `okta`,
+ * `auth0` … login federation is the paid feature". A social provider is not a
+ * lesser class of federation that slips past the gate, and the conservative
+ * reading is also the honest screen: a method nobody may complete is not
+ * offered.
+ */
+async function resolveSocialMethods(): Promise<readonly SignInMethod[]> {
+  if (!(await platformSSOAllowed())) return [];
+  return configuredSocialProviderIds(env).map(federatedMethod);
+}
+
+/** The first occurrence of each method id, in the order given. Two sources
+ *  can name the same provider — `NEXTAUTH_PROVIDER` and the mounted social
+ *  map most obviously — and the rail must draw one button, not two. */
+function dedupeById(methods: readonly SignInMethod[]): readonly SignInMethod[] {
+  const seen = new Set<string>();
+  const kept: SignInMethod[] = [];
+  for (const method of methods) {
+    if (seen.has(method.id)) continue;
+    seen.add(method.id);
+    kept.push(method);
+  }
+  return kept;
+}
+
 /**
  * The policy the router routes on, and the hook enforces from. One resolution
  * per request; both gate reads inside it hit the same per-process memo.
@@ -95,13 +164,24 @@ export async function resolveFederatedMethod(): Promise<SignInMethod | null> {
 export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   const federationLicensed = await platformSSOAllowed();
   const federated = await resolveFederatedMethod();
+  const social = await resolveSocialMethods();
   // Offered alongside whatever else answers, never instead of it: somebody
   // without a passkey on THIS device must still find the way they used last
-  // time. It is appended, so the order the screen renders does not move.
-  const passkeys = [PASSKEY_METHOD];
+  // time. It is appended, so the order the screen renders does not move — and
+  // omitted entirely where the operator turned passkeys off, because the
+  // ceremony routes are not mounted there either.
+  const passkeys = deploymentOffersPasskeys() ? [PASSKEY_METHOD] : [];
+  // `NEXTAUTH_PROVIDER`'s method leads, because on every deployment that has
+  // one it is THE way in and moving it would move the button people reach for.
+  // The social set follows in rail order, less whatever it already named. With
+  // neither, the local set is what is left — which is email mode, unchanged.
+  const federatedMethods = dedupeById([
+    ...(federated ? [federated] : []),
+    ...social,
+  ]);
   return {
     defaultMethods: [
-      ...(federated ? [federated] : LOCAL_METHOD_SET),
+      ...(federatedMethods.length > 0 ? federatedMethods : LOCAL_METHOD_SET),
       ...passkeys,
     ],
     // NOT the passkeys. Break-glass is the door somebody reaches for when the

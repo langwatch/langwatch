@@ -51,9 +51,15 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   # session already records what was proven, so the refinement is a policy
   # reading a claim that exists.
   #
-  # There is no setting. The plugin is mounted on every deployment, because a
-  # deployment where the button exists and the endpoint does not is a state
-  # nobody could be in on purpose.
+  # Passkeys are on unless the operator turns them off, and the one setting
+  # governs the whole surface at once: with it off neither the button nor the
+  # endpoint behind it exists. A deployment where the button exists and the
+  # endpoint does not is the state nobody could be in on purpose, and it is
+  # the reason the setting is one switch rather than two.
+  #
+  # Turning it off is not a deletion. Registered passkeys are left where they
+  # are and nobody is signed out; the method stops being OFFERED, and turning
+  # it back on finds everything still there.
 
   Background:
     Given an organization "acme" with a member "sam"
@@ -385,10 +391,18 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   @unit
   Scenario: A passkey is offered on every deployment, not on some of them
-    Given any installation of LangWatch
+    Given any installation of LangWatch that has not turned passkeys off
     When the method picker is rendered and the security settings are opened
     Then a passkey can be registered and accepted
     And the endpoint behind every passkey button is mounted
+    And whether two-step verification is open makes no difference to any of it
+
+  @unit
+  Scenario: An operator can turn passkeys off for the whole deployment
+    Given an installation whose operator has turned passkeys off
+    When the sign-in page is requested
+    Then no passkey is among the methods the deployment offers
+    And the endpoints behind the passkey ceremonies are not mounted
 
   # A passkey is bound to a relying party at the moment it is created, and the
   # browser offers it back only to that one - which is exactly what makes it

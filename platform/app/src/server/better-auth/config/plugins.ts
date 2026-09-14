@@ -3,6 +3,7 @@ import { buildGenericOAuthConfigs } from "@ee/sso/providers";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
+import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
 import type { PasskeySignUpRegistration } from "../passkey-signup";
 import { passkeySignUpRegistration } from "../passkey-signup";
 import { passkeyRelyingParty } from "../passkeyRelyingParty";
@@ -58,6 +59,12 @@ export function plugins({
 }: PluginsDeps) {
   const genericOAuthConfigs = buildGenericOAuthConfigs(env);
   const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
+  // Asked of the method policy rather than restated here, and that is the
+  // point: the policy decides whether a passkey is OFFERED and this decides
+  // whether the ceremony behind it is MOUNTED. One function answers both, so a
+  // deployment where one says yes and the other no is unreachable rather than
+  // merely unintended. Unlike two-step verification, it is default-on.
+  const passkeysEnabled = deploymentOffersPasskeys();
 
   return [
     ...(genericOAuthConfigs.length > 0
@@ -94,30 +101,32 @@ export function plugins({
           }),
         ]
       : []),
-    ...[
-      passkey({
-        rpName: "LangWatch",
-        // The relying party is the address a BROWSER reaches this deployment
-        // on, which behind a reverse proxy is not `baseURL`. The plugin's own
-        // default derives it from `baseURL` — our internal address — and a
-        // preview host then builds every ceremony for the relying party
-        // "localhost" while the browser signs for the public one, so every
-        // passkey is refused as unrecognized. See `passkeyRelyingParty.ts`.
-        // Null when the deployment names neither address, and the plugin keeps
-        // its own default there rather than the boot failing.
-        ...(passkeyRelyingParty({
-          baseHost: env.BASE_HOST,
-          nextAuthUrl: env.NEXTAUTH_URL,
-        }) ?? {}),
+    ...(passkeysEnabled
+      ? [
+          passkey({
+            rpName: "LangWatch",
+            // The relying party is the address a BROWSER reaches this deployment
+            // on, which behind a reverse proxy is not `baseURL`. The plugin's own
+            // default derives it from `baseURL` — our internal address — and a
+            // preview host then builds every ceremony for the relying party
+            // "localhost" while the browser signs for the public one, so every
+            // passkey is refused as unrecognized. See `passkeyRelyingParty.ts`.
+            // Null when the deployment names neither address, and the plugin keeps
+            // its own default there rather than the boot failing.
+            ...(passkeyRelyingParty({
+              baseHost: env.BASE_HOST,
+              nextAuthUrl: env.NEXTAUTH_URL,
+            }) ?? {}),
 
-        // Signing UP with a passkey, not only adding one to an account that
-        // already exists. This is what drops the session requirement from
-        // the two registration endpoints — see `passkey-signup.ts` for what
-        // stands in its place, and why an address that already has an
-        // account must be refused there.
-        registration: passkeySignUpRegistration({ signUp: passkeySignUp }),
-      }),
-    ],
+            // Signing UP with a passkey, not only adding one to an account that
+            // already exists. This is what drops the session requirement from
+            // the two registration endpoints — see `passkey-signup.ts` for what
+            // stands in its place, and why an address that already has an
+            // account must be refused there.
+            registration: passkeySignUpRegistration({ signUp: passkeySignUp }),
+          }),
+        ]
+      : []),
     // The sign-up confirmation link, spent where a session can be opened for
     // it. See `sign-up-confirmation.ts` for why this is not a tRPC procedure.
     signUpConfirmation({ confirmSignUpAddress }),

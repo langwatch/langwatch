@@ -32,6 +32,7 @@ import {
   usePasskeyCeremony,
 } from "~/features/auth/logic/passkeyCeremony";
 import { showErrorToast } from "~/features/errors";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";
 import { passkeyLabel as labelFor } from "./passkeyAuthenticators";
 import { useLastWayInWarning } from "./useLastWayInWarning";
@@ -356,6 +357,7 @@ function LastWayInNotice() {
  * somebody already uses — and offers to make one.
  */
 export function PasskeysSection() {
+  const publicEnv = usePublicEnv();
   const passkeys = authClient.useListPasskeys();
   const [isCreating, setIsCreating] = useState(false);
   // Which passkey a dialog is open for, or null. Held as the row rather than
@@ -369,6 +371,11 @@ export function PasskeysSection() {
   const abandoned = useRef<{ abandoned: boolean } | null>(null);
 
   const held = passkeys.data ?? [];
+
+  // A deployment that turned passkeys off has no ceremony endpoints mounted,
+  // so the whole section stands down — same contract as TwoFactorSection and
+  // MFA_ENROLLMENT_OPEN: never offer a button with no endpoint behind it.
+  if (publicEnv.data?.PASSKEYS_ENABLED !== true) return null;
 
   const create = () => {
     setIsCreating(true);

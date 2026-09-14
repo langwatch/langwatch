@@ -184,6 +184,28 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the configured provider is the offered method, exactly as before
     And a second method can be added without ending the first
 
+  # ── Which social providers the door offers ─────────────────────────────
+  #
+  # A social button is an offer to dial a provider. An offer the deployment
+  # cannot honour is worse than no offer at all: the person presses Google,
+  # and the platform answers that it has never heard of Google. So the set the
+  # door offers is derived from the set the platform MOUNTED, and from nothing
+  # else — not from a hardcoded cloud list, and not from whether this happens
+  # to be a development build.
+
+  @unit
+  Scenario: Every social provider this deployment mounted is offered by name
+    Given a self-hosted installation that mounted a social identity provider
+    When the sign-in page is requested
+    Then that provider is one of the offered methods, under its own name
+    And it is offered exactly once, however many ways it was named
+
+  @unit
+  Scenario: A social provider this deployment never mounted is never offered
+    Given credentials are present for a social provider this deployment does not mount
+    When the sign-in page is requested
+    Then that provider is not one of the offered methods
+
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 
   @unit
@@ -193,6 +215,17 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then no SSO method appears in any routing decision
     And the email and password method set is offered
     And a direct request to an SSO callback path is still refused
+
+  # ADR-027 Decision 2 scopes the gate to every non-email provider by name —
+  # google, github, gitlab, azure-ad, okta, auth0 — because login federation
+  # is the paid feature. A social provider is not a lesser class of federation
+  # that slips past it.
+  @unit
+  Scenario: A never-licensed installation offers no social provider either
+    Given a self-hosted installation whose license gate denies
+    And a social identity provider is mounted
+    When the sign-in page is requested
+    Then that provider is not one of the offered methods
 
   @unit
   Scenario: The license gate still freezes at startup

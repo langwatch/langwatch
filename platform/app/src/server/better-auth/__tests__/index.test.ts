@@ -117,11 +117,37 @@ describe("better-auth config", () => {
       const on = await pluginIdsUnder("on");
       expect(on).toContain("two-factor");
 
-      // Passkeys are not a flag any more. They are mounted either way, which
-      // is the whole point of removing the setting: a deployment cannot be
-      // in a state where the button exists and the endpoint does not.
+      // Passkeys have a switch of their own, and it is a different switch:
+      // neither state of the two-step flag may move them. This is the
+      // assertion that keeps the two settings independent rather than
+      // accidentally entangled through one plugin list.
       expect(off).toContain("passkey");
       expect(on).toContain("passkey");
+
+      vi.restoreAllMocks();
+      vi.resetModules();
+    });
+
+    /** @scenario "An operator can turn passkeys off for the whole deployment" */
+    it("registers the passkey plugin unless the deployment turned it off", async () => {
+      const pluginIdsUnder = async (passkeys: string): Promise<string[]> => {
+        vi.resetModules();
+        const { env } = await import("~/env.mjs");
+        vi.spyOn(env, "PASSKEYS_ENABLED", "get").mockReturnValue(
+          passkeys as never,
+        );
+        const { auth } = await import("../index");
+        return ((auth as any).options?.plugins ?? []).map(
+          (p: { id?: string }) => p?.id,
+        );
+      };
+
+      // Not registered means the ceremony routes are not mounted, which is
+      // what makes the switch govern the surface rather than only the screens
+      // — and what keeps a deployment out of the state where the button
+      // exists and the endpoint behind it does not.
+      expect(await pluginIdsUnder("off")).not.toContain("passkey");
+      expect(await pluginIdsUnder("on")).toContain("passkey");
 
       vi.restoreAllMocks();
       vi.resetModules();

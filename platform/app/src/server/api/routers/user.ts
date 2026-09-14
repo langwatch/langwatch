@@ -21,7 +21,10 @@ import {
   localSignUpDecision,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
-import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
+import {
+  deploymentOffersPasskeys,
+  deploymentOffersTwoStepVerification,
+} from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
@@ -482,7 +485,7 @@ export const userRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      const passkey = facts.passkeys === 0;
+      const passkey = deploymentOffersPasskeys() && facts.passkeys === 0;
       const twoStep = twoStepOffered && !facts.twoStepEnabled;
       if (!passkey && !twoStep) {
         return { offer: false, passkey: false, twoStep: false, signedInWith };

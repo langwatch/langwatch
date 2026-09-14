@@ -310,11 +310,21 @@ export function createEnvConfig() {
       // set one up signed in and their enrollment rows intact — it stops
       // being ASKED for, and nothing is deleted.
       MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
-      // D07: whether passkeys exist. Same reasoning — registering a passkey
-      // is reached signed out, on the sign-in screen. Off unmounts the
-      // ceremony routes and hides the option; passkeys already registered
-      // are left alone, so turning it on again finds them still there.
-      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
+      // D07: whether this deployment offers passkeys. Same reasoning as the
+      // flag above for why it is an env value — registering a passkey is
+      // reached signed out, on the sign-in screen — and the opposite default,
+      // because passkeys shipped and are now the shortest and strongest way
+      // in. The setting is for the operator who must refuse them, not a
+      // staged rollout.
+      //
+      // One switch governs the whole surface: `off` omits the method from
+      // every method set AND leaves the plugin unregistered, so its ceremony
+      // routes are not mounted. A deployment where the button exists and the
+      // endpoint does not is the state that arrangement makes unreachable.
+      //
+      // Off is not a deletion. Passkeys already registered are left alone and
+      // nobody is signed out, so turning it back on finds them still there.
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("on"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.

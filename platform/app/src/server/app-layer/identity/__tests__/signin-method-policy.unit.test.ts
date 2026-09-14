@@ -14,6 +14,16 @@ vi.mock("~/env.mjs", () => ({
     AUTH0_CLIENT_SECRET: "auth0-secret",
     AUTH0_ISSUER: "https://acme.us.auth0.com/",
     NEXTAUTH_URL: "https://acme.test",
+    // The schema's own default, restated so the mock is a deployment rather
+    // than an accident: passkeys are on unless somebody turns them off.
+    PASSKEYS_ENABLED: "on",
+    GOOGLE_CLIENT_ID: undefined as string | undefined,
+    GOOGLE_CLIENT_SECRET: undefined as string | undefined,
+    GITHUB_CLIENT_ID: undefined as string | undefined,
+    GITHUB_CLIENT_SECRET: undefined as string | undefined,
+    AZURE_AD_CLIENT_ID: undefined as string | undefined,
+    AZURE_AD_CLIENT_SECRET: undefined as string | undefined,
+    AZURE_AD_TENANT_ID: undefined as string | undefined,
   },
 }));
 
@@ -45,16 +55,42 @@ import {
 } from "../../../../../ee/licensing/validation";
 import {
   deploymentIsFederationCapable,
+  deploymentOffersPasskeys,
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,
   PASSWORD_METHOD,
   resolveSignInMethodPolicy,
 } from "../signin-method-policy";
 
-const envMock = (await import("~/env.mjs")).env as unknown as {
+const envMock = (await import("~/env.mjs")).env as unknown as Record<
+  string,
+  unknown
+> & {
   NEXTAUTH_PROVIDER: string;
   IS_SAAS: boolean;
 };
+
+/** Credentials for a social provider, present the way a deployment that
+ *  configured one has them. Whether better-auth MOUNTS it is a separate
+ *  question, and the one several scenarios below turn on. */
+function socialCredentials(provider: "google" | "github" | "azure-ad"): void {
+  if (provider === "google") {
+    envMock.GOOGLE_CLIENT_ID = "google-client";
+    envMock.GOOGLE_CLIENT_SECRET = "google-secret";
+    return;
+  }
+  if (provider === "github") {
+    envMock.GITHUB_CLIENT_ID = "github-client";
+    envMock.GITHUB_CLIENT_SECRET = "github-secret";
+    return;
+  }
+  envMock.AZURE_AD_CLIENT_ID = "azure-client";
+  envMock.AZURE_AD_CLIENT_SECRET = "azure-secret";
+  envMock.AZURE_AD_TENANT_ID = "azure-tenant";
+}
+
+const methodIds = (methods: readonly { id: string }[]): string[] =>
+  methods.map((method) => method.id);
 
 const genuineLicense = () => ({
   data: { expiresAt: "2099-01-01", organizationName: "Acme" },
@@ -77,6 +113,18 @@ describe("the instance sign-in method policy", () => {
     __resetSsoGateForTests();
     envMock.NEXTAUTH_PROVIDER = "auth0";
     envMock.IS_SAAS = false;
+    envMock.PASSKEYS_ENABLED = "on";
+    for (const key of [
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "GITHUB_CLIENT_ID",
+      "GITHUB_CLIENT_SECRET",
+      "AZURE_AD_CLIENT_ID",
+      "AZURE_AD_CLIENT_SECRET",
+      "AZURE_AD_TENANT_ID",
+    ]) {
+      envMock[key] = undefined;
+    }
   });
 
   describe("given a self-hosted installation configured with a single OAuth provider", () => {
@@ -188,6 +236,132 @@ describe("the instance sign-in method policy", () => {
       __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
       const afterRestart = await resolveSignInMethodPolicy();
       expect(afterRestart.federationLicensed).toBe(true);
+    });
+  });
+
+  describe("given a self-hosted installation that mounted a social identity provider", () => {
+    beforeEach(() => {
+      licensedStore(true);
+    });
+
+    /** @scenario "Every social provider this deployment mounted is offered by name" */
+    it("offers that provider under the id the sign-in call dials", async () => {
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(policy.defaultMethods).toEqual([
+        { id: "google", kind: "federated", connectionId: null },
+        PASSKEY_METHOD,
+      ]);
+    });
+
+    /**
+     * better-auth registers Microsoft under `microsoft`; everything outside it
+     * — the env value, the Account rows, the callback path Azure has
+     * registered, the label — calls the same provider `azure-ad`. Both names
+     * reach the policy, and the rail must draw one button.
+     *
+     * @scenario "Every social provider this deployment mounted is offered by name"
+     */
+    it("offers a provider named two ways exactly once", async () => {
+      envMock.NEXTAUTH_PROVIDER = "azure-ad";
+      socialCredentials("azure-ad");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["azure-ad", "passkey"]);
+      expect(methodIds(policy.defaultMethods)).not.toContain("microsoft");
+    });
+  });
+
+  describe("when credentials are present for a provider the deployment does not mount", () => {
+    beforeEach(() => {
+      licensedStore(true);
+    });
+
+    /** @scenario "A social provider this deployment never mounted is never offered" */
+    it("never offers a provider better-auth was not handed", async () => {
+      // Both sets of credentials are present; only one provider is mounted,
+      // because `buildSocialProviders` builds the one `NEXTAUTH_PROVIDER`
+      // names. Offering the other would draw a button whose sign-in call
+      // reaches a provider better-auth has never heard of.
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+      socialCredentials("github");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toContain("google");
+      expect(methodIds(policy.defaultMethods)).not.toContain("github");
+    });
+  });
+
+  describe("when a social provider is mounted but the license gate denies", () => {
+    beforeEach(() => {
+      licensedStore(false);
+    });
+
+    /** @scenario "A never-licensed installation offers no social provider either" */
+    it("offers the local method set and no social provider", async () => {
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(policy.federationLicensed).toBe(false);
+      expect(policy.defaultMethods).toEqual([PASSWORD_METHOD, PASSKEY_METHOD]);
+      expect(methodIds(policy.defaultMethods)).not.toContain("google");
+    });
+  });
+
+  describe("when the operator has turned passkeys off", () => {
+    beforeEach(() => {
+      licensedStore(true);
+      envMock.PASSKEYS_ENABLED = "off";
+    });
+
+    /** @scenario "An operator can turn passkeys off for the whole deployment" */
+    it("offers no passkey in any method set", async () => {
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(deploymentOffersPasskeys()).toBe(false);
+      expect(policy.defaultMethods).toEqual([
+        { id: "auth0", kind: "federated", connectionId: null },
+      ]);
+      expect(policy.localMethods).toEqual(LOCAL_METHOD_SET);
+    });
+
+    /** @scenario "An operator can turn passkeys off for the whole deployment" */
+    it("keeps the passkey out of the routing decision too", async () => {
+      envMock.NEXTAUTH_PROVIDER = "email";
+      const policy = await resolveSignInMethodPolicy();
+
+      const decision = routeSignIn({
+        identifier: null,
+        breakGlass: false,
+        policy,
+        domainConnection: null,
+        activeConnections: [],
+      });
+
+      expect(decision.methodSet).toEqual([PASSWORD_METHOD]);
+    });
+  });
+
+  describe("when the deployment has said nothing about passkeys", () => {
+    /** @scenario "A passkey is offered on every deployment, not on some of them" */
+    it("offers them, because the setting is for turning them off", async () => {
+      licensedStore(true);
+      // What the env schema resolves an unset value to. Absence is the
+      // ordinary state and it has to mean "offered".
+      envMock.PASSKEYS_ENABLED = "on";
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(deploymentOffersPasskeys()).toBe(true);
+      expect(policy.defaultMethods).toContainEqual(PASSKEY_METHOD);
     });
   });
 
