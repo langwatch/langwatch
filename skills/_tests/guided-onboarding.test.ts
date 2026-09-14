@@ -981,6 +981,12 @@ describe("the guided-onboarding skill", () => {
         "Then, before any code edit, check that the installed package carries the API, through the interpreter the install worked with: `python -c \"import langwatch; langwatch.setup; langwatch.connect_agent\"` for Python (`.venv/bin/python -c` when `.venv` exists, `uv run python -c` for a uv project), `node -e \"require('langwatch')\"` for JavaScript.",
       );
       expect(rendered).toContain(
+        "`uv run` is the runner only in a uv project, one where the facts name uv or the folder has a `pyproject.toml` or a `uv.lock`; anywhere else a Python command runs through the interpreter the ladder worked with, `.venv/bin/python` when `.venv` exists, else the `python` or `python3` whose pip installed the package, and never through `uv run`, which in a folder with no project file builds an environment of its own, with nothing of what the ladder installed in it.",
+      );
+      expect(rendered).toContain(
+        "through the runner item 1 settled on, so `.venv/bin/python -c` or `python -c` in place of `uv run python -c` outside a uv project.",
+      );
+      expect(rendered).toContain(
         "A Python release below 1.3.0 has neither `setup` nor `connect_agent`, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, so pip walks back to the last release with none and reports success.",
       );
       expect(rendered).toContain(
@@ -1067,7 +1073,7 @@ describe("the guided-onboarding skill", () => {
         "A spelling was missing: a command not found, so the next rung of the ladder.",
       );
       expect(section).toContain(
-        "A module or dependency the folder declares is missing: `ModuleNotFoundError`, `Cannot find module`, so install what the folder declares through the interpreter or manager that worked, `uv sync`, `python -m pip install -r requirements.txt`, `npm install`, and run the same command again.",
+        "A module or dependency the folder declares is missing: `ModuleNotFoundError`, `Cannot find module`, so install what the folder declares through the interpreter or manager that worked, `uv sync`, `python -m pip install -r requirements.txt`, `npm install`, and run the same command again through the interpreter the install went into: a command that ran under one runner and a package installed through another are two environments, and rerunning the first is a second failure of the same kind by construction, so a `uv run` that failed on a module in a folder with no project file reruns as `python -c` through the interpreter whose pip installed it.",
       );
       expect(section).toContain(
         "One fix and one rerun per command: a second failure of the same kind is a failed step, and the unlock question of this section, when one covers it, comes before any stop.",

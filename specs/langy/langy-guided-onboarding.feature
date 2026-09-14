@@ -705,6 +705,7 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then item 1 imports langwatch.setup and langwatch.connect_agent through the interpreter that installed it, before any edit
       And a JavaScript install is checked with a require
+      And uv run is the runner only in a uv project, and elsewhere Python runs through the interpreter the ladder worked with
       And pip install --upgrade never runs against an interpreter the SDK does not support
       And the tracing skill says the same
 
@@ -831,6 +832,7 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then a command that fails for a cause Langy can act on from what it already knows is fixed and rerun once, never reported
       And the three cases are a command written wrong, a missing spelling and a missing module or dependency the folder declares
+      And the rerun after a dependency install goes through the interpreter the install went into
       And a second failure of the same kind is a failed step, whose unlock question comes before any stop
       And a turn never ends on a "not done yet because" line with no fix tried and no question asked
 
