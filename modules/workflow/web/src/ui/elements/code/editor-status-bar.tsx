@@ -4,13 +4,7 @@ import type { editor } from "monaco-editor";
 import { useEffect, useState } from "react";
 
 /**
- * Thin status bar that mirrors VS Code's bottom strip — cursor position,
- * problem counts, indentation, language, plus two distinct save actions:
- *  - Save (⌘S)         — persists, modal stays open
- *  - Save & Close (⌘↵) — persists, then dismisses
- *
- * Subscribes directly to the editor's cursor + marker events so it stays in
- * sync without prop drilling.
+ * Status bar mirroring VS Code's bottom strip with cursor position and save actions.
  */
 export function EditorStatusBar({
   editor: editorInstance,

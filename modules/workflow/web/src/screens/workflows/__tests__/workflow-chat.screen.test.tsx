@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The standalone chat address: two states worth pinning. Nothing published says so; a published version renders entry fields and runs over `optimization.chat`.
+ * The standalone chat address with two states worth pinning.
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";

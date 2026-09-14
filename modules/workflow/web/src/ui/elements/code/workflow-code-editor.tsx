@@ -235,17 +235,17 @@ export function WorkflowCodeEditorModal({
 }
 
 const onKeyDown = {
-  // biome-ignore lint/suspicious/noEmptyBlockStatements: this is a fair use case for a function expression as a third party client may need to access the fn property of the object.
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: third-party client needs fn property.
   fn: () => {},
 };
 
 const onSave = {
-  // biome-ignore lint/suspicious/noEmptyBlockStatements: same pattern as onKeyDown — a mutable handler stub that the latest CodeEditor mount keeps in sync.
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: mutable handler stub kept in sync.
   fn: () => {},
 };
 
 const onSaveAndClose = {
-  // biome-ignore lint/suspicious/noEmptyBlockStatements: same pattern — mutable handler stub kept in sync with the latest CodeEditor mount.
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: mutable handler stub kept in sync.
   fn: () => {},
 };
 

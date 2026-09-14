@@ -9,19 +9,8 @@ interface HeadProps {
 }
 
 /**
- * Recursively flatten title children to a plain string. Handles:
- *   - strings / numbers → coerce to string
- *   - arrays → flatten + join
- *   - React Fragments (<>foo {bar}</>) → recurse into their children
- *   - other React elements → recurse into their children (best-effort;
- *     anything not text-shaped is dropped rather than rendered as
- *     "[object Object]")
- *
- * G62: when DashboardLayout renders `<title>{pageTitle ?? <>...</>}</title>`
- * without a string `pageTitle`, the fallback is a single Fragment element.
- * The previous `String(c)` path serialised that Fragment as "[object Object]"
- * and leaked it into document.title for any route that didn't pass the
- * `pageTitle` prop (settings sub-routes, /me, /-deep links pre-onboarding).
+ * Recursively flatten title children to a plain string.
+ * Handles strings, numbers, arrays, and React Fragments.
  */
 export function extractTitleText(node: ReactNode): string {
   if (node === null || node === undefined || typeof node === "boolean") {
@@ -64,14 +53,8 @@ function titleFromHeadChildren(children: ReactNode): string | null {
 }
 
 /**
- * Simple Head component that processes children to update document.title.
- * For the basic usage in this app (just <title>), we don't need react-helmet-async.
- *
- * `useLayoutEffect` (not `useEffect`) fires before the browser paints, so
- * the tab title is correct on first paint instead of flashing the parent
- * route's title (e.g. "LangWatch - Personal Workspace") before flipping
- * to the page-specific title on the next tick. Surfaced as Ariana QA
- * finding G12: cold-load title regression on /governance/teams.
+ * Simple Head component that updates document.title from children.
+ * Uses useLayoutEffect to avoid flashing the parent route's title.
  */
 export default function Head({ children }: HeadProps) {
   useLayoutEffect(() => {

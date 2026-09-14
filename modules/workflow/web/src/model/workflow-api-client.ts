@@ -1,5 +1,5 @@
 /**
- * The Workflows client under the name call sites already wrote. Must stay the single module — a second one over the same `createModuleApi` client would give a consumer's test two clients, only one mockable.
+ * The Workflows client — must stay as a single module to remain testable.
  */
 
 export { workflowApi as api } from "./workflow-api.ts";

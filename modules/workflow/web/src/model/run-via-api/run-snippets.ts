@@ -1,22 +1,6 @@
 /**
- * Pure generator for the "Run via API" snippets.
- *
- * One source of truth for both surfaces (the optimization-studio workflow
- * results panel and the evaluations-v3 workbench). Given a target (workflow or
- * experiment), a data source, and a language, it returns ready-to-run code that
- * triggers an evaluation through the unified evaluations-v3 backend AND reads
- * the per-row results back.
- *
- * The snippets mirror the just-shipped SDK public APIs exactly:
- *   - python: langwatch.experiment.run(...) / langwatch.workflow.run(...)
- *   - typescript: langwatch.experiments.runWithResults(...) /
- *     langwatch.workflows.run(...)
- *   - go: net/http POST to start, then poll + GET results
- *   - shell: curl POST to start, then poll + GET results
- *
- * Go has no evaluations entry point on the SDK yet (the Go SDK is tracing only),
- * so its snippet drives the REST API directly, the same three calls the shell
- * snippet makes.
+ * Pure generator for the "Run via API" snippets across multiple languages.
+ * Single source of truth for both optimization-studio and evaluations-v3 workbench.
  */
 import {
   buildEvaluateParameters,

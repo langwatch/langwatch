@@ -1,14 +1,5 @@
 /**
- * Unit tests for the pure Run via API snippet generator.
- *
- * Covers every (language x data source) combination for both targets
- * (workflow + experiment): the right trigger call, the right data-source
- * argument, and a "read the results back" block. Dataset-backed snippets must
- * omit fields the dataset already provides.
- *
- * Go has no SDK entry point, so its snippet drives the REST API directly: the
- * assertions there cover the bearer auth, the bounded poll loop, and the
- * escaping that keeps a hostile field identifier inside the generated literal.
+ * Unit tests for the Run via API snippet generator across all language and data sources.
  */
 import { describe, expect, it } from "vitest";
 

@@ -1,13 +1,5 @@
 /**
- * What this package's screen suites mount the Workflows screens inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what a screen asked the application
- * to do — where it navigated, what it wrote to the address, and every notice it
- * reported — which is exactly the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Test utilities: mount Workflows screens inside a fake host that records surface interactions.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

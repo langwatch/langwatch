@@ -1,17 +1,6 @@
 /**
  * Choosing the icon a new workflow is created with.
- *
- * A FAMILY-LOCAL COPY of
- * `platform/app/src/optimization_studio/components/properties/modals/EmojiPickerModal.tsx`,
- * which the agent and evaluator workflow-selector drawers also render, so the
- * platform module stays.
- *
- * ONE THING CHANGED, and it is the lazy load. `platform/app` deferred the
- * picker through `~/utils/compat/next-dynamic`, an application shim a feature
- * package may not import; `React.lazy` defers it the same way and for the same
- * reason. The reason is worth restating: a VALUE import of even a single enum
- * from `emoji-picker-react` collapses the whole library into whatever chunk
- * this module lands in, which is what the string literals below avoid.
+ * Uses React.lazy to defer the emoji picker and avoid collapsing the library.
  */
 
 import { type BoxProps, PopoverContent } from "@chakra-ui/react";

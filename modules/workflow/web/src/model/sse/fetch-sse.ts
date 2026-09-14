@@ -41,14 +41,7 @@ export interface FetchSSEOptions<T> {
 
 /**
  * Reads the sentence a refused request came back with.
- *
- * Two body shapes reach here. Routes on `@langwatch/api` answer with a coded
- * envelope whose wire `message` is deliberately the code slug, so the words
- * come from the client error registry, keyed by `code`. Legacy SecuredApp
- * routes answer `{ error }` — a dataset still normalising (425), a node with
- * no model (422) — and that sentence is the one telling the user what to fix.
- * Falling back to `statusText` reduced every one of them to "Unprocessable
- * Entity".
+ * Handles both modern coded envelopes and legacy error responses.
  */
 async function describeRefusal(response: Response): Promise<string> {
   const body = (await response

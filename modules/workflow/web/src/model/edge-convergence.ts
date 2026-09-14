@@ -1,21 +1,8 @@
 import type { Connection, Edge, Node } from "@xyflow/react";
 
 /**
- * Branch convergence: when more than one source may feed the same node
- * input.
- *
- * An input normally takes a single source. An If/Else fork is the
- * exception: its branches are mutually exclusive, so two branch outputs
- * can converge on one input and the engine deterministically keeps the
- * value of whichever branch actually ran (the not-taken branch is
- * skipped, contributing nothing). Sources that can run at the same time
- * (two independent nodes, or two outputs of one node) must NOT share an
- * input, because the engine's input resolution is order-dependent and
- * would silently pick a winner.
- *
- * This module decides, purely from the graph, whether a second source may
- * join an input. It mirrors the Go engine's branch gating
- * (runState.shouldSkip in services/nlpgo/app/engine/engine.go).
+ * Branch convergence: only If/Else branches (mutually exclusive) can converge on the same input.
+ * Mirrors the Go engine's branch gating.
  */
 
 /**
@@ -45,15 +32,7 @@ function intersect(sets: Set<Guard>[]): Set<Guard> {
 
 /**
  * Computes the necessary If/Else guards for every node in the graph.
- *
- * Rules (matching the engine):
- *  - An edge from an If/Else node's `true`/`false` handle is a gate: the
- *    target only runs when that gate takes that side. Connecting BOTH
- *    handles of one gate makes a merge point - the gate must be alive but
- *    neither side is required. Gates dominate: a gated node is skipped
- *    when its gate is not taken regardless of any plain data edges.
- *  - Otherwise a node runs when ANY of its data sources ran, so the only
- *    necessary guards are the ones common to all of those sources.
+ * Gates dominate: a gated node skips when its gate is not taken.
  */
 export function computeNodeGuards({
   nodes,

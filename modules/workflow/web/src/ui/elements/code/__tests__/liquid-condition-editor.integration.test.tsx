@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The Liquid condition input must make mistakes visible: a malformed
- * expression shows an error and a reference to an input that does not exist
- * shows a warning, instead of failing silently. Monaco is stubbed out (it
- * cannot mount in jsdom); the inline message and the {% %} affordance are
- * the surface under test.
+ * The Liquid condition input makes mistakes visible with errors and warnings.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

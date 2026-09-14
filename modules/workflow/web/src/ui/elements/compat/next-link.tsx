@@ -1,11 +1,6 @@
 /**
  * Compatibility layer: next/link → the family's navigation port.
- *
- * `platform/app`'s shim rendered a react-router `Link`, which is one of the
- * imports ADR-004 seals off from a feature-web package. The anchor is real —
- * middle-click and cmd-click open a tab, and the address is in the status bar —
- * and a plain click is handed to `WorkflowHostPort.navigate`, which is the same
- * client-side navigation asked through the one port the family declares.
+ * Renders a real anchor; plain clicks hand off to WorkflowHostPort.navigate.
  */
 
 import { type AnchorHTMLAttributes, forwardRef, type MouseEvent, type ReactNode } from "react";

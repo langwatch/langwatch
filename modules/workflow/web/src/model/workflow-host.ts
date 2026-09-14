@@ -1,41 +1,12 @@
 /**
  * What the Workflows screens ask of the application they are mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package. It asks this port instead, and the frontend feature that owns it —
- * `apps/ui/src/features/workflows` — answers it by adapting the browser
- * capabilities the application resolves.
- *
- * THE EIGHTEENTH HOST PORT OF THE SAME SHAPE. Deferred again, for the reason
- * every family before recorded: promoting the shape changes packages a page
- * move does not own, and smuggling it into a page move would hide it.
- *
- * WHAT THIS ONE ASKS THAT NO OTHER DID is nothing at all, which is the point:
- * `scope / hasPermission / copyTargets / route / setQuery / navigate /
- * succeeded / failed` is the evaluator and dataset port written out again. The
- * one difference is that `navigate` is load-bearing here rather than optional —
- * creating a workflow ends by opening the studio at `/:project/studio/:id`, an
- * address `platform/app` still serves.
+ * Sealed from ADR-004 imports; adapted by apps/ui/src/features/workflows.
  */
 
 import { createContext, useContext } from "react";
 
 /**
- * The project the current page is about.
- *
- * FOUR FIELDS WERE ADDED FOR THE OPTIMIZATION STUDIO, and they are additions
- * rather than a second port because they are the same question: fifty-six
- * modules in the studio's closure asked the application's
- * `useOrganizationTeamProject` for the scope, and between all of them they read
- * the project, the organization, the team and whether the answer had settled.
- * Everything else that hook resolves — the demo project, the external-member
- * permission table, the onboarding redirect — is the application's own business
- * and stayed there.
- *
- * `isResolved` is the tri-state the studio actually needs: a screen that treats
- * "still arriving" as "no project" renders an empty studio over a workflow that
- * is about to load.
+ * The project the current page is about, including fields added for the optimization studio.
  */
 export type WorkflowScope = {
   projectId: string | undefined;
@@ -58,20 +29,10 @@ export type WorkflowCopyTarget = {
 };
 
 /**
- * A failure, as a screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error IS its code slug since #5984, so a screen that
- * wrote its own copy would print the slug at the customer. `fallbackTitle`
- * names the action that failed.
+ * A failure, as a screen knows it. `fallbackTitle` names the action that failed.
  */
 /**
- * The one way out a failure offers.
- *
- * `run` rather than `onClick`: a port says what happens, and the application's
- * toaster turns it into a click. The studio's component alert is why this
- * exists — it used to render a "Go to component" button inside a `description`
- * node, which the feedback capability takes as text and dropped on the floor.
+ * The one way out a failure offers; rendered as a button on the notice.
  */
 export type WorkflowFailureAction = {
   label: string;
@@ -150,18 +111,7 @@ const WorkflowHostContext = createContext<WorkflowHostPort | undefined>(void 0);
 export const WorkflowHostProvider = WorkflowHostContext.Provider;
 
 /**
- * The host these screens are mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
- */
-/**
- * The host, or nothing.
- *
- * For the handful of things that are still correct without one: a link is an
- * anchor whether or not a router is listening, and refusing to render it would
- * turn a missing composition into a blank page rather than a slower navigation.
+ * The host these screens are mounted in, or nothing.
  */
 export function useOptionalWorkflowHost(): WorkflowHostPort | undefined {
   return useContext(WorkflowHostContext);
