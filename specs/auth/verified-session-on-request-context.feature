@@ -14,21 +14,21 @@ Feature: A verified browser session reaches the request context
 
   Finding F1 of `dev/docs/plans/e2e-walk-2026-09-04.md`.
 
-  @integration
+  @unit
   Scenario: A verified browser session reaches the surfaces that render the person
     Given a browser session this process has verified
     When the caller lists the organizations they belong to
     Then the organization service is asked for that person's organizations
     And the caller is not refused as anonymous
 
-  @integration
+  @unit
   Scenario: An impersonated session reaches the surface as the impersonated person
     Given an administrator is acting as another person
     When the caller lists the organizations they belong to
     Then the organization service is asked for the impersonated person's organizations
     And the real administrator travels beside them
 
-  @integration
+  @unit
   Scenario: An anonymous caller stays refused by the same surface
     Given a request carrying no browser session
     When the caller lists the organizations they belong to

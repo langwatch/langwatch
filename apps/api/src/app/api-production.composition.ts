@@ -35,7 +35,11 @@ import {
   mountedPathsOfRestFamilies,
   tryCreateApiStaticSurface,
 } from "../app-static/app-static.surface.ts";
-import type { ApiBrowserSessionTransport } from "./api-auth.composition.ts";
+import { AuthApi } from "@langwatch/auth-contract";
+import {
+  composeApiTrpcSession,
+  type ApiBrowserSessionTransport,
+} from "./api-auth.composition.ts";
 import {
   ApiTrpcHost,
   type ApiTrpcNamespace,
@@ -447,32 +451,44 @@ export async function bootApiProcess(options: {
       start: () => void 0,
       stop: () => producerResources.close(),
     })
-    .withTransports((peers: TransportPeers) => ({
-      rest: ApiRestHost.create({
-        peers,
-        config: {
-          // Which secret guards which internal family. One door, several
-          // secrets: a cron bearer must not reach the agent manager.
-          internalSecrets: {
-            cron: config.cronApiKey,
-            "langy-internal": config.langyInternalSecret,
+    .withTransports((peers: TransportPeers) => {
+      // The same auth peer the REST host reaches for: unless the launcher
+      // handed this process a resolver, the tRPC door reads sessions through
+      // the auth module too, so the two doors cannot decide differently about
+      // who somebody is. Left absent, the door stays mounted and refuses every
+      // signed-in caller as anonymous — which the browser shell reads as
+      // "signed out" and answers with a redirect loop through the sign-in page.
+      const auth = peers.find(AuthApi);
+      const trpcSession =
+        options.trpcSession ?? (auth ? composeApiTrpcSession({ auth }) : undefined);
+
+      return {
+        rest: ApiRestHost.create({
+          peers,
+          config: {
+            // Which secret guards which internal family. One door, several
+            // secrets: a cron bearer must not reach the agent manager.
+            internalSecrets: {
+              cron: config.cronApiKey,
+              "langy-internal": config.langyInternalSecret,
+            },
+            instanceAdminKey: config.instanceAdminApiKey,
+            ...(idempotency ? { idempotency } : {}),
+            ...(options.browserSession ? { browserSession: options.browserSession } : {}),
+            ...(options.browserSessions ? { browserSessions: options.browserSessions } : {}),
+            // The engine's address plus the proxy path, joined here because the
+            // path is the WORKFLOW module's and the address is the deployment's.
+            ...(executionProxyBaseUrl ? { executionProxyBaseUrl } : {}),
           },
-          instanceAdminKey: config.instanceAdminApiKey,
-          ...(idempotency ? { idempotency } : {}),
-          ...(options.browserSession ? { browserSession: options.browserSession } : {}),
-          ...(options.browserSessions ? { browserSessions: options.browserSessions } : {}),
-          // The engine's address plus the proxy path, joined here because the
-          // path is the WORKFLOW module's and the address is the deployment's.
-          ...(executionProxyBaseUrl ? { executionProxyBaseUrl } : {}),
-        },
-      }),
-      trpc: (trpc = ApiTrpcHost.create({
-        peers,
-        config: {
-          ...(options.trpcSession ? { browserSession: options.trpcSession } : {}),
-        },
-      })),
-    }))
+        }),
+        trpc: (trpc = ApiTrpcHost.create({
+          peers,
+          config: {
+            ...(trpcSession ? { browserSession: trpcSession } : {}),
+          },
+        })),
+      };
+    })
     .boot();
 
   if (!trpc) {

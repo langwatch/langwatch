@@ -20,6 +20,7 @@
 import type { BrowserSessionApi, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
+import type { ApiTrpcSessionResolver } from "../app-trpc/api-trpc.host.ts";
 
 const logger = createLogger("langwatch:api:auth");
 
@@ -130,6 +131,55 @@ export function composeApiBrowserSession(options: {
       userId: session.user.id,
       ...(session.user.email ? { email: session.user.email } : {}),
       ...(session.user.impersonator ? { impersonator: session.user.impersonator } : {}),
+    };
+  };
+}
+
+/**
+ * The same two halves, joined for the tRPC door — which renders the person, so
+ * it carries the whole resolved user rather than REST's id-and-email caller.
+ *
+ * An unresolvable session answers null here where REST answers a userless
+ * caller: the one REST reader of that distinction is the back office's
+ * `adminAuthSession` fact, and no tRPC procedure asks it. Left unwired, the
+ * door stays mounted and refuses every signed-in caller as anonymous —
+ * spec: specs/auth/verified-session-on-request-context.feature.
+ */
+export function composeApiTrpcSession(options: {
+  auth: BrowserSessionApi;
+}): ApiTrpcSessionResolver {
+  const { auth } = options;
+  const sessions = BetterAuthBrowserSessionTransportAdapter.create({
+    api: { getSession: (input) => auth.tryVerifyBrowserSession(input) },
+  });
+
+  return async (request) => {
+    const verified = await sessions.tryResolveVerifiedSession(request);
+    if (!verified) return null;
+
+    const session = await auth.tryResolveBrowserSession({ verified });
+    if (!session) return null;
+
+    const { impersonator } = session.user;
+
+    return {
+      user: {
+        id: session.user.id,
+        name: session.user.name ?? null,
+        email: session.user.email ?? null,
+        image: session.user.image ?? null,
+        ...(impersonator
+          ? {
+              impersonator: {
+                id: impersonator.id,
+                name: impersonator.name ?? null,
+                email: impersonator.email ?? null,
+                image: impersonator.image ?? null,
+              },
+            }
+          : {}),
+      },
+      sessionId: session.sessionId,
     };
   };
 }
