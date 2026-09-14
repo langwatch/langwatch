@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { BatchRunDataResult } from "@langwatch/scenario-contract";
 

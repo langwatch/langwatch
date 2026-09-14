@@ -4,7 +4,7 @@
 
 import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { toaster } from "@langwatch/design-system/toaster";
 import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";

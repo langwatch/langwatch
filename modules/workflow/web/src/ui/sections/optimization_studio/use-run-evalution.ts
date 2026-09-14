@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";

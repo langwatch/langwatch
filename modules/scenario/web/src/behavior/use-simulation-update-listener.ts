@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   isScenarioTabNavigatePayload,

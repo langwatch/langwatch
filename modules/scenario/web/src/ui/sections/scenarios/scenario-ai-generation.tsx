@@ -11,7 +11,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { type GeneratedScenario, generateScenarioWithAI } from "../../../model/scenario-generation.ts";
 import { consumeStoredPrompt } from "../../../model/scenario-prompt-storage.ts";
 import { type ScenarioFormController } from "../../elements/scenario-form.tsx";

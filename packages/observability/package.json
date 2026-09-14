@@ -21,6 +21,10 @@
       "types": "./dist/constants.d.ts",
       "default": "./src/constants.ts"
     },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "default": "./src/browser/index.ts"
+    },
     "./context": {
       "types": "./dist/context/index.d.ts",
       "default": "./src/context/index.ts"

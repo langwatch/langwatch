@@ -1,5 +1,5 @@
 import { explainSerializedError } from "@langwatch/handled-error/presentation";
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { toError } from "@langwatch/ui-host/errors";
 import { FetchSSETimeoutError } from "./errors.ts";

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "@langwatch/ui-host/toaster";

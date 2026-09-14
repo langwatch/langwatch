@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { useEffect, useRef, useState } from "react";
 
 /**

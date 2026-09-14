@@ -12,7 +12,7 @@
  * installable rewrite the host registers.
  */
 
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 

@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { Edit3, Languages, Lightbulb } from "lucide-react";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";

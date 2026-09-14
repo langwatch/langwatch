@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { describeError, showErrorToast } from "@langwatch/ui-host/errors";

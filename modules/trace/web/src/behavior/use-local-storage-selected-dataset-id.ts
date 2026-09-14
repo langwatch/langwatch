@@ -2,7 +2,7 @@
  * The dataset the reader last added rows to, remembered per browser.
  */
 
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useState } from "react";
 
 import { api } from "./trace-api.ts";

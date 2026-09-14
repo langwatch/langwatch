@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import safe from "safe-regex2";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {

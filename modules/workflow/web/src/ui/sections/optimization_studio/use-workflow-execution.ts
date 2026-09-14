@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
