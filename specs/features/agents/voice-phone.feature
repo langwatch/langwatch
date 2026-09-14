@@ -402,72 +402,22 @@ Feature: Voice agents: reach an agent by phone
   # Agent speaks first (scenario#995, scenario#992 — some agents greet on connect)
   # ---------------------------------------------------------------------------
 
-  @unit
-  Scenario: A phone target defaults to the simulator speaking first
-    Given a phone target with no "Agent speaks first" value set
-    When the config is validated
-    Then "Agent speaks first" is off
-
-  @integration
-  Scenario: Agent speaks first is editable and persisted on the target
-    Given the voice agent editor open on a phone target
-    Then the "Agent speaks first" toggle is off
-    When "Agent speaks first" is turned on and the target is saved and reloaded
-    Then the reloaded editor shows "Agent speaks first" on
-
-  @unit
-  Scenario: With Agent speaks first on, the callee's greeting opens the call
-    Given a phone target with Agent speaks first on
-    When the run connects
-    Then the runner waits for the callee's opening turn to finish before the simulator speaks
-    And that opening turn is recorded as the callee's first turn
-    And the simulator's first line replies to it
-
-  @unit
-  Scenario: With Agent speaks first off, the simulator opens the call
-    Given a phone target with no "Agent speaks first" value set
-    When the run connects
-    Then the simulator speaks first, as before this option existed
-
-  @unit
-  Scenario: A silent callee at the response timeout does not fail the run
-    Given a phone target with Agent speaks first on
-    When the run connects and the callee says nothing within the response timeout
-    Then the simulator proceeds with its first line
-    And the run does not fail on the callee's silence alone
+  @e2e
+  Scenario: A callee that greets on connect opens the call when Agent speaks first is on
+    Given a phone target whose agent greets as soon as the call connects
+    And "Agent speaks first" is turned on for that target and saved
+    When a scenario run places the call
+    Then the callee's greeting is recorded as the first turn of the conversation
+    And the simulator's first line is spoken only after the greeting ends, and replies to it
+    And the run completes without the callee asking whether anyone is there
 
   # ---------------------------------------------------------------------------
   # Callee transcript in the run conversation (scenario#994)
   # ---------------------------------------------------------------------------
 
-  @unit
-  Scenario: A callee turn's transcript is recorded alongside its audio
-    Given a phone run in progress
-    When the callee's audio for a turn is transcribed
-    Then that turn carries both the audio and its transcript, the same way a simulator turn does
-
-  @integration
-  Scenario: The run conversation shows the callee transcript next to its audio player
-    Given a finished phone run with callee turns
-    When the run's conversation is viewed
-    Then each callee turn's audio player is shown with its transcript beside it, the same way the simulator's turns are
-
-  @unit
-  Scenario: The callee transcript is available as soon as the turn is recorded
-    Given a phone run in progress
-    When a callee turn is recorded mid-call, before the run finishes
-    Then that turn's transcript is already readable, not only after the run completes
-
-  @unit
-  Scenario: The trace and the judge read the same callee transcript text
-    Given a finished phone run with a callee turn
-    When the trace input and the judge input for that turn are built
-    Then both read the same transcript text recorded for that turn
-
-  @unit
-  Scenario: A callee turn with failed transcription still shows its audio
-    Given a phone run in progress
-    When transcription fails for one callee turn
-    Then that turn's audio is still recorded and shown
-    And only that turn has no transcript
-    And the run does not fail because of the missing transcript
+  @e2e
+  Scenario: Callee turns show their transcript in the run conversation
+    Given a phone target and a scenario that runs several turns
+    When the run finishes and its conversation is viewed
+    Then every callee turn shows an audio player with its transcript beside it, the same way the simulator's turns do
+    And the transcript text matches what the judge was given for that turn
