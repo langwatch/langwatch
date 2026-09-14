@@ -20,6 +20,7 @@ import {
   copyFile,
   mkdtemp,
   rm,
+  utimes,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -502,5 +503,82 @@ describe("given a session captured by an earlier run", () => {
     const sent = stampsSent(bodies);
     expect(sent).toHaveLength(4);
     expect(new Set(sent).size).toBe(4);
+  });
+});
+
+describe("given a filesystem clock that runs behind the run's own", () => {
+  describe("when pi's file claims a modification time before the run started", () => {
+    /**
+     * The whole session is still captured.
+     *
+     * Not a hypothetical. The run's start is a `Date.now()`; a file's mtime is
+     * the kernel's, and on Linux the kernel's is behind — a file written right
+     * after the stamp carries an earlier mtime 98% of the time, by as much as
+     * 1.2ms. `pi-wrapper-capture.unit.test.ts` leaves roughly 1.5ms between
+     * the two, so the comparison decided that file's fate on a coin flip, and
+     * lost on CI: nothing captured, exit 0, nothing on stderr.
+     *
+     * The skew is a property of the platform and cannot be provoked on macOS,
+     * so this sets the modification time by hand instead. One millisecond of
+     * backdating is the real defect's real size; the grace covers a thousand.
+     */
+    it("captures a file whose mtime predates the run, and its rows", async () => {
+      const startedAtMs = Date.parse("2026-09-14T10:00:04.000Z");
+      const file = join(dir, "skewed.jsonl");
+      await writeFile(file, sessionLines("aaaaaaaa", "bbbbbbbb"), "utf8");
+      // One millisecond before the run began, which no honest clock would
+      // report for a file this run's child just wrote.
+      const behind = new Date(startedAtMs - 1);
+      await utimes(file, behind, behind);
+
+      const bodies: string[] = [];
+      const capture = createPiCapture({
+        sinceMs: startedAtMs,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl: vi.fn(async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        }) as unknown as typeof fetch,
+      });
+
+      // The rows are stamped 10:00:05, one second INTO the run, so they are
+      // this run's work by the only clock that decides that.
+      expect(await capture.harvest()).toBe(2);
+      expect(bodies.join("\n")).toContain(SESSION_ID);
+    });
+
+    /**
+     * The grace widens which files are read. It must not widen which turns are
+     * sent, or a resumed session's earlier turns are billed twice — the exact
+     * loss the row window exists to stop.
+     */
+    it("still drops rows written before the run, from that same file", async () => {
+      // A second after the file's rows (10:00:05), so every row in it predates
+      // the run and none of them may be sent.
+      const startedAtMs = Date.parse("2026-09-14T10:00:06.000Z");
+      const file = join(dir, "earlier.jsonl");
+      await writeFile(file, sessionLines("cccccccc", "dddddddd"), "utf8");
+      // Inside the grace, so the file IS offered to the reader. Without the
+      // row window that alone would put its turns on the wire.
+      const behind = new Date(startedAtMs - 1);
+      await utimes(file, behind, behind);
+
+      const bodies: string[] = [];
+      const capture = createPiCapture({
+        sinceMs: startedAtMs,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl: vi.fn(async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        }) as unknown as typeof fetch,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+      expect(bodies).toEqual([]);
+    });
   });
 });

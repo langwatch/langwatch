@@ -68,6 +68,15 @@ export async function walkSessionFiles({
  * window and is offered again in full. What stops those turns being recorded
  * twice is the caller's de-duplication, not this filter. Unreadable entries are
  * skipped rather than failing the sweep.
+ *
+ * `sinceMs` is compared against a clock this function does not control. A
+ * modification time comes from the kernel, and on Linux the kernel's is behind
+ * the one `Date.now()` reads — by up to about a millisecond, measured. A caller
+ * whose `sinceMs` is a `Date.now()` taken moments before the file was written
+ * is therefore asking a question whose answer is a coin flip, and gets silence
+ * either way. Such a caller must subtract its own grace before calling; see
+ * `FS_CLOCK_SKEW_GRACE_MS` in `pi-capture.ts` for the reasoning and for why a
+ * grace is safe only where a second, finer window enforces the real boundary.
  */
 export async function findFilesModifiedSince({
   root,

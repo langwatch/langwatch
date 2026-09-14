@@ -1346,3 +1346,33 @@ module's existing position on a crash.
       wrapper's window starts at `now`; rows are now stamped when written, and
       the real 132-row fixture is rebased onto the run in the integration test
 - [x] 1003 tests green across 69 files, parity 35/35, `tsc --noEmit` clean
+
+### The CI-only flake: capture compared two different clocks
+
+`pi-wrapper-capture.unit.test.ts` failed twice on CI and never locally, with
+`expected '' to contain ...` and nothing else. The diagnostics added for it
+(`why()`) named the cause on the next trip: `posts=0 exits=[0] stderr=""` — the
+run finished cleanly, capture was on, the sweep ran, and it sent nothing.
+
+Capture has two windows. `readTurnsSince` compares each row's clock against the
+run's start, and that is the real boundary. `sessionFilesTouchedSince` compares
+each file's MODIFICATION time against the same number, and that is only a
+prefilter — but it drops whole files, so when it is wrong the run captures
+nothing and says nothing.
+
+The two numbers come from different clocks. The run's start is `Date.now()`; an
+mtime is the kernel's. Measured on Linux 6.x: a file written immediately after a
+`Date.now()` carries an EARLIER mtime 98% of the time, by up to 1.2ms. Measured
+on macOS: never, 0 of 5000. The margin between the stamp and the write in that
+test is 1.2–1.9ms — the same size as the skew, which is why it is a coin flip on
+Linux and impossible locally.
+
+Fixed by widening the prefilter alone, `FS_CLOCK_SKEW_GRACE_MS` (1s) in
+`pi-capture.ts`. Free, because every row it lets through still meets the row
+window. Two tests pin it: one backdates a file's mtime 1ms before the run and
+requires its rows captured (fails without the grace, 0 where 2 are due), one
+requires rows that predate the run still dropped from a file the grace admits.
+
+`findFilesModifiedSince` is shared with the codex harvest, which has the same
+unsound comparison and no row window to make a grace safe. Left alone; the
+hazard is now documented on the shared helper.
