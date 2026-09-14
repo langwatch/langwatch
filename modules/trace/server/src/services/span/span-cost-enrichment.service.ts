@@ -35,16 +35,7 @@ const CODING_AGENT_MODEL_SPAN_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Service that enriches OTLP spans with custom LLM cost rates from the
- * project's own cost rules.
- *
- * When a project has custom model pricing configured, this service sets
- * `langwatch.model.inputCostPerToken` and `langwatch.model.outputCostPerToken`
- * attributes on the span so the fold projection can use them for cost
- * computation.
- *
- * This service should be applied BEFORE creating immutable events in the event
- * sourcing pipeline (alongside PII redaction and token estimation).
+ * Enriches OTLP spans with custom LLM cost rates from project rules.
  */
 export class OtlpSpanCostEnrichmentService {
   /**
@@ -129,16 +120,7 @@ export class OtlpSpanCostEnrichmentService {
   }
 
   /**
-   * A stored cost row carries `null` for a rate nobody set; a catalog rate
-   * carries `undefined`. The matcher and the stamps above read both the same
-   * way, but the two types do not assign to one another, so the rows are
-   * mapped rate-for-rate — exactly the mapping the application's adapter does
-   * between the same two shapes.
-   *
-   * The scope cascade is the port's, not this service's: an operator's rule
-   * saved on the team or the organization prices this project's spans, and a
-   * row saved above the project carries a null legacy `projectId` that a plain
-   * per-project lookup cannot see.
+   * Rate handling: stored rows use null, catalog uses undefined. Scope cascade is the port's.
    */
   private async listRates(tenantId: string): Promise<ModelCostRate[]> {
     const costs = await this.modelCosts.listCosts({ projectId: tenantId });

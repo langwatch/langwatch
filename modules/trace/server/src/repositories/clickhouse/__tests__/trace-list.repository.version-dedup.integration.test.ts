@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * @integration
- * trace_summaries keeps every version of a trace's row until the merge collapses them, so a filter evaluated before version dedup reads a stale version as if it were current.
+ * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
 import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
 import type { ClickHouseClient } from "@clickhouse/client";

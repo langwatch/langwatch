@@ -8,13 +8,7 @@ export const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME =
   "langwatch_edge_media_extract_fail_open_total";
 
 /**
- * The one series edge media extraction reports, pushed over OTLP.
- *
- * It was declared in the platform application's `server/metrics.ts` while that
- * process supplied the port. It lives beside the port now, and the API's trace
- * ingest composition supplies it wherever it composes media extraction. The port
- * stays optional on the extraction service (`telemetry?:`, called through `?.`),
- * so a caller that passes none still reports nothing.
+ * Metrics for edge media extraction; optional in the extraction service.
  */
 export class OtelTraceEdgeMediaTelemetryAdapter implements TraceEdgeMediaTelemetry {
   static create(): OtelTraceEdgeMediaTelemetryAdapter {

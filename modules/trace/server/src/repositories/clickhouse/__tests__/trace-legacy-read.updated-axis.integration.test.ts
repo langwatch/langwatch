@@ -1,5 +1,6 @@
 /**
- * Mechanism-level coverage for the updated date-axis keyset pagination. Companion to trace-legacy-read.projection-search.integration.test.ts (that proves output shape; this proves the QUERY MECHANISM): dedup collapses every trace version to its GLOBAL latest (max UpdatedAt) before applying window/cursor, so a trace whose latest moved past the window is excluded even if an older version falls inside (no double-emit across CDC windows); the HAVING-on-max(UpdatedAt) cursor seek surfaces each trace exactly once across pages. This is correctness the occurred axis gets for free (OccurredAt is immutable) but the updated axis must enforce explicitly, since UpdatedAt is the mutable RMT version column.
+ * Tests updated date-axis pagination deduplicates on global latest before applying cursor,
+ * ensuring each trace appears exactly once across pages.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

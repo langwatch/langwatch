@@ -1,38 +1,11 @@
 import type { ParsedSqsQueueUrl } from "../services/webhook-destination.service.ts";
 
 /**
- * Queue URL admission, and everything that is read off a queue URL.
- *
- * The SSRF fence in `urlPolicy` never sees this URL, because we do not dial
- * it: the AWS SDK does, from the URL plus a signature. So the fence is
- * replaced by a shape: the URL must be a canonical Amazon SQS queue URL and
- * nothing else, which is also what makes the region and the owning account
- * readable from it rather than configured beside it, where they could
- * disagree with the queue.
+ * Queue URL admission: canonical Amazon SQS URLs only, no SSRF fence.
  */
 
 /**
- * Every spelling AWS actually serves a queue URL under:
- *
- * - `https://sqs.<region>.amazonaws.com/<account>/<queue>`, the current form;
- * - `sqs.<region>.amazonaws.com.cn`, the China partitions;
- * - `sqs-fips.<region>.amazonaws.com`, the FIPS endpoints, which a regulated
- *   customer is required to use and which the plain pattern would have
- *   refused as "not an Amazon SQS queue URL";
- * - `https://<region>.queue.amazonaws.com/<account>/<queue>`, the legacy
- *   regional form that older consoles and SDKs still hand out.
- *
- * The region-less legacy form, `https://queue.amazonaws.com/<account>/<queue>`,
- * is refused. The region is read off the URL precisely so it cannot disagree
- * with the queue, and that URL carries no region to read: accepting it would
- * mean guessing `us-east-1` and writing a customer's events to whatever queue
- * of that name lives there. Re-copy the queue URL from the SQS console, which
- * gives the current form.
- *
- * Queue names are up to 80 characters of alphanumerics, hyphens and
- * underscores; a FIFO queue adds the `.fifo` suffix, which is matched here so
- * it can be refused with a sentence about FIFO rather than one about the URL
- * being unrecognizable.
+ * Canonical SQS URL patterns: regional, FIPS, China, legacy regional; no region-less form.
  */
 const SQS_QUEUE_URL_PATTERNS: readonly RegExp[] = [
   // sqs.<region>.amazonaws.com[.cn] and sqs-fips.<region>.amazonaws.com

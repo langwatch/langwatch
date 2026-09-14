@@ -2,13 +2,7 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The two fences a customer's webhook destination is judged by.
- *
- * Both opt in with the literal `1`, which is the reading both processes
- * already applied, and both refuse any other spelling. A deployment that
- * wrote `true` here has a closed fence and believes it is open; refusing at
- * boot tells the operator, where reading it as off tells nobody. Unset is
- * off, and off is the safe answer.
+ * Webhook destination fences; opt in with literal '1', refuse other values.
  */
 const unsafeSwitch = z
   .union([z.boolean(), z.literal("1"), z.literal("0"), z.literal("")])

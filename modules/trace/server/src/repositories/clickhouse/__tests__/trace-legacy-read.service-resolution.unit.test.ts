@@ -1,7 +1,7 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * @see ADR-022
- * Unit tests for the TraceLegacyReadClickHouseRepository -> blob-resolution seam. Mocks only the lowest-level CH driver (getClickHouseClientForTenant), wires a real TraceBlobStoreService (via getFromEventLog stub) + real TraceIOExtractionService so full resolution + recomputed-IO fires end-to-end.
+ * Tests blob-resolution at the TraceLegacyReadClickHouseRepository seam with real services.
  */
 
 import { TraceOffloadResolutionService } from "../../../services/offload/trace-offload-resolution.service.ts";
@@ -22,7 +22,7 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
 }));
 
 /**
- * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
+ * Tenant-keyed connection provided to the repository constructor.
  */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 

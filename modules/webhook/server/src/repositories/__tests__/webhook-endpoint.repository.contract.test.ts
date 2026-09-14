@@ -1,14 +1,5 @@
 /**
- * The endpoint registry's contract: admission, the reversible enable/disable
- * pair, the two-secret rotation window and the 72h auto-disable streak.
- *
- * The memory twin is the only backend registered here. The Prisma twin runs
- * against a real database in
- * `../prisma/__tests__/prisma.webhook-endpoint.repository.integration.test.ts`,
- * because the auto-disable compare-and-set and the delivery-log stats are raw
- * SQL whose concurrency behaviour only Postgres can answer for. This suite
- * pins the twin to the same observable answers so the app can be driven
- * without a database.
+ * Tests endpoint registry contract: admission, enable/disable, rotation, auto-disable.
  */
 import { WebhookEndpointNotFoundError, WebhookEndpointValidationError } from "@langwatch/webhook-contract";
 import { Temporal, type Instant } from "@langwatch/time";

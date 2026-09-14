@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * The span read's floor is only tenant-aware if something hands the service a retention resolver. Nothing did: the constructor took one as optional, every production path reached the service via create(), and create() never passed it — so the floor stayed the fixed 90-day SPAN_READ_FLOOR_LOOKBACK_MS for every project, feature inert in production despite green unit tests. Pins the wiring, not the floor arithmetic (covered in packages/clickhouse-client). Spec: specs/clickhouse/bounded-reads.feature
+ * Verifies that the span read's floor is only tenant-aware when a retention resolver is
+ * provided. Production wiring was broken: the service never received the optional resolver.
  */
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";

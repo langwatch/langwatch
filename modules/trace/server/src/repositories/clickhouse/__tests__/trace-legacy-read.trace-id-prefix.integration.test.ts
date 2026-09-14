@@ -1,5 +1,5 @@
 /**
- * Integration tests for trace-ID prefix resolution. The CLI trace search table truncates trace IDs to 20 characters for readability; copy-pasting that into trace get used to 404 since the backend required exact matches. Exercises the git-style prefix lookup that unblocks that workflow.
+ * Tests trace-ID prefix resolution: git-style prefix lookup unblocks truncated ID workflows.
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

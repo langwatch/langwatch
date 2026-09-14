@@ -1,13 +1,5 @@
 /**
- * What a webhook is allowed to deliver to.
- *
- * This is the admission gate for a customer-supplied destination, and the same
- * policy the sender enforces at dispatch — so an endpoint that saves is one
- * that can deliver. Everything it refuses, it refuses for a reason worth
- * writing down: credentials in a URL would be stored and replayed on every
- * send, a plain-http destination would carry signed payloads in the clear, and
- * a queue URL that is not actually Amazon's is a destination pointed somewhere
- * nobody audited.
+ * Tests webhook destination admission: customer destinations must be HTTPS or SQS.
  */
 
 import { describe, expect, it } from "vitest";

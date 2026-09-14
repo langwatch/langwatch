@@ -1,14 +1,6 @@
 /**
- * The protections-parameterized coding-agent transcript read.
- *
- * Extracted from the `tracesV2.*` tRPC transport (`transport/api-trpc/traces-v2.api.ts`,
- * last carried in full at `0bf461451c`) when that file's builder was removed. The behavior
- * is unchanged: the transcript is derived from the SAME span and log loads the sibling
- * `spansFull` and `traceLogs` reads use, so transcript content can never skip the
- * redaction passes those reads enforce. Both doors onto it — the tRPC procedure and the
- * REST route (`GET /api/traces/:traceId/transcript`) — hand in the `Protections` they
- * resolved for their own caller, since a project API key resolves them for the project
- * rather than for a user session.
+ * Protections-parameterized coding-agent transcript read; derived from the same spans and
+ * logs as other trace reads.
  */
 
 import type { Protections, SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
