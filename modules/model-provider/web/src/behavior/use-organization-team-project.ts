@@ -1,22 +1,10 @@
 /**
- * `useOrganizationTeamProject`, answered from the host port.
- *
- * The recovered provider editor asks for the tenant the way every
- * `platform/app` component did: one hook returning the organization, the team
- * and the project, plus a permission probe. That hook was an application module
- * — it read the session, the router and the organization graph — and none of
- * those may be reached from a feature-web package.
- *
- * NOTHING HERE FETCHES. The scope and the visible scopes are readings the host
- * has already made, so this is a derivation over them and not a second source
- * of truth. Named after the hook it replaces so the call sites keep reading
- * `const { project, organization } = useOrganizationTeamProject()`.
- *
- * THE GRAPH IS RECONSTRUCTED, NOT RE-READ. `availableScopes()` is a flat list
- * of teams and a flat list of projects carrying their `teamId`, which is the
- * shape the providers table wanted; the editor's scope picker wants them
- * nested. Rebuilding the nesting here is one pass over data already in memory,
- * and it keeps the port from growing a second shape of the same answer.
+ * `useOrganizationTeamProject`, answered from the host port rather than the
+ * application module of the same name a feature-web package cannot reach.
+ * Nothing here fetches: it derives from readings the host already made,
+ * rebuilding `availableScopes()`'s flat team/project lists into the nested
+ * shape the editor's scope picker wants, rather than growing a second shape
+ * on the port itself.
  */
 
 import { useMemo } from "react";

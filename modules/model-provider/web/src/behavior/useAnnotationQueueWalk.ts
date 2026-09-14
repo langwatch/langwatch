@@ -4,13 +4,9 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 /**
  * One step of the annotation queue walk: the item on screen, where it sits in
- * the queue, and the ids either side of it.
- *
- * The walk reads one item at a time on purpose. The page shows one
- * conversation, so resolving the whole queue to render it was work nobody
- * asked for — work that grew with the queue until it stopped working at all.
- * Stepping is a fresh read, which is what lets the item carry its whole trace:
- * the reviewer is never handed an item the page cannot show.
+ * the queue, and the ids either side of it. Reads one item at a time so the
+ * item can carry its whole trace, rather than resolving the whole queue to
+ * render one conversation.
  */
 export function useAnnotationQueueWalk({
   queueItemId,
@@ -50,13 +46,8 @@ export function useAnnotationQueueWalk({
     queueLoading: step.isLoading,
     /**
      * Whether the item above is the one the reviewer has left rather than the
-     * one they asked for: the URL names a new item and its read is still in
-     * flight.
-     *
-     * Anything that acts on the item — finishing it, opening its trace — has to
-     * be held until this clears, or it acts on the item behind. A timer cannot
-     * stand in for this: the read fetches a whole trace, so it routinely
-     * outlasts any beat short enough to feel responsive.
+     * one they asked for. Anything that acts on the item must wait for this to
+     * clear, or it acts on the item behind.
      */
     stepIsStale: step.isPlaceholderData,
   };

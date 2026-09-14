@@ -1,17 +1,5 @@
-/**
- * Deleting a model provider — the authorization and the scope.
- *
- * A model provider holds a customer's own API credentials, so the delete has to
- * refuse three ways before it removes anything: without a tenant anchor to
- * resolve, without an organization behind that anchor, and without a provider
- * actually there. The one that carries the most weight is the fourth: the
- * actor is authorized against the scopes of the provider that was FOUND, not
- * against anything the caller sent, and the row is removed at that provider's
- * own organization.
- *
- * Only three of the nine collaborators take part in a delete, so the rest are
- * left unbuilt rather than stubbed into noise.
- */
+// The actor must be authorized against the scopes of the provider that was FOUND, not against
+// anything the caller sent — that's the case carrying the most weight here, not the plain refusals.
 
 import { describe, expect, it } from "vitest";
 import {

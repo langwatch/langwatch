@@ -1,15 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The transport matters as much as the result here. tRPC sends queries as GET
- * with their input encoded into the URL, and the input is the customer's API
- * key — which lands in access logs, proxy logs and browser history, and gets
- * stripped by proxies that filter credential-shaped query parameters, leaving
- * the server parsing an absent input. Every drawer test mocks this hook away,
- * so nothing else observes which call it makes.
- *
- * Covers @unit scenarios from
- * specs/model-providers/credential-validation.feature.
+ * Verifies the API key travels as a mutation, not a tRPC query — a GET would encode
+ * it into the URL, where access logs, proxies and browser history can catch it.
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

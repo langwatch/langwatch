@@ -1,14 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 /**
- * "16d ago", for the sample spans under the cost-rule regex field.
- *
- * Recovered with the preview from `platform/app`, where it came out of the
- * trace explorer's display formatters. `@langwatch/trace-web` still holds that
- * copy and does not publish it, and the Design System publishes `formatCost`
- * and `formatTokens` — which the preview does import from there — but nothing
- * for relative time. Four lines with one dependency and no home to share, so it
- * is stated here rather than pulled through a package boundary that does not
- * exist yet.
+ * "16d ago", for the sample spans under the cost-rule regex field. `@langwatch/trace-web` holds
+ * an unpublished copy from the trace explorer; stated locally since there's no shared home yet.
  */
 
 const MS_PER_MINUTE = 60_000;

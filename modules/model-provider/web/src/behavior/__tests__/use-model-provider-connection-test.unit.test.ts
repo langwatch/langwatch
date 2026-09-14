@@ -1,11 +1,6 @@
 /**
  * @vitest-environment jsdom
  *
- * Moved from
- * `platform/app/src/hooks/__tests__/useModelProviderConnectionTest.unit.test.ts`.
- * The mock changed from the application's `api` proxy to this package's
- * procedure map and every assertion travelled unchanged.
- *
  * Spec: specs/model-providers/credential-validation.feature
  */
 
@@ -14,13 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelProviderCredentialVerdict } from "@langwatch/model-provider-contract";
 
 /**
- * Typed against the contract, not `vi.fn()` bare.
- *
- * This suite stayed green through the extraction that collapsed the
- * procedure's output to `{ connected: boolean }`, because an untyped mock
- * answered with the union the hook expected while the server no longer sent
- * it. The type parameter is what makes the mock unable to disagree with the
- * wire: a shape the contract stops producing stops compiling here.
+ * Typed against the contract, not bare `vi.fn()`, so a shape the contract stops
+ * producing stops compiling here instead of the mock silently disagreeing with the wire.
  */
 const testConnectionMock = vi.fn<() => Promise<ModelProviderCredentialVerdict>>();
 

@@ -79,16 +79,8 @@ type PollRound = {
 };
 
 /**
- * One poll round. A stale timer from a cancelled attempt never writes its
- * result over a newer one, which is what every attempt check guards.
- *
- * The poll may have written the LANGY and FAST role defaults too, so every
- * default-model answer is refreshed on completion. Snapping Langy's model
- * pill to the new default cannot travel here: that helper is
- * `@langwatch/langy-web`'s and langy-web already depends on this package, so
- * importing it back would be a cycle. The pill's DATA still refetches; only
- * the store's follow is missing, so an open panel keeps the outgoing model
- * until it remounts.
+ * One poll round. The attempt check guards a stale timer from writing its result over a newer
+ * one. The poll may also write new LANGY/FAST model defaults, so those answers are refreshed here.
  */
 async function runPollRound({
   attempt,

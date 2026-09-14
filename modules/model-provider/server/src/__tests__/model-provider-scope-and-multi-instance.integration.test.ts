@@ -1,5 +1,7 @@
 /**
- * Real-Postgres coverage for multi-instance provider rows: creating a second row of the same provider type at a different scope instead of silently overwriting an existing one, the atomic multi-scope write gate, cross-tenant read refusal, and runtime provider-ROW selection following the specific MODEL rather than the collapsed provider winner (a stale project-scoped Azure row must not shadow an organization row whose catalog actually lists the requested model).
+ * Real-Postgres coverage for multi-instance provider rows: a second row at a different scope
+ * instead of a silent overwrite, the atomic multi-scope write gate, cross-tenant read refusal,
+ * and row selection following the specific model rather than the collapsed provider winner.
  * @vitest-environment node
  * @see specs/model-providers/scope-and-multi-instance.feature
  */

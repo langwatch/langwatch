@@ -84,13 +84,10 @@ export type UseProviderFormSubmitActions = {
 export type UseProviderFormSubmitReturn = UseProviderFormSubmitState & UseProviderFormSubmitActions;
 
 /**
- * What the drawer's Advanced section adds to the update payload.
- *
- * Two independent halves, because two independent audiences own them. The
- * `gateway` half is null when the AI Gateway section is not rendered, so a
- * save never clears rate limits the operator cannot see; the
- * skip-permissions half is undefined when its field is not rendered, and an
- * empty array when the operator cleared it.
+ * What the drawer's Advanced section adds to the update payload. `gateway` is
+ * null when that section is not rendered, so a save never clears rate limits
+ * the operator cannot see; skip-permissions is undefined when unrendered, and
+ * an empty array when the operator cleared it.
  */
 export type AdvancedGatewayPayload = {
   gateway: {

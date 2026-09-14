@@ -1,20 +1,11 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: empty blocks here are deliberate no-ops.
 
 import type { api } from "./model-provider-api.ts";
 
 /**
- * BroadcastChannel name for cross-tab model-provider sync.
- *
- * NoModelsConfiguredCallout opens /settings/model-providers via
- * `window.open(..., "_blank")` rather than an in-app navigation, so the
- * settings page runs in its own tab with its own QueryClient instance.
- * Saving a provider there invalidates that tab's cache just fine, but the
- * ORIGINAL tab (e.g. a still-open "New Prompt" dialog) has no route back to
- * that cache and previously depended on `refetchOnWindowFocus` alone to
- * notice — which doesn't fire until the user manually refocuses the
- * original tab, and in practice left the picker stuck empty until a hard
- * refresh (#5827). Posting here on save lets every other open tab
- * invalidate immediately, focus or no focus.
+ * BroadcastChannel name for cross-tab model-provider sync: NoModelsConfiguredCallout opens
+ * settings in its own tab (its own QueryClient), so a save there reaches other open tabs only
+ * via this channel, not `refetchOnWindowFocus` alone, which previously left pickers stuck (#5827).
  */
 const MODEL_PROVIDER_SYNC_CHANNEL = "langwatch:model-providers-updated" as const;
 

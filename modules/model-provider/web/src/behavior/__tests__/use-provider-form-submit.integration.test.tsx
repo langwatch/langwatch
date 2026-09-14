@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression tests for issue #3785:
- * Provider edit drawer's Default Model dropdown silently desyncs from project state.
- *
- * The submit-time guard in useProviderFormSubmit fires a toast and aborts
- * when useAsDefaultProvider is true but any selected model belongs to a
- * different provider (prefix mismatch).
+ * Regression tests for #3785: the submit-time guard fires a toast and aborts when
+ * useAsDefaultProvider is true but a selected model belongs to a different provider.
  */
 
 import { act, renderHook } from "@testing-library/react";
@@ -389,15 +385,10 @@ describe("useProviderFormSubmit()", () => {
     });
   });
 
-  // Regression tests for #3532 + the scope-edit key-preservation bug: the
-  // !isUsingEnvVars branch strips MASKED_KEY_PLACEHOLDER values from customKeys
-  // before submit. When nothing real is left (the user opened the drawer
-  // without re-entering the key, e.g. to only change the scope), it sends
-  // `undefined` rather than `{}`. `undefined` tells the server "no key change"
-  // so it preserves the stored key, whereas `{}` is validated against the
-  // provider's keysSchema — which rejects it for required-key providers like
-  // openai (the "I changed the scope and the key went blank, couldn't save"
-  // report). See specs/model-providers/scope-and-multi-instance.feature.
+  // Regression for #3532: once MASKED_KEY_PLACEHOLDER values are stripped and nothing
+  // real is left, submit must send `undefined` (no key change) rather than `{}`, which
+  // fails keysSchema validation for required-key providers. See
+  // specs/model-providers/scope-and-multi-instance.feature.
   describe("given isUsingEnvVars is false (env-fallback project, drawer open)", () => {
     // Matches the shape of registry.ts azure.keysSchema: all keys optional,
     // .passthrough() so MASKED_KEY_PLACEHOLDER and "" both validate.

@@ -1,5 +1,7 @@
 /**
- * Real-Postgres cover for the onboarding seed's per-key merge (main #7556): the seed used to stop at the first config already attached to a scope, so the order providers were added in decided which roles ever existed — an Anthropic-first organization got DEFAULT and FAST and no EMBEDDINGS, and adding OpenAI afterwards did nothing at all.
+ * Real-Postgres cover for the onboarding seed's per-key merge (#7556): the seed used to stop
+ * at the first config already attached to a scope, so provider order decided which roles ever
+ * existed at all.
  * @vitest-environment node
  * @see specs/model-providers/onboarding-flow.feature
  */

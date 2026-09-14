@@ -1,17 +1,7 @@
 /**
- * Running a credential check against a provider that is already saved.
- *
- * The sibling `useModelProviderApiKeyValidation` — still `platform/app`'s,
- * because the form that types a credential is still `platform/app`'s — checks a
- * credential being TYPED; this one checks the credential already stored, which
- * is the one the form deliberately never shows back. NOTHING HERE SENDS A KEY:
- * the row id goes out and a verdict comes back.
- *
- * The three verdicts are kept apart on purpose. "We could not check this" is an
- * answer, not a soft yes: six of the sixteen providers cannot be probed at all,
- * and a control that rendered them as working would be wrong about more than a
- * third of the list — worse than offering nothing, because the customer would
- * stop looking too.
+ * Checks a credential already stored (by row id, never re-sent) — the counterpart to
+ * `useModelProviderApiKeyValidation`'s typed-credential check. The three verdicts stay distinct
+ * because "we could not check this" must read as its own answer, not a soft yes.
  */
 
 import type {
@@ -23,14 +13,8 @@ import { describeFailure, describeRefusal } from "../model/connection-verdict-co
 import { modelProviderApi } from "./model-provider-api.ts";
 
 /**
- * The wire shape of a verdict — the contract's own type, not a copy of it.
- *
- * The feature's contract package is where the union lives, so the packaged
- * transport that returns it and this hook that reads it are checked against one
- * declaration. That is the guard that failed the last time: an extraction
- * collapsed the procedure's output to `{ connected: boolean }`, and because the
- * hook named a type of its own, the two were free to disagree — every provider
- * fell past all three branches and rendered as untestable.
+ * The contract's own verdict type, not a copy — an earlier extraction that duplicated it let the
+ * transport and this hook disagree silently, and every provider rendered as untestable.
  */
 type ConnectionTestResult = ModelProviderCredentialVerdict;
 
@@ -41,13 +25,8 @@ export type ConnectionTestState =
   | { status: "unchecked"; message: string };
 
 /**
- * What to say when the check never ran.
- *
- * Deliberately short of the reason we hold internally. "This provider signs
- * every request with AWS credentials, which a listing endpoint does not
- * exercise" is true and is not the customer's problem; what they need to know
- * is whether they still have something to do. Only the cases they can act on
- * get a next step.
+ * Deliberately vaguer than the reason held internally — only cases the customer can act on get
+ * a next step, to avoid misdiagnosing an unreadable credential as a missing one.
  */
 const uncheckedMessage = (reason: ModelProviderUncheckedReason): string => {
   if (reason === "no_credential" || reason === "credential_masked") {
@@ -62,18 +41,9 @@ const uncheckedMessage = (reason: ModelProviderUncheckedReason): string => {
 };
 
 /**
- * A verdict, turned into what the row should say.
- *
- * A pure function rather than three branches inside the hook: the mapping is
- * the part worth reading on its own, and keeping it out here is what lets the
- * compiler own exhaustiveness.
- *
- * A `switch` over the discriminant with no `default` and no trailing return is
- * that ownership. TypeScript proves the three cases cover the union, so there
- * is no unreachable branch left to describe an unclassified verdict as "can't
- * be tested automatically" — and a fourth outcome added to the contract makes
- * this a compile error, because the function would then be able to fall through
- * and return `undefined`.
+ * A pure function, kept outside the hook, so the compiler owns exhaustiveness: the `switch` has
+ * no `default`, so a verdict added to the contract later fails to compile here instead of
+ * silently falling through to "can't be tested automatically".
  */
 function toState(result: ConnectionTestResult): ConnectionTestState {
   switch (result.outcome) {
@@ -102,15 +72,9 @@ export function useModelProviderConnectionTest({
     modelProviderApi.modelProvider.testConnection.useMutation();
 
   /**
-   * Which round of verdicts the visible ones belong to.
-   *
-   * Clearing the map is not enough on its own. A probe already in flight when
-   * the map is cleared still resolves afterwards and writes its verdict back,
-   * so the state a customer sees would be a verdict about the credential that
-   * was in the row *before* they edited it — the very thing clearing was meant
-   * to prevent, arriving a second later. Bumping a generation and discarding
-   * anything stamped with an older one closes that window; a counter rather
-   * than a boolean because several rows can be in flight at once.
+   * Which round of verdicts is visible. Clearing the map alone isn't enough — a probe already in
+   * flight can still resolve after a clear and write a stale verdict back, so bumping the
+   * generation and discarding older-stamped results closes that window.
    */
   const generation = useRef(0);
 
@@ -123,19 +87,9 @@ export function useModelProviderConnectionTest({
   );
 
   /**
-   * Forget every verdict.
-   *
-   * A verdict is about the credential that was in the row when it was asked,
-   * and nothing about the row's identity changes when its key does. Left
-   * alone, a green "Connection works" survives the customer pasting a bad key
-   * and saving — which is a success verdict about a credential that was never
-   * checked, the one thing this feature must not produce. The editor closing is
-   * the moment a row may have changed underneath us, and re-asking is one
-   * click, so the cheap and correct move is to drop them all rather than reason
-   * about which row was touched.
-   *
-   * Bumping the generation is what makes this hold for a probe still in flight,
-   * whose answer would otherwise land after the clear.
+   * Forget every verdict: a verdict describes the credential that was in the row when asked, and a
+   * changed key must not keep showing a stale "Connection works". Bumping the generation covers a
+   * probe already in flight, whose answer would otherwise land after this clear.
    */
   const clearResults = useCallback(() => {
     generation.current += 1;

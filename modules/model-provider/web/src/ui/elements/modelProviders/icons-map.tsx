@@ -1,4 +1,4 @@
-// biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
+// biome-ignore lint/style/useImportType: React is needed at runtime for JSX outside jsdom tests
 import React from "react";
 import type { modelProviders } from "@langwatch/model-provider-contract";
 import { Anthropic } from "../icons/anthropic.tsx";
@@ -107,22 +107,9 @@ const PROVIDER_MATCHERS: ReadonlyArray<{
 ];
 
 /**
- * Which provider a recorded model string belongs to, or null when we cannot
- * tell.
- *
- * Two forms arrive: the prefixed one (`openai/gpt-5`) and the bare model id,
- * which is what the collector records far more often. The prefix is trusted
- * when it names a provider we know; otherwise the model id itself is sniffed.
- * Null is a real answer — the caller renders the plain label rather than
- * guessing a vendor at the reader.
- *
- * RECOVERED WITH THE COST DRAWER'S MATCHING-SPANS PREVIEW, which prints one of
- * these marks beside every model it lists. `@langwatch/trace-web` holds the
- * same inference for its model cell and does not publish it. That is the FOURTH
- * copy of something in this file's lineage, and the docblock at the top already
- * records why the promotion has not happened: these are the model-provider
- * feature's marks, this package is where they belong, and moving them is a
- * change to packages a drawer recovery does not own.
+ * Trusts the prefix (`openai/gpt-5`) when it names a known provider, otherwise sniffs the bare
+ * model id — the far more common case. Null is a real answer: the caller renders the plain label
+ * rather than guessing a vendor. `@langwatch/trace-web` holds a fourth, unpublished copy of this.
  */
 export function inferProvider(model: string): ProviderKey | null {
   if (!model) return null;

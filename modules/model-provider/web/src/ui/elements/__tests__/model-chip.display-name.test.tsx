@@ -1,20 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression cover for issue #5759. ModelChip (the Default Models
- * table's per-role model pill) used to rebuild its label from the raw
- * model id via `model.split("/").slice(1).join("/")`, ignoring the
- * provider's configured custom-model display name. It now resolves the
- * label through `modelDisplayLabel` off an optional `displayNames` prop.
- *
- * The prop is optional, so dropping it at a call site would compile
- * silently — these tests are what makes that fail instead.
- *
+ * Regression for #5759: ModelChip used to rebuild its label from the raw model id, ignoring the
+ * configured custom-model display name. `displayNames` is optional, so dropping it at a call site
+ * would compile silently — these tests are what makes that fail instead.
  * @see specs/model-providers/custom-model-display-name.feature
- *
- * Moved from
- * `platform/app/src/components/settings/__tests__/ModelChip.displayName.integration.test.tsx`
- * with the chip; every assertion travelled unchanged.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,25 +1,9 @@
 import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
 
 /**
- * Catalog audit: the four ways a model price goes wrong without anyone
- * noticing. All four bill a real request at the wrong amount and none of
- * them shows up as an error anywhere in the product.
- *
- * 1. No price. A model with no rate any cost field can hold prices every
- *    request at zero — the spend row still settles, so the failure looks
- *    like a cheap customer rather than a defect.
- * 2. Wrong unit. An entry priced in a unit the vendor does not bill in also
- *    bills zero, invisibly to a check that only asks whether a price exists.
- * 3. Drift. A hand-written overlay entry never expires; once the vendor's
- *    price changes the overlay keeps billing the old one and the sync
- *    cannot correct it, because the overlay exists to override the sync.
- * 4. Cross-source disagreement. The two price sources are independent, so
- *    where they disagree materially one of them is wrong and it was
- *    imported with full confidence.
- *
- * The audit reports, it does not correct — choosing a side needs a human.
- * A baseline file holds findings already known and accepted, so the run is
- * green until something NEW appears.
+ * Catalog audit: catches missing prices, wrong billing units, stale overlay
+ * entries and cross-source disagreements — all bill silently at the wrong
+ * amount. Reports only; a baseline holds accepted findings.
  */
 
 /** Rate fields that can actually price a request, grouped by billing unit. */

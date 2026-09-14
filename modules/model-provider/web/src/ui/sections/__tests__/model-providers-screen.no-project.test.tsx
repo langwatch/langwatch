@@ -1,21 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Model Providers for an organization that has no project yet, alongside the
- * ordinary path where one exists.
- *
- * A provider belongs to the organization and reaches the scopes attached to it,
- * so every action on this page works with or without a project. The page used to
- * disable adding, editing and deleting whenever there was no project and offer
- * project creation as the way out, which was a dead end for the buyer whose
- * organization is set up to track coding agents and therefore has no project at
- * all.
- *
- * Moved from `platform/app/src/pages/settings/__tests__/model-providers.no-project.integration.test.tsx`.
- * The mocks changed and the assertions did not: what was a module mock per
- * platform hook is now one fake host plus one mock of this package's procedure
- * map, and every `expect` below is the one that travelled.
- *
+ * Providers are org-scoped, so every action works with or without a project — the page used to
+ * disable adding/editing/deleting with none, a dead end for an org tracking only coding agents.
  * Spec: specs/model-providers/providers-without-a-project.feature
  */
 

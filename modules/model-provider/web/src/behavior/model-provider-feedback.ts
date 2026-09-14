@@ -1,25 +1,9 @@
 /**
- * How this family tells the reader how an action turned out.
- *
- * `~/components/ui/toaster` and `~/features/errors`'s `showErrorToast` are
- * application singletons a feature-web package may not reach, so the two names
- * the recovered editor modules already call are re-bound to the host port. The
- * call SHAPES are carried over unchanged on purpose — `toaster.create({ title,
- * type })` and `showErrorToast({ error, fallbackTitle })` — so the move touches
- * the lines that acquire them and none of the lines that use them. The same
- * shape `@langwatch/organization-web` and `@langwatch/automation-web` state, for
- * the same reasons.
- *
- * WHAT DOES NOT COME WITH THEM: the code-keyed presentation registry. The
- * composing application resolves the words a customer reads from the error's
- * own `code`, which is why every call here hands over the RAW error and a
- * `fallbackTitle` naming the action, rather than a sentence this package
- * composed.
- *
- * A WARNING IS A FAILURE, not a quieter success. The provider form raises one
- * when some of a batch of default-model writes were refused — "Some default
- * model assignments failed" — and routing that through `succeeded` would print
- * a failure under a tick.
+ * How this family tells the reader how an action turned out. The toaster and
+ * `showErrorToast` are application singletons a feature-web package may not
+ * reach, so they're re-bound to the host port, handing over the raw error
+ * rather than a composed sentence since the composing application resolves
+ * customer copy from the error's own `code`.
  */
 
 import { useCallback, useMemo } from "react";

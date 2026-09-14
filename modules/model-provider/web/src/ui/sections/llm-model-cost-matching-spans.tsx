@@ -1,25 +1,8 @@
 /**
- * The live "which spans would this rule match" preview under the regex field.
- *
- * RECOVERED FROM
- * `platform/app/src/components/settings/LLMModelCostMatchingSpans.tsx`, deleted
- * in `cc91631cd8` with the drawer it sits inside.
- *
- * WHAT IT IS FOR: a cost rule is a regular expression matched against whatever
- * string the collector recorded as the model, and the two are easy to get
- * subtly wrong. Showing the spans the rule would match, priced at the rates
- * being typed, is what turns "I think this is right" into "I can see it is".
- * When nothing matches, the models the project HAS seen are offered as
- * one-click exact-match fills, so the dead end is also the fix.
- *
- * THE PREVIEW IS GATED ON `traces:view`, not on the cost permission: the answer
- * carries span metadata — model names, token counts, trace ids — rather than
- * cost-rule configuration. A reader who may edit costs but not read traces gets
- * the form without the preview, which is the correct degradation.
- *
- * The row's deep link writes the trace drawer's own address rather than
- * navigating, because it opens in a new tab: the reader is mid-edit and must
- * not lose the form.
+ * Gated on `traces:view`, not the cost permission, since the preview answer carries
+ * span metadata (model names, token counts, trace ids) rather than cost-rule config. The
+ * row's link writes the trace drawer's address instead of navigating, since it opens in
+ * a new tab and must not lose the mid-edit form.
  */
 
 import { Badge, Box, chakra, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";

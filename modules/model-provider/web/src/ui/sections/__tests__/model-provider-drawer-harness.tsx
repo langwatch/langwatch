@@ -1,15 +1,6 @@
 /**
- * Shared render + query helpers for the EditModelProviderForm integration
- * suites in this directory.
- *
- * RECOVERED FROM the deleted
- * `platform/app/src/components/settings/__tests__/modelProviderDrawerHarness.tsx`,
- * adapted to the current `ModelProviderListEntry` wire shape and the
- * package-local `../../../behavior/model-provider-api` boundary (the old
- * harness mocked `~/utils/api`'s collapsed + flat-list queries against
- * `MaybeStoredModelProvider`).
- *
- * Not exported from the package — a test imports it relatively.
+ * Recovered from the deleted `modelProviderDrawerHarness.tsx`, adapted to the current
+ * `ModelProviderListEntry` wire shape. Not exported — a test imports it relatively.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { screen } from "@testing-library/react";

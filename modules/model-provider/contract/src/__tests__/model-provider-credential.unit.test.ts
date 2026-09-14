@@ -2,16 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { getSchemaShape } from "../model-provider-credential.ts";
 
-/**
- * Against real zod schemas, not hand-built stand-ins.
- *
- * The cases below this block assert the walking logic against object literals
- * shaped the way zod 3 shaped its schemas. That is worth keeping — it says
- * what each branch is for — but it cannot notice zod moving the inner schema,
- * because a literal never moves. Zod 4 did move it, and `.optional()` started
- * answering "this provider declares no credential fields at all" with nothing
- * red anywhere.
- */
+/** Test against real zod schemas; literals can't catch zod schema internals moving. */
 describe("getSchemaShape() over schemas zod actually builds", () => {
   const keys = z.object({ OPENAI_API_KEY: z.string(), OPENAI_BASE_URL: z.string() });
 

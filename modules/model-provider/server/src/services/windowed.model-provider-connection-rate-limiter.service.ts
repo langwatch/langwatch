@@ -5,30 +5,18 @@ import {
   type ModelProviderRateLimit,
 } from "../app/model-provider.members.ts";
 
-/**
- * How often one organization may ask a provider whether its key still works.
- *
- * Twenty a minute is generous for a person clicking "test connection" and
- * ungenerous for a loop, which is the shape being bounded: every probe carries
- * a customer credential to a third party, and a caller that can spend the
- * organization's key at machine speed can get it rate-limited by the PROVIDER.
- */
+/** Generous for a person clicking "test connection", ungenerous for a loop that could get an
+ * organization's key rate-limited by the provider. */
 const ORGANIZATION_WINDOW = { windowSeconds: 60, max: 20 } as const;
 
-/**
- * The same bound for the deployment as a whole, so one organization's loop
- * cannot exhaust the process's outbound capacity for everyone else's.
- */
+/** Bounds the deployment as a whole, so one organization's loop can't exhaust outbound capacity
+ * for everyone else. */
 const GLOBAL_WINDOW = { windowSeconds: 60, max: 500 } as const;
 
 /**
- * The connection-test limiter, counted wherever the process counts.
- *
- * The windows are the feature's — they bound a credential probe, and the
- * numbers travel with the surface that raises them — while the counter is the
- * process's, which is why it arrives as a port. Both windows are consulted in
- * order, and the organization's is charged first so a caller that is already
- * over its own budget does not also spend the deployment's.
+ * The connection-test limiter, counted wherever the process counts. Both windows are checked in
+ * order, organization first, so a caller already over its own budget doesn't also spend the
+ * deployment's.
  */
 export class WindowedModelProviderConnectionRateLimiterAdapter extends ModelProviderConnectionRateLimiter {
   static create(input: {

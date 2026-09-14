@@ -1,19 +1,4 @@
-/**
- * Virtual "latest" / "latest-mini" model aliases.
- *
- * A config can store `openai/latest` or `anthropic/latest-mini` instead
- * of pinning a concrete model id. At read time the alias resolves to the
- * current registry flagship for that provider's variant, so default
- * picks track upstream releases without users having to manually rotate.
- *
- * Aliases live in code, NOT in `llmModels.json` / `llmModels.overlay.json`.
- * They are a UI + resolver concept; downstream consumers (litellm /
- * langwatch_nlp / aigateway) only ever see the resolved concrete id.
- *
- * Only providers we know how to "latest"-pick are aliased — openai,
- * anthropic, gemini. Azure/Bedrock customers pin specific deployment
- * names, so they are intentionally excluded.
- */
+/** "latest" aliases resolve to current registry flagships; code-only, not in llmModels.json. */
 import { compareModelSortKeys, type ModelSortKey, rankOpenAIChatModel } from "./model-tiers.ts";
 import { llmModels } from "./model-catalog.ts";
 
@@ -69,25 +54,7 @@ function pickLatestChat(
   return candidates[0]?.id;
 }
 
-/**
- * Resolves an alias like `openai/latest-mini` to its concrete current
- * flagship, e.g. `openai/gpt-5.5-mini`. Returns `null` if the input is
- * not an alias OR if the registry has nothing matching the variant.
- *
- * Variants per provider:
- *   - openai     → flagship tier (latest), fast tier (latest-mini);
- *                  see `utils/modelTiers` for the tier allow-lists
- *   - anthropic  → `claude-opus-X-Y` (latest), `claude-sonnet-X-Y` (latest-mini)
- *   - gemini     → `gemini-X.Y-pro` (latest), `gemini-X.Y-flash` (latest-mini)
- *
- * Anthropic's `haiku` and OpenAI's `nano` tiers are intentionally
- * excluded — they're a tier below "fast" and not what users expect
- * when they pick "latest-mini" as their FAST default.
- *
- * Gemini's "pro" / "flash" families admit a curated set of suffixes
- * (e.g. `pro-preview`, `flash-lite`) so noisy spin-offs like
- * `flash-image-preview` don't sneak in as defaults.
- */
+/** Resolve latest alias to current flagship (opus/sonnet or flagship/mini per provider). */
 export function resolveLatestAlias(model: string): string | null {
   const parts = parseLatestAlias(model);
   if (!parts) return null;

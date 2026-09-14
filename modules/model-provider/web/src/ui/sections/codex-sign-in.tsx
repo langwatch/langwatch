@@ -9,22 +9,9 @@ import { langyFirstPartyLinkProps } from "../../model/langy-first-party-link.ts"
 import type { ScopeAssignment } from "../../model/scope-assignment.ts";
 
 /**
- * Sign in with your OpenAI account — the Codex provider's whole credential
- * UI, shared verbatim by the settings drawer, Langy's inline setup and the
- * onboarding step (spec: specs/model-providers/codex-account-provider.feature).
- *
- * The flow is OpenAI's device authorization: show a one-time code, open
- * their verification page, poll until the user approves there. Nothing is
- * typed into LangWatch and nothing persists until the poll completes
- * server-side (which is also where the provider row + optional coding
- * defaults are written). The state machine lives in `useCodexDeviceSignIn`;
- * this file only renders its phases.
- *
- * The settings surface passes `setAsCodingDefaults: false` and asks about
- * the defaults AFTER the connect instead: that ask lives on the
- * model-providers page (`CodexCodingDefaultsAsk`), outside the drawer this
- * component sits in, because the drawer closes as soon as the connect
- * completes.
+ * Codex's whole credential UI, shared verbatim by settings, Langy's inline setup and onboarding
+ * (spec: specs/model-providers/codex-account-provider.feature). Renders `useCodexDeviceSignIn`'s
+ * phases only; settings passes `setAsCodingDefaults: false` and asks separately post-connect.
  */
 export function CodexSignIn({
   projectId,

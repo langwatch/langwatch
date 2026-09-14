@@ -1,26 +1,4 @@
-/**
- * Unit tests for how `buildCustomModelDisplayNames()` ranks a row's SCOPE
- * — the `rankOf` / `scopeRank` half of the resolver, which feeds the
- * narrowest-scope tier of `precedence`. The tiers around it (enabled,
- * persisted, lowest id) are covered in
- * `customModelDisplayNames.precedence.unit.test.ts`.
- *
- * Pinned for issue #5837 (AC3 in the coverage map — see
- * specs/model-providers/custom-model-display-name-resolution.feature):
- * two rows of the same provider each defining a REAL name for the same
- * `modelId` resolved to whichever row the caller happened to list last,
- * instead of a precedence rule.
- *
- * The contract this file pins: narrowest scope wins — PROJECT > TEAM >
- * ORGANIZATION > none/unscoped/unrecognized (a scope tier this table
- * doesn't know ranks the same as `isSystem`), read from the `scopes[]`
- * grant set with the collapsed singular `scopeType` as the fallback.
- *
- * Every case here gives the LOSING row the lexicographically LOWER id, so
- * a resolver that failed to rank scope at all would fall through to the id
- * tiebreak and hand the key to the wrong row. That shape is what keeps
- * these cases honest: they cannot pass by accident on the tier below.
- */
+/** Guard scope ranking and prototype-chain safety (#5837 AC3). */
 import { describe, expect, it } from "vitest";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { makeProvider } from "./model-provider.test-helpers.ts";
@@ -88,15 +66,8 @@ describe("given a project-scoped row and an organization-scoped row whose winnin
 
 describe("given a project-scoped row and a row whose scope tier is not one `rankOf` recognizes", () => {
   describe("when display names are built across both rows", () => {
-    // The unknown-tier row deliberately has the lexicographically LOWER
-    // id, so only a correct scope ranking can make the project-scoped
-    // row win: if the unknown tier fell through to the id tiebreak
-    // instead of ranking last, this row would win on id alone and the
-    // test would pass for the wrong reason. "WORKSPACE" stands in for a
-    // future tier, cast in unchecked at a legacy persistence boundary —
-    // `registry.ts`'s `scopes[].scopeType` is typed as the known union,
-    // so reaching an unrecognized value here requires the same kind of
-    // cast a real caller would need to smuggle one past the type system.
+    // Unknown tier has lower id; only scope ranking (not id tiebreak) makes project win.
+    // "WORKSPACE" guards against unrecognized future tiers falling through.
     it("ranks the unrecognized scope tier last, so the project-scoped row's name wins", () => {
       const projectRow = makeProvider({
         provider: "vendorO",
@@ -127,27 +98,8 @@ describe("given a project-scoped row and a row whose scope tier is not one `rank
 
 describe("given a project-scoped row and a row whose scope tier names an inherited Object member", () => {
   describe("when display names are built across both rows", () => {
-    // The case above pins an unrecognized tier that is ABSENT from the
-    // rank table; this pins one that a membership test wrongly reports as
-    // PRESENT. `"toString" in SCOPE_RANK` is `true` — `in` walks the
-    // prototype chain — so an `in`-guarded lookup returns
-    // `Object.prototype.toString`, a FUNCTION, and `Math.min` of a
-    // function is `NaN`: exactly the `NaN` tier the guard exists to
-    // prevent, re-opened one tier lower. `NaN` minus anything is falsy,
-    // so the scope tier drops out of `byPrecedence` and this row — which
-    // should rank last — instead falls through to the id tiebreak and
-    // wins on its lower id. Only an own-property check ranks it as
-    // unscoped. Every `Object.prototype` member is reachable this way;
-    // `toString` stands in for `valueOf`, `constructor`, `hasOwnProperty`
-    // and `__proto__`, cast in unchecked exactly as the unknown-tier case
-    // above casts "WORKSPACE".
-    //
-    // Asserts the semantic property — the PROJECT row wins — rather than
-    // order-independence, which the two cases above pin for their tiers:
-    // with the prototype hole live the unranked row wins in BOTH orders,
-    // so an order-independence assertion here would hold while the defect
-    // stood and prove nothing. Verified by sabotage: restoring `in` turns
-    // this red on the `toBe` alone.
+    // Guard prototype-chain pollution: `in` operator returns true for inherited members,
+    // causing NaN rank; only hasOwnProperty check prevents prototype tiers from winning.
     it("ranks a prototype-inherited scope tier last, so the project-scoped row's name wins", () => {
       const projectRow = makeProvider({
         provider: "vendorR",

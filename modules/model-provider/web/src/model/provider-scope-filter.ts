@@ -1,17 +1,7 @@
 /**
- * The page's scope filter, read off the address and applied to rows.
- *
- * The URL contract, the resolution of the two ambient kinds and the row
- * predicate are `@langwatch/authz-web`'s — the data-governance move harvested
- * them out of `platform/app/src/hooks/useUrlScopeFilter.ts` and
- * `~/utils/filterProvidersByScope` so two packages share one reading of
- * `?scope=` instead of two. What is here is the small part that is this
- * family's: the fan over rows that carry SEVERAL scopes, which is what a
- * provider row and a default-model config both are.
- *
- * The platform util keeps four non-family callers (the api-keys page and its
- * three tests), so this is a narrowed copy of its last function rather than a
- * repoint.
+ * The page's scope filter, read off the address and applied to rows. The URL contract and
+ * ambient resolution live in `@langwatch/authz-web`; this module adds only the fan over rows
+ * that carry several scopes, which a provider row and a default-model config both do.
  */
 
 import {
@@ -23,14 +13,8 @@ import {
 } from "@langwatch/authz-web/surfaces/scope-picker";
 
 /**
- * The two shared types, re-exported for this package's own modules.
- *
- * `ui-screen-closure` counts import LINES, and naming the authz surface from
- * four files buys four findings for what is one decision — the data-governance
- * family's lesson, applied the other way round. This module already has to name
- * it for the functions, so everything else in the package reads the types from
- * here and only the screen, which renders the surface's components, names it a
- * second time.
+ * Re-exported so the rest of this package imports the authz surface from one place instead of
+ * naming it in every file (which `ui-screen-closure` would count separately).
  */
 export type { ScopeFilterValue, ScopeHierarchy };
 

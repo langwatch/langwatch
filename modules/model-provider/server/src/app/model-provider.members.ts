@@ -90,14 +90,8 @@ export abstract class ModelProviderCatalog {
     customKeys: Record<string, unknown>,
   ): Promise<ModelProviderApiKeyValidation>;
   /**
-   * Probes a stored credential and reports which of the three verdicts it is.
-   *
-   * Abstract rather than derived from `validateApiKey`, which is the shape
-   * this port used to carry: that default read `valid` off the save-time
-   * verdict and returned `{ connected }`, so "we could not check this" — the
-   * answer six of the sixteen registered providers give — arrived at the
-   * browser as a pass. A catalog has to answer the question it was asked, and
-   * the compiler now says so.
+   * Probes a stored credential and reports which of the three verdicts it is. Abstract rather
+   * than derived from `validateApiKey`, whose default let "could not check" arrive as a pass.
    */
   abstract testConnection(
     provider: string,
@@ -250,15 +244,8 @@ export abstract class ModelProviderIdService {
 }
 
 /**
- * The project read the scope facts are derived from.
- *
- * Model Provider scopes a cost, a default and a credential to a project, its
- * team and its organization, and all three ids are on the project row read
- * with its team. That one read is the only thing the derivation needs, so it
- * is named here rather than taken as a whole `ProjectApi` — which would
- * put the project write graph, an organization service and an authz service in
- * a process that only prices a span. `ProjectApi` and
- * `ProjectMetadataService` both satisfy this.
+ * The project read the scope facts are derived from, named narrowly rather than a whole
+ * `ProjectApi` so a process that only prices a span doesn't also compose an authz service.
  */
 export abstract class ModelCostProject {
   abstract findWithTeam(id: string): Promise<ProjectWithTeam | null>;
@@ -276,14 +263,9 @@ export abstract class ModelCostProjectScope {
 }
 
 /**
- * The at-rest cipher a stored credential is written and read through.
- *
- * A port rather than an implementation because the KEY is the deployment's:
- * every process reads its own `CREDENTIALS_SECRET` and hands the cipher in,
- * and a package that named the variable would decide for all of them. The
- * format itself is a WIRE FORMAT — rows written by one process are read by
- * another — so the cipher passed here must be the deployment's one cipher and
- * not a second implementation of it.
+ * The at-rest cipher a stored credential is written and read through. A port, not an
+ * implementation: the key is the deployment's own `CREDENTIALS_SECRET`, and rows written by
+ * one process are read by another, so every process must share this one cipher.
  */
 export abstract class ModelProviderCredentialCipher {
   abstract encrypt(value: string): string;
@@ -306,15 +288,9 @@ export type ModelProviderEgressRequest = {
 };
 
 /**
- * The guarded way out of the process, for the credential probe.
- *
- * Every probe carries a customer's credential to a URL a customer chose, so it
- * may not go through bare `fetch`: the composition root supplies an
- * SSRF-validated, IP-pinned, redirect-refusing egress and this package never
- * learns which one. `isRedirectRefusal` is on the port for the same reason the
- * prober matches by type rather than by message — a refused hop is a different
- * answer to the customer than a host that never replied, and only the
- * implementation knows which error class it raises.
+ * The guarded way out of the process, for the credential probe: bare `fetch` is refused since a
+ * customer's credential goes to a customer-chosen URL. `isRedirectRefusal` matches by error type
+ * because only the implementation knows which class a refused hop raises, not the message.
  */
 export abstract class ModelProviderEgress {
   abstract fetch(
@@ -361,14 +337,9 @@ export abstract class ModelProviderRateLimit {
 }
 
 /**
- * Whether LangWatch itself supplies a provider's credentials, and with what.
- *
- * The managed-provider vertical is Enterprise and this package is not, so the
- * two methods it actually needs are named here and the composition root
- * adapts its Enterprise service onto them. Absent, every provider is the
- * customer's own — which is the true answer for every deployment that has no
- * managed providers, and the WRONG one for a deployment that does, so a
- * composition root that has the service must pass it.
+ * Whether LangWatch itself supplies a provider's credentials, and with what. The managed-provider
+ * vertical is Enterprise and this package is not, so a composition root that has that service
+ * must pass it — absent, every provider reads as the customer's own, wrong for one that isn't.
  */
 export abstract class ModelProviderManagedGateway {
   abstract isManaged(input: { organizationId: string; provider: string }): boolean;
@@ -381,13 +352,9 @@ export abstract class ModelProviderManagedGateway {
 }
 
 /**
- * The handle a Codex model executes through.
- *
- * Codex has exactly one road — the AI gateway's Responses endpoint, on the
- * per-project virtual key the Langy agent uses — so resolving one needs the
- * gateway vertical, which is not this feature's. A process that composes no
- * gateway credential passes nothing and the cascade refuses codex models by
- * name; every other provider is unaffected.
+ * The handle a Codex model executes through, via the AI gateway's Responses endpoint — not this
+ * feature's vertical, so a process with no gateway credential passes nothing and the cascade
+ * refuses codex models by name; every other provider is unaffected.
  */
 export abstract class ModelProviderCodexHandle {
   abstract resolve(input: {

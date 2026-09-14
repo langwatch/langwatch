@@ -1,16 +1,7 @@
 /**
- * The Agent Platform door serves chat but not embeddings (verified live:
- * `:batchEmbedContents` answers 404 on aiplatform.googleapis.com), so
- * embedding pickers must not offer registry models the credential that
- * will actually serve them cannot run.
- *
- * "Actually serve" is the load-bearing part: a registry model is listed in
- * no row's custom catalog, so execution keeps the scope-collapse winner
- * (ModelProviderApi.findRowServingModel returns null, resolveServingRow
- * falls back). Availability therefore follows the winner, not the union of
- * accessible rows.
- *
- * Covers @unit scenarios from
+ * The Agent Platform door serves chat but not embeddings (verified live: `:batchEmbedContents`
+ * 404s on aiplatform.googleapis.com), so embedding pickers must not offer a registry model that
+ * credential cannot actually run. Covers @unit scenarios from
  * specs/model-providers/google-agent-platform.feature.
  */
 import { describe, expect, it } from "vitest";

@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The skip-permissions list survives a write and a read on the real column.
- *
- * The drawer scenarios are bound in
- * modules/model-provider/web/src/ui/sections/__tests__/model-provider-form.skip-permissions.integration.test.tsx;
- * this suite is what proves the JSON column behind them, including the clear that returns a
- * provider to its registry default.
- *
+ * Proves the real JSON column behind the drawer's skip-permissions scenarios, including the
+ * clear that returns a provider to its registry default.
  * @see specs/settings/model-provider-skip-permissions.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The Advanced section of the model-provider drawer carries the models
- * allowed to skip Langy's permission checks.
- *
- * Covers the @integration scenarios of
- * specs/settings/model-provider-skip-permissions.feature.
+ * Covers the @integration scenarios of specs/settings/model-provider-skip-permissions.feature.
  */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

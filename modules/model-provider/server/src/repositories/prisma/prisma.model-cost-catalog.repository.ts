@@ -8,22 +8,9 @@ import { ModelProviderProjectScopeService } from "../../services/model-provider-
 export type ModelCostCatalogDatabase = Pick<PrismaClient, "customLLMModelCost">;
 
 /**
- * A project's own model cost rules, composed from one Prisma client and one
- * project read.
- *
- * A background process that folds spans prices each LLM call against the rates
- * the customer stored, and the rates are scoped to the project, its team and
- * its organization. Reaching them through `ModelProviderApi` meant
- * composing nine collaborators — an organization service, an authz service, a
- * provider catalog, a translation port, an id service, a credential codec, a
- * Codex token refresher and a connection rate limiter — for a read that asks
- * none of them anything.
- *
- * The object it builds satisfies Trace's `TraceModelCostCatalog`.
- * `ModelProviderApi` satisfies it as well, because it composes this same
- * service and delegates to it, which is what keeps the application's own
- * compositions compiling unchanged and what keeps the two processes pricing
- * from one implementation rather than two.
+ * A project's own model cost rules, composed from one Prisma client and one project read,
+ * instead of `ModelProviderApi`'s nine collaborators a span-pricing read never needs. Satisfies
+ * Trace's `TraceModelCostCatalog`, same as `ModelProviderApi`, which delegates to this service.
  */
 export class PrismaModelCostCatalogRepository {
   static create(options: {

@@ -4,13 +4,8 @@ import { PrismaModelCostCatalogRepository } from "../prisma.model-cost-catalog.r
 
 /**
  * Spec: modules/model-provider/specs/model-cost-catalog-seam.feature
- *
- * The cost listing record-time enrichment reads. `ModelProviderApi`
- * requires nine collaborators — an organization service, an authz service, a
- * catalog, a translation port, an id service, a credential codec, a Codex
- * token refresher and a connection rate limiter — because writing a cost
- * authorizes a scope and every credential path decrypts a key. This read asks
- * none of them anything.
+ * The cost listing's record-time enrichment reads, which unlike a write need none of
+ * `ModelProviderApi`'s nine collaborators (authz, catalog, credential codec, etc).
  */
 
 const NOW = new Date("2026-09-02T00:00:00.000Z");

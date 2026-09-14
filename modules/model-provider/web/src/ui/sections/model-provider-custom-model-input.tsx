@@ -105,15 +105,7 @@ function CustomModelsTable({
   );
 }
 
-/**
- * Renders the Custom Models section in the model provider configuration drawer.
- * Displays a table of user-defined custom models (chat and embeddings combined),
- * with controls to add new models via dialogs and view registry models.
- *
- * @param state - Form state containing custom model entries
- * @param actions - Form actions for managing custom models
- * @param provider - The model provider configuration
- */
+/** Chat and embeddings models share one table so a provider's model surface reads at a glance. */
 export const CustomModelInputSection = ({
   state,
   actions,

@@ -1,15 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Stepping to the next queue item is a fresh read of a whole trace, so there is
- * a gap between asking for an item and having it. What the page shows in that
- * gap is the item the reviewer has just left, and anything that acts on it then
- * acts on the wrong item — so the gap has to be visible to the page, not merely
- * survived.
- *
- * The tRPC boundary is the only thing stood in for here: keeping the previous
- * item is react-query's own behaviour, and mocking that out would leave the
- * behaviour under test unexercised.
+ * Only the tRPC boundary is mocked: the gap between asking for the next item and
+ * having it is real react-query behaviour, and stubbing that out would leave it unexercised.
  */
 import {
   QueryClient,

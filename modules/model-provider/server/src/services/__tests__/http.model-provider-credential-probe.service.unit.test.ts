@@ -10,11 +10,8 @@ import {
   ProviderUnreachableError,
 } from "../http.model-provider-credential-probe.service.ts";
 
-// The probe goes out through the guarded egress port the composition root hands it, not
-// `global.fetch`, so that port is what these tests stand in for; mocking the global would leave the
-// real SSRF fence in the path and every assertion here would be about DNS. Only the fetch is replaced
-// — the redirect refusal is still recognised by the egress's real error type, so the error classes
-// these tests reject with are the ones production actually sees.
+// Mocks the guarded egress port, not `global.fetch` — the real SSRF fence would make every
+// assertion about DNS. The redirect refusal still uses the egress's real error type.
 const mockFetch = vi.fn();
 const egress: ModelProviderEgress = {
   fetch: (...args: unknown[]) => mockFetch(...args),
@@ -471,11 +468,8 @@ describe("validateProviderApiKey", () => {
       });
     });
 
-    /**
-     * Captured verbatim from Google (translate.googleapis.com, 2026-07-27) by calling a restricted API with a live key. Kept whole rather than
-     * hand-written, because the shape is the thing under test: the reason we act on sits in `error.details[]`, while `error.errors[0].reason`
-     * holds an unrelated "forbidden". Reading the wrong one silently loses the diagnosis, and only a real payload proves which is which.
-     */
+    // Captured verbatim from Google: the reason we act on sits in `error.details[]`, while
+    // `error.errors[0].reason` holds an unrelated "forbidden" that would misdiagnose it.
     const CAPTURED_GOOGLE_403 = {
       error: {
         code: 403,
@@ -769,11 +763,8 @@ describe("validateProviderApiKey", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    /**
-     * Found end to end, not by a mock. Asked about a plainly invalid key the primary endpoints return Google's canonical API_KEY_INVALID, while the OpenAI-compatible
-     * surface answers "Please pass a valid API key" with no reason at all. Preferring whichever refusal merely differed from our own wording picked that vaguer one
-     * and appended it, producing "Invalid API key. Please check your API key and try again. Please pass a valid API key" against a live key.
-     */
+    // Found end to end: preferring whichever refusal merely differed from our own wording once
+    // picked a vaguer fallback message and appended it, garbling the real provider verdict.
     it("prefers the provider's verdict over a vaguer fallback message", async () => {
       const canonical = {
         ok: false,

@@ -1,31 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression cover for issue #5759, where a custom model's configured
- * Display Name never reached ProviderModelSelector: it rebuilt every
- * item's label from the raw Model ID via
- * `value.split("/").slice(1).join("/")`, and the same fallback hit the
- * inherit entry's subtitle and the collapsed trigger's placeholder.
- * Labels now resolve through `modelDisplayLabel` off an optional
- * `displayNames` prop.
- *
- * The prop is optional, so dropping it at a call site would compile
- * silently — these tests are what makes that fail instead. Note the
- * label is resolved where `selectOptions` is BUILT, not where it is
- * rendered: the search filter matches on `item.label`, so a
- * render-only fix would make the item vanish when a user types the
- * name they can see (see the search tests below).
- *
- * Query strategy: Select.Content (role="listbox") is mounted in the DOM
- * whether or not the dropdown is open (Ark/Chakra Select only toggles a
- * `hidden` attribute + `data-state`), so item labels are queryable via
- * `within(listbox).getByText(...)` without driving a click. Unscoped
- * `screen.getByText`/`queryByText` is unsafe here: Chakra's
- * `Select.HiddenSelect` mirrors every item as a native `<option>`
- * sibling, so any label also rendered in the real listbox produces a
- * "multiple elements found" error unless queries are scoped to the
- * listbox (for item text) or the trigger (for the collapsed value).
- *
+ * Regression for #5759 (label resolved where `selectOptions` is built, not at render, since search
+ * filters on `item.label`). Queries scope to listbox/trigger since `Select.HiddenSelect` mirrors
+ * every item as a native `<option>` too.
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

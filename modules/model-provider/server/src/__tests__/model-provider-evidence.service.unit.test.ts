@@ -44,11 +44,7 @@ function testDatabase(row: { id: string } | null) {
 
 describe("ModelProviderEvidenceService", () => {
   describe("given a project whose organization holds an enabled provider", () => {
-    /**
-     * The read that answers the setup checklist's provider step is this feature's, so the `where` it
-     * issues is one place and the columns it selects are governed by the same rules as every other read of
-     * this table. It selects an id: a credential column never leaves the database to answer a boolean.
-     */
+    /** Selects only an id — a credential column never leaves the database to answer a boolean. */
     it("matches the project, team and organization scopes without selecting a credential", async () => {
       const { findFirst, database } = testDatabase({ id: "provider-1" });
       const evidence = PostgresModelProviderEvidenceAdapter.create({

@@ -1,17 +1,5 @@
-/**
- * Which model a feature actually runs on.
- *
- * A default can be set at three scopes and more than once at each, so
- * resolving one is a precedence question: the nearest scope wins, and within a
- * scope the most recently created config does. Both are one line — the tier
- * order and a `createdAt` sort — and both decide, silently, which model a
- * customer's traffic goes to and what it costs.
- *
- * Driven through `getSnapshot` with no actor, which is what makes this cheap:
- * without one the visibility and writability filters short-circuit, so the only
- * collaborators that take part are the scope context, the config store and the
- * feature catalogue.
- */
+// A default can be set at three scopes and more than once at each: the nearest scope wins, and
+// within a scope the most recently created config does — both decide silently which model runs.
 
 import { describe, expect, it } from "vitest";
 import { ModelProviderDefaultsService } from "../model-provider-defaults.service.ts";

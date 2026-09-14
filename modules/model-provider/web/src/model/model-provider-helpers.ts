@@ -73,26 +73,9 @@ function schemaDemandsKey({
 }
 
 /**
- * Which credential fields the drawer marks required, right now.
- *
- * Requiredness is not a property of a field on its own: a provider that
- * accepts either an API key or a base URL (self-hosted endpoints commonly
- * run unauthenticated) needs the key only while no base URL is set. That
- * either/or lives in the provider's schema as a refinement, so the answer
- * is derived from the schema against the values entered so far, and it
- * moves as the customer types. Any provider that adopts the same shape
- * gets this for free, with nothing to declare.
- *
- * `optionalKeys` still declares the fields that are never required
- * (overrides with a working default, such as the base URL itself). The
- * schema may only relax requiredness from there, never tighten it: the
- * credential schemas are deliberately permissive so a key can also arrive
- * from an environment variable, which says nothing about what the customer
- * must type here.
- *
- * Values are trimmed before the schema sees them, so a field holding only
- * spaces counts as blank here whether or not the provider's own refinement
- * remembers to trim.
+ * Requiredness is derived from the schema against values typed so far (not static), since some
+ * providers accept either an API key or a base URL. `optionalKeys` can only relax it further,
+ * never tighten it. Values are trimmed first so whitespace-only counts as blank.
  */
 export function getRequiredCredentialKeys({
   keysSchema,
@@ -293,14 +276,9 @@ export function hasUserModifiedAnyCredential({
 }
 
 /**
- * An extra-header list reduced to what the customer can actually change:
- * the ordered key and value pairs.
- *
- * The form's own header objects carry a `concealed` flag that drives the
- * show/hide eye and never leaves the browser, so a whole-object compare
- * against the stored list always differs and reports a dirty form over an
- * untouched one. Order is kept, because dragging headers into a new order is
- * a real edit.
+ * Drops the form-only `concealed` flag before comparing, so a whole-object diff against the
+ * stored list doesn't report every untouched form as dirty. Order is kept: reordering is a
+ * real edit.
  */
 export function headerSignature(
   headers: { key: string; value: string }[] | null | undefined,

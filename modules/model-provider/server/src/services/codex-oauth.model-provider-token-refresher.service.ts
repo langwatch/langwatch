@@ -10,8 +10,7 @@ import { CodexTokenRefresher } from "../app/model-provider.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Sign in with your OpenAI account for the Codex provider, so requests bill the user's ChatGPT plan instead of API credits. This is OpenAI's own
- * device-code flow, the one the codex CLI ships (and the same client id, so approvals land on OpenAI's official "Codex CLI" grant screen):
+ * OpenAI's device-code flow (codex CLI's own client id) so requests bill the ChatGPT plan.
  * Spec: specs/model-providers/codex-account-provider.feature
  */
 
@@ -28,11 +27,7 @@ export interface CodexDeviceCode {
 /** One poll's outcome: still waiting, or a full token set. */
 export type CodexPollResult = { status: "pending" } | { status: "complete"; keys: CodexTokenKeys };
 
-/**
- * A HandledError (not a bare Error) so the tRPC error formatter serializes it as an expected failure —
- * the sign-in UI shows `message` verbatim and nothing logs as an unhandled 500. `kind` discriminates
- * the poll loop's "keep waiting" cases from terminal ones.
- */
+/** HandledError so the sign-in UI shows `message` verbatim without logging an unhandled 500. */
 export class CodexAuthError extends HandledError {
   /** The issuer's HTTP status for kind "http" — what separates an OAuth
    *  rejection (4xx + error body) from a retryable outage (5xx, network). */
@@ -123,11 +118,7 @@ export class CodexAccountService {
     };
   }
 
-  /**
-   * One poll of the pending sign-in. 403/404 from the endpoint mean "the user hasn't approved yet" —
-   * reported as pending, never as failure. Approval returns the server-made PKCE pair, which is
-   * exchanged for tokens immediately (the authorization code is single-use).
-   */
+  /** 403/404 mean "not approved yet" and report as pending, never as failure. */
   async pollDeviceSignIn(args: {
     deviceAuthId: string;
     userCode: string;
@@ -158,9 +149,8 @@ export class CodexAccountService {
   }
 
   /**
-   * Refresh an expired access token. Only a CONFIRMED OAuth rejection (the issuer answering 4xx with `invalid_grant`: revoked, or the refresh token aged out)
-   * becomes `refresh_rejected` — the terminal signal that sends the user back to sign-in. A timeout, DNS failure, issuer 5xx, rate limit or malformed body stays a
-   * retryable failure: the session may be perfectly valid, and telling its owner to re-authenticate for OpenAI's outage would sign them out for nothing.
+   * Only a confirmed `invalid_grant` rejection becomes `refresh_rejected`; a timeout or 5xx
+   * stays retryable so an OpenAI outage never forces the user to re-authenticate.
    */
   async refresh(keys: CodexTokenKeys): Promise<CodexTokenKeys> {
     const form = new URLSearchParams({

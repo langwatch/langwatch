@@ -1,14 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Customer report (2026-08-13): the Add config drawer at organization
- * scope offered "Inherit (from project)" (inheritance can only flow
- * from wide to narrow), saving with it selected reached the backend as
- * an empty config and surfaced a raw 500, and each save stacked one
- * more row for the same scope.
- *
- * Binds the drawer scenarios in
- * specs/model-providers/role-based-default-models.feature.
+ * Regression for a bug where the org-scope drawer offered "Inherit (from project)" — inheritance
+ * only flows wide to narrow — saving it as empty config surfaced a raw 500 and stacked rows.
+ * Binds specs/model-providers/role-based-default-models.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

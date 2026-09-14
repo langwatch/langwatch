@@ -1,15 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * LLM Model Costs, driven the way a reader drives it.
- *
- * `platform/app/src/pages/settings/model-costs.tsx` and the component it wrapped
- * had NO test of their own - only the drawer beneath them did - so these are
- * new, and they pin the three things the move could plausibly have broken: the
- * grant on the write control, the address each editor action writes, and the
- * failure path handing the raw error to the host rather than composing a
- * sentence out of it.
- *
+ * New tests — the moved screen and its old wrapper had none, only the drawer beneath did. Pins the
+ * write-control grant, each editor action's address, and the raw-error-to-host failure path.
  * Spec: specs/model-providers/model-cost-scoping.feature
  */
 

@@ -1,25 +1,4 @@
-/**
- * Feature registry — the single source of truth for every AI-powered
- * surface in the platform that needs a model.
- *
- * Each entry binds a stable feature key to one of the model roles
- * (DEFAULT / FAST / LANGY / EMBEDDINGS) and supplies the copy the UI renders
- * when surfacing the role expansion list or the missing-model popup.
- *
- * Rules:
- *   - Keys are snake_case, area-prefixed, and STABLE FOREVER. We deprecate,
- *     never rename. Renaming would orphan every saved override that points
- *     at the old key.
- *   - Adding a new model-using surface is a one-line registry change: drop
- *     a declaration here and `resolveModelForFeature` knows how to walk for
- *     it everywhere. The role lines + their expansion lists in the Default
- *     Models UI also re-render automatically.
- *   - Duplicate keys throw at module load so a copy-paste mistake can't
- *     silently swallow one of the declarations.
- *
- * See specs/model-providers/model-resolver-and-registry.feature for the
- * resolution semantics and the contract this file underpins.
- */
+/** Model roles per platform surface; keys stable forever (never rename). */
 
 export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
 export type ModelRole = (typeof MODEL_ROLES)[number];

@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * EditModelProviderForm is parent-gated: LLM-only sections hide when the registry `type` isn't "llm" — e.g. `azure_safety`.
+ * EditModelProviderForm is parent-gated: LLM-only sections hide when the registry `type` isn't
+ * "llm" — e.g. `azure_safety`.
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

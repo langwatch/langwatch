@@ -1,41 +1,4 @@
-/**
- * Unit tests for how `buildCustomModelDisplayNames()` ranks ROWS against
- * each other — the `precedence` / `byPrecedence` half of the resolver.
- * The scope tier those functions consult is ranked by `rankOf` /
- * `scopeRank` and covered in `customModelDisplayNames.scopeRank.unit.test.ts`.
- *
- * Pinned for issue #5837, where a configured custom-model Display Name
- * silently failed to resolve in production. Two of the four ways the
- * function was lossy are this file's subject (labeled by the AC each now
- * guards — see the coverage map in
- * specs/model-providers/custom-model-display-name-resolution.feature):
- *
- *   AC2  — a legacy `string[]` row converted (via `toLegacyCompatibleCustomModels`)
- *        to an entry whose `displayName === modelId` (an "identity" entry)
- *        could clobber a real configured name on another row of the same
- *        provider.
- *   AC3  — two rows of the same provider each defining a REAL name for the
- *        same `modelId` resolved to whichever row the caller happened to
- *        list last, instead of a precedence rule.
- *
- * The contract this file pins:
- *   - Identity entries (`displayName.trim() === modelId`) are not names —
- *     they never enter the map and never compete with a real name.
- *   - When several rows supply a REAL name for the same `modelId`, the
- *     winner is decided, in order: (1) `enabled: true` beats `enabled:
- *     false`; (2) narrowest scope wins (see the scopeRank file); (3) a
- *     persisted row (one with an `id`) beats a synthesized one without;
- *     (4) lowest row `id` lexicographically, as a final total-order
- *     tiebreak.
- *
- * Each tier is pinned by a PAIR of cases — one listing the winner first,
- * one listing it last. Each case's own comment says which resolver bug the
- * pair's other half would otherwise hide.
- *
- * Some cases below (marked inline) already held correctly before this
- * change — they're kept as forward guards so a future change to this
- * contract can't regress them.
- */
+/** Guard row-precedence tiers (enabled > scope > persisted > id lexically) (#5837 AC2/AC3). */
 import { describe, expect, it } from "vitest";
 import { toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
@@ -181,16 +144,8 @@ describe("given a persisted row and a row with no id that both define the same m
 
 describe("given a persisted row and a row with no id whose winning row is returned first", () => {
   describe("when display names are built across both rows", () => {
-    // The mirror of "given a persisted row and a row with no id..."
-    // above, which lists its winner (the persisted row) LAST — the order
-    // plain last-write-wins (the exact pre-fix production code this PR
-    // replaces) also resolves correctly, since the winner being last is
-    // exactly what last-write-wins rewards. That makes the case above
-    // pass for the wrong reason: it can't tell a correct persisted-tier
-    // rule from an incorrect last-write-wins rule. Swapping the order —
-    // winner first, loser last, as below — flips that: only a real
-    // persisted-tier rule still resolves the winner, while last-write-wins
-    // hands it to the loser. Verified by sabotage.
+    // Mirror case (winner first, loser last) catches last-write-wins vs.
+    // real persisted-tier rule; only the pair together pins precedence.
     it("prefers the persisted row's name whichever order the rows arrive in", () => {
       // Same discriminating shape as the case above: neither row carries
       // scopes, so the enabled and scope tiers tie and the id tiebreak

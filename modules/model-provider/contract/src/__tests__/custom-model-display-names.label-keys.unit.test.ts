@@ -1,24 +1,4 @@
-/**
- * Unit tests for the KEY FORMS `buildCustomModelDisplayNames()` writes and
- * the LABEL `modelDisplayLabel()` resolves from them.
- *
- * Pinned for issue #5837 (AC4/AC5/AC6 in the coverage map — see
- * specs/model-providers/custom-model-display-name-resolution.feature).
- * AC4 is the lossy one this file's first block guards: the map was keyed
- * `${provider}/${modelId}` only, so the canonical `${mpId}/${modelId}` form
- * a caller may hold could never hit (#5828).
- *
- * The contract this file pins:
- *   - The map is dual-keyed: every real name is written under both
- *     `${provider}/${modelId}` and, when `row.id` exists,
- *     `${row.id}/${modelId}`.
- *   - A model with no configured name resolves to the id's family part —
- *     the same label every selector rendered before display names existed.
- *
- * Some cases below (marked inline) already held correctly before this
- * change — they're kept as forward guards so a future change to this
- * contract can't regress them.
- */
+/** Guard dual-keying and fallback contract for custom model display names (#5837). */
 import { describe, expect, it } from "vitest";
 import { toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import {

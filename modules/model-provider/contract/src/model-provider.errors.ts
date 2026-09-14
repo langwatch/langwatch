@@ -128,14 +128,9 @@ export class ModelRestrictedForFeatureError extends HandledError {
 }
 
 /**
- * The same licence rule as {@link ModelRestrictedForFeatureError}, caught at
- * the other enforcement point: a codex model reaching execution rather than
- * being chosen as a feature's default.
- *
- * It is a separate code because the two are separate remedies — the feature
- * error names the feature whose default to change, and this one is a model
- * arriving at a surface it cannot run on, which may be a saved value that
- * predates the restriction.
+ * Same licence rule as {@link ModelRestrictedForFeatureError}, caught at execution
+ * instead of selection — a separate code because the remedy differs (a saved value
+ * predating the restriction, not a feature default to change).
  */
 export class ModelRestrictedForExecutionError extends HandledError {
   declare readonly code: "model_restricted_for_execution";
@@ -317,15 +312,9 @@ export class ModelProviderCredentialsUnreadableError extends HandledError {
 }
 
 /**
- * A skip-permissions pattern that does not compile as a regular expression
- * matches nothing, so storing it would leave the operator believing a model
- * is trusted to skip Langy's permission checks while the gate always says
- * no. The whole save is refused instead of storing a list that reads as
- * narrower than it looks.
- *
- * `meta.fieldErrors` names the field so the drawer shows the refusal on the
- * textarea rather than in a toast, and `meta.line` is the one-based line the
- * operator has to correct.
+ * A pattern that doesn't compile matches nothing, so storing it would silently leave
+ * the operator's model untrusted; the whole save is refused instead. `meta.fieldErrors`
+ * routes the refusal onto the drawer's textarea rather than a toast.
  */
 export class ModelProviderSkipPermissionsPatternInvalidError extends HandledError {
   declare readonly code: "model_provider_skip_permissions_pattern_invalid";
@@ -376,16 +365,9 @@ export class ModelDefaultScopeForbiddenError extends HandledError {
 }
 
 /**
- * A credential that names a project but nobody in it tried to write a default.
- *
- * Not a permission refusal like {@link ModelDefaultScopeForbiddenError}: the
- * caller may well be allowed, but the key does not say who they are, so there
- * is nobody to check. 403 rather than 401 because the request IS
- * authenticated — telling an API caller they are not sends them to inspect a
- * key that is working, which is the confusion this error was written to end.
- *
- * Only an API or CLI caller can reach it, so the copy names the two ways out
- * rather than sending them to an admin.
+ * A project-scoped key with no user attached to check permission for. 403 not 401 —
+ * the request IS authenticated, it just names nobody, and 401 would send a caller to
+ * inspect a working key.
  */
 export class ModelDefaultUserKeyRequiredError extends HandledError {
   declare readonly code: "model_default_user_key_required";

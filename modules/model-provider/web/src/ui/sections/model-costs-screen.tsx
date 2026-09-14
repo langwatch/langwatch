@@ -1,20 +1,6 @@
 /**
- * LLM Model Costs - every per-token rate the project resolves, catalogue rows
- * and stored overrides together.
- *
- * Green marks a rate that comes from a stored cost rule at whatever scope,
- * rather than from the model catalogue, so a reader can tell at a glance which
- * numbers someone here decided.
- *
- * Moved from `platform/app/src/pages/settings/model-costs.tsx` and the component
- * it was a two-line wrapper around,
- * `platform/app/src/components/settings/LLMModelCost.tsx`. The editor itself is
- * `llmModelCost`, a registered drawer this move does NOT take: the unmapped-cost
- * suggestion inside a trace opens the same drawer, so deleting its registry
- * entry would break a surface that has not moved. The screen names the drawer
- * and the host writes the address - see `ModelProviderHostApi.openPlatformDrawer`
- * for the gap that leaves.
- *
+ * Green marks a rate from a stored cost rule rather than the model catalogue. The `llmModelCost`
+ * drawer stays registered outside this move — a trace's unmapped-cost suggestion opens it too.
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 

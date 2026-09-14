@@ -1,27 +1,6 @@
 /**
- * The model-provider feature's application: what its three doors call.
- *
- * `modelProvider.*`, `llmModelCost.*` and `translate.*` are all this feature
- * answering, and before this each declared its own private bag —
- * `Readonly<{ modelProviders: ModelProviderGateway }>` in two of them and
- * `Readonly<{ modelProviders; traces: { spans } }>` in the third. Three
- * descriptions of one composition, agreeing by attention rather than by
- * construction, and none of them reachable from the others.
- *
- * Most operations are the service's own, reached through the dependency below.
- * What lives here as a method is what a door would otherwise have to know:
- *
- *   - attributing a write to its caller. Eleven handlers stamped it for
- *     themselves, under two different field names (`actorId` on every write,
- *     `authorId` as well on a default assignment), which is exactly the kind
- *     of detail a transport should never be trusted to get right twice;
- *   - pointing the coding-assistant roles at the Codex model, which
- *     `codexSignInPoll` and `codexApplyCodingDefaults` each looped over for
- *     themselves with the same two roles and the same model.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
+ * `translate.*` all call, so caller attribution and Codex-role defaults are written once.
  */
 import {
   CODEX_DEFAULT_MODEL,
@@ -176,13 +155,8 @@ type ModelProviderSetup = FeatureSetup<
 const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
 
 /**
- * Config schema. Every field mirrors a value `apps/api`'s own
- * `ApiModelProviderConfigResolution` already resolves — the hosted flag, the
- * SSRF fence, and the raw environment a system provider's fallback
- * credential reads from — so this module reads it as config rather than
- * rederiving it from a `secrets` member of its own. Defaults answer the
- * deleted composition's own absent-config answer: never enabled, never
- * reachable outside its own network, TLS verified.
+ * Mirrors `apps/api`'s `ApiModelProviderConfigResolution` so this module reads config rather
+ * than rederiving it; defaults match the deleted composition's absent-config answer.
  */
 const modelProviderAppConfigSchema = z.object({
   /**
@@ -453,13 +427,8 @@ export class ModelProviderApp implements ModelProviderApi {
   }
 
   /**
-   * Points the coding-assistant roles at the Codex model.
-   *
-   * Role-level writes rather than per-feature ones, at the widest scope the
-   * caller picked: the values cascade down from there. Written here because
-   * both the sign-in poll and the after-the-fact "yes please" dialog perform
-   * exactly this, and two copies of "which roles a Codex account serves" is
-   * two chances to answer it differently.
+   * Points the coding-assistant roles at the Codex model, at the widest scope picked.
+   * Shared by the sign-in poll and the "yes please" dialog so both agree on the roles.
    */
   async applyCodexCodingDefaults(
     input: Readonly<{ scopes: readonly ModelDefaultScope[] }>,
@@ -586,14 +555,8 @@ export class ModelProviderApp implements ModelProviderApi {
   }
 
   /**
-   * What a cost rule the caller is still typing would match, priced under the
-   * rates they have entered so far.
-   *
-   * The reader is the trace read stack's, carried through this application as
-   * an opaque handle: only a process that composed one knows its concrete
-   * type, and a process that composed none must say so rather than answering
-   * "no matching spans" — an empty preview would talk somebody out of a rule
-   * that works.
+   * What a cost rule the caller is still typing would match, priced under rates entered so far.
+   * Throws when no span reader was composed, rather than a false "no matching spans".
    */
   previewCostRuleMatchingSpans(
     input: ModelCostPreviewRequest,

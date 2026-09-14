@@ -15,25 +15,8 @@ const ALWAYS_PASSED_THROUGH_PARAMS = new Set([
 ]);
 
 /**
- * Resolve the set of sampling parameters a model accepts.
- *
- * Order of precedence:
- *   1. Project-level `customModels[*].supportedParameters` override —
- *      explicit allowlist set by an operator on the Edit Model form.
- *   2. Built-in `llmModels.json` registry `supportedParameters`.
- *   3. `null` — model is unknown, callers MUST treat as "do not filter"
- *      so the legacy behavior of forwarding every set field is preserved.
- *
- * Returning an empty array `[]` is meaningful: it means the operator
- * has explicitly said "this model accepts no sampling knobs", so every
- * sampling field should be stripped. The caller distinguishes
- * `null` (no info) from `[]` (explicit empty) before filtering.
- *
- * Fix #4429 case: a Bedrock custom model with supportedParameters set
- * to `["temperature"]` was still receiving a leftover `top_p` from a
- * stale prompt-config blob, causing `temperature and top_p cannot both
- * be specified` from Bedrock. With the registry consulted at dispatch,
- * the `top_p` is dropped before the request leaves the control plane.
+ * Precedence: operator override on the model, then the registry, then `null` (unknown,
+ * do not filter). `[]` is a distinct explicit "no sampling knobs" from `null` (#4429).
  */
 export function resolveSupportedParameters(
   modelId: string,
@@ -52,16 +35,8 @@ export function resolveSupportedParameters(
 }
 
 /**
- * Drop every key in `params` that the model does not list as supported.
- * `max_tokens` is always preserved — it is a hard ceiling rather than a
- * sampling knob, and gateway-side dispatchers (anthropic, bedrock,
- * openai) all require it. Reasoning is keyed under both `reasoning`
- * and its mapped provider-specific name (e.g. `reasoning_effort`,
- * `thinkingLevel`); both clear together when the model can't reason.
- *
- * When `allowed` is `null` (model unknown), no filtering happens —
- * the caller sees the input untouched. This preserves legacy behavior
- * for any model we don't have metadata for yet.
+ * Drop unsupported keys; `max_tokens` always survives (gateways require it regardless
+ * of registry support), and `null` (model unknown) skips filtering entirely.
  */
 export function filterUnsupportedSamplingParams<T extends Record<string, unknown>>(
   params: T,

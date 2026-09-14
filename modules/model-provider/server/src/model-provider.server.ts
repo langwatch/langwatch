@@ -27,15 +27,8 @@ export const modelProviderServer = defineServerModule("model-provider")
     llmModelCostTrpcTransport,
     translateTrpcTransport,
   )
-  // Null for a credential that names no key row - a legacy project key - which
-  // is what the snapshot's per-member view is filtered on.
-  //
-  // The playground's own caller (the signed-in person and their standing on
-  // the project header names) and its execution proxy address are resolved by
-  // the PROCESS - a session cookie and a platform address, neither of which
-  // this module can answer for itself - and stay bound on the host's own
-  // fact list. `x-model`, `x-project-id` and `x-system-prompt` travel as
-  // plain headers and need no such collaborator.
+  // The playground's caller and execution proxy address are resolved by the process (session
+  // cookie, platform address) and stay on the host's fact list; other headers need no collaborator.
   .withTransportFacts(() => [
     bindRestMiddleware(modelDefaultsRestCredential, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);

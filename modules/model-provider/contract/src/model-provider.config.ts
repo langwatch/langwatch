@@ -8,19 +8,9 @@ import {
 import { z } from "zod";
 
 /**
- * The address fence an outbound provider call is judged by, the engine it is
- * proxied through, and the model a target that names none falls back to.
- *
- * Whether this deployment is the hosted product is not here: that is one fact
- * from one variable and the SaaS feature owns it, so SYSTEM providers are
- * gated explicitly rather than inferred from a provider key a self-hosted
- * install happens to export.
- *
- * `blockLocalHttpCalls` reads `1` or a case-insensitive `true` and nothing
- * else, because a probe answered differently by two processes is a credential
- * that saves on one screen and fails on another. An unset allowlist is an
- * EMPTY one, never a wildcard: a fence that stops fencing because a variable
- * was absent is the failure this leaf prevents.
+ * The address fence an outbound provider call is judged by. An unset allowlist is
+ * EMPTY, never a wildcard — a fence that stops fencing on an absent variable is the
+ * failure this leaf prevents.
  */
 export const modelProviderServerConfigDefinition = RuntimeConfig.define({
   blockLocalHttpCalls: Config.value(environmentOneOrTrueSchema, {

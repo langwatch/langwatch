@@ -1,29 +1,9 @@
 /**
- * The words a connection-test verdict is rendered as.
- *
- * A refusal travels as a SERIALIZED handled error on the verdict payload — a
- * return value rather than a throw, because asking a provider and being told no
- * is a successful question — so its copy is resolved from the stable `code` the
- * same way every other failure in the product is. `platform/app`'s
- * `explainSerializedError` did that against the ~90-entry presentation registry
- * in `features/errors`, which a feature-web package may not reach.
- *
- * SO THIS FAMILY CARRIES THE SEVEN CODES ITS OWN PROBE RAISES, VERBATIM, rather
- * than degrading them to the generic line the way `describe-error.ts` does in
- * `gateway-web`, `ops-web` and `user-web`. The difference is what the copy is
- * FOR: on those surfaces a code-specific sentence is a nicety, and here it is
- * the whole feature — "that API key was refused" and "nothing answered, so this
- * key was not checked" send a customer to two different places, and collapsing
- * them into "something went wrong" is the misdiagnosis this area exists to
- * avoid. The seven entries below are copied from
- * `platform/app/src/features/errors/logic/presentation.ts` and must be kept in
- * step with it until the registry harvest lands; `provider-refusal-copy.unit.test.ts`
- * is what says so.
- *
- * THE PROVIDER'S OWN SENTENCE IS NEVER RENDERED. A rejected-credential body is
- * where the credential itself tends to turn up — Gemini puts the key in the
- * query string it quotes back — so an unregistered code gets our generic line
- * and nothing of what arrived with it.
+ * Renders a connection-test verdict from its stable `code`, carrying the seven codes the probe
+ * raises verbatim (unlike `describe-error.ts` elsewhere, since here the specific sentence is the
+ * whole feature) — kept in step with `platform/app`'s presentation registry by
+ * `provider-refusal-copy.unit.test.ts`. The provider's own sentence is never rendered, since a
+ * rejected-credential body (e.g. Gemini's) can echo the credential back.
  */
 
 /** The generic line for a failure we cannot name, and the floor under the rest. */

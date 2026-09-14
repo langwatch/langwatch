@@ -310,7 +310,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
      *  alone, still selectable so a pinned key can be cleared back to
      *  inherit. */
     model?: string;
-    /** Short label shown above the model, e.g. "Inherit (from organization)" or "Not configured". */
+    /** Short label above the model, e.g. "Inherit (from organization)" or "Not configured". */
     label: string;
   };
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`.

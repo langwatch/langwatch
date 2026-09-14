@@ -1,13 +1,4 @@
-/**
- * The model allowlist that gates Langy's skip-permissions toggle (ADR-129).
- *
- * A provider carries regular expression sources naming the models trusted to
- * run commands on a developer's machine without asking. The registry ships a
- * default per provider; an operator can replace it on the provider row.
- *
- * Everything here is pure, so the drawer and the server gate read the same
- * rule. Nothing in this module touches the database.
- */
+/** Langy skip-permissions allowlist (ADR-129); pure logic shared between drawer and server. */
 import { modelProviders } from "../model-provider-registry.ts";
 
 /** One entry per line, blanks and surrounding spaces dropped. */

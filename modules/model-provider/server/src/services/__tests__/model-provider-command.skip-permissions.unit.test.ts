@@ -1,13 +1,5 @@
-/**
- * The Langy skip-permissions allowlist (ADR-129) is regular-expression
- * source per line. A pattern that never compiles matches nothing, so
- * storing it would leave the operator believing a model is trusted when the
- * gate always says no — the whole save must be refused, on both the create
- * and the update path, before any database work runs.
- *
- * Only the collaborators the happy path actually touches are stubbed; the
- * rest are left unbuilt rather than stubbed into noise.
- */
+// A regex pattern (ADR-129) that never compiles matches nothing, so storing it would leave the
+// operator believing a model is trusted when the gate always says no — the save must be refused.
 
 import { describe, expect, it } from "vitest";
 import { ModelProviderSkipPermissionsPatternInvalidError } from "@langwatch/model-provider-contract";

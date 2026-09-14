@@ -52,15 +52,9 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
 
   const title = providerName;
 
-  // Editing a specific existing row also has to wait on the flat list:
-  // rendering the form off the (collapsed-record-only) blank fallback
-  // and then resetting once the flat list arrives would wipe whatever
-  // the user had already typed.
-  //
-  // The collapsed record is a per-project read, so it never arrives when
-  // there is no project. Waiting on it there is waiting on a query that
-  // was never issued, which is a spinner that never stops; the org-wide
-  // flat list below is what the form actually resolves rows from.
+  // Waits on the flat list, not just the collapsed record: resetting the form once
+  // it arrives would wipe what the user typed, and the collapsed record never arrives
+  // without a project, so waiting on it alone would spin forever.
   const isCollapsedRecordPending = !!projectId && (isLoading || !providers);
   const isFormDataLoading =
     isCollapsedRecordPending || (isEditingSpecificRow && isAllProvidersLoading);

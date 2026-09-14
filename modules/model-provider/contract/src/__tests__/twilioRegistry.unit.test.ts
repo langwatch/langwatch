@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The Twilio model-provider registry entry: a non-LLM safety-class credential
- * container with three keys, only the auth token secret. Complements the
- * registry-walking credentialFieldClassification test with the twilio-specific
- * assertions the slice-2 brief calls for.
- *
+ * Guard Twilio registry entry: non-LLM safety-class credential container.
  * @see specs/features/agents/voice-phone.feature
  */
 import { describe, expect, it } from "vitest";

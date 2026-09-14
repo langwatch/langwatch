@@ -28,20 +28,10 @@ export type ModelProviderEgressPolicy = Readonly<{
 }>;
 
 /**
- * The guarded way out of the process, for a credential probe.
- *
- * Every request it carries is a customer's credential going to a URL a
- * customer chose — several providers expose a configurable endpoint, and an
- * endpoint saved last month is as attacker-controlled as one supplied on this
- * call — so it goes through the shared SSRF fence: a cloud-metadata denylist
- * that no configuration relaxes, private-address blocking the deployment
- * configures, and IP pinning so a name cannot resolve to something else
- * between the check and the connection.
- *
- * Redirects are refused rather than followed. Measured on this repo's Node, a
- * cross-origin redirect strips `Authorization` but carries `x-api-key`,
- * `x-goog-api-key` and `xi-api-key` straight through to the new host, and a
- * models listing has no business hopping.
+ * The guarded way out of the process for a credential probe against a customer-chosen URL —
+ * routed through the shared SSRF fence (metadata denylist, private-address block, IP pinning).
+ * Redirects are refused rather than followed, since a cross-origin redirect can carry
+ * `x-api-key`/`x-goog-api-key`/`xi-api-key` straight through to the new host.
  */
 export class SsrfModelProviderEgressAdapter extends ModelProviderEgress {
   static create(input: { policy: ModelProviderEgressPolicy }): SsrfModelProviderEgressAdapter {

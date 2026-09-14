@@ -1,14 +1,8 @@
 /**
- * What this package's suites mount a screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what a screen asked the application
- * to do — which query it wrote, which platform drawer it addressed, what it
- * reported — which is exactly the surface the real adapter answers. The same
- * shape `@langwatch/gateway-web`'s `testing.tsx` introduced.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * What this package's suites mount a screen inside. The host port is abstract,
+ * so a test constructs a fake that RECORDS what a screen asked of it, rather
+ * than mocking a module — not exported, since only this package's tests should
+ * construct a host.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

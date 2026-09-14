@@ -24,20 +24,9 @@ export function isSecretCredentialField(key: string): boolean {
 }
 
 /**
- * The credential field names a provider definition declares.
- *
- * Providers whose credentials are valid in more than one combination refine
- * their object (openai and anthropic: either an API key or a base URL), and
- * wrappers like `.optional()` hide `shape` a level down. Unwrap them, or those
- * providers silently report no credential keys at all — which is a provider
- * whose credential form renders empty, not an error anyone would see.
- *
- * Where each major puts the inner schema differs, and this reads all of them:
- * zod 3 wrapped a refined object in a `ZodEffects` (`_def.schema`) and exposed
- * a wrapper's inner schema as an `innerType()` method; zod 4 refines in place,
- * so `shape` is simply there, and a wrapper answers `.unwrap()` or
- * `_def.innerType`. Reading only zod 3's spellings is how the `.optional()`
- * case started returning nothing at all on the upgrade.
+ * The credential field names a provider definition declares. Must unwrap refined/optional
+ * schemas across both zod 3 (`ZodEffects`/`innerType()`) and zod 4 (`.unwrap()`/`_def.innerType`)
+ * spellings, or affected providers silently render an empty credential form.
  */
 export function getSchemaShape(schema: unknown, depth = 0): Record<string, unknown> {
   // Wrappers nest — `.optional().nullable()` is two of them — so this recurses,

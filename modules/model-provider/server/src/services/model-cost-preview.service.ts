@@ -202,9 +202,8 @@ export class ModelCostPreviewService {
   }
 
   /**
-   * Whether a span's detail view should suggest creating a model cost mapping: the span names a model
-   * and carries token usage, yet no cost was computed for it AND no stored rule matches the model. The
-   * last check keeps the suggestion off spans that pre-date a rule the reader already created.
+   * Whether a span's detail view should suggest a cost mapping: model + token usage present, no
+   * cost computed, and no stored rule matches — the last check excludes spans older than a rule.
    */
   async tryDeriveUnmappedCostSuggestion({
     costs,

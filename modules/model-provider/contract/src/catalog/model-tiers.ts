@@ -1,11 +1,6 @@
 /**
- * Model id tier grammar and version ranking, shared by the server-side
- * latest-alias resolver (`catalog/latest-aliases.ts`) and
- * the client-side provider-drawer picker (`utils/pickFlagshipModel.ts`)
- * so the model the drawer pre-fills is the model the org seed writes.
- *
- * Kept free of any catalog import: the client bundle must not pull in
- * `llmModels.json`.
+ * Shared by the server latest-alias resolver and the client provider-drawer
+ * picker; kept free of any catalog import so the client bundle never pulls in `llmModels.json`.
  */
 
 /** Newest-first sort key. `rank` breaks ties inside one generation. */
@@ -23,15 +18,8 @@ export function compareModelSortKeys(a: ModelSortKey, b: ModelSortKey): number {
 export type OpenAIVariant = "flagship" | "mini";
 
 /**
- * OpenAI's flagship tiers, newest naming last.
- *
- * Through GPT-5.5 a generation's flagship was its unsuffixed id
- * (`gpt-5.5`). GPT-5.6 replaced that with named tiers and ships no
- * unsuffixed id at all, so matching on "no suffix" alone finds nothing
- * in the newer generation and the alias silently keeps serving GPT-5.5.
- *
- * The number is a tiebreak used only when one generation offers both
- * spellings; the named tier wins.
+ * OpenAI's flagship tiers, newest naming last. GPT-5.6 replaced the unsuffixed-id
+ * convention with named tiers, so matching on "no suffix" alone would miss it.
  */
 export const OPENAI_FLAGSHIP_TIERS: Record<string, number> = {
   "": 0,
@@ -50,17 +38,9 @@ export const OPENAI_FAST_TIERS: Record<string, number> = {
 const OPENAI_CHAT_ID = /^openai\/gpt-(\d+)\.(\d+)(-[a-z0-9-]+)?$/;
 
 /**
- * Ranks an OpenAI chat model id for the requested variant, or returns
- * null when the id is not a member of that variant's tier.
- *
- * Both tier maps are allow-lists, which is what keeps everything that
- * is not a general-purpose chat tier out of role defaults: `-pro`
- * serving modes (the same model at higher reasoning effort, priced for
- * hard one-off problems rather than every assistive call), `nano`,
- * `codex`, `chat` and the image spin-offs. `terra` is deliberately
- * absent too: a balanced middle tier answers neither "most capable"
- * nor "fastest", so it stays explicitly selectable without ever being
- * picked automatically.
+ * Ranks an OpenAI chat model id for the requested variant, or null if it isn't a
+ * member of that tier. Both tier maps are allow-lists, keeping `-pro`, `nano`,
+ * `codex`, `chat`, image spin-offs and `terra` out of automatic role defaults.
  */
 export function rankOpenAIChatModel({
   id,

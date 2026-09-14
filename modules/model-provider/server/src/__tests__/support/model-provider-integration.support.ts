@@ -185,7 +185,10 @@ export async function createTenancyFixture(
   };
 }
 
-/** Fills in every field `PrismaModelProviderRepository.create` needs, defaults untouched by the test. */
+/**
+ * Fills in every field `PrismaModelProviderRepository.create` needs, defaults untouched by the
+ * test.
+ */
 export function buildModelProvider(overrides: {
   organizationId: string;
   provider: string;

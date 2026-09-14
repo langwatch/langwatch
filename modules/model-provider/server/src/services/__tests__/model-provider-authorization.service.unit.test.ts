@@ -1,25 +1,6 @@
-/**
- * Which permission a model-provider scope check actually asks for.
- *
- * This pins the mapping rather than asserting it is the right one, because
- * three places currently answer the question and they do not all agree:
- *
- *   - this service, which is what the write path REALLY checks;
- *   - the tRPC route's `serviceAuthorizedPolicy` declaration, whose own
- *     `reason` says the service is the thing that checks;
- *   - `platform/app`'s legacy `requiredManagePermission`, on the older RBAC
- *     path.
- *
- * They agree on ORGANIZATION and TEAM. On PROJECT this service asks for
- * `project:update` while the other two name `project:manage`, and those sit in
- * different roles: `project:update` is in MEMBER_ADDITIONS, `project:manage`
- * in ADMIN_ADDITIONS (modules/authz/contract/src/roles.ts).
- *
- * Which one the product wants is not a decision a test can make. What a test
- * CAN do is make the answer visible, so that changing it is a deliberate edit
- * to an assertion rather than a silent drift between three copies — the drift
- * that let these diverge in the first place.
- */
+// Pins the permission mapping rather than asserting it's right — three places currently answer
+// this question and disagree on PROJECT (`project:update` vs `project:manage`), so this test
+// exists to make drift between them a deliberate edit, not a silent divergence.
 
 import { describe, expect, it } from "vitest";
 import type { AuthzService } from "@langwatch/authz-contract";

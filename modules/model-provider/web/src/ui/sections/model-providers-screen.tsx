@@ -1,26 +1,7 @@
 /**
- * Model Providers - every credential the reader can see, and the default models
- * that resolve from them.
- *
- * A provider belongs to the ORGANIZATION and reaches the scopes attached to it,
- * so the write path takes either handle and a project is only the narrower one.
- * An organization on the agent-governance track has no project until it needs
- * one, and organization scope is the default for a new credential, so every
- * action here works with or without a project. See
- * specs/model-providers/providers-without-a-project.feature.
- *
- * NO CREDENTIAL VALUE IS ON THIS PAGE. The list procedure answers rows whose
- * stored keys the service has already masked, the connection test sends a row
- * id and nothing else, and the one place a key is typed is the editor drawer,
- * which this screen only ADDRESSES.
- *
- * Moved from `platform/app/src/pages/settings/model-providers.tsx`. The one
- * thing that did not travel with it has since arrived: the Codex
- * coding-defaults ask, queued by the editor drawer's form and answered here.
- * It has to be a PAGE-level mount, because the drawer that queues it closes the
- * moment the connect completes - a dialog inside the drawer would be unmounted
- * mid-question - and both halves now live in this package, so the store they
- * talk through is one module rather than two.
+ * Providers are org-scoped, so every action works with or without a project (see
+ * specs/model-providers/providers-without-a-project.feature). No credential value renders here —
+ * rows arrive pre-masked and only the editor drawer accepts a key.
  */
 
 import {
@@ -580,17 +561,8 @@ export default function ModelProvidersScreen() {
 }
 
 /**
- * What the last connection test said about this row.
- *
- * Three states, rendered three different ways on purpose. A check that could not
- * run reads as neutral rather than green: it is not a pass, and dressing it as
- * one would tell a customer their configuration is fine on the strength of never
- * having asked.
- *
- * The whole verdict lives in a polite live region. The text arrives well after
- * the click that asked for it, and a screen reader announces neither the
- * "Testing…" transition nor the answer replacing it - so without this the
- * control is a button that appears to do nothing at all.
+ * A check that could not run reads as neutral, never green, so a customer never reads "fine" from
+ * a test we never asked. The live region exists because the verdict arrives well after the click.
  */
 function ConnectionTestVerdict({ state }: { state: ConnectionTestState | undefined }) {
   const verdict = () => {
@@ -627,14 +599,8 @@ function ConnectionTestVerdict({ state }: { state: ConnectionTestState | undefin
 }
 
 /**
- * The shared "Add Model Provider" menu - same provider list, same grant, same
- * handler - wrapped around whatever trigger the caller passes (the header button
- * and the empty state's outline button). One helper for both call sites means
- * the provider list never drifts between the two surfaces.
- *
- * `disabledReason` is the single switch: set it and the trigger is inert with
- * that reason on hover, and no menu is mounted at all, so adding can never open
- * onto a list of providers that lead nowhere.
+ * One helper behind both the header button and the empty state's button, so the provider list
+ * never drifts between them. `disabledReason` set makes the trigger inert instead of a menu.
  */
 function AddModelProviderMenu({
   children,

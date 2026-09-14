@@ -1,12 +1,6 @@
 /**
- * What the cost-rule drawer's live preview answers, and the model ceilings
- * the model pickers read.
- *
- * Both lived in `platform/app`, so `LlmModelCostTrpcMembers` could only declare
- * `Promise<unknown>` and `unknown` for the two operations that publish them —
- * and `unknown` reaches the browser as `{}`. The drawer reads
- * `totalMatchedSpans`, `matchedModels`, `sampleSpans` and `unmatchedModels`
- * off the preview; every one of those reads was unchecked.
+ * What the cost-rule drawer's live preview answers, and the model ceilings the model
+ * pickers read. Moved out of `platform/app` so these shapes are checked, not `unknown`.
  */
 import { z } from "zod";
 

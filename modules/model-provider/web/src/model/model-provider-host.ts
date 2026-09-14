@@ -1,28 +1,8 @@
 /**
- * What the Model Providers and Model Costs screens ask of the application they
- * are mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make these screens
- * untestable outside a running application. They ask this port instead, and the
- * frontend feature that owns it — `apps/ui/src/features/model-provider` —
- * answers it by adapting the browser capabilities the application resolves.
- *
- * THE EIGHTH FAMILY TO DECLARE THIS SHAPE, after governance, gateway, the
- * personal workspace, automations, ops, agents, data governance and datasets.
- * Every one of those recorded that a repeat is the signal to promote it into
- * one place, and every one left it, for the same reason: promotion changes
- * packages a page-family move does not own. Recorded again in
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS FAMILY ASKS THAT THE OTHERS DID NOT is `openPlatformDrawer`. Three
- * of the overlays these pages reach are registered drawers in `platform/app`
- * with callers outside this family — the provider editor is opened by the
- * evaluator type selector, and the model-cost editor by the unmapped-cost
- * suggestion in a trace — so this move may not delete them, and a screen may
- * not carry a copy of a drawer registry. The screen NAMES the drawer and the
- * host writes the address, which is the shape the agents family settled.
+ * What the Model Providers and Model Costs screens ask of the application they are mounted in,
+ * since ADR-004 seals a feature-web package off from `@langwatch/ui`, the router, toasts and the
+ * session client. `openPlatformDrawer` exists because three overlays are `platform/app` drawers
+ * with outside callers, so a screen only names the drawer and the host writes the address.
  */
 
 import { createContext, useContext } from "react";
@@ -33,30 +13,18 @@ export type ModelProviderHostScope = {
   teamId: string | undefined;
   projectId: string | undefined;
   /**
-   * The project's SLUG, which is how it is addressed rather than how it is
-   * stored.
-   *
-   * Asked for by the cost drawer's matching-spans preview: each sample row
-   * opens that span's trace in a new tab, and a trace address is
-   * `/<projectSlug>/traces?...`. Undefined where no project is in scope, which
-   * is what makes the row un-clickable rather than a link to `/undefined`.
+   * The project's slug, used by the cost drawer's matching-spans preview to link each sample
+   * to `/<projectSlug>/traces?...`. Undefined keeps the row un-clickable instead of linking to
+   * `/undefined`.
    */
   projectSlug: string | undefined;
 };
 
 /**
- * The organization, teams and projects the reader can SEE.
- *
- * Two surfaces read it: the scope FILTER at the top of the page offers every
- * one of them, and the scope chips on a provider row resolve a scope id to the
- * name it should read as. Both were derived from the organization graph the
- * application shell already holds, which is where `useAvailableScopes` got them
- * in `platform/app`.
- *
- * Declared structurally rather than as `AvailableScopes` from
- * `@langwatch/authz-web`: the two are the same three fields, and naming that
- * package here would put a second `ui-screen-closure` finding on the family for
- * a shape the port can spell out.
+ * The organization, teams and projects the reader can see — used by the scope filter and by a
+ * provider row's scope chips. Declared structurally rather than importing `AvailableScopes`
+ * from `@langwatch/authz-web`, to avoid a second `ui-screen-closure` finding for a shape the
+ * port can spell out itself.
  */
 export type ModelProviderAvailableScopes = {
   organization: { id: string; name: string } | null;
@@ -128,29 +96,19 @@ export abstract class ModelProviderHostApi {
   abstract failed(failure: ModelProviderFailureNotice): void;
 
   /**
-   * Whether the application has already shown this failure to the reader.
-   *
-   * `platform/app`'s model-costs table asked `isHandledByGlobalHandler` before
-   * toasting, so a refusal the application already put on screen as a modal was
-   * not also toasted. A RECORDED GAP, answered `false`: that answer is a
-   * `WeakSet` four interceptors on `platform/app`'s MutationCache write to, and
-   * that cache does not wrap the client `apps/ui` builds. Same gap the datasets
-   * family recorded for `isReportedGlobally`, and it closes the same way.
+   * Whether the application already showed this failure to the reader (so it isn't toasted
+   * twice). Recorded gap, answered `false`: the backing `WeakSet` lives on `platform/app`'s
+   * MutationCache, which the `apps/ui` client build doesn't wrap — same gap the datasets
+   * family recorded for `isReportedGlobally`.
    */
   abstract isReportedGlobally(error: unknown): boolean;
 
   /**
-   * Puts a `platform/app` drawer's address in the URL.
-   *
-   * `params` are the DRAWER'S OWN parameter names, unprefixed — the `drawer.`
-   * vocabulary belongs to the host, which writes `?drawer.open=<drawer>` plus
-   * one `drawer.<name>` per parameter and clears every stale `drawer.*` key,
-   * exactly as `openDrawer` does.
-   *
-   * KNOWN GAP, shared with the agents, me, automations and gateway families:
-   * nothing mounts that registry above a screen served from `apps/ui` until the
-   * chrome layout route exists, so the address is right and the drawer does not
-   * open yet.
+   * Puts a `platform/app` drawer's address in the URL. `params` use the drawer's own
+   * (unprefixed) names; the host writes the `drawer.*` query keys, as `openDrawer` does. Known
+   * gap shared with the agents, me, automations and gateway families: nothing mounts the
+   * registry above an `apps/ui`-served screen yet, so the address is right but the drawer
+   * doesn't open.
    */
   abstract openPlatformDrawer(request: {
     drawer: ModelProviderPlatformDrawer;

@@ -18,19 +18,9 @@ import { useModelProviderHost, type ModelProviderHostApi } from "../../model/mod
 import type { ScopeAssignment } from "../../model/scope-assignment.ts";
 
 /**
- * The settings surface's post-connect question: should the just-connected
- * codex account also become the coding default? The Langy and onboarding
- * sign-ins answer it inline (setAsCodingDefaults); settings asks, because
- * someone adding a provider row is not necessarily choosing their org's
- * defaults.
- *
- * The ask is a page-level concern on purpose. The sign-in happens inside the
- * provider drawer, and the drawer closes the moment the connect completes
- * (the poll already persisted the row, so Save has nothing left to do), so a
- * dialog mounted inside it would be unmounted mid-question. The drawer
- * queues the ask here instead, and the model-providers page hosts the
- * dialog, so it opens over the refreshed provider list and survives the
- * drawer's whole lifecycle.
+ * Settings asks post-connect (unlike Langy/onboarding, which set it inline) since adding a row
+ * isn't necessarily choosing org defaults. Queued here, not shown in-drawer, because the drawer
+ * closes the moment connect completes and would unmount a dialog mid-question.
  */
 
 interface CodexCodingDefaultsAsk {

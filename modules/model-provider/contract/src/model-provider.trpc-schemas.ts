@@ -1,12 +1,7 @@
 /**
- * The input shapes the Model Provider tRPC surface parses.
- *
- * Kept apart from the service inputs in `model-provider.ts` on purpose. Those
- * are `.strict()` and require a non-empty id; these have always accepted (and
- * dropped) unknown keys, which is what keeps a forward-compatible client
- * working. Tightening one to match the other would turn a shrug into a
- * validation error, so the two shapes stay named separately rather than
- * collapsed into one.
+ * The input shapes the Model Provider tRPC surface parses. Kept apart from
+ * `model-provider.ts`'s `.strict()` service inputs so a forward-compatible client
+ * can send unknown keys without tightening one to match the other into a validation error.
  */
 import { z } from "zod";
 import { MODEL_ROLES } from "./catalog/model-feature-registry.ts";
@@ -229,17 +224,9 @@ export const modelDefaultInheritedValuesTrpcInputSchema = z.object({
 });
 
 /**
- * What the two reads the studio and the dock borrow answer.
- *
- * Both are this contract's own zod-inferred shapes.
- * `listAllForProjectForFrontend` answers the LIST PROJECTION rather than
- * `ModelProviderSummary`: the transport maps every row through the same
- * function the two `getAllForProject*` reads use, which is what
- * `ModelProviderListEntry` was declared for.
- *
- * `getResolvedDefault` answers `null` when nothing resolves — no override, no
- * role default and no provider to infer one from — and the caller falls back
- * to its own choice rather than refusing.
+ * What the two reads the studio and the dock borrow answer, both this contract's own
+ * zod-inferred shapes. `getResolvedDefault` answers `null` when nothing resolves and the
+ * caller falls back to its own choice rather than refusing.
  */
 export type ModelProviderListAllForProjectTrpcOutput = ModelProviderListEntry[];
 export type ModelDefaultResolvedTrpcOutput = ModelDefaultEffective | null;

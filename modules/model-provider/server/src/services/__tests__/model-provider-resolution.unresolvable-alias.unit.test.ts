@@ -52,7 +52,7 @@ function resolver() {
 }
 
 describe("ModelProviderResolutionService.resolve — unresolvable latest-alias exhaustion", () => {
-  /** @scenario 'Exhaustion caused by an unresolvable latest-alias still reports "nothing configured"' */
+  // @scenario Exhaustion caused by an unresolvable latest-alias still reports "nothing configured"
   it("throws plain ModelNotConfiguredError, not a restriction error", async () => {
     await expect(
       resolver().resolve({ projectId: "project-1", featureKey: PLAYGROUND }),

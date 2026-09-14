@@ -3,14 +3,9 @@ import { modelProviders as modelProvidersRegistry } from "@langwatch/model-provi
 import { getRequiredCredentialKeys } from "../model/model-provider-helpers.ts";
 
 /**
- * Credential fields the customer must fill in for this provider, given what
- * they have entered so far. Both the field rendering (required marker) and
- * the Save-time validation message read the same answer, so a field can
- * never be marked required by one and waved through by the other.
- *
- * See `getRequiredCredentialKeys`: providers that accept either an API key
- * or a base URL move a field in and out of the required set as the customer
- * types, so this recomputes with the values.
+ * Credential fields the customer must fill in, given what they have entered so far. Both field
+ * rendering and Save-time validation read this same answer so they can never disagree; see
+ * `getRequiredCredentialKeys` for how the required set shifts as the customer types.
  */
 export function useRequiredCredentialKeys({
   providerKey,

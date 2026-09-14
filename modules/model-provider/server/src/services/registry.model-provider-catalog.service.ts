@@ -43,15 +43,9 @@ export type RegistryModelProviderCatalogOptions = {
 };
 
 /**
- * The catalogue answered from the packaged provider registry and this
- * process's own configuration.
- *
- * Everything the base class can derive from the registry it still derives —
- * model lists, feature defaults, routing-handle rules, static cost rates. What
- * this adds is the four answers that are a DEPLOYMENT's rather than a
- * registry's: which system providers it credentials, what a stored credential
- * resolves to at execution time, whether an organization's provider is managed
- * by LangWatch, and what the provider itself says about a key.
+ * The catalogue answered from the packaged provider registry and this process's own
+ * configuration — the base class derives model lists and static rates; this adds the
+ * deployment-specific answers (system credentials, resolved execution keys, managed status).
  */
 export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
   static create(options: RegistryModelProviderCatalogOptions): RegistryModelProviderCatalogAdapter {

@@ -1,10 +1,6 @@
 /**
- * The two derivations the providers table makes from data it is handed: which
- * providers can still be added, and what order the configured rows read in.
- *
- * Pure, and out of the screen, because both are rules rather than markup —
- * "a deprecated provider accepts no new rows" and "an organization row sits
- * above a team row" are the kind of statement a test should be able to make
+ * The two derivations the providers table makes from data it is handed: which providers can
+ * still be added, and what order the configured rows read in. Kept pure so both are testable
  * without a DOM.
  */
 
@@ -29,14 +25,9 @@ export type AddableProvider = {
 };
 
 /**
- * Every registry provider is always addable — a project may hold "OpenAI" at
- * organization scope plus another "OpenAI" at project scope, and hiding the
- * already-configured ones prevented the very multi-instance flow the scope
- * picker exists to support.
- *
- * Deprecated providers are the one exclusion: the server refuses to create one,
- * so offering it would be a menu entry that leads to a refusal. Stored rows for
- * a deprecated provider still render in the table.
+ * Every registry provider is always addable, so multi-instance setups (an "OpenAI" at org scope
+ * plus another at project scope) stay possible. Deprecated providers are excluded since the
+ * server refuses to create them; their stored rows still render in the table.
  */
 export function addableProviders(): AddableProvider[] {
   return Object.keys(modelProvidersRegistry)
@@ -67,13 +58,9 @@ type OrderableProviderRow = {
 };
 
 /**
- * Configured rows, broadest scope first and by name within a scope — the same
- * order the virtual-key provider picker uses.
- *
- * The label is the row's OWN name, which the list procedure carries: a
- * multi-instance setup has "OpenAI" and "OpenAI2" and they must not sort or
- * read alike. Every row has one — the column is NOT NULL and the env-fed
- * pseudo-rows take the registry's name — so there is nothing to fall back to.
+ * Configured rows, broadest scope first and by name within a scope — the same order the
+ * virtual-key provider picker uses. Sorts by the row's own name (not the registry's), since a
+ * multi-instance setup has "OpenAI" and "OpenAI2" that must not read alike.
  */
 export function sortProvidersForTable<T extends OrderableProviderRow>(rows: readonly T[]): T[] {
   const scopeTypesOf = (row: T): string[] => {

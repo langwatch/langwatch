@@ -16,13 +16,8 @@ import { readableDate } from "../../model/display-formatters.ts";
 export const ADVANCED_ACCORDION_VALUE = "advanced";
 
 /**
- * Editable advanced draft. The parent form owns this state so the drawer's
- * single Save persists basic + advanced together in one
- * `api.modelProvider.update` mutation.
- *
- * Numeric inputs stay as raw strings until submit time so half-typed
- * values do not get coerced to NaN mid-keystroke; the form converts
- * them to `number | null` on the way out.
+ * Owned by the parent form so Save persists basic + advanced in one `update` mutation. Numeric
+ * inputs stay as raw strings until submit so half-typed values don't coerce to NaN mid-keystroke.
  */
 export interface ModelProviderAdvancedDraft {
   rateLimitRpm: string;
@@ -124,17 +119,9 @@ export function parseAdvancedDraft(draft: ModelProviderAdvancedDraft): ParsedAdv
 }
 
 /**
- * Advanced accordion on the ModelProvider drawer. Collapsed by default, so
- * the knobs nobody needs on first setup stay out of sight.
- *
- * Two audiences share it. `showGatewayFields` adds the gateway-only knobs
- * (rate limits, fallback priority, provider config, and the read-only health
- * state); `showSkipPermissionsField` adds the models allowed to skip Langy's
- * permission checks. Either one on its own is enough to render the section.
- *
- * State is owned by the parent form; this component is pure UI. The
- * Save button at the bottom of the drawer persists basic + advanced in
- * a single `update` round-trip.
+ * Collapsed by default so first-setup knobs stay out of sight. `showGatewayFields` and
+ * `showSkipPermissionsField` gate two independent audiences; either alone renders the section.
+ * Pure UI — state and the persisting Save button both live in the parent form.
  */
 export function ModelProviderAdvancedSection({
   modelProviderId,

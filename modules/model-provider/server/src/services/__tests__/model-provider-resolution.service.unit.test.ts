@@ -1,18 +1,6 @@
-/**
- * Which model a feature actually runs on.
- *
- * Two things are being decided here. The first is precedence — a project's
- * choice beats a team's beats the organization's, a feature-specific override
- * beats the role default, and the newest configuration wins a tie — and
- * getting it wrong sends a customer's traffic to a model they did not pick.
- *
- * The second is a licensing rule rather than a preference. A Codex model bills
- * the user's ChatGPT plan through a backend licensed for coding harnesses and
- * light assists, so it may run Langy and the FAST assists and nothing else.
- * The resolver has to step over one configured anywhere else — and say WHY,
- * because "this model is not allowed here" and "you have not configured one"
- * send the customer to different places.
- */
+// Two things are decided here: scope precedence for which model wins, and that a Codex model
+// (licensed only for Langy and FAST assists) is stepped over elsewhere with a distinct reason
+// from "you have not configured one" — the two send the customer to different places.
 
 import { describe, expect, it } from "vitest";
 import {

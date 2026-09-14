@@ -1,26 +1,7 @@
 /**
- * What each credential field is called, and where the customer finds it.
- *
- * A provider's `keysSchema` names its fields as environment variables —
- * `OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`. The editor keeps that as the
- * field's NAME, because it is what the customer's own provider dashboard and
- * their deployment configuration call it too; what it adds underneath is the
- * `description`, which says where to go and get one.
- *
- * THE FORM READS `description` AND NOT `label`. Both halves are carried because
- * both were written, and onboarding renders the label on its tiles; a
- * credentials field that swapped the variable name for prose would make the
- * form harder to match against a `.env` file, not easier.
- *
- * RECOVERED FROM
- * `platform/app/src/features/onboarding/regions/model-providers/registry.tsx`,
- * reduced to the half a form needs. What stayed behind is what only onboarding
- * uses: the tile icons, the default model and base URL each provider is seeded
- * with, and the external documentation links.
- *
- * KEYED BY THE BACKEND PROVIDER KEY, not by the onboarding tile's own key: a
- * few entries name themselves differently in the two places (`open_ai_azure` is
- * `azure` on the backend), and the form only ever knows the backend one.
+ * Field name stays the provider's own env var (matches the customer's `.env`); `description`
+ * carries the "where to get one" prose the form reads. Keyed by backend provider key, which
+ * sometimes differs from the onboarding tile's key (e.g. `open_ai_azure` vs `azure`).
  */
 
 export type ModelProviderFieldMetadata = {

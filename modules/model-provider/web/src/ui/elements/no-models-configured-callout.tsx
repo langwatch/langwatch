@@ -1,30 +1,6 @@
 /**
- * In-picker empty state for any model selection surface when the
- * project has no enabled model providers (or no models of the right
- * mode — chat vs embedding).
- *
- * Replaces the prior behaviour where ModelSelector rendered the bogus
- * system fallback string (e.g. "openai/gpt-5.2") in gray inside the
- * trigger. That looked like a real selection but every AI call errored
- * at runtime. This callout is the honest "you haven't configured
- * anything yet, here's where to go" affordance.
- *
- * v4 visual contract (rchaves feedback round 2):
- *   - Stacked OpenAI / Anthropic / Gemini provider icons (not a
- *     Settings gear) so the surface reads as 'about models' at a
- *     glance. Icons overlap each other by a few px to hint at a
- *     'choose from these' affordance.
- *   - White background so the row matches the regular model-picker
- *     chip styling instead of the gray bg.subtle of the prior cut.
- *   - 'No models configured' text at 0.8 opacity for a disabled-look
- *     hint that the surface is non-functional until set up.
- *   - 'Set up' button keeps a subtle gray fill (variant='subtle') so
- *     it reads as a real action without competing with primary CTAs.
- *   - The entire row is clickable (the button is a visual focal point
- *     but the click target is the whole component). Opens
- *     /settings/model-providers in a new tab. tRPC focus refetch
- *     picks up freshly configured providers on tab-return.
- *
+ * Replaces the old bogus fallback string (e.g. "openai/gpt-5.2") that looked like a real selection
+ * but errored every AI call at runtime — this is the honest "not configured yet" affordance.
  * See specs/model-providers/no-models-empty-state.feature.
  */
 import { Box, Button, HStack, Text } from "@chakra-ui/react";

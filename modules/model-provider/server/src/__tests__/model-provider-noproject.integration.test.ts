@@ -1,5 +1,7 @@
 /**
- * Real-Postgres coverage for the provider write path on an organization that has no project at all. A provider belongs to an organization and reaches the scopes attached to it, so nothing on the write path needs a project — `tryResolveAnchor` short-circuits on `organizationId` before it ever looks at `projectId`. `model-provider-command.delete.unit.test.ts` pins that against a mocked `scopes` port; only real Postgres proves the write actually lands with no project row anywhere near it.
+ * Real-Postgres coverage for the provider write path on an organization with no project at
+ * all — `tryResolveAnchor` short-circuits on `organizationId` before `projectId`. The unit
+ * test pins that against a mock; only real Postgres proves the write lands with no project row.
  * @vitest-environment node
  * @see specs/model-providers/providers-without-a-project.feature
  */
@@ -29,9 +31,8 @@ import {
 type Role = "ADMIN" | "MEMBER";
 
 /**
- * Computes decisions from a real per-user/organization role table, the way `AuthzService` does, instead of echoing
- * whatever the test wants: ADMIN holds every manage permission at its own organization, MEMBER holds none. A user
- * with no row in the table is a stranger to every organization.
+ * Computes decisions from a real per-user/organization role table like `AuthzService` does,
+ * rather than echoing whatever the test wants.
  */
 function roleComputingAuthz(roles: Record<string, { organizationId: string; role: Role }>) {
   return {

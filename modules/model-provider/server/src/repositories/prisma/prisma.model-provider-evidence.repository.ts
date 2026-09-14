@@ -5,23 +5,9 @@ import type { ModelProviderEvidenceRepository } from "../model-provider-evidence
 type Database = Pick<PrismaClient, "modelProvider">;
 
 /**
- * Whether any provider row is attached to one of a project's scopes and
- * switched on.
- *
- * A second repository over the `ModelProvider` table rather than a method on
- * {@link PrismaModelProviderRepository}, and it holds no credential codec on
- * purpose: it selects an id, maps nothing, and therefore cannot hand a
- * credential — encrypted or decrypted — to anybody. That is the whole reason
- * it exists. The setup checklist used to ask this question of the API
- * process's own Prisma delegate, which is exactly the shape
- * `specs/model-providers/encrypt-custom-keys.feature` refuses: a `where` on
- * this table written outside this package is one nobody can hold to the
- * encryption rules.
- *
- * Typed at the seam — `Pick<PrismaClient, "modelProvider">` rather than the
- * `object` the older provider repository still takes — so the client a
- * composition passes is checked by the compiler rather than by a runtime `in`
- * test.
+ * Whether any provider row is attached to one of a project's scopes and switched on. A second
+ * repository over `ModelProvider`, deliberately holding no credential codec so it cannot hand a
+ * credential to anybody — the shape `specs/model-providers/encrypt-custom-keys.feature` requires.
  */
 export class PrismaModelProviderEvidenceRepository implements ModelProviderEvidenceRepository {
   private constructor(private readonly database: Database) {}

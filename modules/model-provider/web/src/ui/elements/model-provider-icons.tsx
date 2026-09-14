@@ -1,26 +1,6 @@
 /**
- * The provider marks the providers table and the default-models chips render.
- *
- * A family-local copy of the map in `platform/app/src/components/modelProviders/iconsMap.tsx`,
- * cut down to the map itself — the same copy `@langwatch/gateway-web` took for
- * its two provider lists, character for character, so the two never disagree
- * about what a vendor looks like. What the platform module also carries — the
- * monochrome set and the `ProviderIconGlyph` wrapper that keeps a flat black
- * mark legible on the dark theme — stays there; neither screen here calls
- * either, so neither travels.
- *
- * A THIRD COPY IS THE SIGNAL, and it is recorded rather than acted on: these
- * are the MODEL PROVIDER feature's marks, so this package is where they belong
- * and `@langwatch/gateway-web` should eventually import them from a surface
- * here. Promoting them is a change to two packages plus eleven `platform/app`
- * call sites, which a page-family move does not own. See
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * The four marks the Design System already publishes are imported rather than
- * copied. The remaining ten are drawn here because they are `platform/app`
- * components the whole product still uses.
- *
- * The key set is the contract's, so a provider added to the registry fails the
+ * Kept character-for-character identical to `@langwatch/gateway-web`'s copy so the two never
+ * disagree about a vendor's mark. The key set is the contract's, so an added provider fails
  * typecheck here rather than rendering a blank cell.
  */
 

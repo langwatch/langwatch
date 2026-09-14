@@ -1,5 +1,7 @@
 /**
- * The setup checklist's `setupModelProviders` step reads `ModelProviderEvidenceService.hasEnabledProvider`, which cascades PROJECT -> TEAM -> ORGANIZATION: a provider attached anywhere in that chain counts, and a disabled one never does. `model-provider-evidence.service.unit.test.ts` pins the WHERE clause shape against a mocked Prisma client; only a real Postgres proves the cascade actually resolves per scope level, since the mock returns the same row regardless of which scope matched.
+ * `ModelProviderEvidenceService.hasEnabledProvider` cascades PROJECT -> TEAM -> ORGANIZATION.
+ * The unit test pins the WHERE clause shape against a mock; only real Postgres proves the
+ * cascade resolves per scope level, since the mock returns the same row regardless of match.
  * @vitest-environment node
  * @see specs/home/onboarding-progress-backend.feature
  */

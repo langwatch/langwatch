@@ -1,21 +1,4 @@
-/**
- * Where Codex models are allowed to run.
- *
- * The Codex provider bills the user's ChatGPT plan through OpenAI's codex
- * backend, whose terms license it for coding-assistant harnesses and light
- * AI assists — not general inference. The rule: Langy itself plus the FAST
- * tier's assists. Everything else (prompt playground, evaluations,
- * workflows, batch runs) must neither offer nor accept a codex model.
- *
- * Consumed by:
- *   - the provider registry entry (`restrictedToFeatureKeys`),
- *   - resolveModelForFeature (rejects restricted models on other features),
- *   - the canonical default-model writer (rejects other feature slots),
- *   - prepareLitellmParams (rejects execution outside these features),
- *   - the frontend pickers (hide codex models elsewhere).
- *
- * Spec: specs/model-providers/codex-account-provider.feature
- */
+/** Codex surfaces: Langy + FAST assists only. */
 
 import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 

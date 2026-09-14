@@ -1,17 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * An organization admin who also holds a custom team role must not lose in
- * the browser what the server grants them. Both server paths answer the same
- * way — an ORGANIZATION-scoped ADMIN binding grants everything, custom team
- * role or not (`checkPermissionFromBindings` in rbac.ts; `bindingGrants` in
- * packages/authz/src/matchers.ts) — so the hook's team-permission resolution
- * has to fall back to the org-admin answer before it applies the custom
- * role's own permission list.
- *
- * These tests execute the real hook, with only its boundaries stubbed, the
- * same way as useOrganizationTeamProject.team-membership.integration.test.tsx.
- *
+ * Server-side, an org-scoped ADMIN binding grants everything regardless of custom
+ * team role, so the hook's resolution must fall back to that before the role's own list.
  * Spec: specs/rbac/fetch-org-role-permission-resolution.feature
  */
 import { cleanup, renderHook } from "@testing-library/react";

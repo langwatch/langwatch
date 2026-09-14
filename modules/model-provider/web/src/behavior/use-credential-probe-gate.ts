@@ -1,23 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
- * Decides whether a credential still has to be probed before saving.
- *
- * A failed probe is a strong signal, not proof. It runs from our servers, so a
- * key restricted to the customer's own network, a provider outage, and a key
- * that has not finished propagating all look exactly like a bad key. Refusing
- * to save at all leaves those customers with nowhere to go, so the first
- * refusal explains itself and the next Save goes through unprobed.
- *
- * This lives beside `useModelProviderApiKeyValidation` rather than inside it
- * because the two answer different questions — that one runs the probe, this
- * one decides whether to — and because every surface that runs the probe needs
- * this answer. The drawer, onboarding and the Langy model gate otherwise
- * disagree about whether a refusal is the end of the road.
+ * Decides whether a credential still has to be probed before saving. A failed
+ * probe cannot tell a bad key from a network restriction or provider outage,
+ * so the first refusal explains itself and the next Save goes through unprobed.
  *
  * @param customKeys - The credentials as currently entered
- * @param resetKey - Changes when the form is pointed at a different provider,
- *   so a refusal does not outlive the credential it was about
+ * @param resetKey - Resets the refusal when the form targets a new provider
  */
 export function useCredentialProbeGate({
   customKeys,

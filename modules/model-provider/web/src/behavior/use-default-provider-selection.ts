@@ -22,12 +22,9 @@ export type UseDefaultProviderSelectionReturn = UseDefaultProviderSelectionState
 
 /**
  * Tracks the in-form state for the "Use as default" toggle and its three
- * model selectors. With the legacy Organization/Team/Project.{default,topicClustering,embeddings}Model
- * scalar columns gone, the form does not pre-fill from a project-scoped
- * default. Initial selector values are empty; the drawer's
- * `ModelProviderDefaultSection` reads `modelSelectorOptions` and picks
- * a flagship per provider when the toggle flips on. Writes route
- * through the canonical default-assignment service against ModelDefaultConfig.
+ * model selectors. With the legacy per-project default-model scalar columns
+ * gone, selectors start empty rather than pre-filled; writes route through
+ * the canonical default-assignment service against ModelDefaultConfig.
  */
 export function useDefaultProviderSelection({
   enabledProvidersCount,

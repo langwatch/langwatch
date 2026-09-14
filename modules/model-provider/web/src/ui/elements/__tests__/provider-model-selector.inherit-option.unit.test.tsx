@@ -1,18 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression: the Inherit row at the top of the model picker must be
- * selectable AND must not render the user-facing word "Cascade".
- *
- * The prior bug rendered the inherit row as a Select.Item whose value
- * (INHERIT_SENTINEL) was not present in the Chakra collection — so the
- * picker looked like it had a clickable Inherit option, but hover and
- * click silently fell through to the first real model below it (caught
- * by rchaves on 2026-05-18 dogfood). Fix wires INHERIT_SENTINEL into
- * the collection and drops the "Cascade" group header.
- *
- * Binds the scenario `Inherit row is a real, selectable option in the
- * model picker` in specs/model-providers/model-default-config-cascade.feature.
+ * Regression: the Inherit row looked clickable but INHERIT_SENTINEL was missing from the Chakra
+ * collection, so hover/click silently fell through to the first real model below it. Binds
+ * specs/model-providers/model-default-config-cascade.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,12 +1,4 @@
-/**
- * The provider defaults that decide which models Langy may run with the
- * permission checks skipped (ADR-129).
- *
- * Binds the @unit scenarios of
- * specs/settings/model-provider-skip-permissions.feature that are about the
- * DEFAULTS. The gate that reads a conversation's model is bound in
- * src/server/app-layer/langy/__tests__/langySkipPermissions.unit.test.ts.
- */
+/** Bind langy skip-permissions defaults (ADR-129). */
 import { describe, expect, it } from "vitest";
 
 import {

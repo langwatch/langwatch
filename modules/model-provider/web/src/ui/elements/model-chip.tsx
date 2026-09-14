@@ -1,12 +1,7 @@
 /**
- * A model identifier ("openai/gpt-5.5") with the provider's mark and the family
- * name in mono.
- *
- * Moved whole from `platform/app/src/components/settings/ModelChip.tsx`, whose
- * only consumers were the Default Models table and its own test. The two icon
- * sizes were `~/components/llmPromptConfigs/constants`, which keeps eleven
- * non-family callers; two string constants are cheaper to state here than to
- * reach for.
+ * A model identifier ("openai/gpt-5.5") with the provider's mark and the family name in mono.
+ * The two icon-size constants are redeclared here rather than imported, since the shared source
+ * (`~/components/llmPromptConfigs/constants`) still keeps eleven non-family callers.
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";

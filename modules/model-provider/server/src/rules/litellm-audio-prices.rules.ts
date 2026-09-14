@@ -1,21 +1,9 @@
 import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
 
 /**
- * Audio, transcription and realtime model prices from litellm's community
- * price registry. OpenRouter, the primary catalog source, routes none of
- * these models, so litellm is the source for this family.
- *
- * Units: litellm prices audio models by character, by second, or by token,
- * per model rather than per mode, so every unit present is read and mapped.
- *
- * Representability: a model is emitted only when `LLMModelPricing` can
- * express every rate litellm publishes for it. When it cannot, the model is
- * reported through `unrepresentable` rather than dropped in silence, because
- * a model that reaches the gateway with a partial price bills confidently
- * and wrongly.
- *
- * Precedence: ids already present in the overlay are excluded by the caller,
- * so a hand-written correction is never contested by this mapping.
+ * Audio/transcription/realtime prices from litellm's registry — OpenRouter routes none of these
+ * models. A model whose rates `LLMModelPricing` can't fully express is reported via
+ * `unrepresentable` rather than dropped, so it never bills confidently on a partial price.
  */
 
 export const LITELLM_PRICES_URL =

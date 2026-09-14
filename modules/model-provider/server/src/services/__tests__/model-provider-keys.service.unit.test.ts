@@ -273,11 +273,8 @@ describe("ModelProviderKeysService maskApiKeys", () => {
   });
 });
 
-/**
- * The read side of the same policy. Every tRPC and REST response carrying a provider row goes through `tryMask` and `maskHeaders` first, so this is
- * the guarantee that a stored credential never reaches a browser. Moved here with the Model Provider tRPC vertical: the masking is the service's, not
- * the transport's, and the transport's own pass-through is pinned separately in `model-provider-trpc-api.unit.test.ts`.
- */
+// The read side of the same policy: every tRPC/REST response carrying a provider row goes
+// through `tryMask`/`maskHeaders` first — the guarantee a credential never reaches a browser.
 describe("ModelProviderKeysService read masking", () => {
   const storedCredentials: Record<string, Record<string, string>> = {
     openai: {

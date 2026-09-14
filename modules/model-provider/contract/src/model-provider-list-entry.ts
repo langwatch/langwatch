@@ -1,35 +1,9 @@
 /**
- * One row of the provider LIST the browser renders.
- *
- * `listAllForProjectForFrontend` and `listAllForOrganizationForFrontend` both
- * answer an array of these, and until now the shape was declared inline in
- * `@langwatch/model-provider-server`'s tRPC transport and read on the browser
- * side through `inferRouterOutputs<AppRouter>`. That inference is exactly what
- * a screen in a feature-web package cannot do — it names the composed router,
- * which lives in the process — so the declaration moves here and both halves
- * are checked against it.
- *
- * NOT the same shape as `LegacyModelProvider`. That one is the full editor
- * payload the drawer reads; this is the narrower list projection, and the two
- * spell `customModels` differently (`{ modelId, displayName, mode }` here,
- * `Model` there). Kept apart rather than merged: widening the list to the
- * editor payload would put every provider's `extraHeaders` and `providerConfig`
- * on the settings page's wire.
- *
- * NO CREDENTIAL VALUE TRAVELS ON THIS TYPE. `customKeys` is the masked record
- * the service produces — the decrypted keys are only ever handed to
- * server-internal callers of `getExecutionProviders` — and the settings table
- * renders none of it. Widening this declaration to carry a readable credential
- * would put one on a wire that ends in a browser.
- *
- * `isSystem` IS DECLARED OPTIONAL BECAUSE THE TRANSPORT DOES NOT SEND IT. The
- * canonical provider carries the flag (`platform/app/src/runtime/app/features/model-provider.ts`
- * sets it on the env-fed pseudo-rows), the transport's projection drops it, and
- * the settings page has been reading `(provider as any).isSystem` — so its
- * "System" scope chip and its read-only row have never rendered. Declaring the
- * field honestly is what makes that visible; adding it to the projection is a
- * behaviour change and belongs to whoever owns the providers table next. See
- * `dev/docs/plans/ui-family-move-manifests.md`.
+ * One row of the provider LIST the browser renders — checked, not inferred from the
+ * composed router, since a feature-web screen can't name that. Deliberately narrower
+ * than `LegacyModelProvider` (no credential value, no `extraHeaders`/`providerConfig`);
+ * `isSystem` is optional because the transport doesn't send it yet (see
+ * `dev/docs/plans/ui-family-move-manifests.md`).
  */
 
 import { z } from "zod";
@@ -52,13 +26,8 @@ export const modelProviderListEntrySchema = z
     customModels: z.array(customModelEntrySchema),
     customEmbeddingsModels: z.array(customModelEntrySchema),
     /**
-     * The operator's own list of models allowed to skip Langy's permission
-     * checks, as regular expression sources, or null when the provider's
-     * registry default applies (ADR-129). Carried because the drawer seeds its
-     * field from the listed row — narrowing it away left the field empty on
-     * reopen, so a saved list read back as the default. Optional as well as
-     * nullable because an absent field and a null one say the same thing, and
-     * every test fixture that predates the column means the default.
+     * Regex sources for models allowed to skip Langy's permission checks, or null for
+     * the registry default (ADR-129). Carried so the drawer can seed from the listed row.
      */
     langySkipPermissionsModels: z.array(z.string()).nullable().optional(),
     /**

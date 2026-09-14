@@ -1,5 +1,8 @@
 /**
- * Real-Postgres coverage for `ModelProviderCommandService.delete`'s scope-aware lookup: a model-provider list shows credentials granted at the organization, a team, or a sibling project, so the delete has to resolve those same rows rather than filtering by the caller's project alone. `model-provider-command.delete.unit.test.ts` pins this against mocked collaborators; only real Postgres proves the repository's own tenancy filter actually matches across scopes and refuses across organizations.
+ * Real-Postgres coverage for `ModelProviderCommandService.delete`'s scope-aware lookup: it must
+ * resolve org/team/sibling-project credentials, not just the caller's project. The unit test
+ * pins this against mocks; only real Postgres proves the tenancy filter matches and refuses
+ * correctly.
  * @vitest-environment node
  * @see specs/model-providers/provider-deletion.feature
  */

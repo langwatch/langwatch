@@ -1,18 +1,4 @@
-/**
- * Model ID translation at the LiteLLM boundary.
- *
- * LiteLLM expects model IDs with dashes but llmModels.json uses dots for version numbers.
- * This module provides runtime dot-to-dash conversion at the API boundary.
- *
- * Example: "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5"
- *
- * Additionally, some models require alias expansion to their full dated versions.
- * Example: "anthropic/claude-sonnet-4" -> "anthropic/claude-sonnet-4-20250514"
- *
- * IMPORTANT: This logic is duplicated in Python (langwatch_nlp/studio/utils.py).
- * Changes here MUST be mirrored there.
- * @see langwatch_nlp/langwatch_nlp/studio/utils.py#translate_model_id_for_litellm
- */
+/** Translate model IDs for LiteLLM: dot-to-dash + alias expansion (also in langwatch_nlp). */
 
 /**
  * Model aliases that need expansion to their full dated versions.
@@ -47,16 +33,7 @@ function getProvider(modelId: string): string {
   return modelId.slice(0, slashIndex).toLowerCase();
 }
 
-/**
- * Translates a model ID for use with LiteLLM.
- *
- * First checks for exact alias matches that need expansion to dated versions.
- * Then converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
- * Other providers (OpenAI, Gemini, etc.) are returned unchanged.
- *
- * @param modelId - The model ID from llmModels.json (e.g., "anthropic/claude-opus-4.5")
- * @returns The translated model ID for LiteLLM (e.g., "anthropic/claude-opus-4-5")
- */
+/** Expand dated aliases first, then dot-to-dash; OpenAI/Gemini unchanged. */
 export function translateModelIdForLitellm(modelId: string): string {
   if (!modelId) {
     return modelId;

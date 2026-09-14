@@ -327,7 +327,8 @@ export const prepareEnvKeys = ({
     return {};
   }
 
-  // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
+  // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for
+  // deployment name mapping
 
   return Object.fromEntries(
     Object.keys(getSchemaShape(providerDefinition.keysSchema))
@@ -346,9 +347,9 @@ export const prepareEnvKeys = ({
 };
 
 /**
- * The managed-provider service is still accepted and still ignored: every caller passes it, and the routing decision it used
- * to feed moved into `prepareExecution`. Typed `unknown` rather than reaching for the enterprise contract, because nothing
- * here reads it and naming the type would put an enterprise dependency on this package for a parameter with no body.
+ * `_managedProviders` is still accepted but unused; the routing decision it fed moved into
+ * `prepareExecution`. Typed `unknown` to avoid an enterprise dependency for a parameter with no
+ * body.
  */
 export const prepareLitellmParams = async (
   service: Pick<ModelProviderApi, "prepareExecution">,

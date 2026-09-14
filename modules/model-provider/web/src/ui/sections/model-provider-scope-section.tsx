@@ -39,20 +39,9 @@ function summariseSelection(scopes: ScopeSelection[]): string {
 }
 
 /**
- * Model-provider scope picker.
- *
- * For NEW providers, renders quick-add chips at the top ("This project",
- * "This team", "Organization") followed by the shared `ScopeChipPicker`
- * for the multi-select case. Each chip replaces the current selection
- * with exactly that single scope — the most common setup is "one scope
- * per credential", and the picker stays available below for cross-team
- * or multi-project setups.
- *
- * For EXISTING providers the section is read-only: scope changes on a
- * persisted credential happen by delete + recreate so we never silently
- * re-parent a credential across orgs/teams.
- *
- * Personal-account projects (no org/team context) render nothing.
+ * New providers get quick-add chips (single scope, the common case) plus the full picker below for
+ * cross-team setups. Existing providers are read-only here — scope changes go through delete +
+ * recreate so a credential never silently re-parents across orgs/teams.
  */
 export function ProviderScopeSection({
   state,
