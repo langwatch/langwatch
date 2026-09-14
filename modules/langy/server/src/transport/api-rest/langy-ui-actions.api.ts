@@ -6,7 +6,7 @@
 import { handlerManagedAuth } from "@langwatch/api";
 import {
   bodyLimit,
-  type AppRestSecurity,
+  type AppRestSecurityMembers,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -57,6 +57,7 @@ export abstract class LangyUiActionRestCatalog implements LangyUiActionCatalog {
     kind: string;
     definition: LangyUiActionDefinition;
   }>[];
+  abstract tryFind(kind: string): LangyUiActionDefinition | null;
 }
 
 /** Everything the UI-action surface reaches that Langy does not own. */
@@ -82,7 +83,7 @@ export type LangyUiActionsRestMembers = LangyRestCredentialMembers &
 
 /** Builds the `/api/langy/ui/actions` family over one process's ports. */
 export function createLangyUiActionsRestApp(options: {
-  security: AppRestSecurity;
+  security: AppRestSecurityMembers;
   ports: LangyUiActionsRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;

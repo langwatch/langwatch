@@ -13,7 +13,7 @@ import {
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
-export type { LangyInfrastructure } from "./app/langy.app.ts";
+export type { LangyInfrastructure } from "./app/langy.members.ts";
 
 // `langy.*` and `langyEgress.*` still name the deleted tRPC builder and are
 // not listed here yet; the UI-action, local and local-control REST families

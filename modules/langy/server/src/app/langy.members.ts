@@ -35,6 +35,7 @@ import {
   langyProcessEventViewSchema,
   langyWorkerDispatchIntentSchema,
 } from "../processes/langy-conversation-process.types.ts";
+import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
 
 export interface LangyInfrastructure {
   langyFrameAuth: LangyFrameAuth;

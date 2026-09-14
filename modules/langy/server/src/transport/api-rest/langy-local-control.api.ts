@@ -9,7 +9,7 @@ import {
   credentialPrincipalOf,
   MANAGEMENT_API_VERSION,
   projectOf,
-  type AppRestSecurity,
+  type AppRestSecurityMembers,
   type EndpointVariables,
   type MountableRestApp,
   type ProjectScopedContext,
@@ -61,7 +61,7 @@ const connectAuth = handlerManagedAuth({
 });
 
 export function createLangyLocalControlRestApp(options: {
-  security: AppRestSecurity;
+  security: AppRestSecurityMembers;
   ports: LangyLocalControlRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;

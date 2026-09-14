@@ -7,7 +7,7 @@
 import { handlerManagedAuth } from "@langwatch/api";
 import {
   bodyLimit,
-  type AppRestSecurity,
+  type AppRestSecurityMembers,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -113,7 +113,7 @@ export type LangyLocalRestMembers = LangyRestCredentialMembers &
   }>;
 
 export function createLangyLocalRestApp(options: {
-  security: AppRestSecurity;
+  security: AppRestSecurityMembers;
   ports: LangyLocalRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;

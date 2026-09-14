@@ -13,7 +13,7 @@ export {
  * built instance) imports the type from here now.
  */
 export { LangyService } from "./services/langy.service.ts";
-export type { LangyInfrastructure } from "./app/langy.app.ts";
+export type { LangyInfrastructure } from "./app/langy.members.ts";
 export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";
 export { type LangyNavigateProject } from "./app/langy.members.ts";
@@ -52,7 +52,6 @@ export type {
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 export {
   LangyApp,
-  type LangyBroadcast,
   type LangyEgressState,
   type LangyRedis,
   type LangyTurnRequest,
@@ -286,7 +285,6 @@ export {
 } from "./services/langy-key-identity.service.ts";
 export {
   LangyRestCallerService,
-  type LangyRestCaller,
   type LangyRestCallerMembers,
 } from "./services/langy-rest-caller.service.ts";
 

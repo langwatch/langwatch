@@ -498,7 +498,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withMiddleware(promptRestFacts, promptRestCredential)
   .withDocs({
     description: "Delete a prompt tag definition and cascade to assignments",
-    responses: { ...baseResponses, 204: { description: "Tag deleted" } },
+    responses: { ...baseResponses, 204: { description: "Tag deleted", content: {} } },
   })
   .handle(async ({ app, input, scope }, project, credential) => {
     await app.assertMayManageTagCatalog({ projectId: scope.id, by: credential });
@@ -629,7 +629,7 @@ export const promptRest = defineRestRouter(PromptApi)
       // The two window parameters stay unrefused by their schema: a caller that
       // sends `version=abc` is answered by the conflict and shorthand rules
       // below, exactly as it always has been.
-      const queryVersion = input.version ? parseInt(input.version) : undefined;
+      const queryVersion = input.version;
       const queryTag = input.tag;
 
       // Reject conflicting shorthand + query param. hadSuffix is true even for

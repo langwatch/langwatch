@@ -1,11 +1,25 @@
 /** Which tags point at which prompt versions, what a tag name resolves to, and assignment. */
 import { NotFoundError, type PromptTagAssignment } from "@langwatch/prompt-contract";
+import { toEpochMs } from "@langwatch/time";
 import type { LlmConfigRepository } from "../repositories/prompt.repository.ts";
 import {
   type PromptTagAssignmentRepository,
+  type PromptTagAssignmentRow,
   TagValidationError,
 } from "../repositories/prompt-tag-assignment.repository.ts";
 import type { PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
+
+/** The row's storage-flexible timestamps, normalized to the domain's real `Date`. */
+function toAssignment(
+  row: PromptTagAssignmentRow & Pick<PromptTagAssignment, "promptTag">,
+): PromptTagAssignment {
+  return {
+    configId: row.configId,
+    versionId: row.versionId,
+    promptTag: row.promptTag,
+    updatedAt: new Date(toEpochMs(row.updatedAt)),
+  };
+}
 
 export class PromptTagLookupService {
   private readonly repository: LlmConfigRepository;
@@ -69,7 +83,8 @@ export class PromptTagLookupService {
     configId: string;
     projectId: string;
   }): Promise<PromptTagAssignment[]> {
-    return this.tagRepository.getTagsForConfig(params);
+    const rows = await this.tagRepository.getTagsForConfig(params);
+    return rows.map(toAssignment);
   }
 
   /** Assign (or reassign) a tag to a specific prompt version. */
@@ -95,13 +110,14 @@ export class PromptTagLookupService {
       );
     }
 
-    return this.tagRepository.assignTag({
+    const row = await this.tagRepository.assignTag({
       configId: params.configId,
       versionId: params.versionId,
       tagId,
       projectId: params.projectId,
       userId: params.userId,
     });
+    return toAssignment(row);
   }
 
   /**
