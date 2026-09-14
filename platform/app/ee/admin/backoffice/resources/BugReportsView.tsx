@@ -185,25 +185,6 @@ function BugReportDrawer({
     { enabled: !!reportId, retry: false },
   );
 
-  const downloadTranscript = () => {
-    if (!report.data?.sessionData) return;
-    const blob = new Blob([report.data.sessionData], {
-      type: "application/jsonl",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `agent-report-${report.data.id}.jsonl`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const copyTranscript = async () => {
-    if (!report.data?.sessionData) return;
-    await navigator.clipboard.writeText(report.data.sessionData);
-    toaster.create({ title: "Transcript copied", type: "success" });
-  };
-
   return (
     <Drawer.Root
       open={!!reportId}
@@ -223,92 +204,126 @@ function BugReportDrawer({
               {report.error.message}
             </Text>
           )}
-          {report.data && (
-            <VStack align="stretch" gap={6}>
-              <SimpleGrid columns={2} gap={3}>
-                <Fact label="Received">
-                  {formatDateTime(report.data.createdAt)}
-                </Fact>
-                <Fact label="Kind">
-                  {kindLabel[report.data.kind] ?? report.data.kind}
-                </Fact>
-                <Fact label="Source">{report.data.source}</Fact>
-                <Fact label="Agent">{report.data.agent ?? "unknown"}</Fact>
-                <Fact label="CLI version">
-                  {report.data.cliVersion ?? "unknown"}
-                </Fact>
-                <Fact label="Project">
-                  {report.data.linkedProjectId ?? "not linked"}
-                </Fact>
-                <Fact label="Contact">
-                  {report.data.contactEmail ?? "none"}
-                </Fact>
-                <Fact label="Transcript">
-                  {report.data.sessionData
-                    ? report.data.sessionTruncated
-                      ? "attached, truncated"
-                      : "attached"
-                    : "none"}
-                </Fact>
-              </SimpleGrid>
-
-              {report.data.summary && (
-                <Box>
-                  <Text fontWeight="semibold" marginBottom={2}>
-                    Summary
-                  </Text>
-                  <Box
-                    backgroundColor="bg.muted"
-                    borderRadius="md"
-                    padding={3}
-                    fontSize="sm"
-                    whiteSpace="pre-wrap"
-                    fontFamily="mono"
-                  >
-                    {report.data.summary}
-                  </Box>
-                </Box>
-              )}
-
-              {report.data.sessionData && (
-                <Box>
-                  <HStack marginBottom={2}>
-                    <Text fontWeight="semibold">Session transcript</Text>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={copyTranscript}
-                    >
-                      <Copy size={12} /> Copy
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={downloadTranscript}
-                    >
-                      <Download size={12} /> Download .jsonl
-                    </Button>
-                  </HStack>
-                  <Box
-                    backgroundColor="bg.muted"
-                    borderRadius="md"
-                    padding={3}
-                    fontSize="xs"
-                    fontFamily="mono"
-                    whiteSpace="pre-wrap"
-                    wordBreak="break-all"
-                    maxHeight="480px"
-                    overflowY="auto"
-                  >
-                    {report.data.sessionData}
-                  </Box>
-                </Box>
-              )}
-            </VStack>
-          )}
+          {report.data && <BugReportContent data={report.data} />}
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+interface BugReport {
+  id: string;
+  title: string;
+  createdAt: string | Date;
+  kind: string;
+  source: string;
+  agent: string | null;
+  cliVersion: string | null;
+  linkedProjectId: string | null;
+  contactEmail: string | null;
+  summary: string | null;
+  sessionData: string | null;
+  sessionTruncated: boolean;
+}
+
+function BugReportContent({ data }: { data: BugReport }) {
+  return (
+    <VStack align="stretch" gap={6}>
+      <BugReportMetadata data={data} />
+      {data.summary && <BugReportSummary summary={data.summary} />}
+      {data.sessionData && <BugReportTranscript data={data} />}
+    </VStack>
+  );
+}
+
+function BugReportMetadata({ data }: { data: BugReport }) {
+  return (
+    <SimpleGrid columns={2} gap={3}>
+      <Fact label="Received">{formatDateTime(data.createdAt)}</Fact>
+      <Fact label="Kind">{kindLabel[data.kind] ?? data.kind}</Fact>
+      <Fact label="Source">{data.source}</Fact>
+      <Fact label="Agent">{data.agent ?? "unknown"}</Fact>
+      <Fact label="CLI version">{data.cliVersion ?? "unknown"}</Fact>
+      <Fact label="Project">{data.linkedProjectId ?? "not linked"}</Fact>
+      <Fact label="Contact">{data.contactEmail ?? "none"}</Fact>
+      <Fact label="Transcript">
+        {data.sessionData
+          ? data.sessionTruncated
+            ? "attached, truncated"
+            : "attached"
+          : "none"}
+      </Fact>
+    </SimpleGrid>
+  );
+}
+
+function BugReportSummary({ summary }: { summary: string }) {
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        Summary
+      </Text>
+      <Box
+        backgroundColor="bg.muted"
+        borderRadius="md"
+        padding={3}
+        fontSize="sm"
+        whiteSpace="pre-wrap"
+        fontFamily="mono"
+      >
+        {summary}
+      </Box>
+    </Box>
+  );
+}
+
+function BugReportTranscript({
+  data,
+}: {
+  data: Pick<BugReport, "id" | "sessionData">;
+}) {
+  const downloadTranscript = () => {
+    const blob = new Blob([data.sessionData], {
+      type: "application/jsonl",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `agent-report-${data.id}.jsonl`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyTranscript = async () => {
+    await navigator.clipboard.writeText(data.sessionData);
+    toaster.create({ title: "Transcript copied", type: "success" });
+  };
+
+  return (
+    <Box>
+      <HStack marginBottom={2}>
+        <Text fontWeight="semibold">Session transcript</Text>
+        <Button size="xs" variant="outline" onClick={copyTranscript}>
+          <Copy size={12} /> Copy
+        </Button>
+        <Button size="xs" variant="outline" onClick={downloadTranscript}>
+          <Download size={12} /> Download .jsonl
+        </Button>
+      </HStack>
+      <Box
+        backgroundColor="bg.muted"
+        borderRadius="md"
+        padding={3}
+        fontSize="xs"
+        fontFamily="mono"
+        whiteSpace="pre-wrap"
+        wordBreak="break-all"
+        maxHeight="480px"
+        overflowY="auto"
+      >
+        {data.sessionData}
+      </Box>
+    </Box>
   );
 }
 
