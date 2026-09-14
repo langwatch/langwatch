@@ -47,7 +47,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "~/server/app-layer/organizations/repositories/organization.repository";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 
@@ -161,6 +161,7 @@ function usePeopleListState({
     organization,
     canManage,
     userId: user?.id,
+    pendingInvites: invitesFlow.pendingInvites,
   });
 
   return {
@@ -984,14 +985,30 @@ function useMemberRemoval(organizationId: string) {
  * purpose: the list must never wait on any of them, and one that fails leaves
  * its column empty rather than leaving the page without rows.
  */
+/**
+ * The pending-invitations read, as everything downstream of it actually uses.
+ *
+ * Structural rather than the query's own type: the list renders the rows, a
+ * failure notice and nothing else, and narrowing here keeps a component from
+ * reaching for a refetch the page has already decided who owns.
+ */
+type PendingInvitesQuery = {
+  data: RouterOutputs["invite"]["getOrganizationPendingInvites"] | undefined;
+  isError: boolean;
+  error: unknown;
+  refetch: () => unknown;
+};
+
 function usePeopleListReads({
   organization,
   canManage,
   userId,
+  pendingInvites,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   canManage: boolean;
   userId: string | undefined;
+  pendingInvites: PendingInvitesQuery;
 }) {
   /**
    * Why each person is here. A second query on purpose: the list must never
