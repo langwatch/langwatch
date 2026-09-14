@@ -125,6 +125,17 @@ Feature: Langy renders domain-capability cards for tool calls
     Then the card shows no failure
     And it counts the rows it read instead of printing their JSON
 
+  # The CLI's suite run document carries the batch's outcome and tallies with
+  # the per-run rows under them. The card read none of those fields, fell to
+  # word-matching the text, and wore the first row's "FAILED" as the run's
+  # badge, beside a page reading two of three passed.
+  @integration
+  Scenario: A run card carries the run's aggregate, not one row's verdict
+    When Langy runs a suite or a scenario with the CLI and waits for it
+    Then the card's badge is the batch's state, completed once every run answered
+    And it shows the pass rate and how many passed, failed and ran, from the run's tallies
+    And a row's verdict never becomes the run's badge
+
   @integration
   Scenario: An unmapped tool falls through to the raw view
     When Langy runs a tool that is not a LangWatch action and has no capability card
