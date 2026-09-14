@@ -3,16 +3,9 @@ import { Config, RuntimeConfig, type ConfigValue } from "./index.ts";
 import { publicAppConfigSchema, type PublicAppConfig } from "./public-app-config.ts";
 
 /**
- * The deployment's private inputs, projected to the exact browser-safe
- * contract in `./public-app-config`.
- *
- * A separate module from that contract, and it must stay one: the definition
- * below names the deployment's secret variables — `SENDGRID_API_KEY`,
- * `RESEND_API_KEY`, `SMTP_URL` — at module scope, and neither this package nor
- * its consumers set `sideEffects: false`, so a `RuntimeConfig.define` at module
- * scope does not tree-shake away. The values never reached the browser (there
- * is no `process.env` there), but the variable names and the whole config
- * runtime did, the one time the two modules were joined.
+ * Deployment's private inputs, projected to the browser-safe contract. A separate module
+ * because it names secret variables at module scope; if joined with the contract, those names
+ * and the config runtime would reach the browser despite `sideEffects: false`.
  */
 
 export const SAAS_GATEWAY_URL = "https://gateway.langwatch.ai" as const;

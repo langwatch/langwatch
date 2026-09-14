@@ -19,20 +19,9 @@ import type {
 } from "@trpc/server";
 
 /**
- * One procedure, as a feature web package describes it.
- *
- * A feature package writes a plain nested map of these — no tRPC types — and
- * this package turns the map into a router type. That split is not stylistic:
- * `packages/architecture-enforcer/oxlint-plugin.mjs` rejects `@trpc/server` from
- * both the `web` and the `contract` role, and the rule fires on the import
- * declaration without checking `importKind`, so `import type` is rejected too.
- * A feature package therefore cannot name `AnyRouter`, `TRPCQueryProcedure` or
- * its own server's router type. This package has no feature role, so it can.
- *
- * A `subscription` names a LIVE procedure — one the platform serves over the
- * SSE lane rather than as a request. Its `output` is the type of ONE entry on
- * that stream, not of the stream: that is what `.subscription(path, input,
- * { onData })` hands the subscriber, one at a time.
+ * One procedure as a feature web package describes it. Feature writes a plain nested map; this
+ * package turns it into a router type. A `subscription` is a LIVE procedure served over SSE,
+ * with `output` being ONE entry type, not the stream.
  */
 export type ProcedureShape =
   | { query: { input: unknown; output: unknown } }
@@ -73,14 +62,8 @@ type ContractMemberShape<Member> = Member extends {
   : never;
 
 /**
- * The map a tRPC contract describes, keyed by the namespace it declares, so a
- * web package restates none of its server's procedures. Intersect several when
- * a package calls more than one namespace.
- */
-/**
- * A dotted namespace (`"analytics.lwql"`) declares a MEMBER namespace, and the
- * real router nests it under its parent — so the map does too, or the type
- * would deny a path the wire answers.
+ * Map a tRPC contract describes, keyed by namespace. A dotted namespace (`"analytics.lwql"`)
+ * declares a member namespace, nested under its parent.
  */
 type NamespaceKeyed<Namespace extends string, Procedures> =
   Namespace extends `${infer Head}.${infer Rest}`
@@ -105,19 +88,9 @@ type ProceduresFrom<TMap> = {
 };
 
 /**
- * The root types a feature's router is built on.
- *
- * Only `transformer` is stated, and it has to be. `AnyTRPCRootTypes` leaves it
- * `any`, and tRPC reads that flag to decide whether an output crossed JSON on
- * the way here: with the flag unknown it hands back BOTH answers, so a
- * procedure returning `{ archivedAt: Date | null }` infers as a union with
- * `{ archivedAt: string | null }` and every consumer of a date fails to
- * typecheck against itself.
- *
- * `false` is the honest value: nothing transforms the wire any more, so tRPC
- * applies its own `Serialize<>` to every declared output and a `Date` a
- * procedure returns is typed here as the ISO string that actually arrives.
- * Parse it at the use site.
+ * Root types a feature's router is built on. Only `transformer` is stated; `AnyTRPCRootTypes`
+ * leaves it `any`, which makes tRPC hand back both serialized and original answers. `false` makes
+ * tRPC apply `Serialize<>`, so Dates typed as ISO strings (as they actually arrive).
  */
 type FeatureApiRootTypes = Omit<AnyTRPCRootTypes, "transformer"> & { transformer: false };
 
@@ -125,65 +98,25 @@ type FeatureApiRootTypes = Omit<AnyTRPCRootTypes, "transformer"> & { transformer
 export type RouterFromMap<TMap> = TRPCBuiltRouter<FeatureApiRootTypes, ProceduresFrom<TMap>>;
 
 /**
- * Every procedure's output, addressed by the same path the map nests it under,
- * as the BROWSER receives it.
- *
- * Read the map directly and you get the shape the server hands the transport,
- * which is not the shape that arrives: `transformer: false` makes tRPC apply
- * `Serialize<>`, so a declared `Date` is an ISO string here and a key holding
- * `undefined` is optional. Deriving from the built router keeps that honest —
- * reading the map by hand does not, and the difference is invisible until a
- * `.getTime()` throws in the browser.
+ * Procedure output as the browser receives it. Read the map directly gives server-side shape;
+ * `transformer: false` makes tRPC apply `Serialize<>`, so declared `Date` is an ISO string here.
  */
 export type OutputsFromMap<TMap extends ModuleApiMap> = inferRouterOutputs<RouterFromMap<TMap>>;
 
 /**
- * One value the way the browser receives it, given the type the server states.
- *
- * The same `Serialize<>` `OutputsFromMap` applies, reached through a one-entry
- * map so no tRPC internal has to be named: a `Date` becomes the ISO string, and
- * a key that can hold `undefined` becomes optional. Name this wherever a
- * component prop or a helper's parameter takes a value that came off a query
- * but is declared by a contract type the SERVER also constructs — flipping that
- * contract to `string` would lie to the server instead.
+ * One value as the browser receives it, given the type the server states. The same `Serialize<>`
+ * applies: Dates become ISO strings. Use this for props/parameters taking values off queries
+ * declared by contract types the server also constructs.
  */
 export type WireOf<TValue> = OutputsFromMap<{
   value: { query: { input: void; output: TValue } };
 }>["value"];
 
 /**
- * The feature's typed tRPC hooks.
- *
- * Call this once per feature web package, at module scope:
- *
- *     export const traceApi = createModuleApi<TraceApiMap>();
- *
- * and then write `traceApi.tracesV2.header.useQuery(input, options)` — the same
- * call the code wrote as `api.tracesV2.header.useQuery(...)` while it lived in
- * the application.
- *
- * WHY SEPARATE INSTANCES ARE SAFE, and this is the whole reason the pattern
- * works: `@trpc/react-query` derives its React Query cache key from the
- * procedure PATH alone. `getQueryKeyInternal` returns
- * `[["tracesV2","header"], { input, type: "query" }]` — no client identity, no
- * provider identity, nothing that distinguishes one `createTRPCReact` instance
- * from another. Given the same QueryClient, a query registered by a feature's
- * hooks and a query registered by the application's `api` proxy are THE SAME
- * CACHE ENTRY. That is what lets hooks move out of the application one file at
- * a time: an un-migrated hook's `utils.tracesV2.header.invalidate()` refetches a
- * migrated hook's query, an un-migrated `setData` seeds it, and a migrated
- * mutation invalidates an un-migrated list — with no coordination between them.
- *
- * It is also the thing to not get wrong. A binding that invents its own key
- * namespace — `["agent-ui", path, input]` — shares no prefix with any tRPC
- * key, so its cache is invisible to every invalidation the rest of the
- * application performs, and vice versa. The symptom is stale UI that looks
- * random.
- *
- * What separate instances DO cost: `useUtils()` is scoped to the feature's own
- * map, so it cannot name another feature's procedures. Use `trpcQueryFilter`
- * for those — deliberately more visible than a typed call, because reaching
- * into another feature's cache should be.
+ * Feature's typed tRPC hooks. Call once per feature web package at module scope. Separate
+ * instances are safe: `@trpc/react-query` derives cache keys from procedure PATH alone, so
+ * feature and application queries share the same cache entry. Use `trpcQueryFilter` to reach
+ * into another feature's cache.
  */
 export type ModuleApi<TMap extends ModuleApiMap> = CreateTRPCReact<RouterFromMap<TMap>, unknown>;
 
@@ -192,14 +125,8 @@ export function createModuleApi<TMap extends ModuleApiMap>(): ModuleApi<TMap> {
 }
 
 /**
- * The transport a feature's hooks run on.
- *
- * Supplied by the process shell, never constructed in a feature package:
- * building a tRPC client means choosing a base URL, a transformer, a batching
- * window and a WebSocket endpoint, and the base URL is read from the
- * environment — which a reusable package may not do (ADR-101). Sharing the one
- * instance also keeps one HTTP batching lane, so a query fired by an
- * application hook and one fired by a package hook in the same tick still
- * travel in a single request. A second client would quietly split them.
+ * Transport a feature's hooks run on. Supplied by the process shell (never constructed in a
+ * feature package). Sharing the one instance keeps one HTTP batching lane for application and
+ * package queries fired in the same tick.
  */
 export type ModuleApiClient<TMap extends ModuleApiMap> = TRPCUntypedClient<RouterFromMap<TMap>>;

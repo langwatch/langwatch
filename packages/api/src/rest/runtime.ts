@@ -90,15 +90,9 @@ import { registerRoutePolicy } from "./security.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The one REST execution path: parse, authenticate, decide, handle, check the
-// answer, respond. The request is parsed BEFORE the credential is resolved, so
-// a malformed body is refused without ever touching the caller's key.
-//
-// A route answers at three addresses - its dated namespace, `latest`, and the
-// family's bare path - plus the `/api/v1` twin of each, and any real date the
-// caller pins dispatches to the latest registration on or before it.
-// ─────────────────────────────────────────────────────────────────────────────
+// The one REST execution path: parse, authenticate, decide, handle, check answer, respond.
+// Request parsed BEFORE credential resolution, so malformed bodies are refused without touching
+// the key. Routes answer at three addresses (dated namespace, `latest`, bare path) plus v1 twins.
 
 const ROUTE_PARAMS = "routeParams" as const;
 const VERSION_REQUEST = "apiVersionRequest" as const;
@@ -867,13 +861,9 @@ function handlerMiddleware<Api>({
 }
 
 /**
- * The trail a route declared. The row is written from the actor the door
- * resolved, the parameters the path named and the id the answer carries; a
- * refusal writes the same row with the handled error's own code, so the trail
- * records what was attempted as well as what succeeded.
- *
- * A route with no declared action runs untouched, and the ONE place that
- * decides whether a row is written is this function.
+ * The trail a route declared. Written from the actor, path parameters, and answer id;
+ * refusals write the same row with the handled error's code. Routes with no declared
+ * action run untouched; this function is the only place that decides whether a row is written.
  */
 async function auditing<TResult>({
   route,

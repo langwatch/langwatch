@@ -346,18 +346,9 @@ type ResolvedDefinition = {
 };
 
 /**
- * One environment variable's value, with the empty string read as absent.
- *
- * `FOO=` in a dotenv file is how every deployment and every `.env.example`
- * writes "this one is not configured" — the key is listed so a reader knows it
- * exists, with nothing after the `=`. Read literally it is an empty string,
- * which is not `undefined`, so `Config.optionalSecret`'s
- * `z.string().min(1).optional()` never reaches its `optional()` branch and
- * rejects the variable as `too_small`. A process then refuses to boot over a
- * credential it does not need and was never given.
- *
- * Reading empty as absent also lets a default apply to `FOO=`, which is the
- * same reading: a variable set to nothing has not been set.
+ * Environment variable value, with empty string read as absent. `FOO=` in dotenv writes
+ * "not configured"; read literally it's an empty string, rejecting optional schemas. Reading
+ * empty as absent lets defaults apply.
  */
 function readSource(source: Readonly<Record<string, unknown>>, binding: string): unknown {
   const value = source[binding];

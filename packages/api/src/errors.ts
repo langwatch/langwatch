@@ -14,15 +14,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 // ---------------------------------------------------------------------------
 
 /**
- * One Zod issue, as a reason on the surrounding `ValidationError`.
- *
- * `ValidationError.fromZodError` in the shared package flattens to
- * `meta.fieldErrors` / `meta.formErrors`, which loses the per-issue `type`.
- * This package's documented wire contract is a `reasons` array of
- * `schema_failure` entries (see the README), so we build the reasons
- * ourselves and keep that shape. Because `serializeReason` renders any
- * `HandledError` child, the emitted entry gains `kind` and `fault` on top of
- * the `code` + `meta` clients already read — additive, not breaking.
+ * One Zod issue as a reason on the surrounding `ValidationError`. Flattening loses the per-issue
+ * `type`, so we build reasons ourselves to preserve the schema_failure shape in the wire contract.
  */
 class SchemaFailure extends HandledError {
   constructor(meta: { field: string; type: string; message: string }) {
@@ -44,13 +37,9 @@ export class ProjectInputMismatchError extends HandledError {
 }
 
 /**
- * The request named a tenant its credential did not resolve to.
- *
- * Distinct from {@link ProjectInputMismatchError} only in which scope was
- * named; that one keeps its own code because customers already see it. `meta`
- * carries the field name so a client can mark the offending input, and
- * nothing else: which organization or team the credential DOES cover is the
- * question the refusal exists to withhold.
+ * The request named a scope its credential did not resolve to. `meta` carries the field name
+ * so a client can mark the offending input; which organization or team the credential covers
+ * is the question the refusal exists to withhold.
  */
 export class ScopeInputMismatchError extends HandledError {
   constructor(scope: string) {
@@ -150,19 +139,9 @@ export class EnterprisePlanRequiredError extends HandledError {
 }
 
 /**
- * Converts a `ZodError` into a `ValidationError` — a real `HandledError`, so
- * it carries `httpStatus: 422` and `fault: "customer"`.
- *
- * That matters beyond tidiness: request logging derives both its status code
- * and its level from the error itself (`getStatusCodeFromError` /
- * `getLogLevelForRequest`). A bare `ZodError` has neither `httpStatus` nor
- * `fault`, so it was logged as a 500 `error` while the response went out 422 —
- * validation noise landing in the 5xx error budget.
- *
- * Typed `ZodLikeError`, not `ZodError`: routes mounted on this app validate
- * with whichever zod their schema was authored against, and the repo now runs
- * both majors. `issue.code`, `issue.path` and `issue.message` are identical
- * across them, so the reasons this builds are too.
+ * Converts a `ZodError` into a `ValidationError` (a `HandledError` with `httpStatus: 422`
+ * and `fault: "customer"`). Needed for logging: a bare `ZodError` was logged as 500 error
+ * while the response went out 422, landing validation noise in the 5xx error budget.
  */
 function validationErrorFromZod(err: ZodLikeError): ValidationError {
   return new ValidationError("Validation error", {
@@ -354,24 +333,15 @@ function validHttpStatus(value: number): value is ContentfulStatusCode {
 // ---------------------------------------------------------------------------
 
 /**
- * The Hono context key holding what the error handler actually resolved: the
- * status it sent, and the error it sent it for.
- *
- * The request logger owns the single error record for a failed request, but on
- * its own it can only see the raw thrown value and has to re-derive a status
- * from it. Both guesses are wrong whenever the handler promoted the error: a
- * `ZodError` has no `httpStatus`, so the logger would report a 500 the caller
- * never received, against an error the response no longer describes. Writing
- * the resolved pair down once removes the guesswork — and keeps the handler
- * from logging a second, competing copy.
+ * The Hono context key holding what the error handler resolved: status and error.
+ * The request logger must not re-derive the status from the raw value (both guesses
+ * are wrong when the handler promoted the error). Writing the resolved pair removes guesswork.
  */
 export const RESOLVED_ERROR = "resolvedError";
 
 /**
  * What {@link createErrorHandler} publishes for the request logger to consume.
- *
- * Request bodies are deliberately absent: automation `actionParams` carry
- * encrypted webhook headers and Slack tokens.
+ * Request bodies are deliberately absent: automation `actionParams` carry encrypted secrets.
  */
 export interface ResolvedError {
   status: ContentfulStatusCode;
@@ -384,14 +354,9 @@ export interface ResolvedError {
 // ---------------------------------------------------------------------------
 
 /**
- * Creates the `app.onError(...)` handler for the service framework.
- *
- * Records the error it sent plus the status it sent it as on the context, so
- * the request logger reports what the caller actually received.
- *
- * This handler does not log. `loggerMiddleware` writes exactly one error
- * record per failed request, from the resolved pair published here — a second
- * record from this side would double every error-log-derived alert and count.
+ * Creates the `app.onError(...)` handler for the service framework. Records the error and
+ * status on the context so the request logger reports what the caller received. Does not log
+ * itself; `loggerMiddleware` writes exactly one error record per failed request.
  */
 export function createErrorHandler(): (err: Error, c: Context) => Response | Promise<Response> {
   return (err: Error, c: Context) => {

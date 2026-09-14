@@ -9,16 +9,9 @@ import type { Context, ErrorHandler } from "hono";
 
 import type { EndpointVariables, ServiceContext } from "./response.ts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The project and the credential a REST request arrives with, stated as the
-// fields the transport reads.
-//
-// These are the project and API-key contracts' own values, described rather
-// than imported. Those contracts declare their tRPC procedures with
-// `@langwatch/api/contract`, so a transport module importing them back would
-// close a declaration cycle. The process door hands in the feature's value and
-// the check is structural: field for field, these are the same shapes.
-// ─────────────────────────────────────────────────────────────────────────────
+// The project and the credential a REST request arrives with. These are the
+// project and API-key contracts' own values — described rather than imported to
+// avoid a declaration cycle. The structural check is field for field.
 
 /**
  * Who a project is, and nothing about how it is configured — the value the
@@ -120,15 +113,9 @@ export type AppRestOrganizationVariables = {
   orgResolvedToken: RestResolvedOrganizationCredential;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The credential a REST request arrived with, as the thing a later permission
-// question is asked ABOUT.
-//
-// A route's declared permission is checked by the chain before the handler
-// runs. A handler that has to ask a SECOND question — "may this caller also see
-// costs?" — used to have nowhere to ask it from and answered `true`, which
-// handed a deliberately narrowed key the reach of whoever created it.
-// ─────────────────────────────────────────────────────────────────────────────
+// The credential a REST request arrived with. Handlers that ask secondary permission
+// questions ("may this caller also see costs?") need to ask them about the resolved
+// credential, not the declared permission checked before the handler runs.
 
 /**
  * The credential a project-scoped door resolved: a scoped key, or the legacy
@@ -196,13 +183,9 @@ export function organizationCredentialPrincipalOfToken(
 }
 
 /**
- * The principal behind a framework-authenticated project request.
- *
- * Raises rather than guessing when no credential was resolved: a handler
- * asking this on an unauthenticated request is a mis-wired route, and reading
- * a blank principal would widen an answer instead of failing. A plain `Error`
- * on purpose — it degrades to the generic unknown response (ADR-045) and logs
- * loudly, because no caller can act on it.
+ * The principal behind a framework-authenticated project request. Raises rather than
+ * guessing: a handler asking this on an unauthenticated request is a mis-wired route. Throws
+ * plain `Error` (degrades to generic unknown per ADR-045) so it logs loudly.
  */
 export function credentialPrincipalOf(c: Context): RestProjectCredentialPrincipal {
   const resolved = c.get("resolvedToken") as RestResolvedProjectCredential | undefined;
@@ -234,21 +217,9 @@ export function organizationCredentialPrincipalOf(c: Context): RestOrganizationC
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// What the process's own doors resolved for one request, as a MODULE reads it
-// back when it binds a fact of its own.
-//
-// A module's route names a fact the request does not carry - the organization
-// behind the key, the workspace the key is pinned to, the person behind the
-// cookie - and the module binds the value itself, because the process must
-// never re-declare a route to supply one. The answer, though, is the DOOR's:
-// resolving it twice would ask the key store a second question per request and
-// could answer differently from the door that let the request in. So the door
-// records what it resolved here, once, and a module's binding reads it.
-//
-// Keyed by the request rather than written into the context on purpose: a door
-// is handed the request and nothing else, which is what keeps it unable to
-// touch the handler's own variables.
-// ─────────────────────────────────────────────────────────────────────────────
+// What the process's doors resolved for one request, as a module reads it back when binding
+// a fact. Keyed by request (not context) so a door remains unable to touch handler variables.
+// The answer is the door's: resolving twice would ask the key store a second time per request.
 
 /** Who a browser cookie was verified as, for a family that binds it as a fact. */
 export type RestBrowserCaller = Readonly<{ userId: string | null }>;
@@ -279,13 +250,8 @@ export function recordBrowserCaller(request: Request, caller: RestBrowserCaller)
 }
 
 /**
- * What the project door resolved for this request.
- *
- * Raises rather than guessing: a fact bound on a family whose door resolves no
- * project credential is a wiring bug, and a blank credential would widen every
- * answer built from it. A plain `Error` on purpose - it degrades to the
- * generic unknown response (ADR-045) and logs loudly, because no caller can
- * act on it.
+ * What the project door resolved for this request. Raises rather than guessing: no resolved
+ * credential is a wiring bug. Throws plain `Error` (degrades to generic unknown per ADR-045).
  */
 export function projectCredentialOfRequest(request: Request): RestResolvedProjectCredential {
   const credential = projectCredentials.get(request);
@@ -392,19 +358,9 @@ export function organizationOf(
  */
 export type RestErrorHandler = ErrorHandler;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Who is behind a personal-workspace API key.
-//
-// Two REST reads answer for a PERSON rather than a project: `/api/me/usage` and
-// the coding agent's pull-request usage. Both need the same two guards, and
-// both live here rather than in each route, so one refusal cannot answer in two
-// shapes.
-//
-// A legacy project key carries no user of its own. It IS that workspace's key,
-// so its holder is the owner by construction. A MODERN key with no user is a
-// service key, minted for a job rather than a person, which is why the guard
-// takes the whole typed credential rather than a user id.
-// ─────────────────────────────────────────────────────────────────────────────
+// Personal-workspace API key checks: `/api/me/usage` and PR usage both need the same
+// two guards. A legacy key carries no user (IS the workspace key), while a modern key with
+// no user is a service key (minted for a job), so the guard takes the whole credential.
 
 /**
  * The calling key belongs to a workspace that is not one person's.
@@ -485,15 +441,8 @@ export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
 }
 
 /**
- * The user whose data a personal-workspace read answers for.
- *
- * Takes the resolved credential rather than fields picked off the request
- * context: the credential's CLASS is half the decision, and a caller that
- * reads two loose ids out of a context bag can only guess at it.
- *
- * @throws {PersonalProjectKeyRequiredError} when the workspace is not personal.
- * @throws {PersonalUsageKeyMismatchError} when a user-bound key does not own it.
- * @throws {PersonalUsageServiceKeyUnsupportedError} for an ownerless modern key.
+ * The user whose data a personal-workspace read answers for. Takes the resolved credential
+ * (not just loose ids from context) because the credential's CLASS is half the decision.
  */
 export function resolvePersonalCaller({
   project,
