@@ -72,7 +72,7 @@ export class NlpLambdaRuntimeService {
     const key = this.keyFor(projectId);
     let raw: string | null;
     try {
-      raw = await this.options.cache.tryGet(key);
+      raw = await this.options.cache.find(key);
     } catch (error) {
       this.options.logger?.warn({ error, projectId }, "shared NLP Lambda ARN cache is unreadable");
 

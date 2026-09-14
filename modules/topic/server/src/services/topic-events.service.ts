@@ -64,11 +64,11 @@ export type TopicClusteringProcessingEvent =
   | TopicClusteringTopicsRecordedEvent;
 
 /** The durable event schemas of the `topic_clustering` aggregate, in one place. */
-export class EventingTopicEventsAdapter {
+export class EventingTopicEventsService {
   private constructor() {}
 
-  static create(): EventingTopicEventsAdapter {
-    return new EventingTopicEventsAdapter();
+  static create(): EventingTopicEventsService {
+    return new EventingTopicEventsService();
   }
 
   static readonly requested = TopicClusteringRequestedEventSchema;

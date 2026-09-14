@@ -107,7 +107,7 @@ export interface ClusteringStoreSummary {
  * the migration's construction.
  */
 export interface TopicClusteringWritePathSeed {
-  trySeedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped">;
+  seedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped">;
 }
 
 /**
@@ -795,7 +795,7 @@ export const storeResults = async (
     // guarantees the seed folds first, so this event can never reconcile
     // the table down to just its own delta. Idempotent (`seed:v1`) and a
     // no-op once the projection owns the model.
-    await deps.migration.trySeedProjectTopicModel(projectId);
+    await deps.migration.seedProjectTopicModel(projectId);
     await deps.commands.recordTopics({
       tenantId: projectId,
       occurredAt: nowInstant().epochMilliseconds,

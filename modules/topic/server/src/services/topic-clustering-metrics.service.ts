@@ -19,9 +19,9 @@ export const TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME =
   "topic_clustering_page_duration_milliseconds";
 
 /** Topic clustering page outcomes and durations, pushed over OTLP. */
-export class OtelTopicClusteringMetricsAdapter implements TopicClusteringMetrics {
-  static create(): OtelTopicClusteringMetricsAdapter {
-    return new OtelTopicClusteringMetricsAdapter(
+export class OtelTopicClusteringMetricsService implements TopicClusteringMetrics {
+  static create(): OtelTopicClusteringMetricsService {
+    return new OtelTopicClusteringMetricsService(
       counter({
         name: TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME,
         description: "Topic clustering page executions by outcome",

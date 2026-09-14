@@ -55,61 +55,68 @@ export interface TopicClusteringProcessingPipelineDeps {
   dispatch: TopicClusteringDispatchDeps;
 }
 
+/** The topic_clustering_processing pipeline definition itself, built once per deps. */
+const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingPipelineDeps) => {
+  return definePipeline<TopicClusteringProcessingEvent>({
+    name: "topic_clustering_processing",
+    aggregate: defineAggregate({
+      type: "topic_clustering",
+      events: defineEvents(TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withPostgresProjection(
+      TopicClusteringRunStatusFoldProjection.create({
+        store: deps.topicClusteringRunStatusStore,
+      }),
+    )
+    .withPostgresProjection(
+      TopicClusteringRunHistoryFoldProjection.create({
+        store: deps.topicClusteringRunHistoryStore,
+      }),
+    )
+    .withPostgresProjection(TopicModelFoldProjection.create({ store: deps.topicModelStore }))
+    .withCommand("requestClustering", RequestTopicClusteringCommand)
+    .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
+    .withCommand("recordClusteringRunCompleted", RecordClusteringRunCompletedCommand)
+    .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
+    .withCommand("recordTopics", RecordTopicsCommand, {
+      // Suppress duplicate appends for the same dedupeKey at enqueue (the
+      // boot seed racing the write-path seed, or a retried page). TTL-bound
+      // and best-effort — the fold's stale-seed guard is the correctness
+      // backstop (topic-model.projection.ts).
+      deduplication: {
+        makeId: recordTopicsDedupeId,
+        ttlMs: 60_000,
+      },
+    })
+    .withProcessManager(
+      TOPIC_CLUSTERING_PROCESS_NAME,
+      TopicClusteringProcess.processManager(deps.dispatch),
+    )
+    .build();
+};
+
 /**
  * The topic-clustering-processing pipeline (ADR-051).
  * Process manager: `topicClustering` (ADR-052 builder) — owns the per-project
  */
-export class TopicClusteringEventingAdapter {
+export class TopicClusteringEventingService {
   private constructor(private readonly deps: TopicClusteringProcessingPipelineDeps) {}
 
-  static create(deps: TopicClusteringProcessingPipelineDeps): TopicClusteringEventingAdapter {
-    return new TopicClusteringEventingAdapter(deps);
+  static create(deps: TopicClusteringProcessingPipelineDeps): TopicClusteringEventingService {
+    return new TopicClusteringEventingService(deps);
   }
 
-  static createPipeline(deps: TopicClusteringProcessingPipelineDeps) {
-    return TopicClusteringEventingAdapter.create(deps).build();
+  static createPipeline(
+    deps: TopicClusteringProcessingPipelineDeps,
+  ): ReturnType<typeof buildTopicClusteringProcessingPipeline> {
+    return TopicClusteringEventingService.create(deps).build();
   }
 
-  build() {
-    return definePipeline<TopicClusteringProcessingEvent>({
-      name: "topic_clustering_processing",
-      aggregate: defineAggregate({
-        type: "topic_clustering",
-        events: defineEvents(TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES),
-      }),
-    })
-      .withPostgresProjection(
-        TopicClusteringRunStatusFoldProjection.create({
-          store: this.deps.topicClusteringRunStatusStore,
-        }),
-      )
-      .withPostgresProjection(
-        TopicClusteringRunHistoryFoldProjection.create({
-          store: this.deps.topicClusteringRunHistoryStore,
-        }),
-      )
-      .withPostgresProjection(TopicModelFoldProjection.create({ store: this.deps.topicModelStore }))
-      .withCommand("requestClustering", RequestTopicClusteringCommand)
-      .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
-      .withCommand("recordClusteringRunCompleted", RecordClusteringRunCompletedCommand)
-      .withCommand("recordClusteringRunFailed", RecordClusteringRunFailedCommand)
-      .withCommand("recordTopics", RecordTopicsCommand, {
-        // Suppress duplicate appends for the same dedupeKey at enqueue (the
-        // boot seed racing the write-path seed, or a retried page). TTL-bound
-        // and best-effort — the fold's stale-seed guard is the correctness
-        // backstop (topic-model.projection.ts).
-        deduplication: {
-          makeId: recordTopicsDedupeId,
-          ttlMs: 60_000,
-        },
-      })
-      .withProcessManager(
-        TOPIC_CLUSTERING_PROCESS_NAME,
-        TopicClusteringProcess.processManager(this.deps.dispatch),
-      )
-      .build();
+  build(): ReturnType<typeof buildTopicClusteringProcessingPipeline> {
+    return buildTopicClusteringProcessingPipeline(this.deps);
   }
 }
 
 export const createTopicClusteringProcessingPipeline =
-  TopicClusteringEventingAdapter.createPipeline;
+  TopicClusteringEventingService.createPipeline;

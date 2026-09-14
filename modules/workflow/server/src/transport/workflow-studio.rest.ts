@@ -57,7 +57,7 @@ function jsonAnswer(body: unknown, status: number): Response {
 }
 
 /** The handled CODE an error carries, or nothing. */
-function handledCodeOf(error: unknown): string | undefined {
+function findHandledCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
 
   const code = (error as { code: unknown }).code;
@@ -75,7 +75,7 @@ function postedBody(raw: string): unknown {
 }
 
 /** The posted document, or nothing where the body was not a JSON object. */
-function postedJson(raw: string): Record<string, unknown> | null {
+function findPostedJson(raw: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
 
@@ -147,7 +147,7 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withDocs({ requestBody: { schema: workflowStudioRestEventSchema } })
   .withMiddleware(workflowStudioSession)
   .handle(async ({ app, raw }, session): Promise<RestRawResult> => {
-    const posted = postedJson(raw);
+    const posted = findPostedJson(raw);
     const validated = posted ? workflowStudioRestEventSchema.safeParse(posted) : null;
 
     if (!posted || !validated?.success) return jsonAnswer({ error: "Invalid body" }, 400);
@@ -228,7 +228,7 @@ function preparationRefusal({
   // failure, not a server fault - a clean 425 and no incident report. Matched
   // on the handled CODE: the dataset module's own class lives in another
   // module's server package, which this one may not name.
-  if (handledCodeOf(error) === "dataset_not_ready") {
+  if (findHandledCode(error) === "dataset_not_ready") {
     return jsonAnswer({ error: error instanceof Error ? error.message : String(error) }, 425);
   }
 

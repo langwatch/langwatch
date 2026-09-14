@@ -17,7 +17,7 @@ import {
   type StagedLangevalsPayload,
 } from "../../app/topic.members.ts";
 import {
-  LangevalsStagedPayloadAdapter,
+  LangevalsStagedPayloadService,
   PayloadTooLargeError,
   type LangevalsStagedPayloadConfig,
 } from "../langevals-staged-payload.service.ts";
@@ -81,7 +81,7 @@ beforeEach(() => {
 
 describe("given a deployment that parks payloads over a threshold", () => {
   const adapterWith = (staging: RecordingStaging) =>
-    LangevalsStagedPayloadAdapter.create({ config: CONFIG, staging });
+    LangevalsStagedPayloadService.create({ config: CONFIG, staging });
 
   describe("when the body is below the staging threshold", () => {
     /** @scenario "Small eval payload posts inline" */
@@ -187,7 +187,7 @@ describe("given a deployment that configured no staging threshold", () => {
     /** @scenario "Self-hosted langevals never stages regardless of payload size" */
     it("posts it inline, because there is no synchronous body cap to dodge", async () => {
       const staging = new RecordingStaging();
-      const adapter = LangevalsStagedPayloadAdapter.create({
+      const adapter = LangevalsStagedPayloadService.create({
         config: {
           stagingThresholdBytes: undefined,
           stagingTtlSeconds: 600,

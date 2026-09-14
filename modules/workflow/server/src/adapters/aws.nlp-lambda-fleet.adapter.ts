@@ -55,7 +55,7 @@ export class AwsNlpLambdaFleetAdapter implements NlpLambdaFleet {
     return found;
   }
 
-  async tryReadLastActivityAt({ functionName }: { functionName: string }): Promise<Instant | null> {
+  async findLastActivityAt({ functionName }: { functionName: string }): Promise<Instant | null> {
     const logGroupName = `${LOG_GROUP_ROOT}${functionName}`;
     try {
       const response = await this.logs.send(

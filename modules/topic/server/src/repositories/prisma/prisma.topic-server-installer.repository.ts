@@ -5,10 +5,10 @@ import type { TopicApi, TopicClusteringModels } from "@langwatch/topic-contract"
 import { type AssignTopicCommandData, TraceTopicAssignment } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import {
-  EventingTopicClusteringCommandsAdapter,
-  EventingTopicClusteringOutcomeCommandsAdapter,
+  EventingTopicClusteringCommandsService,
+  EventingTopicClusteringOutcomeCommandsService,
 } from "../../services/topic-clustering-commands.service.ts";
-import { EventingTopicClusteringScheduleAdapter } from "../../services/topic-clustering-schedule.service.ts";
+import { EventingTopicClusteringScheduleService } from "../../services/topic-clustering-schedule.service.ts";
 import {
   createTopicClusteringProcessingPipeline,
   type TopicClusteringProcessingPipelineDeps,
@@ -78,8 +78,8 @@ export class PrismaTopicServerInstallerRepository {
   readonly persistence: TopicClusteringPersistence;
   readonly runPort: TopicClusteringRun;
 
-  private readonly commands = new EventingTopicClusteringCommandsAdapter();
-  private readonly outcomes = new EventingTopicClusteringOutcomeCommandsAdapter();
+  private readonly commands = new EventingTopicClusteringCommandsService();
+  private readonly outcomes = new EventingTopicClusteringOutcomeCommandsService();
   private readonly traceAssignments = new UnconnectedTraceTopicAssignment();
   private readonly migration: LegacyImportTopicClusteringMigration;
   private installed = false;
@@ -97,7 +97,7 @@ export class PrismaTopicServerInstallerRepository {
     };
     this.service = TopicService.create({
       repository: repositories.topics,
-      schedule: EventingTopicClusteringScheduleAdapter.create({
+      schedule: EventingTopicClusteringScheduleService.create({
         processStore: dependencies.processStore,
       }),
     });
@@ -116,7 +116,17 @@ export class PrismaTopicServerInstallerRepository {
     this.runPort = TopicClusteringRunner.create(runnerDependencies);
   }
 
-  install(options: { eventSourcing: EventSourcing; traceAssignments: TraceTopicAssignment }) {
+  install(options: {
+    eventSourcing: EventSourcing;
+    traceAssignments: TraceTopicAssignment;
+  }): ReturnType<PrismaTopicServerInstallerRepository["installPipeline"]> {
+    return this.installPipeline(options);
+  }
+
+  private installPipeline(options: {
+    eventSourcing: EventSourcing;
+    traceAssignments: TraceTopicAssignment;
+  }) {
     if (this.installed) throw new Error("Topic clustering pipeline is already installed");
     this.installed = true;
 

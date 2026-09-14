@@ -20,7 +20,7 @@ class FakeFleet implements NlpLambdaFleet {
     return this.functions.map((name) => ({ name }));
   }
 
-  async tryReadLastActivityAt({ functionName }: { functionName: string }): Promise<Instant | null> {
+  async findLastActivityAt({ functionName }: { functionName: string }): Promise<Instant | null> {
     return this.activity[functionName] ?? null;
   }
 

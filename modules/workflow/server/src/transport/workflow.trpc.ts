@@ -29,7 +29,9 @@ function cloneDsl(dsl: unknown): StudioWorkflow {
 }
 
 /** How much of each version a history read carries back. */
-function historyModeFor(returnDsl: boolean | "previousVersion" | undefined) {
+function historyModeFor(
+  returnDsl: boolean | "previousVersion" | undefined,
+): "allDsl" | "previousDsl" | "metadata" {
   if (returnDsl === true) return "allDsl" as const;
   if (returnDsl === "previousVersion") return "previousDsl" as const;
 

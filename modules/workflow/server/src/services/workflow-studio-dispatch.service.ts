@@ -118,7 +118,7 @@ export class WorkflowStudioDispatchService {
    * is rejected by Bedrock and several others, and the author has no way to see it.
    */
   private async stripUnsupportedParams(input: WorkflowStudioDispatchInput): Promise<void> {
-    const workflow = studioWorkflowOf(input.event);
+    const workflow = findStudioWorkflow(input.event);
     if (!workflow) {
       return;
     }
@@ -149,8 +149,9 @@ export class WorkflowStudioDispatchService {
     const isAborted = input.isAborted;
     let buffered = "";
     let frames = 0;
+    let streamDone = false;
 
-    for (;;) {
+    while (!streamDone) {
       if (isAborted && (await isAborted())) {
         logger.info("Execution aborted, cancelling stream reader");
         await reader.cancel();
@@ -167,7 +168,8 @@ export class WorkflowStudioDispatchService {
       }
 
       if (read.done || !read.value) {
-        break;
+        streamDone = true;
+        continue;
       }
 
       buffered += decoder.decode(read.value, { stream: true });
@@ -217,7 +219,7 @@ export class WorkflowStudioDispatchService {
 }
 
 /** The workflow a studio event carries, or none where it carries no graph. */
-function studioWorkflowOf(event: StudioClientEvent): StudioWorkflow | null {
+function findStudioWorkflow(event: StudioClientEvent): StudioWorkflow | null {
   const payload = "payload" in event ? (event.payload as Record<string, unknown>) : null;
   if (!payload || typeof payload !== "object") {
     return null;

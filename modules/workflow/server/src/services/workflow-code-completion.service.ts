@@ -15,11 +15,11 @@ export type WorkflowModelResolver = (input: {
 /** The feature key the Studio's code-node completions are priced and routed on. */
 export const WORKFLOW_CODE_COMPLETION_FEATURE_KEY = "studio.autocomplete";
 
-export class WorkflowCodeCompletionAdapter {
+export class WorkflowCodeCompletionService {
   static create(options: {
     resolveModel: WorkflowModelResolver;
-  }): WorkflowCodeCompletionAdapter {
-    return new WorkflowCodeCompletionAdapter(options.resolveModel);
+  }): WorkflowCodeCompletionService {
+    return new WorkflowCodeCompletionService(options.resolveModel);
   }
 
   private constructor(private readonly resolveModel: WorkflowModelResolver) {}

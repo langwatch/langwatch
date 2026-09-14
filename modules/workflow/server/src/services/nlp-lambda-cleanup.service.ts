@@ -41,7 +41,7 @@ export class NlpLambdaCleanupService {
     const report = { functionsDeleted: 0, logGroupsDeleted: 0, skippedUnknownActivity: 0 };
 
     for (const fn of await this.fleet.listFunctions({ namePrefix: NLP_LAMBDA_NAME_PREFIX })) {
-      const lastActivityAt = await this.fleet.tryReadLastActivityAt({ functionName: fn.name });
+      const lastActivityAt = await this.fleet.findLastActivityAt({ functionName: fn.name });
       if (!lastActivityAt) {
         report.skippedUnknownActivity++;
         this.logger?.warn(
@@ -72,7 +72,7 @@ export class NlpLambdaCleanupService {
         continue;
       }
 
-      const lastActivityAt = await this.fleet.tryReadLastActivityAt({ functionName });
+      const lastActivityAt = await this.fleet.findLastActivityAt({ functionName });
       if (!lastActivityAt) {
         report.skippedUnknownActivity++;
         continue;

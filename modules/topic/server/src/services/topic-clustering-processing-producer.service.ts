@@ -16,7 +16,7 @@ import {
   type TopicClusteringRun,
 } from "../intents/topic-clustering.intent.ts";
 import {
-  TopicClusteringEventingAdapter,
+  TopicClusteringEventingService,
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunStatusData,
   type TopicModelData,
@@ -97,16 +97,18 @@ class ProducerOnlyTopicClusteringOutcomeCommands implements TopicClusteringOutco
 }
 
 /** The topic-clustering-processing pipeline as a send-only process composes it. */
-export class TopicClusteringProcessingProducerAdapter {
-  static create(): TopicClusteringProcessingProducerAdapter {
-    return new TopicClusteringProcessingProducerAdapter();
+export class TopicClusteringProcessingProducerService {
+  static create(): TopicClusteringProcessingProducerService {
+    return new TopicClusteringProcessingProducerService();
   }
 
   /**
    * Builds the topic-clustering-processing definition for a process that only sends commands on
    * it — `recordTopics` and `requestClustering`, the whole of `TopicClusteringCommands`.
    */
-  static createPipeline(input: { processName: string }) {
+  static createPipeline(input: {
+    processName: string;
+  }): ReturnType<typeof TopicClusteringEventingService.createPipeline> {
     const { processName } = input;
     const dispatch: TopicClusteringDispatchDeps = {
       runPort: new ProducerOnlyTopicClusteringRun(processName),
@@ -115,7 +117,7 @@ export class TopicClusteringProcessingProducerAdapter {
       metrics: new ProducerOnlyTopicClusteringMetrics(processName),
     };
 
-    return TopicClusteringEventingAdapter.createPipeline({
+    return TopicClusteringEventingService.createPipeline({
       topicClusteringRunStatusStore:
         new ProducerOnlyStateProjectionStore<TopicClusteringRunStatusData>(
           processName,

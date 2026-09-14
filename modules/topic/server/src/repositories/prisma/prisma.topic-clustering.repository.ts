@@ -1,5 +1,5 @@
 import { CostReferenceType, CostType, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { fromDate } from "@langwatch/time";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../processes/topic-clustering.process.ts";
 import {
@@ -24,6 +24,13 @@ export type TopicClusteringDatabase = Pick<
   "$transaction" | "cost" | "processManagerInstance" | "project" | "topicModelProjection"
 > &
   TopicDatabase;
+
+/**
+ * The app's KSUID resource for a cost row (`KSUID_RESOURCES.COST`). The
+ * literal rather than the app's constant table: the prefix is part of the id
+ * format already written to the database, so it belongs with the writer.
+ */
+const COST_KSUID_RESOURCE = "cost";
 
 /** Prisma-backed {@link TopicClusteringRepository}. */
 export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
@@ -86,7 +93,7 @@ export class PrismaTopicClusteringRepository extends TopicClusteringRepository {
   }): Promise<void> {
     await this.prisma.cost.create({
       data: {
-        id: `cost_${nanoid()}`,
+        id: generate(COST_KSUID_RESOURCE).toString(),
         projectId: params.projectId,
         costType: CostType.CLUSTERING,
         costName: "Topics Clustering",

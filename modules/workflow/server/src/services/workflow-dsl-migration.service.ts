@@ -9,9 +9,9 @@
 import { migrateDSLVersion, type WorkflowDsl } from "@langwatch/workflow-contract";
 import { type WorkflowDslMigration } from "../app/workflow.app.ts";
 
-export class ContractWorkflowDslMigrationAdapter implements WorkflowDslMigration {
-  static create(): ContractWorkflowDslMigrationAdapter {
-    return new ContractWorkflowDslMigrationAdapter();
+export class ContractWorkflowDslMigrationService implements WorkflowDslMigration {
+  static create(): ContractWorkflowDslMigrationService {
+    return new ContractWorkflowDslMigrationService();
   }
 
   private constructor() {}

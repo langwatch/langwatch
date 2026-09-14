@@ -32,7 +32,7 @@ export {
   type WorkflowEnvironmentDecryptor,
 } from "./services/workflow-project-environment.service.ts";
 export { WorkflowAgentMappingAdapter } from "./adapters/workflow-agent-mapping.adapter.ts";
-export { ContractWorkflowDslMigrationAdapter } from "./services/workflow-dsl-migration.service.ts";
+export { ContractWorkflowDslMigrationService } from "./services/workflow-dsl-migration.service.ts";
 export {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
@@ -147,7 +147,7 @@ export {
 } from "./services/workflow-studio-version.service.ts";
 export {
   WORKFLOW_CODE_COMPLETION_FEATURE_KEY,
-  WorkflowCodeCompletionAdapter,
+  WorkflowCodeCompletionService,
   type WorkflowModelResolver,
 } from "./services/workflow-code-completion.service.ts";
 export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";

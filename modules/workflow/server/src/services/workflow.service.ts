@@ -20,6 +20,7 @@ import {
   type WorkflowRunAnswer,
   type WorkflowWithVersion,
   type StudioClientEvent,
+  type WorkflowMappingFields,
   type WorkflowReference,
 } from "@langwatch/workflow-contract";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -49,21 +50,27 @@ export type WorkflowServiceOptions = {
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
 export class WorkflowService {
-  async listFields(input: { projectId: string; workflowIds: string[] }) {
+  async listFields(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<Record<string, WorkflowMappingFields>> {
     const sources = await this.options.repository.listFieldSources(input);
 
     return Object.fromEntries(sources.map(({ id, dsl }) => [id, this.dsl.mappingFields(dsl)]));
   }
 
-  listSummaries(input: { projectId: string; workflowIds: string[] }) {
+  listSummaries(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; name: string }[]> {
     return this.options.repository.listSummaries(input);
   }
 
-  archiveLinked(input: WorkflowReference) {
+  archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
     return this.options.repository.archiveLinked(input);
   }
 
-  deleteUncommitted(input: WorkflowReference) {
+  deleteUncommitted(input: WorkflowReference): Promise<void> {
     return this.options.repository.deleteUncommitted(input);
   }
 

@@ -41,7 +41,7 @@ export const workflowEvaluationRunCeiling = defineRestMiddleware(
   z.boolean(),
 );
 
-function toWorkflowResponse(workflow: Workflow) {
+function toWorkflowResponse(workflow: Workflow): Omit<WorkflowRestDetail, "platformUrl"> {
   return {
     id: workflow.id,
     name: workflow.name,
@@ -61,7 +61,7 @@ const NOT_FOUND = { status: 404, body: { error: "Workflow not found" } } as cons
  * The refusals the evaluations pipeline names for itself, each a handled error
  * carrying the status it is owed, published in the bare `{ error }` body.
  */
-function evaluationRefusalOf(
+function findEvaluationRefusal(
   error: unknown,
 ): Readonly<{ status: 400 | 404; body: { error: string } }> | null {
   if (!HandledError.isHandled(error)) return null;
@@ -152,7 +152,7 @@ async function startEvaluation(params: {
       },
     };
   } catch (error) {
-    const refusal = evaluationRefusalOf(error);
+    const refusal = findEvaluationRefusal(error);
 
     if (refusal) return refusal;
 

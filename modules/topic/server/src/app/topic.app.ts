@@ -13,7 +13,7 @@ import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicService } from "../services/topic.service.ts";
-import { EventingTopicClusteringScheduleAdapter } from "../services/topic-clustering-schedule.service.ts";
+import { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
 
 /** Eventing-owned schedule read needed by the Topic status projection. */
 export interface TopicClusteringScheduleReader {
@@ -53,7 +53,7 @@ export class TopicApp implements TopicApi {
     return new TopicApp(
       TopicService.create({
         repository: setup.repositories.topics,
-        schedule: EventingTopicClusteringScheduleAdapter.create({
+        schedule: EventingTopicClusteringScheduleService.create({
           processStore: PrismaProcessStore.create({ database: setup.members.prisma }),
         }),
       }),

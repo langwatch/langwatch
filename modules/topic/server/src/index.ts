@@ -1,6 +1,6 @@
 export {
   createTopicClusteringProcessingPipeline,
-  TopicClusteringEventingAdapter,
+  TopicClusteringEventingService,
   type ProjectedTopic,
   topicClusteringRunHistoryProjectionEntrySchema,
   type TopicClusteringProcessingPipelineDeps,
@@ -9,26 +9,26 @@ export {
   type TopicClusteringRunStatusData,
   type TopicModelData,
 } from "./services/topic-clustering-eventing.service.ts";
-export { TopicClusteringProcessingProducerAdapter } from "./services/topic-clustering-processing-producer.service.ts";
+export { TopicClusteringProcessingProducerService } from "./services/topic-clustering-processing-producer.service.ts";
 export { TopicApp } from "./app/topic.app.ts";
 export { topicServer } from "./topic.server.ts";
 export { topicRepositories } from "./repositories/topic-repositories.registry.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
 export {
-  PrismaTopicServerInstallerRepository as TopicServerInstallerAdapter,
+  PrismaTopicServerInstallerRepository,
   type TopicClusteringExecutionDependencies,
   type TopicServerInstallerDependencies,
 } from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
-export { EventingTopicClusteringScheduleAdapter } from "./services/topic-clustering-schedule.service.ts";
+export { EventingTopicClusteringScheduleService } from "./services/topic-clustering-schedule.service.ts";
 export {
-  OtelTopicClusteringMetricsAdapter,
+  OtelTopicClusteringMetricsService,
   TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME,
   TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME,
 } from "./services/topic-clustering-metrics.service.ts";
 export {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
-  RedisTopicClusteringBootstrapRepository as RedisTopicClusteringBootstrapAdapter,
+  RedisTopicClusteringBootstrapRepository,
 } from "./repositories/redis/redis.topic-clustering-bootstrap.repository.ts";
 export {
   classifyClusteringError,
@@ -80,7 +80,7 @@ export {
   type StagedLangevalsPayload,
 } from "./app/topic.members.ts";
 export {
-  LangevalsStagedPayloadAdapter,
+  LangevalsStagedPayloadService,
   PayloadTooLargeError,
   type LangevalsCallKind,
   type LangevalsStagedPayloadConfig,

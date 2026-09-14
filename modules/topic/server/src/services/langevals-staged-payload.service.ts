@@ -69,7 +69,7 @@ export type LangevalsStagedPayloadConfig = {
 /**
  * Configured transport for callers composed at the application root.
  */
-export class LangevalsStagedPayloadAdapter {
+export class LangevalsStagedPayloadService {
   static create(input: {
     config: LangevalsStagedPayloadConfig;
     /**
@@ -78,8 +78,8 @@ export class LangevalsStagedPayloadAdapter {
      * payload is named rather than silently posted inline into the 6 MB cap.
      */
     staging: LangevalsPayloadStaging;
-  }): LangevalsStagedPayloadAdapter {
-    return new LangevalsStagedPayloadAdapter(input.config, input.staging);
+  }): LangevalsStagedPayloadService {
+    return new LangevalsStagedPayloadService(input.config, input.staging);
   }
 
   private constructor(

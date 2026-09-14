@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/topic-contract";
 import { TopicClusteringModels } from "@langwatch/topic-contract";
 import {
-  OtelTopicClusteringMetricsAdapter,
+  OtelTopicClusteringMetricsService,
   type TopicClusteringLangevals,
   type TopicClusteringClickHouseResolver,
   type TopicClusteringExecutionDependencies,
@@ -89,7 +89,7 @@ export function createWorkerTopicRuntime(
     database: options.database,
     redis: options.redis,
     execution: createWorkerTopicClusteringExecution(options),
-    metrics: OtelTopicClusteringMetricsAdapter.create(),
+    metrics: OtelTopicClusteringMetricsService.create(),
   };
 }
 

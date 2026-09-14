@@ -53,7 +53,7 @@ import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-s
 import { suiteServer } from "@langwatch/suite-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
-  ContractWorkflowDslMigrationAdapter,
+  ContractWorkflowDslMigrationService,
   HttpWorkflowNlpRuntimeAdapter,
   type NlpPayloadStaging,
   StudioEventPreparerService,
@@ -322,7 +322,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
       studioEvents: workflowStudioEvents,
     }),
     studioEvents: workflowStudioEvents,
-    dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+    dslMigration: ContractWorkflowDslMigrationService.create(),
     ids: workflowIds,
   });
 

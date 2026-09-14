@@ -54,9 +54,9 @@ type RunFailedInput = RunStartedInput & {
  * objects, rather than application callbacks, so all delayed work continues
  * through the owning Eventing pipeline.
  */
-export class EventingTopicClusteringCommandsAdapter implements TopicClusteringCommands {
-  static create(): EventingTopicClusteringCommandsAdapter {
-    return new EventingTopicClusteringCommandsAdapter();
+export class EventingTopicClusteringCommandsService implements TopicClusteringCommands {
+  static create(): EventingTopicClusteringCommandsService {
+    return new EventingTopicClusteringCommandsService();
   }
 
   private recordTopicsCommand: CommandSender<RecordTopicsInput> | null = null;
@@ -94,9 +94,9 @@ export class EventingTopicClusteringCommandsAdapter implements TopicClusteringCo
 }
 
 /** Late-bound outcome transport for the pipeline's own retry-safe intent executor. */
-export class EventingTopicClusteringOutcomeCommandsAdapter implements TopicClusteringOutcomeCommands {
-  static create(): EventingTopicClusteringOutcomeCommandsAdapter {
-    return new EventingTopicClusteringOutcomeCommandsAdapter();
+export class EventingTopicClusteringOutcomeCommandsService implements TopicClusteringOutcomeCommands {
+  static create(): EventingTopicClusteringOutcomeCommandsService {
+    return new EventingTopicClusteringOutcomeCommandsService();
   }
 
   private runStartedCommand: CommandSender<RunStartedInput> | null = null;

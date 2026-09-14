@@ -22,7 +22,7 @@ class SharedCache implements NlpLambdaArnCache {
   readonly deleted: string[] = [];
   failReads = false;
 
-  async tryGet(key: string): Promise<string | null> {
+  async find(key: string): Promise<string | null> {
     this.reads.push(key);
     if (this.failReads) throw new Error("Redis is unavailable");
     return this.entries.get(key)?.value ?? null;

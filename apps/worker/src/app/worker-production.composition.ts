@@ -101,7 +101,7 @@ import {
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
-  TopicServerInstallerAdapter,
+  PrismaTopicServerInstallerRepository,
   type TopicClusteringDatabase,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
@@ -1428,7 +1428,7 @@ export class WorkerProductionComposition {
         ? { absence: WorkerProductionComposition.topicAbsence(options)! }
         : {}),
     });
-    const topicServer = TopicServerInstallerAdapter.create({
+    const topicServer = PrismaTopicServerInstallerRepository.create({
       database: topicRuntime.database,
       processStore: eventing.processStore,
       redis: topicRuntime.redis,
@@ -1487,7 +1487,7 @@ export class WorkerProductionComposition {
         organizations: billingReportingPersistence.reportOrganizations,
         billingCheckpoints: billingReportingPersistence.checkpoints,
         getUsageReportingService: () => usageReporting,
-        queryBillableEventsTotal: (input) => billableEvents.tryQueryBillableEventsTotal(input),
+        queryBillableEventsTotal: (input) => billableEvents.findQueryBillableEventsTotal(input),
         organizationCache: RedisBillingOrganizationCacheAdapter.create({
           redis: eventingOptions.groupQueue.redis,
         }),

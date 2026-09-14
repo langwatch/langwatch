@@ -70,7 +70,7 @@ describe("the studio's NLP Lambda sweep", () => {
       const deleteFunction = vi.fn(async () => {});
       const fleet: NlpLambdaFleet = {
         listFunctions,
-        tryReadLastActivityAt: async () =>
+        findLastActivityAt: async () =>
           Temporal.Now.instant().subtract({ hours: 24 * 30 }),
         functionExists: async () => true,
         deleteFunction,

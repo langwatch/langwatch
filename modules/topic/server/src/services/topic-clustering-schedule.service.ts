@@ -4,9 +4,9 @@ import { Temporal, type Instant } from "@langwatch/time";
 import type { TopicClusteringScheduleReader } from "../app/topic.app.ts";
 
 /** Reads Topic's durable wake from the generic process-manager store. */
-export class EventingTopicClusteringScheduleAdapter implements TopicClusteringScheduleReader {
-  static create(options: { processStore: ProcessStore }): EventingTopicClusteringScheduleAdapter {
-    return new EventingTopicClusteringScheduleAdapter(options.processStore);
+export class EventingTopicClusteringScheduleService implements TopicClusteringScheduleReader {
+  static create(options: { processStore: ProcessStore }): EventingTopicClusteringScheduleService {
+    return new EventingTopicClusteringScheduleService(options.processStore);
   }
 
   private constructor(private readonly processStore: ProcessStore) {}

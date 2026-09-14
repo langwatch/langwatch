@@ -39,7 +39,7 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
 });
 
 import { EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
-import { TopicServerInstallerAdapter } from "@langwatch/topic-server";
+import { PrismaTopicServerInstallerRepository } from "@langwatch/topic-server";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
@@ -82,7 +82,7 @@ function database() {
 describe("WorkerProductionComposition infrastructure seam", () => {
   it("constructs one foundation and passes its Redis to Eventing and Topic", async () => {
     const eventingCreate = vi.spyOn(RuntimeServer, "create");
-    const topicCreate = vi.spyOn(TopicServerInstallerAdapter, "create");
+    const topicCreate = vi.spyOn(PrismaTopicServerInstallerRepository, "create");
     const resources = new ResourceScope();
 
     try {

@@ -19,7 +19,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
-  ContractWorkflowDslMigrationAdapter,
+  ContractWorkflowDslMigrationService,
   HttpWorkflowNlpRuntimeAdapter,
   type NlpPayloadStaging,
   StudioEventPreparerService,
@@ -115,7 +115,7 @@ export function createWorkerEvaluationWorkflows(
       studioEvents,
     }),
     studioEvents,
-    dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+    dslMigration: ContractWorkflowDslMigrationService.create(),
     ids,
   });
   return { workflows, nlpRuntime };

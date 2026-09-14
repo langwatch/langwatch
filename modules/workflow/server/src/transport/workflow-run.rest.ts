@@ -19,6 +19,7 @@ import {
   WorkflowNotFoundError,
   WorkflowNotPublishedError,
   WorkflowVersionNotFoundError,
+  type WorkflowRunAnswer,
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -47,7 +48,10 @@ async function runWorkflow({
   versionId?: string | undefined;
   contentType: string | null;
   raw: string;
-}) {
+}): Promise<
+  | Readonly<{ status: 400; body: { message: string } }>
+  | Readonly<{ status: 200; body: WorkflowRunAnswer }>
+> {
   if (!contentType?.includes("application/json")) {
     return { status: 400, body: { message: "Invalid body, expecting json" } } as const;
   }

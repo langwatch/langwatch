@@ -10,13 +10,20 @@ import {
   type CopyStudioWorkflowCommand,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 
 export type WorkflowStudioCopyServiceOptions = {
   datasets: DatasetApi;
   rows: WorkflowRowRepository;
 };
+
+/**
+ * The app's KSUID resource for a workflow row (`KSUID_RESOURCES.WORKFLOW`).
+ * The literal rather than the app's constant table: the prefix is part of the
+ * id format already written to the database, so it belongs with the writer.
+ */
+const WORKFLOW_KSUID_RESOURCE = "workflow";
 
 /** A dataset reference as a Studio node or parameter carries one. */
 type DatasetReference = { id?: string; name?: string };
@@ -60,7 +67,7 @@ export class WorkflowStudioCopyService {
       });
     }
 
-    const workflowId = `workflow_${nanoid()}`;
+    const workflowId = generate(WORKFLOW_KSUID_RESOURCE).toString();
     await this.options.rows.create({
       id: workflowId,
       projectId: input.targetProjectId,

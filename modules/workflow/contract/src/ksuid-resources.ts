@@ -43,4 +43,5 @@ export const KSUID_RESOURCES = {
   WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
   TRACE_EDIT_OVERLAY: "traceedit",
+  WORKFLOW: "workflow",
 } as const;

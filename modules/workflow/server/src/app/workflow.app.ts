@@ -4,7 +4,7 @@
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { EvaluatorApi, type Evaluator } from "@langwatch/evaluator-contract";
+import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { AgentApi } from "@langwatch/agent-contract";
 import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";
@@ -69,7 +69,7 @@ import { WorkflowAgentMappingAdapter } from "../adapters/workflow-agent-mapping.
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
-import { ContractWorkflowDslMigrationAdapter } from "../services/workflow-dsl-migration.service.ts";
+import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
 import {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
@@ -216,7 +216,7 @@ export interface NlpLambdaFleet {
    * "never used": a missing log group is also unknown, and the policy declines
    * to delete on an unknown rather than guessing.
    */
-  tryReadLastActivityAt(input: { functionName: string }): Promise<Instant | null>;
+  findLastActivityAt(input: { functionName: string }): Promise<Instant | null>;
   /** True when the function still exists in the account. */
   functionExists(input: { functionName: string }): Promise<boolean>;
   deleteFunction(input: { functionName: string }): Promise<void>;
@@ -231,7 +231,7 @@ export interface NlpLambdaFleet {
  * which is slower rather than wrong.
  */
 export interface NlpLambdaArnCache {
-  tryGet(key: string): Promise<string | null>;
+  find(key: string): Promise<string | null>;
   set(input: { key: string; value: string; ttlSeconds: number }): Promise<void>;
   delete(key: string): Promise<void>;
 }
@@ -468,7 +468,7 @@ export class WorkflowApp implements WorkflowApi {
         studioEvents,
       }),
       studioEvents,
-      dslMigration: ContractWorkflowDslMigrationAdapter.create(),
+      dslMigration: ContractWorkflowDslMigrationService.create(),
       ids,
     });
 
@@ -763,7 +763,7 @@ export class WorkflowApp implements WorkflowApi {
     }
 
     return this.#members.evaluators.create({
-      id: `evaluator_${nanoid()}`,
+      id: newEvaluatorId(),
       projectId,
       name,
       type: "workflow",
