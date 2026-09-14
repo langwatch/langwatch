@@ -24,7 +24,7 @@ function adapter(
     directories: {
       projects: {
         getOrganizationId: vi.fn().mockResolvedValue("org-1"),
-        tryGetById: vi
+        findById: vi
           .fn()
           .mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
       },
@@ -99,7 +99,7 @@ describe("given a worker holding an automation containment claim", () => {
         const worker1 = WorkerAutomationRunawayAdapter.create({
           redis: null,
           directories: {
-            projects: { getOrganizationId: vi.fn(), tryGetById: vi.fn() },
+            projects: { getOrganizationId: vi.fn(), findById: vi.fn() },
             authorization: { listOrganizationBindings: vi.fn() },
           },
           suppression: { filterSuppressed: vi.fn() },

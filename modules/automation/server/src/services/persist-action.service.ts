@@ -62,7 +62,7 @@ export class AutomationPersistActionService {
     project?: PersistActionProject;
   }): Promise<void> {
     const { trigger, traceId, tenantId } = input;
-    const project = input.project ?? (await this.projects.tryGetById(tenantId));
+    const project = input.project ?? (await this.projects.findById(tenantId));
     if (!project) {
       logger.warn({ tenantId, triggerId: trigger.id }, "Project not found");
 

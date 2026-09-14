@@ -52,7 +52,7 @@ export class PrismaTeamRepository extends TeamRepository {
     return team;
   }
 
-  async tryGetOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
+  async findOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     const team = await this.database.team.findUnique({
       where: { id: teamId },
       select: { organizationId: true },

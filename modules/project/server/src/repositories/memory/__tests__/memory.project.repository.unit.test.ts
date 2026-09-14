@@ -54,14 +54,14 @@ describe("MemoryProjectRepository", () => {
       const project = await repository.create(creation);
       expect(project).toMatchObject({ id: "project_1", archivedAt: null, kind: "application" });
 
-      expect(await repository.tryGetWithTeam("project_1")).toMatchObject({
+      expect(await repository.findWithTeam("project_1")).toMatchObject({
         id: "project_1",
         team: { id: TEAM_ID, organizationId: ORGANIZATION_ID },
       });
       expect(await repository.listPaths({ projectIds: ["project_1"] })).toEqual([
         { projectId: "project_1", fullPath: "Acme / Engineering / Checkout assistant" },
       ]);
-      expect(await repository.tryGetOrganizationId("project_1")).toBe(ORGANIZATION_ID);
+      expect(await repository.findOrganizationId("project_1")).toBe(ORGANIZATION_ID);
     });
 
     it("answers presence only when the organization enables it too", async () => {
@@ -99,7 +99,7 @@ describe("MemoryProjectRepository", () => {
 
       await repository.archive({ id: "project_1", organizationId: ORGANIZATION_ID });
 
-      expect(await repository.tryGetWithTeam("project_1")).toBeNull();
+      expect(await repository.findWithTeam("project_1")).toBeNull();
       expect(
         await repository.findAllByTeam({ organizationId: ORGANIZATION_ID, teamId: TEAM_ID }),
       ).toEqual([]);
@@ -164,15 +164,15 @@ describe("MemoryProjectRepository", () => {
         at: first,
         staleBefore: new Date("2026-08-25T11:00:00.000Z"),
       });
-      expect((await repository.tryGetById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
+      expect((await repository.findById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
 
       await repository.touchCodingAgentSessionSeen({
         projectId: "project_1",
         at: new Date("2026-08-25T12:30:00.000Z"),
         staleBefore: new Date("2026-08-25T11:30:00.000Z"),
       });
-      expect((await repository.tryGetById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
-      expect((await repository.tryGetById("project_1"))?.lastCodingAgentPullRequestAt).toBeNull();
+      expect((await repository.findById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
+      expect((await repository.findById("project_1"))?.lastCodingAgentPullRequestAt).toBeNull();
     });
   });
 
@@ -245,7 +245,7 @@ describe("MemoryProjectRepository", () => {
     it("reports the project's own setting beside the organisation's", async () => {
       const { database, repository } = seeded();
       await repository.create(creation);
-      const project = await repository.tryGetById("project_1");
+      const project = await repository.findById("project_1");
       if (project) database.putProject({ ...project, traceSharingEnabled: false });
 
       expect(await repository.findTraceSharingConfig("project_1")).toEqual({

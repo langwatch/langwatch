@@ -246,7 +246,7 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
         agents: fakeAgentApi(agents),
         prompts: fakePromptApi(),
         projects: createApiFixture<ProjectApi>({
-          tryGetWithTeam: async (id: string) => (id === projectId ? project : null),
+          findWithTeam: async (id: string) => (id === projectId ? project : null),
         }),
       },
       members: {

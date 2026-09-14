@@ -15,7 +15,7 @@ class SilentReporter extends ManagedProviderConfigurationReporter {
 }
 
 class Projects extends TestProjectApi {
-  override async tryGetOrganizationId(): Promise<string> {
+  override async findOrganizationId(): Promise<string> {
     return "org_1";
   }
 

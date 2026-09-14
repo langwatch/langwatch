@@ -50,7 +50,7 @@ function makeProjectStore(initial: { firstMessage: boolean; integrated: boolean 
     project,
     writes,
     projects: {
-      tryGetById: async () => ({ ...project }),
+      findById: async () => ({ ...project }),
       updateMetadata: async ({ data }: { id: string; data: Record<string, unknown> }) => {
         writes.push(data);
         Object.assign(project, data);

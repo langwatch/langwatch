@@ -77,7 +77,7 @@ function serviceFor(options: {
   const agents = fakeAgents(options.namesById);
   const service = AgentTestService.create({
     agents,
-    projects: { tryGetById: vi.fn().mockResolvedValue(null) } as never,
+    projects: { findById: vi.fn().mockResolvedValue(null) } as never,
     workflows: {} as never,
     prompts: {} as never,
     secrets: {} as never,

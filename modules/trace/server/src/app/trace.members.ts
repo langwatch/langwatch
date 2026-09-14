@@ -441,7 +441,7 @@ export interface TraceProductAnalytics {
  * holds only a project row and an org-admin lookup can now answer it too.
  */
 export interface TraceProjectMetadata {
-  tryGetById(id: string): Promise<Project | null>;
+  findById(id: string): Promise<Project | null>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
   /**
    * The org admin's user id, which is also the distinct_id posthog-js

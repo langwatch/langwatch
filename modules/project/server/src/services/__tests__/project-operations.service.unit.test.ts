@@ -19,8 +19,8 @@ import {
 class CharacterizationProjectDirectory implements ProjectOperationsDirectory {
   constructor(private readonly overrides: Partial<ProjectOperationsDirectory>) {}
 
-  tryGetWithTeam: ProjectOperationsDirectory["tryGetWithTeam"] = (id) =>
-    this.overrides.tryGetWithTeam?.(id) ?? Promise.resolve(null);
+  findWithTeam: ProjectOperationsDirectory["findWithTeam"] = (id) =>
+    this.overrides.findWithTeam?.(id) ?? Promise.resolve(null);
 
   update: ProjectOperationsDirectory["update"] = (input) =>
     this.overrides.update?.(input) ?? this.unimplemented("update");
@@ -145,7 +145,7 @@ describe("ProjectOperationsService", () => {
       const updated = characterizationProject(false);
       const update = vi.fn(async () => updated);
       const operations = characterizationOperations({
-        projects: { tryGetWithTeam: async () => characterizationProject(true), update },
+        projects: { findWithTeam: async () => characterizationProject(true), update },
         revokeAllTraceShares,
       });
 
@@ -163,7 +163,7 @@ describe("ProjectOperationsService", () => {
       const revokeAllTraceShares = vi.fn(async () => {});
       const operations = characterizationOperations({
         projects: {
-          tryGetWithTeam: async () => characterizationProject(false),
+          findWithTeam: async () => characterizationProject(false),
           update: async () => characterizationProject(false),
         },
         revokeAllTraceShares,

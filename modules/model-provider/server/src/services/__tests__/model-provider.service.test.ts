@@ -337,7 +337,7 @@ class Projects extends TestProjectApi {
     return Promise.resolve(project);
   }
 
-  override tryGetWithTeam(): ReturnType<ProjectApi["tryGetWithTeam"]> {
+  override findWithTeam(): ReturnType<ProjectApi["findWithTeam"]> {
     return Promise.resolve(project);
   }
 

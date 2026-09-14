@@ -104,7 +104,7 @@ class FakeProjects extends TestProjectApi {
     traceSharingEnabled: false,
   });
 
-  tryGetWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestinationProject;
+  findWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestinationProject;
 }
 
 class FakeSink implements GovernanceOcsfEventSink {

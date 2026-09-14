@@ -164,7 +164,7 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null> {
-    return this.teams.tryGetOrganizationId(getOrganizationIdByTeamIdInputSchema.parse(input));
+    return this.teams.findOrganizationId(getOrganizationIdByTeamIdInputSchema.parse(input));
   }
 
   /** The stored row, decrypted: the cipher is this service's dependency, not the repository's. */

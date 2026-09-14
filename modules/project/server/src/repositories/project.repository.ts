@@ -40,9 +40,9 @@ export interface ProjectRepository {
   }): Promise<InternalProject>;
   isPresenceEnabled(projectId: string): Promise<boolean>;
 
-  tryGetById(id: string): Promise<Project | null>;
-  tryGetOrganizationId(projectId: string): Promise<string | undefined>;
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  findById(id: string): Promise<Project | null>;
+  findOrganizationId(projectId: string): Promise<string | undefined>;
+  findWithTeam(id: string): Promise<ProjectWithTeam | null>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;

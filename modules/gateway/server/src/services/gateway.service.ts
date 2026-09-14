@@ -89,7 +89,7 @@ export class GatewayService {
   }
 
   async listForProject(projectId: string): Promise<GatewayBudgetWithSeats[]> {
-    const project = await this.projects.tryGetWithTeam(projectId);
+    const project = await this.projects.findWithTeam(projectId);
     if (!project) {
       return [];
     }
@@ -119,7 +119,7 @@ export class GatewayService {
   }
 
   async listForProjectWithHealth(projectId: string): Promise<BudgetListWithHealth> {
-    const project = await this.projects.tryGetWithTeam(projectId);
+    const project = await this.projects.findWithTeam(projectId);
     if (!project) {
       return {
         budgets: [],
@@ -401,7 +401,7 @@ export class GatewayService {
     projectId: string,
     organizationId: string,
   ): Promise<void> {
-    const project = await this.projects.tryGetWithTeam(projectId);
+    const project = await this.projects.findWithTeam(projectId);
     if (project?.team.organizationId !== organizationId) {
       throw new GatewayScopeOrgMismatchError("project");
     }

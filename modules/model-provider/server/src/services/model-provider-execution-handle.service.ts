@@ -31,7 +31,7 @@ export type ModelProviderExecutionHandleOptions = {
   /** The composed gateway every provider row and prepared credential is read from. */
   modelProviders: Pick<
     ModelProviderApi,
-    "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
+    "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders" | "prepareExecution"
   >;
   /**
    * The project read that decides whether the id names anything at all.
@@ -59,7 +59,7 @@ async function resolveModel({
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderApi;
+  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
 }): Promise<string> {
   // 1. Explicit model always wins. A latest alias resolves to the concrete
   //    model here so the provider lookup below reads the real prefix.
@@ -112,7 +112,7 @@ async function tryResolveFeatureDefault({
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderApi;
+  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
 }): Promise<string | null> {
   try {
     const resolved = await modelProviderService.resolveModelForFeature({ projectId, featureKey });
@@ -157,7 +157,7 @@ async function disabledProviderError({
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderApi;
+  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
 }): Promise<ModelProviderDisabledError> {
   // `resolved.scope` is always non-null on the success path, but the type is
   // loose — narrow here so the typed error stays correct.
@@ -206,7 +206,7 @@ async function tryFindAlternate({
   skipFromScope: NonNullable<
     Awaited<ReturnType<ModelProviderApi["resolveModelForFeature"]>>["scope"]
   >;
-  modelProviderService: ModelProviderApi;
+  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
 }): Promise<ModelProviderAlternateResolution | null> {
   try {
     return await modelProviderService.findAlternateModel({ projectId, featureKey, skipFromScope });
@@ -246,7 +246,7 @@ export class ModelProviderExecutionHandleService {
     input: ModelProviderExecutionHandleInput & ModelProviderExecutionHandleOptions,
   ): Promise<LanguageModel> {
     const { projectId, model, featureKey = "prompt.create_default" } = input;
-    const project = await input.projects.tryGetWithTeam(projectId);
+    const project = await input.projects.findWithTeam(projectId);
 
     if (!project) {
       throw new Error("Project not found");

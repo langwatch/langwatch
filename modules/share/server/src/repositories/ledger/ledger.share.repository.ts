@@ -25,7 +25,7 @@ import type {
 const SYSTEM_ACTOR: LedgerActor = { type: "system", id: null };
 
 /** The project peer, narrowed to the tenancy answer the ledger fences grants by. */
-type LedgerProjectPeer = Pick<ProjectApi, "tryGetOrganizationId">;
+type LedgerProjectPeer = Pick<ProjectApi, "findOrganizationId">;
 
 type LedgerShareDependencies = {
   head: ShareRepository;
@@ -269,6 +269,6 @@ export class LedgerShareRepository implements ShareRepository {
 
   /** The organisation a project sits in, asked of the module that owns the row. */
   async #organizationOf(projectId: string): Promise<string | null> {
-    return (await this.#projects.tryGetOrganizationId(projectId)) ?? null;
+    return (await this.#projects.findOrganizationId(projectId)) ?? null;
   }
 }

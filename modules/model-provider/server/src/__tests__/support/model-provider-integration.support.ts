@@ -51,7 +51,7 @@ export class PrismaProjects extends TestProjectApi {
     super();
   }
 
-  override async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
+  override async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
       include: { team: true },
@@ -60,7 +60,7 @@ export class PrismaProjects extends TestProjectApi {
   }
 
   override async getWithTeam(id: string): Promise<ProjectWithTeam> {
-    const project = await this.tryGetWithTeam(id);
+    const project = await this.findWithTeam(id);
     if (!project) throw new Error("no project");
     return project;
   }

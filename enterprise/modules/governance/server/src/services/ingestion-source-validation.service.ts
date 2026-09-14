@@ -105,7 +105,7 @@ export class IngestionSourceValidationService {
       return;
     }
 
-    const project = await this.projects.tryGetWithTeam(input.traceProjectId);
+    const project = await this.projects.findWithTeam(input.traceProjectId);
     const isAllowed =
       project !== null &&
       project.archivedAt === null &&

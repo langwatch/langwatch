@@ -786,7 +786,7 @@ export class GatewayApp implements GatewayApi {
   async findProjectOrganization(projectId: string): Promise<string | null> {
     // The directory answers `undefined` for a project it does not hold; the
     // gateway's own vocabulary for "no such row" is null throughout.
-    return (await this.#dependencies.projects.tryGetOrganizationId(projectId)) ?? null;
+    return (await this.#dependencies.projects.findOrganizationId(projectId)) ?? null;
   }
 
   usageSummary(input: { organizationId: string; virtualKeyIds: string[]; window: UsageWindow }) {

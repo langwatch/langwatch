@@ -226,7 +226,7 @@ const resolvedIdentity = projectIdentitySchema.parse({
 function projectPeer(memory: MemoryProjects): ProjectApi {
   return {
     getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
-    tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+    findWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     findIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
     getById: vi.fn().mockResolvedValue(null),
     listByOrganization: vi.fn().mockResolvedValue({ data: [] }),

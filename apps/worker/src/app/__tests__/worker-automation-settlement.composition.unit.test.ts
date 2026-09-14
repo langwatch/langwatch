@@ -444,7 +444,7 @@ function compose(over: ComposeOverrides = {}) {
     clock: new FrozenClock(),
     ...(delivery ? { notifications: delivery } : {}),
     projects: {
-      tryGetById: async () => ({ id: "project-1", name: "Acme", slug: "acme" }),
+      findById: async () => ({ id: "project-1", name: "Acme", slug: "acme" }),
     } as never,
     traces: {
       tryGetSummary: async () => ({
@@ -535,7 +535,7 @@ function recordingContainment(input: {
     directories: {
       projects: {
         getOrganizationId: async () => "organization-1",
-        tryGetById: async () => ({ id: "project-1", name: "Acme", slug: "acme" }),
+        findById: async () => ({ id: "project-1", name: "Acme", slug: "acme" }),
       },
       authorization: {
         listOrganizationBindings: async () => [

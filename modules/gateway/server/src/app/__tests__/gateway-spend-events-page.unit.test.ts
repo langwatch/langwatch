@@ -61,7 +61,7 @@ const SPEND_EVENT_ROW = {
 };
 
 const clickHouseQuery = vi.fn();
-const tryGetOrganizationId = vi.fn();
+const findOrganizationId = vi.fn();
 const virtualKeyFindMany = vi.fn();
 
 /** A fake ClickHouse client answering the spend ledger page read. */
@@ -86,7 +86,7 @@ function gatewayAppStub(): GatewayApp {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
-      projects: projectsStub({ tryGetOrganizationId }),
+      projects: projectsStub({ findOrganizationId }),
       evaluators: peer("evaluators"),
       monitors: peer("monitors"),
     },
@@ -106,7 +106,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clickHouseQuery.mockResolvedValue({ rows: [SPEND_EVENT_ROW] });
-    tryGetOrganizationId.mockResolvedValue("org_1");
+    findOrganizationId.mockResolvedValue("org_1");
     virtualKeyFindMany.mockResolvedValue([
       { id: "vk_1", name: "Customer A key", displayPrefix: "..." },
     ]);
@@ -156,7 +156,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
       expect(result?.rows).toHaveLength(1);
       expect(result?.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
       expect(result?.clickHouseDisabled).toBe(false);
-      expect(tryGetOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
+      expect(findOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
       expect(virtualKeyFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ organizationId: "org_1", id: { in: ["vk_1"] } }),
@@ -168,7 +168,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
   describe("when the project resolves to no organization", () => {
     /** @scenario Unknown project tenants do not resolve virtual-key names */
     it("keeps virtual-key names empty", async () => {
-      tryGetOrganizationId.mockResolvedValue(undefined);
+      findOrganizationId.mockResolvedValue(undefined);
       const app = gatewayAppStub();
 
       const result = await app.findSpendEventsPage(BASE_INPUT);

@@ -67,7 +67,7 @@ function buildRepository({
     findAllResourceGrantIds: vi.fn().mockResolvedValue(grantIds),
     consumeUsage: vi.fn().mockResolvedValue(true),
   } as unknown as ShareGrantRepository;
-  const projects = { tryGetOrganizationId: vi.fn().mockResolvedValue(ORGANIZATION_ID) };
+  const projects = { findOrganizationId: vi.fn().mockResolvedValue(ORGANIZATION_ID) };
   const authz = {
     isOnEngine: vi.fn().mockResolvedValue(onEngine),
     attachResourceGrant: vi.fn().mockResolvedValue(void 0),

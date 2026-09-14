@@ -43,14 +43,14 @@ const prisma = connection?.client as PrismaClient;
  * refused unless its project's team belongs to the budget's org.
  */
 class SuiteProjectService extends TestProjectApi {
-  override async tryGetWithTeam(id: string): ReturnType<ProjectApi["tryGetWithTeam"]> {
+  override async findWithTeam(id: string): ReturnType<ProjectApi["findWithTeam"]> {
     // The generated row types every JSON column as `JsonValue`, which is wider
     // than the contract's `JSONType` by the array case. The rows this suite
     // writes carry no JSON at all.
     return (await prisma.project.findUnique({
       where: { id },
       include: { team: true },
-    })) as Awaited<ReturnType<ProjectApi["tryGetWithTeam"]>>;
+    })) as Awaited<ReturnType<ProjectApi["findWithTeam"]>>;
   }
 }
 

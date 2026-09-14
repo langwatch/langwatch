@@ -115,13 +115,13 @@ describe("the project tRPC namespace", () => {
   describe("when a project has received traces", () => {
     /** @scenario Shows Integration configured alert when firstMessage exists */
     it("returns firstMessage as true", async () => {
-      const tryGetById = vi.fn(async () => ({ firstMessage: true }) as never);
-      const { caller } = mount({ projects: { tryGetById } });
+      const findById = vi.fn(async () => ({ firstMessage: true }) as never);
+      const { caller } = mount({ projects: { findById } });
 
       await expect(caller.getHasFirstMessage({ projectId: "project_123" })).resolves.toEqual({
         firstMessage: true,
       });
-      expect(tryGetById).toHaveBeenCalledWith("project_123");
+      expect(findById).toHaveBeenCalledWith("project_123");
     });
   });
 
@@ -129,7 +129,7 @@ describe("the project tRPC namespace", () => {
     /** @scenario Shows Waiting for messages when no firstMessage */
     it("returns firstMessage as false", async () => {
       const { caller } = mount({
-        projects: { tryGetById: async () => ({ firstMessage: false }) as never },
+        projects: { findById: async () => ({ firstMessage: false }) as never },
       });
 
       await expect(caller.getHasFirstMessage({ projectId: "project_123" })).resolves.toEqual({
@@ -138,7 +138,7 @@ describe("the project tRPC namespace", () => {
     });
 
     it("answers false rather than 404 for a project that does not exist", async () => {
-      const { caller } = mount({ projects: { tryGetById: async () => null } });
+      const { caller } = mount({ projects: { findById: async () => null } });
 
       await expect(caller.getHasFirstMessage({ projectId: "nonexistent" })).resolves.toEqual({
         firstMessage: false,
@@ -148,7 +148,7 @@ describe("the project tRPC namespace", () => {
 
   describe("when the base key is read", () => {
     it("refuses a project that does not exist as not found", async () => {
-      const { caller } = mount({ projects: { tryGetById: async () => null } });
+      const { caller } = mount({ projects: { findById: async () => null } });
 
       await expectRefusal(caller.getProjectAPIKey({ projectId: "nope" }), {
         code: "project_not_found",

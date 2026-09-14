@@ -328,7 +328,7 @@ export class SuiteApp implements SuiteApi {
    * The organization behind a project, refusing when there is none to resolve.
    */
   async getOrganizationId(projectId: string): Promise<string> {
-    const organizationId = await this.#dependencies.projects.tryGetOrganizationId(projectId);
+    const organizationId = await this.#dependencies.projects.findOrganizationId(projectId);
     if (!organizationId) throw new OrganizationNotFoundForProjectError(projectId);
 
     return organizationId;
@@ -386,7 +386,7 @@ export type QueueSimulationRunCommandData = {
   metadata?: Record<string, unknown>;
   secretParameters?: Record<string, string>;
   target?: {
-    type: "prompt" | "http" | "code" | "workflow" | "connected";
+    type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
     referenceId: string;
   };
   occurredAt: number;

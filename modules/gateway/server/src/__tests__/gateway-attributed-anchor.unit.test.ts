@@ -23,7 +23,7 @@ function serviceWith(vkFound: boolean, projectFound: boolean) {
     },
   } as never;
   const projects = {
-    tryGetWithTeam: vi
+    findWithTeam: vi
       .fn()
       .mockResolvedValue(
         projectFound ? { id: "proj_1", teamId: "team_1", team: { organizationId: "org_1" } } : null,

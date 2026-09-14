@@ -67,7 +67,7 @@ export class DataRetentionService {
       return cached;
     }
 
-    const project = await this.options.projects.tryGetWithTeam(input.projectId);
+    const project = await this.options.projects.findWithTeam(input.projectId);
     const context = project
       ? {
           organizationId: project.team.organizationId,
@@ -257,7 +257,7 @@ export class DataRetentionService {
       };
     }
 
-    const project = await this.options.projects.tryGetWithTeam(scope.scopeId);
+    const project = await this.options.projects.findWithTeam(scope.scopeId);
     if (!project) {
       return null;
     }

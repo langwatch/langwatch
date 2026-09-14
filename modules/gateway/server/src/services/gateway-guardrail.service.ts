@@ -140,7 +140,7 @@ export class GatewayGuardrailService {
   }
 
   private async organizationIdFor(projectId: string): Promise<string> {
-    const project = await this.projects.tryGetWithTeam(projectId);
+    const project = await this.projects.findWithTeam(projectId);
     if (!project) {
       throw new GatewayGuardrailProjectNotFoundError();
     }

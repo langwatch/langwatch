@@ -1072,7 +1072,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** One project, or null when it does not exist. */
   findProject(id: string): Promise<Project | null> {
-    return this.#dependencies.projects.tryGetById(id);
+    return this.#dependencies.projects.findById(id);
   }
 
   /** The organization's projects, one page at a time. */

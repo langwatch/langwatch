@@ -31,7 +31,7 @@ export class CodingAgentSessionListPullRequestService {
     }
 
     try {
-      const project = await this.dependencies.projects.tryGetWithTeam(input.projectId);
+      const project = await this.dependencies.projects.findWithTeam(input.projectId);
       if (project === null) {
         return new Map();
       }

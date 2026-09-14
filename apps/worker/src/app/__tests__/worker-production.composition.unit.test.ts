@@ -160,7 +160,7 @@ function createTraceFeature(eventing: WorkerEventingRuntime): {
 }
 
 class Projects extends TestProjectApi {
-  override async tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+  override async findOrganizationId(projectId: string): Promise<string | undefined> {
     return projectId === "project-1" ? "org-1" : undefined;
   }
 }

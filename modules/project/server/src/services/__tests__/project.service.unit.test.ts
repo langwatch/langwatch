@@ -105,11 +105,11 @@ class StubRepository implements ProjectRepository {
   tryFindIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
   create = vi.fn(async () => applicationProject);
-  tryGetById = vi.fn(async () => applicationProject);
-  tryGetOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(
+  findById = vi.fn(async () => applicationProject);
+  findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(
     async () => "org",
   );
-  tryGetWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(async () => null);
+  findWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(async () => null);
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
@@ -473,7 +473,7 @@ describe("ProjectService", () => {
 
   it("returns the project organization through the throwing Project service", async () => {
     const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue({
+    repository.findWithTeam.mockResolvedValue({
       ...applicationProject,
       team: {
         id: "team_1",
@@ -494,12 +494,12 @@ describe("ProjectService", () => {
 
   it("returns absence for a missing or orphaned compatibility tenant lookup", async () => {
     const repository = new StubRepository();
-    repository.tryGetOrganizationId.mockResolvedValue(undefined);
+    repository.findOrganizationId.mockResolvedValue(undefined);
 
-    await expect(createService(repository).tryGetOrganizationId("project_missing")).resolves.toBe(
+    await expect(createService(repository).findOrganizationId("project_missing")).resolves.toBe(
       undefined,
     );
-    expect(repository.tryGetOrganizationId).toHaveBeenCalledWith("project_missing");
+    expect(repository.findOrganizationId).toHaveBeenCalledWith("project_missing");
   });
 
   it("creates an application project through its own repository", async () => {
@@ -728,7 +728,7 @@ describe("ProjectService", () => {
     destination: { id: string; isPersonal: boolean };
   }) => {
     const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue(current);
+    repository.findWithTeam.mockResolvedValue(current);
     repository.tryFindActiveTeamInOrganization.mockResolvedValue(destination);
 
     await expect(
@@ -761,7 +761,7 @@ describe("ProjectService", () => {
   /** @scenario tRPC project.update accepts optional teamId */
   it("moves the project to a live team in the same organization", async () => {
     const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+    repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
     repository.tryFindActiveTeamInOrganization.mockResolvedValue({
       id: "team_2",
       isPersonal: false,
@@ -801,7 +801,7 @@ describe("ProjectService", () => {
 
   it("allows an update that names the current personal team", async () => {
     const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue(
+    repository.findWithTeam.mockResolvedValue(
       projectWithTeam({ isPersonal: true, teamId: "personal" }),
     );
     repository.tryFindActiveTeamInOrganization.mockResolvedValue({
@@ -821,7 +821,7 @@ describe("ProjectService", () => {
   /** @scenario Deleting a project cannot empty a personal workspace */
   it("refuses to archive a personal project", async () => {
     const repository = new StubRepository();
-    repository.tryGetWithTeam.mockResolvedValue(projectWithTeam({ isPersonal: true }));
+    repository.findWithTeam.mockResolvedValue(projectWithTeam({ isPersonal: true }));
 
     await expect(
       createService(repository).archive({

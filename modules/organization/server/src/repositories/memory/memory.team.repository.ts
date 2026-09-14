@@ -37,7 +37,7 @@ export class MemoryTeamRepository extends TeamRepository {
     return toOrganizationTeam(team);
   }
 
-  async tryGetOrganizationId(input: { teamId: string }): Promise<string | null> {
+  async findOrganizationId(input: { teamId: string }): Promise<string | null> {
     return this.memory.teams.get(input.teamId)?.organizationId ?? null;
   }
 

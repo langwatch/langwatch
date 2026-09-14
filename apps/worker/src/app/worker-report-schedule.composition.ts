@@ -241,7 +241,7 @@ export function createWorkerReportSchedule(
 
   const deps: ReportDispatchDeps = {
     loadTrigger: ({ projectId, triggerId }) => triggers.tryFindById({ triggerId, projectId }),
-    loadProject: (projectId) => options.projects.tryGetById(projectId),
+    loadProject: (projectId) => options.projects.findById(projectId),
     delivery: options.delivery.delivery,
     slackProvider: AutomationSlackSecretsService.create(options.delivery.crypto),
     filterSuppressedRecipients: (input) => graphDelivery.filterSuppressed(input),

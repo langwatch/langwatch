@@ -105,7 +105,7 @@ export class ScenarioExecutionLookupService {
   }
 
   async fetchProject(projectId: string): Promise<FetchProjectResult> {
-    const project = await this.options.projects.tryGetById(projectId);
+    const project = await this.options.projects.findById(projectId);
     if (!project) {
       return { success: false, error: `Project ${projectId} not found` };
     }

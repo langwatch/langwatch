@@ -30,7 +30,7 @@ export abstract class ProjectOldestTeam {
  * stored-object runtime and a diagnostics sink.
  */
 export abstract class GovernanceInternalProject {
-  abstract tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  abstract findWithTeam(id: string): Promise<ProjectWithTeam | null>;
 
   abstract ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
 }
@@ -67,8 +67,8 @@ export class GovernanceInternalProjectService extends GovernanceInternalProject 
     super();
   }
 
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
-    return this.repository.tryGetWithTeam(id);
+  findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    return this.repository.findWithTeam(id);
   }
 
   async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {

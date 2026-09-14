@@ -57,7 +57,7 @@ function projectsWith(project: { id: string; lwqlKey: string } | null): {
   tryGetById: ReturnType<typeof vi.fn>;
 } {
   const tryGetById = vi.fn(async () => project);
-  return { projects: createApiFixture<ProjectApi>({ tryGetById }, "workbench projects"), tryGetById };
+  return { projects: createApiFixture<ProjectApi>({ findById }, "workbench projects"), findById };
 }
 
 describe("resolveWorkbenchProtections", () => {

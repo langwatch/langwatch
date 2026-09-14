@@ -74,7 +74,7 @@ function projectRow() {
 
 const projects = {
   getWithTeam: async () => projectRow(),
-  tryGetWithTeam: async () => projectRow(),
+  findWithTeam: async () => projectRow(),
   listByOrganization: async () => ({ data: [], pagination: { total: 0 } }),
 } as unknown as ProjectApi;
 

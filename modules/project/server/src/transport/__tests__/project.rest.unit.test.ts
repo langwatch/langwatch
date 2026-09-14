@@ -413,7 +413,7 @@ describe("the projects REST family", () => {
     /** @scenario Reading a project never discloses its base key */
     it("answers without the base key or the service key", async () => {
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
       });
 
       const response = await send("/api/projects/project_1");
@@ -428,7 +428,7 @@ describe("the projects REST family", () => {
 
     it("reports an unknown id as not found", async () => {
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam: vi.fn(async () => null) },
+        projects: { findWithTeam: vi.fn(async () => null) },
       });
 
       expect((await send("/api/projects/project_doesnotexist")).status).toBe(404);
@@ -437,7 +437,7 @@ describe("the projects REST family", () => {
     it("reports a project in another organization as not found", async () => {
       const { send } = mountProjectRest({
         projects: {
-          tryGetWithTeam: vi.fn(async () =>
+          findWithTeam: vi.fn(async () =>
             projectWithTeam({
               team: { ...projectWithTeam().team, organizationId: "organization-other" },
             }),
@@ -646,7 +646,7 @@ describe("the projects REST family", () => {
     /** @scenario A caller who can change the project reads the base key */
     it("hands the base key to a caller who can update that project", async () => {
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
         grantedOnProject: { project_1: ["project:update"] },
       });
 
@@ -658,9 +658,9 @@ describe("the projects REST family", () => {
 
     /** @scenario A read-only credential cannot read the base key */
     it("refuses a caller who can only view the project, and discloses nothing", async () => {
-      const tryGetWithTeam = vi.fn(async () => projectWithTeam());
+      const findWithTeam = vi.fn(async () => projectWithTeam());
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam },
+        projects: { findWithTeam },
         grantedOnProject: { project_1: ["project:view"] },
       });
 
@@ -668,13 +668,13 @@ describe("the projects REST family", () => {
 
       expect(response.status).toBe(403);
       expect(await response.text()).not.toContain(project().apiKey);
-      expect(tryGetWithTeam).not.toHaveBeenCalled();
+      expect(findWithTeam).not.toHaveBeenCalled();
     });
 
     /** @scenario Permission is checked against the requested project */
     it("refuses a project-scoped caller asking about a sibling project", async () => {
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
         grantedOnProject: { project_1: ["project:update"], project_2: [] },
       });
 
@@ -691,7 +691,7 @@ describe("the projects REST family", () => {
         team: { ...projectWithTeam().team, organizationId: "organization-other" },
       });
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam: vi.fn(async () => foreign) },
+        projects: { findWithTeam: vi.fn(async () => foreign) },
         grantedOnProject: { project_1: ["project:update"] },
       });
 
@@ -706,7 +706,7 @@ describe("the projects REST family", () => {
     it("answers with the new key", async () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
       const { send } = mountProjectRest({
-        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
         apiKeys: { regenerateLegacyProjectKey },
       });
 
@@ -723,7 +723,7 @@ describe("the projects REST family", () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
       const { send } = mountProjectRest({
         projects: {
-          tryGetWithTeam: vi.fn(async () =>
+          findWithTeam: vi.fn(async () =>
             projectWithTeam({
               team: { ...projectWithTeam().team, organizationId: "organization-other" },
             }),
@@ -759,11 +759,11 @@ describe("the projects REST family", () => {
 
     /** @scenario A project route resolves its permission at the project it names */
     it("refuses to read a sibling project, and never reaches the service", async () => {
-      const tryGetWithTeam = vi.fn(async () => projectWithTeam());
-      const { send } = mountProjectRest({ ...SCOPED, projects: { tryGetWithTeam } });
+      const findWithTeam = vi.fn(async () => projectWithTeam());
+      const { send } = mountProjectRest({ ...SCOPED, projects: { findWithTeam } });
 
       expect((await send("/api/projects/project_2")).status).toBe(403);
-      expect(tryGetWithTeam).not.toHaveBeenCalled();
+      expect(findWithTeam).not.toHaveBeenCalled();
     });
 
     it("refuses to update or archive a sibling project", async () => {
@@ -785,7 +785,7 @@ describe("the projects REST family", () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
       const { send } = mountProjectRest({
         ...SCOPED,
-        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
         apiKeys: { regenerateLegacyProjectKey },
       });
 
@@ -801,7 +801,7 @@ describe("the projects REST family", () => {
     it("still serves the project the grant does name", async () => {
       const { send } = mountProjectRest({
         ...SCOPED,
-        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
       });
 
       expect((await send("/api/projects/project_1")).status).toBe(200);

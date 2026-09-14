@@ -518,7 +518,7 @@ export interface GovernanceObjectStore {
  * capability satisfies it as it stands.
  */
 export interface GovernanceProjectDirectory {
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  findWithTeam(id: string): Promise<ProjectWithTeam | null>;
 
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
 }

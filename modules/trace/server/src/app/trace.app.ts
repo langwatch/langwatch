@@ -1259,7 +1259,7 @@ export class TraceApp implements TraceApi {
     language: string | null;
     framework: string | null;
   } | null> {
-    return this.#dependencies.projects.tryGetById(projectId);
+    return this.#dependencies.projects.findById(projectId);
   }
 
   // -- the platform's own links ------------------------------------------

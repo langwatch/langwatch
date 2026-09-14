@@ -56,7 +56,7 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
 
 export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
   return createApiFixture<ProjectApi>({
-    tryGetSummaryById: async () => ({ name: "Project One", slug }),
+    findSummaryById: async () => ({ name: "Project One", slug }),
   });
 }
 

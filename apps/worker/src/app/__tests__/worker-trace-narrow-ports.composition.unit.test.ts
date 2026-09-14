@@ -30,7 +30,7 @@ function services(): {
   monitors: MonitorService;
   modelProviders: ModelProviderApi;
   calls: {
-    tryGetById: ReturnType<typeof vi.fn>;
+    findById: ReturnType<typeof vi.fn>;
     updateMetadata: ReturnType<typeof vi.fn>;
     resolveOrgAdmin: ReturnType<typeof vi.fn>;
     getEnabledOnMessageMonitors: ReturnType<typeof vi.fn>;
@@ -38,7 +38,7 @@ function services(): {
   };
 } {
   const calls = {
-    tryGetById: vi.fn(async () => project),
+    findById: vi.fn(async () => project),
     updateMetadata: vi.fn(async () => void 0),
     resolveOrgAdmin: vi.fn(async () => ({ userId: "user-1" })),
     getEnabledOnMessageMonitors: vi.fn(async () => [
@@ -86,14 +86,14 @@ describe("createWorkerTraceNarrowPorts", () => {
           productAnalytics,
         });
 
-        await ports.projects.tryGetById("project-1");
+        await ports.projects.findById("project-1");
         await ports.projects.updateMetadata({
           id: "project-1",
           data: { firstMessage: true, integrated: true, language: "python" },
         });
         await ports.projects.resolveOrgAdmin("project-1");
 
-        expect(calls.tryGetById).toHaveBeenCalledWith("project-1");
+        expect(calls.findById).toHaveBeenCalledWith("project-1");
         expect(calls.updateMetadata).toHaveBeenCalledWith({
           id: "project-1",
           data: { firstMessage: true, integrated: true, language: "python" },

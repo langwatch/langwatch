@@ -35,7 +35,7 @@ const UNREACHABLE_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
 export function createModelProviderTestProjects(): ProjectApi {
   return createApiFixture<ProjectApi>({
     getWithTeam: async (id: string) => testProject(id),
-    tryGetWithTeam: async (id: string) => testProject(id),
+    findWithTeam: async (id: string) => testProject(id),
   });
 }
 

@@ -100,20 +100,20 @@ export class ProjectApp implements ProjectApiContract {
     return this.#projectService.isPresenceEnabled(input);
   }
 
-  tryGetOrganizationId(projectId: string): Promise<string | undefined> {
-    return this.#projectService.tryGetOrganizationId(projectId);
+  findOrganizationId(projectId: string): Promise<string | undefined> {
+    return this.#projectService.findOrganizationId(projectId);
   }
 
-  tryGetSummaryById(projectId: string) {
-    return this.#projectService.tryGetSummaryById(projectId);
+  findSummaryById(projectId: string) {
+    return this.#projectService.findSummaryById(projectId);
   }
 
   searchByQuery(input: { query: string; organizationId?: string; limit?: number }) {
     return this.#projectService.searchByQuery(input);
   }
 
-  tryGetById(id: string) {
-    return this.#projectService.tryGetById(id);
+  findById(id: string) {
+    return this.#projectService.findById(id);
   }
 
   getOrganizationId(projectId: string) {
@@ -124,8 +124,8 @@ export class ProjectApp implements ProjectApiContract {
     return this.#projectService.getWithTeam(id);
   }
 
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
-    return this.#projectService.tryGetWithTeam(id);
+  findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    return this.#projectService.findWithTeam(id);
   }
 
   listByOrganization(input: {

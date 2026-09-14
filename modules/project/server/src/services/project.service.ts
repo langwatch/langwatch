@@ -196,7 +196,7 @@ export class ProjectService {
   }
 
   async getById(id: string): Promise<Project> {
-    const project = await this.repository.tryGetById(id);
+    const project = await this.repository.findById(id);
     if (!project) {
       throw new ProjectNotFoundError("Project not found");
     }
@@ -210,20 +210,20 @@ export class ProjectService {
     return project.team.organizationId;
   }
 
-  tryGetOrganizationId(projectId: string): Promise<string | undefined> {
-    return this.repository.tryGetOrganizationId(projectId);
+  findOrganizationId(projectId: string): Promise<string | undefined> {
+    return this.repository.findOrganizationId(projectId);
   }
 
   findIdentity(id: string): Promise<ProjectIdentity | null> {
     return this.repository.tryFindIdentity(id);
   }
 
-  tryGetById(projectId: string): Promise<Project | null> {
-    return this.metadata.tryGetById(projectId);
+  findById(projectId: string): Promise<Project | null> {
+    return this.metadata.findById(projectId);
   }
 
-  async tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> {
-    const project = await this.repository.tryGetById(projectId);
+  async findSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> {
+    const project = await this.repository.findById(projectId);
 
     return project ? { name: project.name, slug: project.slug } : null;
   }
@@ -232,8 +232,8 @@ export class ProjectService {
     return this.metadata.getWithTeam(id);
   }
 
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
-    return this.metadata.tryGetWithTeam(id);
+  findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    return this.metadata.findWithTeam(id);
   }
 
   private async assertTeamCanHoldANewProject(input: {
@@ -342,7 +342,7 @@ export class ProjectService {
         );
       }
 
-      const current = await this.repository.tryGetWithTeam(input.id);
+      const current = await this.repository.findWithTeam(input.id);
       if (
         current &&
         current.team.organizationId === input.organizationId &&
@@ -368,7 +368,7 @@ export class ProjectService {
   }
 
   async archive(input: { id: string; organizationId: string }): Promise<Project> {
-    const existing = await this.repository.tryGetWithTeam(input.id);
+    const existing = await this.repository.findWithTeam(input.id);
     const violation =
       existing && existing.team.organizationId === input.organizationId
         ? personalWorkspaceArchiveViolation(existing.isPersonal)

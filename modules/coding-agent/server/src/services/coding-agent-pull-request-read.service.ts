@@ -189,7 +189,7 @@ export class CodingAgentPullRequestReadService {
     projects: Record<string, CodingAgentContributorProject>;
   }): Promise<CodingAgentPersonalPullRequestUsage> {
     const query = codingAgentPersonalPullRequestUsageInputSchema.parse(input);
-    const project = await this.dependencies.projects.tryGetWithTeam(query.projectId);
+    const project = await this.dependencies.projects.findWithTeam(query.projectId);
     if (project === null) {
       return codingAgentPersonalPullRequestUsageSchema.parse({ rows: [], unlinked: [] });
     }

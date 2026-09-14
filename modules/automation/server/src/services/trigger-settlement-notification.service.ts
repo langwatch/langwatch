@@ -103,7 +103,7 @@ export class TriggerSettlementNotificationService {
       return;
     }
 
-    const project = await this.composition.projects.tryGetById(input.projectId);
+    const project = await this.composition.projects.findById(input.projectId);
     if (!project) {
       throw new DispatchError({
         message: `project ${input.projectId} not found at dispatch time`,

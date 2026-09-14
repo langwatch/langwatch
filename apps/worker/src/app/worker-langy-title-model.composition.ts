@@ -15,9 +15,9 @@ import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
  * READ half of Project only.
  */
 export type WorkerLangyTitleProjectDirectory = {
-  tryGetWithTeam: Parameters<
+  findWithTeam: Parameters<
     typeof ModelProviderExecutionHandleService.getVercelAIModel
-  >[0]["projects"]["tryGetWithTeam"];
+  >[0]["projects"]["findWithTeam"];
   getWithTeam: Parameters<
     typeof ModelProviderExecutionHandleService.getVercelAIModel
   >[0]["projects"]["getWithTeam"];

@@ -43,7 +43,7 @@ export class TraceViewerProtectionService {
   async visibilityCutoffMs(projectId: string): Promise<number | null> {
     const dayMs = 24 * 60 * 60 * 1000;
     try {
-      const project = await this.options.projects.tryGetWithTeam(projectId);
+      const project = await this.options.projects.findWithTeam(projectId);
       const organizationId = project?.team?.organizationId;
       if (!organizationId) {
         this.logger.error(
@@ -172,7 +172,7 @@ export class TraceViewerProtectionService {
   async tryResolveForShare(
     input: Readonly<{ projectId: string; userId: string | undefined }>,
   ): Promise<Protections | null> {
-    const project = await this.options.projects.tryGetWithTeam(input.projectId);
+    const project = await this.options.projects.findWithTeam(input.projectId);
     if (!project) return null;
     return this.resolve({ ...input, publiclyShared: true });
   }

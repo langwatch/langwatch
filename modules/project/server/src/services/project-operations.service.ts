@@ -12,7 +12,7 @@ import type { TopicApi } from "@langwatch/topic-contract";
 /** The four project operations these use cases orchestrate, and nothing else. */
 export type ProjectOperationsDirectory = Pick<
   ProjectService,
-  "create" | "tryGetWithTeam" | "update" | "archive"
+  "create" | "findWithTeam" | "update" | "archive"
 >;
 
 type ProjectOperationsDependencies = Readonly<{
@@ -65,7 +65,7 @@ export class ProjectOperationsService {
   async updateSettings(
     input: Readonly<UpdateProjectInput & { projectId: string }>,
   ): Promise<Project> {
-    const project = await this.dependencies.projects.tryGetWithTeam(input.projectId);
+    const project = await this.dependencies.projects.findWithTeam(input.projectId);
     if (!project) {
       throw new ProjectNotFoundError();
     }
@@ -99,7 +99,7 @@ export class ProjectOperationsService {
   }
 
   async archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }> {
-    const target = await this.dependencies.projects.tryGetWithTeam(input.projectId);
+    const target = await this.dependencies.projects.findWithTeam(input.projectId);
     if (!target) {
       return { alreadyArchived: true };
     }

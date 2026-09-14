@@ -107,7 +107,7 @@ const projectApi = createApiFixture<ProjectApi>({
   tryGetById: mockMethod(),
   getOrganizationId: mockMethod(),
   getWithTeam: mockMethod(),
-  tryGetWithTeam: mockMethod(),
+  findWithTeam: mockMethod(),
   listByOrganization: mockMethod(),
   listByTeam: mockMethod(),
   create: mockMethod(),

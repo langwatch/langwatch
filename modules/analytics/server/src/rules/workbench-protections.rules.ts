@@ -84,12 +84,12 @@ export async function resolveWorkbenchProtections(input: {
 export async function resolveWorkbenchRunCaller(input: {
   authz: Pick<AuthzApi, "hasPermission">;
   dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
-  projects: Pick<ProjectApi, "tryGetById">;
+  projects: Pick<ProjectApi, "findById">;
   userId: string;
   projectId: string;
 }): Promise<LangWatchQLRunCaller> {
   const { projects, projectId, ...protectionsInput } = input;
-  const project = await projects.tryGetById(projectId);
+  const project = await projects.findById(projectId);
   if (!project) {
     throw new NotFoundError("project_not_found", "Project", projectId);
   }

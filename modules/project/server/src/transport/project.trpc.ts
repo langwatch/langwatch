@@ -136,7 +136,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
   .procedure("getProjectAPIKey")
   .withPermission("project:update")
   .handle(async ({ app, input }) => {
-    const project = await app.projects().tryGetById(input.projectId);
+    const project = await app.projects().findById(input.projectId);
 
     if (!project) throw new ProjectNotFoundError();
 
@@ -146,7 +146,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
   .procedure("getHasFirstMessage")
   .withPermission("project:view")
   .handle(async ({ app, input }) => {
-    const project = await app.projects().tryGetById(input.projectId);
+    const project = await app.projects().findById(input.projectId);
 
     return { firstMessage: project?.firstMessage ?? false };
   })

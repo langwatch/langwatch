@@ -20,7 +20,7 @@ function authoring(automation: Partial<AutomationApi>) {
   const service = automation as AutomationApi;
   const rules = AutomationRulesService.create({
     automation: service,
-    projects: { tryGetSummaryById: async () => ({ name: "Test", slug: "test" }) } as ProjectApi,
+    projects: { findSummaryById: async () => ({ name: "Test", slug: "test" }) } as ProjectApi,
     featureFlags: { isEnabled: async () => true } as unknown as FeatureFlagApi,
   });
 

@@ -124,7 +124,7 @@ function gatewayAppStub(): GatewayApp {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
-      projects: projectsStub({ tryGetOrganizationId: async () => "org_1" }),
+      projects: projectsStub({ findOrganizationId: async () => "org_1" }),
       evaluators: peer("evaluators"),
       monitors: peer("monitors"),
     },

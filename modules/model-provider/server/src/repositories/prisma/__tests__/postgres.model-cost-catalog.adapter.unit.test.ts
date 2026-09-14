@@ -45,7 +45,7 @@ function projectWithTeam() {
 function catalogue(options: { project?: unknown } = {}) {
   const findMany = vi.fn(async () => [costRow()]);
   const projects = {
-    tryGetWithTeam: vi.fn(async () =>
+    findWithTeam: vi.fn(async () =>
       options.project === undefined ? projectWithTeam() : options.project,
     ),
     getWithTeam: vi.fn(async () => projectWithTeam()),

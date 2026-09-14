@@ -453,7 +453,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
         getNamesByIds: async () => [],
       }),
       projects: createApiFixture<ProjectApi>({
-        tryGetOrganizationId: async () => TEST_PROJECT.organizationId,
+        findOrganizationId: async () => TEST_PROJECT.organizationId,
       }),
     },
     members: {

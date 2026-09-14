@@ -151,7 +151,7 @@ describe("PrismaProjectRepository coding-agent activity", () => {
   });
 });
 
-describe("PrismaProjectRepository.tryGetOrganizationId", () => {
+describe("PrismaProjectRepository.findOrganizationId", () => {
   it("preserves optional tenant resolution for archived and missing projects", async () => {
     const findUnique = vi
       .fn()
@@ -161,8 +161,8 @@ describe("PrismaProjectRepository.tryGetOrganizationId", () => {
       prisma: { project: { findUnique }, team: {} } as unknown as PrismaClient,
     });
 
-    await expect(repository.tryGetOrganizationId("project_archived")).resolves.toBe("org_1");
-    await expect(repository.tryGetOrganizationId("project_missing")).resolves.toBe(undefined);
+    await expect(repository.findOrganizationId("project_archived")).resolves.toBe("org_1");
+    await expect(repository.findOrganizationId("project_missing")).resolves.toBe(undefined);
     expect(findUnique).toHaveBeenNthCalledWith(1, {
       where: { id: "project_archived" },
       select: { team: { select: { organizationId: true } } },

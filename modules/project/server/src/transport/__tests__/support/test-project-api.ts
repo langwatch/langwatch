@@ -8,8 +8,8 @@ import type { ProjectApi } from "@langwatch/project-contract";
 export class TestProjectApi implements ProjectApi {
   constructor(private readonly overrides: Partial<ProjectApi>) {}
 
-  tryGetOrganizationId: ProjectApi["tryGetOrganizationId"] = (projectId) =>
-    this.overrides.tryGetOrganizationId?.(projectId) ?? this.unimplemented("tryGetOrganizationId");
+  findOrganizationId: ProjectApi["findOrganizationId"] = (projectId) =>
+    this.overrides.findOrganizationId?.(projectId) ?? this.unimplemented("findOrganizationId");
 
   searchByQuery: ProjectApi["searchByQuery"] = (input) =>
     this.overrides.searchByQuery?.(input) ?? this.unimplemented("searchByQuery");
@@ -26,11 +26,11 @@ export class TestProjectApi implements ProjectApi {
   isPresenceEnabled: ProjectApi["isPresenceEnabled"] = (input) =>
     this.overrides.isPresenceEnabled?.(input) ?? Promise.resolve(false);
 
-  tryGetSummaryById: ProjectApi["tryGetSummaryById"] = (projectId) =>
-    this.overrides.tryGetSummaryById?.(projectId) ?? Promise.resolve(null);
+  findSummaryById: ProjectApi["findSummaryById"] = (projectId) =>
+    this.overrides.findSummaryById?.(projectId) ?? Promise.resolve(null);
 
-  tryGetById: ProjectApi["tryGetById"] = (id) =>
-    this.overrides.tryGetById?.(id) ?? Promise.resolve(null);
+  findById: ProjectApi["findById"] = (id) =>
+    this.overrides.findById?.(id) ?? Promise.resolve(null);
 
   getOrganizationId: ProjectApi["getOrganizationId"] = (projectId) =>
     this.overrides.getOrganizationId?.(projectId) ?? this.unimplemented("getOrganizationId");
@@ -38,8 +38,8 @@ export class TestProjectApi implements ProjectApi {
   getWithTeam: ProjectApi["getWithTeam"] = (id) =>
     this.overrides.getWithTeam?.(id) ?? this.unimplemented("getWithTeam");
 
-  tryGetWithTeam: ProjectApi["tryGetWithTeam"] = (id) =>
-    this.overrides.tryGetWithTeam?.(id) ?? Promise.resolve(null);
+  findWithTeam: ProjectApi["findWithTeam"] = (id) =>
+    this.overrides.findWithTeam?.(id) ?? Promise.resolve(null);
 
   listByOrganization: ProjectApi["listByOrganization"] = (input) =>
     this.overrides.listByOrganization?.(input) ??

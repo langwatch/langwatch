@@ -166,7 +166,7 @@ export interface AutomationGraphActivity {
  * `ProjectMetadataService` both satisfy this.
  */
 export interface AutomationProjectIdentityPort {
-  tryGetById(projectId: string): Promise<{
+  findById(projectId: string): Promise<{
     id: string;
     name: string;
     slug: string;

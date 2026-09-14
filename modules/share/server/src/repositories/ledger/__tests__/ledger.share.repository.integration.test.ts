@@ -94,7 +94,7 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
   } as unknown as AuthzApi;
 
   /** The project peer answers the organisation the seeded rows sit in. */
-  const projects = { tryGetOrganizationId: async () => organization.id };
+  const projects = { findOrganizationId: async () => organization.id };
 
   const repository = () =>
     LedgerShareRepository.create({

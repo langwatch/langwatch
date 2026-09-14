@@ -123,11 +123,11 @@ export class PrismaProjectRepository
     return Boolean(project?.presenceEnabled && project.team.organization.presenceEnabled);
   }
 
-  async tryGetById(id: string): Promise<Project | null> {
+  async findById(id: string): Promise<Project | null> {
     return this.mapProject(await this.prisma.project.findUnique({ where: { id } }));
   }
 
-  async tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+  async findOrganizationId(projectId: string): Promise<string | undefined> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },
@@ -135,7 +135,7 @@ export class PrismaProjectRepository
     return project?.team?.organizationId;
   }
 
-  async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
+  async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
     const row = await this.prisma.project.findUnique({
       where: { id, archivedAt: null },
       include: { team: true },

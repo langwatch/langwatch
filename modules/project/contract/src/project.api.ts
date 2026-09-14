@@ -26,18 +26,18 @@ export type ProjectPath = { projectId: string; fullPath: string };
 
 export interface ProjectApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
-  tryGetOrganizationId(projectId: string): Promise<string | undefined>;
+  findOrganizationId(projectId: string): Promise<string | undefined>;
   isPresenceEnabled(input: { projectId: string }): Promise<boolean>;
-  tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null>;
+  findSummaryById(projectId: string): Promise<{ name: string; slug: string } | null>;
   searchByQuery(input: {
     query: string;
     organizationId?: string;
     limit?: number;
   }): Promise<SearchProjectsResult[]>;
-  tryGetById(id: string): Promise<Project | null>;
+  findById(id: string): Promise<Project | null>;
   getOrganizationId(projectId: string): Promise<string>;
   getWithTeam(id: string): Promise<ProjectWithTeam>;
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  findWithTeam(id: string): Promise<ProjectWithTeam | null>;
   listByOrganization(input: {
     organizationId: string;
     page: number;

@@ -67,7 +67,7 @@ export class ApiKeyEnrichmentService {
       }
 
       if (binding.scopeType === "PROJECT") {
-        const project = await this.options.projects.tryGetById(binding.scopeId);
+        const project = await this.options.projects.findById(binding.scopeId);
         if (project) {
           projectName.set(project.id, project.name);
           activeProjectIds.add(project.id);

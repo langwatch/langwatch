@@ -88,7 +88,7 @@ export function createWorkerTraceModelCostCatalogPort(
  * and its wide sibling both answer it and this file names neither.
  */
 export type TraceProjectMetadataReader = {
-  tryGetById(id: string): Promise<Project | null>;
+  findById(id: string): Promise<Project | null>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
   resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
 };
@@ -113,8 +113,8 @@ export type WorkerTraceNarrowMembers = Readonly<{
 class WorkerTraceProjectMetadataAdapter implements TraceProjectMetadata {
   constructor(private readonly projects: TraceProjectMetadataReader) {}
 
-  tryGetById(id: string): Promise<Project | null> {
-    return this.projects.tryGetById(id);
+  findById(id: string): Promise<Project | null> {
+    return this.projects.findById(id);
   }
 
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void> {

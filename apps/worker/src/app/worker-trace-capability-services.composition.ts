@@ -41,7 +41,7 @@ import {
  * THE COMPLETE REACH, which is what makes the split honest rather than
  * convenient:
  *
- *     ProjectMetadataService        tryGetById, tryGetWithTeam, getWithTeam,
+ *     ProjectMetadataService        findById, findWithTeam, getWithTeam,
  *                                   updateMetadata, resolveOrgAdmin
  *     DataPrivacyResolution     getResolvedForProject
  *     ModelCostCatalogService       listCosts

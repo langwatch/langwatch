@@ -737,7 +737,7 @@ export class TestProjectService extends TestProjectApi {
     },
   });
 
-  override async tryGetWithTeam(): Promise<ProjectWithTeam | null> {
+  override async findWithTeam(): Promise<ProjectWithTeam | null> {
     return this.teamProject;
   }
 

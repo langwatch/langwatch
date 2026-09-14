@@ -167,7 +167,7 @@ export function createDataRetentionTestProjects(
   const projects = [project, ...siblingProjectIds.map((id) => ({ ...project, id }))];
 
   return createApiFixture<ProjectApi>({
-    tryGetWithTeam: vi.fn(async (id: string) => (id === graph.projectId ? project : null)),
+    findWithTeam: vi.fn(async (id: string) => (id === graph.projectId ? project : null)),
     listByTeam: vi.fn(async () => projects),
     listByOrganization: vi.fn(async () => ({
       data: projects,

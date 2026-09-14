@@ -234,7 +234,7 @@ export class IngestionPullWorkerService {
       return;
     }
 
-    const project = await this.projects.tryGetWithTeam(source.traceProjectId);
+    const project = await this.projects.findWithTeam(source.traceProjectId);
     const destinationIsLive =
       project !== null &&
       project.archivedAt === null &&

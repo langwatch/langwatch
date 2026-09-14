@@ -224,7 +224,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         organizationId: ORGANIZATION_ID,
       });
 
-      const orgId = await repositories.team.tryGetOrganizationId({
+      const orgId = await repositories.team.findOrganizationId({
         teamId: TEAM_ID,
       });
 
@@ -233,7 +233,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         organizationId: ORGANIZATION_ID,
       });
 
-      const stillKnown = await repositories.team.tryGetOrganizationId({
+      const stillKnown = await repositories.team.findOrganizationId({
         teamId: TEAM_ID,
       });
       expect(stillKnown).toBe(orgId);

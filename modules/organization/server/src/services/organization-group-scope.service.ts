@@ -51,7 +51,7 @@ export class OrganizationGroupScopeService extends OrganizationGroupServiceContr
           return;
         }
 
-        const project = await this.dependencies.projects.tryGetById(binding.scopeId);
+        const project = await this.dependencies.projects.findById(binding.scopeId);
         if (project) names.set(binding.scopeId, project.name);
       }),
     );

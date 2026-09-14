@@ -24,7 +24,7 @@ import { nowInstant } from "@langwatch/time";
  * hop between the two is the project directory's answer.
  */
 export type WorkerAutomationRunawayDirectories = Readonly<{
-  projects: Pick<ProjectApi, "getOrganizationId" | "tryGetById">;
+  projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
   authorization: Pick<AuthzService, "listOrganizationBindings">;
 }>;
 
@@ -169,11 +169,11 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
   }
 
   async projectName(projectId: string): Promise<string> {
-    return (await this.input.directories.projects.tryGetById(projectId))?.name ?? "your project";
+    return (await this.input.directories.projects.findById(projectId))?.name ?? "your project";
   }
 
   async automationUrl(input: { projectId: string; triggerId: string }): Promise<string> {
-    const project = await this.input.directories.projects.tryGetById(input.projectId);
+    const project = await this.input.directories.projects.findById(input.projectId);
 
     return `${this.input.baseHost}/${project?.slug ?? ""}/automations?drawer.open=automation&drawer.automationId=${input.triggerId}`;
   }

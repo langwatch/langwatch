@@ -158,7 +158,7 @@ function callerFor(budgets: Array<Record<string, unknown>>) {
       entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({
-        tryGetOrganizationId: async () => ORG_ID,
+        findOrganizationId: async () => ORG_ID,
         listIdsByOrganization: async () => [TENANT_PROJECT_ID],
         // The scope-reach walk resolves a destination per active key's trace
         // project; no test here supplies an active key, so this is never fed

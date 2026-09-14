@@ -38,7 +38,7 @@ function serviceOver(prisma: PrismaClient, project: unknown) {
   return PrismaGatewayAdapter.create({
     database: prisma,
     projects: {
-      tryGetWithTeam: vi
+      findWithTeam: vi
         .fn()
         .mockResolvedValue(
           project

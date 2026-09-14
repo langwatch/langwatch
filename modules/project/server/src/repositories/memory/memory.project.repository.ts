@@ -117,17 +117,17 @@ export class MemoryProjectRepository implements ProjectRepository {
     return Boolean(project?.presenceEnabled && organization?.presenceEnabled);
   }
 
-  async tryGetById(id: string): Promise<Project | null> {
+  async findById(id: string): Promise<Project | null> {
     return this.#database.findProject(id) ?? null;
   }
 
-  async tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+  async findOrganizationId(projectId: string): Promise<string | undefined> {
     const project = this.#database.findProject(projectId);
 
     return project ? this.#database.findTeam(project.teamId)?.organizationId : undefined;
   }
 
-  async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
+  async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
     const project = this.#database.findProject(id);
     if (!project || project.archivedAt !== null) return null;
     const team = this.#database.findTeam(project.teamId);

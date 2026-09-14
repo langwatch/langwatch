@@ -44,7 +44,7 @@ export class GraphTriggerAlertDeliveryService {
     plan: GraphEvaluationPlan,
     values: GraphSeriesEvaluation,
   ): Promise<GraphTriggerEvaluationResult> {
-    const project = await plan.request.deps.projects.tryGetById(plan.request.projectId);
+    const project = await plan.request.deps.projects.findById(plan.request.projectId);
     if (!project) {
       return TriggerEvaluatorService.skippedGraphEvaluation({
         ...plan.request,

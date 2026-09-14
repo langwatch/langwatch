@@ -102,7 +102,7 @@ class FakeProjects extends TestProjectApi {
     archivedAtMs: null,
     traceSharingEnabled: false,
   }));
-  tryGetWithTeam = vi.fn(async () => null);
+  findWithTeam = vi.fn(async () => null);
 }
 class FakeEntitlements implements IngestionSourceEntitlements {
   enterprise = true;
@@ -380,7 +380,7 @@ describe("IngestionSourceService", () => {
         traceProjectId: "project-outside-org",
       }),
     ).rejects.toThrow(/destination must be an active project/i);
-    expect(projects.tryGetWithTeam).toHaveBeenCalledWith("project-outside-org");
+    expect(projects.findWithTeam).toHaveBeenCalledWith("project-outside-org");
     expect(repository.create).not.toHaveBeenCalled();
   });
 
@@ -408,7 +408,7 @@ describe("IngestionSourceService", () => {
    */
   it("is refused when the fetched project belongs to a different organization", async () => {
     const { service, repository, projects } = harness();
-    projects.tryGetWithTeam = vi.fn(async () => ({
+    projects.findWithTeam = vi.fn(async () => ({
       id: "project-of-another-org",
       name: "Someone else's project",
       slug: "someone-elses-project",

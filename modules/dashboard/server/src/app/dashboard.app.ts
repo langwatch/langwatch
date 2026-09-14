@@ -225,7 +225,7 @@ export class DashboardApp implements DashboardApi {
     projectId: string;
     dashboardIds: string[];
   }): Promise<Record<string, string>> {
-    const project = await this.#projects.tryGetSummaryById(input.projectId);
+    const project = await this.#projects.findSummaryById(input.projectId);
     if (!project) throw new Error(`Project ${input.projectId} has no summary to link against`);
 
     return Object.fromEntries(

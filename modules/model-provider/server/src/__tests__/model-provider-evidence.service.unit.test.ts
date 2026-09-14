@@ -18,7 +18,7 @@ class TestProjects extends ModelCostProject {
     super();
   }
 
-  async tryGetWithTeam(): Promise<ProjectWithTeam | null> {
+  async findWithTeam(): Promise<ProjectWithTeam | null> {
     return this.project;
   }
 

@@ -222,7 +222,7 @@ describe("createWorkerTraceCapabilityServices", () => {
           productAnalytics: new RecordingProductAnalytics(),
         });
 
-        await expect(ports.projects.tryGetById("project-1")).resolves.toMatchObject({
+        await expect(ports.projects.findById("project-1")).resolves.toMatchObject({
           id: "project-1",
           slug: "checkout-assistant",
         });

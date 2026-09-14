@@ -12,11 +12,11 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.listPaths?.(input) ?? this.unimplemented("listPaths");
   }
 
-  tryGetOrganizationId(
-    projectId: Parameters<ProjectApi["tryGetOrganizationId"]>[0],
-  ): ReturnType<ProjectApi["tryGetOrganizationId"]> {
+  findOrganizationId(
+    projectId: Parameters<ProjectApi["findOrganizationId"]>[0],
+  ): ReturnType<ProjectApi["findOrganizationId"]> {
     return (
-      this.overrides.tryGetOrganizationId?.(projectId) ?? this.unimplemented("tryGetOrganizationId")
+      this.overrides.findOrganizationId?.(projectId) ?? this.unimplemented("findOrganizationId")
     );
   }
 
@@ -26,10 +26,10 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.isPresenceEnabled?.(input) ?? this.unimplemented("isPresenceEnabled");
   }
 
-  tryGetSummaryById(
-    projectId: Parameters<ProjectApi["tryGetSummaryById"]>[0],
-  ): ReturnType<ProjectApi["tryGetSummaryById"]> {
-    return this.overrides.tryGetSummaryById?.(projectId) ?? this.unimplemented("tryGetSummaryById");
+  findSummaryById(
+    projectId: Parameters<ProjectApi["findSummaryById"]>[0],
+  ): ReturnType<ProjectApi["findSummaryById"]> {
+    return this.overrides.findSummaryById?.(projectId) ?? this.unimplemented("findSummaryById");
   }
 
   searchByQuery(
@@ -38,8 +38,8 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.searchByQuery?.(input) ?? this.unimplemented("searchByQuery");
   }
 
-  tryGetById(id: Parameters<ProjectApi["tryGetById"]>[0]): ReturnType<ProjectApi["tryGetById"]> {
-    return this.overrides.tryGetById?.(id) ?? this.unimplemented("tryGetById");
+  findById(id: Parameters<ProjectApi["findById"]>[0]): ReturnType<ProjectApi["findById"]> {
+    return this.overrides.findById?.(id) ?? this.unimplemented("findById");
   }
 
   getOrganizationId(
@@ -52,10 +52,10 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.getWithTeam?.(id) ?? this.unimplemented("getWithTeam");
   }
 
-  tryGetWithTeam(
-    id: Parameters<ProjectApi["tryGetWithTeam"]>[0],
-  ): ReturnType<ProjectApi["tryGetWithTeam"]> {
-    return this.overrides.tryGetWithTeam?.(id) ?? this.unimplemented("tryGetWithTeam");
+  findWithTeam(
+    id: Parameters<ProjectApi["findWithTeam"]>[0],
+  ): ReturnType<ProjectApi["findWithTeam"]> {
+    return this.overrides.findWithTeam?.(id) ?? this.unimplemented("findWithTeam");
   }
 
   listByOrganization(

@@ -45,16 +45,16 @@ export class ProjectMetadataService {
     return new ProjectMetadataService(options.repository, options.diagnostics);
   }
 
-  tryGetById(projectId: string): Promise<Project | null> {
-    return this.repository.tryGetById(projectId);
+  findById(projectId: string): Promise<Project | null> {
+    return this.repository.findById(projectId);
   }
 
-  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
-    return this.repository.tryGetWithTeam(id);
+  findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    return this.repository.findWithTeam(id);
   }
 
   async getWithTeam(id: string): Promise<ProjectWithTeam> {
-    const project = await this.repository.tryGetWithTeam(id);
+    const project = await this.repository.findWithTeam(id);
     if (!project) {
       throw new ProjectNotFoundError("Project not found");
     }

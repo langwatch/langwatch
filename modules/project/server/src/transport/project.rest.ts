@@ -54,7 +54,7 @@ import {
 /** The five project operations the management door calls, and nothing else. */
 export type ProjectManagementDirectory = Pick<
   ProjectService,
-  "listByOrganization" | "update" | "tryGetWithTeam" | "create" | "archive"
+  "listByOrganization" | "update" | "findWithTeam" | "create" | "archive"
 >;
 
 export interface ProjectManagementApi {
@@ -283,7 +283,7 @@ async function projectInOrganization({
   id: string;
   organizationId: string;
 }): Promise<ProjectWithTeam> {
-  const project = await app.projects().tryGetWithTeam(id);
+  const project = await app.projects().findWithTeam(id);
 
   if (!project || project.team.organizationId !== organizationId) {
     throw new NotFoundError("Project not found");

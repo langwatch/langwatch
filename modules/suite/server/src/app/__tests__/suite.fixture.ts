@@ -59,7 +59,7 @@ export function createSuiteTestApp(
       projects:
         input.dependencies?.projects ??
         createApiFixture<ProjectApi>({
-          tryGetOrganizationId: async () => "organization-1",
+          findOrganizationId: async () => "organization-1",
         }),
     },
     members: {

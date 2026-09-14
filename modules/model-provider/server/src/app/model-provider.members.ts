@@ -261,7 +261,7 @@ export abstract class ModelProviderIdService {
  * `ProjectMetadataService` both satisfy this.
  */
 export abstract class ModelCostProject {
-  abstract tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  abstract findWithTeam(id: string): Promise<ProjectWithTeam | null>;
   abstract getWithTeam(id: string): Promise<ProjectWithTeam>;
 }
 

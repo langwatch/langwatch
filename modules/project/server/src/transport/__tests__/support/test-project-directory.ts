@@ -11,8 +11,8 @@ export class TestProjectDirectory implements ProjectManagementDirectory {
   listByOrganization: ProjectManagementDirectory["listByOrganization"] = (input) =>
     this.overrides.listByOrganization?.(input) ?? this.unimplemented("listByOrganization");
 
-  tryGetWithTeam: ProjectManagementDirectory["tryGetWithTeam"] = (id) =>
-    this.overrides.tryGetWithTeam?.(id) ?? this.unimplemented("tryGetWithTeam");
+  findWithTeam: ProjectManagementDirectory["findWithTeam"] = (id) =>
+    this.overrides.findWithTeam?.(id) ?? this.unimplemented("findWithTeam");
 
   create: ProjectManagementDirectory["create"] = (input) =>
     this.overrides.create?.(input) ?? this.unimplemented("create");

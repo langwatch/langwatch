@@ -11,7 +11,7 @@ export abstract class TeamRepository {
    * The organization that owns one team, or null when none exists. Unlike {@link getById}, does
    * not exclude archived teams — a project's archived team still belongs to its tenant.
    */
-  abstract tryGetOrganizationId(input: { teamId: string }): Promise<string | null>;
+  abstract findOrganizationId(input: { teamId: string }): Promise<string | null>;
   abstract getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam>;
   abstract list(input: {
     organizationId: string;

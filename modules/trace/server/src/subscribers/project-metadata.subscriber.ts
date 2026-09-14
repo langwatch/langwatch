@@ -89,7 +89,7 @@ export class ProjectMetadataSync {
     tenantId: string,
     foldState: TraceSummaryData,
   ): Promise<void> {
-    const project = await deps.projects.tryGetById(tenantId);
+    const project = await deps.projects.findById(tenantId);
 
     if (!project) {
       logger.warn({ tenantId }, "Project not found — skipping metadata update");

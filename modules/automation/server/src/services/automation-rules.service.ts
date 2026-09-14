@@ -114,7 +114,7 @@ export class AutomationRulesService {
 
   /** The project's name and slug, as a rendered notification quotes them. */
   async getProjectIdentity(projectId: string): Promise<AutomationProjectIdentity> {
-    const project = await this.collaborators.projects.tryGetSummaryById(projectId);
+    const project = await this.collaborators.projects.findSummaryById(projectId);
 
     if (!project) throw new ProjectNotFoundError(projectId);
 

@@ -151,7 +151,7 @@ describe.skipIf(!DB_URL)(
           authorization: ModelProviderAuthorizationService.create(bindingComputingAuthz()),
           scopes: ModelProviderScopeService.create({
             projects: {
-              tryGetWithTeam: (id: string) => new PrismaProjects(prisma).tryGetWithTeam(id),
+              findWithTeam: (id: string) => new PrismaProjects(prisma).findWithTeam(id),
               getWithTeam: (id: string) => new PrismaProjects(prisma).getWithTeam(id),
               listIdsByOrganization: async (input: { organizationId: string }) => {
                 const rows = await prisma.project.findMany({

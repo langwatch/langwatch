@@ -78,7 +78,7 @@ export class ManagedProviderService implements ManagedProviderApi {
       return cached;
     }
 
-    const organizationId = await this.projects.tryGetOrganizationId(projectId);
+    const organizationId = await this.projects.findOrganizationId(projectId);
 
     if (organizationId) {
       this.projectOrganizations.set(projectId, organizationId);

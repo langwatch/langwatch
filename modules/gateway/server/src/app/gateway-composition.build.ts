@@ -274,7 +274,7 @@ export function buildGatewayControlPlane(
     schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
 
     organizationIdForProject: async (projectId) => {
-      const organizationId = await projects.tryGetOrganizationId(projectId);
+      const organizationId = await projects.findOrganizationId(projectId);
       if (!organizationId) throw new Error(`project ${projectId} missing team`);
 
       return organizationId;

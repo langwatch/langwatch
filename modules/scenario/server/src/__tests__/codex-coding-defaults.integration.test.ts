@@ -106,7 +106,7 @@ function realModelProviders(prisma: PrismaClient): ModelProviderApi {
   return PostgresModelProviderAdapter.create({
     database: prisma,
     projects: {
-      tryGetWithTeam: async (id: string) =>
+      findWithTeam: async (id: string) =>
         await prisma.project.findUnique({ where: { id }, include: { team: true } }),
       getWithTeam: async (id: string) => {
         const project = await prisma.project.findUnique({

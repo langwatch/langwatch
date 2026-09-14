@@ -209,7 +209,7 @@ describe("GatewayService.create with a cycle anchor", () => {
     return PrismaGatewayAdapter.create({
       database: prisma,
       projects: {
-        tryGetWithTeam: vi.fn().mockResolvedValue({
+        findWithTeam: vi.fn().mockResolvedValue({
           id: "project_1",
           teamId: "team_1",
           team: { organizationId: "org_1" },

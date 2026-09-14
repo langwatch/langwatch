@@ -42,14 +42,14 @@ export function createPrismaProjectApi(options: PostgresProjectAdapterOptions): 
 
   return {
     listPaths: (input) => directory.listPaths(input),
-    tryGetOrganizationId: (projectId) => directory.tryGetOrganizationId(projectId),
+    findOrganizationId: (projectId) => directory.findOrganizationId(projectId),
     isPresenceEnabled: (input) => directory.isPresenceEnabled(input),
-    tryGetSummaryById: (projectId) => directory.tryGetSummaryById(projectId),
+    findSummaryById: (projectId) => directory.findSummaryById(projectId),
     searchByQuery: (input) => directory.searchByQuery(input),
-    tryGetById: (id) => directory.tryGetById(id),
+    findById: (id) => directory.findById(id),
     getOrganizationId: (projectId) => directory.getOrganizationId(projectId),
     getWithTeam: (id) => directory.getWithTeam(id),
-    tryGetWithTeam: (id) => directory.tryGetWithTeam(id),
+    findWithTeam: (id) => directory.findWithTeam(id),
     listByOrganization: (input) => directory.listByOrganization(input),
     listByTeam: (input) => directory.listByTeam(input),
     listNamesByIds: (input) => directory.listNamesByIds(input),

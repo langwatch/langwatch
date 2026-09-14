@@ -60,7 +60,7 @@ function process(role: "api" | "worker") {
     .withProvided(PromptApiToken, createApiFixture<PromptApi>({}))
     .withProvided(
       ProjectApiToken,
-      createApiFixture<ProjectApi>({ tryGetOrganizationId: async () => "organization-1" }),
+      createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     )
     .withModules([withMemoryRepositories(suiteServer)]);
 }
