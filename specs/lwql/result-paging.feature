@@ -70,6 +70,15 @@ Feature: A large answer is paged, never cut
       When it is validated
       Then it is refused with LIMIT_REQUIRED_PER_BRANCH naming every branch that needs one
 
+    # The query docs and OpenAPI spec both document the per-branch LIMIT rule
+    # so callers know to write their UNION branches correctly and why the
+    # server rejects one that names none.
+    @unit
+    Scenario: Each UNION branch must carry its own LIMIT ceiling
+      Given the query documentation and OpenAPI schema
+      When they are read
+      Then they name LIMIT_REQUIRED_PER_BRANCH and describe the per-branch LIMIT rule for UNION queries
+
     # A LIMIT written as a bound parameter is not a value the static validator
     # can read, so it passes both the append decision and the too-high check —
     # the server's own max_result_rows / max_result_bytes ceiling is what
