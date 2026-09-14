@@ -1,5 +1,7 @@
 /**
- * Real-Postgres coverage for the one-config-per-scope invariant on ModelDefaultConfig writes, and the handled errors the write path raises instead of leaking plain 500s. Customer report: "+ Add config" at organization scope stacked a second org row instead of replacing the first, and saving an all-inherit new config surfaced a raw "unknown error" 500.
+ * Real-Postgres coverage for the one-config-per-scope invariant on ModelDefaultConfig writes,
+ * and the handled errors it raises instead of leaking plain 500s (customer report: duplicate
+ * org rows and a raw "unknown error" on an all-inherit save).
  * @vitest-environment node
  * @see specs/model-providers/model-default-config-cascade.feature
  */

@@ -8,25 +8,9 @@ import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 
-/**
- * Regression guard for the 2026-07-09 re-fold storm, slim-fold edition. The
- * slim `trace-analytics` fold mirrors `trace-summary` and reuses the same
- * order-insensitive services, but shipped (ADR-034 Phase 2) WITHOUT
- * `refoldOnOutOfOrder: false`. A hot trace (a Claude Code session streams
- * 100k+ events into one aggregate) then re-folded its entire history on every
- * out-of-order batch, pinning the checkpoint and starving the queue
- * (observed 2026-07-10: one trace with 112k staged fold jobs draining at ~0).
- *
- * Spans are distributed and arrive in any order, so an earlier span is simply
- * folded when it arrives and the event log is never re-read.
- *
- * Was
- * `platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/__tests__/traceAnalyticsRefoldPolicy.unit.test.ts`.
- * `TraceAnalyticsFoldProjection` now takes `traceCanonicalisation` and
- * `runtime` deps alongside `store` (`.create(...)`, not a bare constructor).
- *
- * See specs/trace-processing/hot-trace-fold-amplification.feature.
- */
+/** Regression guard for the 2026-07-09 re-fold storm. The slim trace-analytics
+ * fold shipped without refoldOnOutOfOrder: false, causing hot traces to re-fold
+ * on every out-of-order batch. Now it reuses order-insensitive services. */
 
 const TENANT_ID = createTenantId("project-1");
 const TRACE_ID = "trace-1";

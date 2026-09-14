@@ -8,24 +8,9 @@ import {
   msToUnixNano,
 } from "./fixtures/trace-summary-test.fixtures.ts";
 
-/**
- * The trace-summary fold's STORAGE ANCHOR (ADR-087, migration 00072).
- *
- * `trace_summaries.OccurredAt` is the table's weekly partition key and its TTL
- * anchor. It used to carry the fold's span timing baseline as well — the running
- * `min(span.startTimeUnixMs)` — which only SPANS ever set. A trace whose only
- * signal is a log record (Claude Code / Codex "Path B") therefore committed at
- * `new Date(0)`: partition 196952, TTL deadline `1970 + retention`, already past.
- *
- * The two jobs are now separate state: `storageAnchorMs`, frozen on the first
- * contribution of any kind that carries a usable business time, and `occurredAt`,
- * still span-seeded and still the baseline `totalDurationMs` is measured from.
- *
- * These tests drive the fold through its own dispatch (`projection.apply`),
- * because the anchor is applied at that seam — the point of putting it there is
- * that no contribution type can miss it. Calling a handler directly bypasses the
- * anchor and would assert nothing.
- */
+/** The trace-summary fold's STORAGE ANCHOR (ADR-087, migration 00072). OccurredAt
+ * is the partition key and TTL anchor, now separate from span timing baseline
+ * (storageAnchorMs). Tests drive the fold through projection.apply. */
 
 const TRACE_ID = "aaaa0000000000000000000000000012";
 const BASE_MS = 1_760_000_000_000;
@@ -162,18 +147,9 @@ describe("given a trace-summary fold that anchors its storage time", () => {
   });
 });
 
-/**
- * Migration 00072 and ADR-087 §Backfill both state, in prose that becomes
- * immutable on merge, what the anchor does NOT recover: a row already in
- * partition 196952 is outside this fold's read window, `trustAbsentMiss` makes
- * that miss authoritative, and with no `refoldOnStoreMiss` the fold proceeds
- * from `init()` — so the trace escapes the epoch partition via the WRITE path,
- * not by decoding its old row, and its totals do not survive that fold.
- *
- * That account is only true while these three options hold together. Flipping
- * any one of them changes what the migration promises an operator, so they are
- * pinned here rather than left to the next reader to re-derive.
- */
+/** Migration 00072 and ADR-087 state what the anchor does NOT recover. The
+ * migration promises an operator must hold for the three fold options to
+ * guarantee the recovery account; they are pinned here. */
 describe("given the migration's account of what the anchor does not recover", () => {
   it("holds the three fold options that account depends on", () => {
     const options = projection.options as {

@@ -1,16 +1,5 @@
-/**
- * Unit tests for `tryFindByTraceId`'s OccurredAt-resolution branch selection.
- *
- * The read path first resolves the trace's OccurredAt from a cheap sort-key
- * seek, then chooses how to issue the heavy single-trace read:
- *   - resolve finds no row        -> return null, never issue the heavy read
- *   - resolve yields a positive ms -> bounded heavy read (partition-pruned)
- *   - resolve yields the 0 sentinel -> unbounded heavy read (legacy fallback)
- *
- * These branches are exercised here with a mocked client so they never depend
- * on how a real ClickHouse container round-trips an epoch timestamp; the
- * companion integration test covers the real-CH partition-pruning behavior.
- */
+// Unit tests for `tryFindByTraceId` OccurredAt-resolution branch selection.
+// Three paths: no row -> null; positive ms -> partition-pruned; 0 -> legacy fallback
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -169,15 +158,8 @@ describe("TraceSummaryClickHouseRepository.tryFindByTraceId (unit)", () => {
   });
 });
 
-/**
- * The storage-anchor split (ADR-087, migration 00072). `OccurredAt` is the
- * frozen partition / TTL address; `EarliestSpanStartMs` is the span timing
- * baseline it used to double as. Once BOTH shapes exist,
- * `EarliestSpanStartMs = 0` is ambiguous between "pre-split row, the baseline
- * lives in OccurredAt" and "post-split log-only trace, the baseline genuinely is
- * 0", and only the projection stamp separates them — so the decode is
- * version-gated and these tests are about that gate.
- */
+// Storage-anchor split (ADR-087): OccurredAt = partition/TTL, EarliestSpanStartMs = baseline
+// Version-gated decode handles pre/post-split row ambiguity
 describe("given the trace-summary row carries a storage anchor", () => {
   const anchorMs = 1_760_000_060_000;
   const baselineMs = 1_760_000_055_000;

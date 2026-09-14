@@ -1,8 +1,7 @@
 import type { Protections } from "@langwatch/trace-contract";
-/**
- * @see ADR-087
- * The joined span read must never emit an empty time predicate. fetchTracesWithSpansJoined derived its stored_spans window solely from matched summaries' OccurredAt, keeping only positive values — a page of log-only traces (epoch sentinel) left nothing, so queryWindowed got a null hint + fallback:"none" and BOTH time filters rendered empty, scanning every weekly part (cold S3 included) and dying with MEMORY_LIMIT_EXCEEDED (241). These assert on the SQL itself, since the defect IS the SQL.
- */
+/** ADR-087: The joined span read must never emit an empty time predicate. A
+ * page of log-only traces (epoch sentinel) left nothing, scanning every weekly
+ * part and dying with MEMORY_LIMIT_EXCEEDED. These assert on the SQL. */
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -11,9 +10,8 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
 }));
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
-/**
- * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
- */
+/** The process's tenant-keyed connection as this suite supplies it. The
+ * repository takes the resolver, so the fake sits with every other dependency. */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 vi.mock("~/server/filters/clickhouse", () => ({
@@ -76,9 +74,8 @@ function summaryRow(traceId: string, occurredAtMs: number) {
   };
 }
 
-/**
- * The three reads fetchTracesWithSpansJoined fires with no time range (light min/max resolve, summary read, span read), routed by query shape rather than call order, so a read gained/dropped upstream surfaces as an unmatched query, not a wrong payload two frames away. Every shape is matched explicitly and anything else throws — a default payload would hide exactly the break this routing exists to expose.
- */
+/** The three reads fetchTracesWithSpansJoined fires with no time range are
+ * routed by query shape, not call order. Every shape is matched explicitly. */
 function mockReads({
   resolved,
   summaries,
@@ -110,9 +107,9 @@ function matchRows({
   );
 }
 
-/**
- * Drives the read and hands back the span query it issued. A missing span read is a broken fixture, not a failed expectation — these scenarios are all about the query's SHAPE, so throwing (rather than returning undefined) keeps assertions in the it blocks and reports a setup break as a setup break.
- */
+/** Drives the read and hands back the span query it issued. Missing span
+ * read is a broken fixture, not a failed expectation. Throws to report setup
+ * break as a setup break, keeping assertions in the it blocks. */
 async function readTraces(traceIds: string[]) {
   const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
   const service = new TraceLegacyReadClickHouseRepository({

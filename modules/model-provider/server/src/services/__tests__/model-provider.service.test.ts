@@ -962,8 +962,8 @@ describe("ModelProviderService", () => {
     ).resolves.toMatchObject({ model: "openai/gpt-5.5", scope: "project" });
   });
 
-  /** @scenario "A restricted DEFAULT-role value at project tier is skipped in favor of a wider tier" */
-  /** @scenario 'Exhaustion caused entirely by a restricted model reports the refusal, not "nothing configured"' */
+  // @scenario A restricted DEFAULT-role value at project tier is skipped in favor of a wider tier
+  // @scenario Exhaustion caused entirely by a restricted model reports the refusal, not "nothing configured"
   it("skips restricted defaults and reports restricted-only exhaustion", async () => {
     const defaults = new Defaults();
     const restricted = {

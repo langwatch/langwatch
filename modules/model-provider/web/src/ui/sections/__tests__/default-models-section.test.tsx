@@ -1,18 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The Default Models table: one row per policy the caller can see, scope chips
- * on the left, the role-level model in its matching column, and indented
- * per-feature overrides under their role.
- *
- * Moved from
- * `platform/app/src/components/settings/__tests__/DefaultModelsSection.integration.test.tsx`.
- * The assertions travelled unchanged; what changed is where the two writes land:
- * "+ Add config" and Edit used to be asserted as `openDrawer` calls, and are now
- * asserted as the host being asked for the same drawer with the same parameter —
- * `defaultModelOverride` is still `platform/app`'s and the screen only addresses
- * it.
- *
+ * "+ Add config" and Edit are asserted as the host being asked for the drawer, not as `openDrawer`
+ * calls, since `defaultModelOverride` is still `platform/app`'s and this screen only addresses it.
  * Spec: specs/model-providers/role-based-default-models.feature
  */
 

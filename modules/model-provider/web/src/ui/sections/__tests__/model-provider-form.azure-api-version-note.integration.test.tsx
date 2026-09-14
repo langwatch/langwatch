@@ -1,15 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * #7892: the AI Gateway dispatch path pins Azure's api-version itself, so a
- * caller-supplied AZURE_OPENAI_API_VERSION / AZURE_API_GATEWAY_VERSION is
- * dropped there while the direct dispatch path still honors it. The drawer
- * offered both fields with no indication of that split. This pins the helper
- * text the drawer renders for each field, in customer-facing language that
- * never names an internal component.
- *
- * Covers @integration scenarios from
- * specs/ai-gateway/azure-api-version-override.feature.
+ * #7892: the Gateway dispatch path pins Azure's api-version itself and silently drops a
+ * caller-supplied one, while direct dispatch still honors it. Pins the drawer's per-field helper
+ * text. Covers @integration scenarios from specs/ai-gateway/azure-api-version-override.feature.
  */
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

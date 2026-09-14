@@ -1,8 +1,5 @@
-/**
- * Gemini is one provider with two Google doors: an AI Studio key answers on generativelanguage.googleapis.com, an Agent
- * Platform key on aiplatform.googleapis.com at a path naming the project and location. The credential's shape — pair present
- * or absent — decides which door is asked, so what these tests pin is mostly *which request goes out*.
- */
+// Gemini has two Google doors (AI Studio vs Agent Platform); the credential
+// shape decides which is asked, so these tests pin which request goes out.
 import { RedirectRefusedError } from "@langwatch/egress";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
@@ -74,7 +71,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       }
     });
 
-    /** @scenario An Agent Platform key without project and location is told what is missing, not that it is invalid */
+    // @scenario An Agent Platform key without project and location is told what is missing, not that it is invalid
     it("names the key's restriction rather than calling it invalid", async () => {
       // Google's live answer for an Agent Platform key on the Gemini API
       // host, verified with a real key: the key is fine, the door is wrong.
@@ -103,7 +100,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
   });
 
   describe("given a credential carrying a project and location", () => {
-    /** @scenario A credential carrying project and location is checked through the Agent Platform door */
+    // @scenario A credential carrying project and location is checked through the Agent Platform door
     it("builds the Agent Platform path from the project and location and skips the Gemini API", async () => {
       mockFetch.mockResolvedValue(generated());
 
@@ -119,7 +116,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       expect(requests[0]!.url).not.toContain("generativelanguage");
     });
 
-    /** @scenario A credential carrying project and location is checked through the Agent Platform door */
+    // @scenario A credential carrying project and location is checked through the Agent Platform door
     it("asks the provider to generate content rather than to list models", async () => {
       mockFetch.mockResolvedValue(generated());
 
@@ -267,7 +264,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
      * "nothing to probe". The Agent Platform door builds its own URL; a
      * green check without a request would pass a revoked key.
      */
-    /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
+    // @scenario A legacy row still validates through the Agent Platform door during the fold window
     it("probes the Agent Platform door instead of skipping validation", async () => {
       mockFetch.mockResolvedValue(generated());
 
@@ -287,7 +284,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       expect(result.outcome).toBe("verified");
     });
 
-    /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
+    // @scenario A legacy row still validates through the Agent Platform door during the fold window
     it("still reports a refused legacy key as refused", async () => {
       mockFetch.mockResolvedValue({
         ok: false,

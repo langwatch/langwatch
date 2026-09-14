@@ -11,7 +11,7 @@ export class ClickHouseLabelFacetAdapter {
   }
 
   /**
-   * Trace Label facet: every value of langwatch.labels, a JSON-encoded array of strings on trace_summaries.Attributes. Values arrive as '["foo","bar"]', so the query JSON-decodes and arrayJoins to expose individual labels, trimming quotes since JSONExtractArrayRaw returns the raw quoted form.
+   * Discovers trace labels from the JSON-encoded langwatch.labels attribute.
    */
   static buildLabelFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("OccurredAt");

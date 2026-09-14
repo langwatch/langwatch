@@ -1,21 +1,7 @@
 // @vitest-environment jsdom
 /**
- * One failure, one surface.
- *
- * A save can be refused by something the application has ALREADY put on the
- * reader's screen — a lite-member restriction rendered as a modal, a plan limit
- * — and a drawer that toasts on top of that stacks two accounts of one refusal.
- * `isReportedGlobally` is the host's answer to "have you shown this already",
- * and it is asked before anything is raised here.
- *
- * PORTED WITH THE DRAWER from
- * `platform/app/src/components/settings/__tests__/LLMModelCostDrawer.lite-member.integration.test.tsx`,
- * whose subject was deleted in `cc91631cd8`. Three mocks that named platform
- * modules are gone: the tenant and both feedback paths are the host port now,
- * so the fake host records what the drawer asked the application to do, and the
- * assertions read that instead of a toaster spy. `isHandledByGlobalHandler` was
- * a `~/utils/trpcError` module; it is `host.isReportedGlobally` here.
- *
+ * A drawer must not toast a refusal the application already put on screen (a lite-member modal, a
+ * plan limit) — `isReportedGlobally` is the host's answer to "have you shown this already".
  * @see specs/settings/llm-model-cost-drawer-error-handling.feature
  */
 

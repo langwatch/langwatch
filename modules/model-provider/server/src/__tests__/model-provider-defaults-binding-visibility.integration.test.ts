@@ -1,5 +1,7 @@
 /**
- * Real-Postgres coverage for Default Models read visibility when a member's project access comes from ROLE BINDINGS only (an ORGANIZATION-scope MEMBER binding plus a TEAM-scope MEMBER binding, no legacy TeamUser row).
+ * Real-Postgres coverage for Default Models read visibility when a member's project
+ * access comes from ROLE BINDINGS only (org-scope MEMBER + team-scope MEMBER, no legacy
+ * TeamUser row).
  * @vitest-environment node
  * @see specs/model-providers/role-based-default-models.feature
  */
