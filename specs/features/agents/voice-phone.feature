@@ -421,3 +421,27 @@ Feature: Voice agents: reach an agent by phone
     Given the worker recorded why its public URL tunnel failed to open
     When the phone transport builds the outbound adapter with no public base URL
     Then the run error names that recorded reason rather than a generic message
+
+  # ---------------------------------------------------------------------------
+  # Agent speaks first (scenario#995, scenario#992 — some agents greet on connect)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: A callee that greets on connect opens the call when Agent speaks first is on
+    Given a phone target whose agent greets as soon as the call connects
+    And "Agent speaks first" is turned on for that target and saved
+    When a scenario run places the call
+    Then the callee's greeting is recorded as the first turn of the conversation
+    And the simulator's first line is spoken only after the greeting ends, and replies to it
+    And the run completes without the callee asking whether anyone is there
+
+  # ---------------------------------------------------------------------------
+  # Callee transcript in the run conversation (scenario#994)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: Callee turns show their transcript in the run conversation
+    Given a phone target and a scenario that runs several turns
+    When the run finishes and its conversation is viewed
+    Then every callee turn shows an audio player with its transcript beside it, the same way the simulator's turns do
+    And the transcript text matches what the judge was given for that turn
