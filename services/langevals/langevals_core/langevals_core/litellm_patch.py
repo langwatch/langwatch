@@ -86,7 +86,9 @@ class ToolReasoningConflictError(Exception):
 
 
 def tool_reasoning_conflict(
-    kwargs: dict, exception: BaseException
+    kwargs: dict,
+    exception: BaseException,
+    requested_model: Optional[str] = None,
 ) -> Optional[ToolReasoningConflictError]:
     """
     The error to report in place of a provider rejection that is the
@@ -106,7 +108,7 @@ def tool_reasoning_conflict(
     if REASONING_EFFORT_PARAM not in message or "tool" not in message:
         return None
 
-    return ToolReasoningConflictError(kwargs.get("model"))
+    return ToolReasoningConflictError(requested_model or kwargs.get("model"))
 
 
 def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
@@ -389,8 +391,6 @@ def patch_litellm_embedding_params(kwargs):
     embeddings_deployment = request_env.get(
         "AZURE_EMBEDDINGS_DEPLOYMENT_NAME"
     ) or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
-    if embeddings_deployment is not None:
-        kwargs["model"] = "azure/" + embeddings_deployment
 
     request_credentials(kwargs)
 
@@ -401,6 +401,15 @@ def patch_litellm_embedding_params(kwargs):
             if replaced_key.isupper():
                 continue
             kwargs[replaced_key] = convert_param_type(replaced_key, value)
+
+    # Apply the deployment after X_LITELLM_EMBEDDINGS_model has landed, just
+    # like the completion path. Otherwise the catalog model id overwrites the
+    # mapped Azure deployment selected by the platform.
+    if (
+        embeddings_deployment is not None
+        and kwargs.get("model", "").startswith("azure/")
+    ):
+        kwargs["model"] = "azure/" + embeddings_deployment
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
@@ -414,6 +423,16 @@ def patch_litellm_embedding_params(kwargs):
 originals: dict = {}
 
 
+def _requested_completion_model(kwargs: dict) -> Optional[str]:
+    """Model selected by the evaluator before Azure deployment rewriting."""
+    request_env = current_request_env()
+    return (
+        request_env.get("X_LITELLM_model")
+        or os.environ.get("X_LITELLM_model")
+        or kwargs.get("model")
+    )
+
+
 def patch_litellm():
     if originals:
         return
@@ -423,12 +442,15 @@ def patch_litellm():
     originals["completion_cost"] = litellm.cost_calculator.completion_cost
 
     def patched_completion(*args, **kwargs):
+        requested_model = _requested_completion_model(kwargs)
         kwargs = patch_litellm_params(kwargs)
 
         try:
             return originals["completion"](*args, **kwargs)
         except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
+            conflict = tool_reasoning_conflict(
+                kwargs, exception, requested_model=requested_model
+            )
             if conflict is not None:
                 raise conflict from exception
             raise
@@ -436,12 +458,15 @@ def patch_litellm():
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
+        requested_model = _requested_completion_model(kwargs)
         kwargs = patch_litellm_params(kwargs)
 
         try:
             return await originals["acompletion"](*args, **kwargs)
         except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
+            conflict = tool_reasoning_conflict(
+                kwargs, exception, requested_model=requested_model
+            )
             if conflict is not None:
                 raise conflict from exception
             raise
