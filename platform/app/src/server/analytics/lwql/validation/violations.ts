@@ -96,6 +96,16 @@ export interface LangWatchQLViolation {
   /** Where in the submitted SQL, when the parser reported a position. */
   readonly at?: SqlSourcePosition;
   /**
+   * A generic, code-keyed corrective sentence, present on every violation.
+   *
+   * The bar this API holds itself to: a caller — usually an agent with no
+   * UI — never receives a refusal with nothing to act on. The more specific
+   * fields below (`allowedFunctions`, `availableDatasets`,
+   * `availableColumns`) are the sharper answer where one is resolvable;
+   * `hint` is the floor every code clears regardless.
+   */
+  readonly hint: string;
+  /**
    * The complete function allowlist a query may call.
    *
    * The validator attaches it structurally to `FUNCTION_NOT_ALLOWED` and to no
@@ -106,6 +116,22 @@ export interface LangWatchQLViolation {
    * second round trip to `GET /api/v1/query/schema`.
    */
   readonly allowedFunctions?: readonly string[];
+  /**
+   * The dataset names the caller may reference, attached to `TABLE_NOT_ALLOWED`
+   * when a written name failed to resolve — never to the bound-parameter
+   * variant of that code, which named no dataset to correct.
+   */
+  readonly availableDatasets?: readonly string[];
+  /**
+   * The dataset a `GATED_COLUMN` refusal's field was read from, when the walk
+   * could resolve it to exactly one table in scope.
+   */
+  readonly dataset?: string;
+  /**
+   * The columns of {@link dataset} the caller may reference, attached
+   * alongside it when the policy carries column data for that dataset.
+   */
+  readonly availableColumns?: readonly string[];
 }
 
 /**

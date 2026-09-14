@@ -347,18 +347,65 @@ function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
   return { line, column };
 }
 
+/**
+ * The floor every violation code clears: a corrective sentence, keyed on the
+ * code alone. A code with a sharper, context-derived field (`allowedFunctions`,
+ * `availableDatasets`, `dataset`/`availableColumns`) still carries this — the
+ * sharper field is the better answer, `hint` is what a caller falls back to
+ * when it only reads one field, and what every other code has instead of a
+ * sharper one.
+ *
+ * `Record` over the full union rather than a partial map: a code added to
+ * {@link LWQL_VIOLATION_CODES} without an entry here fails the build, not a
+ * customer's refusal.
+ */
+const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
+  EMPTY_QUERY: "Submit a single SELECT statement.",
+  PARSE_FAILED:
+    "Check the SQL against standard ClickHouse SELECT syntax and try again.",
+  MULTIPLE_STATEMENTS: "Submit exactly one SELECT statement per request.",
+  STATEMENT_NOT_ALLOWED:
+    "Rewrite the request as a single SELECT (or WITH … SELECT) statement.",
+  SETTINGS_CLAUSE:
+    "Remove the SETTINGS clause — result limits are applied automatically.",
+  OUTPUT_CLAUSE:
+    "Remove the output/format clause — this API controls the response format.",
+  SCHEMA_NOT_ALLOWED:
+    "Query one of the analytics datasets listed by GET /api/v1/query/schema instead.",
+  TABLE_NOT_ALLOWED:
+    "Use one of the datasets named in this violation's availableDatasets, or listed by GET /api/v1/query/schema.",
+  TABLE_FUNCTION:
+    "Read from one of the analytics datasets listed by GET /api/v1/query/schema instead of a table function.",
+  FUNCTION_NOT_ALLOWED:
+    "Rewrite the expression using one of the functions named in this violation's allowedFunctions.",
+  GATED_COLUMN:
+    "Remove the field, or use one of the columns named in this violation's availableColumns.",
+  WILDCARD_NOT_ALLOWED:
+    "List the fields you need by name instead of using a wildcard.",
+  NESTING_TOO_DEEP: "Flatten the query — reduce subquery, CTE, or expression nesting.",
+  UNSUPPORTED_SYNTAX:
+    "Rewrite the query as a plain read query over the analytics datasets.",
+};
+
+/** The sharper fields a call site can attach on top of the {@link DEFAULT_VIOLATION_HINTS} floor. */
+type ViolationExtra = Partial<
+  Pick<LangWatchQLViolation, "availableDatasets" | "dataset" | "availableColumns">
+>;
+
 function report({
   ctx,
   frame,
   code,
   message,
   node,
+  extra,
 }: {
   ctx: WalkContext;
   frame: Frame;
   code: LangWatchQLViolationCode;
   message: string;
   node?: SqlAstNode;
+  extra?: ViolationExtra;
 }): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
   const at = node ? positionOf(node) : undefined;
@@ -366,6 +413,7 @@ function report({
     code,
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
+    hint: DEFAULT_VIOLATION_HINTS[code],
     ...(at ? { at } : {}),
     // The allowlist rides on exactly the one code that means "you called
     // something off it", derived from the code here rather than passed in — so
@@ -373,6 +421,7 @@ function report({
     ...(code === "FUNCTION_NOT_ALLOWED"
       ? { allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES }
       : {}),
+    ...extra,
   });
 }
 
@@ -434,6 +483,26 @@ function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
   if (childFrame) walkFields({ rule, node, frame: childFrame, ctx });
 }
 
+/**
+ * `from` first, everything else in the order the parser wrote it.
+ *
+ * The parser's own field order is `select` before `from` — a `SelectQuery`
+ * node lists its projection first — so walking fields as written would check
+ * a column reference in the projection before the block has recorded which
+ * table it was read from. A gated-column refusal wants that table (to name
+ * its dataset and columns; see `resolveGatedColumnDataset`), so `from` has to
+ * be walked, and its table recorded on the block, before any other field of
+ * the same `SELECT` is. `Array.prototype.sort` is stable, so this reorders
+ * nothing else.
+ */
+function fieldsInWalkOrder(node: SqlAstNode): [string, unknown][] {
+  return Object.entries(node).sort(([left], [right]) => {
+    if (left === "from") return right === "from" ? 0 : -1;
+    if (right === "from") return 1;
+    return 0;
+  });
+}
+
 /** Every field the node carries, each against the rule that names it — or none. */
 function walkFields({
   rule,
@@ -441,7 +510,7 @@ function walkFields({
   frame,
   ctx,
 }: NodeArgs & { rule: NodeRule }): void {
-  for (const [field, value] of Object.entries(node)) {
+  for (const [field, value] of fieldsInWalkOrder(node)) {
     if (METADATA_FIELDS.has(field) || value === undefined) continue;
     const fieldRule = Object.hasOwn(rule.fields, field)
       ? rule.fields[field]
@@ -543,6 +612,45 @@ function walkChildNodes({
 // Custom field walkers
 // ---------------------------------------------------------------------------
 
+/**
+ * Which dataset a gated reference's columns should be listed against, when the
+ * walk can tell.
+ *
+ * A qualified reference (`t.body`) resolves through the block's alias/table
+ * list; an unqualified one resolves only when the block reads exactly one
+ * table — with two tables in scope an unqualified name is ambiguous between
+ * them, and guessing would risk naming the wrong dataset's columns.
+ */
+function resolveGatedColumnDataset({
+  name,
+  frame,
+  ctx,
+}: {
+  name: string;
+  frame: Frame;
+  ctx: WalkContext;
+}): ViolationExtra {
+  const tables = frame.block?.tables ?? [];
+  const parts = name.split(".");
+  const qualifier =
+    parts.length > 1 ? parts.at(-2)?.trim().toLowerCase() : undefined;
+  const matched = qualifier
+    ? tables.find(
+        (entry) =>
+          entry.alias === qualifier ||
+          entry.table.split(".").at(-1) === qualifier,
+      )
+    : tables.length === 1
+      ? tables[0]
+      : undefined;
+  if (!matched) return {};
+  const availableColumns = ctx.policy.datasetColumns.get(matched.table);
+  return {
+    dataset: matched.table,
+    ...(availableColumns ? { availableColumns } : {}),
+  };
+}
+
 /** The columns a caller may not reference, matched on the reference's last segment. */
 function gateColumnReference({
   name,
@@ -563,6 +671,7 @@ function gateColumnReference({
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
+    extra: resolveGatedColumnDataset({ name, frame, ctx }),
   });
 }
 
@@ -779,6 +888,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       code: "TABLE_NOT_ALLOWED",
       message: `The dataset "${echoIdentifier(written)}" is not available to you. Use one of the datasets from the schema endpoint.`,
       node,
+      extra: { availableDatasets: ctx.policy.availableDatasets },
     });
     return null;
   }
@@ -1469,7 +1579,15 @@ function statementRejection({
 }): RejectedLangWatchQL {
   return {
     ok: false,
-    violations: [{ code, clause: "statement", message, ...(at ? { at } : {}) }],
+    violations: [
+      {
+        code,
+        clause: "statement",
+        message,
+        hint: DEFAULT_VIOLATION_HINTS[code],
+        ...(at ? { at } : {}),
+      },
+    ],
   };
 }
 

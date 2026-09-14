@@ -42,3 +42,22 @@ Feature: A query error tells the caller how to fix it
       Given a user with an API key with access to at least one project
       When they run a query naming a column or dataset that does not exist
       Then they are told what exists
+
+    @unit
+    Scenario: A TABLE_NOT_ALLOWED violation names the datasets that exist
+      Given the LangWatchQL dataset allowlist the validator enforces
+      When a query names a dataset that is not on the allowlist
+      Then the violation's availableDatasets lists every dataset the caller may query
+      And availableDatasets is sorted and deduplicated
+
+    @unit
+    Scenario: A GATED_COLUMN violation names the dataset's columns
+      Given a dataset whose columns the validator knows
+      When a query names a column that is not available on that dataset
+      Then the violation's dataset names the dataset the column was read from
+      And the violation's availableColumns lists that dataset's columns
+
+    @unit
+    Scenario: Every violation carries a corrective hint
+      Given any LangWatchQL validation refusal, of any violation code
+      Then every violation in the response carries a non-empty hint

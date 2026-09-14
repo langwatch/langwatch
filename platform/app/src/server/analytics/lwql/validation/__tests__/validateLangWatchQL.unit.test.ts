@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type LangWatchQLValidation, validateLangWatchQL } from "../validate";
-import type { LangWatchQLViolationCode } from "../violations";
+import { LWQL_VIOLATION_CODES, type LangWatchQLViolationCode } from "../violations";
 
 /** A catalog with one restricted field, which is the interesting configuration. */
 const POLICY = {
@@ -28,6 +28,7 @@ function validate(
     gatedColumns: readonly string[];
     defaultDatabase?: string;
     limits?: { maxSubqueryDepth: number; maxNodeDepth: number };
+    datasetColumns?: Readonly<Record<string, readonly string[]>>;
   } = POLICY,
 ): LangWatchQLValidation {
   return validateLangWatchQL({ sql, ...policy });
@@ -488,6 +489,208 @@ describe("validateLangWatchQL", () => {
       expect(
         codesOf(validate("SELECT TraceId FROM traces PASTE JOIN spans")),
       ).toContain("UNSUPPORTED_SYNTAX");
+    });
+  });
+
+  describe("given a violation whose refusal should name what exists", () => {
+    /** @scenario "A TABLE_NOT_ALLOWED violation names the datasets that exist" */
+    it("lists the caller's allowed datasets on an unknown dataset", () => {
+      const result = validate("SELECT id FROM billing.invoices");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "TABLE_NOT_ALLOWED",
+      );
+      expect(violation?.availableDatasets).toEqual([
+        "analytics.spans",
+        "analytics.traces",
+      ]);
+    });
+
+    /** @scenario "A TABLE_NOT_ALLOWED violation names the datasets that exist" */
+    it("sorts and deduplicates availableDatasets regardless of the policy's own order", () => {
+      const result = validate("SELECT id FROM billing.invoices", {
+        allowedTables: [
+          "analytics.traces",
+          "analytics.spans",
+          "analytics.traces",
+        ],
+        gatedColumns: [],
+        defaultDatabase: "analytics",
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "TABLE_NOT_ALLOWED",
+      );
+      expect(violation?.availableDatasets).toEqual([
+        "analytics.spans",
+        "analytics.traces",
+      ]);
+    });
+
+    /**
+     * The bound-parameter TABLE_NOT_ALLOWED names no dataset to correct — it
+     * still gets a hint, but never a stale/irrelevant dataset list.
+     */
+    it("omits availableDatasets when no dataset name was written", () => {
+      const result = validate("SELECT id FROM {which:Identifier}");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "TABLE_NOT_ALLOWED",
+      );
+      expect(violation?.availableDatasets).toBeUndefined();
+      expect(violation?.hint).toBeTruthy();
+    });
+
+    /** @scenario "A GATED_COLUMN violation names the dataset's columns" */
+    it("names the dataset and its columns on a gated field read through an alias", () => {
+      const result = validate("SELECT t.body FROM traces AS t", {
+        ...POLICY,
+        datasetColumns: {
+          "analytics.traces": ["TraceId", "Cost", "body"],
+        },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.dataset).toBe("analytics.traces");
+      expect(violation?.availableColumns).toEqual(["body", "Cost", "TraceId"]);
+    });
+
+    /** @scenario "A GATED_COLUMN violation names the dataset's columns" */
+    it("resolves the dataset from the sole table in scope when the reference is unqualified", () => {
+      const result = validate("SELECT body FROM traces", {
+        ...POLICY,
+        datasetColumns: { "analytics.traces": ["TraceId", "body"] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.dataset).toBe("analytics.traces");
+    });
+
+    it("does not guess a dataset for an unqualified gated field with two tables in scope", () => {
+      const result = validate(
+        "SELECT body FROM traces JOIN spans ON traces.TraceId = spans.TraceId",
+        { ...POLICY, datasetColumns: { "analytics.traces": ["body"] } },
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.dataset).toBeUndefined();
+      expect(violation?.availableColumns).toBeUndefined();
+      // Still not left with nothing to act on.
+      expect(violation?.hint).toBeTruthy();
+    });
+
+    it("omits availableColumns when the policy carries no column data for the dataset", () => {
+      const result = validate("SELECT body FROM traces");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.dataset).toBe("analytics.traces");
+      expect(violation?.availableColumns).toBeUndefined();
+    });
+
+    /**
+     * One SQL text per violation code, driven through the real validator —
+     * the exhaustiveness this asserts is that every code a real query can
+     * trigger comes back with a hint, not that the internal lookup table
+     * happens to have every key (which the compiler already guarantees: it
+     * types that table as `Record<LangWatchQLViolationCode, string>`).
+     *
+     * @scenario "Every violation carries a corrective hint"
+     */
+    it.each<[LangWatchQLViolationCode, string]>([
+      ["EMPTY_QUERY", ""],
+      ["PARSE_FAILED", "SELECT FROM WHERE (("],
+      [
+        "MULTIPLE_STATEMENTS",
+        "SELECT TraceId FROM traces; SELECT TraceId FROM spans",
+      ],
+      ["STATEMENT_NOT_ALLOWED", "INSERT INTO traces VALUES (1)"],
+      [
+        "SETTINGS_CLAUSE",
+        "SELECT TraceId FROM traces SETTINGS max_threads = 1",
+      ],
+      ["OUTPUT_CLAUSE", "SELECT TraceId FROM traces FORMAT JSON"],
+      ["SCHEMA_NOT_ALLOWED", "SELECT * FROM system.tables"],
+      ["TABLE_NOT_ALLOWED", "SELECT id FROM billing.invoices"],
+      ["TABLE_FUNCTION", "SELECT * FROM url('http://x', CSV)"],
+      ["FUNCTION_NOT_ALLOWED", "SELECT unsupportedFn(TraceId) FROM traces"],
+      ["GATED_COLUMN", "SELECT body FROM traces"],
+      ["WILDCARD_NOT_ALLOWED", "SELECT * FROM traces"],
+      [
+        "NESTING_TOO_DEEP",
+        "SELECT ((((((TraceId)))))) FROM traces",
+      ],
+      [
+        "UNSUPPORTED_SYNTAX",
+        "SELECT TraceId FROM traces PASTE JOIN spans",
+      ],
+    ])("names a hint for %s", (code, sql) => {
+      const policy =
+        code === "NESTING_TOO_DEEP"
+          ? { ...UNGATED_POLICY, limits: { maxSubqueryDepth: 8, maxNodeDepth: 4 } }
+          : POLICY;
+      const result = validate(sql, policy);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find((entry) => entry.code === code);
+      expect(violation, code).toBeDefined();
+      expect(violation?.hint, code).toBeTruthy();
+    });
+
+    /** Belt-and-suspenders: every code named by the type is covered above. */
+    it("covers every violation code with a hint case", () => {
+      const covered = new Set<LangWatchQLViolationCode>([
+        "EMPTY_QUERY",
+        "PARSE_FAILED",
+        "MULTIPLE_STATEMENTS",
+        "STATEMENT_NOT_ALLOWED",
+        "SETTINGS_CLAUSE",
+        "OUTPUT_CLAUSE",
+        "SCHEMA_NOT_ALLOWED",
+        "TABLE_NOT_ALLOWED",
+        "TABLE_FUNCTION",
+        "FUNCTION_NOT_ALLOWED",
+        "GATED_COLUMN",
+        "WILDCARD_NOT_ALLOWED",
+        "NESTING_TOO_DEEP",
+        "UNSUPPORTED_SYNTAX",
+      ]);
+      expect([...covered].sort()).toEqual([...LWQL_VIOLATION_CODES].sort());
+    });
+
+    /** @scenario "Every violation carries a corrective hint" */
+    it("carries a hint alongside FUNCTION_NOT_ALLOWED's allowedFunctions, not instead of it", () => {
+      const result = validate("SELECT unsupportedFn(TraceId) FROM traces");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "FUNCTION_NOT_ALLOWED",
+      );
+      expect(violation?.hint).toBeTruthy();
+      expect(violation?.allowedFunctions).toBeDefined();
     });
   });
 
