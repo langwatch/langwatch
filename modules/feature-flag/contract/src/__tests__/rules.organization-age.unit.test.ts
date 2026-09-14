@@ -1,14 +1,8 @@
 /**
  * @vitest-environment node
  *
- * The "new users" targeting condition: a rule that names a date instead of an
- * id, matching every organization created on or after it.
- *
- * The load-bearing property is that it fails CLOSED. An age condition the
- * matcher cannot evaluate — an unknown creation date, an unparseable
- * boundary — must not degrade into "no condition", because a rule with no
- * conditions matches everyone, which is the opposite of what an operator
- * rolling out to new signups asked for.
+ * An age condition the matcher cannot evaluate must fail closed: degrading to
+ * "no condition" would match everyone, the opposite of targeting new signups.
  */
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@langwatch/time";

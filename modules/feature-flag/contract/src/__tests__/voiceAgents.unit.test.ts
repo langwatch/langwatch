@@ -1,12 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The single server-side read of `release_voice_agents_enabled` (AC29): every
- * voice door asks {@link isVoiceAgentsEnabledForProject}, so the targeting
- * shape it builds — org passed through, org resolved when omitted, and the
- * orphan-project fallback — is pinned here in one place.
- *
+ * Every voice door reads the flag through one function, so the targeting shape
+ * is pinned here rather than at each door.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it, vi } from "vitest";
