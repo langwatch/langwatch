@@ -96,6 +96,15 @@ folder and the first dot-qualifier the same word, over the tiers `CHANNEL_TIERS`
   and `require*` are refused by `fallible-result-naming` whatever they return: a
   `tryGetQueue` becomes `getQueue` that throws `QueueNotFoundError`, and a swallowed
   catch that returned null becomes the throw it was hiding.
+- **Fixing that rule is a contract decision, not a rename.** `find<Noun>` is only for a
+  genuine lookup whose callers branch on absence as a normal outcome, and the noun names
+  what is found (`findDecryptedToken`). Never bolt `find` onto the old verb — `findGet`,
+  `findSet`, `findUpdateStatus` are the refusal restated, not a fix. A getter keeps its
+  name and returns or throws; a write keeps its verb, and when its target's absence is
+  genuinely normal for callers it returns an explicit non-nullable result union in domain
+  vocabulary (`"updated" | "missing-subscription"`), never null. The body changes with
+  the contract: narrow any blanket try/catch to the one call whose failure means absence,
+  so a real error propagates instead of reading as a miss.
 - Repositories use `findAll` / `findById` / `create` / `update` / `delete` and specific
   reads (`findBySlug`, `listPage`); the app and services use the API's RPC verbs.
 - Parameters are named objects: `fn({ a, b })`. Services parse their input with the

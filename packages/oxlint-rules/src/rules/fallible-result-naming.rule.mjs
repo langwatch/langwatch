@@ -53,7 +53,7 @@ export const fallibleResultNamingRule = defineRule({
     },
     nullableWithoutFind: {
       what: "`{{name}}` can return null/undefined, but only a `find*` method may answer with absence.",
-      fix: "Throw the domain error and drop the nullable from the type, or name it `find*`.",
+      fix: "Throw the domain error and drop the nullable from the type; only a genuine lookup whose callers branch on absence becomes `find<Noun>`, named for what it looks up — never `find` bolted onto this name. A write whose target may normally be absent returns an explicit result union instead of null.",
     },
   },
   create(context) {
