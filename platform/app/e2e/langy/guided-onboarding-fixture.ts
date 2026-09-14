@@ -73,8 +73,10 @@ export const GUIDED_LINES = {
   noRemoteStart:
     "No pull request was opened, since the folder has no remote or gh is not signed in: branch",
   // The third way step 2 can end: the push worked and the pull request command
-  // failed twice. The line names the branch and then the one line the command
-  // printed, so only its middle is fixed.
+  // failed. An error with nothing to fix, "none of the git remotes configured
+  // for this repository point to a known GitHub host", is said at once; any
+  // other gh error gets one fix and one retry first. The line names the branch
+  // and then the one line the command printed, so only its middle is fixed.
   pushedOpenFailed: "is pushed; opening the pull request failed with:",
   branchLineStart: "I left branch",
   branchLineEnd: "checked out: the agent you started runs on it.",
