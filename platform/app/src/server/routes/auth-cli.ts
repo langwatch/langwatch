@@ -880,8 +880,10 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       await redis.del(deviceCodeKey(device_code));
       await redis.del(userCodeKey(record.user_code));
       // The poll-rate key too: consumed means the next poll learns the code
-      // is gone (408), not that it polled too soon (429).
+      // is gone (408), not that it polled too soon (429). And the claim,
+      // which would otherwise outlive the code it serialised.
       await redis.del(pollRateKey(device_code));
+      await redis.del(claimKey);
       return c.json(
         {
           error: "access_denied",
@@ -944,6 +946,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         await redis.del(deviceCodeKey(device_code));
         await redis.del(userCodeKey(record.user_code));
         await redis.del(pollRateKey(device_code));
+        await redis.del(claimKey);
         return c.json(
           {
             error: "access_denied",
@@ -966,6 +969,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
         await redis.del(deviceCodeKey(device_code));
         await redis.del(userCodeKey(record.user_code));
         await redis.del(pollRateKey(device_code));
+        await redis.del(claimKey);
         return c.json(
           {
             error: "access_denied",
@@ -974,11 +978,15 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           410,
         );
       }
-      // Single-use device_code: delete after successful exchange. Per-key
-      // dels — Redis cluster CROSSSLOT-rejects multi-key ops on differing
-      // hash slots.
+      // Single-use device_code: delete after successful exchange, along
+      // with the poll window. The claim is deliberately LEFT to its TTL: a
+      // concurrent exchange that read the record before this deletion would
+      // otherwise re-claim after it and mint a second credential — the exact
+      // double-handout the claim exists to fence. Per-key dels — Redis
+      // cluster CROSSSLOT-rejects multi-key ops on differing hash slots.
       await redis.del(deviceCodeKey(device_code));
       await redis.del(userCodeKey(record.user_code));
+      await redis.del(pollRateKey(device_code));
       return c.json(
         {
           kind: "api_key" as const,
@@ -1101,6 +1109,8 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           );
           await redis.del(deviceCodeKey(device_code));
           await redis.del(userCodeKey(record.user_code));
+          await redis.del(pollRateKey(device_code));
+          await redis.del(claimKey);
           return c.json(
             {
               error: "access_denied",
@@ -1181,11 +1191,16 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
       .exec();
 
-    // Single-use device_code: delete after successful exchange.
+    // Single-use device_code: delete after successful exchange, along with
+    // the poll window. The claim is deliberately LEFT to its TTL: a
+    // concurrent exchange that read the record before this deletion would
+    // otherwise re-claim after it and mint a second session — the exact
+    // double-handout the claim exists to fence.
     // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
     // when keys differ in hash slot.
     await redis.del(deviceCodeKey(device_code));
     await redis.del(userCodeKey(record.user_code));
+    await redis.del(pollRateKey(device_code));
 
     return c.json(
       {

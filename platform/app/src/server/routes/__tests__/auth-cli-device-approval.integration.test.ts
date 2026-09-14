@@ -38,6 +38,7 @@ const suffix = nanoid(8);
 const USER_ID = `usr-approval-${suffix}`;
 const ORG_ID = `org-approval-${suffix}`;
 const PROJECT_ID = `proj-approval-${suffix}`;
+const TEAM_ID = `team-approval-${suffix}`;
 const PROJECT_API_KEY = `sk-lw-approval-${suffix}-${"a".repeat(36)}`;
 
 async function mintDeviceCode(
@@ -134,11 +135,42 @@ describe("CLI device-approval stream", () => {
     await prisma.organizationUser.create({
       data: { userId: USER_ID, organizationId: ORG_ID, role: "ADMIN" },
     });
+    // The project-key branch re-derives the handout at exchange time — the
+    // project must exist and the user must hold project administration on it
+    // (the identity branch's hardening of legacy key exposure), so the racing
+    // polls below are contending for a credential that is genuinely theirs.
+    await prisma.team.create({
+      data: {
+        id: TEAM_ID,
+        name: `Approval Team ${suffix}`,
+        slug: `approval-team-${suffix}`,
+        organizationId: ORG_ID,
+      },
+    });
+    await prisma.teamUser.create({
+      data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
+    });
+    await prisma.project.create({
+      data: {
+        id: PROJECT_ID,
+        name: `Approval Project ${suffix}`,
+        slug: `approval-proj-${suffix}`,
+        apiKey: PROJECT_API_KEY,
+        teamId: TEAM_ID,
+        language: "typescript",
+        framework: "openai",
+      },
+    });
   });
 
   afterAll(async () => {
     await resetDeviceApprovalSubscriber().catch(() => {});
     await resetApp();
+    await prisma.project.deleteMany({ where: { id: PROJECT_ID } }).catch(() => {});
+    await prisma.teamUser
+      .deleteMany({ where: { userId: USER_ID, teamId: TEAM_ID } })
+      .catch(() => {});
+    await prisma.team.deleteMany({ where: { id: TEAM_ID } }).catch(() => {});
     await prisma.organizationUser
       .deleteMany({ where: { userId: USER_ID, organizationId: ORG_ID } })
       .catch(() => {});

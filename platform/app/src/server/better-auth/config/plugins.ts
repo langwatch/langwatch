@@ -3,7 +3,7 @@ import { buildGenericOAuthConfigs } from "@ee/sso/providers";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
-import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
+import { deploymentOffersPasskeys } from "~/server/app-layer/identity/runtime";
 import type { PasskeySignUpRegistration } from "../passkey-signup";
 import { passkeySignUpRegistration } from "../passkey-signup";
 import { passkeyRelyingParty } from "../passkeyRelyingParty";

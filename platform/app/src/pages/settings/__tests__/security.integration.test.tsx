@@ -30,7 +30,10 @@ const {
   mockUnlinkAccount: vi.fn(),
   mockToasterCreate: vi.fn(),
   publicEnvRef: {
-    current: { NEXTAUTH_PROVIDER: "auth0" } as Record<string, unknown>,
+    current: {
+      NEXTAUTH_PROVIDER: "auth0",
+      PASSKEYS_ENABLED: true,
+    } as Record<string, unknown>,
   },
   linkedAccountsRef: {
     current: [
@@ -214,7 +217,7 @@ beforeEach(() => {
   mockChangePassword.mockReset();
   mockUnlinkAccount.mockReset();
   mockToasterCreate.mockReset();
-  publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
+  publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0", PASSKEYS_ENABLED: true };
   linkedAccountsRef.current = [
     {
       id: "acc-1",
@@ -244,6 +247,7 @@ describe("<SecuritySettings/>", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
         MFA_ENROLLMENT_OPEN: true,
+        PASSKEYS_ENABLED: true,
       };
       const { container } = renderPage();
 
@@ -261,7 +265,14 @@ describe("<SecuritySettings/>", () => {
 
     /** @scenario Email addresses and linked accounts sit under one heading */
     it("keeps the addresses, the providers and one action row inside the one band", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      // The connect offer is the method policy's own list now, carried over
+      // publicEnv — a deployment offering Google says so here, where the dev
+      // build used to invent the whole social set.
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        PASSKEYS_ENABLED: true,
+        SIGNIN_FEDERATED_PROVIDERS: ["google"],
+      };
       renderPage();
 
       const band = screen.getByTestId(
@@ -288,7 +299,7 @@ describe("<SecuritySettings/>", () => {
      */
     /** @scenario Email addresses and linked accounts sit under one heading */
     it("leaves the connect buttons where they were when the address field opens", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email", PASSKEYS_ENABLED: true };
       renderPage();
 
       const band = screen.getByTestId(
@@ -318,6 +329,7 @@ describe("<SecuritySettings/>", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
         MFA_ENROLLMENT_OPEN: true,
+        PASSKEYS_ENABLED: true,
       };
       // A password and nothing else: no passkey, no linked account.
       linkedAccountsRef.current = [
@@ -342,6 +354,7 @@ describe("<SecuritySettings/>", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
         MFA_ENROLLMENT_OPEN: true,
+        PASSKEYS_ENABLED: true,
       };
       linkedAccountsRef.current = [
         {
@@ -614,7 +627,7 @@ describe("<SecuritySettings/>", () => {
   describe("when NEXTAUTH_PROVIDER is email", () => {
     /** @scenario Email/credential user sees a dedicated Change Password section with just a button */
     it("renders a dedicated Change Password section with a button (no inline form)", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email", PASSKEYS_ENABLED: true };
       renderPage();
       expect(
         screen.getByRole("button", { name: /Change Password/i }),
@@ -625,7 +638,7 @@ describe("<SecuritySettings/>", () => {
 
     describe("when the dialog is opened", () => {
       it("shows Current + New + Confirm Password fields", async () => {
-        publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+        publicEnvRef.current = { NEXTAUTH_PROVIDER: "email", PASSKEYS_ENABLED: true };
         renderPage();
         await act(async () => {
           fireEvent.click(

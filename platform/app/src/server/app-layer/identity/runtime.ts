@@ -181,6 +181,7 @@ import { isAnyoneOnIdentityWrites, isUserOnIdentityWrites } from "./write-gate";
  */
 export {
   deploymentIsFederationCapable,
+  deploymentOffersPasskeys,
   resolveSignInMethodPolicy,
 } from "./signin-method-policy";
 
