@@ -135,32 +135,10 @@ function DirectorySettingsContent({
     maySeeSync: hasPermission("sso:view"),
     mayManageMembership: hasPermission("organization:manage"),
   };
-  // The counts the tabs carry. Read here rather than inside each tab, because
-  // a number on a closed tab is the reason somebody opens it — a count that
-  // only appears once you are already looking answers nothing.
-  const groups = api.group.listAll.useQuery(
-    { organizationId },
-    { enabled: reach.mayManageMembership && !!organizationId },
-  );
-  const teams = api.team.getTeamsWithRoleBindings.useQuery(
-    { organizationId },
-    { enabled: reach.mayManageMembership && !!organizationId },
-  );
-  // The same reads the People tab runs, so react-query serves both from one
-  // request and the tab's number can never disagree with its own list.
-  const members =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId, includeDeactivated: true },
-      { enabled: reach.mayManageMembership && !!organizationId },
-    );
-  const invites = api.invite.getOrganizationPendingInvites.useQuery(
-    { organizationId },
-    { enabled: reach.mayManageMembership && !!organizationId },
-  );
-  const waiting = api.joinRequests.pending.useQuery(
-    { organizationId },
-    { enabled: reach.mayManageMembership && !!organizationId },
-  );
+  const { groups, teams, peopleCount } = useDirectoryTabCounts({
+    organizationId,
+    enabled: reach.mayManageMembership,
+  });
 
   // Whether the departments tab has anything to say. The hook degrades to
   // "nothing to show" for a reader the departments queries refuse, and the
@@ -168,23 +146,6 @@ function DirectorySettingsContent({
   // there is no error and no empty frame, the tab simply never appears.
   const department = useDepartmentColumn(organizationId);
   const maySeeDepartments = department.show && hasPermission("governance:view");
-
-  /**
-   * Everybody the People tab would list: the members, the invitations still
-   * waiting on somebody, and the people asking to join. Undefined until all
-   * three have answered, so the tab shows no number rather than a number that
-   * is about to grow.
-   */
-  const peopleCount =
-    members.data && invites.data && waiting.data
-      ? members.data.members.length +
-        invites.data.filter(
-          (invite) =>
-            invite.displayStatus === "PENDING" ||
-            invite.displayStatus === "EXPIRED",
-        ).length +
-        waiting.data.length
-      : undefined;
 
   // Which tab is open lives in the address, so "the group you mapped is
   // here" is a link that opens on the groups rather than on the status.
@@ -342,4 +303,67 @@ function DirectoryTabs({
       )}
     </Tabs.Root>
   );
+}
+
+/**
+ * The numbers the closed tabs carry.
+ *
+ * Read HERE rather than inside each tab, because a number on a closed tab is
+ * the reason somebody opens it — a count that only appears once you are
+ * already looking answers nothing. The member and invitation reads are the
+ * same ones the People tab runs, so react-query serves both from one request
+ * and a tab's number can never disagree with its own list.
+ */
+function useDirectoryTabCounts({
+  organizationId,
+  enabled,
+}: {
+  organizationId: string;
+  enabled: boolean;
+}) {
+  // The counts the tabs carry. Read here rather than inside each tab, because
+  // a number on a closed tab is the reason somebody opens it — a count that
+  // only appears once you are already looking answers nothing.
+  const groups = api.group.listAll.useQuery(
+    { organizationId },
+    { enabled: enabled && !!organizationId },
+  );
+  const teams = api.team.getTeamsWithRoleBindings.useQuery(
+    { organizationId },
+    { enabled: enabled && !!organizationId },
+  );
+  // The same reads the People tab runs, so react-query serves both from one
+  // request and the tab's number can never disagree with its own list.
+  const members =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId, includeDeactivated: true },
+      { enabled: enabled && !!organizationId },
+    );
+  const invites = api.invite.getOrganizationPendingInvites.useQuery(
+    { organizationId },
+    { enabled: enabled && !!organizationId },
+  );
+  const waiting = api.joinRequests.pending.useQuery(
+    { organizationId },
+    { enabled: enabled && !!organizationId },
+  );
+
+  /**
+   * Everybody the People tab would list: the members, the invitations still
+   * waiting on somebody, and the people asking to join. Undefined until all
+   * three have answered, so the tab shows no number rather than a number that
+   * is about to grow.
+   */
+  const peopleCount =
+    members.data && invites.data && waiting.data
+      ? members.data.members.length +
+        invites.data.filter(
+          (invite) =>
+            invite.displayStatus === "PENDING" ||
+            invite.displayStatus === "EXPIRED",
+        ).length +
+        waiting.data.length
+      : undefined;
+
+  return { groups, teams, members, invites, waiting, peopleCount };
 }
