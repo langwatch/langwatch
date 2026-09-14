@@ -79,3 +79,23 @@ Feature: A large answer is paged, never cut
       Given a query whose LIMIT is a bound parameter set above the row ceiling
       When it runs against a table with more rows than the ceiling
       Then it is refused with lwql_result_too_large, never a raw driver error
+
+    # The unit proof above shows the default LIMIT is inserted before a bare
+    # OFFSET rather than after it. This is the real-database half: a query
+    # that reaches ClickHouse with OFFSET but no LIMIT — as it would if that
+    # insertion were ever skipped — must not silently return every remaining
+    # row past the ceiling.
+    @integration
+    Scenario: An OFFSET with no LIMIT cannot outrun the server-side ceiling
+      Given a query with an OFFSET but no LIMIT of its own
+      When it runs against more rows than the ceiling
+      Then it is refused with lwql_result_too_large, never a raw driver error
+
+    # LIMIT BY bounds rows per group, never the statement's total output, so a
+    # statement naming only a LIMIT BY clause is not "already paged" either —
+    # the server-side ceiling is what still catches it.
+    @integration
+    Scenario: A LIMIT BY clause cannot outrun the server-side ceiling
+      Given a query whose only LIMIT clause is a LIMIT BY
+      When it runs against more distinct groups than the ceiling
+      Then it is refused with lwql_result_too_large, never a raw driver error

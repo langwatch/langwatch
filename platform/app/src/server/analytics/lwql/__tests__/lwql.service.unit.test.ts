@@ -22,7 +22,6 @@ import {
 } from "../executor";
 import { recordingExecutor } from "../executor.testFakes";
 import {
-  appendDefaultRowLimit,
   closeLangWatchQLService,
   LangWatchQLService,
   setLangWatchQLService,
@@ -126,9 +125,7 @@ describe("given the LangWatchQL service", () => {
       expect(executor.calls).toHaveLength(1);
       // The statement was not named a LIMIT, so the cap is appended and nothing
       // else is changed: the submitted text is a prefix of what ran.
-      expect(executor.calls[0]!.sql).toBe(
-        appendDefaultRowLimit(sql, DEFAULT_LWQL_RESULT_LIMITS.maxRows),
-      );
+      expect(executor.calls[0]!.sql).toBe(`${sql}\nLIMIT 10000`);
     });
 
     it("leaves a statement that already names a LIMIT exactly as written", async () => {
@@ -605,9 +602,7 @@ describe("given the LangWatchQL service", () => {
       });
       // The window is carried in the bound parameters, never injected into the
       // statement; the only edit to the text is the appended default LIMIT.
-      expect(executor.calls[0]!.sql).toBe(
-        appendDefaultRowLimit(PERIOD_SQL, DEFAULT_LWQL_RESULT_LIMITS.maxRows),
-      );
+      expect(executor.calls[0]!.sql).toBe(`${PERIOD_SQL}\nLIMIT 10000`);
       expect(result.followsTimeWindow).toBe(true);
     });
 
@@ -783,12 +778,7 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(result.followsTimeWindow).toBe(false);
-      expect(executor.calls[0]!.sql).toBe(
-        appendDefaultRowLimit(
-          BOUNDED_COUNT,
-          DEFAULT_LWQL_RESULT_LIMITS.maxRows,
-        ),
-      );
+      expect(executor.calls[0]!.sql).toBe(`${BOUNDED_COUNT}\nLIMIT 10000`);
       expect(
         executor.calls[0]!.parameters,
         "a window was injected into a statement that never asked for one",

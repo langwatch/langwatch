@@ -33,6 +33,7 @@ import {
 } from "../executor";
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
+  LWQL_MAX_RESULT_ROWS,
   type LangWatchQLResourceLimits,
 } from "../limits";
 import { lwqlClickHouseSetupStatements } from "../provisioning/accessModel";
@@ -245,6 +246,97 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
           }),
         ),
       ).toBe("lwql_result_too_large");
+    });
+  });
+
+  /**
+   * `numbers(n)` rather than a seeded fact table: the restricted identity is
+   * already proven to reach it in `tenantIsolation.integration.test.ts`
+   * ("still allows the table functions that read no data"), it reads no
+   * tenant data, and it is exactly as many distinct rows as asked for — the
+   * cheapest way to put more than {@link LWQL_MAX_RESULT_ROWS} rows in front
+   * of the *shipped* ceiling, with nothing tightened.
+   *
+   * Both statements bypass the TypeScript-side default-`LIMIT` append (this
+   * suite talks to `executor.execute` directly, never through
+   * `LangWatchQLService`), which is exactly the gap `561a7de247` closed —
+   * this proves the server-side `max_result_rows` backstop still catches
+   * these two shapes even when nothing upstream does.
+   */
+  describe("when a query's own clause does not bound its total output", () => {
+    /** Comfortably above the shipped `max_result_rows` (10,000). */
+    const ROW_COUNT = 10_010;
+
+    afterAll(async () => {
+      await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+    });
+
+    describe("and it names only an OFFSET", () => {
+      /**
+       * `OFFSET 5` with no `LIMIT` still returns every remaining row — 10,005
+       * of them here — so this is the query the append-before-OFFSET logic
+       * exists to bound; run raw, it must still be refused.
+       */
+      const OFFSET_ONLY_QUERY = `SELECT number FROM numbers(${ROW_COUNT}) ORDER BY number OFFSET 5`;
+
+      it("answers a shape that stays within the ceiling", async () => {
+        await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+
+        const result = await executor.execute({
+          sql: `SELECT number FROM numbers(5) ORDER BY number OFFSET 2`,
+          tenantCapability: harness.tenantA.keyHash,
+        });
+
+        expect(result.rows.length).toBe(3);
+      });
+
+      /** @scenario "An OFFSET with no LIMIT cannot outrun the server-side ceiling" */
+      it("fails with lwql_result_too_large rather than a raw driver error", async () => {
+        await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+
+        expect(
+          await codeOfFailure(() =>
+            executor.execute({
+              sql: OFFSET_ONLY_QUERY,
+              tenantCapability: harness.tenantA.keyHash,
+            }),
+          ),
+        ).toBe("lwql_result_too_large");
+      });
+    });
+
+    describe("and its only LIMIT clause is a LIMIT BY", () => {
+      /**
+       * `LIMIT 1 BY number` bounds rows *per group*, never the statement's
+       * total output — every `number` here is its own group, so this still
+       * returns all 10,010 rows.
+       */
+      const LIMIT_BY_ONLY_QUERY = `SELECT number FROM numbers(${ROW_COUNT}) ORDER BY number LIMIT 1 BY number`;
+
+      it("answers a shape that stays within the ceiling", async () => {
+        await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+
+        const result = await executor.execute({
+          sql: `SELECT number FROM numbers(5) ORDER BY number LIMIT 1 BY number`,
+          tenantCapability: harness.tenantA.keyHash,
+        });
+
+        expect(result.rows.length).toBe(5);
+      });
+
+      /** @scenario "A LIMIT BY clause cannot outrun the server-side ceiling" */
+      it("fails with lwql_result_too_large rather than a raw driver error", async () => {
+        await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+
+        expect(
+          await codeOfFailure(() =>
+            executor.execute({
+              sql: LIMIT_BY_ONLY_QUERY,
+              tenantCapability: harness.tenantA.keyHash,
+            }),
+          ),
+        ).toBe("lwql_result_too_large");
+      });
     });
   });
 });
