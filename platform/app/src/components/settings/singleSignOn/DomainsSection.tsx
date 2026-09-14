@@ -50,48 +50,18 @@ export function DomainsSection({
   connectionId: string;
   provesWithLicense: boolean;
 }) {
-  const [domain, setDomain] = useState("");
-  /**
-   * THE VALUE, HELD WHERE IT CAN BE READ.
-   *
-   * It is minted by the command that issues the record and returned ONCE —
-   * the fact keeps only a hash, so no later read can answer it. The screen
-   * used to throw that answer away and then render the record from the
-   * refetched setup, where `value` is forever null, so the one string the
-   * whole ceremony depends on appeared nowhere at all and the page calmly
-   * explained it had been "shown once" without ever having shown it.
-   *
-   * Kept in state rather than pushed anywhere: it is a secret whose whole
-   * lifetime is this screen, and a reload is meant to lose it.
-   *
-   * The WHOLE record, not only the value. The panel that publishes it was
-   * drawn from the read alone, and on the first prove the read has no record
-   * to give — so the press minted a value, stored it, and rendered nothing at
-   * all. It looked like the button did nothing, and pressing it again would
-   * have minted a second value and quietly retired the first.
-   */
-  const [minted, setMinted] = useState<SelfServeIssuedDnsRecord | null>(null);
-  const claim = api.ssoSetup.claimDomain.useMutation();
-  const utils = api.useUtils();
-
-  const proved = new Set(connection.verifiedDomains);
-  const proofByDomain = new Map(
-    connection.domainProofs.map((proof) => [proof.domain, proof]),
-  );
-  // The union of claimed and proved: a domain that is proved but whose claim
-  // row has moved on is still routing, and a list that dropped it would hide
-  // the one thing a reader most needs to see when its record goes missing.
-  const domains = [
-    ...claims.map((entry) => entry.domain),
-    ...connection.verifiedDomains.filter(
-      (entry) => !claims.some((candidate) => candidate.domain === entry),
-    ),
-  ];
-  // The read is authoritative once it has one; before then, the record this
-  // screen just minted IS the record, and drawing it is the whole visible
-  // result of pressing prove. A freshly minted one cannot be expired.
-  const shownRecord: SelfServeSetupView["record"] =
-    record ?? (minted ? { ...minted, expired: false } : null);
+  const {
+    domain,
+    setDomain,
+    minted,
+    setMinted,
+    claim,
+    utils,
+    proved,
+    proofByDomain,
+    domains,
+    shownRecord,
+  } = useDomainClaims({ claims, connection, record });
 
   return (
     <VStack align="stretch" gap={3}>
@@ -233,57 +203,18 @@ function DomainRow({
    *  a caller that ignores it has thrown the ceremony's answer away. */
   onMinted: (minted: SelfServeIssuedDnsRecord) => void;
 }) {
-  const keepMintedValue = (
-    result:
-      | { proved: true }
-      | { proved: false; record: SelfServeIssuedDnsRecord },
-  ) => {
-    if (!result.proved) onMinted(result.record);
-  };
-  const claim = api.ssoSetup.claimDomain.useMutation();
-  const prove = api.ssoSetup.proveDomain.useMutation();
-  const remove = api.ssoSetup.removeDomain.useMutation();
-  const utils = api.useUtils();
-  const chip = domainProofChipFor({
-    proved,
-    proofState: proof?.proofState ?? "VERIFIED",
-    graceEndsAtMs: proof?.graceEndsAtMs ?? null,
-    claim: claimed,
-  });
-  const next = domainNextStepFor({
-    proved,
-    proofState: proof?.proofState ?? "VERIFIED",
-    claim: claimed,
-    provesWithLicense,
-    recordIssued,
-  });
-
-  // AWAITED, not fired and forgotten. An un-awaited invalidate lets the
-  // mutation finish — spinner off, row re-rendered — while the refetch is
-  // still in flight, so the screen settles on the state it already had and
-  // only a manual reload shows what happened. It looked like the button
-  // worked "sometimes", which is the shape of a race rather than a bug in
-  // the step itself. Awaiting keeps the control busy until the answer is in.
-  const settle = {
-    onSuccess: async () => {
-      await utils.ssoSetup.getSetup.invalidate();
-    },
-  };
-  const target = { organizationId, connectionId, domain };
-  // "Claim it again" is a claim; every other move on this row asks to prove.
-  const takeNextStep = () =>
-    next.kind === "claim-again"
-      ? claim.mutate(target, settle)
-      : prove.mutate(target, {
-          ...settle,
-          // The value is in THIS response and in no later read, so keeping
-          // it is the difference between showing it and telling somebody it
-          // was already shown.
-          onSuccess: (result) => {
-            keepMintedValue(result);
-            settle.onSuccess();
-          },
-        });
+  const { chip, next, takeNextStep, claim, prove, remove } =
+    useDomainRowActions({
+      domain,
+      claimed,
+      proved,
+      proof,
+      organizationId,
+      connectionId,
+      provesWithLicense,
+      recordIssued,
+      onMinted,
+    });
 
   return (
     <Table.Row>
@@ -455,6 +386,37 @@ function Disclosure({
   );
 }
 
+/**
+ * THE FIVE FACTS AND NOTHING ELSE: what kind of record, where it goes, and
+ * what goes in it.
+ *
+ * `record.value` comes back null on every read after the mint, so the value
+ * row is drawn from the one this screen caught when it was issued. Rendering
+ * it from the read alone is what made the secret invisible on the very screen
+ * that issued it.
+ */
+function publishedRecordRows({
+  record,
+  shownValue,
+}: {
+  record: NonNullable<SelfServeSetupView["record"]>;
+  shownValue: string | null;
+}) {
+  return [
+    { label: "Type", value: record.type },
+    { label: "Name", hint: "The whole name", value: record.name },
+    ...(shownValue === null
+      ? []
+      : [
+          {
+            label: "Value",
+            hint: "Shown once — this is the secret",
+            value: shownValue,
+          },
+        ]),
+  ];
+}
+
 function PublishedRecord({
   record,
   canManage,
@@ -503,29 +465,7 @@ function PublishedRecord({
       {/* THE FIVE FACTS AND NOTHING ELSE: what kind of record, where it
           goes, and what goes in it. Everything a reader needed once is
           folded below. */}
-      <CopyValueRows
-        rows={[
-          { label: "Type", value: record.type },
-          {
-            label: "Name",
-            hint: "The whole name",
-            value: record.name,
-          },
-          // `record.value` comes back null on every read after the mint, so
-          // the value shown is the one this screen caught when it was
-          // issued. Rendering the row from the read alone is what made the
-          // secret invisible on the very screen that issued it.
-          ...(shownValue === null
-            ? []
-            : [
-                {
-                  label: "Value",
-                  hint: "Shown once — this is the secret",
-                  value: shownValue,
-                },
-              ]),
-        ]}
-      />
+      <CopyValueRows rows={publishedRecordRows({ record, shownValue })} />
       <Disclosure summary="My DNS provider wants something different, or I have no DNS access">
         <Text>
           Some providers ask for the label alone rather than the whole name.
@@ -654,4 +594,167 @@ function PublishedRecord({
       )}
     </VStack>
   );
+}
+
+/**
+ * The domains this connection claims, and the record a fresh claim minted.
+ *
+ * THE MINTED VALUE IS HELD HERE BECAUSE NOTHING ELSE CAN ANSWER IT. It is
+ * returned once by the command that issues the record — the stored fact keeps
+ * only a hash — so a screen that re-read the setup would find `value` forever
+ * null and calmly explain that the string had been "shown once" without ever
+ * having shown it. Kept in state rather than persisted: it is a secret whose
+ * whole lifetime is this screen, and a reload is meant to lose it.
+ */
+function useDomainClaims({
+  claims,
+  connection,
+  record,
+}: {
+  claims: SelfServeDomainClaimView[];
+  connection: NonNullable<SelfServeSetupView["connection"]>;
+  record: SelfServeSetupView["record"];
+}) {
+  const [domain, setDomain] = useState("");
+  /**
+   * THE VALUE, HELD WHERE IT CAN BE READ.
+   *
+   * It is minted by the command that issues the record and returned ONCE —
+   * the fact keeps only a hash, so no later read can answer it. The screen
+   * used to throw that answer away and then render the record from the
+   * refetched setup, where `value` is forever null, so the one string the
+   * whole ceremony depends on appeared nowhere at all and the page calmly
+   * explained it had been "shown once" without ever having shown it.
+   *
+   * Kept in state rather than pushed anywhere: it is a secret whose whole
+   * lifetime is this screen, and a reload is meant to lose it.
+   *
+   * The WHOLE record, not only the value. The panel that publishes it was
+   * drawn from the read alone, and on the first prove the read has no record
+   * to give — so the press minted a value, stored it, and rendered nothing at
+   * all. It looked like the button did nothing, and pressing it again would
+   * have minted a second value and quietly retired the first.
+   */
+  const [minted, setMinted] = useState<SelfServeIssuedDnsRecord | null>(null);
+  const claim = api.ssoSetup.claimDomain.useMutation();
+  const utils = api.useUtils();
+
+  const proved = new Set(connection.verifiedDomains);
+  const proofByDomain = new Map(
+    connection.domainProofs.map((proof) => [proof.domain, proof]),
+  );
+  // The union of claimed and proved: a domain that is proved but whose claim
+  // row has moved on is still routing, and a list that dropped it would hide
+  // the one thing a reader most needs to see when its record goes missing.
+  const domains = [
+    ...claims.map((entry) => entry.domain),
+    ...connection.verifiedDomains.filter(
+      (entry) => !claims.some((candidate) => candidate.domain === entry),
+    ),
+  ];
+  // The read is authoritative once it has one; before then, the record this
+  // screen just minted IS the record, and drawing it is the whole visible
+  // result of pressing prove. A freshly minted one cannot be expired.
+  const shownRecord: SelfServeSetupView["record"] =
+    record ?? (minted ? { ...minted, expired: false } : null);
+
+  return {
+    domain,
+    setDomain,
+    minted,
+    setMinted,
+    claim,
+    utils,
+    proved,
+    proofByDomain,
+    domains,
+    shownRecord,
+  };
+}
+
+/**
+ * What this row currently says, and what pressing its control does.
+ *
+ * INVALIDATION IS AWAITED, not fired and forgotten. An un-awaited invalidate
+ * lets the mutation finish — spinner off, row re-rendered — while the refetch
+ * is still in flight, so the screen settles on the state it already had and
+ * only a manual reload shows what happened. It looked like the button worked
+ * "sometimes", which is the shape of a race rather than a bug in the step.
+ */
+function useDomainRowActions({
+  domain,
+  claimed,
+  proved,
+  proof,
+  organizationId,
+  connectionId,
+  provesWithLicense,
+  recordIssued,
+  onMinted,
+}: {
+  domain: string;
+  claimed: SelfServeDomainClaimView | undefined;
+  proved: boolean;
+  proof:
+    | NonNullable<SelfServeSetupView["connection"]>["domainProofs"][number]
+    | undefined;
+  organizationId: string;
+  connectionId: string;
+  provesWithLicense: boolean;
+  recordIssued: boolean;
+  onMinted: (minted: SelfServeIssuedDnsRecord) => void;
+}) {
+  const keepMintedValue = (
+    result:
+      | { proved: true }
+      | { proved: false; record: SelfServeIssuedDnsRecord },
+  ) => {
+    if (!result.proved) onMinted(result.record);
+  };
+  const claim = api.ssoSetup.claimDomain.useMutation();
+  const prove = api.ssoSetup.proveDomain.useMutation();
+  const remove = api.ssoSetup.removeDomain.useMutation();
+  const utils = api.useUtils();
+  const chip = domainProofChipFor({
+    proved,
+    proofState: proof?.proofState ?? "VERIFIED",
+    graceEndsAtMs: proof?.graceEndsAtMs ?? null,
+    claim: claimed,
+  });
+  const next = domainNextStepFor({
+    proved,
+    proofState: proof?.proofState ?? "VERIFIED",
+    claim: claimed,
+    provesWithLicense,
+    recordIssued,
+  });
+
+  // AWAITED, not fired and forgotten. An un-awaited invalidate lets the
+  // mutation finish — spinner off, row re-rendered — while the refetch is
+  // still in flight, so the screen settles on the state it already had and
+  // only a manual reload shows what happened. It looked like the button
+  // worked "sometimes", which is the shape of a race rather than a bug in
+  // the step itself. Awaiting keeps the control busy until the answer is in.
+  const settle = {
+    onSuccess: async () => {
+      await utils.ssoSetup.getSetup.invalidate();
+    },
+  };
+  const target = { organizationId, connectionId, domain };
+  // "Claim it again" is a claim; every other move on this row asks to prove.
+  const takeNextStep = () =>
+    next.kind === "claim-again"
+      ? claim.mutate(target, settle)
+      : prove.mutate(target, {
+          ...settle,
+          // The value is in THIS response and in no later read, so keeping
+          // it is the difference between showing it and telling somebody it
+          // was already shown.
+          onSuccess: (result) => {
+            keepMintedValue(result);
+            settle.onSuccess();
+          },
+        });
+
+  return { chip, next, takeNextStep, claim, prove, remove };
 }
