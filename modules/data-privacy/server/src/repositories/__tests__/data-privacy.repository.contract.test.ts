@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- * The privacy-rule contract, stated once and run against both backends: the
- * memory twin always, and the Postgres one when a test database is named at
- * `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
- *
- * The rules table is keyed by organization, so the isolation case here is the
- * organization: a rule another organization wrote is never answered with.
- * @see specs/data-privacy-service.feature
+ * Privacy-rule contract test: run against both memory and Postgres backends
+ * (isolated by organization). Spec: specs/data-privacy-service.feature
  */
 import type {
   DataPrivacyConfig,

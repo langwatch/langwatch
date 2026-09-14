@@ -13,15 +13,8 @@ export interface EntitlementInfrastructure {
 }
 
 /**
- * What a counter answers when it could not count.
- *
- * A sentinel rather than `0`, because the two are different facts: an
- * organization that genuinely sent nothing this month, and a counting store
- * that could not be reached. Every consumer used to read the second as the
- * first — enforcement saw an organization comfortably inside its cap, the
- * approaching-limit notifier saw nobody worth warning, and the usage page
- * rendered a confident zero. An outage in the counting store silently switched
- * off metering and told customers their usage had vanished.
+ * Sentinel when a counter cannot count, to distinguish from zero usage.
+ * An outage must not silently disable metering.
  */
 export const USAGE_UNKNOWN = "unknown" as const;
 

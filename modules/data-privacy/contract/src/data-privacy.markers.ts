@@ -1,19 +1,7 @@
 /**
- * Span-attribute markers a privacy pass leaves behind, so a reader can tell
- * what was removed and what was only partly removed.
- *
- * A marker is the ONLY trace of a pass that ran: redaction happens at
- * ingestion and the original is never stored, so a span that reaches the
- * drawer carries no other evidence. That makes the attribute NAME a wire
- * format between whichever process wrote the span and every reader of it.
- *
- * The application's copy is
- * `platform/app/src/server/data-privacy/dropKeyCatalog.ts`, which stays as it
- * is while both graphs ingest. The value here is pinned to that one by literal
- * in `__tests__/data-privacy.markers.unit.test.ts` rather than read from it: a
- * process stamping `langwatch.privacy.pii_incomplete` while the read path
- * looks for a differently-spelled key would present a partly-redacted span as
- * fully scrubbed, and nothing would fail.
+ * Span-attribute markers a privacy pass leaves behind, so readers can tell
+ * what was removed and what was only partly removed. Attribute names are wire
+ * formats; pinned against platform/app's version by tests.
  */
 
 /**

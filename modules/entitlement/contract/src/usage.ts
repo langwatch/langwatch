@@ -1,12 +1,6 @@
 /**
- * What an organization's usage against its plan looks like, as every door
- * reads it.
- *
- * The vocabulary was in `platform/app`, so `LimitsTrpcMembers.getUsageStats`
- * could only say `Promise<unknown>` — and `unknown` is what a tRPC procedure
- * publishes, so the sidebar's usage bar, the usage settings page and the
- * dashboard body were all reading fields off `{}`. The port's own note said
- * the concrete shape reached the client through the generic; it did not.
+ * Organization usage against plan: where it stands, its status, and formatted
+ * copy shared across UI, settings, and email.
  */
 import { z } from "zod";
 import { planSchema } from "./plan.ts";

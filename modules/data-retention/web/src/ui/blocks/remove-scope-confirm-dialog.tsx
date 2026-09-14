@@ -5,14 +5,8 @@ import { ArrowRight } from "lucide-react";
 import { type RetentionScopeGroup, renderPolicyValue } from "../../model/retention-grouping.ts";
 
 /**
- * Confirms removal of a scope's retention policy. Removing a rule is not a
- * delete of data — it only changes the retention applied to NEW data, which
- * falls back to the next tier in the cascade (or the platform default). This
- * dialog spells that out and shows the real fallback number resolved
- * server-side (never a guessed value, and never fetched here — the caller
- * owns the preview query and passes its result down), so a user can't
- * mistake "remove rule" for "delete my traces" — the fear that prompted this
- * UI.
+ * Confirms removal of a scope's retention policy, showing the server-side
+ * fallback to clarify that removal only affects new data, not existing traces.
  */
 export function RemoveScopeConfirmDialog({
   group,

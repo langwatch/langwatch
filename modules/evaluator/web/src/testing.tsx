@@ -1,13 +1,7 @@
 /**
- * What this package's suites mount the evaluators screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to do — the overlay it wanted, the query it wrote, the notices it
- * reported — which is exactly the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Test harness for mounting the evaluators screen. Constructs a fake host that records
+ * what the screen asked the application to do (overlay, query, notices) for verification.
+ * Internal only—not exported.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

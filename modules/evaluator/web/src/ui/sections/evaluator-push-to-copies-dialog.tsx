@@ -1,19 +1,7 @@
 /**
- * Pushing an evaluator's configuration onto its replicas.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/ui/PushToCopiesDialog.tsx` (plus the
- * `components/evaluators/PushToCopiesDialog` that wrapped it), which the
- * studio's workflow card also renders, so the platform module stays.
- *
- * EVERY REPLICA STARTS SELECTED, which is the platform behaviour and the one
- * worth stating: the reader opened this to push, and a dialog that opens with
- * nothing chosen makes the common case two steps.
- *
- * The failing branch reports the load error through the host's failure notice
- * rather than rendering `platform/app`'s `HandledErrorAlert`: the words a
- * customer reads come from the code-keyed presentation registry, which is the
- * application's and not a screen's to restate.
+ * Pushing an evaluator's configuration onto its replicas. A narrowed copy of
+ * platform/app's PushToCopiesDialog. Replicas start selected (common case optimization).
+ * Errors route through the host's failure notice for code-keyed presentation.
  */
 
 import { Button, Text, VStack } from "@chakra-ui/react";

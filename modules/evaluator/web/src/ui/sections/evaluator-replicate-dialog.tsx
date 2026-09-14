@@ -1,24 +1,7 @@
 /**
- * Replicating an evaluator into another project.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/ui/ReplicateToProjectDialog.tsx` (plus the
- * `CopyEvaluatorDialog` that wrapped it), which the monitor and workflow copy
- * dialogs also render, so the platform module stays.
- *
- * What was narrowed away is the generic seam: the platform component took a
- * `title`, an `entityLabel`, an `onCopy` callback, optional extra content and
- * an error logger, because three unrelated features shared it. Here the subject
- * IS an evaluator, so the mutation is called directly and the words are
- * written down.
- *
- * A CLOSED TARGET IS LISTED AND GREYED rather than hidden — the platform
- * dialog's behaviour, kept, because being told the project exists and is closed
- * to you is more use than a short list with no explanation.
- *
- * This is a SECTION and not a block because it calls a hook: only `sections`
- * may depend on `behavior`, which `ui-web-layer-direction` decides rather than
- * taste.
+ * Replicating an evaluator to another project. A narrowed copy of platform/app's
+ * ReplicateToProjectDialog. Closed targets are greyed to show inaccessibility.
+ * Implemented as a section (not block) because it calls a hook.
  */
 
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";

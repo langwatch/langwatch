@@ -7,13 +7,8 @@ import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 
 /**
- * The rewrite path, held in this process.
- *
- * It is a real twin, not a null object: a rewrite it is asked for shows up as
- * a mutation in progress, one that is killed stops being reported, and a
- * second rewrite over the same tables refuses exactly as the live store does.
- * Answering `[]` regardless of what was asked for is what let a project's
- * in-flight retention rewrite read as finished.
+ * A real twin, not a null object: mutations track in-progress rewrites and
+ * refuse concurrent rewrites like the live store does.
  */
 export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentionRepository {
   static create(now: () => Date = () => new Date()): MemoryRetroactiveRetentionRepository {

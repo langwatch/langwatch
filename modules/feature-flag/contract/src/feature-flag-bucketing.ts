@@ -1,19 +1,7 @@
 /**
- * Deterministic percentage bucketing.
- *
- * A subject's bucket depends on the flag key and the subject alone, never on
- * the rollout percentage. Two properties follow, and both are load-bearing:
- *
- *   - Independence. Hashing the flag key in means a subject in the first 10%
- *     of one flag is not thereby in the first 10% of every other flag, so
- *     staged rollouts do not all land on the same unlucky people.
- *   - Monotonicity. Raising a percentage only ever adds subjects, so nobody
- *     loses a feature because the rollout widened.
- *
- * The hash is FNV-1a, 32-bit, written with `Math.imul` so the arithmetic
- * stays exactly 32-bit in every JavaScript runtime. It is portable on
- * purpose: the same bucket must come out in the browser, in a worker and in
- * the API, with no native dependency.
+ * Deterministic percentage bucketing using FNV-1a hash (32-bit with Math.imul). Ensures
+ * independence (subjects bucketed independently per flag) and monotonicity (raising
+ * percentage only adds subjects). Portable across browser, worker, and API.
  */
 
 const FNV_OFFSET_BASIS = 0x811c9dc5;

@@ -386,7 +386,7 @@ export function EvaluatorSelection({
               {category === "custom" && (
                 <GridItem
                   as={Link}
-                  //@ts-expect-error: `href` reaches the Link through the `as` prop, which GridItem's props do not carry
+                  // @ts-expect-error: href reaches Link via as prop, not carried by GridItem
                   href={`/${project?.slug}/workflows`}
                   border="dashed"
                   borderColor="border.emphasized"

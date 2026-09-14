@@ -1,25 +1,7 @@
 /**
- * What the Data Retention screen asks of the application it is mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make this screen
- * untestable outside a running application. It asks this port instead, and the
- * frontend feature that owns it — `apps/ui/src/features/data-retention` —
- * answers it by adapting the browser capabilities the application resolves.
- *
- * THE SEVENTH FAMILY TO DECLARE THIS SHAPE, after governance, gateway, the
- * personal workspace, automations, ops and agents. Each of those recorded that
- * a repeat is the signal to promote it into one place, and each left it, for
- * the same reason: promotion changes packages a page-family move does not own.
- * Recorded again in `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS FAMILY ASKS THAT THE OTHERS DID NOT is `isPlatformAdmin()`. Only a
- * platform administrator may turn retention OFF, and the route enforces that
- * independently; the flag decides nothing but whether the drawer offers the
- * "keep forever" option at all. It is a SEPARATE answer from `hasPermission`
- * on purpose — platform administration is an email allowlist rather than an
- * organization grant, so folding it into a permission would widen it.
+ * Port for what the Data Retention screen needs from its host application
+ * (router, toast, session). See {@link dev/docs/plans/ui-family-move-manifests.md}
+ * and {@link ADR-004}.
  */
 
 import { createContext, useContext } from "react";
@@ -32,16 +14,8 @@ export type RetentionHostScope = {
 };
 
 /**
- * The organization, teams and projects the reader can SEE, for the scope filter.
- *
- * Deliberately not the snapshot's `available`, which is the RBAC-filtered set
- * the reader may WRITE to: narrowing the filter to writable scopes would hide
- * rows a project-only reader is allowed to read. The application derives this
- * from the organization graph it already holds.
- *
- * Declared structurally rather than as `AvailableScopes` from
- * `@langwatch/authz-web`: naming that package here would put a second
- * `ui-screen-closure` finding on the family for a shape three fields wide.
+ * Scopes the reader can see (not RBAC-filtered writable scopes) for the scope
+ * filter. Declared structurally to avoid importing authz-web.
  */
 export type RetentionAvailableScopes = {
   organization: { id: string; name: string } | null;

@@ -1,27 +1,8 @@
 /**
- * What the evaluators screen asks of the application it is mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package. It asks this port instead, and the frontend feature that owns it —
- * `apps/ui/src/features/evaluator` — answers it by adapting the browser
- * capabilities the application resolves.
- *
- * THE FOURTEENTH HOST PORT OF THE SAME SHAPE. Deferred again, for the reason
- * every family before recorded: promoting the shape changes packages a page
- * move does not own, and doing it inside a page-family move would hide it.
- *
- * WHAT THIS ONE ASKS THAT NO OTHER DID is `openOverlay`. Three of the four
- * things the evaluators page opened — the evaluator editor, the code evaluator
- * editor and the category picker — are drawers REGISTERED IN `platform/app`
- * with thirteen openers between them outside this family, so they do not
- * travel. What travels is the ADDRESS: the screen writes `?drawer.open=…` and
- * the application decides what that means. Under `apps/ui` today it means
- * nothing opens, because the registry is mounted by `DashboardPageBody`, which
- * is chrome a packaged screen has nothing above it to supply. The address is
- * still the right thing to write — it is what makes the overlay come back for
- * free when the chrome layout route lands, and it is what a shared link already
- * means.
+ * A port interface for the evaluators screen, required because it cannot import
+ * @langwatch/ui, the router, or singleton clients (ADR-004). Unlike other host ports,
+ * this one uniquely asks for openOverlay to support drawer registration outside the
+ * page-family hierarchy.
  */
 
 import { createContext, useContext } from "react";

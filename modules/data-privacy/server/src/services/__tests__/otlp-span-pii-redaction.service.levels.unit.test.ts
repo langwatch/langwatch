@@ -534,7 +534,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       // MAX_LENGTH = 10; two values of 6 chars each = 12 total > 10
       const span = createMockOtlpSpan([
         { key: "attr.a", value: { stringValue: "aaaaaa" } }, // 6 chars, cumulative = 6 (fits)
-        { key: "attr.b", value: { stringValue: "bbbbbb" } }, // 6 chars, cumulative would be 12 (skipped)
+        { key: "attr.b", value: { stringValue: "bbbbbb" } }, // 6 chars; cumulative 12 (skipped)
       ]);
 
       await maxLengthService.redactSpan(span, null, "STRICT");

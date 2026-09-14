@@ -46,13 +46,8 @@ export type DataPrivacyOrganizationDirectory = Readonly<{
 }>;
 
 /**
- * The organization lineage a privacy rule is placed and named against.
- *
- * Four other verticals' rows — organizations, departments, teams and projects —
- * read for one purpose: to say which organization owns a scope target and what
- * a scope is called. That is why they arrive as members rather than as
- * those verticals' services: this package must not gain a write graph, an
- * authz service and three identity ports to print a team's name beside a rule.
+ * Organization lineage for privacy rules: read-only members for naming scope
+ * targets, avoiding write graphs or authz services.
  */
 export interface DataPrivacyDirectoryReader {
   /** The project the settings page was opened from, or null when there is none. */

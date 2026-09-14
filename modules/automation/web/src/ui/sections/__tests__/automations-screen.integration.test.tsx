@@ -1,22 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The two overlays this screen opens, and the names it opens them by.
- *
- * IT USED TO OWN TWO QUERY KEYS AND RENDER BOTH EDITORS INLINE — `?automation=`
- * and `?viewAutomation=` — because the drawer registry is composition a
- * feature-web package may not reach. The conclusion did not follow: the
- * registry is addressed by a QUERY STRING and the host already writes those, so
- * the screen names the drawer and the host spells `?drawer.open=`. That is what
- * puts a row click on the same address every alert email, the REST
- * `platformUrl`, the trace explorer's Automate button and Langy's relay links
- * already mint, instead of on a second one only this page understood.
- *
- * SO WHAT IS PINNED HERE MOVED WITH IT. The address vocabulary is the composing
- * application's and its own suite pins it; what this file states is the half
- * that is the screen's: which overlay each affordance asks for, with which
- * automation, and that the screen no longer mounts either editor itself — a
- * screen that kept rendering one would put a second copy under the registry's.
+ * The screen delegates overlay management to a drawer registry, enabling
+ * consistent address vocabulary across the application.
  */
 
 import { cleanup, screen } from "@testing-library/react";

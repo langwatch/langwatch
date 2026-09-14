@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- * The retention-policy contract, stated once and run against both backends:
- * the memory twin always, and the Postgres one when a test database is named
- * at `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
- *
- * The policy table is keyed by organization, so the isolation case here is the
- * organization: a policy another organization wrote is never answered with.
- * @see specs/data-retention-service.feature
+ * Contract test run against both memory and Postgres backends; isolation is
+ * per-organization. See {@link specs/data-retention-service.feature}
  */
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import {

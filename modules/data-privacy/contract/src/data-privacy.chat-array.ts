@@ -3,15 +3,9 @@ function isChatMessage(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Remove the given message roles (and optionally assistant `tool_calls`) from a
- * conversation serialized as JSON. Handles the LangWatch
- * `{ type: "chat_messages", value: [...] }` wrapper and a bare messages array.
- * Returns the rewritten JSON and how many messages/tool-call sets were removed,
- * or `null` when the value is not a conversation (left untouched, never thrown).
- *
- * Pure, so it lives in the contract: the ingestion drop policy and the trace
- * read mappers both strip through it, and neither side needs the other's
- * server package to do so.
+ * Remove message roles (and optionally assistant tool_calls) from JSON chat
+ * conversations. Returns rewritten JSON and removal count, or null if not a
+ * conversation. Pure contract function used by ingestion and read paths.
  */
 export function stripRolesFromChatArrayJson(
   json: string,

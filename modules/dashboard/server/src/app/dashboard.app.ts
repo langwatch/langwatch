@@ -80,13 +80,8 @@ type DashboardSetup = FeatureSetup<
 >;
 
 /**
- * Thin calls onto `AnalyticsApi`: the Workbench's rollout gate and its RBAC
- * plus content-category protections are Analytics' own business logic
- * (coordinator ruling, 2026-09-13 evening) — Dashboard only adapts its own
- * `actorId` naming to the peer's `userId` and forwards. A thrown protection
- * check propagates exactly as `AnalyticsApi` throws it: that surface already
- * fails closed (a denied read never degrades to "allowed"), so no second
- * catch is added here to invert it.
+ * Thin adapter to AnalyticsApi: forwards rollout gate and RBAC checks while
+ * adapting actorId naming to userId (AnalyticsApi owns protection logic).
  */
 class AnalyticsWorkbenchAccess implements WorkbenchAccess {
   constructor(private readonly analytics: AnalyticsApiContract) {}

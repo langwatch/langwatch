@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The unsubscribe landing: what a recipient is offered, and what each choice
- * silences.
- *
- * THE PLATFORM PAGE HAD NO SUITE. Nothing mounted it, so nothing asserted the
- * three decisions it makes — that a link with no token or a token the server
- * refuses is a dead end rather than a spinner, that the per-notification choice
- * is only offered when the link names a notification, and that each button
- * confirms the scope it says it does. The last is the one that matters: getting
- * it backwards silences everything from a project for somebody who asked to
- * stop one alert.
- *
+ * The unsubscribe landing: link validation, notification-specific unsubscribe,
+ * and project-wide unsubscribe choice boundaries.
  * Spec: specs/automations/unsubscribe-landing.feature
  */
 

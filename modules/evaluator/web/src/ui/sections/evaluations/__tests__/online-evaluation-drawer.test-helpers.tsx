@@ -1,11 +1,7 @@
 /**
- * Shared test helpers for OnlineEvaluationDrawer test files.
- *
- * Contains mock data, mutable state holders, mock function references,
- * and factory functions for vi.mock() calls.
- *
- * IMPORTANT: vi.mock() must be called in each test file (vitest hoists them per-file).
- * The factory functions here are called FROM those vi.mock() calls.
+ * Shared test helpers for OnlineEvaluationDrawer tests. Contains mock data, mutable state,
+ * and factory functions. Note: vi.mock() must be called per-file (vitest hoists them), and
+ * factory functions here are called from those vi.mock() calls.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type React from "react";
@@ -83,7 +79,7 @@ export const mockEvaluators = [
     ],
     outputFields: standardOutputFields,
   },
-  // Evaluator with only optional fields (langevals/llm_boolean has requiredFields: [], optionalFields: ["input", "output", "contexts"])
+  // Evaluator with only optional fields
   {
     id: "evaluator-4",
     name: "LLM Boolean Judge",

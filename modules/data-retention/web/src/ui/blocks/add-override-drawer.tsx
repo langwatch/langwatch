@@ -199,15 +199,8 @@ export function AddOverrideDrawer({
     setCustomAmount("");
     setCustomUnit("weeks");
     setApplyToExisting(false);
-    // Initialize when the drawer opens, the edit target changes, or a plan/admin
-    // flag resolves. `isEnterprise` and `isPlatformAdmin` both start false while
-    // their queries load and flip once when they settle; without them here,
-    // opening the drawer on a cold load would strand a value the not-yet-loaded
-    // tier can't represent in the read-only "legacy" state (an enterprise value
-    // under paid, or a keep-forever value under non-admin). Both are stable
-    // booleans, so this re-inits at most once each. Deliberately NOT keyed on
-    // currentProjectId / available.projects reference churn — a background
-    // snapshot refetch would wipe in-progress edits.
+    // Reinit when drawer opens, edit target changes, or plan/admin flags settle.
+    // Exclude currentProjectId and available.projects to avoid wiping edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editTarget, isEnterprise, isPlatformAdmin]);
 

@@ -1,26 +1,6 @@
 /**
- * The frame the automations screen renders inside, and the four tabs that make
- * four URLs one screen.
- *
- * `platform/app` wrapped this page in `SectionNavigationLayout`, which wrapped
- * `DashboardLayout` — the whole application chrome — and passed it the four
- * navigation items inline. Two of those three layers are application chrome a
- * feature-web package may not import, and neither is this family's: chrome
- * belongs to the route tree, and this page is a child of a layout route the
- * composing application still serves.
- *
- * So what moved is the middle layer only — the section rail and the content
- * column — harvested the same way `@langwatch/gateway-web`'s
- * `AiGatewayLayout` was, and the tab list travels with it because the four
- * addresses are this screen's own. The rail is built from the project slug the
- * host resolves, so a reader with no project yet gets links that go nowhere
- * rather than links into another project.
- *
- * KNOWN GAP, stated the same way the gateway layout states it: the outer
- * `DashboardLayout` does not come with it. An automations page served from
- * `apps/ui` renders this frame and its content, and the application header,
- * sidebar and org-scope chip are not above it until a chrome layout route
- * exists in the route table. That route is a structural slice of its own.
+ * The automations screen frame and tab navigation (overview, automations,
+ * alerts, schedules). Extracted to be a composable feature-web section layout.
  */
 
 import { Box, Container, HStack, Spacer, Stack, Text } from "@chakra-ui/react";

@@ -205,7 +205,7 @@ export function EvaluatorMappingsSection({
       <VariablesSection
         title="Variables"
         variables={variables}
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op - evaluator inputs are read-only
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: evaluator inputs are read-only
         onChange={() => {}}
         showMappings={true}
         availableSources={availableSources}

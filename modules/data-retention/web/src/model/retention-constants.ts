@@ -41,16 +41,9 @@ export const retentionUnitCollection = createListCollection({
 
 export type RetentionPreset = { value: string; label: string; days: number };
 
-// Presets round UP relative to the human label so the selection covers the
-// full period plus a small buffer (e.g. "1 year" = 371d ≈ 53wk, "1 month" =
-// 35d = 5wk). Avoids underselling: a user who picks "1 year" expects at least a
-// full year, and "1 month" covers a month plus a recovery buffer.
-//
-// Which list a customer sees is plan-gated (see the plan-gated-menu ADR):
-//   - PAID (non-enterprise SaaS): the fixed pair {35, 63}, no custom.
-//   - ENTERPRISE / self-hosted:   the full list below + a custom field (≥49d).
-// The server re-enforces this at the mutation boundary
-// (`assertPlanAllowsRetentionValue`); these lists only shape the UI.
+// Presets round up to cover the full period plus buffer. Plan-gated by tier:
+// PAID → {35, 63}; ENTERPRISE → full list + custom. Server re-enforces at
+// the mutation boundary; these lists only shape the UI.
 
 /** Paid (non-enterprise) menu: "~1 month" / "~2 months" only. */
 export const PAID_RETENTION_PRESETS: RetentionPreset[] = [
@@ -88,14 +81,8 @@ export function legacyLabel(days: number): string {
 export type RetentionMenuItem = { value: string; label: string };
 
 /**
- * The exact option list the retention drawer shows, in order. Plan-gated:
- *   - legacy entry first, only when editing an out-of-menu stored value;
- *   - the tier's presets (paid → {35,63}; enterprise → full list);
- *   - keep-forever, platform admins only;
- *   - Custom…, enterprise / self-hosted only.
- * Pure so the gating is unit-testable without rendering the drawer. The server
- * (`assertPlanAllowsRetentionValue`) is the real enforcement; this only
- * shapes the UI.
+ * Builds the plan-gated retention menu (legacy, presets, keep-forever for
+ * admins, custom for enterprise). Pure function for unit-testability.
  */
 export function buildRetentionMenuItems({
   isEnterprise,

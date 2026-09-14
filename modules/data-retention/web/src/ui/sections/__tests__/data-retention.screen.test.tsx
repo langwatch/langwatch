@@ -1,15 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Retention policies, driven the way a reader drives them.
- *
- * `platform/app/src/pages/settings/data-retention.tsx` had no test of its own —
- * only the drawer, the dialogs and the menu underneath it did — so these are
- * new, and they pin the four things the move could plausibly have broken: the
- * plan gate, the scope filter's address, the fan-out that removes a scope, and
- * the failure path handing the raw error to the host.
- *
- * Spec: specs/data-retention/retention-policy-configuration.feature
+ * Tests retention policy configuration: plan gating, scope filtering, removal,
+ * and error handling. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

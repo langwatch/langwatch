@@ -1,17 +1,7 @@
 /**
- * The address a customer's own SDK should post to, as the usage snippets print
- * it.
- *
- * A NARROWED FAMILY-LOCAL COPY of `platform/app/src/components/code/langwatchEndpointEnv.ts`,
- * which the checks manual-integration panel and the studio's Publish dialog
- * also read. The narrowing is real: the platform module exports the bare
- * endpoint AND the `export LANGWATCH_ENDPOINT=…` line, and only the second is
- * printed here.
- *
- * `window.location` is read behind an injectable override, which is
- * `@langwatch/gateway-web`'s `docs-url` shape: a package may read the address
- * bar, and a test may not mutate jsdom's locked `location`, so the value it
- * would have read is a parameter with a browser default.
+ * The endpoint address for customer SDKs, printed in usage snippets. A narrowed copy
+ * of platform/app's langwatchEndpointEnv (exports the export line only). Location is
+ * injectable to support testing.
  */
 
 /** SaaS hostnames, where the SDK's own default is already correct. */

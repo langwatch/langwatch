@@ -663,17 +663,9 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
 });
 
 /**
- * A resolved policy's PII exceptions are honored wherever the NATIVE pass
- * runs (secrets, and every essential-level entity, including under strict —
- * see the block above and applyContentRedaction.unit.test.ts). They are NOT
- * honored for the strict-only entities (names, locations) that only the
- * analysis-service batch can detect: buildOptions() always selects
- * mainMethod: "presidio", and the Presidio batch call has no parameter for
- * exceptions in the first place (it returns pre-anonymized text, not
- * positioned findings a veto could apply to — unlike the Google DLP path,
- * see maskDlpFindings in piiCheck.ts). This is a documented, tested contract,
- * not a bug: the UI tooltip in data-privacy.tsx and the doc-comment on
- * lambdaAfterNative both call it out.
+ * PII exceptions are honored for native pass (secrets and essential entities)
+ * but not for strict-only entities (names, locations) detected by analysis
+ * service batch. Presidio has no exception parameter; documented contract.
  */
 describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
   function makeServiceWithRealBatch(policy: ResolvedDataPrivacy) {

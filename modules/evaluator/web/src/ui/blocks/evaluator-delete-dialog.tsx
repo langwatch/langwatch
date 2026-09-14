@@ -1,20 +1,7 @@
 /**
- * The confirmation that names what a delete takes with it.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/CascadeArchiveDialog.tsx`, which the agent list
- * drawer and the studio's workflow card also render, so the platform module
- * stays and deletes-only forbids repointing it.
- *
- * NARROWED TWICE OVER. The platform dialog is generic across three entity types
- * and four related lists; an evaluator's cascade produces exactly two —
- * `getRelatedEntities` answers a linked workflow and the online evaluations
- * built on it, and nothing else — so the entity-type switch and the evaluator
- * and agent lists did not travel.
- *
- * THE TYPED CONFIRMATION IS THE POINT AND IT IS KEPT. Deleting an evaluator
- * DELETES every online evaluation running on it, in production, with no undo on
- * this screen. The reader types the word before the button enables.
+ * A narrowed copy of platform/app's CascadeArchiveDialog, specialized for evaluators to
+ * show only evaluator-specific related entities (linked workflow and online evaluations).
+ * Requires typed confirmation because deletion is destructive with no undo.
  */
 
 import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";

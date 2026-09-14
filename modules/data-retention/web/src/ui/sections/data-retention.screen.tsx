@@ -1,28 +1,6 @@
 /**
- * Retention policies, as a reader configures them.
- *
- * `platform/app/src/pages/settings/data-retention.tsx`, moved whole. What
- * changed is only what a feature-web package may not own:
- *
- * - `SettingsLayout` does not travel. Chrome belongs to the route tree, and
- *   `apps/ui` mounts the harvested settings layout around this screen.
- * - `withPermissionGuard("project:view")` does not travel either; the frontend
- *   feature states the same policy in front of the same loader.
- * - The organization, the team, the project, the plan tier, the platform-admin
- *   flag, the address and both toasts are the host's.
- * - The scope filter reads and writes `?scope=` directly rather than mirroring
- *   it into component state. Every value the old hook could hold survives the
- *   round trip through the address, so the mirror only ever risked disagreeing
- *   with the URL.
- *
- * RECORDED COST: `UiFeedback` has two levels and `toaster` had four. The
- * amber "Saved 7 of 9 updates" line and the blue "Applying retention to existing
- * data…" line are both success-lane notices now. The words are unchanged and the
- * error toast beside the first is what still tells the reader something failed;
- * only the colour is gone. Widening the capability is a change to a port every
- * family shares, and a page move is not where that belongs.
- *
- * Spec: specs/data-retention/retention-policy-configuration.feature
+ * Retention policies configuration screen moved from platform/app. Scope filter
+ * reads the URL directly. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
 import {

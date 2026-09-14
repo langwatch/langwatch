@@ -1,12 +1,6 @@
 /**
- * The organization lineage behind the privacy settings page, over Prisma.
- *
- * Moved out of the application process: the reads, the orderings and the
- * archived-department rule are the ones the page has always been served. The
- * one change is that the project row is read ONCE — the application read it
- * twice, once for its lineage and again for its name on the personal-account
- * branch — because a second read of the same row by primary key answers the
- * same thing.
+ * Organization lineage repository over Prisma: moved from the application
+ * process, now reads the project row once instead of twice.
  */
 import type { DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

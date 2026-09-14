@@ -9,18 +9,8 @@ import {
 
 /**
  * Spec: modules/data-privacy/specs/span-content-drop.feature
- *
- * TWIN PIN, by literal. The application's copy is
- * `platform/app/src/server/data-privacy/dropKeyCatalog.ts` and both graphs
- * ingest, so the two must agree key for key. Reading the application's file
- * here would tie this suite to a path that is being deleted; writing the keys
- * out is what survives the move.
- *
- * A key MISSING from a list is the whole failure: the customer set the category
- * to `drop`, the key was never stripped, and the content is in ClickHouse.
- * Nothing about a stored span records which keys were considered, so a span
- * scanned against nine input keys and a span scanned against ten are the same
- * row.
+ * Twin pin with platform/app's dropKeyCatalog: both must agree key for key.
+ * A missing key means content escapes stripping and reaches ClickHouse.
  */
 
 describe("CONTENT_KEY_CATALOG", () => {

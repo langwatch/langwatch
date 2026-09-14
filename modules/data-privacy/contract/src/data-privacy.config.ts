@@ -2,19 +2,9 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The redaction pipeline's two engines and the switch that says whether its
- * verdict is enforced.
- *
- * Where Presidio answers is not here: it is the evaluator service's own
- * address, and the evaluation feature owns that variable so one deployment
- * cannot end up with two of them.
- *
- * `googleDlpDisabled` is carried as written rather than parsed at the leaf:
- * the platform application reads only the literal `true`, and a schema that
- * also accepted `1` would disable DLP in one process and leave it on in the
- * other. `credentials` is carried as written too, because invalid
- * service-account JSON degrades DLP to unavailable rather than failing a boot
- * that has nothing to do with it.
+ * Redaction pipeline config: DLP engines and enforcement switch. Some values
+ * (googleDlpDisabled, credentials) carried as written for consistency and
+ * graceful degradation.
  */
 export const dataPrivacyServerConfigDefinition = RuntimeConfig.define({
   googleApplicationCredentials: Config.optionalSecret({ env: "GOOGLE_APPLICATION_CREDENTIALS" }),

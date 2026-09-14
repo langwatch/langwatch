@@ -2,15 +2,9 @@ import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 import { evaluationPassed } from "./evaluation-status.ts";
 
 /**
- * Verdict-aware counts for a trace's evaluations (#6835).
- *
- * Three states must stay apart:
- *   - a verdict (processed pass/fail),
- *   - "ran and found nothing to judge" (skipped),
- *   - "the evaluator broke" (error).
- *
- * The messages-list tag previously counted skipped runs as passes and
- * errored runs as fails; both invent a verdict nobody produced.
+ * Verdict-aware counts for a trace's evaluations (#6835). Tracks three distinct states:
+ * verdict (pass/fail), skipped (nothing to evaluate), and error (evaluator crashed). The
+ * messages-list tag previously miscounted the latter two.
  */
 export interface EvaluationsTagSummary {
   /** Every evaluation reached a terminal status. */

@@ -1,16 +1,7 @@
 /**
- * Pins the generated Go evaluation snippet.
- *
- * The builder replaced a five-branch if-chain that pushed one data entry per
- * field in a hardcoded order. The order now falls out of the sample-value
- * map's key order and the membership test is a single concatenated list, so
- * these tests assert the two properties the if-chain gave for free: the
- * rendered order is fixed regardless of how the caller orders its fields, and
- * a field named by both lists renders once.
- *
- * The snippet is a whole Go program, so the assertions also cover the
- * import/usage pairing that keeps it compilable — Go rejects an unused import,
- * and `io` is only used on the non-guardrail branch.
+ * Pins the generated Go evaluation snippet. Verifies that field order is fixed (regardless
+ * of input order), duplicates render once, and import/usage pairs remain compilable (Go
+ * rejects unused imports).
  */
 import { describe, expect, it } from "vitest";
 
