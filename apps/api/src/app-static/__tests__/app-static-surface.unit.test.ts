@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ApiRawRequestSurface } from "../../api-http.listener.ts";
+import { ApiPreRoutingSurface } from "../../api-http.listener.ts";
 import {
   ApiStaticSurface,
-  CompositeApiRawSurface,
+  CompositeStaticSurface,
   normalizePathname,
   pathIsClaimedByTheApi,
   resolveClientDistDir,
@@ -133,7 +133,7 @@ describe("given a deployment stages the bundle somewhere", () => {
   });
 });
 
-class StubSurface extends ApiRawRequestSurface {
+class StubSurface extends ApiPreRoutingSurface {
   readonly served: string[] = [];
 
   constructor(
@@ -170,13 +170,13 @@ describe("given the listener offers one raw-surface hook", () => {
   describe("when only one surface is present", () => {
     it("hands back that surface rather than a wrapper", () => {
       const only = new StubSurface(() => true, "only");
-      expect(CompositeApiRawSurface.of([undefined, only])).toBe(only);
+      expect(CompositeStaticSurface.of([undefined, only])).toBe(only);
     });
   });
 
   describe("when no surface is present", () => {
     it("hands back nothing so the listener stays on its plain path", () => {
-      expect(CompositeApiRawSurface.of([undefined, undefined])).toBeUndefined();
+      expect(CompositeStaticSurface.of([undefined, undefined])).toBeUndefined();
     });
   });
 
@@ -184,7 +184,7 @@ describe("given the listener offers one raw-surface hook", () => {
     it("asks them in order, so the fallback never takes a claimed path", () => {
       const mcp = new StubSurface((pathname) => pathname.startsWith("/mcp"), "mcp");
       const fallback = new StubSurface(() => true, "fallback");
-      const composite = CompositeApiRawSurface.of([mcp, fallback])!;
+      const composite = CompositeStaticSurface.of([mcp, fallback])!;
 
       composite.handle({ url: "/mcp/session" } as IncomingMessage, stubResponse());
       composite.handle({ url: "/authorize" } as IncomingMessage, stubResponse());
@@ -196,7 +196,7 @@ describe("given the listener offers one raw-surface hook", () => {
     it("claims a path when any surface does", () => {
       const mcp = new StubSurface((pathname) => pathname.startsWith("/mcp"), "mcp");
       const spa = new StubSurface((pathname) => !pathname.startsWith("/api/"), "spa");
-      const composite = CompositeApiRawSurface.of([mcp, spa])!;
+      const composite = CompositeStaticSurface.of([mcp, spa])!;
 
       expect(composite.handles("/mcp/session")).toBe(true);
       expect(composite.handles("/authorize")).toBe(true);

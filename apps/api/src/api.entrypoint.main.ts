@@ -22,7 +22,7 @@ import { bootApiProcess } from "./app/api-production.composition.ts";
  */
 class ApiProductionComposition extends ApiRuntimeComposition {
   async compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcess> {
-    const { runtime, trpc } = await bootApiProcess({
+    const { runtime, trpc, staticSurface } = await bootApiProcess({
       config: options.config,
       secrets: options.secrets,
     });
@@ -38,6 +38,9 @@ class ApiProductionComposition extends ApiRuntimeComposition {
     const listener = ApiHttpListener.create({
       application,
       port: options.config.port,
+      // The built browser bundle, ahead of the Hono application and declining
+      // every address the families declare; see api-production.composition.ts.
+      ...(staticSurface ? { staticSurface } : {}),
     });
 
     return new (class extends ApiRuntimeProcess {

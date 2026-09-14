@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { ApiHttpListener, ApiRawRequestSurface } from "../api-http.listener.ts";
+import { ApiHttpListener, ApiPreRoutingSurface as ApiStaticSurface } from "../api-http.listener.ts";
 
-class PathClaimingSurface extends ApiRawRequestSurface {
+class PathClaimingSurface extends ApiStaticSurface {
   readonly seen: string[] = [];
 
   constructor(private readonly prefix: string) {
@@ -31,7 +31,7 @@ describe("given a listener with a raw surface in front of the application", () =
         host: "127.0.0.1",
         port: 0,
         drainGraceMs: 1,
-        rawSurface: surface,
+        staticSurface: surface,
       });
       const address = await listener.start();
 
@@ -54,7 +54,7 @@ describe("given a listener with a raw surface in front of the application", () =
         host: "127.0.0.1",
         port: 0,
         drainGraceMs: 1,
-        rawSurface: surface,
+        staticSurface: surface,
       });
       const address = await listener.start();
 
@@ -77,7 +77,7 @@ describe("given a listener with a raw surface in front of the application", () =
         host: "127.0.0.1",
         port: 0,
         drainGraceMs: 1,
-        rawSurface: surface,
+        staticSurface: surface,
       });
       const address = await listener.start();
 

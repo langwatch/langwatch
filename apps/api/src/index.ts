@@ -13,7 +13,7 @@ export {
 } from "./app/api-production.composition.ts";
 export {
   ApiHttpListener,
-  ApiRawRequestSurface,
+  ApiPreRoutingSurface,
   ApiUpgradeSurface,
   type ApiHttpListenerOptions,
   type ApiListenerAddress,

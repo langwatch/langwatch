@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { canonicalOtlpPath } from "@langwatch/otlp";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { resolvePublicAppConfig } from "@langwatch/config/public-app-config/projection";
-import { ApiRawRequestSurface } from "../api-http.listener.ts";
+import { ApiPreRoutingSurface } from "../api-http.listener.ts";
 import { isRootDiscoveryPath } from "../features/discovery/discovery-locations.ts";
 import { assetBaseOrigin, normalizeAssetBase } from "./app-static.asset-base.ts";
 import { serveStaticOrFallback } from "./app-static.handler.ts";
@@ -15,12 +15,13 @@ import { buildSecurityHeaders } from "./app-static.security-headers.ts";
  * The built browser bundle, served by the API process. ONE image serves both halves. `apps/ui`
  * is a Vite build, not a process: it emits `dist/client` and nothing runs it.
  */
-export class ApiStaticSurface extends ApiRawRequestSurface {
+export class ApiStaticSurface extends ApiPreRoutingSurface {
   private constructor(
     private readonly clientDistDir: string,
     private readonly publicConfig: PublicAppConfig,
     private readonly securityHeaders: Record<string, string>,
     private readonly assetBase: string,
+    private readonly mountedPaths: readonly string[],
   ) {
     super();
   }
@@ -36,17 +37,27 @@ export class ApiStaticSurface extends ApiRawRequestSurface {
     securityHeaders?: Record<string, string>;
     /** Normalized `LANGWATCH_ASSET_BASE`; "/" serves assets same-origin. */
     assetBase?: string;
+    /**
+     * Route patterns the mounted REST families declare, so this fallback declines the ones
+     * that sit outside `/api` — the hosted Model Context Protocol endpoint's `/mcp`, `/sse`
+     * and `/.well-known/oauth-*` among them. Supplied by the composition root from the real
+     * route table (see {@link mountedPathsOfRestFamilies}); a literal list here would drift
+     * the moment a family declared another root address.
+     */
+    mountedPaths?: readonly string[];
   }): ApiStaticSurface {
     return new ApiStaticSurface(
       options.clientDistDir,
       options.publicConfig,
       options.securityHeaders ?? {},
       options.assetBase ?? "/",
+      options.mountedPaths ?? [],
     );
   }
 
   handles(pathname: string): boolean {
-    return !pathIsClaimedByTheApi(pathname);
+    if (pathIsClaimedByTheApi(pathname)) return false;
+    return !this.mountedPaths.some((pattern) => declaredPathCovers(pattern, pathname));
   }
 
   handle(request: IncomingMessage, response: ServerResponse): void {
@@ -88,6 +99,54 @@ export function pathIsClaimedByTheApi(pathname: string): boolean {
 }
 
 /**
+ * Every route pattern the mounted REST families declare, read off the families themselves.
+ *
+ * The SPA fallback is asked before the Hono application (the listener's one raw hook), so a
+ * root-level family address the fallback does not decline is an address the fallback SHADOWS.
+ * Deriving the set from `Hono.routes` rather than restating it keeps that impossible: a family
+ * that gains an address gains the reservation with it.
+ *
+ * A bare `*` or `/*` is dropped. Hono records per-family middleware as a route, and a pattern
+ * that matches every path can only be middleware — no family serves the whole origin, and
+ * honouring one would hand the entire browser application to the API.
+ */
+export function mountedPathsOfRestFamilies(
+  families: readonly { readonly routes: readonly { readonly path: string }[] }[],
+): readonly string[] {
+  const patterns = new Set<string>();
+  for (const family of families) {
+    for (const route of family.routes) {
+      if (route.path === "*" || route.path === "/*") continue;
+      patterns.add(route.path);
+    }
+  }
+  return [...patterns];
+}
+
+/**
+ * True when a declared route pattern covers this pathname, in Hono's own terms: `:param`
+ * stands for exactly one segment and `*` for the rest of the path.
+ */
+export function declaredPathCovers(pattern: string, pathname: string): boolean {
+  const requested = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  const patternSegments = pattern.split("/");
+  const pathSegments = requested.split("/");
+
+  for (const [index, segment] of patternSegments.entries()) {
+    if (segment === "*") return true;
+    const actual = pathSegments[index];
+    if (actual === undefined) return false;
+    if (segment.startsWith(":")) {
+      if (actual === "") return false;
+      continue;
+    }
+    if (segment !== actual) return false;
+  }
+
+  return patternSegments.length === pathSegments.length;
+}
+
+/**
  * Where the built browser bundle sits relative to this module. `apps/ui` builds to
  * `apps/ui/dist/client`, and the image copies both apps side by side under `/app/apps`, so the
  * artifact is a fixed relative walk from `apps/api/src/app-static/`.
@@ -107,6 +166,8 @@ export function tryCreateApiStaticSurface(options: {
   /** The process environment, read once by the composition root and passed in. */
   environment: NodeJS.ProcessEnv;
   report: (message: string, context: { clientDistDir: string }) => void;
+  /** The mounted families' own route patterns; see {@link mountedPathsOfRestFamilies}. */
+  mountedPaths?: readonly string[];
 }): ApiStaticSurface | undefined {
   const { environment } = options;
   const clientDistDir = resolveClientDistDir(environment);
@@ -131,6 +192,7 @@ export function tryCreateApiStaticSurface(options: {
     }),
     publicConfig: resolvePublicAppConfig(environment),
     assetBase,
+    mountedPaths: options.mountedPaths ?? [],
   });
 }
 
@@ -139,21 +201,21 @@ export function tryCreateApiStaticSurface(options: {
  * specific surfaces are asked first and the SPA fallback, which claims everything left, is
  * asked last.
  */
-export class CompositeApiRawSurface extends ApiRawRequestSurface {
-  private constructor(private readonly surfaces: readonly ApiRawRequestSurface[]) {
+export class CompositeStaticSurface extends ApiPreRoutingSurface {
+  private constructor(private readonly surfaces: readonly ApiStaticSurface[]) {
     super();
   }
 
   /** `undefined` when nothing was supplied, so the listener stays on its plain path. */
   static of(
-    surfaces: readonly (ApiRawRequestSurface | undefined)[],
-  ): ApiRawRequestSurface | undefined {
+    surfaces: readonly (ApiStaticSurface | undefined)[],
+  ): ApiStaticSurface | undefined {
     const present = surfaces.filter(
-      (surface): surface is ApiRawRequestSurface => surface !== undefined,
+      (surface): surface is ApiStaticSurface => surface !== undefined,
     );
     if (present.length === 0) return undefined;
     if (present.length === 1) return present[0];
-    return new CompositeApiRawSurface(present);
+    return new CompositeStaticSurface(present);
   }
 
   handles(pathname: string): boolean {

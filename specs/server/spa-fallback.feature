@@ -43,6 +43,7 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
   # The shell is served with the runtime asset-base resolver injected — see
   # cdn-asset-base.feature — so it is the index.html document plus that bootstrap,
   # not a byte-for-byte copy.
+  @integration
   Scenario: Unknown non-asset route falls back to index.html for SPA routing
     When a client requests /projects/foo/traces
     Then the response status is 200

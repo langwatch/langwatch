@@ -16,7 +16,7 @@ const CLOSE_PHASE_SLACK_MS = 2_000;
  * needed for the hosted MCP endpoint (SSE holds the socket for the
  * session's life). `handles` is asked first so a "no" costs one compare.
  */
-export abstract class ApiRawRequestSurface {
+export abstract class ApiPreRoutingSurface {
   abstract handles(pathname: string): boolean;
   abstract handle(request: IncomingMessage, response: ServerResponse): void;
 }
@@ -42,8 +42,8 @@ export type ApiHttpListenerOptions = Readonly<{
    * Model Context Protocol sessions are the live registrant.
    */
   closeSessions?: (() => Promise<void>) | undefined;
-  /** Served before the Hono application; see {@link ApiRawRequestSurface}. */
-  rawSurface?: ApiRawRequestSurface | undefined;
+  /** Served before the Hono application; see {@link ApiPreRoutingSurface}. */
+  staticSurface?: ApiPreRoutingSurface | undefined;
   /** Attached to the server's own `upgrade` event; see {@link ApiUpgradeSurface}. */
   upgrades?: ApiUpgradeSurface | undefined;
 }>;
@@ -65,16 +65,16 @@ export class ApiHttpListener {
     const listener = getRequestListener(options.application.fetch, {
       overrideGlobalObjects: false,
     });
-    const rawSurface = options.rawSurface;
+    const staticSurface = options.staticSurface;
     this.server = createServer(
-      rawSurface
+      staticSurface
         ? (request, response) => {
             // The pathname alone, because that is all the surface is asked
             // about. Parsing against a fixed base rather than the Host header
             // keeps a caller-supplied Host out of the routing decision.
             const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
-            if (rawSurface.handles(pathname)) {
-              rawSurface.handle(request, response);
+            if (staticSurface.handles(pathname)) {
+              staticSurface.handle(request, response);
               return;
             }
             listener(request, response);
