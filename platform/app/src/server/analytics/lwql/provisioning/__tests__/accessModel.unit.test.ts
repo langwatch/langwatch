@@ -44,6 +44,8 @@ const LIMITS = {
   maxConcurrentQueriesForUser: 5,
   maxRowsToRead: 222_000,
   maxBytesToRead: 333_000,
+  maxResultRows: 444_000,
+  maxResultBytes: 555_000,
 };
 
 describe("given the LangWatchQL settings profile statement", () => {
@@ -57,6 +59,9 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["rows scanned", "max_rows_to_read = 222000 CONST"],
       ["bytes scanned", "max_bytes_to_read = 333000 CONST"],
       ["scan overflow", "read_overflow_mode = 'throw' CONST"],
+      ["rows returned", "max_result_rows = 444000 CONST"],
+      ["bytes returned", "max_result_bytes = 555000 CONST"],
+      ["result overflow", "result_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
       expect(
         lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS }),

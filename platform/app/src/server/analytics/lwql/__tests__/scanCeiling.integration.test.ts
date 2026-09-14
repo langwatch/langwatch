@@ -61,6 +61,17 @@ const TINY_BYTE_CEILING = 1;
 const SCANNING_QUERY = (database: string) =>
   `SELECT TenantId, TraceId, Model FROM ${database}.traces ORDER BY TraceId`;
 
+/**
+ * Above {@link TINY_RESULT_ROW_CEILING} but not a static value the validator
+ * could refuse — a `LIMIT` written as a bound parameter, exactly the shape
+ * that evades the TypeScript-side `LIMIT_TOO_HIGH` check.
+ */
+const PARAMETERISED_LIMIT_QUERY = (database: string) =>
+  `SELECT TenantId, TraceId, Model FROM ${database}.traces LIMIT {n:UInt64}`;
+
+/** Small enough that the seeded fixture clears it, cheaply. */
+const TINY_RESULT_ROW_CEILING = 1;
+
 describe("given the LangWatchQL settings profile's scan ceilings", () => {
   let harness: LangWatchQLClickHouseHarness;
   let executor: LangWatchQLExecutor;
@@ -94,9 +105,11 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
     });
 
   /** The `code` of whatever the executor threw, or why there is none. */
-  const codeOfFailure = async (): Promise<unknown> => {
+  const codeOfFailure = async (
+    run: () => Promise<unknown> = runLangWatchQLQuery,
+  ): Promise<unknown> => {
     try {
-      await runLangWatchQLQuery();
+      await run();
     } catch (error) {
       return (error as { code?: unknown }).code;
     }
@@ -174,6 +187,65 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
       });
 
       expect(await codeOfFailure()).toBe("query_scan_limit_exceeded");
+    });
+  });
+
+  /**
+   * @scenario "A parameterised LIMIT cannot outrun the server-side ceiling"
+   *
+   * The validator's `LIMIT_TOO_HIGH` check only reads a static integer
+   * literal — a `LIMIT` supplied as a bound parameter is not a value it can
+   * see, so it passes both that refusal and the append decision. This is the
+   * server-side backstop for exactly that gap: `max_result_rows` /
+   * `max_result_bytes` under `result_overflow_mode = 'throw'`, pinned `CONST`
+   * by the same settings profile as the scan ceilings above.
+   */
+  describe("when a query's LIMIT is a bound parameter above the result ceiling", () => {
+    afterAll(async () => {
+      await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+    });
+
+    it("answers the query when the ceiling is not tightened", async () => {
+      await provisionWith(DEFAULT_LWQL_RESOURCE_LIMITS);
+      const control = await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+
+      const result = await executor.execute({
+        sql: PARAMETERISED_LIMIT_QUERY(database),
+        parameters: { n: control.tenantA },
+        tenantCapability: harness.tenantA.keyHash,
+      });
+
+      expect(result.rows.length).toBe(control.tenantA);
+      expect(
+        control.tenantA,
+        "the fixture holds no more rows than the tightened ceiling, so the rejection below would prove nothing",
+      ).toBeGreaterThan(TINY_RESULT_ROW_CEILING);
+    });
+
+    it("fails with lwql_result_too_large rather than a raw driver error", async () => {
+      await provisionWith({
+        ...DEFAULT_LWQL_RESOURCE_LIMITS,
+        maxResultRows: TINY_RESULT_ROW_CEILING,
+      });
+      const control = await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+
+      expect(
+        await codeOfFailure(() =>
+          executor.execute({
+            sql: PARAMETERISED_LIMIT_QUERY(database),
+            parameters: { n: control.tenantA },
+            tenantCapability: harness.tenantA.keyHash,
+          }),
+        ),
+      ).toBe("lwql_result_too_large");
     });
   });
 });

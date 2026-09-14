@@ -204,6 +204,13 @@ export class LangWatchQLResultTooLargeError extends HandledError {
   constructor(
     /** The byte ceiling the result exceeded — the caller's target to get under. */
     maxResultBytes: number,
+    /**
+     * The raw ClickHouse error, present when this was raised from the
+     * server's own `max_result_rows` / `max_result_bytes` backstop
+     * (TOO_MANY_ROWS_OR_BYTES) rather than the post-fetch byte check — carried
+     * for the operator's logs and never relayed to the caller.
+     */
+    options: { reasons?: readonly Error[] } = {},
   ) {
     super(
       "lwql_result_too_large",
@@ -215,6 +222,7 @@ export class LangWatchQLResultTooLargeError extends HandledError {
         // overshot to decide how much to narrow the query by.
         meta: { maxResultBytes },
         ...remediation("lwql_result_too_large"),
+        ...options,
       },
     );
     this.name = "LangWatchQLResultTooLargeError";

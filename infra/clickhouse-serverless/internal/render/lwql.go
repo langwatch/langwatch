@@ -285,6 +285,16 @@ func lwqlRestrictedProfile() lwqlProfile {
 		MaxRowsToRead:               1_000_000_000,
 		MaxBytesToRead:              10_000_000_000,
 		ReadOverflowMode:            "throw",
+		// Backstop for the row cap the app's TypeScript validator and service
+		// already enforce: a static LIMIT above 10,000 is refused there and a
+		// bare statement gets it appended, but LIMIT {n:UInt64} (a bound
+		// parameter) is not a value that check can read. Pinning the same
+		// ceiling here means such a query still cannot return more rows/bytes
+		// than the cap — mirrors LWQL_MAX_RESULT_ROWS / LWQL_MAX_RESULT_BYTES
+		// in the app repo's limits.ts.
+		MaxResultRows:      10_000,
+		MaxResultBytes:     8_000_000,
+		ResultOverflowMode: "throw",
 		Constraints: lwqlConstraints{
 			CustomAPIKeyHash:            lwqlConstraint{ChangeableInReadonly: &empty},
 			MaxExecutionTime:            constEmpty,
@@ -294,6 +304,9 @@ func lwqlRestrictedProfile() lwqlProfile {
 			MaxRowsToRead:               constEmpty,
 			MaxBytesToRead:              constEmpty,
 			ReadOverflowMode:            constEmpty,
+			MaxResultRows:               constEmpty,
+			MaxResultBytes:              constEmpty,
+			ResultOverflowMode:          constEmpty,
 		},
 	}
 }
@@ -309,6 +322,9 @@ type lwqlProfile struct {
 	MaxRowsToRead               int64           `yaml:"max_rows_to_read"`
 	MaxBytesToRead              int64           `yaml:"max_bytes_to_read"`
 	ReadOverflowMode            string          `yaml:"read_overflow_mode"`
+	MaxResultRows               int64           `yaml:"max_result_rows"`
+	MaxResultBytes              int64           `yaml:"max_result_bytes"`
+	ResultOverflowMode          string          `yaml:"result_overflow_mode"`
 	Constraints                 lwqlConstraints `yaml:"constraints"`
 }
 
@@ -323,6 +339,9 @@ type lwqlConstraints struct {
 	MaxRowsToRead               lwqlConstraint `yaml:"max_rows_to_read"`
 	MaxBytesToRead              lwqlConstraint `yaml:"max_bytes_to_read"`
 	ReadOverflowMode            lwqlConstraint `yaml:"read_overflow_mode"`
+	MaxResultRows               lwqlConstraint `yaml:"max_result_rows"`
+	MaxResultBytes              lwqlConstraint `yaml:"max_result_bytes"`
+	ResultOverflowMode          lwqlConstraint `yaml:"result_overflow_mode"`
 }
 
 // lwqlConstraint carries exactly one of const / changeable_in_readonly. The

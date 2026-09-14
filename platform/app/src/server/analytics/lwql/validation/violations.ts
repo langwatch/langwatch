@@ -63,6 +63,15 @@ export const LWQL_VIOLATION_CODES = [
    * violation (`maxRows`, `hint`).
    */
   "LIMIT_TOO_HIGH",
+  /**
+   * A `UNION` branch names no `LIMIT` of its own.
+   *
+   * Each branch of a `UNION` runs and returns independently, so a default
+   * `LIMIT` appended once to the whole statement cannot bound a branch that
+   * lacks one — the append is refused for any statement with more than one
+   * top-level branch, and every branch must name its own bounded `LIMIT`.
+   */
+  "LIMIT_REQUIRED_PER_BRANCH",
   /** Subqueries, CTEs, or expressions nested past the allowed depth. */
   "NESTING_TOO_DEEP",
   /** The default-deny fallthrough: syntax the validator does not recognise. */

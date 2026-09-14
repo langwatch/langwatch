@@ -84,6 +84,7 @@ import {
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
+import type { SqlSourcePosition } from "./validation/parser";
 import { lwqlValidationError } from "./validation/errors";
 import {
   type AcceptedLangWatchQL,
@@ -179,13 +180,67 @@ function resolveRunGranularityOrRefuseUnfilled({
  * A trailing `;` is stripped and the clause goes on its own line, so it is
  * neither swallowed by a trailing line comment nor turned into a second
  * statement. This is the one edit this API makes to a submitted statement: the
- * validator decides when it applies (`appendRowLimit`, only when nothing
- * top-level already pages) and refuses a too-high explicit `LIMIT` before this
- * runs.
+ * validator decides when it applies (`appendRowLimit`, only for a single
+ * top-level `SELECT` naming no `LIMIT`) and refuses a too-high explicit
+ * `LIMIT` before this runs.
+ *
+ * `beforeOffset`, when given, is the position of that statement's own
+ * `OFFSET` (`SELECT … OFFSET 5` with no `LIMIT`) — ClickHouse only accepts
+ * `LIMIT n OFFSET m` in that order, so the default is inserted immediately
+ * before the `OFFSET` keyword instead of appended after it, which would be a
+ * syntax error.
  */
-export function appendDefaultRowLimit(sql: string, maxRows: number): string {
+export function appendDefaultRowLimit(
+  sql: string,
+  maxRows: number,
+  beforeOffset?: SqlSourcePosition,
+): string {
+  if (beforeOffset) {
+    // The AST position names the OFFSET clause's *value* (its literal or bound
+    // parameter), not the `OFFSET` keyword itself, which the parser gives no
+    // node for. The keyword always sits immediately before that value, so the
+    // insertion point is the nearest `OFFSET` before it — found by search
+    // rather than assumed adjacent, since arbitrary whitespace or a comment
+    // may separate the two.
+    const valueAt = charIndexOfPosition(sql, beforeOffset);
+    const keywordAt = lastOffsetKeywordBefore(sql, valueAt);
+    if (keywordAt !== null) {
+      return `${sql.slice(0, keywordAt)}LIMIT ${maxRows} ${sql.slice(keywordAt)}`;
+    }
+  }
   const trimmed = sql.replace(/;\s*$/u, "").replace(/\s+$/u, "");
   return `${trimmed}\nLIMIT ${maxRows}`;
+}
+
+/**
+ * Converts a parser's 1-based `{ line, column }` into a character index into
+ * `sql`, so {@link appendDefaultRowLimit} can splice text at an exact AST
+ * position instead of guessing at a keyword's location with a regular
+ * expression, which a string literal or comment containing the word `OFFSET`
+ * could mislead.
+ */
+function charIndexOfPosition(
+  sql: string,
+  position: SqlSourcePosition,
+): number {
+  const lines = sql.split("\n");
+  let index = 0;
+  for (let i = 0; i < position.line - 1; i++) {
+    index += (lines[i]?.length ?? 0) + 1;
+  }
+  return index + (position.column - 1);
+}
+
+/** The start of the last `OFFSET` keyword before `before`, or `null` if none is found. */
+function lastOffsetKeywordBefore(sql: string, before: number): number | null {
+  const pattern = /\bOFFSET\b/gi;
+  let match: RegExpExecArray | null;
+  let found: number | null = null;
+  while ((match = pattern.exec(sql)) !== null) {
+    if (match.index >= before) break;
+    found = match.index;
+  }
+  return found;
 }
 
 /**
@@ -635,7 +690,11 @@ export class LangWatchQLService {
       // appended when the caller named none, so an unbounded query is capped
       // rather than streamed. A statement that already pages is sent verbatim.
       sql: validation.appendRowLimit
-        ? appendDefaultRowLimit(sql, this.limits.maxRows)
+        ? appendDefaultRowLimit(
+            sql,
+            this.limits.maxRows,
+            validation.appendRowLimitBeforeOffset,
+          )
         : sql,
       ...(Object.keys(executionParameters).length > 0
         ? { parameters: executionParameters }

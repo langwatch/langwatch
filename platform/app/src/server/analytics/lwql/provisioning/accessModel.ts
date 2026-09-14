@@ -247,6 +247,16 @@ export function lwqlKeyMapTableStatement({
  * The tenant capability is the single `CHANGEABLE_IN_READONLY` setting, and its
  * default of `''` is what makes an absent context read zero rows instead of all
  * rows. Everything else is `CONST`.
+ *
+ * `max_result_rows` / `max_result_bytes` (with `result_overflow_mode =
+ * 'throw'`) are the backstop for the row cap the validator and service already
+ * enforce in TypeScript — see {@link LangWatchQLResourceLimits.maxResultRows}.
+ * A `LIMIT` written as a bound parameter (`LIMIT {n:UInt64}`) is not a value
+ * the validator can read, so it passes both the append decision and the
+ * `LIMIT_TOO_HIGH` refusal. Pinning the same ceiling `CONST` server-side means
+ * such a query still cannot return more than the cap — it fails with
+ * TOO_MANY_ROWS_OR_BYTES (396) instead, mapped to `lwql_result_too_large` by
+ * `isClickHouseResultTooLargeError` in the executor, never surfaced raw.
  */
 export function lwqlSettingsProfileStatement({
   names,
@@ -266,7 +276,10 @@ export function lwqlSettingsProfileStatement({
     `           max_concurrent_queries_for_user = ${limits.maxConcurrentQueriesForUser} CONST,\n` +
     `           max_rows_to_read = ${limits.maxRowsToRead} CONST,\n` +
     `           max_bytes_to_read = ${limits.maxBytesToRead} CONST,\n` +
-    `           read_overflow_mode = 'throw' CONST`
+    `           read_overflow_mode = 'throw' CONST,\n` +
+    `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
+    `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
+    `           result_overflow_mode = 'throw' CONST`
   );
 }
 

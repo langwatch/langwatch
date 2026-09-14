@@ -204,14 +204,26 @@ export interface AcceptedLangWatchQL {
   /**
    * Whether the service should append the default `LIMIT` before executing.
    *
-   * `true` when no top-level `SELECT` names a `LIMIT` or an `OFFSET` of its own,
-   * so the statement is otherwise unbounded and the service caps it at
-   * {@link LWQL_MAX_RESULT_ROWS}. A statement that already pages — any top-level
-   * `LIMIT`/`OFFSET` — is left exactly as written. The append is the one edit
-   * this API makes to a submitted statement; a too-high `LIMIT` is refused
-   * before it gets here (`LIMIT_TOO_HIGH`).
+   * `true` for a single top-level `SELECT` that names no `LIMIT` of its own —
+   * an `OFFSET` alone does not count as bounding, since `OFFSET 5` with no
+   * `LIMIT` still returns every remaining row. Always `false` for a `UNION`:
+   * each branch runs and returns independently, so a `LIMIT` appended once to
+   * the whole statement cannot bound a branch that lacks one — every branch of
+   * an accepted `UNION` already names its own bounded `LIMIT`, or the
+   * statement was refused (`LIMIT_REQUIRED_PER_BRANCH`). A too-high `LIMIT` is
+   * refused before it gets here (`LIMIT_TOO_HIGH`).
    */
   readonly appendRowLimit: boolean;
+  /**
+   * Where the appended default `LIMIT` must be inserted, when the statement
+   * this bounds also names an `OFFSET`.
+   *
+   * ClickHouse only accepts `LIMIT n OFFSET m` in that order, so a caller who
+   * wrote `SELECT … OFFSET 5` with no `LIMIT` needs the default inserted
+   * before its `OFFSET`, not appended after it. Present only alongside
+   * `appendRowLimit: true`, and only when that statement also has an `OFFSET`.
+   */
+  readonly appendRowLimitBeforeOffset?: SqlSourcePosition;
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -288,12 +300,21 @@ interface Frame {
 
 /** What a top-level `SELECT` declared about how many rows it returns. */
 interface TopLevelLimit {
-  /** Whether it named a `LIMIT` or an `OFFSET` at all — if so, it is left as written. */
-  readonly hasClause: boolean;
+  /**
+   * Whether it named its own `LIMIT` — the only clause that bounds a row
+   * count. `OFFSET` alone does not: `SELECT … OFFSET 5` with no `LIMIT` is
+   * still unbounded, so `OFFSET` is tracked separately below rather than
+   * folded into this flag.
+   */
+  readonly hasLimit: boolean;
+  /** Whether it named an `OFFSET`, so the default `LIMIT` is inserted before it, not after. */
+  readonly hasOffset: boolean;
   /** The `LIMIT` row count when it is a plain non-negative integer literal, else `null`. */
   readonly staticRows: number | null;
   /** Where the `LIMIT` sits, for the refusal that names a too-high one. */
   readonly at?: SqlSourcePosition;
+  /** Where the `OFFSET` sits, so an appended default `LIMIT` can be inserted before it. */
+  readonly offsetAt?: SqlSourcePosition;
 }
 
 /** Everything the walk accumulates. */
@@ -410,6 +431,9 @@ const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
   LIMIT_TOO_HIGH: `Lower the LIMIT to ${LWQL_MAX_RESULT_ROWS.toLocaleString(
     "en-US",
   )} rows or fewer, and page the rest with LIMIT/OFFSET and an ORDER BY.`,
+  LIMIT_REQUIRED_PER_BRANCH: `Add a LIMIT of ${LWQL_MAX_RESULT_ROWS.toLocaleString(
+    "en-US",
+  )} rows or fewer to every branch of the UNION.`,
   GATED_COLUMN:
     "Remove the field, or use one of the columns named in this violation's availableColumns.",
   WILDCARD_NOT_ALLOWED:
@@ -828,11 +852,15 @@ function readStaticLimitRows(limit: unknown): number | null {
 function recordTopLevelLimit({ node, frame, ctx }: NodeArgs): void {
   if (frame.isInSubquery) return;
   const limitNode = node.limit;
+  const offsetNode = node.offset;
   const at = isNode(limitNode) ? positionOf(limitNode) : undefined;
+  const offsetAt = isNode(offsetNode) ? positionOf(offsetNode) : undefined;
   ctx.topLevelLimits.push({
-    hasClause: limitNode !== undefined || node.offset !== undefined,
+    hasLimit: limitNode !== undefined,
+    hasOffset: offsetNode !== undefined,
     staticRows: readStaticLimitRows(limitNode),
     ...(at ? { at } : {}),
+    ...(offsetAt ? { offsetAt } : {}),
   });
 }
 
@@ -1612,9 +1640,24 @@ export function validateLangWatchQL({
   const ctx = createWalkContext(resolveLangWatchQLPolicy(policy));
   walkNode(screened.statement, ROOT_FRAME, ctx);
   reportTooHighLimits(ctx);
+  reportMissingBranchLimits(ctx);
 
   if (ctx.violations.length > 0)
     return { ok: false, violations: ctx.violations };
+
+  // A single top-level SELECT is unbounded — and gets the default appended —
+  // when it names no LIMIT of its own. OFFSET alone does not bound it: `SELECT
+  // … OFFSET 5` with no LIMIT still returns every row from 5 on, so it is
+  // still unbounded here, and the default LIMIT is inserted before that
+  // OFFSET rather than after (ClickHouse requires `LIMIT n OFFSET m` order).
+  // A UNION (more than one top-level branch) is never appended-to here: each
+  // branch runs and returns independently, so `reportMissingBranchLimits`
+  // above already refused any statement where a branch lacks its own LIMIT,
+  // and every accepted UNION is bounded branch-by-branch already.
+  const [singleBranch] =
+    ctx.topLevelLimits.length === 1 ? ctx.topLevelLimits : [];
+  const appendRowLimit = singleBranch !== undefined && !singleBranch.hasLimit;
+
   return {
     ok: true,
     tables: [...ctx.tables],
@@ -1627,12 +1670,10 @@ export function validateLangWatchQL({
       hasGroupBy: block.hasGroupBy,
       isAggregated: block.isAggregated,
     })),
-    // Append the default cap only when nothing top-level already pages: any
-    // top-level LIMIT or OFFSET means the caller is bounding the result
-    // themselves, and the statement is executed exactly as written.
-    appendRowLimit:
-      ctx.topLevelLimits.length > 0 &&
-      ctx.topLevelLimits.every((limit) => !limit.hasClause),
+    appendRowLimit,
+    ...(appendRowLimit && singleBranch?.hasOffset && singleBranch.offsetAt
+      ? { appendRowLimitBeforeOffset: singleBranch.offsetAt }
+      : {}),
   };
 }
 
@@ -1654,6 +1695,39 @@ function reportTooHighLimits(ctx: WalkContext): void {
         `${LWQL_MAX_RESULT_ROWS.toLocaleString("en-US")} rows this API returns per request. ` +
         `Lower it and page the rest with LIMIT/OFFSET and an ORDER BY.`,
       hint: DEFAULT_VIOLATION_HINTS.LIMIT_TOO_HIGH,
+      maxRows: LWQL_MAX_RESULT_ROWS,
+      ...(limit.at ? { at: limit.at } : {}),
+    });
+  }
+}
+
+/**
+ * Refuses a `UNION` (more than one top-level branch) where any branch names no
+ * `LIMIT` of its own.
+ *
+ * Each branch of a `UNION` runs and returns independently — the default
+ * `LIMIT` this API appends to an unbounded single `SELECT` cannot bound one
+ * branch of many without bounding all of them, and rewriting every branch's
+ * text from here would mean reasoning about each branch's own trailing
+ * `OFFSET` with no printer to verify the result stays valid SQL. Refusing and
+ * naming the gap is the safe alternative: the caller adds a `LIMIT` to the
+ * branch itself. A single `SELECT` (no `UNION`) is unaffected — that case is
+ * still bounded by the appended default.
+ */
+function reportMissingBranchLimits(ctx: WalkContext): void {
+  if (ctx.topLevelLimits.length <= 1) return;
+  for (const limit of ctx.topLevelLimits) {
+    if (ctx.violations.length >= MAX_VIOLATIONS) return;
+    if (limit.hasLimit) continue;
+    ctx.violations.push({
+      code: "LIMIT_REQUIRED_PER_BRANCH",
+      clause: "limit",
+      message:
+        "This UNION has a branch with no LIMIT of its own. Each branch runs and " +
+        `returns independently, so every branch needs its own LIMIT of ${LWQL_MAX_RESULT_ROWS.toLocaleString(
+          "en-US",
+        )} rows or fewer.`,
+      hint: DEFAULT_VIOLATION_HINTS.LIMIT_REQUIRED_PER_BRANCH,
       maxRows: LWQL_MAX_RESULT_ROWS,
       ...(limit.at ? { at: limit.at } : {}),
     });

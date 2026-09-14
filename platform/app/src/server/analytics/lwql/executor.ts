@@ -36,6 +36,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
+  isClickHouseResultTooLargeError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -47,6 +48,7 @@ import {
 } from "./connection";
 import {
   LangWatchQLProvisioningIncompleteError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "./errors";
@@ -225,6 +227,15 @@ function refusalFor({
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({
       identifier: unknownIdentifierFromError(error),
+      reasons: [toError(error)],
+    });
+  }
+  if (isClickHouseResultTooLargeError(error)) {
+    // The server-side backstop (`max_result_rows` / `max_result_bytes`)
+    // fired — the validator's static LIMIT check cannot see a bound
+    // parameter, but the profile's ceiling still catches it. Same customer
+    // code as the post-fetch byte check, never the raw driver diagnostic.
+    return new LangWatchQLResultTooLargeError(LWQL_MAX_RESULT_BYTES, {
       reasons: [toError(error)],
     });
   }

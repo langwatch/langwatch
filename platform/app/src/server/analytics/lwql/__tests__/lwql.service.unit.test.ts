@@ -147,6 +147,28 @@ describe("given the LangWatchQL service", () => {
       expect(executor.calls[0]!.sql).toBe(sql);
     });
 
+    /**
+     * `OFFSET` alone does not page a result — `OFFSET 5` with no `LIMIT`
+     * still returns every remaining row — so the default is appended, and it
+     * must land *before* the `OFFSET`: ClickHouse only accepts
+     * `LIMIT n OFFSET m` in that order, so appending it at the end of the
+     * statement (this API's usual move) would be a syntax error here.
+     */
+    it("inserts the default LIMIT before a bare OFFSET, not after it", async () => {
+      const executor = recordingExecutor();
+      const sql = "SELECT TraceId FROM analytics.traces OFFSET 40";
+
+      await serviceWith(executor).execute({
+        projects: [PROJECT],
+        protections: FULLY_PERMITTED,
+        sql,
+      });
+
+      expect(executor.calls[0]!.sql).toBe(
+        `SELECT TraceId FROM analytics.traces LIMIT ${DEFAULT_LWQL_RESULT_LIMITS.maxRows} OFFSET 40`,
+      );
+    });
+
     it("carries the project's key digest as the tenant capability", async () => {
       const executor = recordingExecutor();
 

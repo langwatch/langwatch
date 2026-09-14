@@ -76,7 +76,7 @@ describe("validateLangWatchQL", () => {
       ],
       [
         "a UNION ALL",
-        "SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM spans",
+        "SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT TraceId FROM spans LIMIT 10",
       ],
       [
         "a join on an equality key",
@@ -678,6 +678,7 @@ describe("validateLangWatchQL", () => {
         "GATED_COLUMN",
         "WILDCARD_NOT_ALLOWED",
         "LIMIT_TOO_HIGH",
+        "LIMIT_REQUIRED_PER_BRANCH",
         "NESTING_TOO_DEEP",
         "UNSUPPORTED_SYNTAX",
       ]);
@@ -856,7 +857,7 @@ describe("validateLangWatchQL", () => {
 
     it("gives each branch of a UNION its own block", () => {
       const blocks = blocksOf(
-        "SELECT TraceId FROM traces UNION ALL SELECT count() FROM spans",
+        "SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT count() FROM spans LIMIT 10",
       );
 
       expect(blocks.map((block) => block.isAggregated)).toEqual([false, true]);
@@ -913,6 +914,63 @@ describe("validateLangWatchQL", () => {
           "UNION ALL SELECT TraceId FROM spans LIMIT 99999",
       );
       expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
+    });
+
+    /** @scenario "An OFFSET with no LIMIT is still unbounded" */
+    it("flags a statement that names only OFFSET for the default cap to be appended", () => {
+      const result = validate("SELECT TraceId FROM traces OFFSET 40");
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(true);
+      expect(
+        result.ok && result.appendRowLimitBeforeOffset,
+      ).toBeDefined();
+    });
+
+    it("accepts the offset,count form of LIMIT as an explicit LIMIT", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 5, 10");
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("refuses the offset,count form when the count is over the cap", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 5, 99999");
+      expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
+    });
+
+    it("flags a statement that names only LIMIT BY for the default cap to be appended", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 1 BY TraceId",
+      );
+      expect(codesOf(result)).toEqual([]);
+      // LIMIT BY caps rows per group, not the response, so it does not count
+      // as an explicit LIMIT — the statement is still unbounded overall.
+      expect(result.ok && result.appendRowLimit).toBe(true);
+    });
+
+    /** @scenario "A UNION cannot rely on the default cap" */
+    it("refuses a UNION where one branch names no LIMIT at all", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 1 " +
+          "UNION ALL SELECT TraceId FROM spans",
+      );
+      expect(codesOf(result)).toEqual(["LIMIT_REQUIRED_PER_BRANCH"]);
+    });
+
+    it("accepts a UNION where every branch names its own bounded LIMIT", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 5 " +
+          "UNION ALL SELECT TraceId FROM spans LIMIT 5",
+      );
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("does not refuse a UNION branch whose LIMIT is a bound parameter", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT {n:UInt32} " +
+          "UNION ALL SELECT TraceId FROM spans LIMIT 5",
+      );
+      expect(codesOf(result)).toEqual([]);
     });
   });
 });

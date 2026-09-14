@@ -49,3 +49,33 @@ Feature: A large answer is paged, never cut
       Given a query whose result exceeds the byte ceiling
       When it runs
       Then it is refused with lwql_result_too_large naming the byte cap, never a partial body
+
+  Rule: The cap cannot be evaded
+
+    # OFFSET alone does not page a result — OFFSET 5 with no LIMIT still
+    # returns every remaining row — so it must not be mistaken for a clause
+    # that already bounds the answer.
+    @unit
+    Scenario: An OFFSET with no LIMIT is still unbounded
+      Given a statement that names OFFSET but no LIMIT of its own
+      When it is validated
+      Then it is flagged for the default row LIMIT to be appended before its OFFSET
+
+    # Each branch of a UNION runs and returns independently, so a default
+    # LIMIT appended once to the whole statement cannot bound a branch that
+    # names none of its own.
+    @unit
+    Scenario: A UNION cannot rely on the default cap
+      Given a UNION where one branch names no LIMIT of its own
+      When it is validated
+      Then it is refused with LIMIT_REQUIRED_PER_BRANCH naming every branch that needs one
+
+    # A LIMIT written as a bound parameter is not a value the static validator
+    # can read, so it passes both the append decision and the too-high check —
+    # the server's own max_result_rows / max_result_bytes ceiling is what
+    # still catches it.
+    @integration
+    Scenario: A parameterised LIMIT cannot outrun the server-side ceiling
+      Given a query whose LIMIT is a bound parameter set above the row ceiling
+      When it runs against a table with more rows than the ceiling
+      Then it is refused with lwql_result_too_large, never a raw driver error
