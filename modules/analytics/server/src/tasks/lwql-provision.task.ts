@@ -1,5 +1,5 @@
 /**
- * @see ../langwatch-ql/production-provisioning.ts — the pure composition
+ * @see ../services/langwatch-ql-production-provisioning.service.ts — the pure composition
  * @see ../../../../../clickhouse-client/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
