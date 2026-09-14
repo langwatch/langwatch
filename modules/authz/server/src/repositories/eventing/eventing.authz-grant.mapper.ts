@@ -15,21 +15,7 @@ export type BindingIdentityInput = {
   customRoleId: string | null;
 };
 
-/**
- * A binding's identity as the database's partial unique indexes define it
- * (migration `20260410120000_fix_role_binding_unique_custom_role`): a
- * built-in binding is keyed on its role, a custom one on its custom role id
- * — the role column is not part of a custom binding's identity at all. Two
- * rows with the same key are the same grant, whatever their row ids.
- *
- * Callers that compare across vocabularies (a legacy enum against the
- * ledger's role key) normalize their `role` before calling this — this
- * function only joins what it is given.
- *
- * Joined on the ASCII unit separator, not a delimiter that could appear
- * inside an id or an enum, the same choice `deriveGrantId` makes in
- * adapters/eventing.authz-grant.adapter.ts.
- */
+// Built-in binding identities keyed on role, custom ones on customRoleId.
 export function bindingIdentityKey({
   principal,
   scopeType,

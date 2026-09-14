@@ -1,19 +1,4 @@
-/**
- * "What may I do here" — the frontend's single source of truth for the
- * CALLER's own effective permissions at one scope (ADR-092 §5/§11).
- *
- * The declaration is stated HERE rather than in `@langwatch/authz-contract`,
- * which is where every other feature states one. `defineTrpcContract` ships
- * from `@langwatch/api`, and `@langwatch/api` depends on this feature's
- * contract for the permission vocabulary every route and procedure declares,
- * so a contract-side declaration would close a package cycle. The payload
- * shapes still live in the contract (`authz.queries.ts`), which is what a
- * browser reads.
- *
- * Which scope "here" means — a project id wins over an organization id riding
- * along with it — is decided in the app, because it is a decision about the
- * domain rather than about this transport.
- */
+// Frontend query for caller's permissions; declared here to avoid package cycle.
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import {

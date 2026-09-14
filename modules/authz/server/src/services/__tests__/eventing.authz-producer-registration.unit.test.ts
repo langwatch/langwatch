@@ -1,20 +1,4 @@
-/**
- * Spec: modules/authz/specs/grants-command-dispatch.feature
- *
- * The grants pipeline registered by a process that only PRODUCES commands.
- *
- * The routing keys asserted here are the whole cross-process contract: the
- * consumer routes on the `pipeline:jobType:jobName` triple a producer stamps
- * (`apps/worker/src/features/job-registry.json` claims `authz_grant` and
- * `command:<name>`), and a job whose triple it does not hold is rejected and
- * redelivered rather than run.
- *
- * The keys cannot drift, because both sides register the SAME packaged
- * definition and the triple is derived from its names — which is exactly why
- * this test builds the definition through `PostgresAuthzAdapter` rather than
- * restating it. What it pins is that a registration with no consumer still
- * produces those keys.
- */
+// Routing keys are cross-process contract; test builds definition through adapter.
 import { describe, expect, it, vi } from "vitest";
 import {
   EventSourcing,

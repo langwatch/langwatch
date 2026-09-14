@@ -1,37 +1,4 @@
-/**
- * The authorization read model's writer: one guarded statement per event.
- *
- * The projection decides WHAT to write (a pure function of the event); this
- * decides how. Nothing here reads current state to compute the next — the
- * guard lives in the WHERE clause, so a stale write loses in the database
- * rather than in a read-modify-write race.
- *
- * The guard is on every statement, and its comparison differs by what the
- * write states — which is the whole of how equal timestamps are made safe:
- *
- *   - A write that states the WHOLE row (`attached`, `defined`) must be
- *     strictly newer: `occurredAt < EXCLUDED."occurredAt"`. Two writes can
- *     share a millisecond — `attachBindings` stamps one `occurredAtMs` for a
- *     whole batch — and on equality a full-row write re-states every column,
- *     so admitting it would let a redelivered `attached` revert a same-
- *     millisecond `role_changed` and restore `legacyRole`. That is the
- *     escalation the projection's own comment describes. Refusing on equality
- *     costs nothing: the only same-millisecond full-row write for one grant is
- *     a redelivery of that same event, and re-applying it is a no-op anyway.
- *
- *   - A write that states ONE field (`role_changed`, `revoked`, and the role
- *     equivalents) may tie: `occurredAt <= :occurredAt`. It touches only the
- *     field it names, so applying it on equality cannot revert anything, and
- *     refusing would drop a genuine same-millisecond change.
- *
- * Either way a redelivered OLDER event loses: a re-applied `role_changed`
- * from before a `revoke` matches no row and writes nothing.
- *
- * The two upserts are raw SQL because the guard has to be part of the same
- * statement. Prisma's `upsert` takes no condition on its update branch, so
- * expressing it as read-then-write would reintroduce exactly the race this
- * design removes; `ON CONFLICT DO UPDATE ... WHERE` is atomic.
- */
+// Guarded upserts in raw SQL; one statement per event; guard in WHERE for atomicity.
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
@@ -86,29 +53,7 @@ const GRANT_FACT_COLUMNS = {
   occurredAt: true,
 } as const;
 
-/**
- * A partial update that matched no row, said out loud.
- *
- * The four field-setting writes are `updateMany`, which writes nothing when
- * the row is absent instead of failing. Ordinarily the row IS there, because
- * a grant is its own aggregate and the group queue gives one aggregate FIFO
- * delivery (`${tenantId}:${aggregateType}:${aggregateId}`) — an `attached`
- * always lands before the `revoked` that follows it.
- *
- * The exception is a BACK-DATED append: a migration replaying an
- * organization's history states `attached` with the grant's original
- * `occurredAt`, and if it appends that after a live `revoked` for the same
- * grant, the revoke arrives first, matches nothing, and the attach then
- * inserts a live row that no revocation contradicts.
- *
- * There is no honest fix at this layer. A tombstone would need
- * `principalType`, `scopeType` and `scopeId`, none of which a revocation
- * event carries, and inventing them would put a fabricated scope into the
- * table that DECIDES access — worse than the miss. The fix belongs to the
- * migration: it must not state a back-dated `attached` for a grant that has
- * already been revoked. This log is what makes a violation of that findable
- * rather than silent.
- */
+// Back-dated migrations may append after revoke; migration must enforce ordering.
 class AuthzProjectionResultMapper {
   static reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
     // Upserts create their own row, so a 0-count is not a miss. A revoke is
@@ -136,18 +81,7 @@ class AuthzProjectionResultMapper {
   }
 }
 
-/**
- * Exactly the five models this writer touches, and the two client-level calls
- * the guard needs, named off the generated client rather than restated.
- *
- * `Grant` and `Role` are the authoritative heads; `RoleBinding`, `CustomRole`
- * and `ShareLink` are the legacy heads a grant expands onto. `$transaction`
- * keeps one batch from leaving the model half-written and `$executeRaw` is
- * what makes the `occurredAt` guard part of the same statement as the write.
- *
- * A composition root hands its own typed client down to this slice, so no
- * caller has to name a model this repository never reads.
- */
+// Structural type for five models; composition root adapts client once.
 export type AuthzProjectionDatabase = Pick<
   PrismaClient,
   "grant" | "role" | "roleBinding" | "customRole" | "shareLink" | "$transaction" | "$executeRaw"
@@ -179,27 +113,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     await this.writeCompatHeads(writes.map((write, index) => ({ write, result: results[index] })));
   }
 
-  /**
-   * The legacy heads — `RoleBinding`, `ShareLink`, `CustomRole` — kept in step
-   * with the authoritative ones.
-   *
-   * ADR-110 left "whether the projection's compat writes survive at all" open.
-   * They survive, because rollback-to-legacy has to stay possible after an
-   * organization switches: the legacy resolver, the settings screens, the
-   * share tier and the revoke-by-filter path all still read these tables, and
-   * an organization whose grants exist only in `Grant` cannot be rolled back
-   * to a head that never saw them.
-   *
-   * Deliberately OUTSIDE the transaction above, and deliberately best-effort.
-   * `Grant`/`Role` are the authority and this is a view of them, so a compat
-   * row that cannot be written must not fail the authoritative write or park
-   * the aggregate's queue lane — a unique or foreign-key conflict here is
-   * warned and stepped over, exactly as the fold this replaced did. Anything
-   * else still raises.
-   *
-   * Every compat row shares its grant's id, so an upsert is idempotent and a
-   * delete can only ever remove a row the ledger itself authored.
-   */
+  // Compat heads kept for rollback-to-legacy; outside transaction, conflicts best-effort.
   private async writeCompatHeads(
     entries: Array<{ write: GrantProjectionWrite; result: unknown }>,
   ): Promise<void> {
@@ -245,18 +159,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     }
   }
 
-  /** A grant reaches whichever legacy head can express it — a binding, a
-   *  share link, or neither. The mappers decide; `null` means the legacy
-   *  tables never represented this shape and their silence is correct.
-   *
-   *  The compat heads are derived from the AUTHORITATIVE row as it stands
-   *  after the guarded write, never from the event. A redelivered older
-   *  `attached` loses the `occurredAt` guard and leaves the Grant marked
-   *  revoked; rebuilding compat from the event would then re-insert the very
-   *  binding the revoke deleted, resurrecting access on the legacy head. So
-   *  the row is re-read here — the same shape `compatForRoleChange` uses — and
-   *  a grant that is absent or revoked has its compat rows removed rather than
-   *  written. */
+  // Compat from authoritative row post-guard prevents resurrecting revoked bindings.
   private async compatForGrant(row: GrantRow, guardWon: boolean): Promise<void> {
     const organizationId = row.organizationId;
 
@@ -456,16 +359,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     }
   }
 
-  /**
-   * Insert the grant, or update it only when this event is at least as new as
-   * the row. The trailing WHERE is the whole point — without it, an `attached`
-   * redelivered after a later change would roll the row back to its original
-   * state.
-   *
-   * `revokedAt` is deliberately absent from the update list: a re-delivered
-   * attach must not un-revoke a grant, and the row's own revocation is not
-   * this event's to state.
-   */
+  // Guarded upsert with trailing WHERE; redelivered attach must not un-revoke.
   private upsertGrant(row: GrantRow): Promise<number> {
     return this.prisma.$executeRaw`
       INSERT INTO "Grant" (

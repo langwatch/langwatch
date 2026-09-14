@@ -1,29 +1,4 @@
-/**
- * The three built-in roles the Roles page shows beside an organization's custom
- * ones, and what each of them can do.
- *
- * REBUILT ON THE CONTRACT, NOT MOVED. The platform page read
- * `getTeamRolePermissions` out of `~/server/api/rbac`, a 2,239-line server
- * module that reaches the engine gate and, through it, a Node-only logger —
- * which is why `~/utils/rbacVocabulary` exists at all, and why `apps/ui` bans
- * `~/server` outright. `@langwatch/authz-contract` publishes the same answer as
- * `builtinRolePermissions(roleKeyForTeamRole(role))`, and its own docblock
- * records that the two are parity-tested cell for cell
- * (`platform/app/src/server/app-layer/authz/__tests__/roles-parity.unit.test.ts`),
- * so this is the fix the agents family made for the copy-target picker rather
- * than a second opinion about role membership.
- *
- * THE TWO SETS ARE NOT CHARACTER-IDENTICAL, and the difference is invisible
- * here. The contract's `admin` set lists `langy:create`, `langy:update` and
- * `langy:delete` explicitly where the legacy bag left them to `langy:manage`
- * and the hierarchy rule; `langy` is not a resource the permission catalogue
- * offers, so no viewer has ever rendered a row for any of the three.
- * `__tests__/builtin-roles.unit.test.ts` pins the property that makes this safe
- * in general — over every permission the catalogue DOES offer, membership of
- * the bag and the engine's hierarchy-aware verdict agree — so a bag that ever
- * omitted an implied permission would fail here rather than quietly
- * under-report what a built-in role can do.
- */
+// Built-in roles from contract; parity-tested against engine; unit test catches omissions.
 
 import {
   type AuthzPermission,

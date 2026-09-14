@@ -1,12 +1,4 @@
-/**
- * The permission decisions the whole product is gated on, asked the way the
- * tRPC and REST boundaries ask them: `getDecision` over stored rows. The
- * engine's walk is pinned in the contract package; what this suite pins is
- * the resolution the SERVICE performs on top of it — scope lineage, group
- * expansion, the org-role floor, the pre-RoleBinding fallbacks, and the
- * organization role every decision carries back to the caller.
- * Spec: modules/authz/specs/permission-resolution.feature
- */
+// Permission decisions service-level resolution; engine walk in contract package.
 import type {
   AuthzPermission,
   CollectedBinding,

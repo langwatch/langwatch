@@ -1,22 +1,4 @@
-/**
- * ADR-092 delivery-plan PR 3 follow-up — the Access surface's legacy reader.
- *
- * These are the queries the settings pages ran inline before the port existed
- * (the former role-binding reader, `TeamService`, the group
- * and API-key repositories), moved here so the per-org fork has a legacy side
- * to delegate to. The WHERE predicates carry over unchanged, with one
- * exception: the group listing gained the organization bound it never had.
- * The row shapes did not - they were consolidated onto one row type and one
- * decoration include, so three reads differ from their inline originals. The
- * API-key read joins where it selected five scalars, `listForOrg`'s role
- * select gained `permissions`, and the synthesis read drops the `group` key
- * it only ever used to filter on.
- *
- * Deliberately independent of `eventing.authz-listing.repository.ts`, for the
- * same reason the decision readers are: the two answer the same questions of
- * different tables, and each has to be readable on its own for a listing
- * parity check to mean anything.
- */
+// Consolidated legacy queries from settings pages for parity verification.
 import type {
   AuthzAccessApiKey,
   AuthzAccessBinding,

@@ -1,21 +1,4 @@
-/**
- * ADR-092 delivery-plan PR 3 — the read repository a CUT-OVER organization
- * collects through: the same port as `prisma.authz-read.repository.ts`, over
- * the grants ledger's own projection (`Grant` / `Role`, plus `GrantUsage` for
- * share-link view accounting) instead of the compat `RoleBinding` /
- * `CustomRole` / `ShareLink` heads.
- *
- * The two implementations are deliberately independent rather than sharing a
- * base class: they answer the same questions of different tables, and each has
- * to be readable on its own for the cutover migration's decision-parity proof
- * to mean anything (it collects through both, explicitly, and compares every
- * decision). Where the query is genuinely the same one - membership and
- * lineage are not grants and were never projected - the duplication is a few
- * lines and the alternative is an inheritance seam nobody wants.
- *
- * Policy stays where it always was: this class returns stored facts, the
- * collector decides what they mean.
- */
+// Read repository for cut-over organizations; deliberately independent for parity verification.
 import type {
   AuthzPrincipalRef,
   CollectedBinding,
@@ -168,18 +151,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return this.collectBindings({ rows, viaGroupId: () => null });
   }
 
-  /**
-   * The same `TeamUser` read the legacy repository performs, on purpose. The
-   * rows live until contract deletes them, and the engine's org-level union
-   * quirk keeps inferring organization-scope answers from them — the
-   * dormant-fact principle (delivery plan decision 13): the genesis-minted
-   * org-member floor grant that will replace the union is stored but not yet
-   * load-bearing, so the inference must keep running IDENTICALLY over both
-   * heads. Returning nothing here made the two readers disagree at
-   * organization scope for every ordinary member, which no parity proof
-   * could ever clear. The quirk, the rows and this read all retire together
-   * at contract.
-   */
+  // Reads dormant TeamUser rows until genesis-minted floor grant takes over.
   async findLegacyTeamMemberships({
     userId,
     organizationId,
@@ -218,20 +190,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     }));
   }
 
-  /**
-   * The `Role` head, fenced on the same two axes as the legacy `CustomRole`
-   * query: the lookup is bounded to the organization being checked, so a
-   * poisoned grant pointing at another organization's role reads as a missing
-   * role; and an API key's private permission role backs only that key's own
-   * grants.
-   *
-   * The second fence is a second query here rather than a relation filter.
-   * `Role` is a projection with no relations (see `Grant`), so the legacy
-   * `roleBindings: { some, every }` + `assignedUsers: { none: {} }` predicate -
-   * "at least one grant on this role is mine, and every grant on it is mine" -
-   * is evaluated over the grants that name the role. A user-principal grant on
-   * a system role fails the `every` half exactly as an `assignedUsers` row did.
-   */
+  // Role head fenced on organization (poisoned grants) and API key (private roles).
   async findCustomRolePermissions({
     organizationId,
     principal,
@@ -277,30 +236,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     })) as { userId: string | null } | null;
   }
 
-  /**
-   * Share links as RESOURCE grants. Token possession is IN the WHERE, as the
-   * port demands - returning rows the request did not present would reopen the
-   * trace-id-guessing hole - and the view budget arrives from `GrantUsage`,
-   * whose writer is ShareService (delivery-plan decision 22). Prisma has no
-   * relation between the two projections, so the join is a second read keyed
-   * on the grant ids just found; a resource with no usage row has been viewed
-   * zero times.
-   *
-   * The organization is resolved from the project first because the org
-   * tenancy guard requires it: `Grant`'s only token-shaped bound is a single
-   * `token: "..."` literal (the ADR-057 possession lookup), and this query
-   * presents a LIST of tokens. Rather than widen that hatch to a list - which
-   * would admit far more than this call needs - the lineage read the collector
-   * already performs supplies the organizationId, and the query is bounded the
-   * ordinary way.
-   *
-   * `organizationId` is OPTIONAL and exists only so a caller who has already
-   * resolved the project's lineage (`RoutedAuthzReadRepository`, which
-   * reads it to decide which head to ask) can hand it straight over instead
-   * of this method resolving it again - the same row, read twice per
-   * share-link check otherwise. A caller with no lineage of its own still
-   * gets the fallback resolve.
-   */
+  // Share links as RESOURCE grants with token possession in WHERE; organizationId optional.
   async findShareLinks({
     projectId,
     tokens,

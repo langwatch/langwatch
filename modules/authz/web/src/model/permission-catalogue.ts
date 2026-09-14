@@ -1,25 +1,4 @@
-/**
- * Which permissions the role editor OFFERS, and in what order.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/utils/permissionsConfig.ts`, which
- * keeps three server-side test consumers of its own and so did not travel.
- * The action and resource vocabulary it read from `~/utils/rbacVocabulary` did
- * not travel either — that module has ten remaining callers across the server,
- * the API application and the Langy contract — so the two constants it exports
- * are restated here as the browser half of the same vocabulary.
- *
- * THE RESTATEMENT IS BOUNDED BY THE REGISTRY, which is what keeps it honest.
- * Nothing here decides what a permission MEANS: every string this module
- * produces is filtered through `isRegistryPermission` before it reaches a
- * checkbox, so a resource or action that drifts out of
- * `@langwatch/authz-contract` stops being offered rather than being offered and
- * refused. The list below can therefore only ever be a subset of the engine's
- * vocabulary, never a second opinion about it.
- *
- * The obligation stands until `orderedResources` and the action table move into
- * the authorization contract, at which point this file is deleted rather than
- * kept in step.
- */
+// Permission editor vocabulary; family-local copy bounded by registry.
 
 import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz-contract";
 

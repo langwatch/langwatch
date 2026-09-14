@@ -1,12 +1,4 @@
-/**
- * The shape ../authz/engine-gate.ts and ../identity/write-gate.ts delegate to.
- * Their own tests
- * already cover the per-gate TTL/fail-safe contract through the two public
- * gates; this suite covers the behaviours that live in the shared helper
- * itself and previously had no test anywhere: a read that throws is LOGGED,
- * concurrent asks for the same cold key share one read, and an invalidation
- * racing an in-flight read stops that read from caching what it resolves.
- */
+// Tests shared helper; logged throws, concurrent reads coalesce, invalidation racing.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PerOrganizationCachedGateStore,

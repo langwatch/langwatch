@@ -328,11 +328,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (grantId) =>
         this.deps.ledger.revokeGrant({
           organizationId,
-          // The pass's business time is in the key for the reason the repair keys carry it: a legacy
-          // row deleted, restored under the same id, then deleted again would otherwise collide with
-          // the first deny's idempotency key and be swallowed, leaving a live head with no legacy
-          // row behind it. A live head is the only sweep candidate, so a re-appended deny costs at
-          // most one event while the fold lags.
+          // Business time in key ensures idempotency: deleted/restored rows don't collide.
           commandId: AuthzMigrationCommandMapper.contentId({
             kind: "deny:grant",
             id: grantId,

@@ -5,15 +5,7 @@ import {
 } from "../authz-audit-trail.repository.ts";
 import { toDate } from "@langwatch/time";
 
-/**
- * Only what this repository touches: one call, `createMany`.
- * `Pick<PrismaClient, "auditLog">` read as that narrowing but was not one — it
- * keeps the whole generated `AuditLogDelegate`, so every caller, a test double
- * included, owed all 18 of its members to satisfy a repository that calls
- * exactly one of them. Structural on purpose, like the feature's other Postgres
- * seams: a composition root adapts its own typed client to this shape once at
- * its boundary, and no generated database type crosses into the feature.
- */
+// Narrow structural type: only createMany touched; avoids burdening test doubles.
 export type AuthzAuditDatabase = {
   auditLog: {
     createMany(args: { data: AuthzAuditInsert[]; skipDuplicates: boolean }): Promise<unknown>;

@@ -1,36 +1,4 @@
-/**
- * What a click on one permission checkbox does to a custom role's permission
- * list.
- *
- * MOVED EXACTLY, and pulled out of the component that held it. In
- * `platform/app/src/components/settings/PermissionSelector.tsx` these five
- * rules lived as closures over a `useMemo`d grouping, which is why they had no
- * test: driving them meant mounting a two-hundred-checkbox Chakra fieldset and
- * reading a callback payload back out. As values they are a table, and the
- * table is what `__tests__/permission-matrix.unit.test.ts` pins.
- *
- * THE FIVE RULES, unchanged:
- *
- * 1. `manage` on a resource IMPLIES every other action the editor offers on it.
- *    Ticking it selects them all; unticking it deselects them all.
- * 2. `create`, `update` and `delete` REQUIRE `view`, so ticking any of them
- *    ticks `view` too — when the registry admits a `view` on that resource.
- * 3. Unticking `view` unticks `create`, `update` and `delete` with it, because
- *    they cannot stand without it.
- * 4. A row that is only implicitly ticked — ticked because `manage` is — sends
- *    its click to the `manage` that implies it. Toggling the row itself would
- *    be a no-op, since it is not in the list.
- * 5. Nothing outside the registry is ever added: the offerable set comes from
- *    {@link permissionsForResource}, which filters through the authorization
- *    contract's own vocabulary.
- *
- * `share` is the reason rule 1 says "every other action the editor OFFERS"
- * rather than the CRUD four: traces offer view and share, and share is not a
- * sub-action of manage anywhere in the registry — but the platform rule
- * expanded `manage` to the whole offered group, and a move does not get to
- * improve on that. Traces offer no manage, so the case does not arise today;
- * the wording is what keeps it honest if one is ever added.
- */
+// Five permission checkbox rules moved from component; tested as table.
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { actionOf, permissionsForResource, resourceOf } from "./permission-catalogue.ts";

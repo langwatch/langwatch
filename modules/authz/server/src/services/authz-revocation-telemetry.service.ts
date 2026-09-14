@@ -16,22 +16,7 @@ export type ObservabilityAuthzRevocationAdapterOptions = {
   counter(reason: AuthzRevocationReason): AuthzRevocationCounter;
 };
 
-/**
- * Counts the two projection writes that deliberately bypass the group queue.
- *
- * Every other AuthZ write is a queued command; a revocation and an offboarding
- * additionally apply their deny effect straight to the projection, because both
- * can only ever make a denial true EARLIER. That is also why the count matters:
- * a direct write is the one path whose effect is not recorded as an event when
- * the queue is down — the deny lands in Postgres, the event never appends, and
- * a later replay would resurrect the access. This counter is how an operator
- * knows that window happened and how wide it was.
- *
- * The counter arrives as an argument, exactly as the cutover reporter's does,
- * so the metric registry stays the composing process's business and this
- * adapter stays the one description of WHEN to increment. Two processes writing
- * the same series described two ways is how the series stops meaning one thing.
- */
+// Counts direct writes outside queue; detects when queue is down; one WHEN description.
 export class ObservabilityAuthzRevocationAdapter extends AuthzRevocationTelemetry {
   static create(
     options: ObservabilityAuthzRevocationAdapterOptions,

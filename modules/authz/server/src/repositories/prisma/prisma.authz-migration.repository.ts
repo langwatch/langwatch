@@ -277,24 +277,7 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     }));
   }
 
-  /**
-   * The view budgets, handed over rather than restarted - and RAISED on a
-   * re-run, never lowered (the port's own contract; decision 22).
-   *
-   * ONE guarded upsert per chunk: a missing row is inserted at the seeded
-   * count, an existing one raised only where the seed is strictly higher.
-   * That refund guard lives in the UPDATE itself, so a consume landing
-   * mid-flight cannot be walked back by a filter resolved in an earlier
-   * SELECT.
-   *
-   * One statement per chunk rather than one per row because this rides every
-   * pass: the previous shape paid a round trip per share link, and on a
-   * converged organization every one matched nothing. The organization that
-   * found it never finished a pass at all, so never recorded a status.
-   *
-   * `organizationId` and `projectId` are matched rather than overwritten: a
-   * row that disagrees about where it lives is not this seed's to move.
-   */
+  // Upsert budgets per chunk with guarded UPDATE; raise on re-run, never lower.
   async seedResourceGrantUsage({
     organizationId,
     seeds,

@@ -1,45 +1,4 @@
-/**
- * ADR-092 delivery-plan PR 3 — the collector's per-organization repoint. One
- * `AuthzReadRepository` in front of two: the legacy compat heads
- * (`RoleBinding` / `CustomRole` / `ShareLink`) and the ledger's own projection
- * (`Grant` / `Role` / `GrantUsage`). Each call resolves the organization it is
- * about, asks the cutover gate whether that organization is served by the
- * engine, and delegates.
- *
- * `findOrganizationMembership`, `findApiKeyOwner`, `findProjectLineage` and
- * `findTeamOrganization` go to legacy always, unconditionally - not an
- * exception to the fork: membership and lineage are not grants and were
- * never projected onto the ledger's head, so both implementations run the
- * SAME query against the SAME table. Forking them would buy a caller nothing
- * and cost a gate read per call. Every other read goes through `readerFor`,
- * gated on the organization it is about (`findShareLinks`'s organization
- * comes from the project's lineage - see below).
- *
- * `findShareLinks` carries a project, not an organization - the port's shape,
- * because ShareLink's tenancy is its project. The lineage read that resolves
- * it is the one the collector performs anyway to build the resource scope.
- * When the project is unknown there is no organization to ask about, so the
- * call goes to legacy: an unresolvable scope must not be a silent head swap.
- *
- * ONE HEAD PER PASS. The gate's answer is cached with a TTL, and a collect is
- * several reads: without a pass boundary that TTL can expire BETWEEN two of
- * them, and the snapshot the engine decides from is half compat bindings and
- * half ledger grants - a state that never existed in either head. So the
- * decision is memoized per organization for the lifetime of ONE instance, and
- * `beginPass()` hands the collector a fresh instance to hold for exactly one
- * snapshot.
- *
- * The memo has to be per-pass rather than per-instance-forever because the
- * composition root holds ONE of these for the whole process
- * (`authz/runtime.ts`'s `authzCollector`): pinning that instance would pin
- * every organization's head until the pod restarted, and a rollback - the
- * emergency lever - would stop working. Instances the fork and shadow compose
- * per request are short-lived either way, so both shapes agree on the same
- * rule: a pin lasts one snapshot, never longer.
- *
- * Browser-safety: like everything else under ./authz, this composes from a
- * caller-supplied Prisma handle and holds no module-scope storage.
- */
+// Routed per cutover gate; memoized per-pass to prevent head flip between reads.
 import type {
   AuthzPrincipalRef,
   CollectedBinding,

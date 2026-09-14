@@ -1,13 +1,4 @@
-/**
- * The role-bindings management REST family. A custom role that carries an
- * organization-exclusive permission is refused at team or project scope at
- * write time rather than silently never granting (ADR-021).
- *
- * The organization and the ledger actor arrive as bound facts rather than off
- * the request's own input: this family authenticates an ORGANIZATION
- * credential, and the tenant and the attribution a credential resolved are the
- * door's answers, not the caller's claims.
- */
+// Role-bindings REST family; custom role scope validation; actor bound not claimed.
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   AuthzApi,

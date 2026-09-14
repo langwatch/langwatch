@@ -1,27 +1,4 @@
-/**
- * ADR-092 delivery-plan PR 3 follow-up — the Access surface's per-organization
- * repoint. One `AccessListingRepository` in front of two: the legacy compat
- * heads (`RoleBinding` / `CustomRole`) and the ledger's own projection
- * (`Grant` / `Role`). Each call resolves the organization it is about, asks
- * the SAME cutover gate the decision fork reads, and delegates - so the page
- * a person looks at and the engine deciding what they may do on it can never
- * be reading different heads for longer than the gate's cache window.
- *
- * Unlike the decision reader (`routed.authz-read.repository.ts`), there is
- * no pass pinning here: every port method is one delegated call, and the
- * delegate finishes its own reads on the head it started on. A caller that
- * issues more than one call for a single page snapshot (the team detail view
- * asks for TEAM and PROJECT scope bindings separately) can therefore straddle
- * a gate flip — tolerated because the calls run concurrently and the gate's
- * 60-second cache bounds how long a straddle lasts, row ids are stable across
- * the heads, and a mixed render is a transient display artifact, never a
- * decision. The one multi-organization method partitions its organizations by
- * the gate's answer and asks both heads, each only about its own
- * organizations.
- *
- * Browser-safety: like everything else under ./authz, this composes from a
- * caller-supplied Prisma handle and holds no module-scope storage.
- */
+// Routed per cutover gate; no pass pinning; every call delegates on its own head.
 import type {
   AuthzAccessBinding,
   AuthzBindingForSynthesis,

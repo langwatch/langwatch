@@ -37,48 +37,13 @@ function isSender(value: unknown): value is UntypedSender {
   return typeof value.send === "function";
 }
 
-/**
- * The late binding between the grants ledger and the Eventing registration
- * that produces its command senders.
- *
- * Both ends are unavoidably out of order. The AuthZ service graph is built
- * from a database and a Redis, and the pipeline whose `commands` this needs is
- * a product OF that graph — `PostgresAuthzAdapter.build()` returns the ledger
- * and the pipeline definition together, and only then can a runtime register
- * it. So the dispatcher exists first and is connected afterwards, in every
- * process that composes AuthZ.
- *
- * What it must not do is silently fall through. A write that arrives before
- * `connect` waits, bounded, and then refuses with
- * {@link AuthzLedgerUnavailableError}: an organization whose genesis import has
- * landed writes through the ledger, and taking the imperative Prisma path
- * instead because a registration was late would write rows the ledger never
- * hears about.
- *
- * A second `connect` with a DIFFERENT set of senders is a composition bug
- * rather than a race — two registrations of one pipeline in one process means
- * two producers for one aggregate — and it throws. Connecting the same senders
- * twice is idempotent, so an installer that runs again finds nothing to do.
- */
+// Late binding; writes wait for connect; duplicate different senders is a bug.
 export class EventingAuthzCommandDispatcherAdapter extends AuthzGrantsCommandDispatcher {
   static create(options: { waitMs?: number } = {}): EventingAuthzCommandDispatcherAdapter {
     return new EventingAuthzCommandDispatcherAdapter(options.waitMs ?? LEDGER_APP_HANDLE_WAIT_MS);
   }
 
-  /**
-   * Narrows what an Eventing registration handed back to the senders the ledger
-   * writes through.
-   *
-   * A runtime's `commands` map is keyed by strings and typed by the definition's
-   * generic parameters, which the AuthZ pipeline widens to `any` so its private
-   * projection and store types stay private. Every process that connected one
-   * therefore reached for an unchecked assertion — and an assertion is exactly
-   * the wrong tool here, because the failure it hides is a pipeline registered
-   * without one of its commands, which surfaces as `undefined.send is not a
-   * function` on the first grant a customer changes.
-   *
-   * This checks instead, once, in the package that owns the six names.
-   */
+  // Check senders at registration time; throw instead of hidden undefined.send errors.
   static sendersFrom(commands: Readonly<Record<string, unknown>>): AuthzGrantsCommandSenders {
     const sender = (name: keyof AuthzGrantsCommandSenders): UntypedSender => {
       const candidate = commands[name];

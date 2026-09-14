@@ -1,13 +1,4 @@
-/**
- * ADR-092 — the Prisma implementation of AuthzReadRepository: every query
- * COLLECT runs, and nothing else. Policy (group expansion semantics, the
- * lenient custom-role parse, share-link liveness) lives in
- * the AuthZ collector; this class returns stored facts.
- *
- * Constructed over a transaction handle too - the offboarding proof binds
- * one of these to the deleting transaction so the re-collect sees the
- * deletes (ADR-092 §10 step 7).
- */
+// Prisma queries only; policy and liveness belong to collector.
 import type {
   AuthzPrincipalRef,
   CollectedBinding,

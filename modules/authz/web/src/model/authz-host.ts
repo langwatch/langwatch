@@ -1,48 +1,8 @@
-/**
- * What the Roles and Role Bindings screens ask of the application they are
- * mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make these screens
- * untestable outside a running application. They ask this port instead, and the
- * frontend feature that owns it — `apps/ui/src/features/authz` — answers it by
- * adapting the browser capabilities the application resolves.
- *
- * THE NINTH FAMILY TO DECLARE THIS SHAPE, after governance, gateway, the
- * personal workspace, automations, ops, agents, data governance, datasets and
- * the model providers. Every one of those recorded that a repeat is the signal
- * to promote it into one place, and every one left it, for the same reason:
- * promotion changes packages a page-family move does not own. Recorded again in
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS FAMILY ASKS THAT THE OTHERS DID NOT is {@link AuthzHostPort.plan}.
- * Both pages are Enterprise surfaces: without the plan they render a sales
- * block instead of the feature, and while the plan is still arriving they
- * render neither, because flashing "Contact sales" at an Enterprise customer is
- * worse than a spinner. A plan is a BILLING FACT and not a grant, so it cannot
- * come off the session capability — the same reason `isPlatformAdmin` sits on
- * the data-governance host rather than in its procedure map.
- *
- * WHAT IT DELIBERATELY DOES NOT ASK is a route reading. Neither page has ever
- * put anything in the URL: the bindings filter is four buttons over a list
- * already in memory, and every roles overlay is a dialog the page opens on
- * itself. There is no address to preserve, so inventing one would be a
- * behaviour change rather than a move.
- */
+// Screens ask application port; plan for Enterprise surfaces; no route reading.
 
 import { createContext, useContext } from "react";
 
-/**
- * The grant both RBAC pages are behind.
- *
- * The route refuses a reader without it — `platform/app` said the same thing as
- * `withPermissionGuard("organization:manage")` on both pages, and
- * `pages/settings/__tests__/admin-page-guards.unit.test.ts` pinned it there
- * because a downgrade to `organization:view` once leaked full organization data
- * to every MEMBER. The write controls ask again, so the same components would
- * behave correctly under a read-only route if one is ever added.
- */
+// Route and writes guard on organization:manage; prevents leaked organization data.
 export const AUTHZ_MANAGE_PERMISSION = "organization:manage";
 
 /** The organization these two pages are about. */

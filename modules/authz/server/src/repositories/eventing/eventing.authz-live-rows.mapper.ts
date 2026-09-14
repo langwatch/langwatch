@@ -1,18 +1,4 @@
-/**
- * Grant and Role reads that only ever see live rows.
- *
- * A revoke marks its row rather than deleting it, so every read that decides
- * or lists access has to exclude the marked ones — and leaving that clause
- * out fails OPEN, which is the worst direction for a mistake nobody can see
- * in a diff.
- *
- * So the fence is not a clause each query remembers; it is the only way these
- * repositories reach the tables. `liveGrants(database).findMany({ where })`
- * cannot be written without it.
- *
- * Reads that deliberately want history — the migration's inventory of what an
- * organization has held, ended or not — use the client directly and say so.
- */
+// Reads only see live rows; revokes mark rather than delete to fail safely when exclusion omitted.
 import type { AuthzDatabase } from "../authz-read.repository.ts";
 
 type QueryArgs = Readonly<{
