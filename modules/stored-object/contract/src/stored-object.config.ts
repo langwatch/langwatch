@@ -8,28 +8,8 @@ import {
 import { z } from "zod";
 
 /**
- * Where a deployment keeps the bytes it externalizes out of traces, datasets,
- * scenarios and evaluation payloads, and the Azure Blob identity it reads and
- * writes that backend through.
- *
- * `backend` is a SELECTION rather than a fallback chain: a deployment that
- * named `azure` means it, and resolving a project to S3 because an S3 bucket
- * also happens to be configured would write a tenant's bytes into a bucket
- * nothing reads them back from. The absence of every S3 value is likewise not
- * "use the shared bucket" — it is the documented single-replica filesystem
- * fallback, which the destination policy owns.
- *
- * `azure` is read together and interpreted nowhere here: which of the four
- * auth modes applies, which variables each one requires, and whether a
- * plaintext endpoint or a sovereign cloud is admissible are this feature's
- * own rules, applied where a blob is addressed. `identity` is the AKS
- * workload-identity webhook's own three variables, named because a process
- * reads no environment outside its config, not because an operator sets them.
- *
- * Per-organization S3 ROUTES are not here: their names carry the
- * organization id (`DATAPLANE_S3__<label>__<organizationId>`), so a
- * declarative projection can only name variables it knows in advance, and
- * every process parses them off the raw environment with one shared helper.
+ * Selects backend storage (S3 or Azure) for externalized bytes.
+ * Auth modes and per-org routes are interpreted per-backend, not in config.
  */
 export const storedObjectServerConfigDefinition = RuntimeConfig.define({
   backend: Config.value(z.enum(["s3", "azure"]).optional(), { env: "STORED_OBJECTS_BACKEND" }),

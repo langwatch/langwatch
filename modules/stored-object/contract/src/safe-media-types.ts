@@ -1,15 +1,6 @@
 /**
- * safe-media-types.ts — single source of truth for the stored-objects
- * MIME allowlist.
- *
- * Two consumers must agree on what media types are "safe to serve inline":
- *  - The content-extractor (ingest path) — refuse to store types that the
- *    read path cannot faithfully serve.
- *  - The files-route (read path) — downgrade anything outside the list to
- *    `application/octet-stream` to neutralize stored-XSS primitives.
- *
- * Keeping the list here means a future widening of either surface stays in
- * sync with the other automatically.
+ * MIME allowlist: single source of truth for ingest (refuse unsafe) and read
+ * (downgrade unsafe) paths to stay in sync on what's safe to serve inline.
  */
 
 /**

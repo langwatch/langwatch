@@ -69,11 +69,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
             },
           ],
           format: "JSONEachRow",
-          // wait_for_async_insert=1: surface insert errors synchronously to the caller. Without
-          // this, async_insert acknowledges immediately and a later batching/network failure is
-          // dropped silently — the service would then return success while no row was written. We
-          // already pay for a storage PUT before the insert, so making the insert synchronous is the
-          // only way the compensating-cleanup path (delete bytes if insert fails) can fire reliably.
+          // Makes insert synchronous for error handling; enables cleanup if insert fails.
           clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
         });
       },
@@ -182,11 +178,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       async (span) => {
         const client = await this.clickhouse.resolveClient(projectId);
 
-        // Project-scoped enumeration. Two notes on cost: 1. Dedup uses the IN-tuple pattern, not a correlated scalar subquery — the inner GROUP BY runs once and produces
-        // the (id, max(inserted_at)) set, then the outer matches against it. The previous correlated form (`inserted_at = (SELECT max(s.inserted_at) WHERE s.id = t.id)`)
-        // re-ran the inner query for every row. 2. No `created_at` (partition) predicate is possible here — cascade-delete needs every row that has ever existed for this
-        // project, including very old objects sitting in cold S3 partitions. The scan is bounded by `project_id IN ORDER BY` so it walks only that project's granules
-        // within each partition, but the partition fan-out itself is unavoidable. Run sparingly; this is a project-deletion cascade, not a hot path.
+        // Cascade-delete: deduped via IN-tuple; includes old objects; not hot path.
         const result = await client.query({
           query: `
             SELECT

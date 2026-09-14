@@ -1,24 +1,6 @@
 /**
  * @vitest-environment node
- *
- * ADR-092 delivery-plan PR 3 (D-PR3-10, decision 22) — the share link's view
- * budget, against a real Postgres.
- *
- * The unit suite next door pins the statements this repository issues and the
- * branch it takes. Everything here is the part a mock cannot honestly stand in
- * for, because it is the DATABASE's behaviour that carries the property:
- *
- *   - the conditional increment is what stops a capped link over-consuming,
- *     and its atomicity is the row lock, not our code;
- *   - the unique violation on `GrantUsage` is what tells a first view from a
- *     spent one, and only the primary key can raise it;
- *   - the budget the cutover HANDS OVER is the count the engine's share-link
- *     read reports, which means an exhausted link stays exhausted the moment
- *     its organization is served by the ledger's head.
- *
- * A mocked version of any of those asserts what we already believe, in the
- * shape we already believe it.
- *
+ * Tests ledger atomicity and constraints that mocks cannot substitute for real Postgres.
  * @see modules/share/specs/share.feature
  */
 import { AUTHZ_ENGINE_MIGRATION_NAME, type AuthzApi } from "@langwatch/authz-contract";

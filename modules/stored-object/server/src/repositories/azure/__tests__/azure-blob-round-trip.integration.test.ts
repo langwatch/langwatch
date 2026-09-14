@@ -1,7 +1,7 @@
 /**
- * Bytes going out to Azure Blob and coming back, through the real driver, the real registry dispatch and the real destination policy — an in-memory blob account stands in for the socket, and nothing above it is doubled.
  * @vitest-environment node
- * Spec: specs/features/scenarios/externalize-event-byte-content.feature
+ * Round-trip bytes through Azure Blob with real driver, registry, and policy.
+ * @see specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";

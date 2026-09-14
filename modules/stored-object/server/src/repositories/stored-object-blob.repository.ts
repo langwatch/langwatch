@@ -1,11 +1,5 @@
 /**
- * The blob row of the stored-object module: object bytes addressed by their
- * storage URI, one provider behind each scheme. Every tier reads and writes
- * the same four operations, so a caller that holds one of them cannot tell
- * S3 from Azure Blob from the local filesystem from the in-memory twin.
- *
- * The URI carries the tenant, because the scheme registry resolves the
- * provider from it before the bytes are touched.
+ * Storage driver: object bytes by URI; all providers support same four operations.
  */
 import type { Readable } from "node:stream";
 

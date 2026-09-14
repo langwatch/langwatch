@@ -123,15 +123,9 @@ export class PrismaShareRepository
   }
 
   async consumeView({ id, projectId, maxViews }: ConsumeShareViewParams): Promise<boolean> {
-    // `update` with the cap in its (filtered-unique) where, NOT `updateMany`:
-    // Prisma 7's compiler splits a conditional `updateMany` into a SELECT of
-    // matching ids and an UPDATE keyed on those ids alone — the cap condition
-    // does not ride the UPDATE, so concurrent opens of a capped link all
-    // increment past it (read-then-write, not compare-and-swap). `update`
-    // keeps its full filter on the UPDATE statement, where Postgres
-    // re-evaluates it after the lock wait: the loser matches zero rows and
-    // surfaces as P2025 instead of over-consuming. The projectId predicate is
-    // the tenancy fence, same as every other query here.
+    // Use update() not updateMany(): the latter splits to SELECT+UPDATE, where
+    // the cap condition doesn't ride the UPDATE (causing over-consumption).
+    // update() keeps the full filter on UPDATE for atomic compare-and-swap.
     try {
       await this.prisma.shareLink.update({
         where: {

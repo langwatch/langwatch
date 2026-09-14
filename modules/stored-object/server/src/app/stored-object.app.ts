@@ -71,13 +71,7 @@ export type StoredObjectInfrastructure = Readonly<{
 }>;
 
 /**
- * The `storedObjects.*` deployment block: which backend a NEW object is
- * minted against (BYOC route, then the selected backend, then the documented
- * single-replica filesystem fallback), and the S3/Azure connection details
- * each backend needs. Mirrors `ApiStoredObjectsConfigResolution`
- * (`apps/api/src/platform/config/api.config.ts`) field for field, with
- * `routes` carried as a plain object keyed by organization id rather than a
- * `Map` — a config schema parses JSON-shaped input, and a `Map` is not one.
+ * Stored-objects backend selection config; routes as plain object for JSON schema parsing.
  */
 const storedObjectS3ConfigSchema = z.object({
   bucket: z.string().optional(),

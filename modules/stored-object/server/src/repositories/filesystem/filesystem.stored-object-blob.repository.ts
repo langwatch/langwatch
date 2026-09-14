@@ -27,11 +27,7 @@ function parseFileUri(uri: string): string {
   const parsed = new URL(uri);
   const decoded = decodeURIComponent(parsed.pathname);
 
-  // Containment check, deliberately AFTER the decode. `new URL()` leaves `%2F` encoded, so a URI can look confined and stop being confined one line later: `…/spool/proj/..%2F..%2Fetc/span` has a single path segment as far as the URL parser is
-  // concerned, and becomes `…/spool/proj/../../etc/span` the moment it is decoded — which is what `mkdir`/`writeFile` would then act on. A caller that percent-encodes its segments is therefore NOT protected by having done so. Callers should still
-  // keep each segment a single component; this is the backstop that makes a mistake there fail loudly instead of writing outside the object root. The check is on `..` segments specifically, NOT on "is the decoded path already canonical". Those are
-  // not the same test, and the stricter one is wrong: a storage root configured with a trailing slash mints `file:///root//project/object`, whose decoded form is non-canonical and completely harmless. Refusing it would break every local-filesystem
-  // write (dataset uploads, scenario media, the queue's durable blob tier) on those installs, none of which is what this guard is here for. A redundant separator is sloppy; only `..` escapes.
+  // Path traversal guard: checks decoded path for ".." segments only.
   const hasParentSegment = decoded.split("/").includes("..");
   if (hasParentSegment) {
     throw new Error(

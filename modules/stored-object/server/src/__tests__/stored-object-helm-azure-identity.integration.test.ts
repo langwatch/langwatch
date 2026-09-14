@@ -1,18 +1,8 @@
 /**
  * @vitest-environment node
  * @integration
- *
- * Issue #6087 / #6182 — the chart's ServiceAccount surface, verified by
- * running `helm template` for real and reading the rendered YAML.
- *
- * Deliberately NOT a unit test asserting on template source text. The
- * sibling `helm-and-docs-shape.unit.test.ts` greps `_helpers.tpl`, which can
- * show a string exists but can never prove "renders successfully", "fails
- * with this error", or "the app and the workers name the SAME account" —
- * those are properties of the OUTPUT. The spec review called this out
- * explicitly.
- *
- * Skips when helm is unavailable so CI without the binary is unaffected.
+ * Tests helm template output for ServiceAccount surface; unit tests grep source.
+ * Skips when helm unavailable.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -49,16 +39,8 @@ function hasHelm(): boolean {
 }
 
 /**
- * `helm template` refuses to render until every dependency in Chart.yaml is
- * present under charts/. Three of ours are local file:// subcharts and one
- * (prometheus) is remote; the built .tgz files are gitignored, so a developer
- * checkout usually has them and a fresh CI runner does not — which made this
- * suite fail on "missing in charts/ directory" long before reaching any
- * assertion.
- *
- * Build them once if they're absent. If that can't be done (no network for the
- * remote chart), skip the suite rather than reporting a chart bug that isn't
- * one — the same honesty as the helm-not-installed guard above.
+ * Builds helm chart dependencies if absent; skips suite if build fails.
+ * Built .tgz files are gitignored, so CI runners need to build them.
  */
 function chartDepsReady(): boolean {
   // Every dependency in Chart.yaml must be present, not merely one archive:

@@ -103,11 +103,7 @@ describe("when put writes a temporary file first", () => {
   });
 });
 
-// Atomicity-under-interruption scenario This is a "regression-flavored" test that verifies the observable invariant (no torn
-// file at <final> after an aborted-write state), not the literal kernel-level atomicity of rename(2). Simulating a literal
-// mid-rename interruption is not feasible in a unit test without OS-level hooks. The scenario: 1. A previous write was
-// interrupted after creating the .tmp file but before rename completed. The .tmp file is orphaned on disk. 2. The final path
-// does NOT exist (no torn bytes). 3. A retry via driver.put converges to a complete file at <final>.
+// Tests atomic writes under interruption; verifies no torn file after aborted write.
 
 describe("Local filesystem driver write is atomic under interruption", () => {
   /** @scenario "Local filesystem driver write is atomic under interruption" */

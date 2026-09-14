@@ -1,16 +1,6 @@
 /**
- * Builds the {@link StoredObjectInfrastructure} `apps/api/src/features/stored-object/stored-object.composition.ts`
- * (deleted by b383462d96) used to hand-compose. Ports every collaborator that
- * already lives in this module, verbatim: the destination policy, the
- * project-keyed storage runtime, the S3/filesystem/Azure drivers, the
- * content-addressed byte store, and the by-name refusals for the delivery and
- * upload-token capabilities this deployment composes no signer for.
- *
- * The legacy id-only owner lookup is NOT ported here: only its ABSENCE branch
- * is (`StoredObjectOwnerAbsence`). The real cross-instance lookup needs every
- * ClickHouse endpoint this process opened, addressable by name, and the api
- * process composes no such directory today — porting it is a named gap, not a
- * silent omission (see the handoff for stored-object-composition-green).
+ * Builds {@link StoredObjectInfrastructure} from the deleted api composition.
+ * Omits legacy owner lookup (see stored-object-composition-green).
  */
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";

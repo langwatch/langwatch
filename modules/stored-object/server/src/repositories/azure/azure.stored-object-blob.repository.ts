@@ -58,11 +58,7 @@ function parseAzureBlobUri(uri: string): ParsedAzureBlobUri {
   return { accountName, container, blobPath };
 }
 
-/**
- * True when `endpointBaseUrl` addresses the account via a path segment rather than a subdomain — the shape Azurite (and other path-style
- * emulators) use, e.g. `http://127.0.0.1:10000/devstoreaccount1` for account `devstoreaccount1`. Production Azure always uses host-style
- * (`https://{account}.blob.core.windows.net`), so this only trips for an explicitly-configured emulator/dev endpoint.
- */
+/** Path-style endpoint (Azurite) vs host-style (production Azure). */
 function isPathStyleEndpoint(endpointBaseUrl: string | undefined, accountName: string): boolean {
   if (!endpointBaseUrl) return false;
   try {
@@ -104,9 +100,7 @@ function canonicalisedResource(
 }
 
 /**
- * Appends canonicalised query parameters to a canonicalised resource, per the shared-key spec: each
- * param is lowercased-name, sorted, `name:value` on its own line. Only used by container-level
- * operations (e.g. `?restype=container`) — the blob get/put/delete/exists paths carry no query string.
+ * Appends canonicalized query params per spec; only container-level operations use them.
  */
 function withCanonicalisedQuery(resource: string, queryParams: Record<string, string>): string {
   // Spec: lowercase the parameter name FIRST, then sort those names with an
@@ -161,7 +155,7 @@ function signRequest({
   blobPath: string;
   extraHeaders: Record<string, string>;
   pathStyle: boolean;
-  /** Canonicalised query params (e.g. `{ restype: "container" }`) for container-level operations. */
+  /** Query params for container-level operations only. */
   queryParams?: Record<string, string>;
 }): string {
   const xMsHeaders = {
@@ -203,11 +197,7 @@ function defaultEndpoint(accountName: string): string {
   return `https://${accountName}.blob.core.windows.net`;
 }
 
-/**
- * Endpoints are concatenated as `${endpoint}/${container}/${blobPath}`, so a trailing slash on the configured value sends `//container/blob` while the
- * signature canonicalises `/container/blob` — Azure answers 400. A trailing slash is a normal thing to paste out of the portal, so strip it once here.
- * Path-style detection reads the same normalised value: an empty final path segment would otherwise stop it ever matching the account name.
- */
+/** Endpoint normalization: strip trailing slashes to prevent signature mismatches. */
 function normalizeEndpoint(endpointBaseUrl: string): string {
   return endpointBaseUrl.replace(/\/+$/, "");
 }
@@ -342,9 +332,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
   }
 
   /**
-   * Returns the blob's size in bytes from a signed HEAD — Content-Length without transferring the body.
-   * NOT part of the `StoredObjectStorageDriver` interface; used by the staged-upload finalize path to
-   * enforce its size cap without downloading the staged upload.
+   * Returns blob size via HEAD without downloading; used by staged-upload finalize path.
    */
   async head(uri: string): Promise<number> {
     const { container, blobPath } = parseAzureBlobUri(uri);
@@ -388,9 +376,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
   }
 
   /**
-   * Idempotently creates a container. NOT part of the `StoredObjectStorageDriver` interface (get/put/delete/exists) — production deployments
-   * provision their container out-of-band (Terraform/Helm/portal), same as an S3 bucket. This exists for integration-test setup against a
-   * fresh Azurite container, which starts with no containers at all. A 409 ContainerAlreadyExists is treated as success.
+   * Idempotently creates container for test setup; not part of StoredObjectStorageDriver interface.
    */
   async ensureContainer(container: string): Promise<void> {
     const endpoint = this.resolvedEndpoint();
@@ -417,9 +403,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
   }
 
   /**
-   * Computes the request headers for one operation. `sharedKey` signs an HMAC Authorization header exactly as before (byte-identical — no
-   * canonicalised-resource/header computation runs for token modes). Token modes fetch a cached bearer token from `azure-token-provider.ts`
-   * and carry NO SharedKey signature at all — no canonicalised resource, headers, or query string are computed for them.
+   * Computes request headers for both SharedKey and token-based authentication.
    */
   private async signedHeaders({
     method,
@@ -436,7 +420,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     contentLength: string;
     contentType: string;
     extraHeaders: Record<string, string>;
-    /** Canonicalised query params (e.g. `{ restype: "container" }`) for container-level operations. */
+    /** Query params for container-level operations only. */
     queryParams?: Record<string, string>;
   }): Promise<Record<string, string>> {
     const date = toDate(nowInstant()).toUTCString();
@@ -478,9 +462,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
   }
 
   /**
-   * Signs and issues one request, with 401/403 handling for token-based modes: a 401 invalidates the cached token and retries EXACTLY once with a fresh one (a
-   * second 401 propagates to the caller); a 403 is never retried and raises an error naming the required role assignment and the account/container scope it must be
-   * granted on. SharedKey mode gets neither special case — its 401/403 handling is unchanged from before (each caller's existing `!response.ok` check applies).
+   * Signs requests with 401/403 auth error handling for token-based modes.
    */
   private async signedFetch({
     url,
@@ -502,13 +484,9 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     contentType: string;
     extraHeaders: Record<string, string>;
     queryParams?: Record<string, string>;
-    /** Additional headers folded into the actual fetch() call but NOT into the signature (e.g. Content-Type). */
+    /** Headers for fetch() but not signature. */
     extraRequestHeaders?: Record<string, string>;
-    /**
-     * The bytes to send, as the one shape every caller here passes. Typed narrowly rather than as the DOM's `BodyInit`, which a
-     * process compiled without the DOM lib does not have a name for. The buffer parameter is spelled out because a
-     * `Uint8Array<ArrayBufferLike>` could be backed by a `SharedArrayBuffer`, which `fetch` does not accept.
-     */
+    /** Request body as Uint8Array; avoids SharedArrayBuffer which fetch rejects. */
     body?: Uint8Array<ArrayBuffer>;
   }): Promise<Response> {
     const buildHeaders = () =>

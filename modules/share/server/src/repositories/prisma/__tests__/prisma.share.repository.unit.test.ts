@@ -4,14 +4,8 @@ import { PrismaShareRepository } from "../prisma.share.repository.ts";
 type ShareDatabase = Parameters<typeof PrismaShareRepository.create>[0]["prisma"];
 
 /**
- * Tenant-isolation guard, carried over from #5834 (which pinned the same
- * property on the pre-ADR-057 `findByResourceType`). Every resource-addressed
- * lookup must carry `projectId` in the query itself, so a cross-tenant row is
- * never returned into memory even transiently.
- *
- * `findByToken` is deliberately exempt: the token is the capability, and the
- * anonymous viewer has no project to scope by. Its tenancy comes from the
- * token's unguessability plus the audience check in `ShareService`.
+ * Tenant-isolation guard: resource-addressed queries must include projectId.
+ * findByToken is exempt: the token itself is the capability.
  */
 describe("PrismaShareRepository tenant scoping", () => {
   const buildRepository = (shareLink: Record<string, unknown>) =>

@@ -169,9 +169,7 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
     });
 
     /**
-     * Ruthless-review P2 on PR #6092: flipping the provider to azureBlob used to drop S3_BUCKET_NAME from
-     * the deployment in the same act, so the migration semantics createS3Client implements (legacy s3://
-     * reads survive while a bucket is configured) were unreachable from the chart.
+     * Must emit S3_BUCKET_NAME for legacy s3:// reads even when azureBlob is write backend.
      */
     it("can still emit the legacy S3 read config while azure is the write backend", () => {
       const values = readRepoFile("charts/langwatch/values.yaml");

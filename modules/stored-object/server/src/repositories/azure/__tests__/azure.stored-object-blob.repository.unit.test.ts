@@ -72,7 +72,7 @@ function newTokenModeDriver(
   });
 }
 
-/** A minimal stub for the non-Azure registry slots — routing is what these tests assert, never exercised otherwise. */
+/** Stub for non-Azure registry slots; tests assert routing only. */
 class NeverCalledDriver implements StoredObjectStorageDriver {
   get(): Promise<Readable> {
     throw new Error("not expected to be called in this suite");
@@ -316,13 +316,9 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
   });
 
   describe("given a fixed-input vector (known-answer test for SharedKey HMAC)", () => {
-    /**
-     * KAT vector — all inputs are fixed so any regression in canonicalization order, positional
-     * string-to-sign slots, or HMAC construction fails this test deterministically rather than silently
-     * producing a header that passes a prefix regex but Azure rejects with a 403.
-     */
+    /** KAT vector: detects regressions in canonicalization order, signing, or HMAC. */
     const KAT_ACCOUNT_NAME = "myaccount";
-    // Raw bytes: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" (64 ASCII chars)
+    // KAT key: hardcoded 64-byte value for deterministic signature testing
     const KAT_ACCOUNT_KEY = Buffer.from(
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     ).toString("base64");
@@ -406,9 +402,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
   describe("when Azurite path-style addressing puts the account in the endpoint path", () => {
     /**
-     * Regression for the Azurite-signing gap (AC37 / issue #4133): when `endpointBaseUrl` addresses the account via a path segment (Azurite's only mode — it has no per-account subdomain like production Azure), the shared-key
-     * canonicalised resource must include the account name TWICE (`/{account}/{account}/{container}/{blob}`), not once. Getting this wrong produces a well-formed-looking `SharedKey` header that Azurite rejects with 403
-     * AuthenticationFailed — a bug a prefix-only regex assertion on the header would never catch, so this test recomputes the exact expected signature (KAT-style) rather than just checking the `SharedKey {account}:` prefix.
+     * Path-style addressing: account name must appear twice in signed resource.
      */
     const PATH_STYLE_ACCOUNT = "devstoreaccount1";
     const PATH_STYLE_ENDPOINT = "http://127.0.0.1:10000/devstoreaccount1";
@@ -565,9 +559,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
   });
 
   /**
-   * The headline contract of issue #6087 is that there is NO credential fallback: a token-mode driver that cannot get a token must fail, never quietly
-   * downgrade to shared-key or send the request unsigned. Every other token test here stubs a SUCCESSFUL acquisition, so adding a `catch` around the
-   * token call that fell back to shared-key signing would leave this whole suite green. These pin the failure path itself.
+   * Token-mode must fail when token exchange fails; these tests pin the failure path.
    */
   describe("given a token-based auth mode where the token exchange fails", () => {
     const tokenFailure = new Error("AADSTS70021: No matching federated identity record found");
