@@ -1,4 +1,4 @@
-/** The dataset drawers, mounted in the host their package asks for; a drawer travels with itself, not the address. */
+/** Exports dataset drawer components with DatasetHost. */
 
 import { SelectDatasetDrawer as SelectDataset } from "@langwatch/dataset-web/drawers";
 

@@ -13,7 +13,7 @@ import { useDrawer } from "@langwatch/ui-drawer";
 import { withHost } from "../../../../ui/sections/ui-page";
 import { EvaluatorHost } from "./evaluator-host";
 
-/** `evaluatorHistory`. No `drawer.evaluatorId` means nothing to show, so it renders null rather than an empty-looking history. */
+/** Renders evaluator history or null if no ID is provided. */
 function EvaluatorHistory({
   evaluatorId,
   evaluatorName,

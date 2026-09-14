@@ -1,4 +1,4 @@
-/** Evaluators: screen, dialogs, history panel and API usage snippets, all in `@langwatch/evaluator-web`. */
+/** Evaluators feature module. */
 
 import { evaluatorApi } from "@langwatch/evaluator-web/evaluators";
 import { lazyDrawer } from "@langwatch/ui-drawer";
@@ -9,7 +9,7 @@ export const evaluatorFeature = uiFeature({
   name: "@langwatch/evaluator-web",
   api: evaluatorApi,
   loaders: evaluatorPageLoaders,
-  /** The drawers this family serves, by the name the address uses — lazy, so their presentation stays out of the bundle until opened. */
+  /** Lazy-loaded drawer registry by address name. */
   drawers: {
     evaluatorHistory: lazyDrawer({
       factory: () => import("./ui/sections/evaluator-drawers"),

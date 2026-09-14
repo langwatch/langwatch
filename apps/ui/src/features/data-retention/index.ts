@@ -1,4 +1,4 @@
-/** Data Retention: screen, drawer and two confirm dialogs, all in `@langwatch/data-retention-web`. */
+/** Data retention feature. */
 
 import { dataRetentionApi } from "@langwatch/data-retention-web/data-retention";
 import { uiFeature } from "../../behavior/ui-feature";

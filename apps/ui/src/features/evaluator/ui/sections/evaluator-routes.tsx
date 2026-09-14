@@ -1,4 +1,4 @@
-/** Which page key the evaluators screen answers: `evaluations:view`, unchanged from the platform page. */
+/** Defines Evaluator page loaders with `evaluations:view` permission. */
 
 import { evaluatorScreens } from "@langwatch/evaluator-web/evaluators";
 import type { ComponentType } from "react";

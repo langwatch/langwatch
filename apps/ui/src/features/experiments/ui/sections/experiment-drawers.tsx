@@ -15,7 +15,7 @@ import { withWorkflowHost } from "../../../workflows/ui/sections/workflows-host"
 /** The grant this family's replicate picker asks about, per target project. */
 const EXPERIMENT_COPY_PERMISSION = "evaluations:manage";
 
-/** `comparisonLeaderboard`. No `evaluatorId` means no comparison, so it renders null rather than an "open the run" sentence for one that doesn't exist. */
+/** Renders comparison leaderboard only if evaluatorId is present. */
 function ComparisonLeaderboardFromAddress({
   evaluatorId,
   ...rest

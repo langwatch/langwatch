@@ -1,4 +1,4 @@
-/** Which page key the Data Retention address answers: `project:view`, framed by the settings layout, matching the platform page one for one. */
+/** Defines Data Retention page loaders with `project:view` permission. */
 
 import { dataRetentionScreens } from "@langwatch/data-retention-web/data-retention";
 import type { ComponentType } from "react";

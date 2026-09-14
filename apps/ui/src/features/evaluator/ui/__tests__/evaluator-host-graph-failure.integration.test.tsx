@@ -1,5 +1,5 @@
 /**
- * `EvaluatorHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the evaluators screen with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * EvaluatorHost must handle organization.getAll failures.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

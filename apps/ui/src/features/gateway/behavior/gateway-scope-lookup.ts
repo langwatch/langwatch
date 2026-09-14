@@ -20,7 +20,7 @@ export function resolveGatewayOrganization({
   return organizations.find((candidate) => candidate.id === organizationId);
 }
 
-/** The project the address is about, found in the graph already in hand rather than fetched again. */
+/** Resolves project from the organization graph. */
 export function resolveGatewayProject({
   organizations,
   projectId,

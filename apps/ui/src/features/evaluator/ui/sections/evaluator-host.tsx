@@ -33,7 +33,7 @@ export function EvaluatorHost({ children }: { children: ReactNode }) {
     fallbackTitle: "Couldn't load your evaluators",
   });
 
-  /** The project the address is about, resolved from the one graph read rather than a second query. */
+  /** Resolves project from the organization graph. */
   const project = useMemo(() => {
     if (!scope.projectId) return { projectId: void 0, projectSlug: void 0 };
     for (const organization of organizations.data ?? []) {

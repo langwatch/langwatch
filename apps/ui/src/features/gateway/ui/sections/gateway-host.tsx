@@ -45,7 +45,7 @@ function readDeployment(): { isSaas: boolean; appBaseUrl: string; gatewayBaseUrl
   }
 }
 
-/** The `organization.getAll` row shape, restated locally since the screen package's public boundary does not export it. */
+/** Type for organization.getAll response rows. */
 type GatewayOrganizationGraphEntry = {
   id: string;
   name: string;
@@ -84,7 +84,7 @@ export function GatewayHost({ children }: { children: ReactNode }) {
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
 
-  /** The graph, with each project stamped with its team id — the screens read a flat project and need it. */
+  /** Augments graph with team IDs for the screens. */
   const organizationsWithTeamIds: readonly GatewayOrganization[] = useMemo(
     () => (organizations.data ?? []).map((organization) => withTeamProjectIds(organization)),
     [organizations.data],

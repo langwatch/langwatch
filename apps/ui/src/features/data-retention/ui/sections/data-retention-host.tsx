@@ -1,7 +1,5 @@
 /**
- * What the Data Retention screen is mounted inside: the tRPC Provider its
- * hooks run on, and the host port for scope, plan, flags, visible scopes,
- * address and feedback. Reads the whole graph — wider than the writable set — since the filter must show every visible scope.
+ * Host component providing context for the Data Retention screen. Reads full graph for filtering.
  */
 
 import {

@@ -10,7 +10,7 @@ import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { GatewayHost } from "./gateway-host";
 
-/** Routing policies' flag is governance's, not gateway's — the editor was a `/settings/governance` page before the address moved. */
+/** Routing policies' flag belongs to governance, not gateway. */
 const ROUTING_POLICIES_FLAG = "release_ui_ai_governance_enabled";
 
 function gatewayPage(
