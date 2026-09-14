@@ -23,7 +23,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { isActiveConnection } from "~/features/directory/logic/connectionLifecycle";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 
 /**
  * What the directory has been doing, who it did it to, and where it should
@@ -270,6 +270,7 @@ function useScimTokens({ organizationId }: { organizationId: string }) {
 
   return {
     tokens,
+    connections,
     connectionOptions,
     labelFor,
     issuableConnections,
@@ -307,7 +308,11 @@ function ScimTokensTable({
   labelFor,
   onRevoke,
 }: {
-  tokens: ReturnType<typeof api.scimToken.list.useQuery>;
+  tokens: {
+    data: RouterOutputs["scimToken"]["list"] | undefined;
+    isError: boolean;
+    error: unknown;
+  };
   mayManage: boolean;
   labelFor: (id: string | null) => string | null;
   onRevoke: (tokenId: string) => void;
@@ -392,7 +397,7 @@ function ScimTokensTable({
                       variant="ghost"
                       colorPalette="red"
                       aria-label={`Revoke ${token.description ?? "token"}`}
-                      onClick={() => setTokenToRevoke(token.id)}
+                      onClick={() => onRevoke(token.id)}
                     >
                       <Trash2 size={14} />
                     </Button>

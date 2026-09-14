@@ -328,7 +328,11 @@ function HowTheySignIn({
   twoStep,
 }: {
   person: NonNullable<RouterOutputs["organization"]["getMemberById"]>;
-  provenance: { data?: RouterOutputs["organization"]["getMemberProvenance"] };
+  provenance: {
+    data?: RouterOutputs["organization"]["getMemberProvenance"];
+    isError: boolean;
+    error: unknown;
+  };
   twoStep: ReturnType<typeof useTwoStepRequirement>;
 }) {
   return (
@@ -406,6 +410,7 @@ function PersonActions({
   >["setMemberDisabled"];
   isSettingDisabled: boolean;
 }) {
+  const queryClient = api.useUtils();
   return (
     <>
       <Section title="Actions">
