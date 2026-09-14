@@ -358,6 +358,20 @@ function LastWayInNotice() {
  */
 export function PasskeysSection() {
   const publicEnv = usePublicEnv();
+
+  // A deployment that turned passkeys off has no ceremony endpoints mounted,
+  // so the whole section stands down — same contract as TwoFactorSection and
+  // MFA_ENROLLMENT_OPEN: never offer a button with no endpoint behind it.
+  // The stand-down is a component boundary rather than an early return so
+  // `useListPasskeys` never fires either: the list endpoint is as unmounted
+  // as the ceremony ones, and a 404 on every settings load is noise a
+  // correctly configured deployment should not emit.
+  if (publicEnv.data?.PASSKEYS_ENABLED !== true) return null;
+
+  return <PasskeysSectionBody />;
+}
+
+function PasskeysSectionBody() {
   const passkeys = authClient.useListPasskeys();
   const [isCreating, setIsCreating] = useState(false);
   // Which passkey a dialog is open for, or null. Held as the row rather than
@@ -371,11 +385,6 @@ export function PasskeysSection() {
   const abandoned = useRef<{ abandoned: boolean } | null>(null);
 
   const held = passkeys.data ?? [];
-
-  // A deployment that turned passkeys off has no ceremony endpoints mounted,
-  // so the whole section stands down — same contract as TwoFactorSection and
-  // MFA_ENROLLMENT_OPEN: never offer a button with no endpoint behind it.
-  if (publicEnv.data?.PASSKEYS_ENABLED !== true) return null;
 
   const create = () => {
     setIsCreating(true);

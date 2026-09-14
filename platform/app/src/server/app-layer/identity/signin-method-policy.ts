@@ -138,8 +138,12 @@ const federatedMethod = (id: string): SignInMethod => ({
  * reading is also the honest screen: a method nobody may complete is not
  * offered.
  */
-async function resolveSocialMethods(): Promise<readonly SignInMethod[]> {
-  if (!(await platformSSOAllowed())) return [];
+function resolveSocialMethods({
+  federationLicensed,
+}: {
+  federationLicensed: boolean;
+}): readonly SignInMethod[] {
+  if (!federationLicensed) return [];
   return configuredSocialProviderIds(env).map(federatedMethod);
 }
 
@@ -162,9 +166,20 @@ function dedupeById(methods: readonly SignInMethod[]): readonly SignInMethod[] {
  * per request; both gate reads inside it hit the same per-process memo.
  */
 export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
+  // Resolved ONCE, and every branch below reads this answer rather than
+  // asking the gate again. On the healthy path re-asking was free (the memo
+  // answers); on the failure path it was not — the gate evicts its memo on
+  // rejection (Decision 6, self-healing), so each extra await recomputed a
+  // licensing scan behind its own timeout, and one unauthenticated request
+  // held several slow database reads open exactly when the database was
+  // already struggling.
   const federationLicensed = await platformSSOAllowed();
-  const federated = await resolveFederatedMethod();
-  const social = await resolveSocialMethods();
+  // DENY is email mode by definition (ADR-027 Decision 2), which is also what
+  // `resolveAuthProvider` would conclude — skipping it here spends no second
+  // gate read to reach the same answer. When the gate allows, the memo is
+  // warm and the call costs nothing.
+  const federated = federationLicensed ? await resolveFederatedMethod() : null;
+  const social = resolveSocialMethods({ federationLicensed });
   // Offered alongside whatever else answers, never instead of it: somebody
   // without a passkey on THIS device must still find the way they used last
   // time. It is appended, so the order the screen renders does not move — and

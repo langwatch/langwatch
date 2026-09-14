@@ -28,13 +28,24 @@ export const publicEnvRouter = publicProcedure
   .query(async ({ ctx }) => {
     // Warning: be very careful with the env vars you expose here
 
+    // Resolved before the object literal so this endpoint asks the license
+    // gate exactly ONCE: the policy's own read answers `federationLicensed`,
+    // and the provider read below only runs when the gate allowed — at which
+    // point the gate's memo is warm and it costs nothing. The gate evicts its
+    // memo on rejection (self-healing), so a second unconditional read here
+    // would recompute a licensing scan per unauthenticated request exactly
+    // when the licensing store is struggling.
+    const signInPolicy = await resolveSignInMethodPolicy();
+
     const publicEnvVars = {
       BASE_HOST: env.BASE_HOST,
       // ADR-027: report "email" whenever the license gate denies SSO, so
       // the sign-in page renders the email form and never auto-redirects to
       // a disabled IdP. `resolveAuthProvider()` is the single source of
       // truth — never read `env.NEXTAUTH_PROVIDER` directly here.
-      NEXTAUTH_PROVIDER: await resolveAuthProvider(),
+      NEXTAUTH_PROVIDER: signInPolicy.federationLicensed
+        ? await resolveAuthProvider()
+        : "email",
       // Whether this deployment mounted the two-factor plugin at boot (D06).
       // A derived boolean rather than the raw setting: the only thing a
       // browser may act on is "is there an endpoint behind the button", and
@@ -50,9 +61,7 @@ export const publicEnvRouter = publicProcedure
       // licensed — as the sign-in method policy's own answer, so the
       // linked-accounts offer and the sign-in rail can never disagree. Ids
       // only: the policy's method objects carry nothing else a browser needs.
-      SIGNIN_FEDERATED_PROVIDERS: (
-        await resolveSignInMethodPolicy()
-      ).defaultMethods
+      SIGNIN_FEDERATED_PROVIDERS: signInPolicy.defaultMethods
         .filter((method) => method.kind === "federated")
         .map((method) => method.id),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
