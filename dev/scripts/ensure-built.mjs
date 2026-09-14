@@ -14,6 +14,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const targets = [
   { name: "langwatch", dir: "sdks/typescript", entry: "dist/index.mjs" },
   { name: "@langwatch/mcp-server", dir: "mcp/typescript", entry: "dist/index.js" },
+  // Before mail: ksuid's `types` condition names its `dist`, and with no
+  // declaration on disk mail's `tsc` falls back to checking ksuid's vendored
+  // SOURCE under mail's own strictness — 26 errors that exist only on a fresh
+  // worktree, where nothing has built ksuid yet.
+  { name: "@langwatch/ksuid", dir: "packages/ksuid", entry: "dist/index.d.ts" },
   { name: "@langwatch/mail", dir: "packages/mail", entry: "dist/index.js" },
 ];
 
