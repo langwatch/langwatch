@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Commit-message autogen gating in save-version fields: with no Fast model resolved, generation never auto-fires and the description field degrades to an explicit sparkles button. See specs/model-providers/missing-model-popup.feature.
+ * Commit-message autogen gating: with no Fast model resolved, generation
+ * never auto-fires and the field degrades to an explicit sparkles button.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

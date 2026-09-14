@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The evaluations panel's Run via API button opens a dialog with copyable
- * snippets for triggering this workflow's evaluation through the unified
- * evaluations-v3 backend and reading the per-row results back. It offers a
- * language picker (Python default, then TypeScript, Go, Shell) and a
- * data-source picker. The examples mirror the entry point's own fields.
+ * Run via API button opens a dialog with copyable snippets (Python default,
+ * TypeScript, Go, Shell) for triggering this workflow via evaluations-v3.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,13 +1,7 @@
 /**
- * Whether a langevals request goes out inline or through a parked payload.
- *
- * Three branches matter: at or below the threshold the body is posted inline;
- * between the threshold and the per-kind cap it is parked and only a presigned
- * URL travels in the header; above the cap the call is refused before any
- * network happens at all.
- *
- * Staging arrives as a port, so the suite stands one up and reads what was
- * parked rather than mocking an object-storage SDK.
+ * Whether a langevals request goes inline or through a parked payload:
+ * at/below the threshold, inline; up to the per-kind cap, parked with a
+ * presigned URL in the header; above the cap, refused before any network.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
