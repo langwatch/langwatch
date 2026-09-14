@@ -47,29 +47,8 @@ export type WorkerGovernanceIngestionOptions = Readonly<{
   logger?: Logger;
 }>;
 
-/**
- * Enterprise Governance's two ingestion pipelines, composed from this
- * process's own substrates.
- *
- *     pulled_usage_processing     command:recordPulledUsage
- *                                 subscriber:pm:pulledUsageLedger
- *     ingestion_pull_processing   command:configure / disable
- *                                 command:recordRunCompleted / recordRunFailed
- *                                 stateProjection:ingestionPullRunStatus
- *                                 subscriber:pm:ingestionPull
- *
- * THE LEDGER IS SUPPLIED, NOT OPTIONAL, and that is a routing fact rather than
- * a preference: `subscriber:pm:pulledUsageLedger` is in the byte-frozen
- * registry, and the Enterprise adapter attaches that process manager only when
- * a ledger is present. A graph composed without one would claim
- * `event-sourcing/jobs` while leaving that key unrouted, so every pulled-usage
- * ledger job would redeliver forever with the pods up.
- *
- * `runsWorkers` is `true` rather than derived. In the application the same
- * value is `roleRunsWorkers(processRole)`, which asks whether THIS process
- * runs background work — and this process is the background worker. It decides
- * one thing: whether the schedule reconcile pass fires at boot.
- */
+// Two ingestion pipelines: pulled_usage_processing and ingestion_pull_processing;
+// both use event-sourced commands and state projections
 export function createWorkerGovernanceIngestion(
   options: WorkerGovernanceIngestionOptions,
 ): GovernanceIngestionWorkerCapability {
@@ -117,17 +96,8 @@ export function createWorkerGovernanceIngestion(
   };
 }
 
-/**
- * A pull walks a URL the CUSTOMER typed, on a schedule, from inside the
- * cluster, with their own credentials attached — so it goes through the same
- * fence every other outbound request in this process does.
- *
- * `blockLocal` is the strict policy rather than the deployment's webhook
- * setting: a webhook destination is a place a customer chose to receive their
- * own data, and an ingestion source is a place we go and read from. The
- * relaxation that makes local webhook endpoints testable has no counterpart
- * here.
- */
+// Ingestion pull validates URLs through strict SSRF policy (blockLocal: true),
+// not the webhook's testable-local relaxation
 class WorkerGovernanceIngestionEgress extends GovernanceIngestionEgress {
   private readonly validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
 

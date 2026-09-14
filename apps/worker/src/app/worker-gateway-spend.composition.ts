@@ -57,8 +57,9 @@ export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase &
 
 /**
  * Reports composition decisions the spend graph would otherwise hide, each
- * silent in production (a stalled settlement, an undeliverable SQS
- * endpoint, an unreadable entitlement). The first two are CONDITIONAL on which substrates the graph was handed, not on what this package can build.
+ * silent in production (a stalled settlement, an undeliverable SQS endpoint,
+ * an unreadable entitlement). The first two depend on which substrates the
+ * graph was handed, not what this package can build.
  */
 export abstract class WorkerGatewaySpendAbsenceReport {
   /** No all-instance ClickHouse directory: open admissions are never swept. */
@@ -81,8 +82,8 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
   resolveClickHouseClient: EventingClickHouseClientResolver;
   /**
    * Every configured ClickHouse endpoint, shared and private — the
-   * settlement sweeper's read side, since one sweeper settles the whole
-   * install and asks each instance directly rather than routing through a tenant resolver, which cannot answer this.
+   * settlement sweeper's read side; it asks each instance directly rather than
+   * routing through a tenant resolver
    */
   resolveClickHouseInstances?: GatewayClickHouseInstanceResolver;
   /** The queue's own Redis, for the spend fold's read-through cache. */
@@ -93,9 +94,9 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
   /** The SSRF-fenced sender this process already composes for automations. */
   egress: WebhookEgressService;
   /**
-   * How this process builds an AWS transport (proxy, TLS agent, assumed
-   * role). Absent leaves a queue endpoint undeliverable, reported rather
-   * than answered with a client built here, which would bypass a self-hosted install's own egress proxy.
+   * How this process builds an AWS transport (proxy, TLS agent, assumed role).
+   * Absent leaves a queue endpoint undeliverable; a client built here would
+   * bypass a self-hosted install's own egress proxy.
    */
   awsClientConfig?: AwsClientConfigResolver;
   /**
@@ -125,9 +126,9 @@ export type WorkerGatewaySpendComposition = Readonly<{
 }>;
 
 /**
- * The Gateway spend spine and Governance signal log, composed as ONE
- * pipeline since neither is meaningful alone — splitting them would
- * silently drop every debit. Rating is NOT here (the fold copies the already-priced amount); the settlement sweeper needs the full instance directory, not a tenant resolver.
+ * The Gateway spend spine and Governance signal log composed as ONE pipeline;
+ * splitting them silently drops debits. Rating is not here (fold copies
+ * already-priced amount); settlement sweeper needs the full instance directory.
  */
 export function createWorkerGatewaySpend(
   options: WorkerGatewaySpendCompositionInput,
@@ -186,9 +187,8 @@ export function createWorkerGatewaySpend(
 }
 
 /**
- * The settlement sweeper's read side, or none. Grace is passed as the raw
- * string the deployment set, since `settlementGraceMs` owns the parse/bound/
- * warning — the same function the REST settlement policy calls, so parsing here too would let the two drift.
+ * The settlement sweeper's read side, or none. Grace passed as the raw string
+ * the deployment set; `settlementGraceMs` owns the parse and validation.
  */
 function resolveSpendSettlement(
   options: WorkerGatewaySpendCompositionInput,
@@ -207,9 +207,8 @@ function resolveSpendSettlement(
 }
 
 /**
- * The last hop for one endpoint, whichever transport it named — both
- * branches are the packaged ones (same egress service/fence/signature), so
- * a verification code keeps working when an integration moves URL->queue. Exported since delivery-time behaviour isn't otherwise observable.
+ * The last hop for one endpoint. Both transports use the same egress fence
+ * and signature; verification code works when integration moves URL->queue.
  */
 export function dispatchWebhookThrough(
   options: WorkerGatewaySpendCompositionInput,
@@ -267,8 +266,8 @@ function dispatchRequestFor(
 
 /**
  * The spend fold's read-through cache, under the prefix both graphs share
- * literally (`gateway_spend`) — a different spelling would give this
- * process its own empty cache and let a redelivered outcome fold twice into a row that carries money.
+ * literally (`gateway_spend`); different spelling would give this process its
+ * own empty cache.
  */
 function cachedSpendFold(
   inner: FoldProjectionStore<GatewaySpendState>,
@@ -286,8 +285,8 @@ function cachedSpendFold(
 
 /**
  * Everything both ADR-073 delivery processes read, composed once: the two
- * process managers share ONE dependency object (endpoint catalogue,
- * delivery log, idempotency receipts), since two objects would be two answers to "is this endpoint deliverable".
+ * process managers share ONE dependency object so they don't disagree on
+ * endpoint deliverability.
  */
 function createWebhookDeliveryDeps(
   options: WorkerGatewaySpendCompositionInput,
@@ -310,9 +309,9 @@ function createWebhookDeliveryDeps(
 }
 
 /**
- * The entitlement the delivery gate reads, or the refusal standing in for
- * it — the deployment's own subscription rows/baseline, so an org the
- * settings screen shows enabled is one this process actually delivers to. Without it the gate refuses BY NAME before a batch leaves.
+ * The entitlement the delivery gate reads, or the refusal standing in for it
+ * — the deployment's own subscription rows/baseline, so the settings screen
+ * and the delivery process see the same answer.
  */
 export function resolveWebhookPlan(
   options: WorkerGatewaySpendCompositionInput,
@@ -390,9 +389,8 @@ class UnconfiguredWebhookSecrets implements WebhookSecret {
 }
 
 /**
- * The two Governance appends a spend debit makes, as this graph's own
- * commands: the debit process resolves budgets/writes debits/reports
- * crossings into the pipeline registered immediately before this one, so a graph mounting spend without governance fails at boot, not silently.
+ * The Governance appends a spend debit makes. The debit process reports
+ * crossings into the governance pipeline, so spend without governance fails at boot.
  */
 class WorkerGovernanceSignalDelivery extends GovernanceSignalDelivery {
   constructor(

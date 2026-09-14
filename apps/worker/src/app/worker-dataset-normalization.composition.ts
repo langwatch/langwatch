@@ -68,29 +68,8 @@ export type WorkerDatasetObjectStorage = {
   azureConfig: WorkerStorageConfig["azure"];
 };
 
-/**
- * Dataset's own application, installed once for the background reads and
- * writes this process makes: an automation appending a matched trace's mapped
- * rows, and the studio datasets an evaluation run materialises.
- *
- * The worker composes no experiment directory and no grants service, so the
- * two operations that read them — borrowing an experiment's name, and copying
- * a dataset into a second project — refuse by name rather than answering.
- *
- * DatasetApp is not yet converted (its App still declares a bespoke
- * `FeatureSetup` Members bag — `storageResolver` — rather than
- * `static readonly reads`), and the v2 builder has no seam left to hand a
- * per-module infrastructure bag through: `withModules` takes only the module
- * list, so this does not type-check (TS2322, naming `storageResolver` as
- * missing) until Dataset is converted. So the `storage` option below (and the
- * `WorkerDatasetStorageResolver` it used to install through
- * `.withModule(datasetServer, { infrastructure: {...} })`) is no longer wired
- * into the app. Unlike a converted module's `reads`, this is NOT an eager,
- * named boot refusal: DatasetApp constructs with `storageResolver` silently
- * `undefined` (so `#normalization` is `null`), and only the first call that
- * needs it fails. That gap is the module-conversion queue's business, not
- * this composition's.
- */
+// Dataset app for background reads and writes: automation appending matched
+// traces and evaluation materializing datasets
 export async function createWorkerDatasetApp(options: {
   database: PrismaClient;
   /** Absent where the caller reads rows only: a chunk read then has no store. */

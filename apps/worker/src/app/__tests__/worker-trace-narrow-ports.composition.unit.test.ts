@@ -12,16 +12,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
 import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.composition.ts";
 
-/**
- * Spec: modules/trace/specs/trace-ingestion-narrow-ports.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so none of these
- * subscribers runs here. What has to be true today is that this composition
- * root can answer all four narrow ports from published services, and that each
- * port really does reach the capability it names — the ports are the whole
- * point of the slice, so a test that exercised the services directly would
- * prove nothing about them.
- */
+// Tests that the composition root can answer all four narrow ports from
+// published services (modules/trace/specs/trace-ingestion-narrow-ports.feature)
 
 const project = { id: "project-1", firstMessage: false, integrated: false };
 

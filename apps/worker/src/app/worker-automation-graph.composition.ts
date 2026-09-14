@@ -23,39 +23,15 @@ import { createWorkerWebhookTransport } from "./worker-webhook-egress.compositio
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { nowInstant, toDate } from "@langwatch/time";
 
-/**
- * What this process still has to be HANDED before the graph vertical composes.
- *
- * ONE OF THE TWO CLEARED. `projects` was recorded here as a capability service
- * no background process could build — `ProjectApi` needs a credentials
- * port, an organization service, the LWQL key map and stored objects. The
- * graph path asks it for one thing: the name and slug of the project an alert
- * is about. It is now `AutomationProjectIdentityPort`, which
- * `createWorkerTraceCapabilityServices` answers from a Prisma client and which
- * `ProjectApi` still satisfies, so the application's own composition is
- * unchanged.
- *
- * `AnalyticsService` stays a parameter. It was never the wall — it is
- * `AnalyticsAdapter` over the ClickHouse resolver this process already holds —
- * and it arrives with the conversion that gives this process a reason to open
- * one, so that the day it does is a change in one composition root and nothing
- * else, and so that a test can compose the whole vertical today.
- */
+// Capabilities the graph vertical needs: project identity (narrowed from
+// ProjectApi) and analytics for metric queries
 export type WorkerAutomationGraphDependencies = Readonly<{
   projects: AutomationProjectIdentityPort;
   analytics: AnalyticsService;
 }>;
 
-/**
- * The transports, ceilings and cipher BOTH halves of Automation send through.
- *
- * One of each, deliberately. The graph alerts and the settled digests reach the
- * same customer through the same mailer and count against the same hourly and
- * daily ceilings, so a process composing two of each would let one half spend
- * the budget the other was protecting — a burst from one and silence from the
- * next. The cipher is shared for a blunter reason: both halves read the same
- * stored Slack token and the same webhook secret, written under one key.
- */
+// Shared transports, ceilings and cipher for both Automation halves to
+// prevent double-spending budgets and secret key conflicts
 export type WorkerAutomationDeliveryComposition = Readonly<{
   delivery: WorkerAutomationNotificationDeliveryAdapter;
   emailCaps: AutomationEmailCapService;
@@ -131,16 +107,8 @@ export type WorkerAutomationGraphCompositionOptions = Readonly<{
    * is larger than intended but still bounded.
    */
   redis?: RedisConnection | null;
-  /**
-   * An SSRF-fenced outbound sender for customer-supplied webhook URLs.
-   *
-   * Defaulted to the one this process composes from `@langwatch/egress` and its
-   * own Redis, so a webhook automation leaves here through the same fence the
-   * application sends through. It stays a parameter because a test wants to
-   * observe the request without making one, and because the delivery adapter
-   * still has to refuse BY NAME in a process that composes no sender at all —
-   * see `WorkerAutomationNotificationDeliveryAdapter`.
-   */
+  // SSRF-fenced sender for customer webhook URLs; defaulted to match the
+  // application's own fence so tests can observe without side effects
   webhookTransport?: WebhookDeliveryTransport;
   /**
    * How this process reaches the Slack Web API.
@@ -153,20 +121,8 @@ export type WorkerAutomationGraphCompositionOptions = Readonly<{
   logger?: Logger;
 }>;
 
-/**
- * Composes the graph-alert vertical, or reports that this process has none.
- *
- * Nothing exactly when the deployment named no `BASE_HOST`. Every alert this
- * path sends carries links back to the deployment — the automation's own page,
- * the graph it watches, the unsubscribe footer — and the sender address is
- * derived from the same host. A vertical composed without it would evaluate
- * correctly and then send mail nobody can act on, which is worse than a
- * process that says it cannot alert.
- *
- * It is a `tryCreate` for the same reason the mail capability is: what an
- * absent capability COSTS is decided by the graph that would have consumed it,
- * not here.
- */
+// Composes the graph-alert vertical if BASE_HOST is set; absent means alerts
+// cannot be sent (links back to deployment and sender address are derived from host)
 export function tryCreateWorkerAutomationGraphComposition(
   options: WorkerAutomationGraphCompositionOptions,
 ): AutomationGraphActivity | undefined {
@@ -192,26 +148,8 @@ export function tryCreateWorkerAutomationGraphComposition(
   });
 }
 
-/**
- * The cipher stored automation credentials were written under, or one that
- * refuses.
- *
- * A deployment that never configured a key has no encrypted credential to
- * read, and its email and Slack-webhook automations work perfectly — so an
- * absent key must not stop the vertical composing. What it must not do either
- * is look like a cipher: a no-op that returned the ciphertext would hand a
- * Slack API an unusable token and produce an error from Slack about the
- * customer's own credentials.
- */
-/**
- * The one cipher this process reads the App's stored secrets with.
- *
- * Exported because THREE verticals share it and must: an automation's Slack
- * token, a webhook endpoint's signing secret and a Governance ingestion
- * source's API credential are all written by the control plane under
- * `CREDENTIALS_SECRET`, and a second cipher here would not fail — it would
- * decrypt to noise and authenticate with garbage.
- */
+// Shared cipher for automation, webhook and governance credentials written
+// under CREDENTIALS_SECRET by the control plane
 export function resolveWorkerStoredSecretCipher(config: WorkerConfig): AutomationSecretCrypto {
   const key = config.automation.credentialsEncryptionKey;
 

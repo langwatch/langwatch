@@ -5,21 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { createWorkerWebhookTransport } from "../worker-webhook-egress.composition.ts";
 
-/**
- * Spec: packages/egress/specs/webhook-egress.feature
- *
- * This is a COMPOSITION-CAPABILITY test, not a mounted pipeline. The
- * application still owns webhook dispatch; what has to be true today is that
- * this process can build the fenced sender from configuration it already reads,
- * and that a dispatch driven THROUGH `WebhookDeliveryTransport` is fenced by the
- * same rules the application fences by.
- *
- * There is deliberately no successful-delivery case here, and its absence is the
- * point: the strict policy refuses plain http, refuses a non-default port and
- * refuses every loopback address, so no local test server is reachable through
- * this transport at all. The envelope on the wire is pinned in
- * `@langwatch/egress`'s own suite, against the fence's own seam.
- */
+// Tests that the fenced webhook sender applies the same fence rules as the
+// application (packages/egress/specs/webhook-egress.feature)
 
 const ENVIRONMENT = {
   BASE_HOST: "https://app.langwatch.test",

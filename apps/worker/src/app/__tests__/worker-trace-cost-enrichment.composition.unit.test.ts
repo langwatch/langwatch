@@ -5,15 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceCostEnrichment } from "../worker-trace-cost-enrichment.composition.ts";
 import { createWorkerTraceModelCostCatalogPort } from "../worker-trace-narrow-ports.composition.ts";
 
-/**
- * Spec: modules/trace/specs/record-time-cost-enrichment.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
- * process enriches a span. What has to be true today is that this composition
- * root can build the whole record-time pricing path out of a published
- * `ModelProviderApi` — and that the path really does run THROUGH the narrow
- * port, because the port is what made the enrichment composable at all.
- */
+// Tests that the composition root builds the record-time pricing path through
+// the narrow port (modules/trace/specs/record-time-cost-enrichment.feature)
 
 function span(model: string, name = "test-span"): OtlpSpan {
   return {

@@ -21,15 +21,8 @@ import {
   type WorkerDatabaseCompositionOptions,
 } from "./worker-production.composition.ts";
 
-/**
- * The two persistence engines the durable Eventing graph is built on.
- *
- * Both arrive as ports rather than as configuration the worker reads. The
- * process-store side is the deployment's Prisma client, handed over opaquely
- * so generated Prisma stays out of this package's declarations; the event
- * store side is a tenant-aware ClickHouse resolver, because routing a tenant
- * to its instance is the host's decision and Eventing must never make it.
- */
+// Process store (Prisma) and event store (ClickHouse) persistence for the
+// durable Eventing graph; both arrive as ports, not configuration
 export type WorkerDurablePersistenceMembers = Readonly<{
   database: EventingProcessPersistenceDatabase;
   resolveClickHouseClient: EventingClickHouseClientResolver;
@@ -54,23 +47,8 @@ export type WorkerDurableCompositionOptions = Readonly<{
   observability?: ProcessObservability;
 }>;
 
-/**
- * The production caller for the Worker's durable graph.
- *
- * It is the single place where the private infrastructure projection (Redis,
- * Group Queue policy, outbound proxy, stored-object storage) meets the durable
- * Eventing persistence (the ClickHouse event store and the Prisma process
- * store), so a deployment has exactly one composition to supply ports to
- * rather than two that could disagree about which Redis or which retention
- * they are using.
- *
- * Consumers stay disabled. This composition asks for none, and it may not:
- * `event-sourcing/jobs` is one shared queue holding every pipeline, so a
- * worker that claimed it while any pipeline were still unmounted would reject
- * and redeliver that pipeline's jobs indefinitely. The graph it builds mounts
- * only the features its caller supplies, which is never all of them yet.
- * Claiming the queue belongs to the composition that completes the registry.
- */
+// Unifies infrastructure projection and durable Eventing persistence so
+// deployments don't disagree about Redis or retention; consumers disabled here
 export function createWorkerDurableComposition(
   options: WorkerDurableCompositionOptions,
 ): Promise<WorkerProductionComposition> {

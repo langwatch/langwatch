@@ -30,26 +30,8 @@ export type WorkerFeatureFlagPeers = Readonly<{
   organizations: OrganizationApiContract;
 }>;
 
-/**
- * The kill switches and rollout rules this process reads.
- *
- * WHY REDIS IS OPTIONAL AND THE ABSENCE IS NOT A REFUSAL. Every flag has a
- * stored row; the cache only decides how often it is re-read. A process
- * without Redis falls back to the app's own in-memory tier and answers the
- * same values a little more often from Postgres, which is what the interactive
- * process does when Redis is down. That is different from the mail capability,
- * where an absent variable would have produced mail nobody could act on.
- *
- * WHY ONE PER PROCESS. The app holds a per-process cache tier whose value
- * depends on being shared by every caller in the process. Two of these would
- * halve the hit rate and let two callers disagree for a TTL about whether a
- * kill switch is thrown.
- *
- * WHY IT INSTALLS AFTER THE FOUNDATION. A tenant-targeted read is authorized
- * against the project and organization directories the foundation boots, and
- * the foundation is composed over the Eventing runtime whose kill switch reads
- * this app. The root hands the switch a reference and binds it here.
- */
+// Per-process cache tier for flags; one per process so callers don't disagree
+// on kill switches; installs after foundation boots project and org directories
 export async function installWorkerFeatureFlags(options: {
   prisma: PrismaClient;
   config: WorkerConfig;

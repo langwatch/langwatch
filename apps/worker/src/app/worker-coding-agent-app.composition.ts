@@ -35,16 +35,8 @@ export async function createWorkerCodingAgentApp(options: {
   database: PrismaConnection["client"];
   organizations: OrganizationApi;
   projects: ProjectApi;
-  /**
-   * No longer wired: `CodingAgentApp` still declares a bespoke infrastructure
-   * bag (billing, scope directory, scope permissions, content visibility,
-   * audit sink — see `modules/coding-agent/server/src/app/coding-agent.app.ts`)
-   * that the v2 builder has no seam for, since the module has not yet
-   * declared its own `reads()`. Kept on this options record purely for
-   * call-site compatibility with `worker-observability-apps.composition.ts`;
-   * closing the gap is the coding-agent module's own conversion, not this
-   * composition's.
-   */
+  // Kept for call-site compatibility; the v2 builder has no seam for the
+  // bespoke infrastructure bag these still declare
   authorization: AuthzApi;
   billing: CodingAgentBillingPolicy;
   /** The process's routed query client the module's live tier reads. */

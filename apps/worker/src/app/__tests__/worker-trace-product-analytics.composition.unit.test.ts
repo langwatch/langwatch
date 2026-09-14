@@ -3,16 +3,9 @@ import { TraceProductAnalytics } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
 
-/**
- * Spec: modules/trace/specs/trace-product-analytics-worker-composition.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so `projectMetadata`
- * still runs in the application and nothing here captures an event in
- * production. What has to be true today is that this composition root can build
- * a REAL sink from the two variables it now reads, and that the sink it builds
- * is flushed when the process gives its resources back — the two things the
- * ledger named as blocking the conversion.
- */
+// Tests that the composition root builds a real sink and that it's flushed
+// when the process gives resources back
+// (modules/trace/specs/trace-product-analytics-worker-composition.feature)
 describe("createWorkerTraceProductAnalytics", () => {
   describe("given the two variables this process now reads", () => {
     describe("when the sink is composed", () => {

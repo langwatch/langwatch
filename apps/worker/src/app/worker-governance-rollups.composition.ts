@@ -13,27 +13,8 @@ import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@lang
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 
-/**
- * The two Governance roll-ups that ride the trace fold.
- *
- * `reactor:governanceKpisSync` writes one hour-bucketed spend and token
- * contribution per governed trace; `reactor:governanceOcsfEventsSync` writes
- * the SIEM export row a customer's security team reads. Both are in the
- * byte-frozen registry, so a consumer that omitted them would leave two kinds
- * of work redelivering forever — which is why they are MOUNTED here rather
- * than left as the "honest absence" the definition's optional parameters would
- * otherwise permit.
- *
- * THEY ARE FULL SUBSCRIBER SPECS BY THE TIME THE PIPELINE SEES THEM, and that
- * is the whole reason this file exists: the OSS trace pipeline must not import
- * `@ee`, so the composition root builds the two specs — window, predicate and
- * handler — and hands them over as data.
- *
- * THE WINDOW IS THE FEATURE'S OWN. Both roll-ups throttle per trace on a
- * constant the governance package exports, not a number chosen here: while
- * both graphs ingest, a window spelled differently on either side would write
- * two contributions for one trace and double a customer's reported spend.
- */
+// Two Governance roll-ups (KPIs and OCSF events) built as full subscriber
+// specs here so the OSS trace pipeline doesn't import @ee
 export type WorkerGovernanceRollups = {
   governanceKpisSync: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
   governanceOcsfEventsSync: SubscriberSpec<TraceProcessingEvent> & { fold: "traceSummary" };
@@ -84,15 +65,8 @@ export function createWorkerGovernanceRollups(options: {
   };
 }
 
-/**
- * Where a governance roll-up reports a row it could not write.
- *
- * It LOGS and continues rather than raising, which is the subscribers' own
- * contract: a KPI contribution that fails must not fail the trace fold that
- * produced it. The application additionally forwards the error to its capture
- * sink; this process has none, so the log line is the whole record — and
- * saying so here is better than composing a capture that swallows.
- */
+// Reports row write failures; logs and continues so a KPI failure doesn't
+// fail the trace fold that produced it
 class WorkerGovernanceSubscriberDiagnostics implements GovernanceSubscriberDiagnosticsSink {
   constructor(private readonly logger: Logger) {}
 

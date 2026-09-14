@@ -6,18 +6,8 @@ import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { WorkerTiktokenCounterAdapter } from "../../platform/infrastructure/worker-token-counter.adapter.ts";
 import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimation.composition.ts";
 
-/**
- * Spec: modules/trace/specs/span-token-estimation.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
- * process estimates a token. What has to be true today is that this
- * composition root can build the whole path — Trace's narrow port, the
- * estimator, the kill switches and the encoding tables — out of the two
- * tokenizer variables and the feature-flag service this process already holds.
- *
- * It is driven through `TraceSpanTokenEstimation`, the port the conversion
- * will call, rather than through the service underneath it.
- */
+// Tests that the composition root builds the token estimation path through
+// the port (modules/trace/specs/span-token-estimation.feature)
 
 const flags = (enabled: Record<string, boolean> = {}): FeatureFlagApi =>
   ({ isEnabled: async (key: string) => enabled[key] ?? false }) as never;

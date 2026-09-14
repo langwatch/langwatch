@@ -15,23 +15,9 @@ import {
   WORKER_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
 } from "../worker-trace-privacy.composition.ts";
 
-/**
- * Spec: modules/data-privacy/specs/span-pii-redaction.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
- * still owns `EventingRecordSpanAdapter`'s adapters and nothing in this process
- * redacts a span. What has to be true today is that this composition root can
- * build the whole path — Trace's narrow port, the redaction service, the
- * native engines and the analysis transport — out of the four privacy
- * variables, the data-privacy service and the feature flags this process
- * already holds, and that a span carrying personal data comes out of it
- * scrubbed.
- *
- * It is driven through `TraceSpanPiiRedaction`, the port the conversion
- * will actually call, rather than through the service underneath it: a graph
- * that redacts correctly but cannot be handed to `EventingRecordSpanAdapter` would
- * pass a service-level test and still be unusable here.
- */
+// Tests that the composition root builds the redaction path through the port
+// so it can be handed to EventingRecordSpanAdapter
+// (modules/data-privacy/specs/span-pii-redaction.feature)
 
 const TENANT = "project-1" as TenantId;
 

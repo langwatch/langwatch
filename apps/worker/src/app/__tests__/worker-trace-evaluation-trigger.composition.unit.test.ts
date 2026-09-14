@@ -13,16 +13,8 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceEvaluationTrigger } from "../worker-trace-evaluation-trigger.composition.ts";
 
-/**
- * Spec: modules/trace/specs/evaluation-trigger.feature
- *
- * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
- * still registers `evaluationTrigger` and nothing here dispatches. What has to
- * be true today is that this composition root can build the subscriber from a
- * published monitor service, a feature-flag service and a queue send — and
- * that the dedup key the queue would squash against is EVALUATION'S own
- * `makeJobId`, reached through the port, not a string this process spells.
- */
+// Tests that the composition root builds the evaluation-trigger subscriber
+// using the evaluation's own makeJobId for dedup (modules/trace/specs/evaluation-trigger.feature)
 
 function foldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {

@@ -14,21 +14,9 @@ import { createWorkerGovernanceRollups } from "../worker-governance-rollups.comp
 import { createWorkerTrackedEvents } from "../worker-tracked-event.composition.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
-/**
- * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature
- *
- * THE CONVERSION, asserted where it can actually fail. The definition test
- * beside this one proves the pipeline REGISTERS the right names; nothing in it
- * could tell a handler that reaches its collaborator from one that was handed
- * in and quietly does nothing — which is exactly what the fifteen parameters
- * used to be.
- *
- * So every assertion here drives a registered handler and observes the effect
- * at the far end: a durable trigger match written through Automation's own
- * recorder, an evaluation reported through Evaluation's, a synthetic span sent
- * back through `recordSpan`, a project's clustering claimed through Topic's.
- * A handler wired to the wrong proxy, or to none, fails here.
- */
+// Tests that each registered handler reaches its collaborator; a handler wired
+// incorrectly or to no proxy fails
+// (specs/trace-processing/worker-trace-pipeline-conversion.feature)
 
 const RECORDED: {
   reportEvaluation: unknown[];
@@ -74,15 +62,8 @@ function reset(): void {
   for (const value of Object.values(RECORDED)) value.length = 0;
 }
 
-/**
- * One project row, in the shape the project contract actually parses.
- *
- * EVERY FIELD IS LOAD-BEARING. `projectSchema` is `.strict()`, so a thin row
- * throws inside the repository — and `projectMetadataHandler` catches and logs
- * its own failures. A short double would leave this test green with the
- * subscriber never reaching Topic at all, which is precisely the failure it
- * exists to catch.
- */
+// Every field is load-bearing: projectSchema is .strict(), so a thin double
+// would miss the failure the handler reaches Topic at all
 const PROJECT_ROW = {
   id: "project-1",
   name: "Acme",
