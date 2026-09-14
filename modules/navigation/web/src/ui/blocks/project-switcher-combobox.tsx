@@ -11,13 +11,8 @@ import { ProjectAvatar } from "../elements/project-avatar.tsx";
 import { ProjectComboboxPopup } from "./project-switcher-combobox-popup.tsx";
 
 /**
- * The project switch chip for an organization with a long project list:
- * a combobox whose popup opens with a focused search field, filters by
- * project and team name as the user types, and answers the arrow keys
- * and Enter. Grouped by team, with the per-team create entry kept while
- * the list is unfiltered.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
+ * Project switch combobox for long lists: searchable, grouped by team,
+ * keyboard navigation. Spec: specs/navigation/product-switcher-navigation.feature
  */
 export function ProjectSwitcherCombobox({
   groups,

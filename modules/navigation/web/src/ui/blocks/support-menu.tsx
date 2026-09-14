@@ -1,11 +1,6 @@
 /**
- * The way to a person, the community and the documentation, at the foot of
- * every navigation column.
- *
- * Moved from `platform/app/src/components/sidebar/SupportMenu.tsx`. The Crisp
- * bubble it used to toggle through `~/utils/crispBubblePolicy` is a script the
- * APPLICATION loads, so the host answers whether there is one; the `IS_SAAS`
- * read that stood in for that question is gone with `usePublicEnv`.
+ * Support links at navigation foot: help, community, docs. Moved from
+ * platform/app; host answers Crisp availability (application-loaded script).
  */
 
 import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";

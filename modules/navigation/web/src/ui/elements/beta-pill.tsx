@@ -9,18 +9,8 @@ import {
 } from "@langwatch/design-system/popover";
 
 /**
- * BetaPill indicates a feature is in beta.
- *
- * Displays a small "Beta" pill badge. On hover, keyboard focus, or click,
- * a popover appears with a customizable message that supports
- * rich content (styled text, clickable links, etc.). Clicking the pill
- * toggles the popover open/closed.
- *
- * Can optionally wrap content (children) to place the badge alongside it,
- * or be used standalone (e.g. as a rightElement in a menu item).
- *
- * @param children - Optional content to wrap (e.g. a page heading)
- * @param message - ReactNode rendered inside the popover on hover/focus
+ * Beta indicator badge with hover/focus popover. Can wrap content or stand alone.
+ * @param message - ReactNode shown in popover on hover/focus
  */
 export function BetaPill({
   children,

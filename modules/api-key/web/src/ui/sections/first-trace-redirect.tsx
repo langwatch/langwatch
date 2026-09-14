@@ -1,12 +1,6 @@
 /**
- * The line under the CLI success card while we wait for the reader's first
- * trace, and the announcement when it arrives.
- *
- * The rendering half of `platform/app/src/pages/cli/FirstTraceRedirect.tsx`; the
- * watch is `behavior/use-first-trace-watch.ts` and the policy it applies is
- * `model/first-trace-policy.ts`. Rendering nothing is the common case, and it is
- * deliberate: a reader whose project already has traces keeps the plain
- * close-this-tab card rather than being told about a wait that will not happen.
+ * Waiting/success line under the CLI card. Rendering nothing is deliberate when
+ * traces already exist.
  */
 
 import { HStack, Icon, Spinner, Text } from "@chakra-ui/react";

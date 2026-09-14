@@ -1,18 +1,7 @@
 /**
- * The product-native scope in the shell's top bar.
- *
- * Moved from
- * `platform/app/src/features/navigation/shell/ProductScopeControl.tsx`. The
- * groups it offered came from `useWorkspaceData`, a `platform/app` hook that
- * no longer exists; this package already publishes the same answer —
- * `useProjectPickItems` builds the groups from the host's own workspace graph,
- * and it is what the project switcher in the application chrome reads too.
- *
- * The per-team "New Project" entry is not offered, the narrowing the switcher
- * move already recorded: it opened the create-project drawer, which is a
- * `platform/app` component.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
+ * Product-native scope in top bar. Groups from useProjectPickItems (host's
+ * workspace graph); create-project entry not offered. Spec:
+ * specs/navigation/product-switcher-navigation.feature
  */
 
 import { Badge, Box, Button, HStack, Portal, Text } from "@chakra-ui/react";

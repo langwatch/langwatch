@@ -1,18 +1,6 @@
 /**
- * The personal column's entries: my usage, my traces, my sessions, my library.
- *
- * Moved from `platform/app/src/components/PersonalSidebar.tsx`. What travelled
- * is `PersonalSidebarLinks` — the list the product sidebar renders for the Me
- * product. The COLUMN around it belonged to `DashboardLayout`, the legacy
- * chrome this move deletes, and the shell that renders these links draws its
- * own column.
- *
- * `findPersonalProject` is gone with `platform/app/src/utils/personalProject`;
- * which project is the reader's own is a question the HOST already answers,
- * through the teams it says the reader may open, ordered with the ambient one
- * first. Asking it there rather than restating the rule here is the same
- * choice `resolveLlmOpsProjectSlug` made.
- *
+ * Personal column entries (usage, traces, sessions, library). PersonalSidebarLinks
+ * only; column came from DashboardLayout (deleted). Personal project from host.
  * Spec: specs/navigation/product-sidebars.feature
  */
 

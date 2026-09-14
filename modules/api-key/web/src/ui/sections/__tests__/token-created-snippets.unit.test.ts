@@ -1,29 +1,7 @@
 /**
- * The token dialog's snippets: the commands it builds and the languages it names.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/__tests__/token-created-snippets.unit.test.ts`.
- * THE ASSISTANT-COMMAND CASES ARE VERBATIM — they drive the exported builders
- * and never read a file, so they travelled unchanged. The rest of that file was
- * a SOURCE-READING GUARD over four platform modules, three of which no longer
- * exist, and it is restated here against behaviour instead:
- *
- *   - "CodePreview's adapter registers ini / shellscript / bash / json" was a
- *     substring match on a file. It is now `isShikiLangReady` over every
- *     language the dialog actually names, resolved through the same alias table
- *     the renderer uses. A new tab whose language is only lazily loadable fails
- *     this; the substring match could not have noticed.
- *   - "the dialog-local ShikiCommandBox is deleted" and "index/ApiKeysSection do
- *     not import shikiAdapter" named files this move deletes. What survives is
- *     the invariant under them: nothing in this package statically imports the
- *     Shiki engine, so a settings page that renders no code block does not pay
- *     for one.
- *   - "package.json contains only the pre-existing highlighting libraries" read
- *     `platform/app/package.json`. It is NARROWED to this package's own
- *     manifest: the family may not bring a second highlighter, and the
- *     application-wide version of that guard dies with the file it lived in.
- *     Recorded rather than silently dropped.
- *
- * Spec: specs/api-keys/token-created-snippets.feature
+ * Token dialog snippets: builders are verbatim from platform/app, but
+ * source-reading guards are restated against behavior. Spec:
+ * specs/api-keys/token-created-snippets.feature
  */
 
 import { isShikiLangReady, normalizeShikiLang } from "@langwatch/design-system/shiki";

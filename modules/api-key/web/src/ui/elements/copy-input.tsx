@@ -1,17 +1,6 @@
 /**
- * A read-only field whose whole job is being copied.
- *
- * The THIRD family-local copy of the field `platform/app`'s `components/CopyInput`
- * was — `@langwatch/scim-web` and `@langwatch/organization-web` each took one for
- * the same reason, and the platform original has since been deleted, so there is
- * nothing left to move. The three die together when the field lands in the Design
- * System, where every half could name it.
- *
- * What differs from those two, and deliberately: the clipboard write and the
- * notice go through the HOST rather than through a toaster this element imports.
- * Every copy button in the product says the same thing about a refused write, and
- * saying "copied" for a write that did not happen is worse than saying nothing —
- * which on a page that hands out a credential is the whole point.
+ * Read-only copy field that routes clipboard writes through the HOST host, not a
+ * toaster, so failed copies don't falsely confirm when handling credentials.
  */
 
 import { Input } from "@chakra-ui/react";

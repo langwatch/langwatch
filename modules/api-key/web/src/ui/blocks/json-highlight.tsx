@@ -1,14 +1,5 @@
-/**
- * The MCP config block in the token dialog, syntax-highlighted.
- *
- * A FAMILY-LOCAL COPY of
- * `platform/app/src/features/onboarding/components/sections/shared/JsonHighlight.tsx`,
- * which stays: four other onboarding surfaces render it. ONE substitution —
- * the shared Shiki adapter comes from `@langwatch/design-system/shiki` rather
- * than from `@langwatch/trace-web`, which merely re-exports it (`index.ts`:
- * `export * from "@langwatch/design-system/shiki"`). Same singleton
- * highlighter, same themes, one fewer web-to-web import.
- */
+// MCP config syntax-highlighted. Family-local copy (onboarding needs it). Uses
+// design-system/shiki not trace-web re-export (one fewer web-to-web import).
 
 import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
 import type React from "react";
@@ -20,15 +11,7 @@ export function JsonHighlight({
   highlightLines,
 }: {
   code: string;
-  /**
-   * 1-indexed line numbers to call out with a background tint. Used by
-   * the empty-state onboarding to flag the env-var lines (API key,
-   * project id, endpoint) the user actually has to copy. Highlight
-   * styling itself comes from the global rule in
-   * `packages/design-system/src/system/config.ts`
-   * (`[data-line][data-highlight]:after`) so every code block in the
-   * app shares the same orange accent.
-   */
+  /** 1-indexed lines to highlight for onboarding env-var reference (styling from design-system). */
   highlightLines?: number[];
 }): React.ReactElement {
   const { colorMode } = useColorMode();

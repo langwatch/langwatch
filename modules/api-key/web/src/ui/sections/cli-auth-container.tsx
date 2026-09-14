@@ -1,27 +1,6 @@
 /**
- * The full-page frame the CLI authorize screen renders inside.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/features/onboarding/components/containers/OnboardingContainer.tsx`,
- * which stays for the onboarding family that owns it. `/cli/auth` is not a
- * settings page — it is the page a browser opened by `langwatch login` lands on,
- * with no shell around it — so it frames itself, and the settings chrome every
- * other family in this move uses would be wrong here.
- *
- * WHAT DID NOT TRAVEL, and why each is a deletion rather than a loss:
- *
- *   - **The sign-out button.** It reached `signOut` from the session client and
- *     `useAnalytics` to emit its click, neither of which a screen may name. It is
- *     also the one control on the frame that has nothing to do with approving a
- *     device code: a reader who signs out mid-approval loses the flow. Recorded
- *     as the one visible difference on this page.
- *   - **The back button, the skip link, `widthVariant` and `compressedHeader`.**
- *     `/cli/auth` passes none of them — `showBackButton={false}` explicitly — so
- *     they are dead props here, and carrying them would drag `~/components/ui/link`
- *     and its router with them.
- *
- * The mesh background, the logo, the entrance animation and the loading skeleton
- * all travel, because they are what the page looks like.
+ * Full-page frame for CLI authorize screen. Narrowed copy because /cli/auth is
+ * standalone (no shell), so settings chrome is wrong here.
  */
 
 import {

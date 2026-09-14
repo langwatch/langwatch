@@ -135,7 +135,7 @@ export const MAX_RECENT_ITEMS = 50;
 export const RECENT_ITEMS_DISPLAY_LIMIT = 5;
 
 // Search constants
-/** Debounce delay in ms for search queries - fast enough for responsive feel, slow enough to batch keystrokes */
+/** Debounce delay in ms for search queries — responsive but batches keystrokes. */
 export const SEARCH_DEBOUNCE_MS = 300;
 /** Minimum query length before searching */
 export const MIN_SEARCH_QUERY_LENGTH = 2;

@@ -1,13 +1,6 @@
 /**
- * A copy button that flashes a tick when the write actually landed.
- *
- * A FAMILY-LOCAL COPY of
- * `platform/app/src/features/onboarding/components/sections/shared/InlineCopyButton.tsx`,
- * narrowed in one way: the platform component reached the toast singleton
- * through `copy-to-clipboard.ts`, and a screen may reach neither the clipboard
- * nor a toaster. It asks the host, which does both and answers whether the write
- * landed — so the tick still cannot appear for a copy that was refused, which is
- * the one behaviour in this button worth keeping.
+ * Copy button routed through the host so the tick only flashes when the write
+ * actually succeeds.
  */
 
 import { Button } from "@chakra-ui/react";

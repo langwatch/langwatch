@@ -1,20 +1,6 @@
 /**
- * `/mcp/authorize` - grant an MCP client access to a project.
- *
- * THE REDIRECT ALLOWLIST IS UNCHANGED, byte for byte, and that is the point of
- * keeping `model/redirect-schemes` inside this package rather than behind the
- * host port: it is the SECOND lock behind the server's own client-registry
- * check, and a lock a different composition could answer differently is not a
- * lock. Both call sites are here - the redirect the server hands back, and the
- * `redirect_uri` a denial bounces off - exactly as the platform page had them.
- *
- * What did change is the wire and the frame. The POST to `/api/mcp/authorize` is
- * a REST exchange with an MCP client waiting on the other side, so it lives in
- * `apps/ui/src/behavior` where a browser transport belongs and reaches this
- * screen as `authorizeMcpClient()` - the same shape the `/cli/auth` device flow
- * took. `DashboardLayout` is the chrome layout route's, and the project switcher
- * in the header - which is HOW a reader chooses what is being granted - arrives
- * as a `ReactNode` off the port.
+ * Grant an MCP client access to a project. Redirect allowlist is unchanged
+ * (security-critical second lock); wire and frame changed per port architecture.
  */
 
 import { Button, Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";

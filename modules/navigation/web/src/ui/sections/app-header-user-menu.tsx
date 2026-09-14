@@ -1,23 +1,6 @@
 /**
- * The avatar button and its dropdown, top-right of the shell's header.
- *
- * Moved from `platform/app/src/components/AppHeaderUserMenu.tsx`. It keeps its
- * account entries, the navigation-mode picker and the reduced-graphics control;
- * three things travelled differently and all three are recorded:
- *
- * - LOGOUT IS AN ACTION, NOT A LINK. It was `<a href="/api/auth/logout">`,
- *   which named an address of the application that served it. The host ends
- *   the session instead, through the ONE identity client the application owns —
- *   a governed web package may not import an authentication implementation at
- *   all (`frontend-ui-boundaries` names `better-auth` by name).
- * - The experiments dialog and the impersonation switch-back entry are
- *   `@langwatch/feature-flag-web` and `platform/app`'s ops components. Both are
- *   handed in by the host as nodes, the shape `waiting()` established, so this
- *   package takes no dependency on either half.
- * - The presence toggle reads a presence store and a presence feature gate
- *   that belong to `@langwatch/trace-web`, and it is offered on one lens only,
- *   so it arrives as `accountMenu.presence` — a node, gated by the host.
- *
+ * Avatar dropdown menu (account, nav mode, graphics toggle). Logout via host
+ * identity client; experiments and presence toggles handed in as nodes.
  * Spec: specs/navigation/navigation-modes.feature
  */
 

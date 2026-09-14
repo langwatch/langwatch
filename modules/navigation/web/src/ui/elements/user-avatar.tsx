@@ -1,11 +1,6 @@
 /**
- * The person in the header's avatar button.
- *
- * Moved from `platform/app/src/components/UserAvatar.tsx` as it stood. The
- * `onError` guard tracks the BROKEN URL rather than a bare boolean, so a new
- * photo mid-session is not latched to the fallback by the old one's failure.
- *
- * Spec: specs/settings/user-avatar.feature
+ * Header avatar button. onError tracks broken URL, not boolean, so new photos
+ * mid-session don't get stuck on old failures. Spec: specs/settings/user-avatar.feature
  */
 
 import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";

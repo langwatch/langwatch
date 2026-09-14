@@ -1,23 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings > API Keys: what the table shows, what it hides, and what a mint
- * reveals exactly once.
- *
- * Consolidates three platform suites - `api-keys-ingestion-split`,
- * `api-keys-scope-filter` and `project-key-rotation` - onto this package's host
- * harness. What changed is where the ambient facts come from: the platform files
- * mocked `~/hooks/useOrganizationTeamProject`, `~/utils/auth-client` and a
- * router; here the fake host answers all three, which is what the real adapter
- * does too.
- *
- * THE CREDENTIAL CASES ARE THE POINT OF THE FILE. A row renders a lookup PREFIX
- * and never a secret; the legacy project key shows four characters and copies in
- * full; a minted token appears once, in the dialog, and is gone when it closes.
- *
- * Specs: specs/api-keys/unified-api-keys.feature,
- *        specs/api-keys/scope-filter.feature,
- *        specs/api-keys/project-key-rotation.feature
+ * Consolidates three platform suites onto the host harness. Core cases: lookup
+ * prefix never shows secrets; minted token appears once then vanishes.
+ * Specs: specs/api-keys/{unified-api-keys,scope-filter,project-key-rotation}.feature
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";

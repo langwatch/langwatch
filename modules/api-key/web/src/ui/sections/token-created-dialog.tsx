@@ -1,35 +1,7 @@
 /**
- * THE ONE-TIME REVEAL. Shown immediately after an API key is minted, and the
- * only place in the product a plaintext token is ever rendered.
- *
- * Renders four sections:
- *  1. "Use in Code" tabs (.env / Bearer / Basic Auth) — CodePreview
- *  2. Amber "Copy this token now" warning
- *  3. "Use with Code Assistants" tabs — CodePreview
- *  4. "Or paste into your config file" — JsonHighlight
- *
- * ## The credential rules this dialog keeps, unchanged by the move
- *
- *  - The token arrives in `apiKey.create`'s answer and lives in the SCREEN's
- *    state for as long as this dialog is open. Closing it clears the state, and
- *    no read can bring it back: every list answer carries a `lookupIdPrefix`
- *    and nothing more. That is what the amber line means literally.
- *  - What is DISPLAYED is masked until the reader asks; what is COPIED is
- *    always the real value. `CodePreview`'s own docblock says why the two must
- *    differ.
- *  - The Basic Auth tab's `sensitiveValue` is the BASE64 BLOB, not the token. A
- *    token is not a substring of its own base64, so masking on the token there
- *    would silently fail open and print the credential in full.
- *  - The JSON config block renders the MASKED key and its copy button carries
- *    the real one, which is the same split one level up.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/TokenCreatedDialog.tsx`.
- * The seven onboarding modules it reached stay where they are — seven other
- * surfaces render them — so this package carries its own narrowed copies, and
- * `TOKEN_SNIPPET_LANGUAGES` below is what replaces the source-reading guard that
- * used to assert the highlighter knew the dialog's languages.
- *
- * @see specs/api-keys/token-created-snippets.feature
+ * One-time reveal: token displays masked (real value copied), lives in screen
+ * state, cleared on close. Credential rules unchanged from moved platform file.
+ * Spec: specs/api-keys/token-created-snippets.feature
  */
 
 import { Alert, Box, createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
@@ -51,17 +23,7 @@ import { TabButton } from "../elements/tab-button.tsx";
 
 type CodeTab = "env" | "bearer" | "basic";
 
-/**
- * Every Shiki language this dialog names, so the guard can check the shared
- * highlighter knows all of them.
- *
- * `token-created-snippets.unit.test.ts` resolves each through
- * `normalizeShikiLang` and asserts the result is in the Design System's eager
- * `SHIKI_BASE_LANGS`. A new tab whose language is only lazily loadable renders
- * unhighlighted on first paint, which is exactly the regression the platform
- * guard's substring match was written for — and this catches it by behaviour
- * rather than by reading a file off disk.
- */
+/** Every Shiki language this dialog names, guarded against lazy-load regression. */
 export const TOKEN_SNIPPET_LANGUAGES = ["ini", "shellscript", "bash", "json"] as const;
 
 /** What a snippet needs to name this project and this freshly minted token. */
@@ -87,18 +49,8 @@ export interface CodeAssistant {
 }
 
 /**
- * The coding assistants this dialog knows how to set up, and the ONE place
- * that decides so.
- *
- * This list previously lived twice and disagreed with itself: two hardcoded
- * tabs (Claude Code, Codex) alongside five config-path chips naming a
- * different set of editors, which is how a customer came to notice that the
- * assistants they used were missing. Both surfaces below now read from here.
- *
- * Commands are the ones the docs publish — `claude mcp add` / `codex mcp add`
- * (docs/integration/mcp.mdx). An assistant with no published installer gets a
- * config path instead; inventing a command for symmetry hands the user a line
- * that fails at the one moment they can still read their token.
+ * Centralized coding assistants list (was duplicated and disagreed); both tabs
+ * and config chips read from here. Commands published in docs; others use paths.
  */
 export const CODE_ASSISTANTS: CodeAssistant[] = [
   {

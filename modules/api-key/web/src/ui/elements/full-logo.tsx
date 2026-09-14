@@ -1,14 +1,4 @@
-/**
- * The LangWatch wordmark, as the CLI authorize screen shows it.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/icons/FullLogo.tsx`, which
- * stays for its sixteen other callers. It is a brand mark rather than a feature
- * component, so the RIGHT home is `@langwatch/design-system` — promoting it
- * there is a change to a shared package a page move does not own, and it would
- * not remove the platform copy anyway while the deletes-only ruling forbids
- * repointing those sixteen imports. Recorded so the next person to touch either
- * copy knows there are two, and that they must not drift.
- */
+/** LangWatch wordmark for the CLI authorize screen. Family-local copy; must not drift. */
 
 import { useColorMode } from "@langwatch/design-system/color-mode";
 

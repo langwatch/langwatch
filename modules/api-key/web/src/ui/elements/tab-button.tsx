@@ -1,12 +1,4 @@
-/**
- * One tab in the token dialog's two tab rows.
- *
- * A FAMILY-LOCAL COPY of
- * `platform/app/src/features/onboarding/components/sections/shared/TabButton.tsx`,
- * which stays: two other onboarding surfaces render it and the deletes-only
- * ruling forbids repointing them. Thirty-nine lines of Chakra props with no
- * behaviour, so the copy is the whole component rather than a narrowing.
- */
+/** Tab in the token dialog; family-local copy used by other onboarding surfaces. */
 
 import { Button } from "@chakra-ui/react";
 import type React from "react";

@@ -1,11 +1,6 @@
 /**
- * "Are you sure?" before the legacy project base key is rotated.
- *
- * MOVED, not copied: `platform/app/src/components/settings/RegenerateApiKeyDialog.tsx`
- * had exactly one caller — the API Keys table's rotate control — so it travels
- * whole and the platform file is deleted. The Design System's `Dialog` replaces
- * `~/components/ui/dialog`, the same substitution the revoke dialog next door
- * makes and for the same recorded reason.
+ * Rotation confirmation for legacy project base key. Moved whole from
+ * platform/app (one caller); Design System Dialog replaces ui/dialog.
  */
 
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";

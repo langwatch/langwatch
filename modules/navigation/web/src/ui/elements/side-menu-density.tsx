@@ -1,15 +1,8 @@
 import { createContext, type ReactNode, useContext } from "react";
 
 /**
- * How tight the sidebar menu items are drawn.
- *
- * The current chrome uses "comfortable". The navigation-v2 shells use
- * "compact", which fits page names the wider type truncated, and the
- * two share every menu component, so the size travels in context rather
- * than as a prop through each of them.
- *
- * Specs: specs/navigation/product-sidebars.feature,
- *        specs/navigation/settings-shell-v2.feature
+ * Sidebar item density (comfortable/compact) in context, shared across menu
+ * components. Specs: product-sidebars.feature, settings-shell-v2.feature
  */
 export type SideMenuDensity = "comfortable" | "compact";
 

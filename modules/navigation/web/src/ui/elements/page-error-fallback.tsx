@@ -4,14 +4,8 @@ import { useState } from "react";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 
 /**
- * What a page that threw is replaced with.
- *
- * Moved from `platform/app/src/components/ui/PageErrorFallback.tsx`. Two
- * things did not travel: the PostHog capture, because product analytics is the
- * application's and `platform/app/src/utils/posthogErrorCapture` is one of its
- * modules; and `process.env.NODE_ENV`, which a browser does not have and a
- * governed web package may not name — the host's deployment reading says
- * whether this is a development build.
+ * Error fallback for page throws. PostHog and NODE_ENV don't travel (host
+ * provides deployment reading).
  */
 export function PageErrorFallback({
   error,
