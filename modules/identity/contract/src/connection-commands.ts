@@ -8,20 +8,8 @@ import {
 import { identityActorSchema } from "./vocabulary.ts";
 
 /**
- * The SSO connection commands (ADR-117 §5, D04). Every verb the lifecycle
- * has, and no other way to change a connection: the backoffice, the
- * grandfather migration and D05's self-service all arrive here.
- *
- * Each command carries a caller-minted `commandId` — the caller mints it
- * once, retries reuse it, and each emitted fact's idempotency key is
- * `<commandId>:<index>`, so a retried command dedupes at the event store
- * while a legitimately repeated action never can. The grandfather migration
- * derives its ids from the organization (`grandfather:<orgId>`), which is
- * what makes a second pass cost no event.
- *
- * PII does not ride here at all: a connection is org-level configuration.
- * Secrets do not either — commands carry credential REFERENCES, and the DNS
- * ceremony carries the token's hash, exactly as the facts do.
+ * SSO connection commands (ADR-117 §5, D04): lifecycle verbs with idempotent retries via commandId.
+ * Commands carry credential references, not PII or secrets.
  */
 
 export const REGISTER_CONNECTION_COMMAND_TYPE = "lw.identity.register_connection" as const;
@@ -140,13 +128,7 @@ export const requestVerificationCommandDataSchema = commandDataSchema({
 export type RequestVerificationCommandData = z.infer<typeof requestVerificationCommandDataSchema>;
 
 /**
- * A platform operator attesting a domain (D05 tier 1). Carries the domain and
- * nothing else: no method, because there is only one way to attest, and no
- * token hash, because nothing was published.
- *
- * Who may command it is not a field here — a boolean on the wire saying "I am
- * an operator" would be the caller asserting its own authorization. The guard
- * asks a platform-operator port about `actor` instead.
+ * Domain attestation command (D05 tier 1): carries domain only; authorization checked via port.
  */
 export const attestDomainCommandDataSchema = commandDataSchema(domainShape);
 export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSchema>;
@@ -182,14 +164,7 @@ export const completeTeardownCommandDataSchema = commandDataSchema({});
 export type CompleteTeardownCommandData = z.infer<typeof completeTeardownCommandDataSchema>;
 
 /**
- * What the legacy strings imply, as one command. The whole history —
- * registered, claimed, approved, verified, activated — is stated in a single
- * commit so the facts share one `commandId` and their idempotency keys are
- * `grandfather:<orgId>:0…4`: a second pass re-derives the identical keys and
- * the event store dedupes every one of them.
- *
- * `source` is fixed rather than defaulted here: nothing else may state a
- * grandfathered fact, and nothing grandfathered may be stated any other way.
+ * Grandfather migration command: encodes all history as one with fixed source and idempotent keys.
  */
 export const grandfatherConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,

@@ -1,14 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * "View traces" is only worth offering when the link leads somewhere: the key
- * has a trace destination, that project still exists, and the viewer belongs
- * to a team that holds it. The row action is rendered over the real page so
- * the gate is observed where a customer meets it, not on a helper in
- * isolation.
- *
- * Real component tree, network boundary mocked.
- *
+ * Tests View traces row action gate: destination, project exist, and team holds it.
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen } from "@testing-library/react";

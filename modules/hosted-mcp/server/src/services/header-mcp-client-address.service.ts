@@ -2,23 +2,8 @@ import type { IncomingMessage } from "node:http";
 import { McpClientAddress } from "../app/hosted-mcp-members.ts";
 
 /**
- * The address the endpoint rate-limits a caller by, read from the forwarding
- * headers in priority order.
- *
- * `cf-connecting-ip` first, because it is the header the edge writes itself:
- * Cloudflare replaces any caller-supplied value before the request reaches an
- * origin, so what is bucketed on is edge-authored rather than caller-authored
- * wherever the deployment keeps that edge in front. A deployment that exposes
- * the origin directly is trusting these headers to the same degree as every
- * other rate limit in front of it.
- *
- * The order is here rather than in a composition root because it is the rate
- * limit's own correctness: a bucket keyed on the wrong header charges one
- * caller for another's traffic, which is what the suite beside this asserts
- * does not happen.
- *
- * `unknown` for a request with no address at all, rather than a throw — a rate
- * limiter that failed open on an unidentifiable caller would be no limiter.
+ * Reads forwarding headers in priority order (cf-connecting-ip first as edge-authored).
+ * Returns 'unknown' if no address found, so rate limiter fails safe.
  */
 export class HeaderMcpClientAddressAdapter extends McpClientAddress {
   private static readonly HEADERS = [

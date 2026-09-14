@@ -12,13 +12,7 @@ import {
 } from "../join-request.ts";
 
 /**
- * The fold, as the four endings.
- *
- * The reducer is total and pure, so these run the same function the queue's
- * fold and the replay proof run. What is worth asserting is the shape every
- * ending shares — the deadline is cleared, `resolvedAt` is the fact's business
- * time — and the one thing that distinguishes them, which is who ended it.
- *
+ * Tests fold function for the four endings: clears deadline, sets resolvedAt, differs by actor.
  * Spec: specs/identity/join-requests.feature
  */
 

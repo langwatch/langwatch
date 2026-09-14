@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The key's own page states where its traces land, so that sentence is where
- * the button to go read them belongs. It appears under the same gate as the
- * row action: a destination that exists, is not deleted, and sits on a team
- * the viewer belongs to.
- *
- * Real component tree, network boundary mocked.
- *
+ * Tests View traces button gate: destination must exist, not be deleted, and be on viewer's team.
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen } from "@testing-library/react";

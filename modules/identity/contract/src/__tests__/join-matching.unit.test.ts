@@ -26,14 +26,7 @@ function asked(decision: JoinLookupDecision): readonly JoinOffer[] {
 }
 
 /**
- * The reveal discipline, as a table of refusals.
- *
- * Every test here is really the same assertion from a different angle: an
- * organization a person may not see answers exactly what an organization that
- * does not exist answers. `{ outcome: "none" }` carries no reason field, so
- * the tests cannot check "which nothing" even if somebody wanted to — which
- * is the design, not a limitation of the tests.
- *
+ * Tests reveal discipline: hidden organizations answer the same as non-existent ones.
  * Spec: specs/identity/join-matching-and-privacy.feature
  */
 

@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The virtual-key detail page, on the four things it used to get wrong or
- * leave out: when the key expires, where its traces are, what its routing
- * policy is called, and which providers it may actually reach.
- *
- * Real component tree for the parts under test (the eligible-providers
- * panel resolves for real), network boundary mocked.
- *
+ * Tests virtual-key detail page: key expiry, traces, routing policy, and eligible providers.
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";

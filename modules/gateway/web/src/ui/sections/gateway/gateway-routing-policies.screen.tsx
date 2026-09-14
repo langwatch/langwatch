@@ -20,21 +20,8 @@ import { api } from "../../../behavior/gateway-api.ts";
 import { docsUrl } from "@langwatch/config/docs-url";
 
 /**
- * The routing policy editor opens at the name the registry answers to.
- *
- * IT USED TO KEEP A KEY OF ITS OWN, `?policy=<id>` to edit and `?policy=new`
- * plus the seed to create, and render the editor inline. The reason was real —
- * the drawer registry is application composition a feature-web package may not
- * reach — and the conclusion did not follow: the registry is addressed by a
- * QUERY STRING, which the host already writes. So the screen names the drawer
- * and the host spells `?drawer.open=routingPolicy`, which is what the spec
- * asked for all along ("the address carries the policy, so the same link
- * reopens it", specs/ai-gateway/governance/admin-routing-policies.feature) and
- * what a virtual key's detail page already links to for the policy that key
- * routes through. One editor, one address, whichever page the reader came from.
- *
- * A create is the same drawer with no `policyId` rather than the sentinel the
- * screen's own key needed; the seed rides along as the drawer's own parameters.
+ * Routing policy editor uses drawer registry (drawer.open=routingPolicy), not its own query key.
+ * Spec: specs/ai-gateway/governance/admin-routing-policies.feature
  */
 const ROUTING_POLICY_DRAWER = "routingPolicy" as const;
 
@@ -279,12 +266,6 @@ function NoDefaultNotice({
 }
 
 /**
- * Routing policies are read with `routingPolicies:view` and written with
- * `routingPolicies:manage`, which is what the router asks for and what every
- * sibling Gateway page gates on. The page opens on the read grant; the
- * authoring controls appear only for the write one — the read grant and the
- * section flag are now stated once, in the route table this screen is bound
- * from, and the write grant is still asked here because it hides controls
- * rather than the page.
+ * RBAC: routingPolicies:view opens page, routingPolicies:manage shows authoring controls.
  */
 export default RoutingPoliciesPage;

@@ -9,22 +9,8 @@ import {
 } from "./vocabulary.ts";
 
 /**
- * The identity facts (ADR-101, D01): what an identity event SAYS, without
- * the event-sourcing envelope that carries it. The app's pipeline composes
- * each payload here with its framework `EventSchema` (id, aggregate, tenant,
- * cursor time); the reducer folds the payload plus `occurredAt` and nothing
- * else, which is what lets the same reducer run inside the framework and in
- * a browser tab.
- *
- * Payloads carry ids, enums, timestamps, email domains, HMAC hashes — and
- * the normalized email itself where the fact is about one (the payload
- * rule, ADR-101 §4). Secrets never appear in any fact: protocol values ride
- * only on commands and land through repositories as row-truth on `Account`.
- *
- * Erasure (R11) is the one sanctioned log mutation: it wipes `value` and
- * `identifierHash` out of the user's prior events, which is why both are
- * nullable here — a schema that required them would refuse the user's own
- * erased history on replay. `domain` is an org-level fact and survives.
+ * Identity facts (ADR-101, D01): event payloads with IDs, enums, hashes.
+ * Secrets excluded; value/hash nullable for erasure (R11).
  */
 
 export const IDENTIFIER_ATTACHED_EVENT_TYPE = "lw.identity.identifier_attached" as const;
@@ -66,27 +52,8 @@ export const identifierAttachedPayloadSchema = z.object({
    *  no protocol row backs (the email adopted from `User.email`). */
   providerId: z.string().min(1).nullable(),
   /**
-   * WHO asserted the subject below — the other half of the account key, and
-   * the half that makes the subject mean anything.
-   *
-   * A subject is unique only WITHIN an issuer, so `providerAccountId` alone
-   * names nobody: two enterprise IdPs minting the same `sub` are two
-   * different people. `providerId` has stood in for the issuer until now,
-   * and only because there is currently exactly one connection per
-   * configured provider — a stand-in the projection's own unique index
-   * warns is temporary, because every customer connecting their own IdP
-   * directly breaks it.
-   *
-   * better-auth 1.7 keys an account by `(issuer, accountId)` and hands this
-   * value to the ceremony on the row it is about to write, so the fact
-   * carries what the library itself decided rather than a reconstruction.
-   * For a provider that declares no issuer of its own the library
-   * synthesises one; for a real OIDC connection it is the IdP's, and that is
-   * a fact about the customer's identity we cannot derive from anything
-   * else we hold.
-   *
-   * Null exactly when `providerId` is: an identifier no protocol row backs
-   * has no issuer to name.
+   * Subject issuer (IdP). Paired with accountId to uniquely identify user within that issuer.
+   * Null if no protocol row backs the identifier.
    */
   issuer: z.string().min(1).nullable(),
   /** The provider's own subject for this user - `sub` for OIDC, the
@@ -277,16 +244,8 @@ export function emptyIdentityHeads({ userId }: { userId: string }): IdentityHead
 // ---- commands ------------------------------------------------------------
 
 /**
- * Command inputs (ADR-101, D01). Every command carries a caller-minted
- * `commandId`: the caller mints it once, retries reuse it, and each emitted
- * fact's idempotency key is `<commandId>:<index>` — a retried command dedupes
- * at the event store while a legitimately repeated action never can. The
- * backfill derives its commandIds deterministically from source rows
- * (`backfill:<accountId>`); ceremony paths mint a random KSUID.
- *
- * PII rides here transiently — commands are dispatched and processed, never
- * durably stored — and the RAW identifier value rides only on the command:
- * the guard normalizes it, and only the normalized form ever reaches a fact.
+ * Command inputs (ADR-101, D01): idempotent via caller-minted commandId.
+ * IDs deterministic (backfill) or random (ceremony). PII transient.
  */
 
 export const ATTACH_IDENTIFIER_COMMAND_TYPE = "lw.identity.attach_identifier" as const;
@@ -315,16 +274,8 @@ const commandIdentitySchema = z.object({
 });
 
 /**
- * Every identity command carries the identity block AND the invariant that
- * makes it one history per user: `tenantId === userId`. The emitted fact
- * takes its `tenantId` from the command envelope and its `aggregateId` from
- * `userId` — a caller wiring them differently would persist the event under
- * one tenant's stream and fold it into another user's projection, which
- * nothing downstream can detect. Refused at the wire boundary instead.
- *
- * Exported because `mfa.ts` is the same shape of aggregate — one history per
- * person, the person as the tenant — and the invariant has to hold there for
- * the same reason. Two copies of a refinement is two ways for it to drift.
+ * User-tenanted commands: tenantId must equal userId (one history per user).
+ * Fact's tenantId from envelope, aggregateId from userId; mismatches refused at wire boundary.
  */
 export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(shape: Shape) {
   return commandIdentitySchema.extend(shape).refine(

@@ -1,18 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The virtual-keys table's two data cells that say something a reader
- * could misread:
- *
- *   - ROUTING, whose three modes are a policy name, plain fallback, and
- *     the null glyph for a key that falls back nowhere.
- *   - SPENT THIS MONTH, which carries a period bar under the month total
- *     for keys with a cap of their own. The month figure and the bar are
- *     different measurements, so the bar's accessible label names the
- *     period it is measured over.
- *
- * jsdom does no layout, so the bar's geometry is a browser-QA claim; what
- * is asserted here is which rows get a bar at all and what it says.
+ * Tests ROUTING (policy/fallback/null) and SPENT THIS MONTH bar presence and label.
  */
 import { cleanup, screen, within } from "@testing-library/react";
 

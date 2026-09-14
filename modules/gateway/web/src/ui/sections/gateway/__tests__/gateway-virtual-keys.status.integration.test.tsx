@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * What the status column says, and which keys the Active tab holds.
- *
- * Expiry is a date on an ACTIVE key rather than a status value, so the
- * badge derives it and the stored stops still win. A disabled key used to
- * fall out of both tabs and carry no actions at all, which left the only
- * route to it a link somebody had kept.
- *
+ * Tests status column and Active tab: expiry shows on active keys, disabled keys now have actions.
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";

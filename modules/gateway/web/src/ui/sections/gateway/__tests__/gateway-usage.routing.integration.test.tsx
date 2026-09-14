@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The Usage page's date-range presets and key-filter chip rewrite the query of
- * the page the reader is already on. In `platform/app` they said that with
- * `router.push({ pathname: router.pathname, query })`, and the bug these cases
- * were written for was the compat router resolving that pathname through the
- * /settings wildcard and bouncing the browser to the bare settings root.
- *
- * The screen now writes through the host's route capability, which replaces the
- * query and cannot move the path at all — so what these assert is the same
- * guarantee, read off what the screen wrote: the query it asked for, and no
- * navigation.
+ * Tests that query changes (date ranges, key filters) don't move the path or navigate.
  */
 import { cleanup, screen } from "@testing-library/react";
 

@@ -45,13 +45,8 @@ export function identifierStateSatisfies(
 }
 
 /**
- * The D01 exit gate: the fold-built rows against what the live rows imply,
- * in both directions. Forward: every expected identifier is present in its
- * expected state with its expected value. Backward: any LIVE row nothing
- * implies (say, the stale VERIFIED identifier of an email the user has
- * since changed — accountId null, so never orphan-detachable) is a
- * `surplus_row` diff, because such a row keeps blocking its value for every
- * other user; DETACHED and DEAD_END surpluses are inert tombstones and fine.
+ * D01 exit gate: compares fold-built rows against live rows in both directions.
+ * Surplus rows (not implied by expected state) block values for other users.
  */
 export function backfillParityDiffs({
   rows,

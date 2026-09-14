@@ -1,10 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The Usage page's "View all traces" button: offered only while one key is
- * in focus and its traces can actually be opened, and carrying the period
- * the reader is looking at rather than a default one.
- *
+ * View all traces button appears only when a key is in focus and carries the selected period.
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen } from "@testing-library/react";

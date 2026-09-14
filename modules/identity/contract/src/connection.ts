@@ -3,43 +3,19 @@ import type { RoutableConnection } from "./signin-routing.ts";
 import { identityActorSchema } from "./vocabulary.ts";
 
 /**
- * The SSO connection vocabulary (ADR-117 §5, D04): what a connection is, the
- * lifecycle it moves through, what each of its events SAYS, and the pure
- * reducer that folds them into one connection's state.
- *
- * Isomorphic like the rest of this package — no Prisma, no env, no framework,
- * no clock. The guards that decide whether a command may state a fact are
- * `@langwatch/identity-server`; the envelope that carries a fact into the
- * event log is the app's pipeline.
- *
- * The payload rule is ADR-101 §4's, unchanged: ids, domains, enums, hashes.
- * An IdP client secret never appears in a fact — the projection holds a
- * `secretRef` and the events carry the reference. The DNS ceremony carries
- * the verification token's HASH; the token itself is shown to the operator
- * once and never recorded.
+ * SSO connection vocabulary (ADR-117 §5, D04): states, events, and pure reducer.
+ * Isomorphic; secrets carried as refs, not values.
  */
 
 /**
- * The protocol a connection speaks. The aggregate is deliberately
- * protocol-agnostic: `idpMetadata` carries either shape, and which engine
- * actually terminates SAML is ADR-117 §5's named debt, due at D05's
- * onboarding. Nothing here needs that answer.
+ * Protocol field: aggregate is protocol-agnostic. SAML engine is named debt for D05 (ADR-117).
  */
 export const SSO_CONNECTION_TYPES = ["oidc", "saml"] as const;
 export const ssoConnectionTypeSchema = z.enum(SSO_CONNECTION_TYPES);
 export type SsoConnectionType = z.infer<typeof ssoConnectionTypeSchema>;
 
 /**
- * The lifecycle (ADR-117 §5):
- *
- *   DRAFT → CLAIMED → APPROVED → VERIFICATION_PENDING → VERIFIED → ACTIVE
- *             │  └→ REJECTED (re-claimable)              ACTIVE ⇄ SUSPENDED
- *             └→ DISCARDED           ACTIVE|SUSPENDED → TEARDOWN_PENDING
- *                                              └→ TORN_DOWN (grace elapsed)
- *
- * REJECTED is not terminal: the note is recorded and the domain may be
- * claimed again, which is what makes an ops mistake recoverable without a
- * second connection. DISCARDED and TORN_DOWN are.
+ * Connection lifecycle: REJECTED re-claimable; DISCARDED, TORN_DOWN terminal (ADR-117 §5).
  */
 export const SSO_CONNECTION_STATES = [
   "DRAFT",
@@ -58,21 +34,7 @@ export const ssoConnectionStateSchema = z.enum(SSO_CONNECTION_STATES);
 export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionStateSchema>;
 
 /**
- * How a domain claim is proved. Self-hosted installations that cannot
- * publish a TXT record prove ownership with their license token instead.
- *
- * `operator-attested` is the D05 amendment: a LangWatch operator states out
- * of band that the domain is that organization's, which replaces the PROOF
- * and never the approval. It publishes nothing, so it carries no token and
- * is not a two-step ceremony — which is why it is absent from
- * `SSO_VERIFICATION_CEREMONY_METHODS` below and has a verb of its own.
- *
- * `legacy-configuration` is not a ceremony and cannot be requested: it is
- * what the grandfather migration states for a domain that was already
- * serving production sign-ins through `Organization.ssoDomain` before
- * connections existed. The proof is that history, and re-running a DNS
- * ceremony against a domain the platform has been routing for years would
- * be theater. The ceremony commands accept the first two only.
+ * Verification methods: DNS TXT, license token, operator-attested (D05), legacy (grandfather).
  */
 export const SSO_VERIFICATION_METHODS = [
   "dns-txt",
@@ -206,16 +168,7 @@ export const verificationRequestedPayloadSchema = z.object({
 });
 
 /**
- * A LangWatch operator stating out of band that a domain is that
- * organization's (D05 amendment). Its OWN fact rather than a
- * `verification_requested` carrying a nullable `tokenHash`, because there is
- * no token: an attestation publishes nothing, so nothing was ever shown to
- * anybody to hash. A nullable hash would also make a `dns-txt` request
- * without a proof structurally representable, moving an invariant the schema
- * enforces today onto a runtime check.
- *
- * It is also one step rather than two — APPROVED straight to VERIFIED —
- * because there is nothing to wait for between them.
+ * Domain attestation (D05 amendment): out of band, no token. Goes APPROVED→VERIFIED in one step.
  */
 export const domainAttestedPayloadSchema = z.object({
   connectionId: z.string().min(1),
@@ -571,15 +524,8 @@ export function routingStateOf(state: SsoConnectionLifecycleState): RoutableConn
 }
 
 /**
- * What the routing comparison actually judges.
- *
- * Deliberately NOT the connection id: the legacy port answers `org:<id>` and
- * the projection answers a real `ssoc_…`, so comparing ids would report a
- * mismatch for every organization on earth while the sign-in they produce is
- * identical. What matters to a person signing in is whether a door opens,
- * which one, and whether it takes them: the method dialed, the routing state,
- * whether the deployment actually mounted it, and whether an unknown subject
- * gets provisioned.
+ * Routing comparison: method, state, deployment, provisioning.
+ * Ignores connection ID (legacy and projection formats differ).
  */
 export interface ConnectionRoutingFacts {
   routes: boolean;

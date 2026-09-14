@@ -1,24 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * `/gateway/routing-policies` is reached from the Gateway section navigation,
- * which is offered on `virtualKeys:view`. Its router reads on
- * `routingPolicies:view` and writes on `routingPolicies:manage`, the same
- * split every sibling Gateway page gates on, but the page guard used to ask
- * for `organization:manage` - so a team member holding `routingPolicies:view`
- * was offered the menu entry and refused the page.
- *
- * The page now opens on the read grant and the authoring controls appear only
- * for the write one. WHICH GRANT OPENS THE PAGE AT ALL IS NO LONGER THE
- * SCREEN'S: the route table states it and `withUiPageGuard` enforces it, so
- * the refusal half of this rule is pinned in `apps/ui/tests/gateway-routes.unit.test.ts`
- * and what is left here is what the page itself decides — that a reader with
- * only the read grant sees every policy and none of the authoring controls.
- *
- * Only the tRPC client and the section layout are faked; permissions run
- * through the authz contract's own hierarchy rule, so a case cannot pass here
- * by disagreeing with the rule the server applies.
- *
+ * Readers with read-only grant see all policies but no authoring controls.
  * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
 import { cleanup, screen } from "@testing-library/react";
