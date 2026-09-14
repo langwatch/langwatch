@@ -77,14 +77,8 @@ export type PostgresAuthzAdapterOptions = {
   redis: AuthzEpochRedis | null;
   dispatcher: AuthzGrantsCommandDispatcher;
   /**
-   * Where the two AuthZ counters go, on a process that renders any.
-   *
-   * Optional, and that is the whole point of the port: the counters are
-   * operational rather than load-bearing, so a process with no metric registry
-   * composes the same graph and counts nothing. What is NOT optional is the
-   * behaviour behind them — the cutover warning still logs and the revocation
-   * still records — because both are built here from this one input rather
-   * than handed in ready-made.
+   * Operational metrics; optional so non-scrape processes count nothing.
+   * Behavior (cutover warning, revocation record) always built here.
    */
   metrics?: AuthzMetrics;
   newBindingId: () => string;

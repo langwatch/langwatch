@@ -1,12 +1,6 @@
 /**
- * The grant writer's per-organization fork (ADR-092 decision 4), legacy side.
- *
- * An organization whose genesis import has not landed keeps the imperative
- * writes this module replaced — including the audit rows the call sites used
- * to write — and emits nothing, so the deploy is inert until the flip. The
- * ledger side lives in `ledger-write-fork.ledger.unit.test.ts`.
- *
- * @see specs/migration/authz-grants-rollout.feature
+ * Legacy path: organization without genesis import keeps imperative writes;
+ * emits nothing until the flip (ADR-092 decision 4).
  */
 import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";

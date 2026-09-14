@@ -117,22 +117,8 @@ export class AuthzApp implements AuthzApi {
   }
 
   /**
-   * Builds the AuthZ graph over the two members this process opened.
-   *
-   * The dispatcher is constructed here and connected later, by the eventing
-   * declaration, because the senders it needs come from REGISTERING the
-   * pipeline this call produces. That order is not an accident of wiring: the
-   * composition deleted by b383462d96 did the same two steps, and said why —
-   * "the ledger's write path opens here and nowhere else: until `connect`
-   * runs, a grant change waits for the senders and then refuses with a
-   * ledger-unavailable error rather than silently taking the imperative Prisma
-   * path."
-   *
-   * `metrics` is deliberately not supplied. It is optional by design so that a
-   * process rendering no scrape endpoint composes the same graph and counts
-   * nothing; the cutover warning still logs and the revocation is still
-   * recorded, because the feature builds both from this input rather than
-   * receiving them ready-made.
+   * Build AuthZ graph; dispatcher constructed here, connected by eventing
+   * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
   static create(setup: AuthzSetup): AuthzApp {
     const dispatcher = EventingAuthzCommandDispatcherAdapter.create();

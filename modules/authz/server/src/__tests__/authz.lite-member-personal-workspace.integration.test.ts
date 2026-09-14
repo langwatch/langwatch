@@ -1,6 +1,8 @@
+/** @vitest-environment node */
+
 /**
- * @vitest-environment node
- * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
+ * Lite-member personal workspace: verify governance policies in isolation
+ * (personal-workspace-integrity.feature).
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
