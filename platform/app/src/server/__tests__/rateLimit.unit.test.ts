@@ -7,6 +7,12 @@ const { tryGetAppMock } = vi.hoisted(() => ({
 vi.mock("../app-layer/app", () => ({ tryGetApp: tryGetAppMock }));
 
 import { _resetMemoryRateLimitStore, rateLimit } from "../rateLimit";
+import { rateLimitExceededTotal } from "../rateLimit.metrics";
+
+async function exceededCount(scope: string): Promise<number> {
+  const metric = await rateLimitExceededTotal.get();
+  return metric.values.find((v) => v.labels.scope === scope)?.value ?? 0;
+}
 
 describe("rateLimit (in-memory fallback)", () => {
   beforeEach(() => {
@@ -14,6 +20,7 @@ describe("rateLimit (in-memory fallback)", () => {
     tryGetAppMock.mockReset();
     tryGetAppMock.mockReturnValue(undefined);
     _resetMemoryRateLimitStore();
+    rateLimitExceededTotal.reset();
   });
 
   describe("when called within a single window", () => {
@@ -175,6 +182,57 @@ describe("rateLimit (in-memory fallback)", () => {
         allowed: false,
         remaining: 0,
         resetAt: 61_000,
+      });
+    });
+  });
+
+  describe("rate_limit_exceeded_total metric", () => {
+    describe("when a call is allowed", () => {
+      /** @scenario "An allowed call leaves the counter unmoved" */
+      it("does not move the counter", async () => {
+        await rateLimit({
+          key: "auth.route:metric-allowed",
+          windowSeconds: 60,
+          max: 3,
+        });
+
+        expect(await exceededCount("auth.route")).toBe(0);
+      });
+    });
+
+    describe("when a call is denied", () => {
+      /** @scenario "A denied call increments the counter for its scope" */
+      it("increments the counter, labelled by the scope before the first ':'", async () => {
+        const opts = {
+          key: "auth.route:metric-denied",
+          windowSeconds: 60,
+          max: 1,
+        };
+        await rateLimit(opts);
+        const denied = await rateLimit(opts);
+
+        expect(denied.allowed).toBe(false);
+        expect(await exceededCount("auth.route")).toBe(1);
+      });
+    });
+
+    describe("when the Redis path denies the call", () => {
+      /** @scenario "The Redis-backed path counts denials the same way as the in-memory path" */
+      it("increments the counter the same way as the in-memory path", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(1_000);
+        const incr = vi.fn().mockResolvedValue(2);
+        const expire = vi.fn().mockResolvedValue(1);
+        const ttl = vi.fn().mockResolvedValue(60);
+        tryGetAppMock.mockReturnValue({ redis: { incr, expire, ttl } });
+
+        const result = await rateLimit({
+          key: "auth.redis-route:metric-denied",
+          windowSeconds: 60,
+          max: 1,
+        });
+
+        expect(result.allowed).toBe(false);
+        expect(await exceededCount("auth.redis-route")).toBe(1);
       });
     });
   });

@@ -1,4 +1,5 @@
 import { tryGetApp } from "./app-layer/app";
+import { rateLimitExceededTotal } from "./rateLimit.metrics";
 
 /**
  * Per-key sliding-window rate limiter. Uses Redis when available
@@ -28,6 +29,18 @@ interface MemoryEntry {
 }
 
 const memoryStore = new Map<string, MemoryEntry>();
+
+/** The calling scope out of a `scope:addr:hash`-shaped key, for the metric's
+ *  low-cardinality label — never the address or hash that follows it. */
+function scopeOf(key: string): string {
+  const i = key.indexOf(":");
+  return i === -1 ? key : key.slice(0, i);
+}
+
+/** Records a denial on the operational counter; a no-op when allowed. */
+function noteExceeded(key: string, allowed: boolean): void {
+  if (!allowed) rateLimitExceededTotal.labels(scopeOf(key)).inc();
+}
 
 /**
  * Opportunistic garbage collection for the in-memory store. The naive
@@ -66,8 +79,10 @@ export async function rateLimit(opts: {
       }
       const ttl = await redisConnection.ttl(redisKey);
       const resetAt = now + (ttl > 0 ? ttl : windowSeconds) * 1000;
+      const allowed = count <= max;
+      noteExceeded(key, allowed);
       return {
-        allowed: count <= max,
+        allowed,
         remaining: Math.max(0, max - count),
         resetAt,
       };
@@ -83,15 +98,19 @@ export async function rateLimit(opts: {
   const existing = memoryStore.get(key);
   if (!existing || existing.expiresAt <= now) {
     memoryStore.set(key, { count: 1, expiresAt: now + windowSeconds * 1000 });
+    const allowed = 1 <= max;
+    noteExceeded(key, allowed);
     return {
-      allowed: 1 <= max,
+      allowed,
       remaining: max - 1,
       resetAt: now + windowSeconds * 1000,
     };
   }
   existing.count += 1;
+  const allowed = existing.count <= max;
+  noteExceeded(key, allowed);
   return {
-    allowed: existing.count <= max,
+    allowed,
     remaining: Math.max(0, max - existing.count),
     resetAt: existing.expiresAt,
   };
