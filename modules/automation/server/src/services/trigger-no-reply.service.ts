@@ -1,34 +1,8 @@
 import { createHmac } from "node:crypto";
 
 /**
- * The `To:` address every automation email is sent to.
- *
- * The real recipients ride in BCC, and this hashed no-reply is the only string
- * interpolated into the To header. That buys three things at once:
- *
- *   1. Recipient privacy. With several addresses in To or Cc every receiver
- *      sees the rest of the list, and that list is the customer's internal
- *      business.
- *   2. Reply-all containment. A reply to a no-reply address goes to a bounce
- *      handler instead of fanning out to everyone on the original.
- *   3. Header-injection blast radius. The recipient list is free-form JSON;
- *      moving it off the To header means the header is built entirely from
- *      values we control.
- *
- * The local part carries a short HMAC of the automation id, salted with the
- * injected signing key, so the address is stable per automation (useful for
- * bounce attribution) and best-effort unguessable.
- *
- * Unlike the unsubscribe token, an absent key DEGRADES rather than refuses.
- * This tag carries no authority — recipients are in BCC, the To header is a
- * public no-reply, and a forged tag grants nothing — so an empty key costs the
- * unguessability property and nothing else. Blocking every automation email
- * over it would be the larger harm; the caller is told instead, by warning.
- *
- * The application's copy is `platform/app/src/server/mailer/triggerNoReply.ts`
- * and stays frozen while both exist. The address is stable per automation, so
- * a bounce processor keyed on the hash reads mail from either process the same
- * way only while the two agree.
+ * No-reply To: address using BCC for recipients: protects privacy, prevents
+ * reply-all spam, and prevents header injection via HMAC-hashed local part.
  */
 
 /** Bytes of HMAC in the local part, rendered as twice as many hex characters. */

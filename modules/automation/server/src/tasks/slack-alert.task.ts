@@ -2,7 +2,9 @@ import { Task } from "@langwatch/task";
 import { SlackWebhookClientAdapter } from "#channels/slack/slack.webhook-client.channel";
 import { SlackWebhookDeliveryAdapter } from "#channels/slack/slack.webhook-delivery.channel";
 
-/** Manual smoke test of the automation delivery path: one sample alert to the webhook URL given as the first argument. */
+/** Manual smoke test of the automation delivery path: sends one sample alert to the webhook URL
+ * given as the first argument.
+ */
 export class SlackAlertTask extends Task {
   readonly name = "slack-alert";
   readonly description = "Sends one fixed sample alert to a Slack incoming-webhook URL.";

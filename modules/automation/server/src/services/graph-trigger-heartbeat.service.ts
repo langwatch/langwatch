@@ -1,26 +1,6 @@
 /**
- * ADR-034 Phase 5 — heartbeat sweep for custom-graph threshold alerts,
- * driven by the graphAlertSweep process every 30 seconds (ADR-052 §4; the
- * locked Phase 5 cadence). Every sweep:
- *
- *   1. For each project with graph triggers, load (a) active triggers
- *      whose operator/threshold combination matches `isNoDataPredicate`,
- *      plus (b) active triggers with at least one unresolved `TriggerSent`
- *      row. Union = candidates.
- *   2. Pre-filter (LOCKED by the Phase 5 spec): one batched
- *      `max(OccurredAt)` query against the slim `trace_analytics`
- *      table per project per sweep — bounded by `max(windowMs)` across
- *      that project's candidates. For each candidate, if the project's
- *      most recent qualifying event is older than the candidate's own
- *      window (or NULL), evaluate. If it is recent enough, the
- *      real-time subscriber is already handling that trigger, so skip.
- *   3. Return one candidate per surviving trigger; the sweep intent
- *      handler runs each through the shared `evaluateGraphTrigger`.
- *
- * The sweep does NOT evaluate every active trigger every tick — only the
- * absence cases the event-driven path cannot reach. The shared evaluator
- * picks the actual `fired` / `resolved` / `not_breached` outcome from the
- * analytics data.
+ * Heartbeat sweep for custom-graph threshold alerts per ADR-034 Phase 5: pre-filters
+ * by data window and evaluates survivors that event-driven path cannot reach.
  */
 
 import { isNoDataPredicate, type GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
@@ -173,15 +153,8 @@ export class GraphTriggerHeartbeatService {
   }
 
   /**
-   * Per-project, per-source pre-filter — ONE batched slim query per
-   * (project, source) per sweep (at most two per project: `trace_analytics`
-   * and `evaluation_analytics`). If the project's recent qualifying activity
-   * for a trigger's source is fresher than that trigger's window, the
-   * real-time path is already handling it and the candidate is skipped.
-   *
-   * Throws on an unreadable project; `decideGraphTriggerHeartbeat` isolates
-   * that so the remaining projects still get their absence/resolve
-   * evaluations.
+   * One pre-filter query per (project, source) per sweep; skips if recent
+   * activity is fresher than trigger window (real-time path already active).
    */
   private async collectCandidatesForProject({
     deps,

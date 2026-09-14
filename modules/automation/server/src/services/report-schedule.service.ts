@@ -72,14 +72,8 @@ export class ReportScheduleService {
   }
 
   /**
-   * Create the schedule row of every active report that has none.
-   *
-   * A report's `Trigger` row and its `ScheduledJob` are two writes, and a
-   * process that made the first and not the second leaves an active report
-   * that never comes due — silence a customer reads as "the report is
-   * running". Repairing at boot is what closes that window without a
-   * distributed transaction: the sweep is create-if-missing and therefore
-   * race-safe across every worker that runs it.
+   * Create schedule row for each active report missing one using create-if-missing,
+   * race-safe across workers without distributed transactions.
    */
   async reconcile(): Promise<{ repaired: number }> {
     const reports = await this.triggers.findActiveReportTargets();

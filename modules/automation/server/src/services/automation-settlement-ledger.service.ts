@@ -21,14 +21,8 @@ import {
 } from "./persist-cap.service.ts";
 
 /**
- * The ten settlement reads and writes, over repository interfaces and one Redis.
- *
- * The trigger catalogue goes through {@link ActiveTriggerCacheService} rather
- * than straight to the repository, and it must: two caches over the one table
- * would give one process two different ideas of which automations are live, so
- * a settled match could be confirmed against an automation the graph half had
- * already seen deleted. One minute of staleness is inherited, not introduced —
- * it was already true of every pod in a multi-pod deployment.
+ * Settlement reads/writes must use {@link ActiveTriggerCacheService} to prevent
+ * duplicate caches from giving different answers about live automations.
  */
 export class AutomationSettlementLedgerService extends AutomationSettlementLedger {
   static create(input: {

@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The condition builder is the friendly front-end over the trace query string.
- * These tests pin the two things that matter: an existing query renders as
- * editable rows, and editing a row emits the updated query string (so the
- * builder and the Code editor stay one source of truth). Chakra Select menus
- * don't open reliably in jsdom, so interactions go through the plain inputs.
+ * Condition builder tests: verify rendering and editing updates; uses plain inputs
+ * (Chakra Select menus unreliable in jsdom).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

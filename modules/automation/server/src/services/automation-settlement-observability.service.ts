@@ -10,14 +10,8 @@ export abstract class AutomationSettlementObservability {
 }
 
 /**
- * The overflow series, pushed over OTLP, with error capture delegated.
- *
- * The counter was declared in the platform application's `server/metrics.ts`
- * while that process supplied this collaborator. It lives beside the
- * interface now. `capture` stays the caller's, because where an error goes is
- * a fact of the process rather than of settlement — `apps/worker` logs it
- * today (`LoggedSettlementObservability`), and that composition can adopt
- * this service by passing its existing capture through.
+ * OTLP overflow metric with error capture delegated, since error handling is
+ * process-specific (e.g., app logs vs. worker logging strategy).
  */
 export class OtelAutomationSettlementObservabilityAdapter extends AutomationSettlementObservability {
   static create(options: {

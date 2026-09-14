@@ -6,26 +6,8 @@ import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 const ACTIVE_CACHE_TTL_MS = 60_000;
 
 /**
- * One project's active automations, split the two ways the pipelines ask for
- * them, held for a minute.
- *
- * The read is on the hot path twice over: every trace that lands asks whether
- * this project has trace automations, and every trace that lands asks again
- * whether it has graph ones. Without the window that is two queries per span
- * batch per project.
- *
- * A minute of staleness is the deliberate cost. A newly saved automation may
- * not fire for up to a minute in a process that has already read the project;
- * the writer calls `invalidate` so its OWN process sees the change at once,
- * and every other process in the fleet waits out its window. That was already
- * true of a multi-pod deployment and is why the window is short enough to be
- * unremarkable and long enough to matter.
- *
- * It lives here rather than inside the service that used to hold it because
- * two callers now need the same answer with the same window: the full
- * `AutomationService`, and the graph-only activity adapter a background process
- * composes. Two caches over one table would give one process two different
- * ideas of which automations are live.
+ * Cache one project's active automations for 1 min: the read is on the hot path
+ * twice per trace, and staleness is the deliberate cost of avoiding queries.
  */
 export class ActiveTriggerCacheService {
   private readonly entries = new Map<string, { expires: number; value: TriggerSummary[] }>();

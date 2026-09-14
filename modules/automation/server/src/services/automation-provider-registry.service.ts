@@ -1,19 +1,6 @@
 /**
- * Every automation channel's at-rest secret handling, in one registry.
- *
- * A channel owns the lifecycle of its own `actionParams`: how a wire payload
- * becomes a stored row — secrets encrypted, "keep what is there" sentinels
- * resolved — and how a stored row is stripped before it goes back to a
- * browser. Channels with no secrets have neither hook, and the registry
- * applies the identity for them.
- *
- * The one thing this service cannot own is the cipher: the encryption key is
- * the deployment's, shared with every other vertical that stores a
- * credential, and a second key here would decrypt to noise. It arrives as
- * {@link AutomationSecretCrypto}.
- *
- * Moved out of the platform application, where the same five modules were
- * bound to that application's own `encrypt`/`decrypt` pair.
+ * Secret registry for all automation channels using the deployment's shared
+ * cipher; each channel defines encryption/decryption for its own params.
  */
 import {
   annotationQueueProvider as annotationQueueShared,

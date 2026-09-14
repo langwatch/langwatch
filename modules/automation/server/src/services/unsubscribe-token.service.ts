@@ -11,42 +11,8 @@ export abstract class UnsubscribeTokenVerifier {
 }
 
 /**
- * The signed unsubscribe token (ADR-031), as both halves of one format.
- *
- * Every automation email carries a per-recipient footer link whose token
- * encodes `{projectId, triggerId, email}` and an HMAC over those fields. The
- * public `/unsubscribe` route verifies it without a login, so the token IS the
- * authorization: it cannot be altered to unsubscribe a different address (the
- * HMAC covers the email) and it cannot be forged without the key.
- *
- * ## Why it is here and not in the process that sends
- *
- * It is a WIRE FORMAT, not a utility, and the two ends are different
- * processes. A link minted by a background worker's mail is verified by the
- * application's route, months later, out of somebody's inbox. Signing and
- * verifying therefore live in one module in the feature that owns the
- * semantics, exactly as the stored-secret cipher does
- * (`AesGcmSecretEncryptionAdapter`), rather than once per composition root.
- *
- * The application keeps its own copy at
- * `platform/app/src/server/mailer/unsubscribeToken.ts`. Neither description is
- * free to drift while both exist: this suite pins the recorded bytes of a
- * token the other module signed.
- *
- * ## Where the key comes from
- *
- * Nowhere in here. Each process reads its own environment and hands the key
- * in, which is what makes the empty-key refusal exercisable without mutating a
- * process. The application reads `NEXTAUTH_SECRET`; so does the worker's
- * projection, spelling for spelling.
- *
- * decide(ADR-031): tokens carry no expiry and no version field, so they are
- * replayable forever and cannot be rotated without invalidating every footer
- * link already in inboxes. This is intentional. The blast radius of a leaked
- * token is bounded to the single HMAC-bound recipient address it encodes —
- * replaying it only (re-)suppresses that recipient's own mail, which they
- * could do from the footer anyway. Rotating the signing key invalidates all
- * tokens at once, which is the deliberate kill switch.
+ * Signed unsubscribe token wire format (ADR-031) shared between worker and app:
+ * HMAC protects against forgery and alteration of projectId/triggerId/email.
  */
 export class UnsubscribeTokenService {
   static create(input: {

@@ -1,23 +1,8 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
 /**
- * The three containment series, and a sink that records nothing.
- *
- * `AutomationRunaway` mixes members the policy needs (email,
- * leases, project reads) with three pure observations. Only the observations
- * are declared here, so a composition root can delegate `onCeilingBreach`,
- * `onAutoPaused` and `onContainmentFailed` to this sink without the sink
- * having to satisfy the whole port.
- *
- * They were declared in the platform application's `server/metrics.ts` while
- * that process owned the wiring. That process is gone, so they live beside
- * the port whose methods increment them. Nothing composes the OTLP sink yet:
- * `apps/api` logs the three events (`UncontainedApiAutomationRunaway`) and
- * `apps/worker` composes no containment at all, so the default in force is
- * `NoopAutomationRunawayMetrics` and the series are unpublished. That is a
- * wiring decision in each root, not a code move — and unpublished is the
- * honest state, because a panel that is flat because nothing writes the
- * metric reads exactly like an automation fleet that never breached.
+ * Three containment observations isolated so composition can use them without
+ * satisfying the whole `AutomationRunaway` port; wiring per-root decides OTLP.
  */
 export abstract class AutomationRunawayMetricsSink {
   abstract onCeilingBreach(): void;

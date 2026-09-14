@@ -1,24 +1,6 @@
 /**
- * The automations family, as the browser application mounts it.
- *
- * ADR-004 makes a screen an owner-only export named after the frontend feature
- * that composes it, so the whole family is one entry. What it exposes is a
- * loader rather than a component, because the screen drags Monaco, the Liquid
- * templating module and five delivery providers behind it and none of that
- * belongs in the chunk that renders the rest of the application.
- *
- * ONE SCREEN, FIVE ADDRESSES. `/:project/automations` and its four tab URLs are
- * the same module — they always were, and `platform/app`'s loader registry said
- * so by pointing five keys at one import. The map from a page key to this
- * loader is `apps/ui`'s to make, and so is which of the four tabs a key shows:
- * the screen takes it as a prop rather than matching the pathname, which is a
- * screen reading the address to learn what the route table already knew. The
- * tab names travel with the loader so the mapping can be written in the
- * package's own vocabulary.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is two things: the tRPC
- * Provider this package's hooks run on, and the host port that answers for the
- * session, the scope, the address, the deployment's own URL and the toasts.
+ * Automations family: lazy-loaded screen (Monaco, Liquid templating) with
+ * five-URL mapping managed by host package per ADR-004 owner-only exports.
  */
 
 import type { ComponentType } from "react";
@@ -48,15 +30,8 @@ export {
 } from "./model/automation-host.ts";
 
 /**
- * The unsubscribe landing, `/unsubscribe`.
- *
- * It shares nothing with the automations family but the transport — no session,
- * no scope, no host, no chrome — and it takes its token as a prop, so it keeps
- * its own loader type. It rides this entry because a screen export is named
- * after the frontend feature that composes it, and that feature is
- * `automations`. There is NO host port and NO page guard: the token is the
- * authorization (ADR-031), so a guard would refuse the only person the link was
- * minted for.
+ * Unsubscribe landing page: token-only authorization per ADR-031, no session/
+ * scope/host/chrome/page-guard (token is the only authorization needed).
  */
 export type UnsubscribeScreenLoader = () => Promise<{
   default: ComponentType<{ token: string }>;

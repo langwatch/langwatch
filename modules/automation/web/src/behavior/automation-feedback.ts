@@ -1,25 +1,6 @@
 /**
- * How an automations surface tells the reader how an action turned out.
- *
- * `~/components/ui/toaster` and `~/features/errors`'s `showErrorToast` /
- * `describeError` are application singletons a feature-web package may not
- * reach, so the names the screen already calls are re-bound to the host port.
- * The call SHAPES are carried over unchanged on purpose —
- * `toaster.create({ title, type })`, `showErrorToast({ error, fallbackTitle })`
- * and `describeError({ error, fallbackTitle })` — so the move touches the lines
- * that acquire them and none of the call sites that use them.
- *
- * WHAT DOES NOT COME WITH THEM, and is a later slice: the code-keyed
- * presentation registry. `apps/ui` resolves a handful of codes and falls back
- * to the action name plus the generic line; the full registry, its tips, its
- * docs links and its global-handler dedup still live in `platform/app`.
- *
- * `explainAnyError` does not travel at all. The authoring drawer used it to
- * decide whether a code carried registered copy, so a test-fire attempt could
- * be logged with the same words the toast said. A screen cannot ask the host
- * that question without the registry, so the attempt log takes the same
- * one-line description the toast would show, which is the property the log was
- * after — recorded in `dev/docs/plans/ui-family-move-manifests.md`.
+ * Re-bind application error/toaster functions via host port with unchanged
+ * call shapes; feature packages cannot reach app singletons directly.
  */
 
 import { useCallback, useMemo } from "react";

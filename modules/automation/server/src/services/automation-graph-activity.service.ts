@@ -26,13 +26,8 @@ import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 
 /**
- * The graph-alert vertical, composed from repository interfaces and ports.
- *
- * The whole path behind the two questions Trace's real-time subscriber asks:
- * read the project's graph automations, re-evaluate one, and — when it fires —
- * render its template and hand the result to whichever channel the author
- * chose. Deliberately NOT here: the heartbeat sweep and persist-cap breach
- * containment, which need collaborators this path never reaches.
+ * Graph-alert dispatch: re-evaluate automations and send notifications via chosen
+ * channels. Deliberately excludes heartbeat sweep and persistence-cap containment.
  */
 export class AutomationGraphActivityService implements AutomationGraphActivity {
   static create(input: {
