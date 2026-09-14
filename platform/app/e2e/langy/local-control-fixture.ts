@@ -27,6 +27,7 @@ import {
   promises as fs,
   openSync,
   readFileSync,
+  realpathSync,
 } from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
@@ -798,9 +799,30 @@ export async function createFixtureFolder({
 function supportedPython(): string {
   for (const name of ["python3.13", "python3.12", "python3"]) {
     const found = spawnSync("which", [name], { encoding: "utf8" });
-    if (found.status === 0 && found.stdout.trim()) return found.stdout.trim();
+    if (found.status === 0 && found.stdout.trim()) {
+      return realPython(found.stdout.trim());
+    }
   }
   return "python3";
+}
+
+/**
+ * The interpreter behind whatever `which` answered.
+ *
+ * A uv-installed Python is reached through a symlink in `~/.local/bin`, and
+ * `venv` writes the directory of the interpreter it was invoked as into
+ * `pyvenv.cfg` as `home`. Invoked through the symlink that is `~/.local/bin`,
+ * which holds no `lib/pythonX.Y`, so the environment it builds starts with
+ * `Fatal Python error: Failed to import encodings module` and every scenario
+ * that needs one fails in setup on a machine where the interpreter itself is
+ * fine. Resolving the link first puts the real install's `bin` in `home`.
+ */
+function realPython(candidate: string): string {
+  try {
+    return realpathSync(candidate);
+  } catch {
+    return candidate;
+  }
 }
 
 /** A Python interpreter of a scenario's own, and the ways it uses one. */
